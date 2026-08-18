@@ -28,17 +28,18 @@ Enforced by `.github/workflows/ci.yml`, triggered on push/PR against `master`, f
 - `ci-passed` — depends on all five jobs above (`needs:`), `if: always()`, fails if any of them didn't succeed. Exists purely so GitHub branch protection has **one** status check to require instead of five — requiring each job by name individually breaks silently the moment any one of them is renamed (branch protection keeps waiting for the old name forever, with no obvious reason why a PR won't merge). Runs in parallel with nothing to wait on itself, so it costs no extra wall-clock time.
 - No direct commits to `master` — every change goes through a PR, even solo; enforced via GitHub branch protection requiring the `ci-passed` check (a repo setting, not something the workflow file itself can guarantee).
 
-## 4a. SonarCloud Quality Gate — added 2026-08-17, requires one-time manual setup before it's live
+## 4a. SonarCloud Quality Gate — added 2026-08-17, setup complete as of 2026-08-18
 
 The `sonarcloud` job runs `mvn verify` plus the Sonar Maven plugin in one pass, uploading JaCoCo coverage (`pom.xml`/`app/pom.xml` — `jacoco-maven-plugin`) alongside the static analysis. `sonar.qualitygate.wait=true` makes the CI job itself fail if the Quality Gate comes back red — this is what "a commit only reaches `master` once validated" actually means mechanically: a red Quality Gate is a red CI check, and a red CI check is what branch protection (below) refuses to merge.
 
-**Setup status (2026-08-18) — two of three done:**
+**Setup status (2026-08-18) — all done:**
 
 1. ~~Create the project at sonarcloud.io and set `sonar.projectKey`/`sonar.organization` in `ci.yml`~~ — **done**: project key `RedeArmy_Clavaris`, organization `redearmy`.
-2. Generate a token (SonarCloud → My Account → Security) and add it as the `SONAR_TOKEN` repo secret (GitHub → Settings → Secrets and variables → Actions) — **still needed**, confirmed live: the job fails with "Not authorized or project not found" until this exists.
-3. Enable Branch Protection on `master` (GitHub → Settings → Branches) requiring every job in `ci.yml` — `sonarcloud` included — to pass before a PR can merge — **still needed**, a repo-admin-only GitHub setting. Until this is set, the `sonarcloud` job existing in the workflow is advisory only; nothing stops a merge if it fails.
+2. ~~Generate a token and add it as the `SONAR_TOKEN` repo secret~~ — **done**, confirmed: the job authenticates successfully.
+3. ~~Enable Branch Protection on `master` requiring `ci-passed`~~ — **done**. Branch protection only enforces on public repos below GitHub Team/Enterprise (confirmed live: GitHub refused to enforce it while the repo was private) — the repo was made public specifically to unblock this; see the LICENSE (proprietary, all rights reserved) for why that's not a contradiction — public visibility, not an open-source grant.
+4. ~~Install the SonarCloud/SonarQube Cloud GitHub App on the repository~~ — **done**, confirmed live: PR decoration (Quality Gate summary comment) now appears on PRs. This is separate from `SONAR_TOKEN` — the token lets CI authenticate and push analysis results, but posting the PR comment itself is done by the GitHub App's own installation, not by anything in `ci.yml`.
 
-Until both remaining items are done, this job fails on every run — expected, not a bug, until setup completes.
+First real PR under this full setup (`docs/policy-updates` → PR #9) merged successfully via the enforced process, not a direct push — confirms the whole chain works end to end, not just that each piece is individually configured.
 
 ## 5. Feature flags
 
