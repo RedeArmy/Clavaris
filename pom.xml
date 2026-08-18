@@ -27,7 +27,7 @@
              1.21.x fixes this while staying pre-2.0 (Spring Boot 3.4's
              spring-boot-testcontainers integration is only verified against
              the Testcontainers 1.x line). -->
-        <testcontainers.version>1.21.4</testcontainers.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
     </properties>
 
     <!--
