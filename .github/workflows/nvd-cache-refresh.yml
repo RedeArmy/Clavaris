@@ -44,7 +44,7 @@ jobs:
       # lets this pick up last week's data as a base for an incremental update
       # rather than starting from zero every single week.
       - name: Cache OWASP Dependency-Check data
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.dependency-check-data
           key: depcheck-nvd-${{ steps.week.outputs.week }}

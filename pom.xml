@@ -75,9 +75,15 @@
         <!-- CVE-2026-54291 (pgjdbc, CVSS 8.2 — silent SCRAM channel-binding
              downgrade, defeats MITM protection) — fixed in 42.7.12+. -->
         <postgresql.version>42.7.13</postgresql.version>
-        <!-- CVE-2026-55276/-53434/-59083/-59084/etc. (Tomcat, up to CVSS
-             9.1) — fixed in Tomcat 11.0.23. -->
-        <tomcat.version>11.0.23</tomcat.version>
+        <!-- Tomcat CVEs land faster than this file gets revisited — 11.0.23
+             (the previous pin here) fixed CVE-2026-55276/-53434/etc., but
+             confirmed live that 11.0.23 itself still carries
+             CVE-2026-59083/-59084 (fixed in 11.0.24) and CVE-2026-66299,
+             CVSS 9.1/9.1/7.5 (fixed only in 11.0.25 — 11.0.24 alone still
+             fails the gate). 11.0.25 confirmed present on Maven Central
+             (11.0.26 is not, as of this writing) — this is the latest
+             available patch release, not an arbitrary bump. -->
+        <tomcat.version>11.0.25</tomcat.version>
     </properties>
 
     <!--
