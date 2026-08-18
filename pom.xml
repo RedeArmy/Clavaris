@@ -20,14 +20,18 @@
         <!-- Bump to the latest 3.4.x patch at implementation time — pinned
              here only so the module tree resolves, not a deliberate patch choice. -->
         <spring-boot.version>4.1.0</spring-boot.version>
-        <!-- Overrides Spring Boot 3.4.1's BOM-managed 1.20.4: that version's
-             docker-java client hardcodes API 1.32 in its detection-phase ping,
-             which recent Docker Engine builds (this dev host: 29.5.2, min
-             supported API 1.40) reject outright — confirmed live, not assumed.
-             1.21.x fixes this while staying pre-2.0 (Spring Boot 3.4's
-             spring-boot-testcontainers integration is only verified against
-             the Testcontainers 1.x line). -->
+        <!-- Overrides the Spring Boot BOM's own managed Testcontainers version:
+             an old 1.20.4 default hardcoded Docker API 1.32 in its
+             detection-phase ping, which recent Docker Engine builds (this dev
+             host: 29.5.2, min supported API 1.40) reject outright — confirmed
+             live, not assumed. Now on the 2.0.x line, which renamed several
+             artifacts (testcontainers-junit-jupiter, testcontainers-postgresql
+             — see app/pom.xml) relative to 1.x. -->
         <testcontainers.version>2.0.5</testcontainers.version>
+        <!-- Coverage data SonarCloud's Quality Gate is computed against
+             (git-workflow.md §4) — a Quality Gate with no coverage report to
+             read is not actually measuring anything. -->
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <!--
@@ -77,6 +81,11 @@
                     <configuration>
                         <release>${maven.compiler.release}</release>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

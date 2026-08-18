@@ -1,14 +1,16 @@
 name: CI
 
 # git-workflow.md §4: every change goes through a PR gated by this workflow —
-# no direct commits to main are pushed here, but branch-protection (a GitHub
-# repo setting, not something a workflow file can enforce) is what actually
-# blocks them; this workflow is the "all green" half of that gate.
+# no direct commits to master are pushed here, but branch-protection (a
+# GitHub repo setting, not something a workflow file can enforce) is what
+# actually blocks them; this workflow is the "all green" half of that gate.
+# Branch is "master" — this repo's actual default branch (kept as-is,
+# deliberately not renamed to "main").
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 # Least-privilege default — jobs opt into anything broader explicitly instead
 # of inheriting write access they don't need.
@@ -107,3 +109,56 @@ jobs:
       # script's own header for what it does and doesn't catch.
       - name: Run doc consistency checks
         run: ./scripts/check-doc-consistency.sh
+
+  sonarcloud:
+    name: SonarCloud analysis (Quality Gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # SonarCloud's new-code/blame analysis needs real history, not the
+          # single-commit shallow clone checkout defaults to.
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Cache SonarCloud analysis cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # Runs the full test suite (mvn verify — same as build-and-test) so
+      # JaCoCo's coverage report exists before Sonar reads it, then uploads
+      # analysis + coverage in one pass. sonar.qualitygate.wait=true makes
+      # this step itself fail — and this whole job fail — the moment
+      # SonarCloud's Quality Gate comes back red, not just "analysis ran."
+      #
+      # REQUIRES SETUP BEFORE THIS JOB CAN PASS (git-workflow.md §4a):
+      #  1. Create the project at https://sonarcloud.io (import this GitHub repo).
+      #  2. Replace sonar.projectKey / sonar.organization below with the real
+      #     values SonarCloud assigns.
+      #  3. Add SONAR_TOKEN as a repo secret (Settings → Secrets and
+      #     variables → Actions) — generate it from SonarCloud's own
+      #     My Account → Security → Generate Token.
+      #  4. Enable Branch Protection on `master` (Settings → Branches) and
+      #     require this job ("SonarCloud analysis (Quality Gate)") — and
+      #     the other CI jobs — to pass before merging. Neither this file nor
+      #     Claude Code can set that from here; it's a GitHub repo setting
+      #     only a repo admin can configure.
+      - name: Build, test, and analyse
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+          -Dsonar.projectKey=TODO_REPLACE_WITH_SONARCLOUD_PROJECT_KEY
+          -Dsonar.organization=TODO_REPLACE_WITH_SONARCLOUD_ORG_KEY
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml

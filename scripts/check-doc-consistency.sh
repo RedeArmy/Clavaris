@@ -92,6 +92,21 @@ check \
     'ADRs 0001-0009\b' \
     ""
 
+# This repo's default branch is "master" (a deliberate decision, not
+# renamed to "main"), but docs/CI kept being drafted with "main" by habit —
+# found twice already (ci.yml's own trigger, definition-of-done.md's merge
+# checklist item). Excludes the intentional "deliberately not renamed to
+# main" phrasing this project consistently uses when explaining the choice.
+hits=$(grep -rnE '\bmain\b' docs/ CLAUDE.md .github/ 2>/dev/null \
+    | grep -viE 'main class|mainclass|main\(\)|src/main|main artifact' \
+    | grep -v 'not renamed to' || true)
+if [[ -n "$hits" ]]; then
+    echo "FAIL: 'main' referenced where this repo's branch is 'master' — check it's not a stale branch reference"
+    echo "$hits" | sed 's/^/  /'
+    echo
+    fail=1
+fi
+
 if [[ "$fail" -eq 0 ]]; then
     echo "OK: doc consistency checks passed."
 fi
