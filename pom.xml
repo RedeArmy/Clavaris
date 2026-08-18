@@ -178,6 +178,18 @@
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <release>${maven.compiler.release}</release>
+                        <!-- Spring's @PathVariable/@RequestParam/@ModelAttribute binding falls
+                             back to reflecting the compiled parameter name when no explicit name
+                             is given on the annotation — without -parameters, the class file
+                             carries "arg0" instead, and binding fails at request time, not at
+                             compile time ("Name for argument of type [...] not specified").
+                             Confirmed live: RegisterAccountControllerTest failed exactly this way
+                             against `@PathVariable UUID organizationId`. A global flag, not a
+                             per-annotation explicit name on every future controller parameter —
+                             this is the kind of thing that's silently correct until the one time
+                             someone forgets, so fixing it at the compiler level removes the
+                             failure mode entirely instead of relying on remembering. -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -187,6 +199,16 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <!-- Moved here from app/pom.xml (which had the only executions of
+             this plugin) once real business-module code and tests existed
+             to matter: coverage was only ever measured for the app module,
+             leaving SonarCloud's Quality Gate computing "coverage on new
+             code" against zero instrumented lines the moment a PR's new
+             code landed in identity-module instead — confirmed live, "0.0%
+             Coverage on New Code" failing the gate despite 39 real tests.
+             Same "bound here, not pluginManagement, so every child inherits
+             automatically" rationale as Spotless/PMD above. -->
 
         <!-- Bound here, not in pluginManagement — every child module inherits
              these executions automatically (Maven's default plugin
@@ -276,6 +298,31 @@
                         <phase>verify</phase>
                         <goals>
                             <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Coverage (git-workflow.md §4a): SonarCloud's Quality Gate reads
+                 target/site/jacoco/jacoco.xml from every module, not just app —
+                 binding this here, not per-module, is what makes that true. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <!-- Instruments the JVM running each module's own tests. -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <!-- Produces target/site/jacoco/jacoco.xml per module. -->
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>

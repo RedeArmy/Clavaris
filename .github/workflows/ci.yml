@@ -192,17 +192,36 @@ jobs:
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
-      # No explicit sonar.coverage.jacoco.xmlReportPaths: the scanner's own
-      # default location list already includes target/site/jacoco/jacoco.xml
-      # per module — exactly where app/pom.xml's jacoco:report execution
-      # writes it (confirmed live: mvn clean verify produces
-      # app/target/site/jacoco/jacoco.xml). An explicit override here was
-      # redundant with that default and only added noise: common/identity-
-      # module/organization-module/client-registry-module have no code yet
-      # (CLAUDE.md §11 scaffolding state), so Sonar logging "no coverage
-      # report found" for those is expected, not a failure — it's a WARN,
-      # falls back to the same default list, and doesn't fail the build or
-      # the Quality Gate (which grades new-code coverage, not empty folders).
+      # Explicit sonar.coverage.jacoco.xmlReportPaths — this is the SECOND
+      # attempt at this exact problem, the first one (a **-glob pointed at
+      # app/target/site/jacoco-aggregate/jacoco.xml) confirmed live NOT to
+      # work: SonarCloud still reported the same files at 0.0% afterwards.
+      # Root cause, confirmed against SonarSource's own community docs on
+      # this exact scenario: this property is resolved separately for EACH
+      # module, relative to THAT module's own basedir — a `**` glob can only
+      # ever search within a module's own subtree, so from
+      # identity-module's own analysis context it could never reach
+      # app/target/..., a sibling directory, no matter how the glob was
+      # written. The fix the docs describe ("set this property in every
+      # module on which the coverage should be imported") means an explicit
+      # path that's actually reachable from each module's own basedir —
+      # ../app/... — not a glob.
+      #
+      # The underlying gap this exists for: RegisterAccountIntegrationTest
+      # lives in app/, not identity-module/, because it needs the full
+      # Spring context + aggregated Flyway migrations only app has (same
+      # reasoning as FlywayMigrationIntegrationTest). It genuinely exercises
+      # identity-module's persistence adapters end to end against a real
+      # Postgres, but identity-module's own default report only ever
+      # correlates identity-module's own exec data against its own compiled
+      # classes. app/pom.xml's report-aggregate execution (run only there,
+      # since app is the one module that already depends on every business
+      # module) combines every reactor module's exec data against every
+      # dependency's own compiled classes into one file at
+      # app/target/site/jacoco-aggregate/jacoco.xml; every business module
+      # is a direct child of the repo root, so ../app/... resolves correctly
+      # from any of their basedirs (including app's own — app/../app/...
+      # normalises back to itself).
       #
       # Setup (git-workflow.md §4a): project created at sonarcloud.io,
       # projectKey/organization below are real values, and SONAR_TOKEN is
@@ -220,6 +239,7 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
 
   # Branch protection needs to require exactly one status check, not five —
   # requiring each job individually breaks silently the moment any one of

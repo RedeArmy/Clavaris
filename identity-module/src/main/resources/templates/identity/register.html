@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Create an account — Clavaris</title>
+</head>
+<body>
+<main>
+    <h1>Create an account</h1>
+
+    <form th:action="@{''}" th:object="${form}" method="post">
+        <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
+            <p th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+        </div>
+
+        <div>
+            <label for="password">Password</label>
+            <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
+            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+        </div>
+
+        <div>
+            <label for="confirmPassword">Confirm password</label>
+            <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password" required/>
+            <p th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}">Confirm password error</p>
+        </div>
+
+        <button type="submit">Create account</button>
+    </form>
+</main>
+</body>
+</html>
