@@ -1,0 +1,68 @@
+# Threat Model (STRIDE) — Clavaris
+
+🟡 En revisión
+
+STRIDE analysis across the highest-value attack surfaces: authentication, token issuance, session management, and client/organization administration. This is Clavaris's own threat model — distinct from and more security-critical than any single consumer's, since a defect here has blast radius across every consuming application (`CLAUDE.md` §6).
+
+## 1. Account authentication (login, registration, password reset)
+
+| Threat | Scenario | Mitigation |
+|---|---|---|
+| **S**poofing | Credential stuffing against `/login` using leaked password lists | Rate limiting tuned specifically against credential stuffing (BR-ID-06), account lockout/backoff after repeated failures |
+| **S**poofing | Social login account takeover via unverified email pre-registration | Flagged open question, `prd-mvp.md` §5 — resolution required before social login ships |
+| **T**ampering | Password reset token guessed or brute-forced | Cryptographically random, sufficiently long token; hashed at rest (`data-model.md` §2); single-use; time-limited (BR-ID-04) |
+| **R**epudiation | User disputes having requested a password change | Structured audit log of every auth event (NFR §5), without ever logging the credential itself |
+| **I**nformation disclosure | Password or token value appears in logs or error responses | BR-DATA-01, BR-ID-05: passwords/tokens never logged, never returned in API responses |
+| **I**nformation disclosure | Timing attack distinguishing "account exists" vs. "wrong password" on login | Constant-time comparison for password verification (inherent to `Argon2PasswordEncoder`); identical response shape/timing for "unknown email" vs. "wrong password" |
+| **D**enial of service | Registration endpoint flooded to exhaust email-sending quota | Rate limiting on registration and verification-email resend, independent of login rate limits |
+| **E**levation of privilege | Password reset flow used to take over an account without proving control of the original credential | Reset invalidates all sessions/refresh tokens on completion (BR-ID-04) — limits blast radius even if this control were bypassed |
+
+## 2. Token issuance and refresh
+
+| Threat | Scenario | Mitigation |
+|---|---|---|
+| **S**poofing | Forged access token accepted by a consumer | RS256 signing (ADR-0002) — forgery requires the private key, never distributed to consumers |
+| **T**ampering | Refresh token stolen and replayed after legitimate rotation | Single-use rotation + reuse detection revokes the entire token family (BR-ID-03) |
+| **I**nformation disclosure | Authorization code intercepted in transit (e.g. via a malicious redirect) | PKCE mandatory for every client, including confidential ones (BR-CLIENT-03) — an intercepted code is useless without the original `code_verifier` |
+| **I**nformation disclosure | Signing key compromise | Key rotation with overlap (`CLAUDE.md` §6); private key never stored in the database (`data-model.md` §2); compromise response requires an incident-response runbook — **not yet written**, flagged as an open gap |
+| **D**enial of service | `/oauth2/token` flooded to exhaust compute (RS256 verification/signing cost) | Rate limiting on the token endpoint (BR-ID-06) |
+| **E**levation of privilege | Token issued for one client accepted as valid for another client's protected resource | BR-CLIENT-02 — cross-client validity requires an explicit, currently unbuilt mechanism; no implicit trust between clients |
+
+## 3. Session management
+
+| Threat | Scenario | Mitigation |
+|---|---|---|
+| **S**poofing | Session fixation | New session identifier issued on every authentication, never reused from a pre-auth state |
+| **T**ampering | Client-side session state manipulation | Sessions are server-side records (`Session` entity), never trust client-supplied session claims beyond the signed token itself |
+| **D**enial of service | Mass forced logout via revocation endpoint abuse | `/oauth2/revoke` requires the token owner's own valid credentials — not exposed as an unauthenticated action |
+
+## 4. Client, organization, and platform administration
+
+| Threat | Scenario | Mitigation |
+|---|---|---|
+| **S**poofing | Malicious redirect URI registered to exfiltrate authorization codes | Exact-match `redirect_uris` allowlist, no wildcards (BR-CLIENT-01) |
+| **T**ampering | Workspace membership role escalated without authorization | Role changes gated by existing `OWNER`/`ADMIN` permission checks in the application layer, never client-trusted |
+| **E**levation of privilege | Last `OWNER` removed, leaving a workspace ownerless and open to a race condition on next ownership claim | BR-WS-01 (renamed from the pre-ADR-0010 `BR-ORG-01`): atomic ownership transfer, never a zero-owner state |
+| **R**epudiation | Admin action (client registration, member removal) disputed later | Audit logging of management API actions — not yet formally designed, flagged as an open gap alongside the key-compromise runbook above |
+| **E**levation of privilege | `PlatformClient` credential (`PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET`) compromised — the one credential able to create, and thus indirectly control, every `Organization` | ADR-0010 (Organization provisioning): env-var-seeded, never an HTTP-exposed bootstrap path, never shipped in code; structurally separate issuer/JWKS from every tenant (BR-PLATFORM-01) limits *what* a compromise can forge, but does not limit *that* it could create rogue Organizations — an incident-response runbook for this credential specifically is a new, real gap, tracked alongside the signing-key-compromise runbook in §6 |
+| **S**poofing | A tenant's own `OAuthClient` presents its access token against a management-API endpoint, hoping platform-tier authorization is checked loosely | BR-PLATFORM-02: `/api/v1/admin/*` accepts platform-tier tokens exclusively in v1 — a tenant-scoped token is issued by a structurally different issuer and fails audience/issuer validation before any authorization-scope check even runs |
+
+## 5. Lessons from a comparable system's disclosed CVEs (Clerk)
+
+Two real, disclosed vulnerabilities in Clerk (`docs/00-vision/clerk-feature-analysis.md` §5) map directly onto attack surfaces Clavaris shares — added here as concrete threat rows with Clavaris-specific tests, not as abstract cautionary tales.
+
+| Threat | Real-world precedent | Clavaris mitigation / required test |
+|---|---|---|
+| **E**levation of privilege | CVE-2025-63700: `clerk-js` allowed bypassing the OAuth flow entirely by manipulating the request at the OTP-verification step — a mid-flow step was skippable/reorderable | Every multi-step authentication flow (email verification, MFA challenge once built, social-login linking) must be modeled as an explicit server-side state machine where each step's completion is a precondition checked server-side, never inferred from "the client called the next endpoint" — required test: attempting to call a later step's endpoint directly, skipping the precondition, must fail |
+| **E**levation of privilege | A `@clerk/nextjs` SDK bug: passing an authorization parameter (`role`/`permission`) in the same options object as certain other fields (`token`, `unauthorizedUrl`) caused the authorization check to be **silently discarded** rather than evaluated | Authorization checks on the management API must fail closed on any configuration ambiguity — never "if this combination of parameters is present, skip the check silently." Required test: every authorization-check code path has a test asserting it actually runs (not just that the *expected* behavior results) for every documented combination of check parameters, not just the common case |
+| **E**levation of privilege | January 2024 `@clerk/nextjs` bug present for over a year before discovery, allowing acting on behalf of another user | A defect class this severe surviving undetected for a year argues for the ArchUnit/ISA-level test discipline already mandated (`test-strategy.md` §2) to explicitly include authorization-check *presence*, not just correctness — a missing check is easy to miss in review, hard to miss in a test that asserts the check exists |
+
+## 6. Known gaps (not yet resolved)
+
+- No incident-response runbook for signing-key compromise — **higher priority since ADR-0010**: N organizations means N independent key pairs, so the runbook must specify per-tenant containment (rotate/revoke one Organization's key without touching any other's), not a single-key procedure.
+- **No incident-response runbook for `PlatformClient`/bootstrap-credential compromise** (new, ADR-0010 Organization provisioning, §4 above) — arguably higher severity than a single tenant's signing-key compromise, since this credential can create and indirectly reach every `Organization`, not just forge tokens for one. Needs its own runbook, not an assumed extension of the per-tenant one.
+- No formal audit-logging design for the management API (distinct from the auth-event logging already specified in `nfr-quality-attributes.md` §5) — tracked jointly with `BR-ADMIN-01`'s impersonation-audit requirement (`business-rules.md`), since both need the same underlying audit-log mechanism. **This is now a hard blocking dependency, not just a gap**: ADR-0010 §6.2 explicitly requires audit logging to ship *before* tenant self-service `RateLimitPolicy` editing (v1.1) can be enabled — that v1.1 item cannot start until this gap closes. Every platform-tier action (organization creation, key rotation) is exactly the kind of action this audit log must cover first.
+- MFA absence (backlog per `prd-mvp.md`) means a compromised password alone is sufficient for full account takeover in v1 — accepted risk for v1, explicitly flagged, not silently ignored.
+- ~~Spring Authorization Server's multi-tenant JWKS extension (required by ADR-0010 §5) is unvalidated in code~~ — **resolved 2026-08-17**: spike completed with a GO result, see `docs/03-architecture/spikes/0001-spring-authorization-server-multitenancy.md` and ADR-0003's addendum.
+
+These gaps must be closed or explicitly risk-accepted before the external security review gate (`CLAUDE.md` §6).

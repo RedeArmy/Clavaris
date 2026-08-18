@@ -1,0 +1,75 @@
+# Local development stack. Reads secrets/config from .env (copy from
+# .env.example, never commit .env — see .gitignore). Postgres/Redis are
+# always present; "app" builds the single deployable (system-design-document.md
+# §3 — modular monolith, one process, resolved in favor of one image rather
+# than one per module).
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_DEV_USER:-clavaris}
+      POSTGRES_PASSWORD: ${DB_DEV_PASSWORD:-clavaris}
+      POSTGRES_DB: ${DB_DEV_NAME:-clavaris}
+    ports:
+      - "${DB_DEV_PORT:-5432}:5432"
+    volumes:
+      - clavaris-postgres-data:/var/lib/postgresql/data
+      - ./infra/docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # pg_isready alone only proves the server is accepting connections, not
+      # that the target DB/role exist yet — checking against the real DB name
+      # and user catches a misconfigured .env at `docker-compose up` time
+      # instead of surfacing as a mysterious app-side connection failure.
+      test: ["CMD-SHELL", "pg_isready -U ${DB_DEV_USER:-clavaris} -d ${DB_DEV_NAME:-clavaris}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - clavaris-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # Inside the compose network the app reaches its dependencies by
+      # service name, not localhost — overrides whatever .env has for a
+      # host-machine (non-Docker) run of the app.
+      DB_DEV_HOST: postgres
+      DB_DEV_PORT: 5432
+      DB_DEV_NAME: ${DB_DEV_NAME:-clavaris}
+      DB_DEV_USER: ${DB_DEV_USER:-clavaris}
+      DB_DEV_PASSWORD: ${DB_DEV_PASSWORD:-clavaris}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  clavaris-postgres-data:
+  clavaris-redis-data:

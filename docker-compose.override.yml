@@ -1,0 +1,16 @@
+# Local developer overrides for docker-compose.yml — automatically merged by
+# `docker compose up` when both files are present. Intended for
+# machine-specific tweaks (port remapping, bind mounts, extra env vars) that
+# should never be committed as part of the base stack definition.
+#
+# Example (uncomment/adapt, don't commit real values):
+#
+# services:
+#   postgres:
+#     ports:
+#       - "5433:5432"   # avoid a port clash with a Postgres already running locally
+#   app:
+#     environment:
+#       SPRING_PROFILES_ACTIVE: dev
+
+services: {}

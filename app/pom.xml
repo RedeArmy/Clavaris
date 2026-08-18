@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.clavaris</groupId>
+        <artifactId>clavaris-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>app</artifactId>
+    <packaging>jar</packaging>
+    <name>app</name>
+    <description>
+        Spring Boot bootstrap module — the single deployable (system-design-document.md §3,
+        modular monolith). Owns the @SpringBootApplication entry point and cross-cutting
+        infrastructure wiring (Actuator health checks) only. No domain/application code lives
+        here — it depends on the business modules, never the reverse, same direction as the
+        hexagonal rule (CLAUDE.md §7.2) applied at the module-graph level.
+    </description>
+
+    <dependencies>
+        <!-- Business modules — placeholder deps until each has real classes to expose. -->
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>identity-module</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>organization-module</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>client-registry-module</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Actuator: health checks from day one (DB + Redis + liveness/readiness probes),
+             per the gap flagged in nfr-quality-attributes.md §7. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- DB health indicator (DataSourceHealthIndicator) is auto-configured once
+             spring-boot-starter-data-jpa + a driver are on the classpath (ADR-0004: Postgres). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Schema is Flyway-owned, not Hibernate-owned (data-model.md §4) — every
+             environment reaches the same schema by running the same versioned
+             migrations automatically at startup, never by someone running a .sql
+             file by hand. flyway-database-postgresql is the PostgreSQL-specific
+             module Flyway 10+ split out of flyway-core. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <!-- Redis health indicator is auto-configured once this starter is present
+             and a RedisConnectionFactory bean exists (ADR-0004: Redis for rate limiting/session cache). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Enforces the hexagonal dependency rule (CLAUDE.md §7.2) as a real,
+             CI-checked constraint, not a code-review convention. Lives here
+             (not per-module) because "app" is the one module that already
+             depends on every business module, so it's the single place that
+             can see the whole com.clavaris tree at once — see
+             coding-standards.md §2, test-strategy.md §2. -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Proves the Flyway migrations (data-model.md §4) apply cleanly against a
+             real Postgres, in CI, on every build — not just verified once by hand.
+             Versions managed by the Spring Boot BOM. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>clavaris-app</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.clavaris.app.ClavarisApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

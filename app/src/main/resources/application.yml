@@ -1,0 +1,65 @@
+# Base configuration — safe defaults for local development against the
+# docker-compose stack (docker-compose.yml exposes Postgres/Redis on
+# localhost). Real deployments must override every credential via env vars
+# from .env (never commit real values — .env.example lists names only).
+
+spring:
+  application:
+    name: clavaris
+  datasource:
+    url: jdbc:postgresql://${DB_DEV_HOST:localhost}:${DB_DEV_PORT:5432}/${DB_DEV_NAME:clavaris}
+    username: ${DB_DEV_USER:clavaris}
+    password: ${DB_DEV_PASSWORD:clavaris}
+  jpa:
+    open-in-view: false # never leak a persistence session implicitly into the web layer
+    hibernate:
+      # Flyway owns the schema (data-model.md §4) — Hibernate only ever verifies
+      # entities match it, never creates or alters a table itself. "update" would
+      # let dev/CI/prod schemas silently drift apart from each other; "validate"
+      # fails loudly at startup instead.
+      ddl-auto: validate
+  flyway:
+    # Default locations (classpath:db/migration) already match every module's
+    # scaffolded db/migration folder (CLAUDE.md §7.1) — nothing to override here.
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Never "*" — the full Actuator surface (env, beans, heapdump, ...) is a
+        # real information-disclosure risk if exposed by default (BR-DATA-01
+        # discipline extended to operational endpoints, not just app logs).
+        include: health,info
+  endpoint:
+    health:
+      # Kubernetes-style liveness/readiness groups — closes the health/readiness
+      # gap flagged in nfr-quality-attributes.md §7. Exposes
+      # /actuator/health/liveness and /actuator/health/readiness.
+      probes:
+        enabled: true
+      # Safe default: never leak DB/Redis connection details publicly.
+      # application-dev.yml relaxes this for local debugging only.
+      show-details: never
+      group:
+        # By default Spring Boot's "readiness" group only reflects
+        # readinessState (has the app context finished starting?) — it does
+        # NOT reflect downstream dependencies unless told to. Verified live
+        # (docker compose): with Postgres killed, /actuator/health showed
+        # "db": "DOWN" but /actuator/health/readiness still returned 200/UP.
+        # An orchestrator watching only /readiness would keep routing traffic
+        # to an instance that can't actually serve a request — exactly the
+        # failure mode health checks exist to prevent. Explicitly folding db
+        # and redis into the readiness group is what makes it meaningful.
+        readiness:
+          include: readinessState,db,redis
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

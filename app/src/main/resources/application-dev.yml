@@ -1,0 +1,11 @@
+# Local-only convenience overrides. Never used in a real deployment
+# (SPRING_PROFILES_ACTIVE should never be "dev" outside a developer's machine).
+
+management:
+  endpoint:
+    health:
+      show-details: always # convenience for local debugging only — base application.yml keeps this "never"
+
+logging:
+  level:
+    com.clavaris: DEBUG
