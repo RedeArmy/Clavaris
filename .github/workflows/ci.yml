@@ -97,33 +97,38 @@ jobs:
 
       # security-architecture.md §8 / git-workflow.md §4: dependency
       # vulnerability scanning is a required CI gate, not a "nice to have."
-      # NVD_API_KEY confirmed live (auth works, real download started —
-      # ~380k records on a cold cache, this repo's first-ever sync). That
-      # first full sync then hit NVD's own servers returning repeated 503s
-      # until retries were exhausted — a transient NVD-side outage, not a
-      # config problem; a re-run (or NVD simply recovering) succeeds. Two
-      # mitigations against this recurring:
-      #  - nvdApiDelay spaces requests out more (default pace was apparently
-      #    tight enough to help trigger NVD's own throttling during a large
-      #    cold-cache sync) — a slower, steadier sync is more likely to
-      #    finish than a fast one that gets 503'd repeatedly.
-      #  - The weekly cache above means this multi-minute full sync is a
-      #    one-time cost per week, not paid on every single run — once one
-      #    run completes it (even after a retry), subsequent runs in the
-      #    same week only need a small incremental update.
-      #  - nvdApiKeyEnvironmentVariable (the plugin's own recommended CI
-      #    pattern) instead of passing the key as a -D value directly.
+      # NVD_API_KEY confirmed live (auth works). A cold-cache full sync
+      # (~380k records) confirmed live at two different costs: first hit
+      # repeated 503s until retries were exhausted (transient NVD-side
+      # outage), then — even once NVD itself was healthy — took 5 hours,
+      # an unacceptable blocking cost on an ordinary push. Root cause of the
+      # 5 hours: this job both restores AND is the only thing that ever
+      # populates the weekly cache below, so any push that's first to hit a
+      # new/evicted cache pays the full cold-sync cost inline, gating real
+      # work behind it.
+      # Fix: nvd-cache-refresh.yml now pre-warms this exact cache key on a
+      # weekly schedule, decoupling the slow full sync from this gate — by
+      # the time an ordinary push runs, this step should almost always find
+      # a warm cache and only need a small incremental update (seconds, not
+      # hours). This job's own restore step stays as a safety net (still
+      # correct on a cold cache, just slow), not the primary way the cache
+      # gets populated. nvdApiDelay=2000: NVD's documented limit for
+      # API-key holders is 50 requests/rolling 30s (≈600ms minimum
+      # spacing) — 2000ms keeps a ~3x safety margin against triggering
+      # NVD's own throttling while running noticeably faster than the
+      # 6000ms this replaces (matches nvd-cache-refresh.yml's own value, so
+      # both jobs behave consistently against NVD).
+      # nvdApiKeyEnvironmentVariable: the plugin's own recommended CI
+      # pattern, instead of passing the key as a -D value directly.
       # `dependency-check:check` invoked as a bare goal (no lifecycle phase)
-      # does not package any module first. Once the NVD update itself
-      # started succeeding (cache hit), the scan advanced far enough to hit
-      # this for real: "app" declares common/identity-module/organization-
-      # module/client-registry-module as compile-scope dependencies, and
-      # with no prior `package`, none of those .jars exist anywhere this job
-      # can find them — confirmed live ("Could not find artifact
-      # com.clavaris:common:jar..."). `package` first, in the SAME mvn
-      # invocation, makes each module's jar available to the reactor before
-      # the module that depends on it needs it (the same mechanism every
-      # `mvn verify` elsewhere in this workflow already relies on).
+      # does not package any module first: "app" declares common/identity-
+      # module/organization-module/client-registry-module as compile-scope
+      # dependencies, and with no prior `package`, none of those .jars exist
+      # anywhere this job can find them — confirmed live ("Could not find
+      # artifact com.clavaris:common:jar..."). `package` first, in the SAME
+      # mvn invocation, makes each module's jar available to the reactor
+      # before the module that depends on it needs it (the same mechanism
+      # every `mvn verify` elsewhere in this workflow already relies on).
       # -DskipTests: this job scans dependencies, it doesn't need to
       # re-run the test suite build-and-test already covers.
       - name: OWASP Dependency-Check
@@ -134,7 +139,7 @@ jobs:
           -DfailBuildOnCVSS=7
           -DdataDirectory=$HOME/.dependency-check-data
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
-          -DnvdApiDelay=6000
+          -DnvdApiDelay=2000
 
       - name: Upload dependency-check report
         if: always()
@@ -187,6 +192,18 @@ jobs:
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
+      # No explicit sonar.coverage.jacoco.xmlReportPaths: the scanner's own
+      # default location list already includes target/site/jacoco/jacoco.xml
+      # per module — exactly where app/pom.xml's jacoco:report execution
+      # writes it (confirmed live: mvn clean verify produces
+      # app/target/site/jacoco/jacoco.xml). An explicit override here was
+      # redundant with that default and only added noise: common/identity-
+      # module/organization-module/client-registry-module have no code yet
+      # (CLAUDE.md §11 scaffolding state), so Sonar logging "no coverage
+      # report found" for those is expected, not a failure — it's a WARN,
+      # falls back to the same default list, and doesn't fail the build or
+      # the Quality Gate (which grades new-code coverage, not empty folders).
+      #
       # Setup (git-workflow.md §4a): project created at sonarcloud.io and
       # projectKey/organization below are real values (2026-08-18). Still
       # needed before this job can pass:
@@ -207,4 +224,3 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
-          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml

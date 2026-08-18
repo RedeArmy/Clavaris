@@ -69,11 +69,24 @@
         <!-- Schema is Flyway-owned, not Hibernate-owned (data-model.md §4) — every
              environment reaches the same schema by running the same versioned
              migrations automatically at startup, never by someone running a .sql
-             file by hand. flyway-database-postgresql is the PostgreSQL-specific
-             module Flyway 10+ split out of flyway-core. -->
+             file by hand.
+             spring-boot-starter-flyway, not a raw flyway-core dependency: Spring
+             Boot 4 split FlywayAutoConfiguration out of spring-boot-autoconfigure
+             into its own spring-boot-flyway module, only pulled in by this
+             starter — confirmed live (spring-boot-autoconfigure-4.1.0.jar
+             contains zero Flyway classes; the DEBUG conditions-evaluation report
+             doesn't mention Flyway at all). Depending on flyway-core directly, as
+             before, put the library on the classpath without ever registering the
+             Flyway bean or running a migration at startup — a real, previously
+             undetected gap: Hibernate's ddl-auto=validate never caught it because
+             this codebase has zero @Entity classes yet, so there was nothing to
+             validate a schema against. flyway-database-postgresql is the
+             PostgreSQL-specific module Flyway 10+ split out of flyway-core;
+             still declared explicitly since the starter doesn't pull in a
+             database-specific module for you. -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

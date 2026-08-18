@@ -1,0 +1,69 @@
+name: NVD Cache Refresh
+
+# Decouples the slow, occasionally multi-hour cold NVD sync (dependency-check's
+# full CVE dataset download, ~380k records) from the per-push/PR dependency-scan
+# gate in ci.yml — confirmed live: a cold-cache run took 5 hours, an
+# unacceptable blocking cost on an ordinary push. This job runs on a schedule
+# instead, populating the same weekly cache key dependency-scan restores from
+# (ci.yml, "Cache OWASP Dependency-Check data" step) — by the time any push
+# happens that week, dependency-scan should find a warm cache and only need a
+# fast incremental update, not a full re-download.
+on:
+  schedule:
+    # Sunday 02:00 UTC — ahead of the Monday-anchored ISO week key
+    # (date +%Y-W%V) ci.yml's dependency-scan job computes, so the cache is
+    # warm before the first push of the new week, not racing against it.
+    - cron: "0 2 * * 0"
+  # Lets a maintainer force a refresh on demand (e.g. right after adding
+  # NVD_API_KEY, or to recover from a week where the scheduled run failed)
+  # without waiting for the next Sunday.
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-nvd-cache:
+    name: Refresh OWASP Dependency-Check NVD cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Compute cache week
+        id: week
+        run: echo "week=$(date +%Y-W%V)" >> "$GITHUB_OUTPUT"
+
+      # Same key/path ci.yml's dependency-scan job restores from — restore-keys
+      # lets this pick up last week's data as a base for an incremental update
+      # rather than starting from zero every single week.
+      - name: Cache OWASP Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check-data
+          key: depcheck-nvd-${{ steps.week.outputs.week }}
+          restore-keys: depcheck-nvd-
+
+      # update-only: refreshes the local NVD database without scanning this
+      # repo's own dependencies — this job exists purely to populate the
+      # cache, not to gate anything, so no -DfailBuildOnCVSS or report
+      # generation is needed here. nvdApiDelay=2000: NVD's documented limit
+      # for API-key holders is 50 requests/rolling 30s (≈600ms minimum
+      # spacing) — 2000ms keeps a healthy ~3x safety margin against
+      # triggering NVD's own throttling (security-architecture.md §8's
+      # original motivation for a delay at all) while running noticeably
+      # faster than the 6000ms this replaces.
+      - name: Update NVD data
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn -B org.owasp:dependency-check-maven:13.0.0:update-only
+          -DdataDirectory=$HOME/.dependency-check-data
+          -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+          -DnvdApiDelay=2000

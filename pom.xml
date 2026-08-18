@@ -51,6 +51,33 @@
              of hard-failing — confirmed live under JDK 25. Bumped for the
              same reason as spotless.version above. -->
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
+        <!-- Left unpinned, Maven re-resolves "latest compatible" on every
+             build by walking plugin metadata newest-first — confirmed live:
+             it tried (and rejected) four Maven-4-only 4.0.0-beta-N releases
+             before landing on this one, on every single invocation. Pinning
+             makes the build both faster (no metadata walk) and reproducible
+             (an unpinned version could silently change what "latest
+             compatible" resolves to over time without any pom edit) —
+             consistent with every other plugin version in this file already
+             being explicit, not left to Maven's own discretion. -->
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <!-- CVE overrides (security-architecture.md §8, CLAUDE.md §6 — zero
+             critical/high findings open, non-negotiable): spring-boot-
+             dependencies 4.1.0 manages versions with real, live CVSS ≥ 7
+             CVEs — confirmed by OWASP Dependency-Check actually failing the
+             build on these, not a hypothetical. No Spring Boot patch release
+             newer than 4.1.0 exists yet to pull the fix in the normal way
+             (confirmed: 4.1.1 doesn't exist on Maven Central as of this
+             writing), so each is pinned explicitly below until one does.
+             CVE-2026-56820/-56817/-56745/etc. (netty, up to CVSS 9.1) — fixed
+             in netty 4.2.16.Final. -->
+        <netty.version>4.2.16.Final</netty.version>
+        <!-- CVE-2026-54291 (pgjdbc, CVSS 8.2 — silent SCRAM channel-binding
+             downgrade, defeats MITM protection) — fixed in 42.7.12+. -->
+        <postgresql.version>42.7.13</postgresql.version>
+        <!-- CVE-2026-55276/-53434/-59083/-59084/etc. (Tomcat, up to CVSS
+             9.1) — fixed in Tomcat 11.0.23. -->
+        <tomcat.version>11.0.23</tomcat.version>
     </properties>
 
     <!--
@@ -76,12 +103,57 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Same "declared before, and wins" mechanism as testcontainers-bom
+                 above — CVE-2026-56820 and siblings (netty.version property
+                 comment above), fixed in 4.2.16.Final. netty-bom, not a
+                 per-artifact override, because netty ships as many
+                 interdependent jars (netty-common, netty-buffer, netty-handler,
+                 netty-transport, netty-resolver, netty-codec-*, ...) that must
+                 all resolve to the same release — a partial per-artifact bump
+                 risks a mismatched-version classpath crashing at runtime
+                 instead of at build time. -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Plain per-artifact overrides here (not a nested-BOM import like
+                 netty-bom above) are enough for these two: pgjdbc ships as a
+                 single artifact, and Tomcat's embed jars don't publish a BOM to
+                 import — but confirmed by testing (same as testcontainers/netty
+                 above) that simply overriding ${postgresql.version}/
+                 ${tomcat.version} as properties does NOT reach versions managed
+                 inside the already-imported spring-boot-dependencies BOM; an
+                 explicit <dependency> entry here, which wins as the first
+                 matching groupId:artifactId, is what actually takes effect. -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-core</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-el</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-websocket</artifactId>
+                <version>${tomcat.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -97,6 +169,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <release>${maven.compiler.release}</release>
                     </configuration>
