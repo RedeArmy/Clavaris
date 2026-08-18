@@ -3,7 +3,7 @@
 # (smaller image = smaller attack surface, consistent with this project's
 # security-first posture, CLAUDE.md §6).
 
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 # Copy the whole multi-module reactor — module interdependencies mean we
@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends maven \
     && rm -rf /var/lib/apt/lists/* \
     && mvn -B -pl app -am -DskipTests package
 
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
 # curl is not present in the base JRE image — installed explicitly and only
