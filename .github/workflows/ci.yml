@@ -77,16 +77,41 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Compute cache week
+        id: week
+        run: echo "week=$(date +%Y-W%V)" >> "$GITHUB_OUTPUT"
+
+      # Cached NVD data survives across runs — without it, a rate-limited or
+      # transiently failed NVD update (see below) leaves the scanner with
+      # zero fallback data and it fails outright ("NoDataException: No
+      # documents exist"), confirmed live on this exact CI run. Weekly cache
+      # key: refreshes periodically without redownloading the ~multi-GB
+      # dataset on every single build. Path must match -DdataDirectory below
+      # exactly, or the cache silently caches the wrong directory.
+      - name: Cache OWASP Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check-data
+          key: depcheck-nvd-${{ steps.week.outputs.week }}
+          restore-keys: depcheck-nvd-
+
       # security-architecture.md §8 / git-workflow.md §4: dependency
       # vulnerability scanning is a required CI gate, not a "nice to have."
-      # An NVD API key raises the free rate limit substantially and avoids
-      # flaky throttling failures — add NVD_API_KEY as a repo secret
-      # (https://nvd.nist.gov/developers/request-an-api-key). Runs without
-      # one too, just slower.
+      # Without NVD_API_KEY, unauthenticated NVD API rate limits are tight
+      # enough that the update can fail outright on a cold cache, not just
+      # run slower as this comment previously (wrongly) claimed — confirmed
+      # live. Get a free key at https://nvd.nist.gov/developers/request-an-api-key
+      # and add it as the NVD_API_KEY repo secret; the cache above is a
+      # safety net for when the update still fails occasionally, not a
+      # substitute for having a key. Bumped 10.0.4 → 13.0.0: the NVD API v2.0
+      # client in 10.0.4 is old enough to plausibly be the source of the
+      # NullPointerException seen in that failed update, independent of the
+      # rate-limit question.
       - name: OWASP Dependency-Check
         run: >
-          mvn -B org.owasp:dependency-check-maven:10.0.4:check
+          mvn -B org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
+          -DdataDirectory=$HOME/.dependency-check-data
           -Dnvd.api.key=${{ secrets.NVD_API_KEY }}
 
       - name: Upload dependency-check report

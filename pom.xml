@@ -31,12 +31,26 @@
         <!-- Coverage data SonarCloud's Quality Gate is computed against
              (git-workflow.md §4) — a Quality Gate with no coverage report to
              read is not actually measuring anything. -->
-        <jacoco.version>0.8.12</jacoco.version>
+        <!-- 0.8.12's bundled/shaded ASM can't instrument JDK 25 runtime
+             classes ("Unsupported class file major version 69" while
+             instrumenting java.sql.SQLException, non-fatal but silently
+             degrades coverage) — confirmed live. 0.8.15 targets newer JDKs. -->
+        <jacoco.version>0.8.15</jacoco.version>
         <!-- coding-standards.md §1: formatting and clean-code rules enforced
              as a real build gate (mvn verify fails on a violation), not a
              style-guide document nobody re-reads before every PR. -->
-        <spotless.version>2.44.3</spotless.version>
-        <pmd-plugin.version>3.26.0</pmd-plugin.version>
+        <!-- 2.44.3's bundled google-java-format/javac-internals shim does not
+             support JDK 25's internal compiler API shape
+             (NoSuchMethodError: Log$DeferredDiagnosticHandler.getDiagnostics)
+             — confirmed live against app/Dockerfile's build stage
+             (eclipse-temurin:25-jdk). 3.10.0 fixes this. -->
+        <spotless.version>3.10.0</spotless.version>
+        <!-- 3.26.0's bundled ASM can't parse JDK 25 class files
+             ("Unsupported class file major version 69"), silently degrading
+             type-resolution-dependent rules (e.g. LooseCouplingRule) instead
+             of hard-failing — confirmed live under JDK 25. Bumped for the
+             same reason as spotless.version above. -->
+        <pmd-plugin.version>3.28.0</pmd-plugin.version>
     </properties>
 
     <!--
@@ -153,6 +167,30 @@
                         <ruleset>${maven.multiModuleProjectDirectory}/pmd-ruleset.xml</ruleset>
                     </rulesets>
                 </configuration>
+                <!-- 3.28.0 pins pmd-core 7.17.0 internally (not the latest
+                     pmd-core release), which bundles ASM 9.7.1 — predates JDK
+                     25 class-file support ("Unsupported class file major
+                     version 69"). Forcing pmd-core itself, not just asm,
+                     because overriding asm alone left the error unchanged
+                     (confirmed live) — pmd-core 7.17.0's own dependency
+                     mediation was still winning. -->
+                <dependencies>
+                    <dependency>
+                        <groupId>net.sourceforge.pmd</groupId>
+                        <artifactId>pmd-core</artifactId>
+                        <version>7.26.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>net.sourceforge.pmd</groupId>
+                        <artifactId>pmd-java</artifactId>
+                        <version>7.26.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                        <version>9.10.1</version>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>pmd-check</id>
