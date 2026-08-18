@@ -113,11 +113,24 @@ jobs:
       #    same week only need a small incremental update.
       #  - nvdApiKeyEnvironmentVariable (the plugin's own recommended CI
       #    pattern) instead of passing the key as a -D value directly.
+      # `dependency-check:check` invoked as a bare goal (no lifecycle phase)
+      # does not package any module first. Once the NVD update itself
+      # started succeeding (cache hit), the scan advanced far enough to hit
+      # this for real: "app" declares common/identity-module/organization-
+      # module/client-registry-module as compile-scope dependencies, and
+      # with no prior `package`, none of those .jars exist anywhere this job
+      # can find them — confirmed live ("Could not find artifact
+      # com.clavaris:common:jar..."). `package` first, in the SAME mvn
+      # invocation, makes each module's jar available to the reactor before
+      # the module that depends on it needs it (the same mechanism every
+      # `mvn verify` elsewhere in this workflow already relies on).
+      # -DskipTests: this job scans dependencies, it doesn't need to
+      # re-run the test suite build-and-test already covers.
       - name: OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
-          mvn -B org.owasp:dependency-check-maven:13.0.0:check
+          mvn -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
           -DdataDirectory=$HOME/.dependency-check-data
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
