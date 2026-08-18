@@ -25,8 +25,4 @@ docker compose up --build
 - Liveness: `http://localhost:8080/actuator/health/liveness`
 - Readiness: `http://localhost:8080/actuator/health/readiness` (checks DB + Redis)
 
-## Relationship to other projects
-
-Clavaris has no product-specific logic — it doesn't know what "JobSeeker" or any other consumer is. [JobSeeker](../JobSeeker) is its first client, integrating as a standard OIDC relying party.
-
 See `docs/` for architecture, product, and domain documentation.
