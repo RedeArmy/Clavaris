@@ -18,14 +18,15 @@ Conventional-commit-style prefix (`feat:`, `fix:`, `docs:`, `chore:`, `security:
 
 ## 4. CI gates before merge
 
-Enforced by `.github/workflows/ci.yml`, triggered on push/PR against `master`, five jobs:
+Enforced by `.github/workflows/ci.yml`, triggered on push/PR against `master`, five substantive jobs plus one aggregator:
 
 - `build-and-test` — `mvn verify`: all tests green (`test-strategy.md`), including the ArchUnit hexagonal-dependency check, Spotless formatting (`validate` phase — fails before compilation), and PMD clean-code rules (`verify` phase, `pmd-ruleset.xml`) — `coding-standards.md` §1. None of these are separate CI steps by design; they all run as part of the one `mvn verify` invocation.
 - `docker-build` — `app/Dockerfile` actually builds; catches Dockerfile/pom drift as a CI failure instead of a deploy-time surprise.
 - `dependency-scan` — OWASP Dependency-Check, fails the build on CVSS ≥ 7 (`security-architecture.md` §8). **`NVD_API_KEY` as a repo secret is required, not just a flakiness reducer** — confirmed live: a cold run with no key and no cached NVD data failed outright (`NullPointerException` during the NVD update, then `NoDataException: No documents exist` once it tried to fall back to local data that didn't exist yet). The job caches the NVD dataset weekly (`~/.dependency-check-data`), but a **separate scheduled workflow, `nvd-cache-refresh.yml`, is what actually populates that cache** (Sundays 02:00 UTC, plus manual `workflow_dispatch`) — confirmed live that leaving this job as the only thing populating its own cache meant the first push against a new/evicted weekly cache paid a full cold-sync cost inline (~380k NVD records, **5 hours** on one real run) before this gate would go green. With the scheduled job pre-warming the same cache key ahead of time, this job should almost always find a warm cache and only need a fast incremental update.
 - `doc-consistency` — runs `scripts/check-doc-consistency.sh` (`definition-of-done.md` §1a); a cheap, deliberately non-exhaustive stopgap against the exact class of drift ADR-0010 caused once already.
 - `sonarcloud` — full analysis + Quality Gate (§4a below).
-- No direct commits to `master` — every change goes through a PR, even solo; enforced via GitHub branch protection (a repo setting, not something the workflow file itself can guarantee).
+- `ci-passed` — depends on all five jobs above (`needs:`), `if: always()`, fails if any of them didn't succeed. Exists purely so GitHub branch protection has **one** status check to require instead of five — requiring each job by name individually breaks silently the moment any one of them is renamed (branch protection keeps waiting for the old name forever, with no obvious reason why a PR won't merge). Runs in parallel with nothing to wait on itself, so it costs no extra wall-clock time.
+- No direct commits to `master` — every change goes through a PR, even solo; enforced via GitHub branch protection requiring the `ci-passed` check (a repo setting, not something the workflow file itself can guarantee).
 
 ## 4a. SonarCloud Quality Gate — added 2026-08-17, requires one-time manual setup before it's live
 

@@ -204,17 +204,13 @@ jobs:
       # falls back to the same default list, and doesn't fail the build or
       # the Quality Gate (which grades new-code coverage, not empty folders).
       #
-      # Setup (git-workflow.md §4a): project created at sonarcloud.io and
-      # projectKey/organization below are real values (2026-08-18). Still
-      # needed before this job can pass:
-      #  1. Add SONAR_TOKEN as a repo secret (Settings → Secrets and
-      #     variables → Actions) — generate it from SonarCloud's own
-      #     My Account → Security → Generate Token.
-      #  2. Enable Branch Protection on `master` (Settings → Branches) and
-      #     require this job ("SonarCloud analysis (Quality Gate)") — and
-      #     the other CI jobs — to pass before merging. Neither this file nor
-      #     Claude Code can set that from here; it's a GitHub repo setting
-      #     only a repo admin can configure.
+      # Setup (git-workflow.md §4a): project created at sonarcloud.io,
+      # projectKey/organization below are real values, and SONAR_TOKEN is
+      # confirmed added as a repo secret (2026-08-18). Branch protection on
+      # `master` requiring the `ci-passed` aggregator job below (not this
+      # job individually) is a GitHub repo setting only an admin can
+      # configure — neither this file nor Claude Code can set that from
+      # here.
       - name: Build, test, and analyse
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -224,3 +220,40 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
+
+  # Branch protection needs to require exactly one status check, not five —
+  # requiring each job individually breaks silently the moment any one of
+  # them is renamed (GitHub keeps requiring the old name forever, and the
+  # PR sits unmergeable with no obvious reason why) and, until this job
+  # existed, would have made setup itself a five-item checklist to keep in
+  # sync by hand. This job depends on all five and only succeeds if every
+  # one of them did — branch protection requires only "CI Passed"
+  # (git-workflow.md §4). Runs in parallel with nothing to wait on itself,
+  # so it adds no wall-clock time beyond whichever upstream job is slowest.
+  ci-passed:
+    name: CI Passed
+    runs-on: ubuntu-latest
+    needs:
+      [build-and-test, docker-build, dependency-scan, doc-consistency, sonarcloud]
+    # Without this, a failure in any `needs` job skips this one entirely —
+    # a "skipped" required check leaves a PR stuck pending forever instead
+    # of showing a clear red ✗, which is confusing to debug from the PR
+    # page alone. always() makes this job run regardless, so it can report
+    # an explicit, visible failure.
+    if: always()
+    steps:
+      - name: Fail if any required job did not succeed
+        run: |
+          echo "build-and-test:    ${{ needs.build-and-test.result }}"
+          echo "docker-build:      ${{ needs.docker-build.result }}"
+          echo "dependency-scan:   ${{ needs.dependency-scan.result }}"
+          echo "doc-consistency:   ${{ needs.doc-consistency.result }}"
+          echo "sonarcloud:        ${{ needs.sonarcloud.result }}"
+          if [ "${{ needs.build-and-test.result }}" != "success" ] ||
+             [ "${{ needs.docker-build.result }}" != "success" ] ||
+             [ "${{ needs.dependency-scan.result }}" != "success" ] ||
+             [ "${{ needs.doc-consistency.result }}" != "success" ] ||
+             [ "${{ needs.sonarcloud.result }}" != "success" ]; then
+            echo "One or more required jobs did not succeed — failing the aggregate check."
+            exit 1
+          fi
