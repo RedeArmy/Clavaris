@@ -178,6 +178,18 @@
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <release>${maven.compiler.release}</release>
+                        <!-- Spring's @PathVariable/@RequestParam/@ModelAttribute binding falls
+                             back to reflecting the compiled parameter name when no explicit name
+                             is given on the annotation — without -parameters, the class file
+                             carries "arg0" instead, and binding fails at request time, not at
+                             compile time ("Name for argument of type [...] not specified").
+                             Confirmed live: RegisterAccountControllerTest failed exactly this way
+                             against `@PathVariable UUID organizationId`. A global flag, not a
+                             per-annotation explicit name on every future controller parameter —
+                             this is the kind of thing that's silently correct until the one time
+                             someone forgets, so fixing it at the compiler level removes the
+                             failure mode entirely instead of relying on remembering. -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>
