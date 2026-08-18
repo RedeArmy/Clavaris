@@ -159,6 +159,40 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Cross-module coverage attribution gap, confirmed live on SonarCloud:
+                 RegisterAccountIntegrationTest lives here (app), not in identity-module,
+                 because it needs the full Spring context + aggregated Flyway migrations
+                 only app has (same reasoning as FlywayMigrationIntegrationTest,
+                 MigrationDataPreservationTest). It genuinely exercises identity-module's
+                 persistence adapters (JpaAccountRepository, the JPA entities,
+                 UseCaseConfig) end to end against a real Postgres — but the regular,
+                 per-module jacoco:report goal (root pom.xml) only ever correlates a
+                 module's own target/jacoco.exec against that same module's own
+                 target/classes, so hits recorded here for identity-module's classes
+                 never reach identity-module's own jacoco.xml. SonarCloud reported those
+                 classes at a flat 0.0% as a result, despite being covered by a real
+                 integration test. report-aggregate fixes this the standard way for a
+                 multi-module Maven reactor: run only here, where every business module
+                 (common, identity-module, organization-module, client-registry-module)
+                 is already a declared dependency, it combines every reactor module's
+                 exec data against every dependency's own compiled classes into one
+                 report — ci.yml's sonarcloud job points
+                 sonar.coverage.jacoco.xmlReportPaths at this file specifically, alongside
+                 each module's own report, so Sonar merges both views per source file. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>report-aggregate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

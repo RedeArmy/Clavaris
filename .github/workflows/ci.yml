@@ -192,17 +192,27 @@ jobs:
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
-      # No explicit sonar.coverage.jacoco.xmlReportPaths: the scanner's own
-      # default location list already includes target/site/jacoco/jacoco.xml
-      # per module — exactly where app/pom.xml's jacoco:report execution
-      # writes it (confirmed live: mvn clean verify produces
-      # app/target/site/jacoco/jacoco.xml). An explicit override here was
-      # redundant with that default and only added noise: common/identity-
-      # module/organization-module/client-registry-module have no code yet
-      # (CLAUDE.md §11 scaffolding state), so Sonar logging "no coverage
-      # report found" for those is expected, not a failure — it's a WARN,
-      # falls back to the same default list, and doesn't fail the build or
-      # the Quality Gate (which grades new-code coverage, not empty folders).
+      # Explicit sonar.coverage.jacoco.xmlReportPaths, not just the scanner's
+      # own default fallback: real cross-module coverage attribution gap
+      # confirmed live on SonarCloud — RegisterAccountIntegrationTest lives
+      # in app/, not identity-module/, because it needs the full Spring
+      # context + aggregated Flyway migrations only app has (same reasoning
+      # as FlywayMigrationIntegrationTest). It genuinely exercises
+      # identity-module's persistence adapters end to end against a real
+      # Postgres, but the default per-module report
+      # (identity-module/target/site/jacoco/jacoco.xml) only ever correlates
+      # that module's own exec data against its own compiled classes —
+      # SonarCloud reported those classes at a flat 0.0% ("Coverage on New
+      # Code 65.8%", every 0.0% file a persistence adapter or JPA entity)
+      # despite being covered by a real test. app/pom.xml's report-aggregate
+      # execution (bound to verify, run only there since app is the one
+      # module that already depends on every business module) combines every
+      # reactor module's exec data against every dependency's own compiled
+      # classes into one file — listed second below so Sonar merges it with
+      # each module's own default-location report per source file, not
+      # replaces it (identity-module's own unit-test-covered domain classes,
+      # e.g. Account.java, still need their own report; the aggregate is a
+      # supplement for cross-module coverage, not a substitute).
       #
       # Setup (git-workflow.md §4a): project created at sonarcloud.io,
       # projectKey/organization below are real values, and SONAR_TOKEN is
@@ -220,6 +230,7 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
+          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml,**/target/site/jacoco-aggregate/jacoco.xml
 
   # Branch protection needs to require exactly one status check, not five —
   # requiring each job individually breaks silently the moment any one of

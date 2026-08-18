@@ -27,10 +27,20 @@ public record Email(String value) {
   // left to backtrack over.
   private static final Pattern FORMAT = Pattern.compile("^[^\\s@]+@[^\\s@.]+(?:\\.[^\\s@.]+)+$");
 
+  // RFC 5321 §4.5.3.1.3: 254 characters is the maximum total length of a valid email address —
+  // not an arbitrary number, the actual protocol limit. Enforced BEFORE the regex runs, not just
+  // as an additional sanity check: java.util.regex implements a quantified group like
+  // (?:\.[^\s@.]+)+ above via recursive descent, one stack frame per repetition, so an
+  // unbounded input with enough dots risks a genuine StackOverflowError, flagged live by static
+  // analysis — distinct from the backtracking-cost concern the group's own shape already
+  // resolves. Bounding the input first means the maximum possible repetition count, and so the
+  // maximum recursion depth, is a small fixed number regardless of how the pattern is written.
+  private static final int MAX_LENGTH = 254;
+
   public Email {
     Objects.requireNonNull(value, "Email value must not be null");
     value = value.strip().toLowerCase(Locale.ROOT);
-    if (value.isEmpty() || !FORMAT.matcher(value).matches()) {
+    if (value.isEmpty() || value.length() > MAX_LENGTH || !FORMAT.matcher(value).matches()) {
       throw new IllegalArgumentException("Not a valid email address: " + value);
     }
   }

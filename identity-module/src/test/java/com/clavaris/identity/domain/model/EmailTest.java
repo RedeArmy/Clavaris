@@ -36,4 +36,35 @@ class EmailTest {
   void rejectsNull() {
     assertThatNullPointerException().isThrownBy(() -> new Email(null));
   }
+
+  @Test
+  void acceptsAtTheRfc5321MaximumLength() {
+    // "a...a@b...b.com" sized to exactly 254 chars total.
+    String local = "a".repeat(64);
+    String domain = "b".repeat(254 - local.length() - 1 - ".com".length()) + ".com";
+    String atMaxLength = local + "@" + domain;
+    assertThat(atMaxLength).hasSize(254);
+
+    assertThat(new Email(atMaxLength).value()).isEqualTo(atMaxLength);
+  }
+
+  @Test
+  void rejectsAboveTheRfc5321MaximumLength() {
+    String local = "a".repeat(64);
+    String domain = "b".repeat(255 - local.length() - 1 - ".com".length()) + ".com";
+    String tooLong = local + "@" + domain;
+    assertThat(tooLong).hasSize(255);
+
+    assertThatIllegalArgumentException().isThrownBy(() -> new Email(tooLong));
+  }
+
+  @Test
+  void rejectsAPathologicallyLongInputWithoutStackOverflow() {
+    // A pathological input (many dot-separated labels) must be rejected on length alone, before
+    // ever reaching the regex — proves the length guard actually short-circuits, not just that a
+    // long input happens to fail the pattern too.
+    String manyLabels = "a@" + "b.".repeat(500_000);
+
+    assertThatIllegalArgumentException().isThrownBy(() -> new Email(manyLabels));
+  }
 }
