@@ -7,9 +7,11 @@ A change is done when **all** of the following hold — not merely "compiles and
 ## 1. Every change
 
 - [ ] Tests added/updated per `test-strategy.md`, including the ArchUnit hexagonal-dependency check passing.
+- [ ] `mvn spotless:apply` run before committing — `mvn verify` fails on unformatted code, not just flags it (`coding-standards.md` §1).
+- [ ] No new PMD violation (`mvn verify`, `pmd-ruleset.xml`) — a genuine false positive gets a targeted `@SuppressWarnings` with a comment, never a ruleset-wide exclusion to silence it.
 - [ ] Comment added/updated per `coding-standards.md` §3 if the change encodes a business rule or architectural decision.
 - [ ] No PII, credential, or token value introduced into logs (BR-DATA-01) — checked explicitly, not assumed.
-- [ ] CI green: tests, dependency vulnerability scan, ArchUnit.
+- [ ] CI green: tests, dependency vulnerability scan, ArchUnit, Spotless, PMD.
 - [ ] PR reviewed (even solo — see `git-workflow.md` §4) before merge to `master`, and the SonarCloud Quality Gate (`git-workflow.md` §4a) is green.
 
 ## 1a. Every change to a *documented decision* (new/amended ADR, renamed or redefined domain concept)

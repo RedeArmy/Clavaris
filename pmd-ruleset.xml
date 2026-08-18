@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Clavaris"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Clean-code rules (coding-standards.md §1, pom.xml). Imports PMD's own
+        curated categories wholesale, minus rules that don't apply to this
+        project without configuration this repo has no use for.
+    </description>
+
+    <rule ref="category/java/bestpractices.xml"/>
+    <rule ref="category/java/errorprone.xml"/>
+    <rule ref="category/java/codestyle.xml"/>
+    <rule ref="category/java/design.xml">
+        <!-- Needs an explicit allowed-package list to mean anything; Clavaris's
+             module boundary is already enforced by ArchUnit
+             (HexagonalArchitectureTest) and by separate Maven artifacts per
+             module — a second, differently-shaped coupling rule here would
+             just be unconfigured noise, not a real check. -->
+        <exclude name="LoosePackageCoupling"/>
+    </rule>
+
+</ruleset>

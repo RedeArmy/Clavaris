@@ -32,6 +32,11 @@
              (git-workflow.md §4) — a Quality Gate with no coverage report to
              read is not actually measuring anything. -->
         <jacoco.version>0.8.12</jacoco.version>
+        <!-- coding-standards.md §1: formatting and clean-code rules enforced
+             as a real build gate (mvn verify fails on a violation), not a
+             style-guide document nobody re-reads before every PR. -->
+        <spotless.version>2.44.3</spotless.version>
+        <pmd-plugin.version>3.26.0</pmd-plugin.version>
     </properties>
 
     <!--
@@ -89,6 +94,76 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <!-- Bound here, not in pluginManagement — every child module inherits
+             these executions automatically (Maven's default plugin
+             inheritance), no per-module opt-in needed. Applies to code that
+             doesn't exist yet as much as to what does (CLAUDE.md §11): the
+             gate exists before the first real domain class does. -->
+        <plugins>
+            <!-- Formatting (coding-standards.md §1): Google Java Format, the
+                 same zero-config style Google's own engineers write against —
+                 no house style to invent or bikeshed, and no ambiguity for
+                 whoever writes the next class about which formatter settings
+                 "the project uses." `mvn spotless:apply` fixes violations
+                 locally; `mvn verify` (spotless:check, bound to validate —
+                 fails before compilation even starts) refuses to build
+                 unformatted code. -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat/>
+                        <removeUnusedImports/>
+                        <importOrder/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Clean-code rules (coding-standards.md §1) — distinct concern
+                 from formatting above: unused/dead code, empty catch blocks,
+                 needlessly complex methods, naming conventions, non-idiomatic
+                 constructs. Bound to verify (needs compiled classes), fails
+                 the build on any violation at the default priority
+                 threshold — deliberately strict while the codebase is still
+                 small enough that fixing a flagged violation is cheap; revisit
+                 the threshold only if a specific rule proves to be genuine
+                 noise against this codebase, not preemptively. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>${pmd-plugin.version}</version>
+                <configuration>
+                    <linkXRef>false</linkXRef>
+                    <printFailingErrors>true</printFailingErrors>
+                    <rulesets>
+                        <ruleset>${maven.multiModuleProjectDirectory}/pmd-ruleset.xml</ruleset>
+                    </rulesets>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pmd-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <modules>
