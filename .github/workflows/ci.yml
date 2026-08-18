@@ -192,27 +192,36 @@ jobs:
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
-      # Explicit sonar.coverage.jacoco.xmlReportPaths, not just the scanner's
-      # own default fallback: real cross-module coverage attribution gap
-      # confirmed live on SonarCloud — RegisterAccountIntegrationTest lives
-      # in app/, not identity-module/, because it needs the full Spring
-      # context + aggregated Flyway migrations only app has (same reasoning
-      # as FlywayMigrationIntegrationTest). It genuinely exercises
+      # Explicit sonar.coverage.jacoco.xmlReportPaths — this is the SECOND
+      # attempt at this exact problem, the first one (a **-glob pointed at
+      # app/target/site/jacoco-aggregate/jacoco.xml) confirmed live NOT to
+      # work: SonarCloud still reported the same files at 0.0% afterwards.
+      # Root cause, confirmed against SonarSource's own community docs on
+      # this exact scenario: this property is resolved separately for EACH
+      # module, relative to THAT module's own basedir — a `**` glob can only
+      # ever search within a module's own subtree, so from
+      # identity-module's own analysis context it could never reach
+      # app/target/..., a sibling directory, no matter how the glob was
+      # written. The fix the docs describe ("set this property in every
+      # module on which the coverage should be imported") means an explicit
+      # path that's actually reachable from each module's own basedir —
+      # ../app/... — not a glob.
+      #
+      # The underlying gap this exists for: RegisterAccountIntegrationTest
+      # lives in app/, not identity-module/, because it needs the full
+      # Spring context + aggregated Flyway migrations only app has (same
+      # reasoning as FlywayMigrationIntegrationTest). It genuinely exercises
       # identity-module's persistence adapters end to end against a real
-      # Postgres, but the default per-module report
-      # (identity-module/target/site/jacoco/jacoco.xml) only ever correlates
-      # that module's own exec data against its own compiled classes —
-      # SonarCloud reported those classes at a flat 0.0% ("Coverage on New
-      # Code 65.8%", every 0.0% file a persistence adapter or JPA entity)
-      # despite being covered by a real test. app/pom.xml's report-aggregate
-      # execution (bound to verify, run only there since app is the one
-      # module that already depends on every business module) combines every
-      # reactor module's exec data against every dependency's own compiled
-      # classes into one file — listed second below so Sonar merges it with
-      # each module's own default-location report per source file, not
-      # replaces it (identity-module's own unit-test-covered domain classes,
-      # e.g. Account.java, still need their own report; the aggregate is a
-      # supplement for cross-module coverage, not a substitute).
+      # Postgres, but identity-module's own default report only ever
+      # correlates identity-module's own exec data against its own compiled
+      # classes. app/pom.xml's report-aggregate execution (run only there,
+      # since app is the one module that already depends on every business
+      # module) combines every reactor module's exec data against every
+      # dependency's own compiled classes into one file at
+      # app/target/site/jacoco-aggregate/jacoco.xml; every business module
+      # is a direct child of the repo root, so ../app/... resolves correctly
+      # from any of their basedirs (including app's own — app/../app/...
+      # normalises back to itself).
       #
       # Setup (git-workflow.md §4a): project created at sonarcloud.io,
       # projectKey/organization below are real values, and SONAR_TOKEN is
@@ -230,7 +239,7 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
-          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml,**/target/site/jacoco-aggregate/jacoco.xml
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
 
   # Branch protection needs to require exactly one status check, not five —
   # requiring each job individually breaks silently the moment any one of

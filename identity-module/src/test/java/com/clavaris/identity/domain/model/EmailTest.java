@@ -67,4 +67,32 @@ class EmailTest {
 
     assertThatIllegalArgumentException().isThrownBy(() -> new Email(manyLabels));
   }
+
+  @Test
+  void acceptsAMultiLevelDomain() {
+    Email email = new Email("someone@sub.example.co.uk");
+
+    assertThat(email.value()).isEqualTo("someone@sub.example.co.uk");
+  }
+
+  @Test
+  void rejectsADomainWithNoDotAtAll() {
+    assertThatIllegalArgumentException().isThrownBy(() -> new Email("someone@example"));
+  }
+
+  @Test
+  void rejectsADomainStartingWithADot() {
+    assertThatIllegalArgumentException().isThrownBy(() -> new Email("someone@.example.com"));
+  }
+
+  @Test
+  void rejectsADomainEndingWithADot() {
+    assertThatIllegalArgumentException().isThrownBy(() -> new Email("someone@example.com."));
+  }
+
+  @Test
+  void rejectsADomainWithAnEmptyLabel() {
+    // "sub..example.com" — two adjacent dots leave a zero-length label between them.
+    assertThatIllegalArgumentException().isThrownBy(() -> new Email("someone@sub..example.com"));
+  }
 }

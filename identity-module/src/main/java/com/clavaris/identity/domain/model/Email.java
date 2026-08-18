@@ -18,30 +18,51 @@ public record Email(String value) {
   // letting a slightly unusual one through, since delivery of the verification email (BR-ID-05)
   // is the actual proof an address is valid, not this pattern.
   //
-  // The domain part is split into dot-separated labels ([^\s@.]+, dots excluded) rather than
-  // matched with two adjacent [^\s@]+ groups either side of a literal dot: the original version
-  // let both groups match "." too, which let the engine try every possible split point between
-  // them on a domain-less input before failing — O(n²) backtracking, flagged live by static
-  // analysis as superlinear. Excluding "." from each label's own character class removes the
-  // ambiguity entirely: every character has exactly one way to be consumed, so there's nothing
-  // left to backtrack over.
-  private static final Pattern FORMAT = Pattern.compile("^[^\\s@]+@[^\\s@.]+(?:\\.[^\\s@.]+)+$");
+  // Only checks the local-part/@/domain shape — no quantified group, no repetition of any kind.
+  // Two earlier versions of this pattern tried to also validate the domain's dot-separated
+  // labels here: the first let both sides of the literal dot match "." too, letting the engine
+  // try every possible split point on a domain-less input before failing (O(n²) backtracking,
+  // flagged by static analysis as superlinear); the fix for that — a repeated group,
+  // (?:\.[^\s@.]+)+ — was itself then flagged for a genuine stack-overflow risk, since
+  // java.util.regex implements quantified *group* repetition via recursive descent, one stack
+  // frame per repetition, unlike a plain character-class quantifier. A length guard on the input
+  // (still enforced below, RFC 5321 §4.5.3.1.3) mitigates the practical risk but doesn't change
+  // what the pattern itself statically contains, so the warning persisted regardless. Moving the
+  // "at least one interior dot, no empty label" check into plain String operations
+  // (hasValidDomainShape below) removes the structural cause instead of working around it —
+  // there is no regex construct left that can backtrack or recurse, at any input length.
+  private static final Pattern LOCAL_AND_DOMAIN = Pattern.compile("^[^\\s@]+@[^\\s@]+$");
 
   // RFC 5321 §4.5.3.1.3: 254 characters is the maximum total length of a valid email address —
-  // not an arbitrary number, the actual protocol limit. Enforced BEFORE the regex runs, not just
-  // as an additional sanity check: java.util.regex implements a quantified group like
-  // (?:\.[^\s@.]+)+ above via recursive descent, one stack frame per repetition, so an
-  // unbounded input with enough dots risks a genuine StackOverflowError, flagged live by static
-  // analysis — distinct from the backtracking-cost concern the group's own shape already
-  // resolves. Bounding the input first means the maximum possible repetition count, and so the
-  // maximum recursion depth, is a small fixed number regardless of how the pattern is written.
+  // not an arbitrary number, the actual protocol limit. Kept as a first, cheap rejection even
+  // though the pattern above no longer has any repetition for it to bound the cost of.
   private static final int MAX_LENGTH = 254;
 
   public Email {
     Objects.requireNonNull(value, "Email value must not be null");
     value = value.strip().toLowerCase(Locale.ROOT);
-    if (value.isEmpty() || value.length() > MAX_LENGTH || !FORMAT.matcher(value).matches()) {
+    if (value.isEmpty() || value.length() > MAX_LENGTH || !hasValidShape(value)) {
       throw new IllegalArgumentException("Not a valid email address: " + value);
     }
+  }
+
+  private static boolean hasValidShape(final String candidate) {
+    // Single boolean expression, not an early-return guard clause: hasValidDomainShape must never
+    // run against a candidate that doesn't even contain "@" (indexOf would return -1, and
+    // substring(0) would silently "validate" the whole string as a domain) — short-circuiting
+    // && is what keeps that ordering a guarantee rather than a convention to remember.
+    return LOCAL_AND_DOMAIN.matcher(candidate).matches()
+        && hasValidDomainShape(candidate.substring(candidate.indexOf('@') + 1));
+  }
+
+  // Equivalent to the regex-repetition approach this replaced (a domain must resolve to two or
+  // more non-empty, dot-separated labels — e.g. "example.com", not just "example") but expressed
+  // as plain String scans: each of these is a single linear pass with no backtracking or
+  // recursion possible, at any input length.
+  private static boolean hasValidDomainShape(final String domain) {
+    return domain.contains(".")
+        && !domain.startsWith(".")
+        && !domain.endsWith(".")
+        && !domain.contains("..");
   }
 }
