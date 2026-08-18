@@ -97,22 +97,31 @@ jobs:
 
       # security-architecture.md §8 / git-workflow.md §4: dependency
       # vulnerability scanning is a required CI gate, not a "nice to have."
-      # Without NVD_API_KEY, unauthenticated NVD API rate limits are tight
-      # enough that the update can fail outright on a cold cache, not just
-      # run slower as this comment previously (wrongly) claimed — confirmed
-      # live. Get a free key at https://nvd.nist.gov/developers/request-an-api-key
-      # and add it as the NVD_API_KEY repo secret; the cache above is a
-      # safety net for when the update still fails occasionally, not a
-      # substitute for having a key. Bumped 10.0.4 → 13.0.0: the NVD API v2.0
-      # client in 10.0.4 is old enough to plausibly be the source of the
-      # NullPointerException seen in that failed update, independent of the
-      # rate-limit question.
+      # NVD_API_KEY confirmed live (auth works, real download started —
+      # ~380k records on a cold cache, this repo's first-ever sync). That
+      # first full sync then hit NVD's own servers returning repeated 503s
+      # until retries were exhausted — a transient NVD-side outage, not a
+      # config problem; a re-run (or NVD simply recovering) succeeds. Two
+      # mitigations against this recurring:
+      #  - nvdApiDelay spaces requests out more (default pace was apparently
+      #    tight enough to help trigger NVD's own throttling during a large
+      #    cold-cache sync) — a slower, steadier sync is more likely to
+      #    finish than a fast one that gets 503'd repeatedly.
+      #  - The weekly cache above means this multi-minute full sync is a
+      #    one-time cost per week, not paid on every single run — once one
+      #    run completes it (even after a retry), subsequent runs in the
+      #    same week only need a small incremental update.
+      #  - nvdApiKeyEnvironmentVariable (the plugin's own recommended CI
+      #    pattern) instead of passing the key as a -D value directly.
       - name: OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
           mvn -B org.owasp:dependency-check-maven:13.0.0:check
           -DfailBuildOnCVSS=7
           -DdataDirectory=$HOME/.dependency-check-data
-          -Dnvd.api.key=${{ secrets.NVD_API_KEY }}
+          -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+          -DnvdApiDelay=6000
 
       - name: Upload dependency-check report
         if: always()
@@ -165,14 +174,13 @@ jobs:
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
-      # REQUIRES SETUP BEFORE THIS JOB CAN PASS (git-workflow.md §4a):
-      #  1. Create the project at https://sonarcloud.io (import this GitHub repo).
-      #  2. Replace sonar.projectKey / sonar.organization below with the real
-      #     values SonarCloud assigns.
-      #  3. Add SONAR_TOKEN as a repo secret (Settings → Secrets and
+      # Setup (git-workflow.md §4a): project created at sonarcloud.io and
+      # projectKey/organization below are real values (2026-08-18). Still
+      # needed before this job can pass:
+      #  1. Add SONAR_TOKEN as a repo secret (Settings → Secrets and
       #     variables → Actions) — generate it from SonarCloud's own
       #     My Account → Security → Generate Token.
-      #  4. Enable Branch Protection on `master` (Settings → Branches) and
+      #  2. Enable Branch Protection on `master` (Settings → Branches) and
       #     require this job ("SonarCloud analysis (Quality Gate)") — and
       #     the other CI jobs — to pass before merging. Neither this file nor
       #     Claude Code can set that from here; it's a GitHub repo setting
@@ -182,8 +190,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
-          -Dsonar.projectKey=TODO_REPLACE_WITH_SONARCLOUD_PROJECT_KEY
-          -Dsonar.organization=TODO_REPLACE_WITH_SONARCLOUD_ORG_KEY
+          -Dsonar.projectKey=RedeArmy_Clavaris
+          -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
           -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml

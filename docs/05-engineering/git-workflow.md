@@ -31,13 +31,13 @@ Enforced by `.github/workflows/ci.yml`, triggered on push/PR against `master`, f
 
 The `sonarcloud` job runs `mvn verify` plus the Sonar Maven plugin in one pass, uploading JaCoCo coverage (`pom.xml`/`app/pom.xml` — `jacoco-maven-plugin`) alongside the static analysis. `sonar.qualitygate.wait=true` makes the CI job itself fail if the Quality Gate comes back red — this is what "a commit only reaches `master` once validated" actually means mechanically: a red Quality Gate is a red CI check, and a red CI check is what branch protection (below) refuses to merge.
 
-**Not live yet — three things a repo admin must do by hand, none of which a workflow file or Claude Code can do from here:**
+**Setup status (2026-08-18) — two of three done:**
 
-1. Create the project at sonarcloud.io (import this GitHub repository) and replace the `sonar.projectKey`/`sonar.organization` placeholders in `ci.yml`'s `sonarcloud` job with the real values SonarCloud assigns.
-2. Generate a token (SonarCloud → My Account → Security) and add it as the `SONAR_TOKEN` repo secret (GitHub → Settings → Secrets and variables → Actions).
-3. Enable Branch Protection on `master` (GitHub → Settings → Branches) requiring every job in `ci.yml` — `sonarcloud` included — to pass before a PR can merge. Until this is set, the `sonarcloud` job existing in the workflow is advisory only; nothing stops a merge if it fails.
+1. ~~Create the project at sonarcloud.io and set `sonar.projectKey`/`sonar.organization` in `ci.yml`~~ — **done**: project key `RedeArmy_Clavaris`, organization `redearmy`.
+2. Generate a token (SonarCloud → My Account → Security) and add it as the `SONAR_TOKEN` repo secret (GitHub → Settings → Secrets and variables → Actions) — **still needed**, confirmed live: the job fails with "Not authorized or project not found" until this exists.
+3. Enable Branch Protection on `master` (GitHub → Settings → Branches) requiring every job in `ci.yml` — `sonarcloud` included — to pass before a PR can merge — **still needed**, a repo-admin-only GitHub setting. Until this is set, the `sonarcloud` job existing in the workflow is advisory only; nothing stops a merge if it fails.
 
-Until all three are done, this job will fail on every run (no valid project key/token) — expected, not a bug, until setup completes.
+Until both remaining items are done, this job fails on every run — expected, not a bug, until setup completes.
 
 ## 5. Feature flags
 
