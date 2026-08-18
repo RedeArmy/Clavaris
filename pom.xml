@@ -200,6 +200,16 @@
             </plugins>
         </pluginManagement>
 
+        <!-- Moved here from app/pom.xml (which had the only executions of
+             this plugin) once real business-module code and tests existed
+             to matter: coverage was only ever measured for the app module,
+             leaving SonarCloud's Quality Gate computing "coverage on new
+             code" against zero instrumented lines the moment a PR's new
+             code landed in identity-module instead — confirmed live, "0.0%
+             Coverage on New Code" failing the gate despite 39 real tests.
+             Same "bound here, not pluginManagement, so every child inherits
+             automatically" rationale as Spotless/PMD above. -->
+
         <!-- Bound here, not in pluginManagement — every child module inherits
              these executions automatically (Maven's default plugin
              inheritance), no per-module opt-in needed. Applies to code that
@@ -288,6 +298,31 @@
                         <phase>verify</phase>
                         <goals>
                             <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Coverage (git-workflow.md §4a): SonarCloud's Quality Gate reads
+                 target/site/jacoco/jacoco.xml from every module, not just app —
+                 binding this here, not per-module, is what makes that true. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <!-- Instruments the JVM running each module's own tests. -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <!-- Produces target/site/jacoco/jacoco.xml per module. -->
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>

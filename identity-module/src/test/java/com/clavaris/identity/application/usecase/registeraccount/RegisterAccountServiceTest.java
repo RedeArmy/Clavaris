@@ -74,9 +74,14 @@ class RegisterAccountServiceTest {
 
   @Test
   void rejectsAPasswordThatFailsPolicy_beforeTouchingTheRepository() {
+    // Command construction pulled out of the lambda passed to isThrownBy: with it inside, the
+    // lambda has two invocations that could throw (the constructor and handle()), leaving it
+    // ambiguous which one static analysis — and a future reader — should credit for the
+    // exception. A single invocation in the lambda keeps the assertion unambiguous.
+    RegisterAccountCommand command = new RegisterAccountCommand(organizationId, email, "short");
+
     assertThatExceptionOfType(WeakPasswordException.class)
-        .isThrownBy(
-            () -> service.handle(new RegisterAccountCommand(organizationId, email, "short")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
     verify(outbox, never()).write(any(), any(), any());
@@ -85,11 +90,11 @@ class RegisterAccountServiceTest {
   @Test
   void rejectsRegistrationWhenThePreCheckFindsTheEmailAlreadyTaken() {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(true);
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD);
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
-        .isThrownBy(
-            () ->
-                service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
     verify(outbox, never()).write(any(), any(), any());
@@ -102,11 +107,11 @@ class RegisterAccountServiceTest {
     // load-bearing here, not this pre-check (data-model.md §3).
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
     doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).save(any());
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD);
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
-        .isThrownBy(
-            () ->
-                service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(outbox, never()).write(any(), any(), any());
   }

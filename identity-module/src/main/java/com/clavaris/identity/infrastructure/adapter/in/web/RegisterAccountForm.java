@@ -36,11 +36,13 @@ public class RegisterAccountForm {
   @NotBlank(message = "Please confirm your password")
   private String confirmPassword;
 
-  // Explicit only because PMD.AtLeastOneConstructor requires it; PMD.UnnecessaryConstructor is
-  // suppressed for the same reason as Argon2PasswordHasher's — Spring MVC/Thymeleaf need a
-  // no-arg constructor to bind form data onto, and this class genuinely needs nothing beyond it.
+  // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor (see its
+  // comment) — Spring MVC/Thymeleaf need a no-arg constructor to bind form data onto.
   @SuppressWarnings("PMD.UnnecessaryConstructor")
-  public RegisterAccountForm() {}
+  public RegisterAccountForm() {
+    // Intentionally empty — Spring MVC/Thymeleaf just need a no-arg constructor to bind
+    // form-submitted values onto via the setters below; there's no state to initialise here.
+  }
 
   public String getEmail() {
     return email;
