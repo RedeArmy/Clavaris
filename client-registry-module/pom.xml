@@ -11,5 +11,47 @@
     <artifactId>client-registry-module</artifactId>
     <packaging>jar</packaging>
     <name>client-registry-module</name>
-    <description>Placeholder POM for client-registry-module. No dependencies yet.</description>
+    <description>
+        Registered consuming applications (OAuth clients), authorization codes, and the
+        platform-tier PlatformClient that authenticates the management API itself
+        (ADR-0010, Organization provisioning). First real code: PlatformClient bootstrap
+        (BR-PLATFORM-03).
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- JSON serialization for platform_clients.allowed_scopes (text/JSON array,
+             data-model.md §2) — this module has no web layer yet to pull Jackson in
+             transitively, unlike identity-module's spring-boot-starter-web. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
+        </dependency>
+        <!-- ADR-0005-style hashing for client_secret_hash — same "hash-not-plaintext" principle
+             as PasswordCredential (data-model.md §2). Not a dependency on identity-module's own
+             Argon2PasswordHasher: business modules stay mutually independent (app is the only
+             module allowed to see the whole tree, CLAUDE.md §7.2's spirit applied at the
+             module-graph level) — a small amount of duplication between two modules is an
+             acceptable, explicit trade-off; refactor into a shared utility only once a third
+             module needs the same thing (YAGNI, not premature abstraction). -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.85.2</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>
