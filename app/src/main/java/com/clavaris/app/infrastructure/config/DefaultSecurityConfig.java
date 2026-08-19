@@ -29,15 +29,14 @@ class DefaultSecurityConfig {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
 
-  // HttpSecurity's own fluent API declares `throws Exception` on every configurer method (Spring
-  // Security's own contract, not something a caller can narrow) — same idiom on every
-  // SecurityFilterChain @Bean method in this codebase.
-  @SuppressWarnings("PMD.SignatureDeclareThrowsException")
   @Bean
   @Order(3)
-  /* package */ SecurityFilterChain defaultSecurityFilterChain(final HttpSecurity http)
-      throws Exception {
+  /* package */ SecurityFilterChain defaultSecurityFilterChain(final HttpSecurity http) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+        // Matches the pre-Spring-Security state exactly (see class Javadoc): nothing behind this
+        // catch-all chain used a cookie-based session needing CSRF protection before this chain
+        // existed, and nothing does now — RegisterAccount's own form CSRF gap is a real, tracked
+        // follow-up, not something this line is meant to silently paper over.
         .csrf(AbstractHttpConfigurer::disable);
     return http.build();
   }

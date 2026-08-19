@@ -6,15 +6,18 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 
 /**
  * Adapts client-registry-module's {@link PlatformClientRepository} port to Spring Authorization
  * Server's own {@link RegisteredClientRepository} SPI — the bridge lives in {@code app}, not either
  * business module, for the same reason {@code SigningKeyProvisioner}'s implementation does (see
  * {@code CreateOrganizationSigningKeyBridge}): app is the one module allowed to depend on both.
+ * {@code @Repository}, not {@code @Component}: this class genuinely is a {@code *Repository}
+ * implementation (Spring's own naming convention), and the stereotype also enables JPA/Hibernate
+ * exception translation for whatever {@code platformClients} does underneath.
  */
-@Component
+@Repository
 class PlatformRegisteredClientRepository implements RegisteredClientRepository {
 
   private final PlatformClientRepository platformClients;

@@ -45,18 +45,13 @@ class PlatformAuthorizationServerConfig {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
 
-  // HttpSecurity's own fluent API declares `throws Exception` on every configurer method (Spring
-  // Security's own contract, not something a caller can narrow) — same idiom on every
-  // SecurityFilterChain @Bean method in this codebase.
-  @SuppressWarnings("PMD.SignatureDeclareThrowsException")
   @Bean
   @Order(1)
   /* package */ SecurityFilterChain platformAuthorizationServerSecurityFilterChain(
       final HttpSecurity http,
       final RegisteredClientRepository registeredClients,
       final PlatformSigningKeyMaterial signingKey,
-      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl)
-      throws Exception {
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl) {
     final AuthorizationServerSettings settings =
         AuthorizationServerSettings.builder()
             .issuer(baseUrl)

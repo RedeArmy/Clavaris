@@ -33,15 +33,10 @@ class AdminApiSecurityConfig {
     return NimbusJwtDecoder.withPublicKey((RSAPublicKey) platformKey.keyPair().getPublic()).build();
   }
 
-  // HttpSecurity's own fluent API declares `throws Exception` on every configurer method
-  // (Spring Security's own contract, not something a caller can narrow) — same idiom on every
-  // SecurityFilterChain @Bean method in this codebase (PlatformAuthorizationServerConfig,
-  // DefaultSecurityConfig).
-  @SuppressWarnings("PMD.SignatureDeclareThrowsException")
   @Bean
   @Order(2)
   /* package */ SecurityFilterChain adminApiSecurityFilterChain(
-      final HttpSecurity http, final JwtDecoder jwtDecoder) throws Exception {
+      final HttpSecurity http, final JwtDecoder jwtDecoder) {
     http.securityMatcher("/api/v1/admin/**")
         .authorizeHttpRequests(
             authorize ->
