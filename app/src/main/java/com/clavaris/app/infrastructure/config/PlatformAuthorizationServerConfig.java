@@ -15,6 +15,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
@@ -106,10 +107,19 @@ class PlatformAuthorizationServerConfig {
                                                     Argon2PasswordEncoder
                                                         .defaultsForSpringSecurity_v5_8())))))
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+        // STATELESS, not left at Spring Security's IF_REQUIRED default: without this, a
+        // successful Basic-Auth client_credentials request could still get its SecurityContext
+        // persisted to an HttpSession (Spring Security's default SecurityContextRepository
+        // behaviour), which would make "no session, no CSRF token to carry" below an assumption
+        // rather than something actually enforced by this chain. A client_credentials token
+        // endpoint has no reason to remember anything between requests — every call re-presents
+        // its own credentials.
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         // Client authentication itself (Basic-Auth clientId/secret against the PlatformClient's
-        // Argon2 hash) is what protects /oauth2/token — no separate login session, no CSRF token
-        // to carry, exactly as any client_credentials token endpoint works. securityMatcher
-        // above already scopes this whole chain to /oauth2/**, so
+        // Argon2 hash) is what protects /oauth2/token; STATELESS above rules out a session
+        // cookie entirely — no CSRF token to carry, exactly as any client_credentials token
+        // endpoint works. securityMatcher already scopes this whole chain to /oauth2/**, so
         // ignoringRequestMatchers("/oauth2/**") would just restate that as a no-op condition —
         // disabling outright says what's actually true.
         .csrf(AbstractHttpConfigurer::disable);
