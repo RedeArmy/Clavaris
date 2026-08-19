@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -50,9 +51,12 @@ class AdminApiSecurityConfig {
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
-        // A Bearer token, not a browser session — no CSRF token to carry, same as the platform
-        // issuer's own token endpoint.
-        .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/admin/**"))
+        // Resource server, STATELESS session policy below, and securityMatcher already scopes
+        // this whole chain to /api/v1/admin/** — every request reaching this point authenticates
+        // via a Bearer token, never a cookie-based session, so there's no CSRF token to carry in
+        // the first place. ignoringRequestMatchers(the same path already gating the chain) would
+        // just restate that as a no-op condition; disabling outright says what's actually true.
+        .csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 

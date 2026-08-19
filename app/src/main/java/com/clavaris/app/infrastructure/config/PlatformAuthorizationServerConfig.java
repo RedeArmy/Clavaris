@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -107,8 +108,11 @@ class PlatformAuthorizationServerConfig {
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         // Client authentication itself (Basic-Auth clientId/secret against the PlatformClient's
         // Argon2 hash) is what protects /oauth2/token — no separate login session, no CSRF token
-        // to carry, exactly as any client_credentials token endpoint works.
-        .csrf(csrf -> csrf.ignoringRequestMatchers("/oauth2/**"));
+        // to carry, exactly as any client_credentials token endpoint works. securityMatcher
+        // above already scopes this whole chain to /oauth2/**, so
+        // ignoringRequestMatchers("/oauth2/**") would just restate that as a no-op condition —
+        // disabling outright says what's actually true.
+        .csrf(AbstractHttpConfigurer::disable);
 
     return http.build();
   }
