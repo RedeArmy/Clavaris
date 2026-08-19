@@ -11,5 +11,77 @@
     <artifactId>organization-module</artifactId>
     <packaging>jar</packaging>
     <name>organization-module</name>
-    <description>Placeholder POM for organization-module. No dependencies yet.</description>
+    <description>
+        Organization (tenant isolation boundary, ADR-0010) and Workspace. First real code:
+        CreateOrganization (BR-ORG-06) — an operator-only action that provisions the initial
+        SigningKey synchronously, in the same operation, via a port implemented in app (the one
+        module allowed to depend on both organization-module and identity-module).
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- CreateOrganizationController (infrastructure/adapter/in/web) — the only REST controller
+             in this module so far. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- @NotBlank on CreateOrganizationRequest.name — starter-web alone doesn't pull in a
+             Bean Validation implementation (Hibernate Validator) since Spring Boot 3. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- @Operation/@ApiResponse annotations only (ADR-0008) — the full springdoc starter that
+             actually serves /v3/api-docs + Swagger UI is a runtime concern of the final assembled
+             deployable, wired in app/pom.xml, not needed just to write the annotations here. -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>2.2.52</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- test-strategy.md §2: persistence adapters get a real-Postgres integration test —
+             JpaOrganizationRepositoryTest runs the actual organizations migration (not a
+             Hibernate-generated schema), scoped to this module alone. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>
