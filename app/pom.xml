@@ -54,6 +54,42 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- ADR-0003, ADR-0010 (Organization provisioning): issues the platform issuer's own
+             client_credentials tokens (BR-PLATFORM-01) — wired here, not in identity-module or
+             client-registry-module, because it needs both at once (client-registry-module's
+             PlatformClient for the RegisteredClientRepository, identity-module's
+             PlatformSigningKeyMaterial for the JWKSource/signer), and app is the one module
+             already allowed to depend on every business module (CLAUDE.md §7.2's module-graph
+             rule). Uses the two implementation patterns the spike validated
+             (docs/03-architecture/spikes/0001-spring-authorization-server-multitenancy.md
+             Appendix A/B) as the starting point, per CLAUDE.md §11 and the spike's own §7
+             recommendation, not re-derived from scratch. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-authorization-server</artifactId>
+        </dependency>
+        <!-- Validates incoming Bearer tokens on /api/v1/admin/** against the platform issuer's own
+             JWKS (BR-PLATFORM-02) — a different concern from issuing them above, hence a separate
+             starter/SecurityFilterChain, not the same one. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- ADR-0008: springdoc generates /v3/api-docs + Swagger UI from the @Operation/
+             @ApiResponse annotations already on organization-module's CreateOrganizationController
+             — the runtime doc-serving endpoint only needs to exist on app's own classpath (the
+             final assembled deployable) to pick up every annotated controller from every
+             dependency module; organization-module itself only needs the lightweight annotations
+             artifact (see its own pom.xml) to write those annotations, not this whole starter. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <!-- 2.x doesn't support Spring Framework 7/Boot 4 — confirmed: 3.0.0 is the first
+                 version with that support, 3.0.1 specifically fixed a 7.0.2 compat regression;
+                 3.1.0 is the latest available on Maven Central as of this writing. -->
+            <version>3.1.0</version>
+        </dependency>
+
         <!-- DB health indicator (DataSourceHealthIndicator) is auto-configured once
              spring-boot-starter-data-jpa + a driver are on the classpath (ADR-0004: Postgres). -->
         <dependency>
