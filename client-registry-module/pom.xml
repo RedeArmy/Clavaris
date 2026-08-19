@@ -23,9 +23,29 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- JSON serialization for platform_clients.allowed_scopes (text/JSON array,
-             data-model.md §2) — this module has no web layer yet to pull Jackson in
-             transitively, unlike identity-module's spring-boot-starter-web. -->
+        <!-- CreateOrganizationController's counterpart here: RegisterOAuthClientController
+             (infrastructure/adapter/in/web), POST /api/v1/admin/organizations/{organizationId}/clients. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- @NotEmpty/@NotBlank on RegisterOAuthClientRequest — starter-web alone doesn't pull in
+             a Bean Validation implementation (Hibernate Validator) since Spring Boot 3. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- @Operation/@ApiResponse annotations only (ADR-0008) — same convention as
+             organization-module's own pom.xml; the full springdoc starter that serves
+             /v3/api-docs + Swagger UI is wired once, in app/pom.xml. -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>2.2.52</version>
+        </dependency>
+        <!-- JSON serialization for platform_clients.allowed_scopes / oauth_clients' three JSON-array
+             columns (data-model.md §2) — spring-boot-starter-web now pulls Jackson in transitively
+             too, but this stays explicit rather than relying on that indirection. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jackson</artifactId>

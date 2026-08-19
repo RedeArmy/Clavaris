@@ -4,6 +4,10 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.B
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientService;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,5 +30,13 @@ class ClientRegistryUseCaseConfig {
   /* package */ BootstrapPlatformClientUseCase bootstrapPlatformClientUseCase(
       final PlatformClientRepository platformClients, final ClientSecretHasher hasher) {
     return new BootstrapPlatformClientService(platformClients, hasher);
+  }
+
+  @Bean
+  /* package */ RegisterOAuthClientUseCase registerOAuthClientUseCase(
+      final OAuthClientRepository oauthClients,
+      final OrganizationExistsChecker orgExistsChecker,
+      final ClientSecretHasher hasher) {
+    return new RegisterOAuthClientService(oauthClients, orgExistsChecker, hasher);
   }
 }
