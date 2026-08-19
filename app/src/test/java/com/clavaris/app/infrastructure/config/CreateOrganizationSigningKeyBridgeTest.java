@@ -56,6 +56,6 @@ class CreateOrganizationSigningKeyBridgeTest {
     bridge.provisionFor(organizationId);
 
     verify(materialFactory).generateFor(expected);
-    verify(keyActivator).handle(eq(expected), eq("a-kid"), eq("RS256"));
+    verify(keyActivator).handle(expected, "a-kid", "RS256");
   }
 }
