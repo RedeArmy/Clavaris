@@ -9,6 +9,8 @@
     <h1>Create an account</h1>
 
     <form th:action="@{''}" th:object="${form}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
         <div>
             <label for="email">Email</label>
             <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
