@@ -1,5 +1,11 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyService;
+import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyUseCase;
+import com.clavaris.identity.application.usecase.activateplatformsigningkey.PlatformSigningKeyRepository;
+import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationService;
+import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -16,12 +22,12 @@ import org.springframework.context.annotation.Configuration;
  * infrastructure, not as a class-level {@code @Service} on the service itself.
  */
 @Configuration
-class UseCaseConfig {
+class IdentityUseCaseConfig {
 
   // Written out explicitly for the same reason as Argon2PasswordHasher's own constructor
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
   @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ UseCaseConfig() {
+  /* package */ IdentityUseCaseConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
 
@@ -34,5 +40,17 @@ class UseCaseConfig {
       final PasswordHasher passwordHasher,
       final EventOutboxWriter eventOutboxWriter) {
     return new RegisterAccountService(accountRepository, passwordHasher, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ ActivatePlatformSigningKeyUseCase activatePlatformSigningKeyUseCase(
+      final PlatformSigningKeyRepository platformKeys) {
+    return new ActivatePlatformSigningKeyService(platformKeys);
+  }
+
+  @Bean
+  /* package */ ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase(
+      final SigningKeyRepository signingKeys) {
+    return new ActivateSigningKeyForOrganizationService(signingKeys);
   }
 }
