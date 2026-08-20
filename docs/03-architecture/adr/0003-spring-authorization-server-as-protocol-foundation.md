@@ -13,7 +13,7 @@ Use **Spring Authorization Server** (Spring's official OAuth2/OIDC provider fram
 ## Consequences
 
 - **Positive:** protocol correctness (PKCE validation, code exchange, token introspection semantics) is inherited from a maintained, widely-used library instead of hand-built and hand-tested.
-- **Positive:** natural fit with the rest of the stack (Java 21, Spring Boot 3.4, Spring Security) — no additional runtime or language introduced.
+- **Positive:** natural fit with the rest of the stack (Java 25, Spring Boot 4.1, Spring Security) — no additional runtime or language introduced.
 - **Negative:** Clavaris is coupled to Spring Authorization Server's release cadence and design opinions; if the project is abandoned or diverges incompatibly from Spring Boot's own versioning, this becomes a forced migration. No fallback plan exists yet (`project-charter.md` §6 — flagged as an unmitigated assumption).
 - **Negative:** some product requirements (e.g. the exact shape of `organization-module`) may not map cleanly onto Spring Authorization Server's extension points, requiring workarounds discovered only during implementation — acceptable risk, not fully known yet.
 

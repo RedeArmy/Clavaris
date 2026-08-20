@@ -13,9 +13,9 @@
     <description>Parent POM for Clavaris, a standalone OIDC/OAuth2 identity provider.</description>
 
     <properties>
-        <!-- CLAUDE.md §3 locked stack: Java 21, Spring Boot 3.4. -->
-        <java.version>21</java.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <!-- CLAUDE.md §3 locked stack: Java 25, Spring Boot 4.1. -->
+        <java.version>25</java.version>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Bump to the latest 3.4.x patch at implementation time — pinned
              here only so the module tree resolves, not a deliberate patch choice. -->
