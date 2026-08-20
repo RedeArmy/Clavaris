@@ -79,6 +79,30 @@ public final class Account {
     this.passwordCredential = PasswordCredential.issue(id, passwordHash);
   }
 
+  /**
+   * Rehydrates an existing row — preserves the real persisted {@code id}/{@code createdAt}/{@code
+   * status}, same discipline as {@code SigningKey#reconstitute}/{@code OAuthClient#reconstitute}.
+   * Unlike {@link #register}, this accepts an already-issued {@link PasswordCredential} directly
+   * (via {@link PasswordCredential#reconstitute}) rather than going through {@link
+   * #attachPasswordCredential(String)} — that method's "must not already have one" guard models a
+   * registration-time invariant, not a rehydration-from-storage one. {@code passwordCredential} may
+   * be {@code null} for an account whose only authentication method is a (not yet implemented)
+   * social identity — BR-ID-02 still guarantees at least one exists, just not necessarily this one.
+   */
+  public static Account reconstitute(
+      final AccountId id,
+      final OrganizationId organizationId,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PasswordCredential passwordCredential) {
+    final Account account = new Account(id, organizationId, email, createdAt, status);
+    account.emailVerifiedAt = emailVerifiedAt;
+    account.passwordCredential = passwordCredential;
+    return account;
+  }
+
   public AccountId id() {
     return id;
   }

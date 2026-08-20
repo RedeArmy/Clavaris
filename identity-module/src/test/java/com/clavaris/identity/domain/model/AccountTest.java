@@ -3,6 +3,7 @@ package com.clavaris.identity.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -54,5 +55,50 @@ class AccountTest {
 
     assertThatIllegalStateException()
         .isThrownBy(() -> account.attachPasswordCredential("second-hash"));
+  }
+
+  @Test
+  void reconstitutePreservesTheRealPersistedFieldsAndAttachedCredential() {
+    AccountId id = new AccountId(UUID.randomUUID());
+    Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+    Instant emailVerifiedAt = Instant.parse("2026-01-02T00:00:00Z");
+    PasswordCredential credential =
+        PasswordCredential.reconstitute(
+            UUID.randomUUID(), id, "argon2id$stored-hash", Instant.parse("2026-01-03T00:00:00Z"));
+
+    Account account =
+        Account.reconstitute(
+            id,
+            organizationId,
+            email,
+            createdAt,
+            emailVerifiedAt,
+            AccountStatus.SUSPENDED,
+            credential);
+
+    assertThat(account.id()).isEqualTo(id);
+    assertThat(account.organizationId()).isEqualTo(organizationId);
+    assertThat(account.email()).isEqualTo(email);
+    assertThat(account.createdAt()).isEqualTo(createdAt);
+    assertThat(account.emailVerifiedAt()).contains(emailVerifiedAt);
+    assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
+    assertThat(account.passwordCredential()).contains(credential);
+  }
+
+  @Test
+  void reconstituteAllowsANullPasswordCredential() {
+    // BR-ID-02 still guarantees at least one auth method exists — just not necessarily this one
+    // (a social-only account, once SocialIdentity exists, is the real case this covers).
+    Account account =
+        Account.reconstitute(
+            new AccountId(UUID.randomUUID()),
+            organizationId,
+            email,
+            Instant.now(),
+            null,
+            AccountStatus.ACTIVE,
+            null);
+
+    assertThat(account.passwordCredential()).isEmpty();
   }
 }

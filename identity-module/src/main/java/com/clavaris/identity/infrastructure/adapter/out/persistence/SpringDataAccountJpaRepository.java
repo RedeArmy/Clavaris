@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -10,4 +11,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
   boolean existsByOrganizationIdAndEmail(UUID organizationId, String email);
+
+  Optional<AccountEntity> findByOrganizationIdAndEmail(UUID organizationId, String email);
 }
