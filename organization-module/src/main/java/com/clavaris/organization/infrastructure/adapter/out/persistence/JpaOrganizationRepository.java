@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -21,5 +22,10 @@ class JpaOrganizationRepository implements OrganizationRepository {
   public void save(final Organization organization) {
     organizations.save(
         new OrganizationEntity(organization.id(), organization.name(), organization.createdAt()));
+  }
+
+  @Override
+  public boolean existsById(final UUID organizationId) {
+    return organizations.existsById(organizationId);
   }
 }

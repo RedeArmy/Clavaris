@@ -14,6 +14,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -74,12 +76,20 @@ class JpaPlatformClientRepositoryTest {
     assertThat(repository.findByClientId(UUID.randomUUID().toString())).isEmpty();
   }
 
-  // Package-scoped so it shares this test's package with PlatformClientEntity and
-  // JpaPlatformClientRepository — Boot's default entity/repository scan base package is the
-  // package of the class carrying @EnableAutoConfiguration, so no explicit @EntityScan is needed.
+  // @Import, not @ComponentScan: this package also holds JpaOAuthClientRepositoryTest's own
+  // nested TestConfig (same class shape, same package) — confirmed live in identity-module's
+  // equivalent pair of tests that scanning the whole package picks up a sibling test's
+  // @Configuration too and double-registers its Spring Data repositories, crashing context load.
+  // @Import registers exactly the one bean this test needs; the filtered @EnableJpaRepositories
+  // below does the same for its Spring Data interface.
   @Configuration
   @EnableAutoConfiguration
-  @EnableJpaRepositories(basePackageClasses = SpringDataPlatformClientJpaRepository.class)
-  @ComponentScan(basePackageClasses = JpaPlatformClientRepository.class)
+  @EnableJpaRepositories(
+      basePackageClasses = SpringDataPlatformClientJpaRepository.class,
+      includeFilters =
+          @ComponentScan.Filter(
+              type = FilterType.ASSIGNABLE_TYPE,
+              classes = SpringDataPlatformClientJpaRepository.class))
+  @Import(JpaPlatformClientRepository.class)
   static class TestConfig {}
 }
