@@ -2,9 +2,12 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
+import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -31,6 +34,37 @@ class JpaAccountRepository implements AccountRepository {
   public boolean existsByOrganizationIdAndEmail(
       final OrganizationId organizationId, final Email email) {
     return accounts.existsByOrganizationIdAndEmail(organizationId.value(), email.value());
+  }
+
+  @Override
+  public Optional<Account> findByOrganizationIdAndEmail(
+      final OrganizationId organizationId, final Email email) {
+    return accounts
+        .findByOrganizationIdAndEmail(organizationId.value(), email.value())
+        .map(this::toDomain);
+  }
+
+  private Account toDomain(final AccountEntity entity) {
+    final AccountId accountId = new AccountId(entity.getId());
+    // A password-only login attempt against an account that only has a social identity attached
+    // (not yet implemented) is exactly the case reconstitute's own Javadoc calls out — absent here
+    // is not a bug, AuthenticateWithPasswordService treats it as "no password credential to check".
+    final PasswordCredential credential =
+        credentials
+            .findByAccountId(entity.getId())
+            .map(
+                row ->
+                    PasswordCredential.reconstitute(
+                        row.getId(), accountId, row.getPasswordHash(), row.getUpdatedAt()))
+            .orElse(null);
+    return Account.reconstitute(
+        accountId,
+        new OrganizationId(entity.getOrganizationId()),
+        new Email(entity.getEmail()),
+        entity.getCreatedAt(),
+        entity.getEmailVerifiedAt(),
+        AccountStatus.valueOf(entity.getStatus()),
+        credential);
   }
 
   @Override

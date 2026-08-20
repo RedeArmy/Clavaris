@@ -6,6 +6,9 @@ import com.clavaris.identity.application.usecase.activateplatformsigningkey.Plat
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationService;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -52,5 +55,11 @@ class IdentityUseCaseConfig {
   /* package */ ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase(
       final SigningKeyRepository signingKeys) {
     return new ActivateSigningKeyForOrganizationService(signingKeys);
+  }
+
+  @Bean
+  /* package */ AuthenticateWithPasswordUseCase authenticateWithPasswordUseCase(
+      final AccountRepository accountRepository, final PasswordVerifier passwordVerifier) {
+    return new AuthenticateWithPasswordService(accountRepository, passwordVerifier);
   }
 }

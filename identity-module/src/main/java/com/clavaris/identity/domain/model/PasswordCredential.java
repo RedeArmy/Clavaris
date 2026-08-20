@@ -13,7 +13,6 @@ import java.util.UUID;
  * <p>Same record-style-accessor rationale as {@link Account} for the PMD suppressions below.
  */
 @SuppressWarnings({
-  "PMD.DataClass",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName"
@@ -49,6 +48,20 @@ public final class PasswordCredential {
    */
   public static PasswordCredential issue(final AccountId accountId, final String passwordHash) {
     return new PasswordCredential(UUID.randomUUID(), accountId, passwordHash, Instant.now());
+  }
+
+  /**
+   * Rehydrates an existing row — preserves the real persisted {@code id}/{@code updatedAt}, same
+   * discipline as {@code SigningKey#reconstitute}/{@code OAuthClient#reconstitute}. Used by {@code
+   * JpaAccountRepository} to load an {@code Account} back out for {@code
+   * AuthenticateWithPasswordService} to verify against.
+   */
+  public static PasswordCredential reconstitute(
+      final UUID id,
+      final AccountId accountId,
+      final String passwordHash,
+      final Instant updatedAt) {
+    return new PasswordCredential(id, accountId, passwordHash, updatedAt);
   }
 
   public UUID id() {
