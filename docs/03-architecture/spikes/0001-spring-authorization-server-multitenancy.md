@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | ✅ Completed — **GO** |
-| **Date** | 2026-08-17 |
+| **Status** | ✅ Completed — **GO**. See [Appendix C](#appendix-c-addendum--dynamic-single-chain-resolution-2026-08-19-sas-710) — the §6 dynamic-resolution gap is now closed and supersedes §5.2's `multipleIssuersAllowed` rejection. |
+| **Date** | 2026-08-17 (original); addendum 2026-08-19 |
 | **Author** | Engineering (solo project) |
 | **Time-box** | 2–3 days allotted (`ADR-0003` addendum); completed within a single investigation session |
 | **Related decisions** | `ADR-0003` (Spring Authorization Server as protocol foundation), `ADR-0010` (organization-scoped tenant isolation, §5) |
@@ -12,6 +12,8 @@
 ## TL;DR
 
 Spring Authorization Server (SAS) 1.4.1 on Spring Boot 3.4.1 supports a per-`Organization` issuer, a per-`Organization` JWKS document, and a per-`Organization` `RegisteredClientRepository` as a **clean extension** of its public API — no autoconfiguration was disabled or replaced wholesale. Two non-obvious implementation patterns are required to get there, both discovered by running real code against real HTTP requests, not by reading documentation. Full details in [Findings](#findings). **Recommendation: proceed with `ADR-0010` §5 as designed; no change to `ADR-0003`.**
+
+**2026-08-19 addendum:** the original investigation only validated two *static* hardcoded tenant chains and explicitly left dynamic, database-driven tenant resolution unevaluated (§6). By real-implementation time, Spring Boot 4.1 had bumped the resolved dependency to SAS 7.1.0, which turned out to support genuine single-chain dynamic multi-tenancy natively (`multipleIssuersAllowed`, decompiled and confirmed live against the actual resolved jar) — see [Appendix C](#appendix-c-addendum--dynamic-single-chain-resolution-2026-08-19-sas-710) for the full findings and the revised implementation shape for Task #19.
 
 ## 1. Problem Statement
 
@@ -236,6 +238,34 @@ http.addFilterBefore(
         new TenantScopedOidcDiscoveryFilter(prefix + "/.well-known/openid-configuration", baseUrl, settings),
         AbstractPreAuthenticatedProcessingFilter.class);
 ```
+
+## Appendix C: Addendum — Dynamic Single-Chain Resolution (2026-08-19, SAS 7.1.0)
+
+**Status:** ✅ Closes the §6 gap ("resolving the tenant per request from a database lookup... not evaluated here"). **Supersedes §5.2's rejection of `multipleIssuersAllowed`.**
+
+This spike's original body (above) validated two *static*, hardcoded `SecurityFilterChain` beans (`org-a`/`org-b`), against Spring Boot 3.4.1 / SAS 1.4.1. It explicitly did not attempt a single dynamic chain resolving an arbitrary `{organizationId}` learned only at request time from the database — the real shape `identity-module` needs, since Organizations are created at runtime via `CreateOrganization`, not known at application-startup bean-wiring time.
+
+By the time real implementation started, Spring Boot 4.1 had bumped the resolved dependency to **`spring-security-oauth2-authorization-server` 7.1.0** (folded into Spring Security's own versioning — a major jump from 1.4.1). Rather than re-run the original spike's black-box HTTP methodology, this addendum was produced by decompiling the actual resolved 7.1.0 jars (`javap -p -c -constants` against `spring-security-oauth2-authorization-server-7.1.0.jar` and `spring-security-config-7.1.0.jar`) — the same "confirmed live, not assumed" discipline this project applies everywhere, extended here to framework internals since no live multi-tenant instance existed yet to black-box test.
+
+**Finding: `AuthorizationServerSettings.multipleIssuersAllowed(true)` is now genuine, framework-native, path-based multi-tenancy for a single deployable — not a reverse-proxy-only pattern.**
+
+Three concrete, decompiled findings, each reversing or closing a §5.2/§5.3/§6 gap from the original spike:
+
+1. **Endpoint matchers are now built with an official wildcard-prefix helper.** `OAuth2ConfigurerUtils.withMultipleIssuersPattern(String)` (new in 7.1.0) turns a relative endpoint path into `"/**" + path` whenever `multipleIssuersAllowed()` is true — e.g. `/oauth2/jwks` becomes the matcher pattern `/**/oauth2/jwks`, built via `PathPatternRequestMatcher`. This is wired automatically inside `OAuth2AuthorizationServerConfigurer.init(HttpSecurity)` for every endpoint (token, jwks, authorization, revocation, introspection, PAR, device). A single chain with `securityMatcher("/o/**")` and *relative, tenant-agnostic* endpoint settings (`tokenEndpoint("/oauth2/token")`, not `/o/{org}/oauth2/token`) now matches every organization's requests without one bean per tenant.
+
+2. **The issuer itself resolves per-request from the same relative settings, with no custom code.** `AuthorizationServerContextFilter$IssuerResolver.resolve(HttpServletRequest)` (decompiled in full): when `AuthorizationServerSettings.getIssuer()` is `null` (which `multipleIssuersAllowed(true)` requires), it takes the request's actual path, finds whichever configured `*-endpoint` value the path *contains*, strips that suffix off, and rebuilds the issuer as `scheme://host:port` + whatever prefix remains — e.g. a request to `/o/3fa8.../oauth2/token` with `tokenEndpoint("/oauth2/token")` configured resolves the issuer to `http://host:port/o/3fa8...`, exactly ADR-0010 §5's required shape, with zero custom resolver code.
+
+3. **OIDC discovery is now natively multi-tenant too — the spike's entire Appendix A custom filter is obsolete.** `OidcProviderConfigurationEndpointFilter` in 7.1.0 matches `/**/.well-known/openid-configuration` whenever `AuthorizationServerContextHolder.getContext().getAuthorizationServerSettings().isMultipleIssuersAllowed()` is true (decompiled `createRequestMatcher()`/`lambda$createRequestMatcher$0`), and builds the discovery document per-request from `AuthorizationServerContext.getIssuer()`/`getAuthorizationServerSettings()` rather than from filter-construction-time state. This is precisely what Appendix A's ~40-line custom filter was hand-built to do against 1.4.1; the framework itself now does it.
+
+4. **`AuthorizationServerContextFilter` runs early enough to build on.** Decompiled insertion point: `addFilterAfter(contextFilter, SecurityContextHolderFilter.class)` — before `OAuth2ClientAuthenticationFilter` and the token endpoint filter. `AuthorizationServerContextHolder.getContext()` (thread-local) is therefore reliably populated with the correctly-resolved per-tenant issuer for the *entire remainder* of request processing on that thread, including inside application-owned code such as a custom `RegisteredClientRepository` or `JWKSource`.
+
+**What is still genuinely custom, and now the actual scope of Task #19:**
+
+- **`JWKSource` remains a fixed field on `NimbusJwkSetEndpointFilter`, set once at chain-construction time** (decompiled constructor: `this.jwkSource = jwkSource` — no per-request re-resolution inside the filter itself). This is unchanged from the original spike's §5.3 finding. The fix is the same shape as Appendix B, relocated one level up: build **one** `JWKSource<SecurityContext>` bean whose own `get(JWKSelector, SecurityContext)` implementation reads `AuthorizationServerContextHolder.getContext().getIssuer()`, parses `{organizationId}` back out of it, and looks up that Organization's actual key material (`SigningKeyRepository.findActive` + `OrganizationSigningKeyMaterialFactory.keyPairFor`, both already built). Wire that single dynamic instance via `http.setSharedObject(JWKSource.class, ...)` and into `NimbusJwtEncoder`, exactly Appendix B's mechanics — the dynamism now lives inside the `JWKSource` implementation instead of in per-tenant bean selection.
+- **`RegisteredClientRepository` is a single shared bean, not one-repository-per-tenant** — so cross-tenant isolation is no longer structural-by-construction (§5.4's original guarantee: "a client from org-a literally cannot be found by org-b's repository instance"). With one dynamic chain there is exactly one repository instance for every organization, backed by `OAuthClientRepository.findByClientId(clientId)` (clientId is globally unique — confirmed by the new `ux_oauth_clients_client_id` index). The repository implementation must explicitly re-derive the current tenant the same way (`AuthorizationServerContextHolder` → parsed `organizationId`) and reject (return `null`, which SAS surfaces as `invalid_client`) any resolved `OAuthClient` whose own `organizationId` doesn't match. **This changes the guarantee's nature — enforced by application code we write and test, not by object-graph isolation — and needs the dedicated live cross-tenant rejection test §6 already called for, not just a happy-path test**, before this is treated as satisfying ADR-0010 §5's "structurally impossible, not policy-disallowed" bar.
+- Malformed or unknown `{organizationId}` segments (JWKS/token request for an Organization that doesn't exist, or an unparseable path) need explicit, tested handling — the original spike's two-hardcoded-tenants topology never had to consider this; a dynamic single chain serving arbitrary path segments does.
+
+**Revised recommendation:** proceed with a single dynamic `SecurityFilterChain` (`securityMatcher("/o/**")`, `multipleIssuersAllowed(true)`, relative endpoint settings) for the real per-Organization OIDC issuer, rather than the original body's implied N-static-chains approach. This removes an entire category of "how do we add a `SecurityFilterChain` bean for an Organization created after the app already started" problem that the original two-hardcoded-tenants design would otherwise have forced onto Task #19.
 
 ## Appendix B: JWKSource Wiring
 
