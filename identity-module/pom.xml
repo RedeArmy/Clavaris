@@ -17,6 +17,17 @@
         (CLAUDE.md §4). First real use case: RegisterAccount.
     </description>
 
+    <properties>
+        <!-- git-workflow.md §4a: SonarCloud's Java analyzer only scans src/main/java by default —
+             the hosted login/consent Thymeleaf templates under src/main/resources/templates
+             (register.html, register-pending-verification.html) were going unindexed, which
+             disables its Java-based XSS detection against them entirely. Only added here, not at
+             the reactor root, because identity-module is currently the only module with Thymeleaf
+             templates to index — the other modules' src/main/resources is just Flyway migrations
+             and application config, nothing this property changes anything about. -->
+        <sonar.sources>src/main/java,src/main/resources</sonar.sources>
+    </properties>
+
     <dependencies>
         <!-- Inbound web adapter (infrastructure/adapter/in/web) — @Controller, form binding. -->
         <dependency>

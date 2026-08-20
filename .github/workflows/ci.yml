@@ -241,6 +241,14 @@ jobs:
           -Dsonar.qualitygate.wait=true
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
 
+      # Expected, harmless log noise from the step above, not a real gap:
+      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...".
+      # Confirmed live (ls'd every module's target/site/jacoco/jacoco.xml after a real
+      # `mvn clean verify`): every module with actual classes produces one correctly;
+      # `common` is the sole exception, because it currently has zero classes and zero
+      # tests (still just placeholder folders) — there is no coverage data to report in
+      # the first place, not a broken report path. Revisit once `common` gains real code.
+
   # Branch protection needs to require exactly one status check, not five —
   # requiring each job individually breaks silently the moment any one of
   # them is renamed (GitHub keeps requiring the old name forever, and the
