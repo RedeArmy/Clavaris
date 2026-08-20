@@ -84,18 +84,21 @@ class RegisterOAuthClientServiceTest {
 
   @Test
   void rejectsRegistrationUnderANonExistentOrganization() {
+    // Command construction pulled out of the lambda passed to isThrownBy — same rationale as
+    // RegisterAccountServiceTest's own equivalent test: with it inside, the lambda has two
+    // invocations that could throw, leaving it ambiguous which one a future reader (or static
+    // analysis) should credit for the exception.
     UUID unknownOrganizationId = UUID.randomUUID();
     when(organizationExistsChecker.exists(unknownOrganizationId)).thenReturn(false);
+    RegisterOAuthClientCommand command =
+        new RegisterOAuthClientCommand(
+            unknownOrganizationId,
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"));
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new RegisterOAuthClientCommand(
-                        unknownOrganizationId,
-                        List.of("https://jobseeker.example.com/callback"),
-                        List.of("authorization_code"),
-                        List.of("openid"))));
+        .isThrownBy(() -> service.handle(command));
 
     verify(oauthClients, never()).save(any());
   }

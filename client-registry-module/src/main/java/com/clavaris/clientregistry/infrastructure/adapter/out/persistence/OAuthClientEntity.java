@@ -43,6 +43,9 @@ public class OAuthClientEntity {
 
   protected OAuthClientEntity() {}
 
+  // One parameter per persisted column — same convention as every other *Entity in this codebase
+  // (PasswordCredentialEntity, SigningKeyEntity, ...), just the first with more than 7 columns.
+  @SuppressWarnings("java:S107")
   public OAuthClientEntity(
       final UUID id,
       final UUID organizationId,

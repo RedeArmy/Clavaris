@@ -41,6 +41,11 @@ public final class OAuthClient {
   private final List<String> allowedScopes;
   private final Instant createdAt;
 
+  // One parameter per persisted column — same rationale as this class's own TooManyMethods
+  // suppression above: a rehydration factory for an 8-column aggregate takes 8 parameters, not a
+  // sign this constructor does too much. Introducing a synthetic parameter-object purely to dodge
+  // the threshold would add indirection without removing any real complexity.
+  @SuppressWarnings("java:S107")
   private OAuthClient(
       final UUID id,
       final UUID organizationId,
@@ -87,6 +92,7 @@ public final class OAuthClient {
    * Rehydrates an existing row — preserves the real persisted {@code id}, same discipline as {@code
    * PlatformClient#reconstitute}.
    */
+  @SuppressWarnings("java:S107")
   public static OAuthClient reconstitute(
       final UUID id,
       final UUID organizationId,

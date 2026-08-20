@@ -35,9 +35,9 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
   @Override
   public RegisterOAuthClientResult handle(final RegisterOAuthClientCommand command) {
     // BR-ORG-02: never let a client be registered under a non-existent Organization — the FK
-    // constraint doesn't enforce this (deferred, cross-module migration-ordering isn't guaranteed;
-    // see the signing_keys migration's own comment for the same reasoning), so the application
-    // layer is the only thing that actually rules this out.
+    // constraint doesn't enforce this. Cross-module migration ordering isn't guaranteed (see the
+    // signing_keys migration's own comment for the same reasoning), so the application layer is
+    // the only thing that actually rules this out.
     if (!orgExistsChecker.exists(command.organizationId())) {
       throw new OrganizationNotFoundException(command.organizationId());
     }
