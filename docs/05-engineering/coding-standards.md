@@ -4,7 +4,7 @@
 
 ## 1. Language and style
 
-Java 21. Standard Java conventions (naming, package structure) as already fixed by the module layout in `CLAUDE.md` §7.1. No divergence from JobSeeker's own coding-standards baseline (`../../JobSeeker/docs/05-engineering/coding-standards.md`) except where this document says otherwise.
+Java 25. Standard Java conventions (naming, package structure) as already fixed by the module layout in `CLAUDE.md` §7.1. No divergence from JobSeeker's own coding-standards baseline (`../../JobSeeker/docs/05-engineering/coding-standards.md`) except where this document says otherwise.
 
 **Formatting and clean-code rules are a build gate, not a style guide (added 2026-08-17)** — enforced project-wide via the root `pom.xml`'s `<build><plugins>` (inherited by every module automatically, no per-module opt-in):
 
