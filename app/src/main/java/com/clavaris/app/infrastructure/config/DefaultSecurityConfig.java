@@ -7,15 +7,16 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Everything not matched by {@link PlatformAuthorizationServerConfig} (/oauth2/**) or {@link
- * AdminApiSecurityConfig} (/api/v1/admin/**) — the hosted UI ({@code /o/{organizationId}/register},
- * RegisterAccount's own Thymeleaf form) and Actuator health checks. Adding Spring Security to app's
- * classpath for the first time (needed for the two OAuth2-specific chains above) activates its
- * autoconfiguration for the *whole* application by default — without this catch-all chain, every
- * existing endpoint would suddenly require authentication against a random generated password, a
- * real regression confirmed live while building this. Kept exactly as permissive as the
- * pre-Spring-Security state was regarding *authentication* — {@code anyRequest().permitAll()},
- * nothing here required login before, nothing does now.
+ * Everything not matched by {@link PlatformAuthorizationServerConfig} (/oauth2/**), {@link
+ * AdminApiSecurityConfig} (/api/v1/admin/**), or {@link OrganizationAuthorizationServerConfig}
+ * (/o/*&#47;oauth2/**, /o/*&#47;.well-known/**, /o/*&#47;userinfo) — the hosted UI ({@code
+ * /o/{organizationId}/register}, RegisterAccount's own Thymeleaf form) and Actuator health checks.
+ * Adding Spring Security to app's classpath for the first time (needed for the two OAuth2-specific
+ * chains above) activates its autoconfiguration for the *whole* application by default — without
+ * this catch-all chain, every existing endpoint would suddenly require authentication against a
+ * random generated password, a real regression confirmed live while building this. Kept exactly as
+ * permissive as the pre-Spring-Security state was regarding *authentication* — {@code
+ * anyRequest().permitAll()}, nothing here required login before, nothing does now.
  *
  * <p>CSRF, unlike authentication, is deliberately left at Spring Security's own default (enabled)
  * rather than disabled — a SonarCloud CSRF hotspot review (java:S4502) on an earlier version of
@@ -35,7 +36,7 @@ class DefaultSecurityConfig {
   }
 
   @Bean
-  @Order(3)
+  @Order(4)
   /* package */ SecurityFilterChain defaultSecurityFilterChain(final HttpSecurity http) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
     return http.build();
