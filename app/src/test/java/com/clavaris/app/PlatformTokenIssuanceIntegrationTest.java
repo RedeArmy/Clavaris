@@ -2,6 +2,9 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -16,7 +19,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.text.ParseException;
 import java.util.Base64;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -60,12 +67,49 @@ class PlatformTokenIssuanceIntegrationTest {
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  // TD-SEC-016: proves TokenIssuanceEventLogger actually fires wired into the real bean graph
+  // (JwtGenerator.setJwtCustomizer(...) in PlatformAuthorizationServerConfig), not just that its
+  // customize() method behaves correctly in isolation (TokenIssuanceEventLoggerTest covers that
+  // separately) — the same "confirmed live, not assumed" bar every issuance test in this suite
+  // already holds itself to for signature verification.
+  private final ListAppender<ILoggingEvent> tokenIssuanceLogAppender = new ListAppender<>();
+
+  @BeforeEach
+  void attachTokenIssuanceLogAppender() {
+    tokenIssuanceLogAppender.start();
+    tokenIssuanceLogger().addAppender(tokenIssuanceLogAppender);
+  }
+
+  @AfterEach
+  void detachTokenIssuanceLogAppender() {
+    tokenIssuanceLogger().detachAppender(tokenIssuanceLogAppender);
+    tokenIssuanceLogAppender.stop();
+    tokenIssuanceLogAppender.list.clear();
+  }
+
+  // By fully-qualified name, not TokenIssuanceEventLogger.class — that class is deliberately
+  // package-private (same convention as every other class in app.infrastructure.config), and
+  // Logback resolves loggers by name, so no import/visibility relaxation is needed to reach it.
+  private static Logger tokenIssuanceLogger() {
+    return (Logger)
+        LoggerFactory.getLogger("com.clavaris.app.infrastructure.config.TokenIssuanceEventLogger");
+  }
+
   @Test
   void issuesATokenSignedWithTheKeyActuallyPublishedInJwks() throws Exception {
     HttpResponse<String> tokenResponse =
         requestToken("test-platform-client", "a-test-platform-secret");
 
     assertThat(tokenResponse.statusCode()).isEqualTo(200);
+    List<ILoggingEvent> tokenIssuedEvents = tokenIssuanceLogAppender.list;
+    assertThat(tokenIssuedEvents)
+        .as("TokenIssuanceEventLogger must actually fire on a real token exchange")
+        .hasSize(1);
+    assertThat(tokenIssuedEvents.get(0).getFormattedMessage())
+        .contains("event=token_issued")
+        .contains("tokenType=access_token")
+        .contains("grantType=client_credentials")
+        .contains("clientId=test-platform-client");
     JsonNode body = objectMapper.readTree(tokenResponse.body());
     String accessToken = body.get("access_token").asString();
     assertThat(accessToken).isNotBlank();

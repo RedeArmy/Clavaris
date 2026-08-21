@@ -22,7 +22,9 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -53,6 +55,10 @@ class PlatformAuthorizationServerConfig {
       final HttpSecurity http,
       final RegisteredClientRepository registeredClients,
       final PlatformSigningKeyMaterial signingKey,
+      // Descriptive over PMD's default LongVariable threshold, kept in full rather than
+      // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
+      @SuppressWarnings("PMD.LongVariable")
+          final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl) {
     final AuthorizationServerSettings settings =
         AuthorizationServerSettings.builder()
@@ -68,7 +74,11 @@ class PlatformAuthorizationServerConfig {
     http.setSharedObject(JWKSource.class, jwkSource);
 
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(jwkSource);
-    final OAuth2TokenGenerator<?> tokenGenerator = new JwtGenerator(jwtEncoder);
+    final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
+    // TD-SEC-016: every token this tier issues (platform-tier client_credentials only) gets a
+    // structured event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc.
+    jwtGenerator.setJwtCustomizer(tokenIssuanceLogger);
+    final OAuth2TokenGenerator<?> tokenGenerator = jwtGenerator;
 
     http.securityMatcher("/oauth2/**")
         .with(
