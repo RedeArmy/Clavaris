@@ -47,7 +47,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # TD-SEC-013: no silent fallback to "dev" — application-dev.yml's own header comment says
+      # it must never run outside a developer's machine (relaxed Actuator detail exposure, DEBUG
+      # logging raising the odds of an accidental BR-DATA-01 leak). An unset var used to default
+      # here to "dev" automatically; now it's a hard, visible failure at `docker compose up` time
+      # instead of a security-relevant misconfiguration nobody notices. Set it explicitly in .env
+      # (see .env.example) — CI never evaluates this file (only `docker build`, no `compose up`),
+      # so this cannot break CI.
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:?SPRING_PROFILES_ACTIVE must be set explicitly in .env (see .env.example) — this stack refuses to silently default to dev}"
       # Inside the compose network the app reaches its dependencies by
       # service name, not localhost — overrides whatever .env has for a
       # host-machine (non-Docker) run of the app.
