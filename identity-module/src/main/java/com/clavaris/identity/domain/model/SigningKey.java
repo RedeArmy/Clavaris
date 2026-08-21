@@ -64,8 +64,8 @@ public final class SigningKey {
   }
 
   /**
-   * CLAUDE.md §6: retiring stops it signing new tokens; JWKS still serves it until every token
-   * issued under it expires.
+   * Retiring stops it signing new tokens; JWKS still serves it until every token issued under it
+   * expires.
    */
   public void retire() {
     this.retiredAt = Instant.now();

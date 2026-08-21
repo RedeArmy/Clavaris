@@ -4,7 +4,7 @@
 
 ## 1. Security (the dominant quality attribute for this system)
 
-- Mandatory external security review before any consumer sends real user traffic (`CLAUDE.md` §6) — this gates production launch, full stop.
+- Mandatory external security review before any consumer sends real user traffic — this gates production launch, full stop.
 - OWASP ASVS Level 2 as the baseline control set to self-assess against ahead of the external review (informal checklist, not a certification).
 - Signing keys (RS256) rotate with overlap; no key has an unbounded lifetime; JWKS always publishes the previous key until every token issued under it has naturally expired.
 - Rate limiting on `/oauth2/token` and the login endpoint tuned specifically against credential stuffing (distinct thresholds from a generic API rate limit) from the first deployment.

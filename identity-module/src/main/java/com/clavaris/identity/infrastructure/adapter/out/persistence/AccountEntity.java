@@ -10,7 +10,7 @@ import java.util.UUID;
 /**
  * JPA row mapping for {@code accounts} (data-model.md §2) — persistence-only shape, deliberately
  * separate from {@code domain.model.Account}: the domain aggregate never carries
- * {@code @Entity}/{@code @Column} annotations (CLAUDE.md §7.2, verified by {@code
+ * {@code @Entity}/{@code @Column} annotations (the hexagonal dependency rule, verified by {@code
  * HexagonalArchitectureTest}). Mapping to/from the domain type happens in {@link
  * JpaAccountRepository}, not here.
  *

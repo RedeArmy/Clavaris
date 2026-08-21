@@ -21,7 +21,7 @@ Three releases, sequenced by what unblocks a real consumer first, not by module 
 | Two-layer rate limiting: fixed anti-abuse threshold (never tenant-configurable) + operator-managed per-Organization capacity ceiling (ADR-0010 §6) | `identity-module` / `organization-module` |
 | Admin account-deletion API (consumed by JobSeeker's own ADR-0013 cascade) | `identity-module` |
 
-**Exit criterion:** JobSeeker completes a real login → token → `/userinfo` round trip against a deployed Clavaris instance, and the external security review (`CLAUDE.md` §6) has no open critical/high findings.
+**Exit criterion:** JobSeeker completes a real login → token → `/userinfo` round trip against a deployed Clavaris instance, and the mandatory external security review has no open critical/high findings.
 
 ## 3. v1.1 — Developer experience + hardening
 

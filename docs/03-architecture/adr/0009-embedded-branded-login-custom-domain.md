@@ -1,10 +1,10 @@
 # ADR-0009: Embedded, branded login via per-client custom domain (CNAME) + iframe-modal presentation
 
-**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Aprobado y agregarse a `CLAUDE.md` §10
+**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Aprobado y añadirse a la lista de ADRs vigentes del proyecto
 
 ## Context
 
-A consumer application wants its login experience to feel entirely native — no full-page navigation to a visibly different domain, matching its own branding, embedded as a modal inside its own page — while `identity-module` still owns all authentication logic (BR-CLIENT-03's PKCE-everywhere philosophy, `CLAUDE.md` §6). This is a legitimate, recurring request (it's the default expectation set by Clerk, Auth0, and every modern hosted-auth product), not a one-off.
+A consumer application wants its login experience to feel entirely native — no full-page navigation to a visibly different domain, matching its own branding, embedded as a modal inside its own page — while `identity-module` still owns all authentication logic (BR-CLIENT-03's PKCE-everywhere philosophy). This is a legitimate, recurring request (it's the default expectation set by Clerk, Auth0, and every modern hosted-auth product), not a one-off.
 
 Two constraints collide here:
 
@@ -17,7 +17,7 @@ Clerk itself hits the identical constraint and solves it identically: production
 
 ### 1. Presentation: iframe-modal over Clavaris's hosted login page, not an embedded widget
 
-The consumer's frontend opens a modal overlay containing an `<iframe>` pointed at Clavaris's Authorization Code endpoint (`display=modal` query param, purely presentational — the OIDC flow underneath is unchanged, ADR-0006). The page rendered inside that iframe is Clavaris's own Thymeleaf-rendered hosted UI (`CLAUDE.md` §3), themed per `OAuthClient` (§2 below). The password is entered and submitted entirely within Clavaris's origin — the consumer's JavaScript never sees it, preserving the same security property a full-page redirect has.
+The consumer's frontend opens a modal overlay containing an `<iframe>` pointed at Clavaris's Authorization Code endpoint (`display=modal` query param, purely presentational — the OIDC flow underneath is unchanged, ADR-0006). The page rendered inside that iframe is Clavaris's own Thymeleaf-rendered hosted UI, themed per `OAuthClient` (§2 below). The password is entered and submitted entirely within Clavaris's origin — the consumer's JavaScript never sees it, preserving the same security property a full-page redirect has.
 
 On successful authentication, Clavaris redirects (within the iframe) to the client's `redirect_uri`, which runs a small callback page that does **not** render normal application UI — it immediately `postMessage`s the authorization code to the parent window and the parent closes the modal and completes the code exchange server-to-server, per the standard flow.
 
@@ -29,7 +29,7 @@ A production `OAuthClient` (BR-CLIENT-04, new) must configure one of:
 
 - **CNAME mode** (recommended, mirrors Clerk): the consumer points a subdomain they control (e.g. `login.jobseeker.com`) at Clavaris via CNAME. Clavaris's session cookie is scoped to that subdomain. Because the subdomain shares the consumer's own registrable domain (eTLD+1), browsers treat it as **same-site**, not third-party — ITP and Chrome's cookie deprecation don't apply. TLS for the subdomain is provisioned by Clavaris (SNI-based dynamic certificate issuance, e.g. via Let's Encrypt) once DNS ownership is verified.
 - **Proxy mode** (fallback, mirrors Clerk's own fallback for consumers who can't touch DNS): the consumer runs a thin reverse proxy on their own infrastructure forwarding a path/subdomain to Clavaris. Same same-site cookie outcome, different operational shape — the consumer owns the proxy instead of a DNS record.
-- **Shared mode** (default, development only): no custom domain — Clavaris's own domain is used directly. This is what every client gets today and remains fine for local development and testing, but is explicitly **not eligible for production traffic** once this ADR ships (BR-CLIENT-04), because the embedded-modal experience silently degrades (cookie loss) without a clear error signal — the same failure class the mandatory-external-security-review gate (`CLAUDE.md` §6) exists to catch before real users see it.
+- **Shared mode** (default, development only): no custom domain — Clavaris's own domain is used directly. This is what every client gets today and remains fine for local development and testing, but is explicitly **not eligible for production traffic** once this ADR ships (BR-CLIENT-04), because the embedded-modal experience silently degrades (cookie loss) without a clear error signal — the same failure class the mandatory external security review gate exists to catch before real users see it.
 
 Domain ownership is verified before a `CNAME`/`PROXY`-mode client is marked active (standard DNS TXT-record challenge), same category of control as any certificate-authority domain validation — prevents a client claiming a domain it doesn't control.
 

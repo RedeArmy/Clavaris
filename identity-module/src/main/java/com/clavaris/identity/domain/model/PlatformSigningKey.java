@@ -58,8 +58,8 @@ public final class PlatformSigningKey {
   }
 
   /**
-   * CLAUDE.md §6: JWKS always exposes the previous key until every token signed under it has
-   * expired — retiring stops it signing new tokens, doesn't remove the row.
+   * JWKS always exposes the previous key until every token signed under it has expired — retiring
+   * stops it signing new tokens, doesn't remove the row.
    */
   public void retire() {
     this.retiredAt = Instant.now();

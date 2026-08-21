@@ -8,9 +8,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * BR-ID-01 / CLAUDE.md §6: proves the raw password never appears in this command's string form — a
- * record's default {@code toString()} would otherwise print every component, {@code rawPassword}
- * included, making it a silent log-leak vector for anything that ever logs a command whole.
+ * BR-ID-01: proves the raw password never appears in this command's string form — a record's
+ * default {@code toString()} would otherwise print every component, {@code rawPassword} included,
+ * making it a silent log-leak vector for anything that ever logs a command whole.
  */
 class RegisterAccountCommandTest {
 

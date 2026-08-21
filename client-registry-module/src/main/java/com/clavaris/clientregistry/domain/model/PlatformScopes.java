@@ -6,7 +6,7 @@ import java.util.List;
  * ADR-0010: platform-tier scopes are namespaced {@code platform:*}, reserved and structurally
  * distinct from any per-Organization management scope — prevents a scope-string collision between
  * the two tiers. Only the one scope CreateOrganization needs exists so far; more are added here as
- * more platform-tier use cases are built, not pre-declared ahead of them (CLAUDE.md §11).
+ * more platform-tier use cases are built, not pre-declared ahead of them.
  */
 public final class PlatformScopes {
 

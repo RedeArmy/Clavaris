@@ -13,7 +13,7 @@ Sign all tokens with **RS256** (asymmetric). Clavaris holds the private signing 
 ## Consequences
 
 - **Positive:** a consumer application never holds signing-capable key material — a compromised consumer cannot forge tokens for other consumers or escalate its own token's claims.
-- **Positive:** key rotation (`CLAUDE.md` §6) is transparent to consumers — they always fetch the current JWKS, no coordinated secret-rotation across every consumer required.
+- **Positive:** key rotation with overlap is transparent to consumers — they always fetch the current JWKS, no coordinated secret-rotation across every consumer required.
 - **Negative:** RS256 tokens are larger and signature verification is more CPU-expensive than HS256 — accepted; not a meaningful cost at this project's expected token-issuance volume.
 - **Negative:** private key custody (storage, backup, rotation ceremony) is a real operational responsibility this project now owns — mitigated by treating `TOKEN_SIGNING_KEY_STORE_PATH` as a reference to externally-managed key material, never committed or logged.
 

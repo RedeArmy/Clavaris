@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * controller annotations, not a hand-maintained spec file — that guarantee only holds if every
  * endpoint actually carries {@code @Operation}. Without a check like this, a new
  * {@code @RestController} endpoint added without it is silently invisible at {@code /v3/api-docs},
- * quietly breaking CLAUDE.md §4's "integrate in under a day" goal for whoever explores the API
+ * quietly breaking the project's own "integrate in under a day" goal for whoever explores the API
  * next.
  *
  * <p>Runs against every business module's compiled classes at once (same rationale as {@link

@@ -4,7 +4,7 @@
 
 ## 1. Bounded contexts
 
-Three bounded contexts, matching the modules in `CLAUDE.md` §4. Each owns its own ubiquitous language — a `Role` in `organization-module` (a membership role) is a different concept from a `Scope` in `client-registry-module` (an OAuth permission grant), and neither leaks into the other's model.
+Three bounded contexts, matching the project's own modules. Each owns its own ubiquitous language — a `Role` in `organization-module` (a membership role) is a different concept from a `Scope` in `client-registry-module` (an OAuth permission grant), and neither leaks into the other's model.
 
 ## 2. `identity-module` — core entities
 
@@ -77,10 +77,10 @@ classDiagram
 - **`Account.organizationId`** — ADR-0010: mandatory, references `organization-module`'s `Organization` (tenant isolation boundary) by UUID only. Uniqueness moves from a global `email` constraint to `(organizationId, email)` — the same email address can be an entirely separate, unrelated `Account` in a different `Organization`. There is no cross-organization identity linking in this design.
 - **`RefreshToken.rotatedFromId`** exists specifically to support BR-ID-03's reuse-detection: presenting a token whose `rotatedFromId` chain shows it was already superseded triggers revocation of the entire session's token family, not just that one token.
 - **`VerificationToken`** is a single model serving both email verification and password reset (`type` discriminates) — BR-ID-04/BR-ID-05: single-use, time-limited, delivered only to the email of record.
-- **`SigningKey`** models RS256 key rotation with overlap (`CLAUDE.md` §6) — `retiredAt` is set when a key stops signing new tokens, but the key stays published in JWKS until every token signed under it has naturally expired.
+- **`SigningKey`** models RS256 key rotation with overlap — `retiredAt` is set when a key stops signing new tokens, but the key stays published in JWKS until every token signed under it has naturally expired.
 - **`SigningKey.organizationId`** — ADR-0010 §5: mandatory; JWKS is per-`Organization`, not Clavaris-wide. A verifier application only ever needs its own Organization's JWKS document; rotation of one Organization's key has no effect on any other Organization's keys or rotation schedule. A signing-key compromise is a single-tenant incident, not a Clavaris-wide one.
 - **Issuer** — ADR-0010 §5.1: each `Organization`'s issuer is `{clavarisBaseUrl}/o/{organizationId}`, path-based (not subdomain), resolved natively by Spring Authorization Server's per-request issuer support (ADR-0003). Every token's `iss` claim, and every `OAuthClient`'s discovery URL, is scoped under its own Organization's path.
-- **Key rotation (v1 scope)** — ADR-0010 §5.2: a manually-triggered, audited management-API operation per Organization (not a scheduler-driven job in v1) generates a new key and retires the previous one with overlap, same guarantee as `CLAUDE.md` §6, sized for a solo-developer-operated handful of tenants. Unattended scheduled rotation is v1.1.
+- **Key rotation (v1 scope)** — ADR-0010 §5.2: a manually-triggered, audited management-API operation per Organization (not a scheduler-driven job in v1) generates a new key and retires the previous one with overlap, same guarantee as `SigningKey`'s own invariant above, sized for a solo-developer-operated handful of tenants. Unattended scheduled rotation is v1.1.
 - **`PlatformSigningKey`** — ADR-0010 (Organization provisioning): a single, structurally separate key set signing tokens for the platform issuer only (`client-registry-module` §4a's `PlatformClient`), never for any tenant's `Account`. Kept as its own small table rather than a nullable `organizationId` on `SigningKey`, for the same reason `PlatformClient` is its own table — a forgotten null-check is a worse risk than one extra table. Same overlap-rotation guarantee as `SigningKey`.
 
 ## 3. `organization-module` — core entities
@@ -251,12 +251,12 @@ classDiagram
 
 - **`WebhookEndpoint.oauthClientId`** — references `client-registry-module`'s `OAuthClient` by UUID only, through `webhook-module`'s own port, same cross-module discipline as §5 below (never a live object reference across the boundary).
 - **`WebhookEndpoint.secretHash`** — only the hash is persisted; the raw secret is shown once at creation, same principle as `oauth_clients.client_secret_hash` (`data-model.md` §2).
-- **`EventOutboxEntry`** — written in the *same transaction* as the domain state change it records (ADR-0007 §1, BR-WEBHOOK-05); `identity-module`/`organization-module` write these rows, `webhook-module`'s dispatcher only ever reads them — this is how the two producing modules stay unaware that `webhook-module` exists at all, preserving the hexagonal dependency rule (`CLAUDE.md` §7.2).
+- **`EventOutboxEntry`** — written in the *same transaction* as the domain state change it records (ADR-0007 §1, BR-WEBHOOK-05); `identity-module`/`organization-module` write these rows, `webhook-module`'s dispatcher only ever reads them — this is how the two producing modules stay unaware that `webhook-module` exists at all, preserving the hexagonal dependency rule.
 - **`WebhookDelivery.status`** — `PENDING | SUCCEEDED | FAILED | EXHAUSTED` (BR-WEBHOOK-03); `EXHAUSTED` is a terminal state requiring manual replay, never a silent drop.
 
 ## 6. Cross-context relationships
 
-`WorkspaceMembership.accountId` and `AuthorizationCode.accountId` both reference `identity-module`'s `Account` — but per the hexagonal dependency rule (`CLAUDE.md` §7.2), no module holds a live object reference across the boundary. Cross-module reads go through each module's own port, keyed by the shared `accountId` UUID, exactly as JobSeeker's own modules avoid leaking internal types across bounded contexts. `WebhookEndpoint.oauthClientId` follows the same rule (§5).
+`WorkspaceMembership.accountId` and `AuthorizationCode.accountId` both reference `identity-module`'s `Account` — but per the hexagonal dependency rule, no module holds a live object reference across the boundary. Cross-module reads go through each module's own port, keyed by the shared `accountId` UUID, exactly as JobSeeker's own modules avoid leaking internal types across bounded contexts. `WebhookEndpoint.oauthClientId` follows the same rule (§5).
 
 Since ADR-0010, two more cross-module references follow this same discipline and form the actual tenant-isolation mechanism: `Account.organizationId` (`identity-module` → `organization-module`) and `OAuthClient.organizationId` (`client-registry-module` → `organization-module`). Both are ID-only references through each module's own port — `organization-module` never reaches into either module, it is only referenced by them.
 

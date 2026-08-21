@@ -47,7 +47,7 @@ public class LoginForm {
     this.password = password;
   }
 
-  /** BR-ID-01 / CLAUDE.md §6 rationale — same as {@code RegisterAccountForm#toString()}. */
+  /** BR-ID-01 rationale — same as {@code RegisterAccountForm#toString()}. */
   @Override
   public String toString() {
     return "LoginForm[email=" + email + ", password=[REDACTED]]";

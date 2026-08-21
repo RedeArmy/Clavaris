@@ -10,7 +10,7 @@ import java.util.UUID;
  * ADR-0010, BR-ORG-02: a consuming application's protocol registration, scoped to exactly one
  * {@code Organization} — {@code organizationId} is an opaque {@link UUID}, not identity-module's
  * own {@code OrganizationId} value type, for the same module-independence reason {@code
- * SigningKeyProvisioner} stays primitive-typed (CLAUDE.md §7.2's dependency rule applied at the
+ * SigningKeyProvisioner} stays primitive-typed (the hexagonal dependency rule applied at the
  * module-graph level). One Organization may register several {@code OAuthClient}s (web + mobile for
  * the same system), all sharing that Organization's isolated account pool.
  *

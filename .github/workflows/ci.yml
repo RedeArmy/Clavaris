@@ -228,8 +228,7 @@ jobs:
       # confirmed added as a repo secret (2026-08-18). Branch protection on
       # `master` requiring the `ci-passed` aggregator job below (not this
       # job individually) is a GitHub repo setting only an admin can
-      # configure — neither this file nor Claude Code can set that from
-      # here.
+      # configure — nothing in this workflow file can set that from here.
       - name: Build, test, and analyse
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

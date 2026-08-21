@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/** BR-ID-01 / CLAUDE.md §6: same rationale as {@code RegisterAccountCommandTest}. */
+/** BR-ID-01: same rationale as {@code RegisterAccountCommandTest}. */
 class RegisterAccountFormTest {
 
   @Test

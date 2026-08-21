@@ -22,17 +22,17 @@ import org.springframework.stereotype.Component;
  *       before a restart stop verifying after one, until a fresh key is generated.
  *   <li>This map holds at most one key pair per Organization at a time — a later call for the same
  *       {@link OrganizationId} (manual rotation, ADR-0010 §5.2) overwrites the previous entry
- *       immediately. CLAUDE.md §6's overlap requirement ("JWKS always exposes the previous key
- *       until every issued token under it has expired") is NOT yet satisfied by this class alone;
- *       real rotation support needs to retain retired keys until expiry, not just the metadata row
- *       {@code SigningKey.retire()} already tracks. Acceptable for {@code CreateOrganization} (a
- *       brand-new Organization has no previous key to overlap with) but must be closed before the
- *       rotation endpoint (`api-contract-overview.md` §3) goes live.
+ *       immediately. The overlap requirement ("JWKS always exposes the previous key until every
+ *       issued token under it has expired") is NOT yet satisfied by this class alone; real rotation
+ *       support needs to retain retired keys until expiry, not just the metadata row {@code
+ *       SigningKey.retire()} already tracks. Acceptable for {@code CreateOrganization} (a brand-new
+ *       Organization has no previous key to overlap with) but must be closed before the rotation
+ *       endpoint (`api-contract-overview.md` §3) goes live.
  *   <li>Deliberately does NOT wire a per-Organization {@code SecurityFilterChain}/JWKS endpoint —
- *       that's the spike's Appendix A discovery-filter pattern, a separate slice (CLAUDE.md
- *       §11/§12: "don't build ahead of the use case that needs it"). This class only makes the key
- *       material exist and be retrievable by {@link OrganizationId}; wiring it into a real
- *       per-tenant OIDC issuer is the next slice after {@code CreateOrganization}, not part of it.
+ *       that's the spike's Appendix A discovery-filter pattern, a separate slice ("don't build
+ *       ahead of the use case that needs it"). This class only makes the key material exist and be
+ *       retrievable by {@link OrganizationId}; wiring it into a real per-tenant OIDC issuer is the
+ *       next slice after {@code CreateOrganization}, not part of it.
  * </ul>
  */
 @Component

@@ -14,11 +14,11 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 |---|---|---|
 | Register with email + password | ✅ | Argon2id hashing (ADR-0005); no plaintext ever stored or logged. Registration always happens in the context of one `Organization` (ADR-0010) — the same email can register independently in a different `Organization` with no linkage |
 | Email verification | ✅ | Time-limited signed token, single-use; unverified accounts can authenticate but consuming apps decide whether to gate features on `email_verified_at` — that policy is the consumer's, not Clavaris's |
-| Login with email + password | ✅ | Rate-limited from day one (`CLAUDE.md` §6) |
+| Login with email + password | ✅ | Rate-limited from day one (BR-ID-06) |
 | Social login (Google, GitHub) | ✅ | Account linking by verified email; a social login with an email matching an existing account links to it rather than creating a duplicate — ambiguity here is a real security question, see §5 open questions |
 | Password recovery (forgot password) | ✅ | Time-limited signed token, single-use, invalidates all active sessions on successful reset |
 | Session management (list/revoke active sessions) | ✅ | Minimal UI, functional not polished |
-| Refresh token issuance + rotation | ✅ | Single-use, reuse-detection revokes all active tokens for the account (`CLAUDE.md` §5) |
+| Refresh token issuance + rotation | ✅ | Single-use, reuse-detection revokes all active tokens for the account (BR-ID-03) |
 | MFA (TOTP) | ❌ backlog | Real gap, not silently dropped — flagged in roadmap as first post-v1 priority |
 | Passkeys (WebAuthn, passwordless primary login) | ❌ v1.1 | `clerk-feature-analysis.md` §6 — real UX/security upgrade, not launch-blocking |
 | Breached-password check at registration/password-change | ❌ v1.1 | BR-ID-07; k-anonymity-style check (e.g. HIBP range query, no plaintext password ever leaves the server) — `clerk-feature-analysis.md` §7 item 1 |
@@ -31,7 +31,7 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 |---|---|---|
 | Register an OAuth client (manual/admin, not self-service) | ✅ | `client_id`, `client_secret`, `redirect_uris`, allowed grants/scopes, assigned to exactly one `Organization` (ADR-0010) — one Organization can register several clients (e.g. web + mobile) sharing its isolated account pool |
 | Authorization Code flow with PKCE | ✅ | The only supported interactive flow in v1 — no implicit flow, no resource owner password credentials grant (both are legacy/discouraged patterns) |
-| `client_credentials` grant | ✅ | For the management API only (`CLAUDE.md` §3) |
+| `client_credentials` grant | ✅ | For the management API only (ADR-0006) |
 | Discovery document, JWKS, `/userinfo`, `/revoke`, end-session endpoint | ✅ | Standard OIDC surface — required for "any language, standard client library" to actually be true |
 | Self-service client registration UI | ❌ backlog | v1 clients are registered manually; a self-service developer console is a v1.1+ concern |
 | Embedded, branded login (iframe-modal + per-client custom domain) | ❌ v1.1/v2, see ADR-0009 | Requires DNS/proxy domain verification and dynamic TLS — real infra work, not a UI-only feature |
@@ -82,7 +82,7 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 
 SAML, SCIM provisioning, self-service client registration console, configurable per-organization roles, MFA, multi-region deployment. Every one of these is a real, legitimate feature — deferred because no current consumer needs it yet, not because it's unimportant. See `docs/01-product/roadmap-and-release-plan.md` for sequencing.
 
-**Explicit non-goals, not just deferrals** (per `clerk-feature-analysis.md` §6, informed by what Clerk bundles into its product that Clavaris deliberately won't): billing/subscription management, feature/plan gating, and "waitlist" launch-gating. These are product-specific business logic that belongs in each consumer's own backend — bundling them here would violate `CLAUDE.md` §1's core boundary ("Clavaris doesn't know what a candidate is"), not a scope gap to close later.
+**Explicit non-goals, not just deferrals** (per `clerk-feature-analysis.md` §6, informed by what Clerk bundles into its product that Clavaris deliberately won't): billing/subscription management, feature/plan gating, and "waitlist" launch-gating. These are product-specific business logic that belongs in each consumer's own backend — bundling them here would violate this project's own core boundary ("Clavaris doesn't know what a candidate is"), not a scope gap to close later.
 
 ## 5. Open questions
 

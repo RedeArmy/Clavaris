@@ -13,8 +13,8 @@
     <name>identity-module</name>
     <description>
         Accounts, password credentials, linked social identities, sessions, email verification,
-        password recovery, refresh token issuance/rotation, signing key (JWKS) management
-        (CLAUDE.md §4). First real use case: RegisterAccount.
+        password recovery, refresh token issuance/rotation, signing key (JWKS) management.
+        First real use case: RegisterAccount.
     </description>
 
     <properties>
@@ -34,7 +34,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- CLAUDE.md §3: hosted login/consent UI is server-side rendered Thymeleaf, not a SPA. -->
+        <!-- Hosted login/consent UI is server-side rendered Thymeleaf, not a SPA. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>

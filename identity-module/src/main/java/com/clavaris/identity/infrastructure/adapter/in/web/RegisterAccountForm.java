@@ -73,7 +73,7 @@ public class RegisterAccountForm {
   }
 
   /**
-   * BR-ID-01 / CLAUDE.md §6: never print password/confirmPassword — same rationale as {@code
+   * BR-ID-01: never print password/confirmPassword — same rationale as {@code
    * RegisterAccountCommand}'s overridden {@code toString()}. This class doesn't auto-generate one
    * (it's a plain class, not a record), but an explicit safe override here means a future edit
    * (e.g. adding Lombok's {@code @Data}) can't silently reintroduce the leak.

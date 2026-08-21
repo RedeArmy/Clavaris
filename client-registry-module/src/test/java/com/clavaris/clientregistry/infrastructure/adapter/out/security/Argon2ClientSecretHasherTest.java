@@ -8,8 +8,8 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 /**
  * ADR-0005 / test-strategy.md §2 (security-specific): same discipline as identity-module's own
  * {@code Argon2PasswordHasherTest} — a silently-weakened hashing parameter must be caught by a test
- * asserting the actual behaviour, arguably even higher-stakes here (CLAUDE.md §5: this hashes the
- * single highest-value credential in the system).
+ * asserting the actual behaviour, arguably even higher-stakes here: this hashes the single
+ * highest-value credential in the system.
  */
 class Argon2ClientSecretHasherTest {
 

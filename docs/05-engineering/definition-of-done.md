@@ -42,5 +42,5 @@ Added after ADR-0010 shipped with five other documents left contradicting it (`s
 
 - [ ] OpenID Foundation conformance test suite passed (`test-strategy.md` §4).
 - [ ] Known gaps in `threat-model-stride.md` §5 closed or explicitly risk-accepted in writing.
-- [ ] External security review completed with zero open critical/high findings (`CLAUDE.md` §6) — this gate blocks real user traffic, not just a "should do eventually" item.
+- [ ] External security review completed with zero open critical/high findings — this gate blocks real user traffic, not just a "should do eventually" item.
 - [ ] JobSeeker completes a real end-to-end integration against a deployed Clavaris instance (`roadmap-and-release-plan.md` §2 exit criterion).
