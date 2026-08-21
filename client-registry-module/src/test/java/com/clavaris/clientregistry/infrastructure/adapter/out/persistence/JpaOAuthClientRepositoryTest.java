@@ -72,6 +72,32 @@ class JpaOAuthClientRepositoryTest {
     assertThat(repository.findByClientId(UUID.randomUUID().toString())).isEmpty();
   }
 
+  @Test
+  void findByIdReturnsTheSameClientLookedUpByItsOwnPersistedId() {
+    // TD-SEC-010: this is the exact lookup OrganizationRegisteredClientRepository.findById now
+    // performs on JdbcOAuth2AuthorizationService's behalf (TD-SEC-003) when reloading a persisted
+    // OAuth2Authorization row.
+    OAuthClient client =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "another-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"));
+    repository.save(client);
+
+    Optional<OAuthClient> found = repository.findById(client.id());
+
+    assertThat(found).isPresent();
+    assertThat(found.get().clientId()).isEqualTo("another-client-id");
+  }
+
+  @Test
+  void findByIdIsEmptyForAnUnknownId() {
+    assertThat(repository.findById(UUID.randomUUID())).isEmpty();
+  }
+
   // @Import, not @ComponentScan — see JpaPlatformClientRepositoryTest's own TestConfig comment
   // for why: this package also holds that test's nested TestConfig, and scanning the whole
   // package here would pick it up too, double-registering Spring Data repositories across both

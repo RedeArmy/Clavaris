@@ -8,12 +8,15 @@ import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -95,6 +98,7 @@ class OrganizationAuthorizationServerConfig {
       final SigningKeyRepository signingKeys,
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final SecurityContextRepository contextRepository,
+      final JdbcTemplate jdbcTemplate,
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
       @SuppressWarnings("PMD.LongVariable")
@@ -131,6 +135,15 @@ class OrganizationAuthorizationServerConfig {
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
 
+    // TD-SEC-003: same fix, same rationale as the platform tier's own config — see this class's
+    // sibling comment there and the migration's own comment for why both tiers deliberately share
+    // one physical oauth2_authorization table. This is the tier that actually matters most for
+    // BR-ID-03 (refresh tokens): every Organization's interactive Authorization Code + PKCE
+    // exchange, not just the low-volume platform client_credentials tier, now survives a restart.
+    @SuppressWarnings("PMD.LongVariable")
+    final OAuth2AuthorizationService authorizationService =
+        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients);
+
     http.securityMatcher("/o/*/oauth2/**", "/o/*/.well-known/**", "/o/*/userinfo", "/o/*/login")
         .with(
             new OAuth2AuthorizationServerConfigurer(),
@@ -138,6 +151,7 @@ class OrganizationAuthorizationServerConfig {
                 server
                     .registeredClientRepository(registeredClients)
                     .authorizationServerSettings(settings)
+                    .authorizationService(authorizationService)
                     .tokenGenerator(tokenGenerator)
                     // TD-SEC-017: every successful /oauth2/revoke call on any Organization gets a
                     // structured event=token_revoked log line — see TokenRevocationEventLogger's

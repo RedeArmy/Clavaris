@@ -5,6 +5,7 @@ import com.clavaris.clientregistry.domain.model.PlatformClient;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -36,6 +37,12 @@ class JpaPlatformClientRepository implements PlatformClientRepository {
   @Override
   public Optional<PlatformClient> findByClientId(final String clientId) {
     return platformClients.findByClientId(clientId).map(this::toDomain);
+  }
+
+  @SuppressWarnings("PMD.ShortVariable") // matches the port's own parameter naming
+  @Override
+  public Optional<PlatformClient> findById(final UUID id) {
+    return platformClients.findById(id).map(this::toDomain);
   }
 
   @Override

@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
 import com.clavaris.clientregistry.domain.model.PlatformClient;
+import java.util.UUID;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
@@ -39,14 +40,22 @@ class PlatformRegisteredClientRepository implements RegisteredClientRepository {
   // Parameter name matches RegisteredClientRepository's own interface signature (findById(String
   // id)) — kept as-is for readability against the SPI it implements, rather than renamed just to
   // dodge PMD's ShortVariable rule.
-  @SuppressWarnings("PMD.ShortVariable")
+  @SuppressWarnings({"PMD.ShortVariable", "PMD.OnlyOneReturn"})
   @Override
   public RegisteredClient findById(final String id) {
-    // Not exercised by the client_credentials grant (the only one this issuer supports, per the
-    // spike's own scope) — clients authenticate with Basic-Auth clientId/secret, resolved via
-    // findByClientId below, not by this internal id lookup.
-    throw new UnsupportedOperationException(
-        "Not needed by the client_credentials-only flow this issuer supports");
+    // TD-SEC-010 (closed): JdbcOAuth2AuthorizationService (TD-SEC-003) calls this on every reload
+    // of a persisted OAuth2Authorization row — no longer unreachable now that authorization state
+    // actually persists. The SPI's own null-for-not-found convention (mirrored by findByClientId
+    // below) extends to a malformed id, same as "unknown client" — never an exception for a
+    // not-found/malformed lookup, only for genuinely unsupported operations (save() above).
+    try {
+      return platformClients
+          .findById(UUID.fromString(id))
+          .map(this::toRegisteredClient)
+          .orElse(null);
+    } catch (final IllegalArgumentException e) {
+      return null;
+    }
   }
 
   @Override

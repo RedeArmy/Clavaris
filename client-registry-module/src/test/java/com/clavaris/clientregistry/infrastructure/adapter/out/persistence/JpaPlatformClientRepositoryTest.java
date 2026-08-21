@@ -76,6 +76,27 @@ class JpaPlatformClientRepositoryTest {
     assertThat(repository.findByClientId(UUID.randomUUID().toString())).isEmpty();
   }
 
+  @Test
+  void findByIdReturnsTheSameClientLookedUpByItsOwnPersistedId() {
+    // TD-SEC-010: this is the exact lookup PlatformRegisteredClientRepository.findById now
+    // performs on JdbcOAuth2AuthorizationService's behalf (TD-SEC-003) when reloading a persisted
+    // OAuth2Authorization row.
+    final PlatformClient client =
+        PlatformClient.register(
+            "id-lookup-client", "$argon2id$hashed", PlatformScopes.BOOTSTRAP_DEFAULT);
+    repository.save(client);
+
+    final Optional<PlatformClient> found = repository.findById(client.id());
+
+    assertThat(found).isPresent();
+    assertThat(found.get().clientId()).isEqualTo("id-lookup-client");
+  }
+
+  @Test
+  void findByIdIsEmptyForAnUnknownId() {
+    assertThat(repository.findById(UUID.randomUUID())).isEmpty();
+  }
+
   // @Import, not @ComponentScan: this package also holds JpaOAuthClientRepositoryTest's own
   // nested TestConfig (same class shape, same package) — confirmed live in identity-module's
   // equivalent pair of tests that scanning the whole package picks up a sibling test's
