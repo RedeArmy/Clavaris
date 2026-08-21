@@ -11,8 +11,8 @@ import org.springframework.stereotype.Component;
 /**
  * Adapts organization-module's {@link SigningKeyProvisioner} outbound port to identity-module's
  * real key-generation/activation machinery — the bridge lives in {@code app}, not either business
- * module, because it needs both at once and {@code app} is the one module allowed to (CLAUDE.md
- * §7.2's module-graph rule).
+ * module, because it needs both at once and {@code app} is the one module allowed to (the
+ * module-graph's dependency rule).
  *
  * <p>Landed in this PR (not the later platform-tier composition PR) because organization-module's
  * own {@code OrganizationUseCaseConfig} eagerly wires a {@code CreateOrganizationUseCase} bean that

@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * ADR-0010: the tenant isolation boundary — one row per consuming system (e.g. "JobSeeker" is one
  * {@code Organization}), owning its own fully isolated pool of {@code Account}s and {@code
- * OAuthClient}s (CLAUDE.md §5). Not to be confused with {@code Workspace}, a team/company grouping
- * *within* one Organization's account pool.
+ * OAuthClient}s. Not to be confused with {@code Workspace}, a team/company grouping *within* one
+ * Organization's account pool.
  *
  * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
  * the same reason {@code Account} (identity-module) suppresses them — the deliberate record-style

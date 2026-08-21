@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Thymeleaf form-POST controller (CLAUDE.md §3 — hosted UI, server-rendered), not a JSON API:
- * registration happens through the login/consent surface, not the management API.
+ * Thymeleaf form-POST controller (server-rendered hosted UI), not a JSON API: registration happens
+ * through the login/consent surface, not the management API.
  *
  * <p>{@code organizationId} comes from the path, never from a form field — the hosted UI's own
  * origin is scoped per-Organization ({@code {clavarisBaseUrl}/o/{organizationId}/...},

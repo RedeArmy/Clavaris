@@ -15,12 +15,11 @@ public record RegisterAccountCommand(
     OrganizationId organizationId, Email email, String rawPassword) {
 
   /**
-   * BR-ID-01 / CLAUDE.md §6 ("no PII, credential, or token value in logs, ever"): a record's
-   * auto-generated {@code toString()} prints every component, {@code rawPassword} included — this
-   * override exists specifically to close that gap. Anything that ever logs a command whole (an
-   * unhandled-exception handler, an accidental {@code logger.debug(command)}, request tracing)
-   * would otherwise leak the raw password into logs without a single line of code looking like it
-   * does.
+   * BR-ID-01 ("no PII, credential, or token value in logs, ever"): a record's auto-generated {@code
+   * toString()} prints every component, {@code rawPassword} included — this override exists
+   * specifically to close that gap. Anything that ever logs a command whole (an unhandled-exception
+   * handler, an accidental {@code logger.debug(command)}, request tracing) would otherwise leak the
+   * raw password into logs without a single line of code looking like it does.
    */
   @Override
   public String toString() {

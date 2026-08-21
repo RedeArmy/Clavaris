@@ -55,4 +55,4 @@ Standard practice expected (not yet formalized as an ADR): automated dependency 
 
 ## 9. External review gate
 
-Per `CLAUDE.md` §6: no consumer sends real user traffic to Clavaris until an external security review finds zero open critical/high findings. This document, `threat-model-stride.md`, and the known-gaps list in both are the primary inputs to that review — closing the gaps listed in `threat-model-stride.md` §5 is a precondition for scheduling it, not something to be discovered during it.
+Non-negotiable: no consumer sends real user traffic to Clavaris until an external security review finds zero open critical/high findings. This document, `threat-model-stride.md`, and the known-gaps list in both are the primary inputs to that review — closing the gaps listed in `threat-model-stride.md` §5 is a precondition for scheduling it, not something to be discovered during it.

@@ -2,8 +2,8 @@
 -- case (RegisterAccount), not pre-created ahead of it.
 --
 -- organization_id is a plain UUID column, NOT a foreign key to an `organizations` table: that
--- table doesn't exist yet (organization-module has no migrations/domain code as of this commit,
--- CLAUDE.md §11). Adding the FK constraint is a tracked follow-up for whichever change first
+-- table doesn't exist yet (organization-module has no migrations/domain code as of this commit).
+-- Adding the FK constraint is a tracked follow-up for whichever change first
 -- creates `organizations` (organization-module's own first vertical slice) — until then,
 -- referential integrity for organization_id is enforced only at the application layer. This is a
 -- real, deliberate gap, not an oversight: recorded here so it isn't silently forgotten.

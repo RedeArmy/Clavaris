@@ -2,7 +2,7 @@
 
 🟡 En revisión
 
-STRIDE analysis across the highest-value attack surfaces: authentication, token issuance, session management, and client/organization administration. This is Clavaris's own threat model — distinct from and more security-critical than any single consumer's, since a defect here has blast radius across every consuming application (`CLAUDE.md` §6).
+STRIDE analysis across the highest-value attack surfaces: authentication, token issuance, session management, and client/organization administration. This is Clavaris's own threat model — distinct from and more security-critical than any single consumer's, since a defect here has blast radius across every consuming application.
 
 ## 1. Account authentication (login, registration, password reset)
 
@@ -24,7 +24,7 @@ STRIDE analysis across the highest-value attack surfaces: authentication, token 
 | **S**poofing | Forged access token accepted by a consumer | RS256 signing (ADR-0002) — forgery requires the private key, never distributed to consumers |
 | **T**ampering | Refresh token stolen and replayed after legitimate rotation | Single-use rotation + reuse detection revokes the entire token family (BR-ID-03) |
 | **I**nformation disclosure | Authorization code intercepted in transit (e.g. via a malicious redirect) | PKCE mandatory for every client, including confidential ones (BR-CLIENT-03) — an intercepted code is useless without the original `code_verifier` |
-| **I**nformation disclosure | Signing key compromise | Key rotation with overlap (`CLAUDE.md` §6); private key never stored in the database (`data-model.md` §2); compromise response requires an incident-response runbook — **not yet written**, flagged as an open gap |
+| **I**nformation disclosure | Signing key compromise | Key rotation with overlap; private key never stored in the database (`data-model.md` §2); compromise response requires an incident-response runbook — **not yet written**, flagged as an open gap |
 | **D**enial of service | `/oauth2/token` flooded to exhaust compute (RS256 verification/signing cost) | Rate limiting on the token endpoint (BR-ID-06) |
 | **E**levation of privilege | Token issued for one client accepted as valid for another client's protected resource | BR-CLIENT-02 — cross-client validity requires an explicit, currently unbuilt mechanism; no implicit trust between clients |
 
@@ -65,4 +65,4 @@ Two real, disclosed vulnerabilities in Clerk (`docs/00-vision/clerk-feature-anal
 - MFA absence (backlog per `prd-mvp.md`) means a compromised password alone is sufficient for full account takeover in v1 — accepted risk for v1, explicitly flagged, not silently ignored.
 - ~~Spring Authorization Server's multi-tenant JWKS extension (required by ADR-0010 §5) is unvalidated in code~~ — **resolved 2026-08-17**: spike completed with a GO result, see `docs/03-architecture/spikes/0001-spring-authorization-server-multitenancy.md` and ADR-0003's addendum.
 
-These gaps must be closed or explicitly risk-accepted before the external security review gate (`CLAUDE.md` §6).
+These gaps must be closed or explicitly risk-accepted before the mandatory external security review gate.

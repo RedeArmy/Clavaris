@@ -8,9 +8,9 @@ import org.springframework.transaction.annotation.Transactional;
  * synchronously, in the same operation — an Organization that exists but cannot yet issue a token
  * is never allowed to be an observable state. {@code @Transactional} covers both this module's own
  * {@code Organization} write and identity-module's {@code SigningKey} write reached through {@link
- * SigningKeyProvisioner}: this is a modular monolith on one database (CLAUDE.md §3), so both writes
- * share the same connection/transaction manager despite crossing a module boundary — true
- * atomicity, not a best-effort saga. Deliberately does NOT create a {@code RateLimitPolicy} row
+ * SigningKeyProvisioner}: this is a modular monolith on one database, so both writes share the same
+ * connection/transaction manager despite crossing a module boundary — true atomicity, not a
+ * best-effort saga. Deliberately does NOT create a {@code RateLimitPolicy} row
  * (BR-ORG-05/BR-ORG-06): a missing row already means "use the system default."
  */
 public class CreateOrganizationService implements CreateOrganizationUseCase {

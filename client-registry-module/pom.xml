@@ -53,8 +53,8 @@
         <!-- ADR-0005-style hashing for client_secret_hash — same "hash-not-plaintext" principle
              as PasswordCredential (data-model.md §2). Not a dependency on identity-module's own
              Argon2PasswordHasher: business modules stay mutually independent (app is the only
-             module allowed to see the whole tree, CLAUDE.md §7.2's spirit applied at the
-             module-graph level) — a small amount of duplication between two modules is an
+             module allowed to see the whole tree, the hexagonal dependency rule's spirit applied
+             at the module-graph level) — a small amount of duplication between two modules is an
              acceptable, explicit trade-off; refactor into a shared utility only once a third
              module needs the same thing (YAGNI, not premature abstraction). -->
         <dependency>

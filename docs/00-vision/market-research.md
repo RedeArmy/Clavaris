@@ -9,7 +9,7 @@ This is not commercial market research in the traditional sense — Clavaris is 
 | Product | Model | Why it wasn't chosen |
 |---|---|---|
 | **Auth0** | Hosted, per-MAU pricing | Pricing scales against a portfolio of side projects rather than one funded product; vendor lock-in on the hardest component to migrate later |
-| **Clerk** | Hosted, per-MAU pricing, strong DX (this project's explicit UX inspiration — see `CLAUDE.md` §1 origin) | Same pricing/lock-in concern as Auth0; also closed-source, so "reuse across any language" is bounded by whatever SDKs Clerk chooses to ship. Deep-dive feature/criticism analysis: `clerk-feature-analysis.md` |
+| **Clerk** | Hosted, per-MAU pricing, strong DX (this project's explicit UX inspiration) | Same pricing/lock-in concern as Auth0; also closed-source, so "reuse across any language" is bounded by whatever SDKs Clerk chooses to ship. Deep-dive feature/criticism analysis: `clerk-feature-analysis.md` |
 | **Keycloak** | Self-hosted, open source, Java/Quarkus-based | Mature and OIDC-conformant, but admin-console-first and heavyweight to extend with custom domain concepts (e.g. this project's `organization-module` shape); steep operational learning curve for a solo developer |
 | **Zitadel** | Self-hosted or hosted, open source, Go-based | Strong multi-tenancy model (close to what `organization-module` wants), but a different language/ecosystem than the rest of this author's stack, adding an operational surface the author isn't already fluent in |
 | **Ory (Kratos/Hydra)** | Self-hosted, open source, composed of separate services | Correct separation of concerns (identity vs. OAuth2), but the "compose several services yourself" model reintroduces integration complexity that a solo developer is trying to avoid |

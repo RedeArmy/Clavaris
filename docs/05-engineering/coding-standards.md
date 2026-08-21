@@ -4,7 +4,7 @@
 
 ## 1. Language and style
 
-Java 25. Standard Java conventions (naming, package structure) as already fixed by the module layout in `CLAUDE.md` §7.1. No divergence from JobSeeker's own coding-standards baseline (`../../JobSeeker/docs/05-engineering/coding-standards.md`) except where this document says otherwise.
+Java 25. Standard Java conventions (naming, package structure) as already fixed by the module layout (§7 of `domain-model.md` / `system-design-document.md`). No divergence from JobSeeker's own coding-standards baseline (`../../JobSeeker/docs/05-engineering/coding-standards.md`) except where this document says otherwise.
 
 **Formatting and clean-code rules are a build gate, not a style guide (added 2026-08-17)** — enforced project-wide via the root `pom.xml`'s `<build><plugins>` (inherited by every module automatically, no per-module opt-in):
 
@@ -14,11 +14,11 @@ Java 25. Standard Java conventions (naming, package structure) as already fixed 
 
 ## 2. Hexagonal dependency rule enforcement
 
-The rule in `CLAUDE.md` §7.2 (`domain/` depends on nothing; `application/` depends only on `domain/`; `infrastructure/` depends on both, never the reverse) is enforced by an **ArchUnit test running in CI**, not by code review alone — a violation fails the build. Lives at `app/src/test/java/com/clavaris/app/architecture/HexagonalArchitectureTest.java` (checks every business module's compiled classes at once, since `app` is the one module that depends on all of them); live-verified against a deliberately injected violation before this was trusted, not just assumed to work. See `test-strategy.md` §2.
+The hexagonal dependency rule (`domain/` depends on nothing; `application/` depends only on `domain/`; `infrastructure/` depends on both, never the reverse) is enforced by an **ArchUnit test running in CI**, not by code review alone — a violation fails the build. Lives at `app/src/test/java/com/clavaris/app/architecture/HexagonalArchitectureTest.java` (checks every business module's compiled classes at once, since `app` is the one module that depends on all of them); live-verified against a deliberately injected violation before this was trusted, not just assumed to work. See `test-strategy.md` §2.
 
 ## 3. Commenting standard
 
-Same as `CLAUDE.md` §8: every class or method encoding a business rule, architectural decision, or non-obvious technical choice gets a 1-3 line comment explaining *why*, referencing the `BR-XXX-NN` ID when one exists. No restating *what* the code does. No commented-out code. No TODO without an owner and a reason.
+Every class or method encoding a business rule, architectural decision, or non-obvious technical choice gets a 1-3 line comment explaining *why*, referencing the `BR-XXX-NN` ID when one exists. No restating *what* the code does. No commented-out code. No TODO without an owner and a reason.
 
 Given this system's security-critical nature, this standard is applied with particular strictness to:
 - Anything touching password/token hashing configuration (reference ADR-0005/ADR-0002).
@@ -33,4 +33,4 @@ Given this system's security-critical nature, this standard is applied with part
 
 ## 5. Relevant ADR range
 
-ADRs 0001-0006 (`docs/03-architecture/adr/`) — all currently locked, referenced from `CLAUDE.md` §10.
+ADRs 0001-0006 (`docs/03-architecture/adr/`) — all currently locked, considered settled unless a new ADR explicitly revisits one of them.

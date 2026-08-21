@@ -7,8 +7,7 @@ apply to this change; don't leave unchecked boxes that were never relevant.
 ## What changed and why
 
 <!-- One or two sentences. Reference the business rule or ADR ID if this
-     implements one (CLAUDE.md §8), e.g. "Rotates refresh token on use
-     (BR-ID-03)." -->
+     implements one, e.g. "Rotates refresh token on use (BR-ID-03)." -->
 
 ## Checklist (definition-of-done.md)
 

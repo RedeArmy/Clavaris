@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 /**
  * Same hashing discipline as {@code identity-module}'s {@code Argon2PasswordHasher} (ADR-0005) —
  * duplicated rather than shared across modules (see this module's pom.xml comment for why).
- * Arguably even higher-stakes here: CLAUDE.md §5 names the platform-tier credential the single
- * highest-value target in the whole system.
+ * Arguably even higher-stakes here: the platform-tier credential is the single highest-value target
+ * in the whole system.
  */
 @Component
 class Argon2ClientSecretHasher implements ClientSecretHasher {

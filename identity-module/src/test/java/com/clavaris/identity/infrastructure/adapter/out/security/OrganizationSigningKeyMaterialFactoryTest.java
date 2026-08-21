@@ -50,8 +50,8 @@ class OrganizationSigningKeyMaterialFactoryTest {
   @Test
   void aSecondCallForTheSameOrganizationOverwritesThePreviousKey() {
     // Documented, known limitation (this class's own Javadoc) — asserted here so a future change
-    // that accidentally starts retaining both keys (a real fix for the overlap requirement,
-    // CLAUDE.md §6) doesn't silently change this behaviour without a test noticing.
+    // that accidentally starts retaining both keys (a real fix for the overlap requirement)
+    // doesn't silently change this behaviour without a test noticing.
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     factory.generateFor(organizationId);
     KeyPair first = factory.keyPairFor(organizationId).orElseThrow();

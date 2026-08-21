@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * Records the {@link PlatformSigningKeyMaterial} bean's already-generated key as the active {@code
  * platform_signing_keys} row (retiring whichever row was active before, if any) — the key material
  * itself was generated the moment {@code PlatformSigningKeyMaterial} was constructed; this runner
- * only makes that event observable in the audit trail (CLAUDE.md §6).
+ * only makes that event observable in the audit trail.
  */
 @Component
 class PlatformSigningKeyActivationRunner implements ApplicationRunner {

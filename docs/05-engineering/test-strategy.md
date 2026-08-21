@@ -14,7 +14,7 @@ Clavaris is the credential store and token issuer for every consuming applicatio
 | Integration | Persistence adapters against a real Postgres (Testcontainers) — every repository implementation, migration correctness | JUnit 5 + Testcontainers |
 | Contract / conformance | The OIDC surface itself — Authorization Code + PKCE flow end-to-end, JWKS correctness, discovery document completeness | Spring Boot `@SpringBootTest` against a running Authorization Server context; OpenID Foundation conformance suite ahead of v1 exit (`vision-document.md` §2) |
 | Security-specific | Refresh token reuse-detection actually revokes the full token family; rate limiting actually triggers at the configured threshold; Argon2id parameters actually resist a quick brute-force check | Dedicated test suite, not folded into generic unit tests — these are the tests that most directly validate `threat-model-stride.md` mitigations |
-| Architecture | Hexagonal dependency rule enforcement (`domain/` importing nothing from `org.springframework.*` or `jakarta.persistence.*`, `CLAUDE.md` §7.2) | ArchUnit, run in CI on every build — not a manual review step. `HexagonalArchitectureTest` (`app` module) — live, not aspirational, as of this commit |
+| Architecture | Hexagonal dependency rule enforcement (`domain/` importing nothing from `org.springframework.*` or `jakarta.persistence.*`) | ArchUnit, run in CI on every build — not a manual review step. `HexagonalArchitectureTest` (`app` module) — live, not aspirational, as of this commit |
 
 ## 3. What must never ship without a test
 

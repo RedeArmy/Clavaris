@@ -1,10 +1,10 @@
 # First Vertical Slice Blueprint — reference template for every use case
 
-🟡 En revisión — illustrative, not yet implemented (`CLAUDE.md` §11: no application classes exist yet)
+🟡 En revisión — illustrative, not yet implemented (no application classes exist yet)
 
 ## 1. Purpose
 
-`CLAUDE.md` §7.1 fixes the folder shape (`domain/` → `application/usecase/<name>/` → `infrastructure/adapter/{in,out}/`) but doesn't show it filled in with real code. This document works through **two** concrete use cases end-to-end — one per architectural concern that needed a worked example — so that when implementation actually starts (roadmap v1), every subsequent use case has a template to copy instead of re-deriving the pattern from principles each time.
+The project's own conventions fix the folder shape (`domain/` → `application/usecase/<name>/` → `infrastructure/adapter/{in,out}/`) but don't show it filled in with real code. This document works through **two** concrete use cases end-to-end — one per architectural concern that needed a worked example — so that when implementation actually starts (roadmap v1), every subsequent use case has a template to copy instead of re-deriving the pattern from principles each time.
 
 This is not a spec to build *now*. It exists to make four things concrete, each demonstrated against a real use case rather than described abstractly:
 
@@ -140,7 +140,7 @@ public class RegisterAccountService implements RegisterAccountUseCase {
 
 ### 2.4 Infrastructure layer — web adapter
 
-`RegisterAccountController` is a Thymeleaf form-POST controller (`CLAUDE.md` §3 — hosted UI, server-rendered), not a JSON REST endpoint — registration happens through the login/consent UI, not the management API. It maps the form's `RegisterAccountForm` (web-specific, with Bean Validation annotations) to the domain-shaped `RegisterAccountCommand`, calls `RegisterAccountUseCase`, and redirects to the email-verification-pending page on success or re-renders the form with a field error on `EmailAlreadyRegisteredException` — the exception never becomes a raw 500 or leaks a stack trace.
+`RegisterAccountController` is a Thymeleaf form-POST controller (server-rendered hosted UI), not a JSON REST endpoint — registration happens through the login/consent UI, not the management API. It maps the form's `RegisterAccountForm` (web-specific, with Bean Validation annotations) to the domain-shaped `RegisterAccountCommand`, calls `RegisterAccountUseCase`, and redirects to the email-verification-pending page on success or re-renders the form with a field error on `EmailAlreadyRegisteredException` — the exception never becomes a raw 500 or leaks a stack trace.
 
 ### 2.5 Tests (per `test-strategy.md` §2)
 

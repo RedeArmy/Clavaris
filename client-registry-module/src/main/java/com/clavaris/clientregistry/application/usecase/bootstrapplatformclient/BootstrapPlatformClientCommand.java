@@ -8,8 +8,8 @@ package com.clavaris.clientregistry.application.usecase.bootstrapplatformclient;
 public record BootstrapPlatformClientCommand(String clientId, String rawClientSecret) {
 
   /**
-   * BR-ID-01's principle, CLAUDE.md §6: never print the raw secret — see RegisterAccountCommand's
-   * identical override for the full rationale.
+   * BR-ID-01's principle: never print the raw secret — see RegisterAccountCommand's identical
+   * override for the full rationale.
    */
   @Override
   public String toString() {

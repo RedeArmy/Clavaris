@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /**
  * Adapts identity-module's {@link AuthenticatedSessionEstablisher} port to real Spring Security
  * machinery — the bridge lives in {@code app}, not identity-module, for the same reason {@code
- * OrganizationExistsCheckerBridge}'s implementation does (CLAUDE.md §7.2's module-graph rule):
+ * OrganizationExistsCheckerBridge}'s implementation does (the module-graph's dependency rule):
  * identity-module deliberately never depends on {@code spring-security-config}.
  *
  * <p>Not going through the standard {@code UsernamePasswordAuthenticationFilter}-based form-login

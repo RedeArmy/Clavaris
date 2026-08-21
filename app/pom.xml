@@ -17,7 +17,7 @@
         modular monolith). Owns the @SpringBootApplication entry point and cross-cutting
         infrastructure wiring (Actuator health checks) only. No domain/application code lives
         here — it depends on the business modules, never the reverse, same direction as the
-        hexagonal rule (CLAUDE.md §7.2) applied at the module-graph level.
+        hexagonal dependency rule applied at the module-graph level.
     </description>
 
     <dependencies>
@@ -59,11 +59,12 @@
              client-registry-module, because it needs both at once (client-registry-module's
              PlatformClient for the RegisteredClientRepository, identity-module's
              PlatformSigningKeyMaterial for the JWKSource/signer), and app is the one module
-             already allowed to depend on every business module (CLAUDE.md §7.2's module-graph
-             rule). Uses the two implementation patterns the spike validated
+             already allowed to depend on every business module (the module-graph's own
+             dependency rule). Uses the two implementation patterns the spike validated
              (docs/03-architecture/spikes/0001-spring-authorization-server-multitenancy.md
-             Appendix A/B) as the starting point, per CLAUDE.md §11 and the spike's own §7
-             recommendation, not re-derived from scratch. -->
+             Appendix A/B) as the starting point, per the "don't build ahead of the use case
+             that needs it" principle and the spike's own §7 recommendation, not re-derived
+             from scratch. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-authorization-server</artifactId>
@@ -142,7 +143,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Enforces the hexagonal dependency rule (CLAUDE.md §7.2) as a real,
+        <!-- Enforces the hexagonal dependency rule as a real,
              CI-checked constraint, not a code-review convention. Lives here
              (not per-module) because "app" is the one module that already
              depends on every business module, so it's the single place that

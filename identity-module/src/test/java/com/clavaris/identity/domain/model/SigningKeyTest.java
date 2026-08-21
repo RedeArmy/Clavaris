@@ -23,8 +23,8 @@ class SigningKeyTest {
 
   @Test
   void retireMarksTheKeyRetiredWithoutErasingItsMetadata() {
-    // CLAUDE.md §6: JWKS keeps serving a retired key until every token signed under it has
-    // expired — retiring must never look like the row was deleted.
+    // JWKS keeps serving a retired key until every token signed under it has expired —
+    // retiring must never look like the row was deleted.
     SigningKey key = SigningKey.activate(organizationId, "a-kid", "RS256");
 
     key.retire();

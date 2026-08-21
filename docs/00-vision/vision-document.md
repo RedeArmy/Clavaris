@@ -18,7 +18,7 @@ It is infrastructure, not a product feature. It succeeds when a new project's de
 
 Clavaris has exactly one class of "user" that matters at the product level: **developers of consuming applications** — currently the author, currently one consumer (JobSeeker), with more expected over time. End users of those applications (a JobSeeker candidate, a JobSeeker recruiter) interact with Clavaris only indirectly, through the hosted login/consent screens during an OIDC flow — they should never need to know Clavaris exists as a separate system.
 
-This distinction matters for every product decision: features are evaluated against "does this make integrating a new consumer easier / does this keep existing consumers' users secure," never against "does this help a JobSeeker candidate specifically" — that framing belongs to JobSeeker, not here (see `CLAUDE.md` §1).
+This distinction matters for every product decision: features are evaluated against "does this make integrating a new consumer easier / does this keep existing consumers' users secure," never against "does this help a JobSeeker candidate specifically" — that framing belongs to JobSeeker, not here.
 
 ## 4. Why build instead of adopt
 
@@ -32,7 +32,7 @@ Full reasoning: `docs/03-architecture/adr/0001-build-custom-identity-vs-adopt-ex
 
 ## 5. Non-goals for v1/v1.1 (explicitly out of scope *now*, not a claim about forever — see §7)
 
-- **Not a commercial SaaS product yet.** No public signup, no billing, no multi-tenant-at-the-infrastructure-level *offered to third parties* in v1/v1.1 — a single Clavaris deployment serves the author's own projects today. This is a sequencing decision, not a ceiling: see §7 for the declared long-term direction. Do not build billing/plan-gating/public-signup now; that remains real scope to earn later, not silently drifted toward (`CLAUDE.md` §12).
+- **Not a commercial SaaS product yet.** No public signup, no billing, no multi-tenant-at-the-infrastructure-level *offered to third parties* in v1/v1.1 — a single Clavaris deployment serves the author's own projects today. This is a sequencing decision, not a ceiling: see §7 for the declared long-term direction. Do not build billing/plan-gating/public-signup now; that remains real scope to earn later, not silently drifted toward.
 - **Not an enterprise CIAM competitor.** No SAML, no SCIM provisioning, no enterprise SSO federation in v1. Those are real, well-understood features, just not needed by any current or near-term consumer.
 - **Not multi-region.** Single-region deployment is sufficient for the current consumer set.
 - **Not a general password manager or MFA authenticator app** — Clavaris issues and verifies credentials for its own consumer applications only.
@@ -41,7 +41,7 @@ Full reasoning: `docs/03-architecture/adr/0001-build-custom-identity-vs-adopt-ex
 
 - JobSeeker's Wave 1 identity integration is live against Clavaris in production, with zero credential-related security incidents.
 - A second, unrelated project (not yet identified) integrates in under a day using nothing but standard OIDC client libraries — the real test of "reusable," since a second successful integration is the only way to disprove "reusable in theory, actually still coupled to JobSeeker's assumptions in practice."
-- An external security review has been completed with no open critical/high findings (§6 of `CLAUDE.md`).
+- An external security review has been completed with no open critical/high findings.
 
 ## 7. Long-term direction (declared intent, not current scope — added 2026-08-17)
 

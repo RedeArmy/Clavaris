@@ -28,8 +28,8 @@ class PlatformClientTest {
 
   @Test
   void rejectsABlankSecretHash_theHighestValueCredentialInTheSystem() {
-    // CLAUDE.md §5: the PlatformClient credential is the single highest-value target in the
-    // system — a hasher bug producing an empty hash must fail loudly here, not silently reach
+    // The PlatformClient credential is the single highest-value target in the system — a hasher
+    // bug producing an empty hash must fail loudly here, not silently reach
     // persistence as a credential nothing (and everything) would authenticate against.
     assertThatIllegalArgumentException()
         .isThrownBy(() -> PlatformClient.register("bootstrap-client", " ", List.of()));

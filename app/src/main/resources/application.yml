@@ -20,7 +20,7 @@ spring:
       ddl-auto: validate
   flyway:
     # Default locations (classpath:db/migration) already match every module's
-    # scaffolded db/migration folder (CLAUDE.md §7.1) — nothing to override here.
+    # scaffolded db/migration folder — nothing to override here.
     enabled: true
   data:
     redis:

@@ -15,7 +15,7 @@ public record AuthenticateWithPasswordCommand(
 
   /**
    * Same rationale as {@code RegisterAccountCommand#toString()} — a record's auto-generated {@code
-   * toString()} would otherwise print {@code rawPassword} verbatim (BR-ID-01, CLAUDE.md §6).
+   * toString()} would otherwise print {@code rawPassword} verbatim (BR-ID-01).
    */
   @Override
   public String toString() {

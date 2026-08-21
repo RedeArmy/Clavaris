@@ -53,7 +53,7 @@ public final class PlatformClient {
       // Same defensive rationale as PasswordCredential's own blank-hash guard: a hasher bug
       // producing an empty hash must fail loudly here, not silently reach persistence as a
       // credential nothing (and everything) authenticates against — for THIS credential
-      // specifically, the highest-value target in the whole system (CLAUDE.md §5).
+      // specifically, the highest-value target in the whole system.
       throw new IllegalArgumentException("clientSecretHash must not be blank");
     }
   }

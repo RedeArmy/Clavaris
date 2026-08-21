@@ -2,8 +2,8 @@
 
 Clavaris is a self-hosted identity provider — the credential store and token
 issuer for everything that depends on it. A vulnerability here has a blast
-radius across every consuming application, not just this repository
-(`CLAUDE.md` §1, §6). If you find one, please report it privately.
+radius across every consuming application, not just this repository. If you
+find one, please report it privately.
 
 ## Reporting a vulnerability
 
@@ -26,17 +26,17 @@ Please include:
 
 ## Current state
 
-This project is pre-launch (`CLAUDE.md` §11): no consumer sends real user
-traffic through it yet, and a mandatory external security review is required
-before any consumer does (`CLAUDE.md` §6 — non-negotiable). Reports made now,
-before that review, are still valuable and still handled seriously.
+This project is pre-launch: no consumer sends real user traffic through it
+yet, and a mandatory external security review is required before any
+consumer does — non-negotiable. Reports made now, before that review, are
+still valuable and still handled seriously.
 
 One known gap, tracked openly rather than hidden: there is no formal
 incident-response runbook yet for compromise of the `PlatformClient`
-bootstrap credential (`CLAUDE.md` §5, §6) — the single highest-value target
-in the system, since it can create and thus reach every tenant. If your
-report relates to this credential specifically, please still report it
-privately; treat it as high-severity by default.
+bootstrap credential — the single highest-value target in the system,
+since it can create and thus reach every tenant. If your report relates
+to this credential specifically, please still report it privately; treat
+it as high-severity by default.
 
 ## Supported versions
 

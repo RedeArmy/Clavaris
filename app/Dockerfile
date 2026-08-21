@@ -1,7 +1,7 @@
 # Multi-stage build — the build stage's Maven cache/JDK never ships in the
 # final image, keeping the runtime image small and free of build tooling
 # (smaller image = smaller attack surface, consistent with this project's
-# security-first posture, CLAUDE.md §6).
+# security-first posture).
 
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
@@ -15,7 +15,7 @@ COPY organization-module ./organization-module
 COPY client-registry-module ./client-registry-module
 COPY app ./app
 
-# No Maven wrapper committed yet (CLAUDE.md §11) — installs Maven directly in
+# No Maven wrapper committed yet — installs Maven directly in
 # the build stage instead. Revisit in favor of ./mvnw once the wrapper exists,
 # for a pinned Maven version instead of "whatever apt currently ships."
 RUN apt-get update && apt-get install -y --no-install-recommends maven \

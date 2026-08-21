@@ -14,7 +14,7 @@ Trunk-based development. `master` is always deployable (this repo's actual defau
 
 ## 3. Commit messages
 
-Conventional-commit-style prefix (`feat:`, `fix:`, `docs:`, `chore:`, `security:`), imperative mood, reference the business rule or ADR ID when the commit implements one (`CLAUDE.md` §8) — e.g. `feat: rotate refresh token on use (BR-ID-03)`.
+Conventional-commit-style prefix (`feat:`, `fix:`, `docs:`, `chore:`, `security:`), imperative mood, reference the business rule or ADR ID when the commit implements one — e.g. `feat: rotate refresh token on use (BR-ID-03)`.
 
 ## 4. CI gates before merge
 

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * client-registry-module's {@link OrganizationExistsChecker} outbound port — the bridge lives in
  * {@code app}, not either business module, same convention as {@code
  * CreateOrganizationSigningKeyBridge}: it needs both at once and {@code app} is the one module
- * allowed to (CLAUDE.md §7.2's module-graph rule).
+ * allowed to (the module-graph's dependency rule).
  *
  * <p>Landed in the same PR as {@code RegisterOAuthClientUseCase}, not deferred to a later one —
  * confirmed live once already (that earlier fix's own commit message has the full story): without

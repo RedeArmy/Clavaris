@@ -32,9 +32,9 @@ import org.springframework.security.web.SecurityFilterChain;
  * never reachable through or confusable with any tenant's own OIDC surface. Deliberately does NOT
  * include the spike's Appendix A custom OIDC discovery filter: this issuer is pure OAuth2 {@code
  * client_credentials} for operator/admin tooling, not an OIDC identity flow — nothing currently
- * needs {@code /.well-known/openid-configuration} to exist for it, and CLAUDE.md §11's "don't build
- * ahead of the use case that needs it" applies here as much as anywhere else. Uses the spike's
- * Appendix B pattern (JWKSource wiring) as-is: docs/03-architecture/spikes/
+ * needs {@code /.well-known/openid-configuration} to exist for it, and the project's own "don't
+ * build ahead of the use case that needs it" principle applies here as much as anywhere else. Uses
+ * the spike's Appendix B pattern (JWKSource wiring) as-is: docs/03-architecture/spikes/
  * 0001-spring-authorization-server-multitenancy.md §5.3 found that {@code .tokenGenerator(...)}
  * alone only wires the signer — the JWKS endpoint reads its key from a separate shared-object slot
  * that nothing sets by default, silently serving the wrong key otherwise.

@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
  * factory's own current-recommendation defaults ({@code
  * Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8}) rather than hand-picked numbers — Spring
  * Security's own team tracks OWASP guidance on cost-factor recommendations over time; re-deriving
- * that judgement here would be the kind of hand-rolled security decision CLAUDE.md §1 explicitly
- * avoids ("never reinventing cryptography... on top of a vetted framework").
+ * that judgement here would be the kind of hand-rolled security decision this project's own
+ * philosophy explicitly avoids ("never reinventing cryptography... on top of a vetted framework").
  */
 @Component
 class Argon2PasswordHasher implements PasswordHasher {

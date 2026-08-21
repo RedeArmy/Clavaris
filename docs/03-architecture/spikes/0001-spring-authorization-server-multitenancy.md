@@ -42,7 +42,7 @@ Explicitly out of scope for this investigation — these are real `identity-modu
 
 ## 4. Methodology
 
-A standalone, disposable Spring Boot application was built outside this repository (never committed — Clavaris's `identity-module`/`client-registry-module` remain at zero application classes, per `CLAUDE.md` §11; mixing exploratory spike code into a security-critical codebase was treated as unacceptable regardless of outcome). Findings were written back into `ADR-0003`/`ADR-0010`; the code itself was discarded after the investigation concluded.
+A standalone, disposable Spring Boot application was built outside this repository (never committed — Clavaris's `identity-module`/`client-registry-module` remain at zero application classes; mixing exploratory spike code into a security-critical codebase was treated as unacceptable regardless of outcome). Findings were written back into `ADR-0003`/`ADR-0010`; the code itself was discarded after the investigation concluded.
 
 **Stack:** Java 21, Spring Boot 3.4.1, `spring-boot-starter-oauth2-authorization-server` (resolves `spring-security-oauth2-authorization-server` 1.4.1, `spring-security-core` 6.4.2), `spring-boot-starter-web`.
 

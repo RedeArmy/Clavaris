@@ -6,10 +6,10 @@ import java.util.UUID;
  * Outbound port (BR-ORG-06): generates and activates the new Organization's initial signing key,
  * synchronously, in the same operation as its creation. Deliberately does NOT reference {@code
  * SigningKey} or any identity-module type directly — organization-module and identity-module stay
- * mutually independent business modules (CLAUDE.md §7.2's dependency rule applied at the
- * module-graph level, same convention {@code PlatformClientRepository} follows on the
- * client-registry-module side). Implemented in {@code app}, the one module allowed to depend on
- * both, by {@code CreateOrganizationSigningKeyBridge}.
+ * mutually independent business modules (the hexagonal dependency rule applied at the module-graph
+ * level, same convention {@code PlatformClientRepository} follows on the client-registry-module
+ * side). Implemented in {@code app}, the one module allowed to depend on both, by {@code
+ * CreateOrganizationSigningKeyBridge}.
  */
 @FunctionalInterface
 public interface SigningKeyProvisioner {

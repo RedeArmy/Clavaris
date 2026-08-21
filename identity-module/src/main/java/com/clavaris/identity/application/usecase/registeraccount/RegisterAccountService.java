@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Orchestration for {@link RegisterAccountUseCase}. {@code @Transactional} is the one place Spring
  * leaks into this class — every type it depends on otherwise (the domain model, the ports) has zero
- * Spring imports (CLAUDE.md §7.2).
+ * Spring imports.
  */
 public class RegisterAccountService implements RegisterAccountUseCase {
 

@@ -1,6 +1,6 @@
 # ADR-0008: API versioning strategy and OpenAPI/Swagger as the contract source of truth
 
-**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Aprobado y agregarse a `CLAUDE.md` §10
+**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Aprobado y añadirse a la lista de ADRs vigentes del proyecto
 
 ## Context
 
@@ -9,7 +9,7 @@ Clavaris exposes two API surfaces with different versioning needs:
 1. The **standard OIDC/OAuth2 surface** (`/authorize`, `/token`, `/userinfo`, `/jwks.json`, `.well-known/openid-configuration`, `/revoke`, end-session) — this is protocol-defined by the OpenID/OAuth2 specs themselves. It is **not** versioned by Clavaris; conformance requires these paths and shapes to match the spec exactly (ADR-0006, `vision-document.md` §2). Any "versioning" concern here is a spec-conformance concern, not a product decision.
 2. The **management API** (organizations, invitations, user administration) and the **webhook payload catalog** (ADR-0007) — both Clavaris-specific contracts (ADR-0006 §Consequences already flags this), and both will change over time as the product grows. These need an explicit, deliberate versioning story.
 
-Separately, `CLAUDE.md` §4's "Integration cost for a new consumer" success metric ("under a day, no custom SDK") only holds if the management API and webhook contracts are **discoverable and machine-readable**, not just described in prose docs that drift from the real implementation.
+Separately, the project's own "integration cost for a new consumer" success metric ("under a day, no custom SDK") only holds if the management API and webhook contracts are **discoverable and machine-readable**, not just described in prose docs that drift from the real implementation.
 
 ## Decision
 

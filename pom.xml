@@ -13,7 +13,7 @@
     <description>Parent POM for Clavaris, a standalone OIDC/OAuth2 identity provider.</description>
 
     <properties>
-        <!-- CLAUDE.md §3 locked stack: Java 25, Spring Boot 4.1. -->
+        <!-- Locked stack: Java 25, Spring Boot 4.1. -->
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -61,8 +61,8 @@
              consistent with every other plugin version in this file already
              being explicit, not left to Maven's own discretion. -->
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
-        <!-- CVE overrides (security-architecture.md §8, CLAUDE.md §6 — zero
-             critical/high findings open, non-negotiable): spring-boot-
+        <!-- CVE overrides (security-architecture.md §8 — zero critical/high
+             findings open, non-negotiable): spring-boot-
              dependencies 4.1.0 manages versions with real, live CVSS ≥ 7
              CVEs — confirmed by OWASP Dependency-Check actually failing the
              build on these, not a hypothetical. No Spring Boot patch release
@@ -213,8 +213,8 @@
         <!-- Bound here, not in pluginManagement — every child module inherits
              these executions automatically (Maven's default plugin
              inheritance), no per-module opt-in needed. Applies to code that
-             doesn't exist yet as much as to what does (CLAUDE.md §11): the
-             gate exists before the first real domain class does. -->
+             doesn't exist yet as much as to what does: the gate exists
+             before the first real domain class does. -->
         <plugins>
             <!-- Formatting (coding-standards.md §1): Google Java Format, the
                  same zero-config style Google's own engineers write against —
