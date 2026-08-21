@@ -2,6 +2,8 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -18,8 +20,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
@@ -72,6 +76,13 @@ import org.springframework.security.web.context.SecurityContextRepository;
  * for every org-scoped path (this chain's {@code anyRequest().authenticated()} would apply to the
  * register form too) and break it.
  */
+// This class's whole job is wiring together SAS's own protocol types (ADR-0003: build on the
+// framework, never reimplement it) — many distinct collaborators, long descriptive parameter
+// names matching SAS's own naming, and the same "PMD.LongVariable" suppression literal repeated
+// per-parameter all follow directly from that, not from an organically grown class that should be
+// split. TD-SEC-003/BR-ID-03 added the JDBC-backed OAuth2AuthorizationService plus refresh-token
+// use case imports/parameters, tipping this over PMD's default thresholds.
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.LongVariable", "PMD.ExcessiveParameterList"})
 @Configuration
 class OrganizationAuthorizationServerConfig {
 
@@ -99,12 +110,10 @@ class OrganizationAuthorizationServerConfig {
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final SecurityContextRepository contextRepository,
       final JdbcTemplate jdbcTemplate,
-      // Descriptive over PMD's default LongVariable threshold, kept in full rather than
-      // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
-      @SuppressWarnings("PMD.LongVariable")
-          final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
-      @SuppressWarnings("PMD.LongVariable")
-          final TokenRevocationEventLogger tokenRevocationLogger) {
+      final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
+      final TokenRevocationEventLogger tokenRevocationLogger,
+      final IssueRefreshTokenUseCase issueRefreshToken,
+      final RotateRefreshTokenUseCase rotateRefreshToken) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -130,7 +139,13 @@ class OrganizationAuthorizationServerConfig {
     // the interactive Authorization Code flow's access + ID tokens) gets a structured
     // event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc.
     jwtGenerator.setJwtCustomizer(tokenIssuanceLogger);
-    final OAuth2TokenGenerator<?> tokenGenerator = jwtGenerator;
+    // BR-ID-03: the initial-issuance half of refresh-token support — JwtGenerator returns null
+    // for the non-JWT REFRESH_TOKEN token type, so DelegatingOAuth2TokenGenerator falls through
+    // to SessionBackedRefreshTokenGenerator for exactly that case, and only that case (see its
+    // own Javadoc for why AUTHORIZATION_CODE-only scoping matters here).
+    final OAuth2TokenGenerator<?> tokenGenerator =
+        new DelegatingOAuth2TokenGenerator(
+            jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
 
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
@@ -153,6 +168,23 @@ class OrganizationAuthorizationServerConfig {
                     .authorizationServerSettings(settings)
                     .authorizationService(authorizationService)
                     .tokenGenerator(tokenGenerator)
+                    // BR-ID-03: replaces SAS's own OAuth2RefreshTokenAuthenticationProvider
+                    // entirely for the refresh grant — same provider-swap extension point already
+                    // used below for ClientSecretAuthenticationProvider's password encoder. See
+                    // RefreshTokenRotationAuthenticationProvider's own Javadoc for why this is a
+                    // full replacement, not a delegating wrapper.
+                    .tokenEndpoint(
+                        tokenEndpoint ->
+                            tokenEndpoint.authenticationProviders(
+                                providers -> {
+                                  providers.removeIf(
+                                      OAuth2RefreshTokenAuthenticationProvider.class::isInstance);
+                                  providers.add(
+                                      new RefreshTokenRotationAuthenticationProvider(
+                                          authorizationService,
+                                          tokenGenerator,
+                                          rotateRefreshToken));
+                                }))
                     // TD-SEC-017: every successful /oauth2/revoke call on any Organization gets a
                     // structured event=token_revoked log line — see TokenRevocationEventLogger's
                     // own Javadoc for why this replaces (not adds to) SAS's own default handler.

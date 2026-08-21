@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -9,6 +10,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 /**
  * Adapts client-registry-module's {@link OAuthClientRepository} to Spring Authorization Server's
@@ -96,7 +98,16 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
             // BR-CLIENT-03: PKCE is mandatory for every OAuthClient, confidential or not — enforced
             // here at SAS-config level rather than stored per-client in the domain (this is that
             // task, per OAuthClient's own design notes).
-            .clientSettings(ClientSettings.builder().requireProofKey(true).build());
+            .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+            // BR-ID-03: SAS's own default refreshTokenTimeToLive is 1 hour (confirmed live) — a
+            // sensible access-token lifetime, but far too short for the token whose entire point
+            // is letting a session outlive one access token's expiry. No business rule pins an
+            // exact value yet, so 30 days is a reasonable default until one does; note this is
+            // now dead weight for reuseRefreshTokens specifically —
+            // RefreshTokenRotationAuthenticationProvider never reads that flag, since it always
+            // rotates unconditionally, regardless of what it's set to.
+            .tokenSettings(
+                TokenSettings.builder().refreshTokenTimeToLive(Duration.ofDays(30)).build());
     client
         .allowedGrantTypes()
         .forEach(grant -> builder.authorizationGrantType(new AuthorizationGrantType(grant)));
