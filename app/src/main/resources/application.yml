@@ -28,6 +28,16 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
+# TD-SEC-002: TOKEN_SIGNING_KEY_STORE_PATH is now actually read — a PKCS12 file (SigningKeyStore)
+# holding the platform tier's and every Organization's RSA private key material, so a process
+# restart no longer regenerates every signing key and mass-invalidates every issued token. The
+# dev-default path/password below are convenience-only, same convention as DB_DEV_*: never used in
+# a real deployment, where both must be set explicitly.
+clavaris:
+  signing-key-store:
+    path: ${TOKEN_SIGNING_KEY_STORE_PATH:./data/dev-signing-keys.p12}
+    password: ${TOKEN_SIGNING_KEY_STORE_PASSWORD:dev-only-signing-key-store-password-change-in-real-deployments}
+
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;
 # confirmed present in the resolved spring-boot-4.1.0 jar, org.springframework.boot.logging.

@@ -65,6 +65,14 @@ services:
       DB_DEV_PASSWORD: ${DB_DEV_PASSWORD:-clavaris}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # TD-SEC-002: PKCS12 file holding real signing-key material — mounted from a named volume
+      # below so it survives `docker compose up`/`down` and container recreation, not just
+      # process restarts within one running container. Required, same as SPRING_PROFILES_ACTIVE
+      # above — no silent default for a value this security-sensitive.
+      TOKEN_SIGNING_KEY_STORE_PATH: /app/data/signing-keys.p12
+      TOKEN_SIGNING_KEY_STORE_PASSWORD: "${TOKEN_SIGNING_KEY_STORE_PASSWORD:?TOKEN_SIGNING_KEY_STORE_PASSWORD must be set explicitly in .env (see .env.example)}"
+    volumes:
+      - clavaris-signing-keys-data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,3 +88,4 @@ services:
 volumes:
   clavaris-postgres-data:
   clavaris-redis-data:
+  clavaris-signing-keys-data:
