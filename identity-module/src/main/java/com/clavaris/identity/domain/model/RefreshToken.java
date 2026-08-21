@@ -47,6 +47,11 @@ public final class RefreshToken {
   private final Instant expiresAt;
   private Instant revokedAt;
 
+  // One parameter per persisted column — same rationale as OAuthClient's own S107 suppression: a
+  // rehydration factory for an 8-column aggregate takes 8 parameters, not a sign this constructor
+  // does too much. A synthetic parameter-object purely to dodge the threshold would add
+  // indirection without removing any real complexity.
+  @SuppressWarnings("java:S107")
   private RefreshToken(
       final UUID id,
       final UUID sessionId,
@@ -95,6 +100,7 @@ public final class RefreshToken {
         null);
   }
 
+  @SuppressWarnings("java:S107") // same rationale as the private constructor's own suppression
   public static RefreshToken reconstitute(
       final UUID id,
       final UUID sessionId,

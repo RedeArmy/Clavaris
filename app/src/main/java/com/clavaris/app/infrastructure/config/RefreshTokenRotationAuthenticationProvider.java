@@ -190,7 +190,13 @@ final class RefreshTokenRotationAuthenticationProvider implements Authentication
                   "sid",
                   result.sessionId().toString(),
                   IdTokenClaimNames.AUTH_TIME,
-                  Date.from(result.sessionCreatedAt())));
+                  // Sonar's "use java.time" rule doesn't apply here: JwtGenerator's own source
+                  // reads this claim back with `Date authTimeClaim = currentIdToken.getClaim(...)`
+                  // — an unchecked cast keyed on the claim's stored runtime type, so it must
+                  // literally be a java.util.Date instance (matching what a real ID token's own
+                  // getAuthenticationTime() already stores via Date.from(...)), not this
+                  // codebase's own preferred java.time type.
+                  Date.from(result.sessionCreatedAt()))); // NOSONAR: see comment above
       authorizationBuilder.token(priorIdTokenPlaceholder);
 
       final OAuth2TokenContext idTokenContext =

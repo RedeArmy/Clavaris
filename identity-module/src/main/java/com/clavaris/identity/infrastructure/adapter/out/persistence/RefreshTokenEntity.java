@@ -38,6 +38,9 @@ public class RefreshTokenEntity {
 
   protected RefreshTokenEntity() {}
 
+  // One parameter per persisted column — same convention as every other *Entity in this codebase
+  // (PasswordCredentialEntity, SigningKeyEntity, OAuthClientEntity, ...) that crosses 7 columns.
+  @SuppressWarnings("java:S107")
   public RefreshTokenEntity(
       final UUID id,
       final UUID sessionId,

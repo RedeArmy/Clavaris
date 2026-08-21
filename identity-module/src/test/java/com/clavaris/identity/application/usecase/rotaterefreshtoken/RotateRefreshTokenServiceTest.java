@@ -118,9 +118,10 @@ class RotateRefreshTokenServiceTest {
   @Test
   void rejectsAnUnknownToken() {
     when(refreshTokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    RotateRefreshTokenCommand command = commandFor("garbage", Instant.now().plusSeconds(3600));
 
     assertThatExceptionOfType(InvalidRefreshTokenException.class)
-        .isThrownBy(() -> service.handle(commandFor("garbage", Instant.now().plusSeconds(3600))));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
   }
@@ -136,10 +137,11 @@ class RotateRefreshTokenServiceTest {
             Instant.now().minusSeconds(1));
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("expired-value")))
         .thenReturn(Optional.of(expired));
+    RotateRefreshTokenCommand command =
+        commandFor("expired-value", Instant.now().plusSeconds(3600));
 
     assertThatExceptionOfType(InvalidRefreshTokenException.class)
-        .isThrownBy(
-            () -> service.handle(commandFor("expired-value", Instant.now().plusSeconds(3600))));
+        .isThrownBy(() -> service.handle(command));
 
     // Ordinary expiry is not the BR-ID-03 reuse signal — no mass revocation, no alert.
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
@@ -161,10 +163,11 @@ class RotateRefreshTokenServiceTest {
         .thenReturn(Optional.of(alreadyRotatedAway));
     when(accounts.findById(accountId))
         .thenReturn(Optional.of(Account.register(organizationId, new Email("victim@example.com"))));
+    RotateRefreshTokenCommand command =
+        commandFor("stolen-old-value", Instant.now().plusSeconds(3600));
 
     assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
-        .isThrownBy(
-            () -> service.handle(commandFor("stolen-old-value", Instant.now().plusSeconds(3600))));
+        .isThrownBy(() -> service.handle(command));
 
     // BR-ID-03: every active token for the account, not just the reused one — completed
     // synchronously, before the exception was even thrown. Note: a plain Mockito unit test can

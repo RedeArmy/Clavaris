@@ -11,12 +11,10 @@ class RefreshTokenSecretTest {
     String first = RefreshTokenSecret.generateRawValue();
     String second = RefreshTokenSecret.generateRawValue();
 
-    assertThat(first).isNotBlank();
     assertThat(second).isNotBlank();
-    assertThat(first).isNotEqualTo(second);
     // 256 bits, base64url without padding — a fixed length is itself a property worth pinning so a
     // future accidental entropy reduction doesn't go unnoticed.
-    assertThat(first).hasSize(43);
+    assertThat(first).isNotBlank().isNotEqualTo(second).hasSize(43);
   }
 
   @Test
@@ -47,7 +45,7 @@ class RefreshTokenSecretTest {
   void hashIsLowercaseHexOfTheExpectedSha256Length() {
     String hash = RefreshTokenSecret.hash("any-value");
 
-    assertThat(hash).hasSize(64); // SHA-256: 32 bytes -> 64 hex characters
-    assertThat(hash).matches("[0-9a-f]{64}");
+    // SHA-256: 32 bytes -> 64 hex characters.
+    assertThat(hash).hasSize(64).matches("[0-9a-f]{64}");
   }
 }
