@@ -34,7 +34,7 @@ classDiagram
     class Session {
         +UUID id
         +UUID accountId
-        +String userAgent
+        +List~String~ scopes
         +Instant createdAt
         +Instant lastSeenAt
         +Instant revokedAt
@@ -75,7 +75,8 @@ classDiagram
 
 - **`Account`** — BR-ID-02: never has zero authentication methods (at least one of `PasswordCredential` or a `SocialIdentity` must exist at all times).
 - **`Account.organizationId`** — ADR-0010: mandatory, references `organization-module`'s `Organization` (tenant isolation boundary) by UUID only. Uniqueness moves from a global `email` constraint to `(organizationId, email)` — the same email address can be an entirely separate, unrelated `Account` in a different `Organization`. There is no cross-organization identity linking in this design.
-- **`RefreshToken.rotatedFromId`** exists specifically to support BR-ID-03's reuse-detection: presenting a token whose `rotatedFromId` chain shows it was already superseded triggers revocation of the entire session's token family, not just that one token.
+- **`Session.scopes`** — real (not placeholder) shape: fixed at open, since RFC 6749 §6 forbids a refresh grant from ever widening scope beyond what was originally authorized. Replaces this diagram's original placeholder `userAgent` field — no use case populates one yet (no "list your active sessions/devices" feature exists); the real HTTP-request plumbing to populate it is added only once one does, per this project's own "don't build ahead of the need" principle.
+- **`RefreshToken.rotatedFromId`** exists specifically to support BR-ID-03's reuse-detection, and is kept as the audit trail for *why*/*when* a token was superseded — but the actual real-time reuse check doesn't walk this chain: a presented token whose own row already has `revokedAt` set is reuse, full stop, because rotating away and the BR-ID-03 revocation cascade are the only two things that ever set it. See `RefreshToken`'s own Javadoc (identity-module) for the full reasoning behind that simplification.
 - **`VerificationToken`** is a single model serving both email verification and password reset (`type` discriminates) — BR-ID-04/BR-ID-05: single-use, time-limited, delivered only to the email of record.
 - **`SigningKey`** models RS256 key rotation with overlap — `retiredAt` is set when a key stops signing new tokens, but the key stays published in JWKS until every token signed under it has naturally expired.
 - **`SigningKey.organizationId`** — ADR-0010 §5: mandatory; JWKS is per-`Organization`, not Clavaris-wide. A verifier application only ever needs its own Organization's JWKS document; rotation of one Organization's key has no effect on any other Organization's keys or rotation schedule. A signing-key compromise is a single-tenant incident, not a Clavaris-wide one.
@@ -282,7 +283,7 @@ Not every internal domain event becomes a webhook — only the ones a consumer p
 ## 8. Open questions
 
 - Social-login account linking (see `prd-mvp.md` §5) needs a domain-level answer: does linking-by-verified-email happen automatically, or does it raise a `SocialIdentityLinkPendingEvent` requiring explicit confirmation via the existing email address? Leaning toward the latter for safety; not yet decided. Note this linking is now implicitly scoped to one `Organization` (ADR-0010) — the same Google account linking to two different `Organization`s' `Account`s is two independent links, not one.
-- Should `Session` and `RefreshToken` be merged into one aggregate, or kept separate as modeled here (one session can have a chain of rotated refresh tokens)? Kept separate for now because reuse-detection needs to reason about the *chain*, not just the current token — revisit once the actual use case implementation surfaces friction.
+- ~~Should `Session` and `RefreshToken` be merged into one aggregate, or kept separate?~~ — resolved by building BR-ID-03 for real: kept separate, and it held up without friction. The reuse check that motivated keeping them separate ended up not even needing to walk the `rotatedFromId` chain at runtime (a presented token's own `revokedAt` is sufficient — see `RefreshToken`'s own Javadoc) — but `Session` still earned its keep as the anchor `scopes`/`createdAt` (for OIDC `auth_time` continuity across rotations) actually needed to live on, distinct from any one `RefreshToken` in the chain.
 - ~~Multi-consumer identity scenario flagged in `business-rules.md` (BR-DATA-03 open question)~~ — resolved by ADR-0010: `Account` is now `Organization`-scoped, so "the same Clavaris account used to log into two consumers" is structurally impossible, not an open design question.
 - ADR-0010's own open questions (Organization provisioning ownership, system-wide rate-limit ceiling value, automated key-rotation tooling) are tracked there, not duplicated here.
 - `webhook-module` (§5) is new and carries its own open questions — see ADR-0007's own open-questions section (secret rotation, delivery log retention, outbox cleanup) rather than duplicating them here.
