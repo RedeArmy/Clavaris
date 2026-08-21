@@ -8,6 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -15,10 +18,13 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 class AuthenticateWithPasswordServiceTest {
 
@@ -31,11 +37,30 @@ class AuthenticateWithPasswordServiceTest {
   private PasswordVerifier verifier;
   private AuthenticateWithPasswordService service;
 
+  // TD-SEC-014: captures what AuthenticateWithPasswordService actually logs, the same way a real
+  // log shipper would see it — not a Mockito spy on the Logger, which would prove the call
+  // happened but not what the rendered message (with placeholders substituted) actually says.
+  private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+
   @BeforeEach
   void setUp() {
     accounts = mock(AccountRepository.class);
     verifier = mock(PasswordVerifier.class);
     service = new AuthenticateWithPasswordService(accounts, verifier);
+
+    logAppender.start();
+    loggerUnderTest().addAppender(logAppender);
+  }
+
+  @AfterEach
+  void tearDown() {
+    loggerUnderTest().detachAppender(logAppender);
+    logAppender.stop();
+    logAppender.list.clear();
+  }
+
+  private static Logger loggerUnderTest() {
+    return (Logger) LoggerFactory.getLogger(AuthenticateWithPasswordService.class);
   }
 
   @Test
@@ -50,6 +75,10 @@ class AuthenticateWithPasswordServiceTest {
         service.handle(new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD));
 
     assertThat(result).isEqualTo(account.id());
+    assertThat(onlyLoggedMessage())
+        .contains("event=login_success")
+        .contains(organizationId.toString())
+        .contains(account.id().toString());
   }
 
   @Test
@@ -62,6 +91,9 @@ class AuthenticateWithPasswordServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(verifier, never()).matches(any(), any());
+    assertThat(onlyLoggedMessage())
+        .contains("event=login_failure")
+        .contains("reason=unknown_account");
   }
 
   @Test
@@ -76,6 +108,11 @@ class AuthenticateWithPasswordServiceTest {
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    assertThat(onlyLoggedMessage())
+        .contains("event=login_failure")
+        .contains("reason=invalid_password")
+        .contains(account.id().toString());
   }
 
   @Test
@@ -100,6 +137,10 @@ class AuthenticateWithPasswordServiceTest {
     // A suspended account must never even reach the password check — the account-status guard
     // runs first, deliberately, not as an afterthought once a credential match already succeeded.
     verify(verifier, never()).matches(any(), any());
+    assertThat(onlyLoggedMessage())
+        .contains("event=login_failure")
+        .contains("reason=inactive_account")
+        .contains(account.id().toString());
   }
 
   @Test
@@ -122,5 +163,48 @@ class AuthenticateWithPasswordServiceTest {
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    assertThat(onlyLoggedMessage())
+        .contains("event=login_failure")
+        .contains("reason=no_password_credential")
+        .contains(account.id().toString());
+  }
+
+  @Test
+  void neverLogsTheRawPasswordOrTheAccountEmailOnAnySuccessOrFailurePath() {
+    // BR-DATA-01, exercised across every branch this class has, not just one — the same
+    // discipline as RegisterAccountCommandTest/BootstrapPlatformClientCommandTest's toString()
+    // guards, applied here to what actually gets written to a real log sink. A future edit that
+    // changes a log line to (accidentally) include command.email() or command.rawPassword()
+    // fails this test immediately, instead of shipping a PII/credential leak into production logs.
+    Account activeAccount = Account.register(organizationId, email);
+    activeAccount.attachPasswordCredential("argon2id$stored-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(activeAccount));
+    when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true, false);
+    AuthenticateWithPasswordCommand command =
+        new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD);
+
+    service.handle(command); // event=login_success
+    assertThatExceptionOfType(InvalidCredentialsException.class) // event=login_failure, wrong pwd
+        .isThrownBy(() -> service.handle(command));
+
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email)).thenReturn(Optional.empty());
+    assertThatExceptionOfType(InvalidCredentialsException.class) // event=login_failure, unknown
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(logAppender.list).hasSize(3);
+    for (ILoggingEvent event : logAppender.list) {
+      assertThat(event.getFormattedMessage())
+          .as("no logged line may ever contain the raw password or the account's email")
+          .doesNotContain(RAW_PASSWORD)
+          .doesNotContain(email.value());
+    }
+  }
+
+  private String onlyLoggedMessage() {
+    List<ILoggingEvent> events = logAppender.list;
+    assertThat(events).as("expected exactly one security-event log line").hasSize(1);
+    return events.get(0).getFormattedMessage();
   }
 }
