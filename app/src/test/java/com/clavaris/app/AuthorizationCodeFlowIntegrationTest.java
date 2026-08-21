@@ -2,6 +2,9 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -24,10 +27,14 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -84,6 +91,34 @@ class AuthorizationCodeFlowIntegrationTest {
           .build();
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final SecureRandom secureRandom = new SecureRandom();
+
+  // TD-SEC-016: proves TokenIssuanceEventLogger fires wired into the real bean graph for the
+  // organization tier specifically (OrganizationAuthorizationServerConfig's own
+  // JwtGenerator.setJwtCustomizer(...) call) — the platform tier's wiring is proven separately by
+  // PlatformTokenIssuanceIntegrationTest; the two tiers build their JwtGenerator independently, so
+  // neither test's pass proves the other's wiring is correct.
+  private final ListAppender<ILoggingEvent> tokenIssuanceLogAppender = new ListAppender<>();
+
+  @BeforeEach
+  void attachTokenIssuanceLogAppender() {
+    tokenIssuanceLogAppender.start();
+    tokenIssuanceLogger().addAppender(tokenIssuanceLogAppender);
+  }
+
+  @AfterEach
+  void detachTokenIssuanceLogAppender() {
+    tokenIssuanceLogger().detachAppender(tokenIssuanceLogAppender);
+    tokenIssuanceLogAppender.stop();
+    tokenIssuanceLogAppender.list.clear();
+  }
+
+  // By fully-qualified name, not TokenIssuanceEventLogger.class — that class is deliberately
+  // package-private (same convention as every other class in app.infrastructure.config), and
+  // Logback resolves loggers by name, so no import/visibility relaxation is needed to reach it.
+  private static Logger tokenIssuanceLogger() {
+    return (Logger)
+        LoggerFactory.getLogger("com.clavaris.app.infrastructure.config.TokenIssuanceEventLogger");
+  }
 
   @Test
   void completesARealPkceAuthorizationCodeFlowWithRealLoginEndToEnd() throws Exception {
@@ -145,6 +180,11 @@ class AuthorizationCodeFlowIntegrationTest {
     assertThat(code).isNotBlank();
     assertThat(queryParam(redirectWithCode, "state")).isEqualTo(state);
 
+    // Isolate what's checked below to this exchange specifically — requestPlatformAccessToken()
+    // above (bootstrapping the organization/client via the management API) already logged its own
+    // event=token_issued line for that unrelated client_credentials token.
+    tokenIssuanceLogAppender.list.clear();
+
     // 5. Exchange the code for tokens, presenting the real PKCE verifier.
     HttpResponse<String> tokenResponse = exchangeCode(organizationId, client, code, codeVerifier);
     assertThat(tokenResponse.statusCode()).isEqualTo(200);
@@ -155,6 +195,22 @@ class AuthorizationCodeFlowIntegrationTest {
     assertThat(idToken)
         .as("scope=openid must yield a real ID token, not just an access token")
         .isNotBlank();
+    // TD-SEC-016: both the access token and the ID token this exchange just issued must have
+    // logged their own event=token_issued line — proves the wiring, not just the customizer's own
+    // isolated behaviour (TokenIssuanceEventLoggerTest covers that).
+    List<String> tokenIssuedMessages =
+        tokenIssuanceLogAppender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    assertThat(tokenIssuedMessages)
+        .as("one event=token_issued line per token type this exchange issued")
+        .hasSize(2)
+        .allSatisfy(
+            message ->
+                assertThat(message)
+                    .contains("event=token_issued")
+                    .contains("grantType=authorization_code")
+                    .contains("clientId=" + client.clientId()))
+        .anyMatch(message -> message.contains("tokenType=access_token"))
+        .anyMatch(message -> message.contains("tokenType=id_token"));
 
     // 6. Cryptographic proof, not just a 200 — same bar as every other issuance test in this
     // suite: both tokens must actually verify against this Organization's own published JWKS.

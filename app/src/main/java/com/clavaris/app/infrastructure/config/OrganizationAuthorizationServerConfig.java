@@ -17,7 +17,9 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -92,7 +94,11 @@ class OrganizationAuthorizationServerConfig {
       final OAuthClientRepository oauthClients,
       final SigningKeyRepository signingKeys,
       final OrganizationSigningKeyMaterialFactory keyMaterial,
-      final SecurityContextRepository contextRepository) {
+      final SecurityContextRepository contextRepository,
+      // Descriptive over PMD's default LongVariable threshold, kept in full rather than
+      // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
+      @SuppressWarnings("PMD.LongVariable")
+          final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -113,7 +119,12 @@ class OrganizationAuthorizationServerConfig {
     http.setSharedObject(JWKSource.class, jwkSource);
 
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(jwkSource);
-    final OAuth2TokenGenerator<?> tokenGenerator = new JwtGenerator(jwtEncoder);
+    final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
+    // TD-SEC-016: every token any Organization issues (client_credentials and, far more commonly,
+    // the interactive Authorization Code flow's access + ID tokens) gets a structured
+    // event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc.
+    jwtGenerator.setJwtCustomizer(tokenIssuanceLogger);
+    final OAuth2TokenGenerator<?> tokenGenerator = jwtGenerator;
 
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
