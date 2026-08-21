@@ -63,7 +63,7 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
     final UUID clientId;
     try {
       clientId = UUID.fromString(id);
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
     return oauthClients

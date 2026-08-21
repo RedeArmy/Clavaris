@@ -75,7 +75,7 @@ public class LoginController {
                   new OrganizationId(organizationId),
                   new Email(form.getEmail()),
                   form.getPassword()));
-    } catch (final InvalidCredentialsException e) {
+    } catch (final InvalidCredentialsException _) {
       // Deliberately one single, generic, form-level error — never field-scoped (that would
       // itself leak "the email field was fine, it was the password" or vice versa), matching
       // InvalidCredentialsException's own anti-enumeration design.

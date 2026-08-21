@@ -53,7 +53,7 @@ class PlatformRegisteredClientRepository implements RegisteredClientRepository {
           .findById(UUID.fromString(id))
           .map(this::toRegisteredClient)
           .orElse(null);
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
   }

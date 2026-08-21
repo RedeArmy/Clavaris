@@ -73,13 +73,13 @@ public class RegisterAccountController {
       useCase.handle(
           new RegisterAccountCommand(
               new OrganizationId(organizationId), new Email(form.getEmail()), form.getPassword()));
-    } catch (EmailAlreadyRegisteredException e) {
+    } catch (EmailAlreadyRegisteredException _) {
       // Never leaks the low-level exception message (which includes the raw organizationId
       // UUID) to the rendered page — a generic, field-scoped error only.
       bindingResult.rejectValue(
           "email", "email.alreadyRegistered", "This email is already registered");
       return FORM_VIEW;
-    } catch (WeakPasswordException e) {
+    } catch (WeakPasswordException _) {
       bindingResult.rejectValue(
           "password", "password.tooWeak", "Password does not meet the minimum requirements");
       return FORM_VIEW;
