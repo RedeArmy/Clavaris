@@ -74,17 +74,31 @@ class PlatformTokenIssuanceIntegrationTest {
   // already holds itself to for signature verification.
   private final ListAppender<ILoggingEvent> tokenIssuanceLogAppender = new ListAppender<>();
 
+  // TD-SEC-017: /oauth2/revoke was, before this, completely unexercised anywhere in this codebase
+  // — no test, no wiring investigated. This is the first real exercise of it, proving both that
+  // revocation itself works end to end and that TokenRevocationEventLogger fires wired into the
+  // real bean graph, not just in isolation (TokenRevocationEventLoggerTest covers that).
+  private final ListAppender<ILoggingEvent> tokenRevocationLogAppender = new ListAppender<>();
+
+  // One @BeforeEach/@AfterEach pair, not one per appender — attaching/detaching both together
+  // keeps setup/teardown order obvious from a single method instead of relying on JUnit 5's
+  // (unspecified, for same-annotation methods in one class) ordering across several.
   @BeforeEach
-  void attachTokenIssuanceLogAppender() {
+  void attachLogAppenders() {
     tokenIssuanceLogAppender.start();
     tokenIssuanceLogger().addAppender(tokenIssuanceLogAppender);
+    tokenRevocationLogAppender.start();
+    tokenRevocationLogger().addAppender(tokenRevocationLogAppender);
   }
 
   @AfterEach
-  void detachTokenIssuanceLogAppender() {
+  void detachLogAppenders() {
     tokenIssuanceLogger().detachAppender(tokenIssuanceLogAppender);
     tokenIssuanceLogAppender.stop();
     tokenIssuanceLogAppender.list.clear();
+    tokenRevocationLogger().detachAppender(tokenRevocationLogAppender);
+    tokenRevocationLogAppender.stop();
+    tokenRevocationLogAppender.list.clear();
   }
 
   // By fully-qualified name, not TokenIssuanceEventLogger.class — that class is deliberately
@@ -93,6 +107,12 @@ class PlatformTokenIssuanceIntegrationTest {
   private static Logger tokenIssuanceLogger() {
     return (Logger)
         LoggerFactory.getLogger("com.clavaris.app.infrastructure.config.TokenIssuanceEventLogger");
+  }
+
+  private static Logger tokenRevocationLogger() {
+    return (Logger)
+        LoggerFactory.getLogger(
+            "com.clavaris.app.infrastructure.config.TokenRevocationEventLogger");
   }
 
   @Test
@@ -139,6 +159,28 @@ class PlatformTokenIssuanceIntegrationTest {
   }
 
   @Test
+  void revokesARealTokenAndLogsAStructuredEventWithoutEverLoggingTheTokenItself() throws Exception {
+    HttpResponse<String> tokenResponse =
+        requestToken("test-platform-client", "a-test-platform-secret");
+    String accessToken = objectMapper.readTree(tokenResponse.body()).get("access_token").asString();
+    tokenRevocationLogAppender.list.clear(); // isolate from the issuance above
+
+    HttpResponse<String> revokeResponse = revokeToken(accessToken);
+
+    // RFC 7009 §2.2: 200 is the correct, spec-mandated response for a successful revocation
+    // request — proves the endpoint itself works, which nothing in this codebase had verified
+    // before this test existed.
+    assertThat(revokeResponse.statusCode()).isEqualTo(200);
+    assertThat(tokenRevocationLogAppender.list)
+        .as("TokenRevocationEventLogger must actually fire on a real revocation request")
+        .hasSize(1);
+    assertThat(tokenRevocationLogAppender.list.get(0).getFormattedMessage())
+        .contains("event=token_revoked")
+        .contains("clientId=test-platform-client")
+        .doesNotContain(accessToken);
+  }
+
+  @Test
   void rejectsAWrongClientSecret() throws Exception {
     HttpResponse<String> response = requestToken("test-platform-client", "the-wrong-secret");
 
@@ -166,6 +208,21 @@ class PlatformTokenIssuanceIntegrationTest {
             .POST(
                 HttpRequest.BodyPublishers.ofString(
                     "grant_type=client_credentials&scope=platform:organizations:write"))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> revokeToken(String token) throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/oauth2/revoke"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "token=" + token + "&token_type_hint=access_token"))
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }

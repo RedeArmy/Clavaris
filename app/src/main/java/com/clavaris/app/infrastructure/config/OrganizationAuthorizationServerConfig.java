@@ -98,7 +98,9 @@ class OrganizationAuthorizationServerConfig {
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
       @SuppressWarnings("PMD.LongVariable")
-          final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger) {
+          final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
+      @SuppressWarnings("PMD.LongVariable")
+          final TokenRevocationEventLogger tokenRevocationLogger) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -137,6 +139,11 @@ class OrganizationAuthorizationServerConfig {
                     .registeredClientRepository(registeredClients)
                     .authorizationServerSettings(settings)
                     .tokenGenerator(tokenGenerator)
+                    // TD-SEC-017: every successful /oauth2/revoke call on any Organization gets a
+                    // structured event=token_revoked log line — see TokenRevocationEventLogger's
+                    // own Javadoc for why this replaces (not adds to) SAS's own default handler.
+                    .tokenRevocationEndpoint(
+                        revocation -> revocation.revocationResponseHandler(tokenRevocationLogger))
                     // A genuine OIDC discovery document (/.well-known/openid-configuration), not
                     // just plain OAuth2 authorization server metadata — ADR-0010 §5 requires every
                     // Organization to have its own *OIDC* issuer, and this is what makes the

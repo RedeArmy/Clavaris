@@ -28,6 +28,17 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
+# TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
+# key=value text — Spring Boot's own native structured-logging support (no extra dependency;
+# confirmed present in the resolved spring-boot-4.1.0 jar, org.springframework.boot.logging.
+# structured.*), Elastic Common Schema chosen as a neutral, widely-ingestible default absent a
+# more specific log-aggregation stack decision (still genuinely open — this is a format choice,
+# not a commitment to any particular vendor/backend).
+logging:
+  structured:
+    format:
+      console: ecs
+
 management:
   endpoints:
     web:
