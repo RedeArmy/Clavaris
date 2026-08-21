@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.config;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +32,14 @@ import org.springframework.stereotype.Component;
  * layers. Manually populating and persisting the {@link SecurityContext} here is the direct
  * equivalent of what {@code UsernamePasswordAuthenticationFilter.successfulAuthentication} does
  * internally — same mechanism, invoked from {@code LoginController} instead of a filter.
+ *
+ * <p>Because this bypasses the filter, it also bypasses Spring Security's default {@code
+ * SessionAuthenticationStrategy} — the one piece of that mechanism this class cannot skip without
+ * reopening a session-fixation hole (CWE-384): a session created before login (the {@code
+ * RequestCache} step above requires one to exist) must not simply become the authenticated session
+ * under the same ID, or an attacker who fixed that ID beforehand inherits it. {@link #establish}
+ * rotates the session ID itself, the same defense {@code ChangeSessionIdAuthenticationStrategy}
+ * applies in the standard filter chain.
  */
 @Component
 class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSessionEstablisher {
@@ -54,6 +63,21 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
       final HttpServletResponse response,
       final UUID accountId,
       final String fallbackUrl) {
+    // CWE-384 fix: rotate the session ID before the SecurityContext is attached to it, exactly as
+    // ChangeSessionIdAuthenticationStrategy does for the standard filter-based login path. Only a
+    // pre-existing session is at risk of fixation — request.getSession(false) never creates one, so
+    // a request that arrives with no session yet (nothing to fix) is left alone; a fresh session
+    // gets a fresh, attacker-unknowable ID for free when saveContext below creates it.
+    // changeSessionId() (Servlet 3.1+), not invalidate()+getSession(true): it keeps the existing
+    // session's attributes under the new ID, which matters here specifically because the
+    // RequestCache above already stored the pre-login /oauth2/authorize request in this same
+    // session — losing it would silently drop the user back to a generic page instead of resuming
+    // the flow they started.
+    final HttpSession existingSession = request.getSession(false);
+    if (existingSession != null) {
+      request.changeSessionId();
+    }
+
     // A FactorGrantedAuthority, not an empty authority list: SAS's own JwtGenerator computes the
     // OIDC auth_time claim by scanning the Authentication's authorities for one of these and
     // reading its issuedAt — confirmed live (a 500, "authenticationTime cannot be null", the first
