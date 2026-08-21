@@ -9,11 +9,18 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -61,5 +68,22 @@ class IdentityUseCaseConfig {
   /* package */ AuthenticateWithPasswordUseCase authenticateWithPasswordUseCase(
       final AccountRepository accountRepository, final PasswordVerifier passwordVerifier) {
     return new AuthenticateWithPasswordService(accountRepository, passwordVerifier);
+  }
+
+  @Bean
+  /* package */ IssueRefreshTokenUseCase issueRefreshTokenUseCase(
+      final SessionRepository sessions, final RefreshTokenRepository refreshTokens) {
+    return new IssueRefreshTokenService(sessions, refreshTokens);
+  }
+
+  @Bean
+  /* package */ RotateRefreshTokenUseCase rotateRefreshTokenUseCase(
+      final RefreshTokenRepository refreshTokens,
+      final SessionRepository sessions,
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new RotateRefreshTokenService(
+        refreshTokens, sessions, accounts, accountTokenRevoker, eventOutboxWriter);
   }
 }
