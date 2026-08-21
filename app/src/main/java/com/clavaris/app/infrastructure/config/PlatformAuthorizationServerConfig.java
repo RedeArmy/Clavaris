@@ -59,6 +59,7 @@ class PlatformAuthorizationServerConfig {
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
       @SuppressWarnings("PMD.LongVariable")
           final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
+      @SuppressWarnings("PMD.LongVariable") final TokenRevocationEventLogger tokenRevocationLogger,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl) {
     final AuthorizationServerSettings settings =
         AuthorizationServerSettings.builder()
@@ -93,6 +94,11 @@ class PlatformAuthorizationServerConfig {
                     .registeredClientRepository(registeredClients)
                     .authorizationServerSettings(settings)
                     .tokenGenerator(tokenGenerator)
+                    // TD-SEC-017: every successful /oauth2/revoke call on this tier gets a
+                    // structured event=token_revoked log line — see TokenRevocationEventLogger's
+                    // own Javadoc for why this replaces (not adds to) SAS's own default handler.
+                    .tokenRevocationEndpoint(
+                        revocation -> revocation.revocationResponseHandler(tokenRevocationLogger))
                     // Confirmed live: without this, every client_credentials request failed with
                     // "Given that there is no default password encoder configured, each password
                     // must have a password encoding prefix" — SAS's default
