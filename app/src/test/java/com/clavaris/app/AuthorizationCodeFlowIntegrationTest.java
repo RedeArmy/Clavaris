@@ -11,6 +11,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import java.io.IOException;
 import java.net.CookieManager;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -73,10 +74,12 @@ class AuthorizationCodeFlowIntegrationTest {
   // One CookieManager for the whole test — the session established while fetching the login
   // page's CSRF token, and the one Spring Security persists the authenticated SecurityContext
   // into after login, must be the SAME session throughout, exactly as a real browser would carry
-  // it across every hop below.
+  // it across every hop below. Kept as a field (not just handed to the builder) so the test can
+  // also read the JSESSIONID cookie's own value directly — see currentSessionId() below.
+  private final CookieManager cookieManager = new CookieManager();
   private final HttpClient httpClient =
       HttpClient.newBuilder()
-          .cookieHandler(new CookieManager())
+          .cookieHandler(cookieManager)
           .followRedirects(HttpClient.Redirect.NEVER)
           .build();
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -101,6 +104,12 @@ class AuthorizationCodeFlowIntegrationTest {
     assertThat(authorizeAttempt.statusCode()).isEqualTo(302);
     String loginRedirect = authorizeAttempt.headers().firstValue("Location").orElseThrow();
     assertThat(loginRedirect).endsWith("/o/" + organizationId + "/login");
+    // TD-SEC-012 regression check: this is the pre-login session an attacker could have fixed
+    // beforehand (RequestCache above just created it to remember this /authorize request).
+    String sessionIdBeforeLogin = currentSessionId();
+    assertThat(sessionIdBeforeLogin)
+        .as("a session must exist before login for this to be a real regression check")
+        .isNotBlank();
 
     // 2. GET the login form, extract its real CSRF token — /o/*/login is not one of SAS's own
     // endpoints, so it is NOT covered by OAuth2AuthorizationServerConfigurer's automatic CSRF
@@ -115,6 +124,16 @@ class AuthorizationCodeFlowIntegrationTest {
     assertThat(loginResponse.statusCode()).isEqualTo(302);
     String backToAuthorize = loginResponse.headers().firstValue("Location").orElseThrow();
     assertThat(backToAuthorize).contains("/oauth2/authorize");
+    // TD-SEC-012: a real session-fixation regression check, not just a code-reading claim — the
+    // session ID must differ from the pre-login one captured above. This only passes because
+    // SpringSecurityAuthenticatedSessionEstablisher.establish() calls request.changeSessionId()
+    // before attaching the authenticated SecurityContext; it also only passes at all because
+    // changeSessionId() preserves session attributes — if it didn't, the RequestCache's saved
+    // /oauth2/authorize request (captured before login) would be lost and step 4 below would fail.
+    assertThat(currentSessionId())
+        .as("session ID must rotate on successful login (CWE-384)")
+        .isNotBlank()
+        .isNotEqualTo(sessionIdBeforeLogin);
 
     // 4. Re-request the saved /authorize URL — now authenticated (same session cookie) — SAS
     // issues a real authorization code and redirects to the client's own redirect_uri.
@@ -335,6 +354,17 @@ class AuthorizationCodeFlowIntegrationTest {
 
   private URI baseUri(String path) {
     return URI.create("http://localhost:" + port + path);
+  }
+
+  // Reads the real cookie the container sent, not an assumption about internal session-tracking
+  // state — the only way to actually observe from outside the process whether the session ID
+  // changed, which is the entire point of the TD-SEC-012 regression checks above.
+  private String currentSessionId() {
+    return cookieManager.getCookieStore().getCookies().stream()
+        .filter(cookie -> "JSESSIONID".equalsIgnoreCase(cookie.getName()))
+        .map(HttpCookie::getValue)
+        .findFirst()
+        .orElse(null);
   }
 
   private String generateCodeVerifier() {
