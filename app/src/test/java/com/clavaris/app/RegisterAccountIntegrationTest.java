@@ -145,7 +145,7 @@ class RegisterAccountIntegrationTest {
     try {
       useCase.handle(new RegisterAccountCommand(organizationId, email, password));
       return true;
-    } catch (EmailAlreadyRegisteredException lostTheRace) {
+    } catch (EmailAlreadyRegisteredException _) {
       return false;
     }
   }

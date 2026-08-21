@@ -47,14 +47,30 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
   // Parameter name matches RegisteredClientRepository's own interface signature — kept as-is for
   // readability against the SPI it implements, same precedent as
   // PlatformRegisteredClientRepository.
-  @SuppressWarnings("PMD.ShortVariable")
+  @SuppressWarnings({"PMD.ShortVariable", "PMD.OnlyOneReturn"})
   @Override
   public RegisteredClient findById(final String id) {
-    // Not needed by the client_credentials grant this slice supports (discovery + JWKS + token
-    // endpoint, Task #19's own scope) — the interactive Authorization Code flow's consent/
-    // authorization-code persistence needs this, and wiring it is Task #21's job, not this one's.
-    throw new UnsupportedOperationException(
-        "Not needed by the client_credentials-only flow this slice supports");
+    // TD-SEC-010 (closed): JdbcOAuth2AuthorizationService (TD-SEC-003) calls this on every reload
+    // of a persisted OAuth2Authorization row for the interactive Authorization Code flow — no
+    // longer unreachable now that authorization state actually persists. Same cross-tenant
+    // isolation discipline as findByClientId below: a malformed id or a real client belonging to a
+    // *different* Organization than the current request both resolve to null, identically to
+    // "not found" — never a raw exception, and never a cross-tenant client handed back.
+    final Optional<UUID> orgId = CurrentOrganizationContext.currentOrganizationId();
+    if (orgId.isEmpty()) {
+      return null;
+    }
+    final UUID clientId;
+    try {
+      clientId = UUID.fromString(id);
+    } catch (final IllegalArgumentException _) {
+      return null;
+    }
+    return oauthClients
+        .findById(clientId)
+        .filter(client -> client.organizationId().equals(orgId.get()))
+        .map(OrganizationRegisteredClientRepository::toRegisteredClient)
+        .orElse(null);
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")

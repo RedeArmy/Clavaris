@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.activateplatformsigningkey;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,10 +28,7 @@ class ActivatePlatformSigningKeyServiceTest {
   }
 
   @Test
-  void retiresThePreviouslyActiveKeyBeforeActivatingTheNewOne() {
-    // The old key's real material is gone the moment the previous process exited (this slice
-    // doesn't persist it) — leaving its row marked active would misrepresent what the running
-    // system can still actually verify against.
+  void retiresThePreviouslyActiveKeyBeforeActivatingADifferentOne() {
     PlatformSigningKeyRepository repository = mock(PlatformSigningKeyRepository.class);
     PlatformSigningKey previouslyActive = PlatformSigningKey.activate("old-kid", "RS256");
     when(repository.findActive()).thenReturn(Optional.of(previouslyActive));
@@ -40,5 +38,22 @@ class ActivatePlatformSigningKeyServiceTest {
 
     assertThat(previouslyActive.retiredAt()).isPresent();
     verify(repository, times(2)).save(any()); // once for the retired old key, once for the new one
+  }
+
+  @Test
+  void reactivatingTheAlreadyActiveKidIsANoOp() {
+    // TD-SEC-002: PlatformSigningKeyMaterial now reloads persisted key material on restart and
+    // hands the *same* kid back to this service — retiring and immediately recreating that same
+    // row every startup would misrepresent the row's real activeFrom history for no reason.
+    PlatformSigningKeyRepository repository = mock(PlatformSigningKeyRepository.class);
+    PlatformSigningKey alreadyActive = PlatformSigningKey.activate("same-kid", "RS256");
+    when(repository.findActive()).thenReturn(Optional.of(alreadyActive));
+    ActivatePlatformSigningKeyService service = new ActivatePlatformSigningKeyService(repository);
+
+    PlatformSigningKey result = service.handle("same-kid", "RS256");
+
+    assertThat(result).isSameAs(alreadyActive);
+    assertThat(alreadyActive.retiredAt()).isEmpty();
+    verify(repository, never()).save(any());
   }
 }

@@ -5,6 +5,7 @@ import com.clavaris.clientregistry.domain.model.OAuthClient;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,6 +42,12 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
   @Override
   public Optional<OAuthClient> findByClientId(final String clientId) {
     return oauthClients.findByClientId(clientId).map(this::toDomain);
+  }
+
+  @SuppressWarnings("PMD.ShortVariable") // matches the port's own parameter naming
+  @Override
+  public Optional<OAuthClient> findById(final UUID id) {
+    return oauthClients.findById(id).map(this::toDomain);
   }
 
   private OAuthClient toDomain(final OAuthClientEntity entity) {

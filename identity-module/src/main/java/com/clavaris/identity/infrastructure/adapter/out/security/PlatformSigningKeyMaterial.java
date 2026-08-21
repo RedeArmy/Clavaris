@@ -1,21 +1,23 @@
 package com.clavaris.identity.infrastructure.adapter.out.security;
 
+import com.clavaris.identity.application.usecase.activateplatformsigningkey.PlatformSigningKeyRepository;
+import com.clavaris.identity.domain.model.PlatformSigningKey;
 import java.security.KeyPair;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
- * Holds the platform issuer's own RSA key pair (ADR-0002: RS256) — generated once, in memory, when
- * this bean is constructed at application startup.
+ * Holds the platform issuer's own RSA key pair (ADR-0002: RS256).
  *
- * <p><b>Known, deliberate limitation, not a silent gap:</b> the actual key material is never
- * persisted (spike follow-up item #2, {@code
- * docs/03-architecture/spikes/0001-spring-authorization-server-multitenancy.md} §8 — {@code
- * TOKEN_SIGNING_KEY_STORE_PATH}-backed persistence is explicitly out of scope for this slice).
- * Every process restart generates a brand-new key pair, invalidating every previously-issued
- * platform token — acceptable for now because the platform issuer only serves the low-volume,
- * operator-only management API, not any end-user-facing flow, but a real limitation that must be
- * closed before this is relied on for anything higher-stakes.
+ * <p>TD-SEC-002 (closed): on construction, this bean first checks whether {@code
+ * platform_signing_keys} already has an active row <em>and</em> {@link SigningKeyStore} already has
+ * matching material for that row's {@code kid} — the durable-restart case, where a previous process
+ * already generated and persisted a key. Only when that lookup comes up empty (the true first-ever
+ * boot, or a compromised key's row/keystore entry was deliberately removed — see {@code
+ * incident-response-signing-key-compromise.md} §3) is a brand-new key pair generated. Every process
+ * restart used to generate a fresh key pair unconditionally, invalidating every previously-issued
+ * platform token; a routine deploy is no longer indistinguishable from a mass logout.
  *
  * <p>This class deliberately exposes only {@code java.security} types, not a Nimbus {@code
  * JWKSource} — building the actual {@code JWKSource<SecurityContext>} Spring Authorization Server's
@@ -35,9 +37,18 @@ public class PlatformSigningKeyMaterial {
   private final KeyPair keyPair;
   private final String kid;
 
-  /* package */ PlatformSigningKeyMaterial() {
-    this.keyPair = RsaKeyPairs.generate();
-    this.kid = UUID.randomUUID().toString();
+  /* package */ PlatformSigningKeyMaterial(
+      final PlatformSigningKeyRepository repository, final SigningKeyStore keyStore) {
+    final Optional<PlatformSigningKey> active = repository.findActive();
+    final Optional<KeyPair> persisted = active.flatMap(key -> keyStore.find(key.kid()));
+
+    if (active.isPresent() && persisted.isPresent()) {
+      this.kid = active.get().kid();
+      this.keyPair = persisted.get();
+    } else {
+      this.kid = UUID.randomUUID().toString();
+      this.keyPair = keyStore.generate(this.kid);
+    }
   }
 
   public KeyPair keyPair() {

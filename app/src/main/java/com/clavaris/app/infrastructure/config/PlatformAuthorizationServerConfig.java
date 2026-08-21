@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
@@ -19,6 +20,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -41,6 +44,12 @@ import org.springframework.security.web.SecurityFilterChain;
  * alone only wires the signer — the JWKS endpoint reads its key from a separate shared-object slot
  * that nothing sets by default, silently serving the wrong key otherwise.
  */
+// This class's whole job is wiring together SAS's own protocol types (ADR-0003: build on the
+// framework, never reimplement it) — a high import count here reflects how many distinct SAS/
+// Spring Security types one SecurityFilterChain bean legitimately touches, not an organically
+// grown class that should be split. TD-SEC-003 added the JDBC-backed OAuth2AuthorizationService
+// import trio, tipping this over PMD's default threshold.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Configuration
 class PlatformAuthorizationServerConfig {
 
@@ -55,6 +64,7 @@ class PlatformAuthorizationServerConfig {
       final HttpSecurity http,
       final RegisteredClientRepository registeredClients,
       final PlatformSigningKeyMaterial signingKey,
+      final JdbcTemplate jdbcTemplate,
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
       @SuppressWarnings("PMD.LongVariable")
@@ -81,6 +91,18 @@ class PlatformAuthorizationServerConfig {
     jwtGenerator.setJwtCustomizer(tokenIssuanceLogger);
     final OAuth2TokenGenerator<?> tokenGenerator = jwtGenerator;
 
+    // TD-SEC-003: SAS's own well-tested JDBC-backed implementation (ADR-0003 — build on the
+    // framework, never reimplement its own state machine), not the default
+    // InMemoryOAuth2AuthorizationService — client_credentials exchanges against this tier now
+    // survive a restart and are visible to more than one running instance, closing the same root
+    // cause TD-SEC-002 already closed for signing keys. See the migration's own comment
+    // (V20260821100000__create_oauth2_authorization_table.sql) for why this shares one physical
+    // table with the Organization tier's own instance below, rather than the usual two-tables
+    // pattern this codebase uses everywhere else platform/tenant state is split.
+    @SuppressWarnings("PMD.LongVariable")
+    final OAuth2AuthorizationService authorizationService =
+        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients);
+
     http.securityMatcher("/oauth2/**")
         .with(
             // Spring Security 7.x (Spring Boot 4.1's own dependency, resolved 7.1.0 — a major
@@ -93,6 +115,7 @@ class PlatformAuthorizationServerConfig {
                 server
                     .registeredClientRepository(registeredClients)
                     .authorizationServerSettings(settings)
+                    .authorizationService(authorizationService)
                     .tokenGenerator(tokenGenerator)
                     // TD-SEC-017: every successful /oauth2/revoke call on this tier gets a
                     // structured event=token_revoked log line — see TokenRevocationEventLogger's

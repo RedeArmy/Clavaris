@@ -55,7 +55,7 @@ class RegisterOAuthClientController {
                   request.redirectUris(),
                   request.allowedGrantTypes(),
                   request.allowedScopes()));
-    } catch (final OrganizationNotFoundException e) {
+    } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
     }
     return ResponseEntity.status(HttpStatus.CREATED).body(RegisterOAuthClientResponse.from(result));

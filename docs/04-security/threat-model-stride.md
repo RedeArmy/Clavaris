@@ -25,6 +25,7 @@ STRIDE analysis across the highest-value attack surfaces: authentication, token 
 | **T**ampering | Refresh token stolen and replayed after legitimate rotation | Single-use rotation + reuse detection revokes the entire token family (BR-ID-03) |
 | **I**nformation disclosure | Authorization code intercepted in transit (e.g. via a malicious redirect) | PKCE mandatory for every client, including confidential ones (BR-CLIENT-03) — an intercepted code is useless without the original `code_verifier` |
 | **I**nformation disclosure | Signing key compromise | Key rotation with overlap; private key never stored in the database (`data-model.md` §2); compromise response follows `incident-response-signing-key-compromise.md` |
+| **I**nformation disclosure | Postgres compromise directly exposes every currently-valid access/refresh/ID token | TD-SEC-019 (new, not yet mitigated): `oauth2_authorization` (TD-SEC-003) stores literal bearer values, not hashes — a documented, framework-forced exception to `security-architecture.md` §2's own hash-only rule for every other token table this project controls the schema for |
 | **D**enial of service | `/oauth2/token` flooded to exhaust compute (RS256 verification/signing cost) | Rate limiting on the token endpoint (BR-ID-06) |
 | **E**levation of privilege | Token issued for one client accepted as valid for another client's protected resource | BR-CLIENT-02 — cross-client validity requires an explicit, currently unbuilt mechanism; no implicit trust between clients |
 

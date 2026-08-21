@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.activatesigningkeyfororganizat
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,7 +35,7 @@ class ActivateSigningKeyForOrganizationServiceTest {
   }
 
   @Test
-  void retiresThePreviouslyActiveKeyBeforeActivatingTheNewOne() {
+  void retiresThePreviouslyActiveKeyBeforeActivatingADifferentOne() {
     // ADR-0010 §5.2: this same service doubles, unchanged, as the future manual-rotation
     // operation — this is the path that exercises.
     SigningKeyRepository repository = mock(SigningKeyRepository.class);
@@ -60,5 +61,22 @@ class ActivateSigningKeyForOrganizationServiceTest {
     service.handle(organizationId, "new-kid", "RS256");
 
     verify(repository).findActive(organizationId);
+  }
+
+  @Test
+  void reactivatingTheAlreadyActiveKidIsANoOp() {
+    // TD-SEC-002: symmetric with the platform-tier fix — a double-submit of the same kid must
+    // not retire and immediately recreate the row it would otherwise no-op against.
+    SigningKeyRepository repository = mock(SigningKeyRepository.class);
+    SigningKey alreadyActive = SigningKey.activate(organizationId, "same-kid", "RS256");
+    when(repository.findActive(organizationId)).thenReturn(Optional.of(alreadyActive));
+    ActivateSigningKeyForOrganizationService service =
+        new ActivateSigningKeyForOrganizationService(repository);
+
+    SigningKey result = service.handle(organizationId, "same-kid", "RS256");
+
+    assertThat(result).isSameAs(alreadyActive);
+    assertThat(alreadyActive.retiredAt()).isEmpty();
+    verify(repository, never()).save(any());
   }
 }

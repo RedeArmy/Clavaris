@@ -50,7 +50,7 @@ final class CurrentOrganizationContext {
     final String segment = issuer.substring(prefixIndex + PREFIX.length());
     try {
       return Optional.of(UUID.fromString(segment));
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return Optional.empty();
     }
   }

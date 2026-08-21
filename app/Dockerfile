@@ -30,8 +30,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Never run as root inside the container.
-RUN useradd --system --uid 10001 clavaris
+# Never run as root inside the container. /app must be writable by this user, not just
+# root-owned-and-readable — TD-SEC-002's SigningKeyStore writes its PKCS12 file under
+# /app/data (docker-compose.yml's own volume mount) at runtime, as this user, not at build time.
+RUN useradd --system --uid 10001 clavaris \
+    && mkdir -p /app/data \
+    && chown -R clavaris:clavaris /app
 USER clavaris
 
 COPY --from=build /workspace/app/target/clavaris-app.jar app.jar
