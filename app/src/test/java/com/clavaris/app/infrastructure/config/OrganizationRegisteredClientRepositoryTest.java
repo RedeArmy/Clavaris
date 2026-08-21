@@ -53,10 +53,10 @@ class OrganizationRegisteredClientRepositoryTest {
 
   @Test
   void findByIdReturnsNullWhenTheCurrentIssuerIsNotAnOrganizationIssuer() {
-    // The realistic "no org" case — AuthorizationServerContextHolder.getContext() only ever
-    // returns null outside of a real SAS-managed request (this chain never calls findById
-    // outside one), so the actual guard this exercises is CurrentOrganizationContext's own
-    // "issuer doesn't contain /o/" branch, not an entirely absent context.
+    // The realistic "no org" case — outside of a real SAS-managed request (this chain never
+    // calls findById outside one), the thread-local context holder has nothing set for the
+    // current thread, so the actual guard this exercises is the "issuer doesn't contain /o/"
+    // branch in CurrentOrganizationContext, not an entirely absent context.
     AuthorizationServerContextHolder.setContext(
         issuerContext("https://clavaris.example.com/oauth2/token"));
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
@@ -128,8 +128,8 @@ class OrganizationRegisteredClientRepositoryTest {
 
       @Override
       public AuthorizationServerSettings getAuthorizationServerSettings() {
-        // Never read by CurrentOrganizationContext.currentOrganizationId() — only getIssuer() is;
-        // a real settings object isn't needed for this test to be meaningful.
+        // Not read by the production code this test exercises — only the issuer is; a real
+        // settings object isn't needed for this test to be meaningful.
         return null;
       }
     };
