@@ -198,21 +198,19 @@ class AuthorizationCodeFlowIntegrationTest {
     // TD-SEC-016: both the access token and the ID token this exchange just issued must have
     // logged their own event=token_issued line — proves the wiring, not just the customizer's own
     // isolated behaviour (TokenIssuanceEventLoggerTest covers that).
-    List<ILoggingEvent> tokenIssuedEvents = tokenIssuanceLogAppender.list;
-    assertThat(tokenIssuedEvents)
-        .as("one event=token_issued line per token type this exchange issued")
-        .hasSize(2);
     List<String> tokenIssuedMessages =
-        tokenIssuedEvents.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        tokenIssuanceLogAppender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     assertThat(tokenIssuedMessages)
+        .as("one event=token_issued line per token type this exchange issued")
+        .hasSize(2)
         .allSatisfy(
             message ->
                 assertThat(message)
                     .contains("event=token_issued")
                     .contains("grantType=authorization_code")
-                    .contains("clientId=" + client.clientId()));
-    assertThat(tokenIssuedMessages).anyMatch(message -> message.contains("tokenType=access_token"));
-    assertThat(tokenIssuedMessages).anyMatch(message -> message.contains("tokenType=id_token"));
+                    .contains("clientId=" + client.clientId()))
+        .anyMatch(message -> message.contains("tokenType=access_token"))
+        .anyMatch(message -> message.contains("tokenType=id_token"));
 
     // 6. Cryptographic proof, not just a 200 — same bar as every other issuance test in this
     // suite: both tokens must actually verify against this Organization's own published JWKS.
