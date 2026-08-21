@@ -48,14 +48,16 @@ class TokenRevocationEventLogger implements AuthenticationSuccessHandler {
   }
 
   @Override
-  @SuppressWarnings("PMD.GuardLogStatement") // same false-positive rationale as
-  // TokenIssuanceEventLogger: every logged argument is a cheap accessor on an already-built
-  // Authentication, not an expensive computation the rule exists to guard against.
   public void onAuthenticationSuccess(
       final HttpServletRequest request,
       final HttpServletResponse response,
       final Authentication authentication) {
-    if (authentication instanceof OAuth2TokenRevocationAuthenticationToken revocation) {
+    // Guarded, not unconditional: clientIdOf(...) below calls into RegisteredClient, which
+    // SonarCloud (rightly, unlike PMD's GuardLogStatement elsewhere in this codebase) won't assume
+    // is free — isInfoEnabled() skips it entirely when INFO is disabled, rather than computing an
+    // argument nothing will use.
+    if (authentication instanceof OAuth2TokenRevocationAuthenticationToken revocation
+        && LOG.isInfoEnabled()) {
       LOG.info(
           "event=token_revoked tokenTypeHint={} clientId={}",
           revocation.getTokenTypeHint(),

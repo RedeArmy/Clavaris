@@ -74,17 +74,31 @@ class PlatformTokenIssuanceIntegrationTest {
   // already holds itself to for signature verification.
   private final ListAppender<ILoggingEvent> tokenIssuanceLogAppender = new ListAppender<>();
 
+  // TD-SEC-017: /oauth2/revoke was, before this, completely unexercised anywhere in this codebase
+  // — no test, no wiring investigated. This is the first real exercise of it, proving both that
+  // revocation itself works end to end and that TokenRevocationEventLogger fires wired into the
+  // real bean graph, not just in isolation (TokenRevocationEventLoggerTest covers that).
+  private final ListAppender<ILoggingEvent> tokenRevocationLogAppender = new ListAppender<>();
+
+  // One @BeforeEach/@AfterEach pair, not one per appender — attaching/detaching both together
+  // keeps setup/teardown order obvious from a single method instead of relying on JUnit 5's
+  // (unspecified, for same-annotation methods in one class) ordering across several.
   @BeforeEach
-  void attachTokenIssuanceLogAppender() {
+  void attachLogAppenders() {
     tokenIssuanceLogAppender.start();
     tokenIssuanceLogger().addAppender(tokenIssuanceLogAppender);
+    tokenRevocationLogAppender.start();
+    tokenRevocationLogger().addAppender(tokenRevocationLogAppender);
   }
 
   @AfterEach
-  void detachTokenIssuanceLogAppender() {
+  void detachLogAppenders() {
     tokenIssuanceLogger().detachAppender(tokenIssuanceLogAppender);
     tokenIssuanceLogAppender.stop();
     tokenIssuanceLogAppender.list.clear();
+    tokenRevocationLogger().detachAppender(tokenRevocationLogAppender);
+    tokenRevocationLogAppender.stop();
+    tokenRevocationLogAppender.list.clear();
   }
 
   // By fully-qualified name, not TokenIssuanceEventLogger.class — that class is deliberately
@@ -93,25 +107,6 @@ class PlatformTokenIssuanceIntegrationTest {
   private static Logger tokenIssuanceLogger() {
     return (Logger)
         LoggerFactory.getLogger("com.clavaris.app.infrastructure.config.TokenIssuanceEventLogger");
-  }
-
-  // TD-SEC-017: /oauth2/revoke was, before this, completely unexercised anywhere in this codebase
-  // — no test, no wiring investigated. This is the first real exercise of it, proving both that
-  // revocation itself works end to end and that TokenRevocationEventLogger fires wired into the
-  // real bean graph, not just in isolation (TokenRevocationEventLoggerTest covers that).
-  private final ListAppender<ILoggingEvent> tokenRevocationLogAppender = new ListAppender<>();
-
-  @BeforeEach
-  void attachTokenRevocationLogAppender() {
-    tokenRevocationLogAppender.start();
-    tokenRevocationLogger().addAppender(tokenRevocationLogAppender);
-  }
-
-  @AfterEach
-  void detachTokenRevocationLogAppender() {
-    tokenRevocationLogger().detachAppender(tokenRevocationLogAppender);
-    tokenRevocationLogAppender.stop();
-    tokenRevocationLogAppender.list.clear();
   }
 
   private static Logger tokenRevocationLogger() {
