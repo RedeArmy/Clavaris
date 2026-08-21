@@ -247,6 +247,20 @@ jobs:
       # `common` is the sole exception, because it currently has zero classes and zero
       # tests (still just placeholder folders) — there is no coverage data to report in
       # the first place, not a broken report path. Revisit once `common` gains real code.
+      #
+      # Also expected, also harmless: "The Data Dictionary is not configured for the
+      # PLSQL analyzer, which prevents rule(s) S3641, S3921, S3618, S3651 from raising
+      # issues." SonarCloud's PL/SQL (SonarPLSQL) analyzer runs against every `.sql` file
+      # it sees regardless of dialect, including Flyway's plain Postgres DDL migrations
+      # here — there is no per-dialect opt-out, only a full Data Dictionary connection.
+      # Confirmed against SonarSource's own docs: the Data Dictionary is a live JDBC
+      # connection to a real Oracle database (querying SYS.ALL_TAB_COLUMNS and similar
+      # views) that those four rules need to resolve table/column metadata — explicitly
+      # Oracle-only, with no PostgreSQL equivalent. This project has zero Oracle PL/SQL
+      # anywhere (ADR-0004: PostgreSQL) and never will, so there is no Data Dictionary to
+      # configure and nothing these four rules could ever check here — not a
+      # misconfiguration, a mismatch between a generic file-extension-triggered analyzer
+      # and a project that was never going to use the one database engine it targets.
 
   # Branch protection needs to require exactly one status check, not five —
   # requiring each job individually breaks silently the moment any one of
