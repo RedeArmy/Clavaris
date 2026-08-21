@@ -21,7 +21,7 @@ erDiagram
     ACCOUNTS ||--o{ WORKSPACE_MEMBERSHIPS : "belongs to"
     WORKSPACES ||--o{ WORKSPACE_MEMBERSHIPS : has
     WORKSPACES ||--o{ WORKSPACE_INVITATIONS : issues
-    OAUTH_CLIENTS ||--o{ AUTHORIZATION_CODES : authorizes
+    OAUTH_CLIENTS ||--o{ OAUTH2_AUTHORIZATION : authorizes
     OAUTH_CLIENTS ||--o{ WEBHOOK_ENDPOINTS : registers
     OAUTH_CLIENTS ||--o| CLIENT_DOMAIN_CONFIGS : embeds_via
     OAUTH_CLIENTS ||--o| CLIENT_BRANDINGS : themes
@@ -147,15 +147,21 @@ erDiagram
         text allowed_scopes
         timestamptz created_at
     }
-    AUTHORIZATION_CODES {
-        uuid id PK
-        uuid client_id FK
-        uuid account_id FK
-        varchar code_hash UK
-        varchar code_challenge
-        varchar redirect_uri
-        timestamptz expires_at
-        timestamptz consumed_at
+    OAUTH2_AUTHORIZATION {
+        varchar id PK
+        varchar registered_client_id FK
+        varchar principal_name
+        varchar authorization_grant_type
+        varchar authorized_scopes
+        text attributes
+        varchar state
+        text authorization_code_value
+        timestamptz authorization_code_expires_at
+        text access_token_value
+        timestamptz access_token_expires_at
+        text oidc_id_token_value
+        text refresh_token_value
+        timestamptz refresh_token_expires_at
     }
     EVENT_OUTBOX {
         uuid id PK
@@ -218,6 +224,7 @@ erDiagram
 - **`rate_limit_policies`** — ADR-0010 §6.2: **capacity ceiling only**, one optional row per `Organization` (`UNIQUE(organization_id)`), overriding the system-default aggregate request ceiling for that tenant. A missing row means "use the system default." The application layer, not this table, enforces the hard system-wide ceiling an Organization's own policy can never exceed. **v1: operator-managed only** (no tenant self-service until v1.1, gated on audit logging). This table does **not** govern anti-abuse/credential-stuffing thresholds — those are fixed, system-wide, keyed by `(organization_id, account_or_ip_identifier)`, enforced directly in Redis with no corresponding table (ADR-0010 §6.1) so they can never be loosened by a tenant.
 - **`oauth_clients.organization_id`** — ADR-0010: mandatory FK to `organizations`. One organization may register several `oauth_clients` (e.g. web + mobile for the same system), all sharing that organization's isolated account pool — this FK is the actual mechanism that keeps one tenant's login flow from ever authenticating another tenant's accounts.
 - **`oauth_clients.client_secret_hash`** — same hash-not-plaintext principle as passwords; `redirect_uris`/`allowed_grant_types`/`allowed_scopes` stored as `text` (JSON array) in v1 — a normalized child table is a reasonable future refactor if per-URI querying is ever needed, not needed yet.
+- **`oauth2_authorization`** — TD-SEC-003 (closed): backs Spring Authorization Server's own `JdbcOAuth2AuthorizationService`, not a bespoke table this project designed — every authorization code, access token, refresh token, and OIDC ID token either issuer tier issues, one row per authorization. Its real shape is the framework's own upstream schema (Postgres-adapted per that file's own embedded instructions), richer than this document's original placeholder sketch (`AUTHORIZATION_CODES`, now retired) since it tracks every token type SAS itself tracks per grant, not just the authorization code. **Deliberately one shared table for both the platform tier and every Organization**, not the usual two-tables-per-tier split this document uses everywhere else (`platform_clients`/`oauth_clients`, `platform_signing_keys`/`signing_keys`) — `JdbcOAuth2AuthorizationService` hardcodes its own table name internally, so two differently-named tables aren't supported without forking the class; `registered_client_id` still fully separates platform-tier rows from Organization-tier rows, since the two tiers' client id spaces are already structurally disjoint. Bearer values (`*_value` columns) are the actual token text SAS needs to verify later reuse/introspection against — not hashed, unlike this project's own `password_credentials`/`refresh_tokens` convention, because that convention is this project's own choice for tables it designed, not a knob `JdbcOAuth2AuthorizationService` exposes.
 - **`platform_clients`** / **`platform_signing_keys`** — ADR-0010 (Organization provisioning). Deliberately **no** `organization_id` column, not even nullable — these authenticate the operations that create/manage `organizations` rows themselves, so making them belong to one would be circular and would reopen the exact cross-tenant blast-radius risk ADR-0010 §1–§2 close for everything else. The first `platform_clients` row is seeded from `PLATFORM_BOOTSTRAP_CLIENT_ID`/`PLATFORM_BOOTSTRAP_CLIENT_SECRET` (`.env.example`) via an idempotent startup check, not an HTTP endpoint. `allowed_scopes` values are namespaced `platform:*`, reserved and disjoint from any per-organization management scope.
 - **`workspace_memberships`** — composite uniqueness on `(workspace_id, account_id)` — one membership row per account per workspace, role changes update the row rather than creating a new one.
 - **`event_outbox`** — 🟡 proposed, see ADR-0007. Written in the same transaction as the domain state change it records (BR-WEBHOOK-05); `published_at IS NULL` marks a row still waiting for the `webhook-module` dispatcher to fan it out. `payload` is the event's own versioned JSON shape (`schema_version`), independent of the management API's URL-based versioning (ADR-0008).
