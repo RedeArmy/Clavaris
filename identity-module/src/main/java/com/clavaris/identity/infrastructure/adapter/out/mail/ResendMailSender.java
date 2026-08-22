@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.mail;
 
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.io.IOException;
 import java.net.URI;
@@ -25,10 +26,13 @@ import tools.jackson.databind.ObjectMapper;
  * codebase — nothing here assumes a specific registrar.
  *
  * <p>Builds the actual {@code {clavarisBaseUrl}/o/{organizationId}/...} link here, not in the
- * application layer — see {@link MailSender}'s own Javadoc for why that split exists.
+ * application layer — see {@link MailSender}'s own Javadoc for why that split exists. Also
+ * implements {@link PlatformMailSender} (ADR-0012) — same HTTP mechanics, generic "Clavaris"
+ * branding instead of a per-Organization one, {@code {clavarisBaseUrl}/platform/...} links instead
+ * of {@code /o/{organizationId}/...}.
  */
 @Component
-class ResendMailSender implements MailSender {
+class ResendMailSender implements MailSender, PlatformMailSender {
 
   private static final URI RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
   private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
@@ -85,6 +89,29 @@ class ResendMailSender implements MailSender {
             + " this, you can safely ignore it — your password will not be changed.</p>");
   }
 
+  @Override
+  public void sendPlatformAccountEmailVerification(final String toAddress, final String rawToken) {
+    final String link = platformLink("verify-email", rawToken);
+    send(
+        toAddress,
+        "Verify your email address",
+        "<p>Confirm your email address to finish setting up your Clavaris account:</p>"
+            + htmlButton(link, "Verify email")
+            + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
+  }
+
+  @Override
+  public void sendPlatformAccountPasswordReset(final String toAddress, final String rawToken) {
+    final String link = platformLink("reset-password", rawToken);
+    send(
+        toAddress,
+        "Reset your password",
+        "<p>A password reset was requested for your Clavaris account:</p>"
+            + htmlButton(link, "Reset password")
+            + "<p>This link expires in 30 minutes and can only be used once. If you didn't request"
+            + " this, you can safely ignore it — your password will not be changed.</p>");
+  }
+
   // Extracted purely to remove the "<p><a href=\"" literal's duplication
   // (PMD.AvoidDuplicateLiterals)
   // — the four send*() methods above all render one clickable action link, just with a different
@@ -99,6 +126,14 @@ class ResendMailSender implements MailSender {
         + "/o/"
         + organizationId.value()
         + "/"
+        + path
+        + "?token="
+        + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
+  }
+
+  private String platformLink(final String path, final String rawToken) {
+    return baseUrl
+        + "/platform/"
         + path
         + "?token="
         + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
