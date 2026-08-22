@@ -57,7 +57,9 @@ class JpaPlatformClientRepositoryTest {
     assertThat(found).isPresent();
     assertThat(found.get().id()).isEqualTo(client.id());
     assertThat(found.get().clientSecretHash()).isEqualTo("$argon2id$hashed");
-    assertThat(found.get().allowedScopes()).containsExactly(PlatformScopes.ORGANIZATIONS_WRITE);
+    assertThat(found.get().allowedScopes())
+        .containsExactly(
+            PlatformScopes.ORGANIZATIONS_WRITE, PlatformScopes.RATE_LIMIT_POLICY_WRITE);
   }
 
   @Test

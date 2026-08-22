@@ -16,7 +16,9 @@ class PlatformClientTest {
 
     assertThat(client.clientId()).isEqualTo("bootstrap-client");
     assertThat(client.clientSecretHash()).isEqualTo("argon2id$hashed");
-    assertThat(client.allowedScopes()).containsExactly(PlatformScopes.ORGANIZATIONS_WRITE);
+    assertThat(client.allowedScopes())
+        .containsExactly(
+            PlatformScopes.ORGANIZATIONS_WRITE, PlatformScopes.RATE_LIMIT_POLICY_WRITE);
     assertThat(client.createdAt()).isNotNull();
   }
 

@@ -5,11 +5,16 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
+import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import java.time.Duration;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -87,6 +92,10 @@ import org.springframework.security.web.context.SecurityContextRepository;
 @Configuration
 class OrganizationAuthorizationServerConfig {
 
+  // Appears 4 times across securityMatcher/authorizeHttpRequests/two RateLimitRules below — one
+  // constant, not four literals that could silently drift apart (PMD.AvoidDuplicateLiterals).
+  private static final String LOGIN_PATH_PATTERN = "/o/*/login";
+
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ OrganizationAuthorizationServerConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
@@ -114,7 +123,16 @@ class OrganizationAuthorizationServerConfig {
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final IssueRefreshTokenUseCase issueRefreshToken,
-      final RotateRefreshTokenUseCase rotateRefreshToken) {
+      final RotateRefreshTokenUseCase rotateRefreshToken,
+      final RateLimiter rateLimiter,
+      final RateLimitPolicyRepository rateLimitPolicies,
+      @Value("${clavaris.rate-limit.login.per-account-limit:10}") final int loginPerAccountLimit,
+      @Value("${clavaris.rate-limit.login.per-ip-limit:30}") final int loginPerIpLimit,
+      @Value("${clavaris.rate-limit.token.per-client-limit:20}") final int tokenPerClientLimit,
+      @Value("${clavaris.rate-limit.token.refresh-per-client-limit:600}")
+          final int tokenRefreshPerClientLimit,
+      @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
+          final int capacityDefaultRequestsPerMinute) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -160,7 +178,8 @@ class OrganizationAuthorizationServerConfig {
     final OAuth2AuthorizationService authorizationService =
         new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients);
 
-    http.securityMatcher("/o/*/oauth2/**", "/o/*/.well-known/**", "/o/*/userinfo", "/o/*/login")
+    http.securityMatcher(
+            "/o/*/oauth2/**", "/o/*/.well-known/**", "/o/*/userinfo", LOGIN_PATH_PATTERN)
         .with(
             new OAuth2AuthorizationServerConfigurer(),
             server ->
@@ -225,7 +244,11 @@ class OrganizationAuthorizationServerConfig {
         // Spring Authorization Server's own endpoint filters don't fully own.
         .authorizeHttpRequests(
             authorize ->
-                authorize.requestMatchers("/o/*/login").permitAll().anyRequest().authenticated())
+                authorize
+                    .requestMatchers(LOGIN_PATH_PATTERN)
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated())
         .securityContext(context -> context.securityContextRepository(contextRepository))
         // Security finding (SDE-III review, 2026-08-22): the actual fix for cross-tier session
         // confusion on this chain — see TenantAccountOnlySecurityContextFilter's own Javadoc.
@@ -234,6 +257,65 @@ class OrganizationAuthorizationServerConfig {
         // filters end up installed for a given request path.
         .addFilterAfter(
             new TenantAccountOnlySecurityContextFilter(), SecurityContextHolderFilter.class)
+        // ADR-0010 §6/BR-ID-06/BR-ORG-05: both rate-limiting layers, as early in the chain as
+        // possible — before Argon2id password verification (deliberately slow, BR-ID-02) or any
+        // SAS-managed endpoint filter runs, so a rejected attempt costs almost nothing to reject.
+        .addFilterAfter(
+            new AntiAbuseRateLimitingFilter(
+                rateLimiter,
+                List.of(
+                    new RateLimitRule(
+                        "login:account",
+                        HttpMethod.POST,
+                        LOGIN_PATH_PATTERN,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        loginPerAccountLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "login:ip",
+                        HttpMethod.POST,
+                        LOGIN_PATH_PATTERN,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        loginPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    // Non-refresh grants (authorization_code, and any future grant this endpoint
+                    // ever accepts) — the credential-adjacent, actually-guessable half of this
+                    // endpoint's traffic.
+                    new RateLimitRule(
+                        "token:client",
+                        HttpMethod.POST,
+                        "/o/*/oauth2/token",
+                        request -> !"refresh_token".equals(request.getParameter("grant_type")),
+                        RateLimitIdentifiers::oauthClientId,
+                        tokenPerClientLimit,
+                        Duration.ofMinutes(5)),
+                    // BR-ID-06: "must never throttle a legitimate token-refresh cycle for an
+                    // already-active session" — a separate, deliberately much higher ceiling, not
+                    // an exemption outright (a genuinely runaway/looping client still deserves a
+                    // backstop). Per-client, not per-account: this endpoint has no email field to
+                    // key by, and decoding the presented refresh token just to identify its owner
+                    // would mean a DB lookup inside a rate-limit filter, which the reuse-detection
+                    // check already occurring downstream (BR-ID-03) makes redundant here.
+                    new RateLimitRule(
+                        "token:refresh",
+                        HttpMethod.POST,
+                        "/o/*/oauth2/token",
+                        request -> "refresh_token".equals(request.getParameter("grant_type")),
+                        RateLimitIdentifiers::oauthClientId,
+                        tokenRefreshPerClientLimit,
+                        Duration.ofMinutes(5)))),
+            // Anchored after TenantAccountOnlySecurityContextFilter, not SecurityContextHolder
+            // Filter directly — real bug, confirmed live: three separate addFilterAfter calls all
+            // anchored at the same filter class silently only kept the last-registered one, so the
+            // anti-abuse filter never actually ran. Chaining each new filter off the previous
+            // custom one gives every filter its own distinct position, deterministically.
+            TenantAccountOnlySecurityContextFilter.class)
+        .addFilterAfter(
+            new OrganizationCapacityRateLimitingFilter(
+                rateLimiter, rateLimitPolicies, capacityDefaultRequestsPerMinute),
+            AntiAbuseRateLimitingFilter.class)
         .exceptionHandling(
             exceptions ->
                 exceptions.authenticationEntryPoint(new OrganizationLoginRedirectEntryPoint()));
