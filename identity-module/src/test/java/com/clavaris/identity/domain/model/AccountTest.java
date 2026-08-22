@@ -86,6 +86,48 @@ class AccountTest {
   }
 
   @Test
+  void verifyEmailSetsTheTimestampOnceAndIsIdempotentOnASecondCall() {
+    Account account = Account.register(organizationId, email);
+
+    account.verifyEmail();
+    Instant firstVerifiedAt = account.emailVerifiedAt().orElseThrow();
+    account.verifyEmail();
+
+    // Idempotent, not "re-verify resets the clock": a second confirm (e.g. a stale duplicate
+    // click) must not disturb the original verification timestamp.
+    assertThat(account.emailVerifiedAt()).contains(firstVerifiedAt);
+  }
+
+  @Test
+  void resetPasswordCredentialUpdatesTheExistingCredentialsHashInPlace() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("old-hash");
+    PasswordCredential original = account.passwordCredential().orElseThrow();
+
+    account.resetPasswordCredential("new-hash");
+
+    PasswordCredential replaced = account.passwordCredential().orElseThrow();
+    assertThat(replaced.passwordHash()).isEqualTo("new-hash");
+    assertThat(replaced.accountId()).isEqualTo(account.id());
+    assertThat(replaced).isNotSameAs(original);
+    // Regression check for a real bug a live integration test caught: reusing the SAME id (not
+    // minting a fresh one) is what makes JpaAccountRepository#save persist this as an UPDATE to
+    // the one password_credentials row an account may ever have, not an INSERT of a second row
+    // that violates the table's own UNIQUE(account_id) constraint.
+    assertThat(replaced.id()).isEqualTo(original.id());
+  }
+
+  @Test
+  void resetPasswordCredentialRejectsAnAccountWithNoExistingCredential() {
+    // BR-ID-04's reset flow presupposes something to reset — a social-only account (once
+    // SocialIdentity exists) has no password to replace; the use case must reject this before it
+    // ever reaches here, not silently attach a first credential via the reset path.
+    Account account = Account.register(organizationId, email);
+
+    assertThatIllegalStateException().isThrownBy(() -> account.resetPasswordCredential("hash"));
+  }
+
+  @Test
   void reconstituteAllowsANullPasswordCredential() {
     // BR-ID-02 still guarantees at least one auth method exists — just not necessarily this one
     // (a social-only account, once SocialIdentity exists, is the real case this covers).

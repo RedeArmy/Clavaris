@@ -9,6 +9,10 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
+import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
+import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
+import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
@@ -18,6 +22,12 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
+import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
+import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
@@ -31,6 +41,19 @@ import org.springframework.context.annotation.Configuration;
  * (first-vertical-slice-blueprint.md §2.3) — bean registration for it lives here, in
  * infrastructure, not as a class-level {@code @Service} on the service itself.
  */
+// ExcessiveImports/CouplingBetweenObjects: this class exists specifically to wire together every
+// use case in the module — one import per port/service/use-case type is what that job looks like,
+// not accidental coupling to split apart. Same reasoning as app module's own AuthorizationServer
+// config classes' identical suppression for "wiring together many distinct types." AvoidDuplicate
+// Literals: the repeated string is "PMD.LongVariable" itself, used on six different parameters
+// across five methods — a real code smell would be a repeated business-logic string, not the same
+// suppression annotation value reused because the same port name (verificationTokens,
+// accountTokenRevoker) legitimately appears as a parameter that many times.
+@SuppressWarnings({
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects",
+  "PMD.AvoidDuplicateLiterals"
+})
 @Configuration
 class IdentityUseCaseConfig {
 
@@ -85,5 +108,50 @@ class IdentityUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter) {
     return new RotateRefreshTokenService(
         refreshTokens, sessions, accounts, accountTokenRevoker, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ RequestEmailVerificationUseCase requestEmailVerificationUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final MailSender mailSender) {
+    return new RequestEmailVerificationService(accounts, verificationTokens, mailSender);
+  }
+
+  @Bean
+  /* package */ ConfirmEmailVerificationUseCase confirmEmailVerificationUseCase(
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final AccountRepository accounts,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new ConfirmEmailVerificationService(verificationTokens, accounts, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ RequestPasswordResetUseCase requestPasswordResetUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final MailSender mailSender,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new RequestPasswordResetService(
+        accounts, verificationTokens, mailSender, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ ConfirmPasswordResetUseCase confirmPasswordResetUseCase(
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final AccountRepository accounts,
+      final SessionRepository sessions,
+      final RefreshTokenRepository refreshTokens,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      final PasswordHasher passwordHasher,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new ConfirmPasswordResetService(
+        verificationTokens,
+        accounts,
+        sessions,
+        refreshTokens,
+        accountTokenRevoker,
+        passwordHasher,
+        eventOutboxWriter);
   }
 }
