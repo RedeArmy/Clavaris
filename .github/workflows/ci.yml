@@ -72,7 +72,12 @@ jobs:
       # uploaded artifact below) but don't fail the build, same "close what's actionable and
       # severe, don't block on noise" stance security-architecture.md already takes elsewhere.
       - name: Trivy container image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        # Real bug, confirmed live: the initial pin (0.28.0, no "v" prefix) doesn't match this
+        # action's actual tagging convention — GitHub Actions failed to resolve it outright before
+        # this workflow ever ran. Verified the real tag list against GitHub's own API
+        # (api.github.com/repos/aquasecurity/trivy-action/tags) rather than guessing again: every
+        # release is v-prefixed, v0.36.0 is the current latest.
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: clavaris-app:ci
           format: table

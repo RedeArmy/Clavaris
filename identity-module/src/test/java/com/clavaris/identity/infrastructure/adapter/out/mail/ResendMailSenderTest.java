@@ -60,7 +60,7 @@ class ResendMailSenderTest {
   }
 
   @Test
-  void sendsAWellFormedRequestForATenantAccountAndSucceedsOnA2xxResponse() throws Exception {
+  void sendsAWellFormedRequestForATenantAccountAndSucceedsOnA2xxResponse() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
     UUID organizationId = UUID.randomUUID();
@@ -69,8 +69,8 @@ class ResendMailSenderTest {
         "user@example.com", new OrganizationId(organizationId), "the-raw-token");
 
     assertThat(capturedRequest.method).isEqualTo("POST");
-    assertThat(capturedRequest.headers.get("Authorization")).isEqualTo("Bearer " + API_KEY);
-    assertThat(capturedRequest.headers.get("Content-Type")).isEqualTo("application/json");
+    assertThat(capturedRequest.headers).containsEntry("Authorization", "Bearer " + API_KEY);
+    assertThat(capturedRequest.headers).containsEntry("Content-Type", "application/json");
     JsonNode body = objectMapper.readTree(capturedRequest.body);
     assertThat(body.get("from").asString()).isEqualTo(FROM_ADDRESS);
     assertThat(body.get("to").get(0).asString()).isEqualTo("user@example.com");
@@ -83,7 +83,7 @@ class ResendMailSenderTest {
   }
 
   @Test
-  void sendsAWellFormedRequestForAPlatformAccountWithThePlatformTierLinkShape() throws Exception {
+  void sendsAWellFormedRequestForAPlatformAccountWithThePlatformTierLinkShape() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
 
@@ -97,7 +97,7 @@ class ResendMailSenderTest {
   }
 
   @Test
-  void urlEncodesTheTokenInTheLinkItBuilds() throws Exception {
+  void urlEncodesTheTokenInTheLinkItBuilds() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
 
@@ -112,7 +112,7 @@ class ResendMailSenderTest {
   }
 
   @Test
-  void throwsMailDeliveryExceptionOnANon2xxResponse() throws Exception {
+  void throwsMailDeliveryExceptionOnANon2xxResponse() {
     respondWith(422, "{\"message\":\"Invalid `from` field\"}");
     ResendMailSender sender = senderPointedAtTheStubServer();
 
@@ -126,7 +126,7 @@ class ResendMailSenderTest {
   }
 
   @Test
-  void throwsMailDeliveryExceptionWrappingAnIOException() throws Exception {
+  void throwsMailDeliveryExceptionWrappingAnIOException() throws IOException, InterruptedException {
     HttpClient httpClient = mock(HttpClient.class);
     IOException networkFailure = new IOException("connection reset");
     when(httpClient.send(any(), any())).thenThrow(networkFailure);
@@ -140,7 +140,7 @@ class ResendMailSenderTest {
 
   @Test
   void throwsMailDeliveryExceptionAndRestoresTheInterruptFlagOnInterruptedException()
-      throws Exception {
+      throws IOException, InterruptedException {
     HttpClient httpClient = mock(HttpClient.class);
     when(httpClient.send(any(), any())).thenThrow(new InterruptedException("interrupted mid-send"));
     ResendMailSender sender = senderWith(httpClient);
