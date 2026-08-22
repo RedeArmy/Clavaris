@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -56,7 +57,7 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
     })
-class PlatformTokenIssuanceIntegrationTest {
+class PlatformTokenIssuanceIntegrationTest extends RedisBackedIntegrationTest {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");

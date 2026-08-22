@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
@@ -58,7 +59,7 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_ID=cross-tier-test-platform-client",
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-cross-tier-test-platform-secret"
     })
-class CrossTierOAuth2AuthorizeIntegrationTest {
+class CrossTierOAuth2AuthorizeIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final String REDIRECT_URI = "https://client.example.test/callback";
   private static final Pattern CSRF_TOKEN_PATTERN =

@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccount;
@@ -41,7 +42,7 @@ import tools.jackson.databind.ObjectMapper;
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
       "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
     })
-class CreateOrganizationIntegrationTest {
+class CreateOrganizationIntegrationTest extends RedisBackedIntegrationTest {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
