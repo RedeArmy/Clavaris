@@ -1,6 +1,6 @@
 # ADR-0010: Organization-scoped tenant isolation (Account belongs to exactly one Organization)
 
-**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Aprobado y añadirse a la lista de ADRs vigentes del proyecto
+**Status:** ✅ Aprobado (2026-08-22 — see "Ratification" addendum below)
 
 ## Context
 
@@ -136,3 +136,15 @@ Working through this surfaced a real problem the original open question didn't a
 
 - **Concrete default thresholds**: the system-wide rate-limit ceiling for §6.2 and the fixed per-identifier thresholds for §6.1 both need real numbers (requests/window for login and token endpoints) — deferred to implementation time, not a design question this ADR needs to resolve.
 - **v1.1 automated key-rotation trigger criteria**: §5.2 scopes v1 to manual rotation; the *scheduling* design for v1.1 (time-based, usage-based, or externally triggered) is not designed here, only committed to the roadmap.
+
+## Addendum — self-service Organization creation now exists (2026-08-22, ratification review)
+
+The "Organization provisioning" section above states creation is "a Clavaris-operator-only action... no self-service tenant creation in v1." **That is no longer accurate as written.** ADR-0012 (`PlatformAccount` — self-service Organization ownership) introduced a second, self-service creation path: a `PlatformAccount` registers itself, logs into a session-authenticated `/platform/dashboard`, and creates the `Organization`(s) it owns directly — calling the same `CreateOrganizationUseCase` the operator-only REST endpoint already used.
+
+This does **not** weaken or contradict anything §1–§6 of this ADR establish — cross-tenant isolation, per-Organization JWKS/issuer, and the two-layer rate-limiting design are all unaffected by *who* is allowed to create the tenant row; only the provisioning *actor* changed. `CreateOrganizationCommand.ownerPlatformAccountId` now records that actor either way (derived from the session on the dashboard path, supplied explicitly in the request body on the operator/REST path — an ops script creating an Organization on a customer's behalf must still name who owns it). The platform-tier authentication boundary itself (§"Organization provisioning," `PlatformClient`/platform issuer) is unchanged; ADR-0012's `PlatformAccount` is a structurally separate, human, session-authenticated identity, never a `PlatformClient` credential.
+
+Ratification of this ADR proceeds treating this as a correction, not a re-opened design question — see ADR-0012 for the full rationale, alternatives considered, and consequences of the self-service path itself.
+
+## Ratification (2026-08-22)
+
+Approved. This ADR has been the load-bearing design every implemented module (`identity-module`, `organization-module`, `client-registry-module`, `app`) was already built directly against (TD-PROC-001) — reviewed against the actual code, not re-litigated: §1 (`UNIQUE(organization_id, email)`), §2 (`oauth_clients.organization_id` mandatory, no cross-module FK), §4 (module dependency direction), and §5 (per-Organization issuer/JWKS, spike-validated GO) all verified live in this pass, matching what this ADR describes. Two real, already-tracked implementation gaps remain open against §5.2/§6 specifically — no dedicated `signing-keys/rotate` HTTP endpoint yet, and §6's two-layer rate limiting is entirely unbuilt (**TD-SEC-001**, the one P0 row in the technical-debt register) — neither changes the *decision* this ADR records, both are tracked as what they are: implementation debt against an approved design, not open design questions.
