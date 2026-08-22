@@ -1,6 +1,7 @@
 package com.clavaris.identity.application.usecase.registeraccount;
 
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.util.Optional;
@@ -29,6 +30,12 @@ public interface AccountRepository {
    * against it.
    */
   Optional<Account> findByOrganizationIdAndEmail(OrganizationId organizationId, Email email);
+
+  /**
+   * BR-ID-03: {@code RotateRefreshTokenService} uses this to resolve {@code organizationId} for
+   * {@code RefreshTokenReuseDetectedEvent} — the only fact a bare {@link AccountId} can't carry.
+   */
+  Optional<Account> findById(AccountId accountId);
 
   /** Persists the account and its attached credential in one write. */
   void save(Account account);
