@@ -27,6 +27,12 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 @Configuration
 class PlatformDashboardSecurityConfig {
 
+  // Every authenticated-but-rejected path on this chain (concurrent-session expiry, permitAll
+  // list, the wrong-tier accessDeniedHandler) sends the browser to the same one page — a single
+  // constant, not three independent literals that could silently drift apart.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String PLATFORM_LOGIN_PATH = "/platform/login";
+
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ PlatformDashboardSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
@@ -63,14 +69,14 @@ class PlatformDashboardSecurityConfig {
                         concurrency
                             .maximumSessions(-1)
                             .sessionRegistry(sessionRegistry)
-                            .expiredUrl("/platform/login")))
+                            .expiredUrl(PLATFORM_LOGIN_PATH)))
         .authorizeHttpRequests(
             authorize ->
                 authorize
                     .requestMatchers(
                         "/platform/register",
                         "/platform/register/pending-verification",
-                        "/platform/login",
+                        PLATFORM_LOGIN_PATH,
                         "/platform/verify-email",
                         "/platform/forgot-password",
                         "/platform/forgot-password/pending",
@@ -105,7 +111,7 @@ class PlatformDashboardSecurityConfig {
                     // gets sent to the same place an anonymous visitor would.
                     .accessDeniedHandler(
                         (request, response, _) ->
-                            response.sendRedirect(request.getContextPath() + "/platform/login")));
+                            response.sendRedirect(request.getContextPath() + PLATFORM_LOGIN_PATH)));
     return http.build();
   }
 }
