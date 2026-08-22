@@ -64,6 +64,36 @@ jobs:
       - name: Build app image
         run: docker build -f app/Dockerfile -t clavaris-app:ci .
 
+      # TD-SEC-021: distinct from dependency-scan below (Java/Maven dependencies only) — this
+      # scans the actual OS-level packages inside the built image (eclipse-temurin:25-jre's own
+      # Debian base), the layer dependency-scan never touches at all. exit-code 1 on
+      # CRITICAL/HIGH mirrors dependency-scan's own -DfailBuildOnCVSS=7 gate — same bar, applied
+      # to the other half of the supply chain. UNKNOWN/LOW/MEDIUM findings are reported (via the
+      # uploaded artifact below) but don't fail the build, same "close what's actionable and
+      # severe, don't block on noise" stance security-architecture.md already takes elsewhere.
+      - name: Trivy container image scan
+        # Real bug, confirmed live: the initial pin (0.28.0, no "v" prefix) doesn't match this
+        # action's actual tagging convention — GitHub Actions failed to resolve it outright before
+        # this workflow ever ran. Verified the real tag list against GitHub's own API
+        # (api.github.com/repos/aquasecurity/trivy-action/tags) rather than guessing again: every
+        # release is v-prefixed, v0.36.0 is the current latest.
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: clavaris-app:ci
+          format: table
+          output: trivy-report.txt
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          if-no-files-found: ignore
+
   dependency-scan:
     name: Dependency vulnerability scan
     runs-on: ubuntu-latest

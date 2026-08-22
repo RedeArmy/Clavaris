@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -34,7 +35,9 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 class ResendMailSender implements MailSender, PlatformMailSender {
 
-  private static final URI RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
+  @SuppressWarnings("PMD.LongVariable")
+  private static final URI DEFAULT_RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
+
   private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
   // Resend's API never redirects on a real request — treating 3xx as failure too, not just 4xx/5xx,
@@ -49,19 +52,44 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   private final String apiKey;
   private final String fromAddress;
   private final String baseUrl;
+  private final URI resendEndpoint;
 
   // Package-private: constructed only by Spring's own component scan (via @Component above) —
-  // MailSender (the port) is what every caller outside this package should depend on.
+  // MailSender (the port) is what every caller outside this package should depend on. @Autowired
+  // is required now that a second constructor exists (below) — without it Spring has no way to
+  // pick between two candidates.
+  @Autowired
   /* package */ ResendMailSender(
       final ObjectMapper objectMapper,
       @Value("${clavaris.mail.resend-api-key}") final String apiKey,
       @Value("${clavaris.mail.from-address}") final String fromAddress,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl) {
-    this.httpClient = HttpClient.newHttpClient();
+    this(
+        HttpClient.newHttpClient(),
+        objectMapper,
+        apiKey,
+        fromAddress,
+        baseUrl,
+        DEFAULT_RESEND_ENDPOINT);
+  }
+
+  // Test-only (TD-SEC-020): lets ResendMailSenderTest point this at a local stub HTTP server —
+  // never the real Resend API — and inject a fully-controlled HttpClient to simulate IOException/
+  // InterruptedException deterministically, without real network flakiness. Never invoked by
+  // Spring itself; @Autowired on the constructor above resolves the ambiguity unambiguously.
+  /* package */ ResendMailSender(
+      final HttpClient httpClient,
+      final ObjectMapper objectMapper,
+      final String apiKey,
+      final String fromAddress,
+      final String baseUrl,
+      final URI resendEndpoint) {
+    this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.apiKey = apiKey;
     this.fromAddress = fromAddress;
     this.baseUrl = baseUrl;
+    this.resendEndpoint = resendEndpoint;
   }
 
   @Override
@@ -153,7 +181,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     }
 
     final HttpRequest request =
-        HttpRequest.newBuilder(RESEND_ENDPOINT)
+        HttpRequest.newBuilder(resendEndpoint)
             .timeout(REQUEST_TIMEOUT)
             .header("Authorization", "Bearer " + apiKey)
             .header("Content-Type", "application/json")
