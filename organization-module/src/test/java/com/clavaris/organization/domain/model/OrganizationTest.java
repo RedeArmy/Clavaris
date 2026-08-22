@@ -9,23 +9,28 @@ import org.junit.jupiter.api.Test;
 
 class OrganizationTest {
 
+  private final UUID ownerPlatformAccountId = UUID.randomUUID();
+
   @Test
-  void registerCarriesTheGivenName() {
-    final Organization organization = Organization.register("JobSeeker");
+  void registerCarriesTheGivenNameAndOwner() {
+    final Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
 
     assertThat(organization.name()).isEqualTo("JobSeeker");
     assertThat(organization.id()).isNotNull();
     assertThat(organization.createdAt()).isNotNull();
+    assertThat(organization.ownerPlatformAccountId()).isEqualTo(ownerPlatformAccountId);
   }
 
   @Test
   void rejectsABlankName() {
-    assertThatIllegalArgumentException().isThrownBy(() -> Organization.register(" "));
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> Organization.register(" ", ownerPlatformAccountId));
   }
 
   @Test
   void rejectsANullName() {
-    assertThatIllegalArgumentException().isThrownBy(() -> Organization.register(null));
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> Organization.register(null, ownerPlatformAccountId));
   }
 
   @Test
@@ -37,10 +42,12 @@ class OrganizationTest {
     final Instant persistedCreatedAt = Instant.parse("2026-01-01T00:00:00Z");
 
     final Organization organization =
-        Organization.reconstitute(persistedId, "JobSeeker", persistedCreatedAt);
+        Organization.reconstitute(
+            persistedId, "JobSeeker", persistedCreatedAt, ownerPlatformAccountId);
 
     assertThat(organization.id()).isEqualTo(persistedId);
     assertThat(organization.name()).isEqualTo("JobSeeker");
     assertThat(organization.createdAt()).isEqualTo(persistedCreatedAt);
+    assertThat(organization.ownerPlatformAccountId()).isEqualTo(ownerPlatformAccountId);
   }
 }

@@ -4,6 +4,8 @@ import com.clavaris.organization.application.usecase.createorganization.CreateOr
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,5 +28,11 @@ class OrganizationUseCaseConfig {
   /* package */ CreateOrganizationUseCase createOrganizationUseCase(
       final OrganizationRepository organizations, final SigningKeyProvisioner keyProvisioner) {
     return new CreateOrganizationService(organizations, keyProvisioner);
+  }
+
+  @Bean
+  /* package */ ListOrganizationsForPlatformAccountUseCase
+      listOrganizationsForPlatformAccountUseCase(final OrganizationRepository organizations) {
+    return new ListOrganizationsForPlatformAccountService(organizations);
   }
 }

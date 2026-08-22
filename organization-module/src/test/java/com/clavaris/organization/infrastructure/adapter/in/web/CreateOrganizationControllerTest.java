@@ -38,7 +38,8 @@ class CreateOrganizationControllerTest {
 
   @Test
   void returns201WithTheCreatedOrganizationAndItsProvisionedSigningKey() throws Exception {
-    Organization organization = Organization.register("JobSeeker");
+    UUID ownerPlatformAccountId = UUID.randomUUID();
+    Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
     ProvisionedSigningKey signingKey =
         new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256");
     when(useCase.handle(any())).thenReturn(new CreateOrganizationResult(organization, signingKey));
@@ -47,7 +48,10 @@ class CreateOrganizationControllerTest {
         .perform(
             post("/api/v1/admin/organizations")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"JobSeeker\"}"))
+                .content(
+                    "{\"name\":\"JobSeeker\",\"ownerPlatformAccountId\":\""
+                        + ownerPlatformAccountId
+                        + "\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(organization.id().toString()))
         .andExpect(jsonPath("$.name").value("JobSeeker"))
@@ -61,7 +65,18 @@ class CreateOrganizationControllerTest {
         .perform(
             post("/api/v1/admin/organizations")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"\"}"))
+                .content(
+                    "{\"name\":\"\",\"ownerPlatformAccountId\":\"" + UUID.randomUUID() + "\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void rejectsAMissingOwnerPlatformAccountIdWithoutEverCallingTheUseCase() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"JobSeeker\"}"))
         .andExpect(status().isBadRequest());
   }
 }

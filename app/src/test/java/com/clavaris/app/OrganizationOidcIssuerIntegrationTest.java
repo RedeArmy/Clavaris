@@ -192,7 +192,13 @@ class OrganizationOidcIssuerIntegrationTest {
         HttpRequest.newBuilder(baseUri("/api/v1/admin/organizations"))
             .header("Authorization", "Bearer " + platformToken)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"name\":\""
+                        + name
+                        + "\",\"ownerPlatformAccountId\":\""
+                        + UUID.randomUUID()
+                        + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());

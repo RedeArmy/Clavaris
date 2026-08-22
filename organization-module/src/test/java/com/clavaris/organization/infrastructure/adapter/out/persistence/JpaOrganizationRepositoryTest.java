@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.within;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -43,18 +45,38 @@ class JpaOrganizationRepositoryTest {
 
   @Test
   void savesAnOrganizationAndPersistsItsRealFields() {
-    Organization organization = Organization.register("JobSeeker");
+    UUID ownerPlatformAccountId = UUID.randomUUID();
+    Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
 
     repository.save(organization);
 
     OrganizationEntity persisted = springDataRepository.findById(organization.id()).orElseThrow();
     assertThat(persisted.getId()).isEqualTo(organization.id());
     assertThat(persisted.getName()).isEqualTo("JobSeeker");
+    assertThat(persisted.getOwnerPlatformAccountId()).isEqualTo(ownerPlatformAccountId);
     // Postgres' timestamptz column stores microsecond precision, not the nanosecond precision
     // Instant.now() carries in memory — an exact isEqualTo would be a coin-flip on every real
     // run, not a genuine assertion.
     assertThat(persisted.getCreatedAt())
         .isCloseTo(organization.createdAt(), within(1, ChronoUnit.MILLIS));
+  }
+
+  @Test
+  void findAllOwnedByReturnsOnlyThatOwnersOrganizations() {
+    UUID ownerA = UUID.randomUUID();
+    UUID ownerB = UUID.randomUUID();
+    Organization ownedByA1 = Organization.register("A's First Org", ownerA);
+    Organization ownedByA2 = Organization.register("A's Second Org", ownerA);
+    Organization ownedByB = Organization.register("B's Org", ownerB);
+    repository.save(ownedByA1);
+    repository.save(ownedByA2);
+    repository.save(ownedByB);
+
+    List<Organization> found = repository.findAllOwnedBy(ownerA);
+
+    assertThat(found)
+        .extracting(Organization::id)
+        .containsExactlyInAnyOrder(ownedByA1.id(), ownedByA2.id());
   }
 
   @Configuration
