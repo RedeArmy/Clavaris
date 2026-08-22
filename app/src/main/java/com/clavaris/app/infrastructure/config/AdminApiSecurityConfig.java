@@ -48,6 +48,13 @@ class AdminApiSecurityConfig {
                     // PlatformScopes already reserves for this exact action.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations")
                     .hasAuthority("SCOPE_" + PlatformScopes.ORGANIZATIONS_WRITE)
+                    // ADR-0010 §6.2: tuning the capacity-layer ceiling is its own scope too, same
+                    // defence-in-depth reasoning as Organization creation above — a platform
+                    // token that can create Organizations doesn't automatically get to also
+                    // change a running one's rate-limit ceiling.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/rate-limit-policy")
+                    .hasAuthority("SCOPE_" + PlatformScopes.RATE_LIMIT_POLICY_WRITE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

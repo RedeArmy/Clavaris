@@ -8,10 +8,13 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -30,6 +33,7 @@ import org.springframework.security.oauth2.server.authorization.token.JwtGenerat
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 /**
  * ADR-0010 (Organization provisioning), BR-PLATFORM-01: {@code client_credentials}-only issuer at
@@ -48,8 +52,11 @@ import org.springframework.security.web.SecurityFilterChain;
 // framework, never reimplement it) — a high import count here reflects how many distinct SAS/
 // Spring Security types one SecurityFilterChain bean legitimately touches, not an organically
 // grown class that should be split. TD-SEC-003 added the JDBC-backed OAuth2AuthorizationService
-// import trio, tipping this over PMD's default threshold.
-@SuppressWarnings("PMD.ExcessiveImports")
+// import trio, tipping this over PMD's default threshold. PMD.AvoidDuplicateLiterals: the
+// "PMD.LongVariable" suppression string itself now repeats a 4th time (rate limiting's own new
+// param) — same descriptive-parameter-names reasoning as OrganizationAuthorizationServerConfig's
+// own identical comment, not worth a named constant purely to satisfy a check about a check.
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
 @Configuration
 class PlatformAuthorizationServerConfig {
 
@@ -70,7 +77,11 @@ class PlatformAuthorizationServerConfig {
       @SuppressWarnings("PMD.LongVariable")
           final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       @SuppressWarnings("PMD.LongVariable") final TokenRevocationEventLogger tokenRevocationLogger,
-      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl) {
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl,
+      final RateLimiter rateLimiter,
+      @SuppressWarnings("PMD.LongVariable")
+          @Value("${clavaris.rate-limit.token.per-client-limit:20}")
+          final int tokenPerClientLimit) {
     final AuthorizationServerSettings settings =
         AuthorizationServerSettings.builder()
             .issuer(baseUrl)
@@ -146,6 +157,25 @@ class PlatformAuthorizationServerConfig {
                                                     Argon2PasswordEncoder
                                                         .defaultsForSpringSecurity_v5_8())))))
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+        // ADR-0010 §6.1/BR-ID-06: this tier's own client_credentials-only anti-abuse layer — no
+        // refresh_token grant exists here at all (BR-PLATFORM-04: PlatformAccount never issues an
+        // OAuth token in the first place), so there's no BR-ID-06 "never throttle refresh"
+        // distinction to make, unlike the tenant tier's own token rule. No capacity-layer filter
+        // on this chain either — §6.2 is explicitly per-Organization, and the platform tier has
+        // no organization_id to aggregate by.
+        .addFilterAfter(
+            new AntiAbuseRateLimitingFilter(
+                rateLimiter,
+                List.of(
+                    new RateLimitRule(
+                        "platform-token:client",
+                        HttpMethod.POST,
+                        "/oauth2/token",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::oauthClientId,
+                        tokenPerClientLimit,
+                        Duration.ofMinutes(5)))),
+            SecurityContextHolderFilter.class)
         // STATELESS, not left at Spring Security's IF_REQUIRED default: without this, a
         // successful Basic-Auth client_credentials request could still get its SecurityContext
         // persisted to an HttpSession (Spring Security's default SecurityContextRepository
