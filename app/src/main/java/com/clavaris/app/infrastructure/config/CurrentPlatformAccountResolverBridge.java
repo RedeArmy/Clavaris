@@ -38,7 +38,7 @@ class CurrentPlatformAccountResolverBridge implements CurrentPlatformAccountReso
     }
     try {
       return Optional.of(UUID.fromString(authentication.getName()));
-    } catch (final IllegalArgumentException notAUuid) {
+    } catch (final IllegalArgumentException _) {
       // A principal name that isn't a UUID at all can't be a PlatformAccountId — same
       // "malformed input surfaces as absent, never an exception" convention as
       // CurrentOrganizationContext's own empty-Optional paths.
