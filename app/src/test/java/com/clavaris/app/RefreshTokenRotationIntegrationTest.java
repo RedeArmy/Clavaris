@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.TestMailSenderConfig;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -39,8 +41,12 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Not a subclass/shared-base of {@link AuthorizationCodeFlowIntegrationTest} — this codebase's
  * own convention (confirmed across every other integration test in this package) is self-contained
  * test files, each with its own copy of the small set of raw-HTTP helpers, not a shared base class.
+ *
+ * <p>{@link TestMailSenderConfig}: {@code registerAccount} below now really does trigger {@code
+ * RequestEmailVerificationUseCase} (TD-SEC-004) — must never reach the real Resend API.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(TestMailSenderConfig.class)
 @Testcontainers
 @TestPropertySource(
     properties = {
@@ -198,7 +204,13 @@ class RefreshTokenRotationIntegrationTest {
         HttpRequest.newBuilder(baseUri("/api/v1/admin/organizations"))
             .header("Authorization", "Bearer " + platformToken)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"name\":\""
+                        + name
+                        + "\",\"ownerPlatformAccountId\":\""
+                        + UUID.randomUUID()
+                        + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());

@@ -15,6 +15,12 @@ import java.util.HexFormat;
  * standard choice here, not a weaker substitute for Argon2id; hashing a password with SHA-256 would
  * be wrong (too fast against brute force), but hashing an already-256-bit-random token with it is
  * exactly right (nothing to brute-force, the value's entropy is the defense, not the hash's cost).
+ *
+ * <p>Reused as-is (not duplicated) by {@code VerificationToken} issuance (email verification,
+ * password reset) — the same reasoning applies unchanged: those raw values are also
+ * system-generated, already-high-entropy, never user-chosen. The name predates that second use; not
+ * renamed to something more generic purely to avoid an unrelated diff across already-shipped,
+ * already-tested {@code RefreshToken} code for a cosmetic reason.
  */
 public final class RefreshTokenSecret {
 

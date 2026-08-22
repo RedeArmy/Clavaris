@@ -37,6 +37,13 @@ clavaris:
   signing-key-store:
     path: ${TOKEN_SIGNING_KEY_STORE_PATH:./data/dev-signing-keys.p12}
     password: ${TOKEN_SIGNING_KEY_STORE_PASSWORD:dev-only-signing-key-store-password-change-in-real-deployments}
+  # TD-SEC-004: ResendMailSender (identity-module) — email verification and password reset
+  # delivery, via Resend's HTTP API. The sending domain behind MAIL_FROM_ADDRESS is provisioned
+  # and DNS-verified with Resend separately (ADR-0011); no default for either value on purpose —
+  # an unset RESEND_API_KEY should fail loudly against the real provider, not silently no-op.
+  mail:
+    resend-api-key: ${RESEND_API_KEY:}
+    from-address: ${MAIL_FROM_ADDRESS:}
 
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;

@@ -10,15 +10,18 @@ import java.util.Optional;
  * which future use case touches an account. ADR-0010: {@code organizationId} is mandatory and
  * immutable — there is no factory path that produces an {@code Account} without a tenant.
  *
- * <p>PMD's DataClass/AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this
- * class for its many single-word accessors ({@code id()}, {@code email()}, ...) matching the field
- * names they read — that's the deliberate record-style accessor convention used throughout this
- * codebase's value objects ({@code AccountId.value()}, etc.), not an accidental data-holder shape;
- * the real behaviour (BR-ID-02's invariant, enforced in {@link #attachPasswordCredential}) lives in
- * this class precisely because it's an aggregate, not a bag of fields with getters.
+ * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
+ * its many single-word accessors ({@code id()}, {@code email()}, ...) matching the field names they
+ * read — that's the deliberate record-style accessor convention used throughout this codebase's
+ * value objects ({@code AccountId.value()}, etc.), not an accidental data-holder shape.
+ * (PMD.DataClass itself no longer fires here — enough real behaviour now lives in this class, e.g.
+ * {@link #verifyEmail()}/{@link #resetPasswordCredential}, that PMD stopped considering it a bag of
+ * fields, which is exactly the point.) TooManyMethods is suppressed below: an aggregate root
+ * accumulating one more mutator per use case that touches it (BR-ID-02, BR-ID-04, BR-ID-05) is
+ * growth in the right place, not a sign this class should be split.
  */
 @SuppressWarnings({
-  "PMD.DataClass",
+  "PMD.TooManyMethods",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
@@ -129,5 +132,45 @@ public final class Account {
 
   public Optional<PasswordCredential> passwordCredential() {
     return Optional.ofNullable(passwordCredential);
+  }
+
+  /**
+   * Confirms the email of record — {@code ConfirmEmailVerificationService} calls this only after
+   * validating a single-use {@code VerificationToken} (BR-ID-05). Idempotent by design: a token is
+   * single-use so this normally runs once, but re-confirming an already-verified account is a
+   * harmless no-op, not an error worth failing the request over.
+   */
+  public void verifyEmail() {
+    if (this.emailVerifiedAt == null) {
+      this.emailVerifiedAt = Instant.now();
+    }
+  }
+
+  /**
+   * Replaces the account's password credential's hash in place — the password-reset flow
+   * (BR-ID-04), not registration-time attachment ({@link #attachPasswordCredential}), which is why
+   * this method exists separately and has no "must not already have one" guard. Requires an
+   * existing credential: a reset presupposes something to reset, and an account with only a (not
+   * yet implemented) social identity has no password to replace — that case is the caller's (the
+   * use case's) responsibility to reject before ever reaching this method, not this method's to
+   * silently attach a first one.
+   *
+   * <p>Deliberately reuses the existing credential's own {@code id} via {@link
+   * PasswordCredential#reconstitute} rather than {@link PasswordCredential#issue}, which mints a
+   * fresh random one — confirmed live (a real integration test, not just inspection) that minting a
+   * new id here makes {@code JpaAccountRepository#save} attempt an INSERT of a second {@code
+   * password_credentials} row for the same account, violating the table's own {@code
+   * UNIQUE(account_id)} constraint (data-model.md §2) the moment a real reset ran end to end. This
+   * is an update to the one credential row an account may ever have, not a replacement of it with
+   * an unrelated new one.
+   */
+  public void resetPasswordCredential(final String newPasswordHash) {
+    if (this.passwordCredential == null) {
+      throw new IllegalStateException(
+          "Account " + id.value() + " has no password credential to reset");
+    }
+    this.passwordCredential =
+        PasswordCredential.reconstitute(
+            this.passwordCredential.id(), id, newPasswordHash, Instant.now());
   }
 }
