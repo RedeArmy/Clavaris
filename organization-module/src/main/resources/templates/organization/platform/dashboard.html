@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Your organizations — Clavaris</title>
+</head>
+<body>
+<main>
+    <h1>Your organizations</h1>
+
+    <ul>
+        <li th:each="organization : ${organizations}" th:text="${organization.name()}">Organization name</li>
+        <li th:if="${#lists.isEmpty(organizations)}">You don't have any organizations yet.</li>
+    </ul>
+
+    <h2>Create a new organization</h2>
+    <form th:action="@{''}" th:object="${form}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+        <div>
+            <label for="name">Name</label>
+            <input id="name" type="text" th:field="*{name}" required/>
+            <p th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+        </div>
+
+        <button type="submit">Create organization</button>
+    </form>
+</main>
+</body>
+</html>
