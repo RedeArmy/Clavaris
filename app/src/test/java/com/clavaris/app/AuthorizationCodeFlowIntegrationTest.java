@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.app.support.TestMailSenderConfig;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -38,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -58,8 +60,12 @@ import tools.jackson.databind.ObjectMapper;
  * /authorize} → redirect to the hosted login page → real credential check against a real registered
  * Account → redirect back to the original {@code /authorize} request, now authenticated →
  * authorization code → token exchange with the real PKCE verifier).
+ *
+ * <p>{@link TestMailSenderConfig}: the registration step below now really does trigger {@code
+ * RequestEmailVerificationUseCase} (TD-SEC-004) — must never reach the real Resend API.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(TestMailSenderConfig.class)
 @Testcontainers
 @TestPropertySource(
     properties = {
@@ -272,7 +278,13 @@ class AuthorizationCodeFlowIntegrationTest {
         HttpRequest.newBuilder(baseUri("/api/v1/admin/organizations"))
             .header("Authorization", "Bearer " + platformToken)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"name\":\""
+                        + name
+                        + "\",\"ownerPlatformAccountId\":\""
+                        + UUID.randomUUID()
+                        + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());

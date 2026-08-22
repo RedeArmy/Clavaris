@@ -16,6 +16,8 @@ import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyReg
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
+import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -42,11 +44,13 @@ class RegisterAccountControllerTest {
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();
 
   private RegisterAccountUseCase useCase;
+  private RequestEmailVerificationUseCase requestEmailVerification;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     useCase = mock(RegisterAccountUseCase.class);
+    requestEmailVerification = mock(RequestEmailVerificationUseCase.class);
 
     // SpringResourceTemplateResolver needs a real ApplicationContext to resolve "classpath:"
     // resources (confirmed live — IllegalArgumentException: Application Context cannot be null
@@ -69,7 +73,8 @@ class RegisterAccountControllerTest {
     viewResolver.setTemplateEngine(templateEngine);
 
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new RegisterAccountController(useCase))
+        MockMvcBuilders.standaloneSetup(
+                new RegisterAccountController(useCase, requestEmailVerification))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -84,8 +89,10 @@ class RegisterAccountControllerTest {
   }
 
   @Test
-  void validSubmissionRegistersAndRedirectsToPendingVerification() throws Exception {
-    when(useCase.handle(any())).thenReturn(AccountId.newId());
+  void validSubmissionRegistersTriggersVerificationEmailAndRedirectsToPendingVerification()
+      throws Exception {
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
 
     mockMvc
         .perform(
@@ -102,6 +109,9 @@ class RegisterAccountControllerTest {
                 new OrganizationId(ORGANIZATION_ID),
                 new Email("new-user@example.com"),
                 "a-valid-password"));
+    // TD-SEC-004: registration must actually trigger the verification email it promises on the
+    // page it redirects to, not just claim to have.
+    verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(accountId));
   }
 
   @Test
@@ -117,6 +127,7 @@ class RegisterAccountControllerTest {
         .andExpect(model().attributeHasFieldErrors("form", "email"));
 
     verifyNoInteractions(useCase);
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test
@@ -132,6 +143,7 @@ class RegisterAccountControllerTest {
         .andExpect(model().attributeHasFieldErrors("form", "password"));
 
     verifyNoInteractions(useCase);
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test
@@ -151,6 +163,7 @@ class RegisterAccountControllerTest {
         .andExpect(model().attributeHasFieldErrors("form", "password"));
 
     verifyNoInteractions(useCase);
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test
@@ -166,6 +179,7 @@ class RegisterAccountControllerTest {
         .andExpect(model().attributeHasFieldErrors("form", "confirmPassword"));
 
     verifyNoInteractions(useCase);
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test
@@ -181,6 +195,7 @@ class RegisterAccountControllerTest {
         .andExpect(model().attributeHasFieldErrors("form", "confirmPassword"));
 
     verifyNoInteractions(useCase);
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test
@@ -200,6 +215,8 @@ class RegisterAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
         .andExpect(model().attributeHasFieldErrors("form", "email"));
+
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test
@@ -218,6 +235,8 @@ class RegisterAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
         .andExpect(model().attributeHasFieldErrors("form", "password"));
+
+    verifyNoInteractions(requestEmailVerification);
   }
 
   @Test

@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.TestMailSenderConfig;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,8 +27,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * live, real HTTP, real session cookie, not an assumption that Spring Security's default "just
  * works": a POST with no {@code _csrf} token is rejected (403), and the exact same form submitted
  * with the token {@code register.html} actually renders succeeds (302 to pending-verification).
+ *
+ * <p>{@link TestMailSenderConfig}: a successful registration now really does trigger {@code
+ * RequestEmailVerificationUseCase} (TD-SEC-004) — this test must never let that reach the real
+ * Resend API.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(TestMailSenderConfig.class)
 @Testcontainers
 class RegisterAccountCsrfIntegrationTest {
 
