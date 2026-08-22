@@ -181,6 +181,16 @@ final class RefreshTokenRotationAuthenticationProvider implements Authentication
       // Date.from(...) convention exactly) — satisfies it correctly rather than working around
       // it; the placeholder is immediately superseded in authorizationBuilder by the real,
       // freshly-generated ID token below (OAuth2Authorization.Builder.token(T) keys by class).
+      // java:S2143/PMD.ReplaceJavaUtilDate ("use java.time") don't apply here: JwtGenerator's own
+      // source reads this claim back with `Date authTimeClaim = currentIdToken.getClaim(...)` —
+      // an unchecked cast keyed on the claim's stored runtime type, so it must literally be a
+      // java.util.Date instance (matching what a real ID token's own getAuthenticationTime()
+      // already stores via Date.from(...)), not this codebase's own preferred java.time type. A
+      // local variable, not an inline NOSONAR, so the suppression follows this codebase's own
+      // established convention (java:S107 elsewhere) rather than a NOSONAR comment, which this
+      // SonarCloud project may not honor as a general analysis-scope setting.
+      @SuppressWarnings({"java:S2143", "PMD.ReplaceJavaUtilDate"})
+      final Date authTimeClaimValue = Date.from(result.sessionCreatedAt());
       final OidcIdToken priorIdTokenPlaceholder =
           new OidcIdToken(
               "placeholder-never-served-to-a-client",
@@ -190,13 +200,7 @@ final class RefreshTokenRotationAuthenticationProvider implements Authentication
                   "sid",
                   result.sessionId().toString(),
                   IdTokenClaimNames.AUTH_TIME,
-                  // Sonar's "use java.time" rule doesn't apply here: JwtGenerator's own source
-                  // reads this claim back with `Date authTimeClaim = currentIdToken.getClaim(...)`
-                  // — an unchecked cast keyed on the claim's stored runtime type, so it must
-                  // literally be a java.util.Date instance (matching what a real ID token's own
-                  // getAuthenticationTime() already stores via Date.from(...)), not this
-                  // codebase's own preferred java.time type.
-                  Date.from(result.sessionCreatedAt()))); // NOSONAR: see comment above
+                  authTimeClaimValue));
       authorizationBuilder.token(priorIdTokenPlaceholder);
 
       final OAuth2TokenContext idTokenContext =
