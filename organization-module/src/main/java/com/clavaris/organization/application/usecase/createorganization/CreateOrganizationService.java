@@ -13,20 +13,36 @@ import org.springframework.transaction.annotation.Transactional;
  * best-effort saga. Deliberately does NOT create a {@code RateLimitPolicy} row
  * (BR-ORG-05/BR-ORG-06): a missing row already means "use the system default."
  */
+@SuppressWarnings("PMD.LongVariable")
 public class CreateOrganizationService implements CreateOrganizationUseCase {
 
   private final OrganizationRepository organizations;
   private final SigningKeyProvisioner keyProvisioner;
+  private final PlatformAccountExistsChecker platformAccountExistsChecker;
 
   public CreateOrganizationService(
-      final OrganizationRepository organizations, final SigningKeyProvisioner keyProvisioner) {
+      final OrganizationRepository organizations,
+      final SigningKeyProvisioner keyProvisioner,
+      final PlatformAccountExistsChecker platformAccountExistsChecker) {
     this.organizations = organizations;
     this.keyProvisioner = keyProvisioner;
+    this.platformAccountExistsChecker = platformAccountExistsChecker;
   }
 
   @Override
   @Transactional
   public CreateOrganizationResult handle(final CreateOrganizationCommand command) {
+    // Security finding (SDE-III review, 2026-08-22): ownerPlatformAccountId used to be trusted
+    // as-is — on the dashboard path it always comes from a real authenticated session, but the
+    // REST/operator path (CreateOrganizationController) accepts it as caller-supplied JSON with
+    // only @NotNull validation. The migration's own comment claims this is "enforced at the
+    // application layer only" — this check is that enforcement; before it existed, that claim was
+    // false and any UUID, real account or not, produced a real Organization with a real signing
+    // key.
+    if (!platformAccountExistsChecker.exists(command.ownerPlatformAccountId())) {
+      throw new PlatformAccountNotFoundException(command.ownerPlatformAccountId());
+    }
+
     final Organization organization =
         Organization.register(command.name(), command.ownerPlatformAccountId());
     organizations.save(organization);

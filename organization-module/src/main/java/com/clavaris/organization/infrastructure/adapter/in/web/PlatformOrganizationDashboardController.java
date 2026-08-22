@@ -70,6 +70,13 @@ public class PlatformOrganizationDashboardController {
       return DASHBOARD_VIEW;
     }
 
+    // Not caught here: CreateOrganizationUseCase now validates ownerPlatformAccountId against a
+    // real PlatformAccount (security finding, SDE-III review, 2026-08-22) and throws
+    // PlatformAccountNotFoundException otherwise — but on this path the id is never caller
+    // input, it's requireCurrentPlatformAccount()'s own resolved session principal, so a real
+    // PlatformAccount existing is exactly what an authenticated session already guarantees. If
+    // that guarantee is ever violated, an unhandled 500 here is a real, loud signal something
+    // upstream is broken, same reasoning as requireCurrentPlatformAccount()'s own comment above.
     createOrganization.handle(
         new CreateOrganizationCommand(form.getName(), ownerPlatformAccountId));
 

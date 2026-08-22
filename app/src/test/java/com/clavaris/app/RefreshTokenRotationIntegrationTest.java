@@ -3,6 +3,9 @@ package com.clavaris.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.app.support.TestMailSenderConfig;
+import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
+import com.clavaris.identity.domain.model.Email;
+import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
@@ -66,6 +69,7 @@ class RefreshTokenRotationIntegrationTest {
   private int port;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private PlatformAccountRepository platformAccounts;
 
   private final CookieManager cookieManager = new CookieManager();
   private final HttpClient httpClient =
@@ -209,11 +213,25 @@ class RefreshTokenRotationIntegrationTest {
                     "{\"name\":\""
                         + name
                         + "\",\"ownerPlatformAccountId\":\""
-                        + UUID.randomUUID()
+                        + registerAPlatformAccount()
                         + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
+  }
+
+  // A real PlatformAccount row, written directly through the repository rather than the full
+  // /platform/register + /platform/verify-email HTTP flow — CreateOrganizationService (security
+  // finding, SDE-III review, 2026-08-22) now validates ownerPlatformAccountId against a real row.
+  private UUID registerAPlatformAccount() {
+    PlatformAccount account =
+        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
+    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
+    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
+    // never logs in as this account, only needs its row to exist for the owner check.
+    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
+    platformAccounts.save(account);
+    return account.id().value();
   }
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)

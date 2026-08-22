@@ -27,6 +27,12 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 @Configuration
 class PlatformDashboardSecurityConfig {
 
+  // Every authenticated-but-rejected path on this chain (concurrent-session expiry, permitAll
+  // list, the wrong-tier accessDeniedHandler) sends the browser to the same one page — a single
+  // constant, not three independent literals that could silently drift apart.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String PLATFORM_LOGIN_PATH = "/platform/login";
+
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ PlatformDashboardSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
@@ -63,14 +69,14 @@ class PlatformDashboardSecurityConfig {
                         concurrency
                             .maximumSessions(-1)
                             .sessionRegistry(sessionRegistry)
-                            .expiredUrl("/platform/login")))
+                            .expiredUrl(PLATFORM_LOGIN_PATH)))
         .authorizeHttpRequests(
             authorize ->
                 authorize
                     .requestMatchers(
                         "/platform/register",
                         "/platform/register/pending-verification",
-                        "/platform/login",
+                        PLATFORM_LOGIN_PATH,
                         "/platform/verify-email",
                         "/platform/forgot-password",
                         "/platform/forgot-password/pending",
@@ -78,10 +84,34 @@ class PlatformDashboardSecurityConfig {
                         "/platform/reset-password/success")
                     .permitAll()
                     .anyRequest()
-                    .authenticated())
+                    // Security finding (SDE-III review, 2026-08-22): this was `.authenticated()`,
+                    // which only checks "is there any SecurityContext" — since app-wide there is
+                    // exactly one SecurityContextRepository bean
+                    // (OrganizationAuthorizationServerConfig.securityContextRepository()), shared
+                    // by both this chain's SpringSecurityPlatformAuthenticatedSessionEstablisher
+                    // and the tenant tier's SpringSecurityAuthenticatedSessionEstablisher, a plain
+                    // tenant Account's session satisfied it too. Confirmed live before this fix: a
+                    // tenant Account, logged in only via /o/{organizationId}/login, could GET (and
+                    // POST to) /platform/dashboard and successfully create an Organization owned by
+                    // its own AccountId masquerading as a PlatformAccountId. hasAuthority, not
+                    // authenticated(), is what actually enforces "this session belongs to a
+                    // PlatformAccount" — the authority SpringSecurityPlatformAuthenticatedSession
+                    // Establisher grants and no tenant session ever carries.
+                    .hasAuthority("ROLE_PLATFORM_ACCOUNT"))
         .exceptionHandling(
             exceptions ->
-                exceptions.authenticationEntryPoint(new PlatformLoginRedirectEntryPoint()));
+                exceptions
+                    .authenticationEntryPoint(new PlatformLoginRedirectEntryPoint())
+                    // hasAuthority (unlike authenticated()) rejects an authenticated-but-wrong-tier
+                    // session via AccessDeniedException, not AuthenticationException — that path
+                    // only reaches authenticationEntryPoint above for the anonymous case. Without
+                    // this, a tenant session hitting /platform/dashboard would now get Spring
+                    // Security's default whitelabel 403 instead of a clean redirect; from this
+                    // session's own point of view it is simply not logged in to this tier, so it
+                    // gets sent to the same place an anonymous visitor would.
+                    .accessDeniedHandler(
+                        (request, response, _) ->
+                            response.sendRedirect(request.getContextPath() + PLATFORM_LOGIN_PATH)));
     return http.build();
   }
 }

@@ -30,6 +30,7 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
 
 /**
@@ -214,10 +215,25 @@ class OrganizationAuthorizationServerConfig {
                                                         .defaultsForSpringSecurity_v5_8())))))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.
+        //
+        // .anyRequest().authenticated() below is NOT what protects /oauth2/authorize from a
+        // cross-tier session (see TenantAccountOnlySecurityContextFilter's own Javadoc for why:
+        // Spring Authorization Server's own filters read SecurityContextHolder directly and fully
+        // handle/commit that request before AuthorizationFilter, the filter this DSL call installs,
+        // ever runs). It is kept anyway as a correct, if redundant, statement of intent for this
+        // chain and a real backstop for any future path added under this securityMatcher that
+        // Spring Authorization Server's own endpoint filters don't fully own.
         .authorizeHttpRequests(
             authorize ->
                 authorize.requestMatchers("/o/*/login").permitAll().anyRequest().authenticated())
         .securityContext(context -> context.securityContextRepository(contextRepository))
+        // Security finding (SDE-III review, 2026-08-22): the actual fix for cross-tier session
+        // confusion on this chain — see TenantAccountOnlySecurityContextFilter's own Javadoc.
+        // addFilterAfter(SecurityContextHolderFilter.class), not addFilterBefore any SAS-specific
+        // filter, so this runs as early as this chain allows regardless of exactly which SAS
+        // filters end up installed for a given request path.
+        .addFilterAfter(
+            new TenantAccountOnlySecurityContextFilter(), SecurityContextHolderFilter.class)
         .exceptionHandling(
             exceptions ->
                 exceptions.authenticationEntryPoint(new OrganizationLoginRedirectEntryPoint()));

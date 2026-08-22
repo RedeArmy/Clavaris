@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -118,6 +119,79 @@ class PlatformAccountDashboardIntegrationTest {
         .isEqualTo(302);
     assertThat(dashboardAfterReset.headers().firstValue("Location").orElseThrow())
         .contains("/platform/login");
+  }
+
+  // Security finding (SDE-III review, 2026-08-22), regression test for its fix: before this fix,
+  // both tiers shared the one app-wide SecurityContextRepository bean, and
+  // PlatformDashboardSecurityConfig only checked .anyRequest().authenticated() — a plain tenant
+  // Account's session, established entirely via /o/{organizationId}/login and never once touching
+  // /platform/login, satisfied that check and reached a fully functional dashboard. Confirmed live
+  // pre-fix (HTTP 200, real dashboard HTML); this test proves the fix rejects it instead.
+  @Test
+  void aTenantAccountSessionCannotReachThePlatformDashboard() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    registerTenantAccount(organizationId, "tenant@example.com", "the-tenant-password");
+    assertThat(
+            loginAsTenant(organizationId, "tenant@example.com", "the-tenant-password").statusCode())
+        .isEqualTo(302);
+
+    HttpResponse<Void> dashboardResponse = getDashboardDiscardingBody();
+
+    assertThat(dashboardResponse.statusCode())
+        .as("a tenant Account's session must not be treated as an authenticated PlatformAccount")
+        .isEqualTo(302);
+    assertThat(dashboardResponse.headers().firstValue("Location").orElseThrow())
+        .contains("/platform/login");
+  }
+
+  private void registerTenantAccount(UUID organizationId, String email, String password)
+      throws IOException, InterruptedException {
+    HttpResponse<String> form =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/register")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    String csrfToken = extractCsrfToken(form.body());
+
+    String body =
+        "_csrf="
+            + csrfToken
+            + "&email="
+            + email
+            + "&password="
+            + password
+            + "&confirmPassword="
+            + password;
+    HttpResponse<Void> response =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/register"))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(),
+            HttpResponse.BodyHandlers.discarding());
+    assertThat(response.statusCode()).isEqualTo(302);
+  }
+
+  private HttpResponse<Void> loginAsTenant(UUID organizationId, String email, String password)
+      throws IOException, InterruptedException {
+    HttpResponse<String> form =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/login")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    String csrfToken = extractCsrfToken(form.body());
+
+    String body = "_csrf=" + csrfToken + "&email=" + email + "&password=" + urlEncode(password);
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/login"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build(),
+        HttpResponse.BodyHandlers.discarding());
+  }
+
+  private HttpResponse<Void> getDashboardDiscardingBody() throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/platform/dashboard")).GET().build(),
+        HttpResponse.BodyHandlers.discarding());
   }
 
   private void registerPlatformAccount(String email, String password)

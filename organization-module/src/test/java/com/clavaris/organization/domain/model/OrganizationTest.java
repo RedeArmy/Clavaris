@@ -33,6 +33,26 @@ class OrganizationTest {
         .isThrownBy(() -> Organization.register(null, ownerPlatformAccountId));
   }
 
+  // Security finding (SDE-III review, 2026-08-22), regression test for its fix: matches the
+  // organizations.name column (varchar(255)) — before this, an over-length name reached the DB
+  // unchecked and surfaced as a raw DataIntegrityViolationException instead of a clean rejection.
+  @Test
+  void rejectsANameLongerThan255Characters() {
+    final String tooLong = "a".repeat(256);
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> Organization.register(tooLong, ownerPlatformAccountId));
+  }
+
+  @Test
+  void acceptsANameExactly255CharactersLong() {
+    final String exactly255 = "a".repeat(255);
+
+    final Organization organization = Organization.register(exactly255, ownerPlatformAccountId);
+
+    assertThat(organization.name()).isEqualTo(exactly255);
+  }
+
   @Test
   void reconstituteKeepsTheRealPersistedIdRatherThanMintingANewOne() {
     // Same bug class already caught once in JpaAccountRepository's own history (and again in

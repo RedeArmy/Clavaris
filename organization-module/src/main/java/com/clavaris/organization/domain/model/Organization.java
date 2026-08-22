@@ -28,6 +28,14 @@ import java.util.UUID;
 })
 public final class Organization {
 
+  // Matches the organizations.name column (varchar(255), V20260818170300 migration) — enforced
+  // here too, not only at the web-layer DTOs' own @Size(max = 255): security finding (SDE-III
+  // review, 2026-08-22) — before this, an over-length name passed Bean Validation entirely and
+  // only failed at the DB as an unhandled DataIntegrityViolationException (a raw 500), and any
+  // future caller of register()/reconstitute() that skips the web layer would have hit the same
+  // gap with no check at all.
+  private static final int MAX_NAME_LENGTH = 255;
+
   private final UUID id;
   private final String name;
   private final Instant createdAt;
@@ -39,7 +47,7 @@ public final class Organization {
       final Instant createdAt,
       final UUID ownerPlatformAccountId) {
     this.id = Objects.requireNonNull(id, "id must not be null");
-    this.name = requireNonBlank(name);
+    this.name = requireValidName(name);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.ownerPlatformAccountId =
         Objects.requireNonNull(ownerPlatformAccountId, "ownerPlatformAccountId must not be null");
@@ -61,9 +69,13 @@ public final class Organization {
     return new Organization(id, name, createdAt, ownerPlatformAccountId);
   }
 
-  private static String requireNonBlank(final String name) {
+  private static String requireValidName(final String name) {
     if (name == null || name.isBlank()) {
       throw new IllegalArgumentException("Organization name must not be blank");
+    }
+    if (name.length() > MAX_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "Organization name must not exceed " + MAX_NAME_LENGTH + " characters");
     }
     return name;
   }
