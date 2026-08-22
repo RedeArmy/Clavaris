@@ -4,6 +4,9 @@ import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyReg
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
+import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.validation.Valid;
@@ -36,8 +39,15 @@ public class RegisterAccountController {
 
   private final RegisterAccountUseCase useCase;
 
-  public RegisterAccountController(final RegisterAccountUseCase useCase) {
+  @SuppressWarnings("PMD.LongVariable") // names exactly what it is — TD-SEC-004's own fix.
+  private final RequestEmailVerificationUseCase requestEmailVerification;
+
+  public RegisterAccountController(
+      final RegisterAccountUseCase useCase,
+      @SuppressWarnings("PMD.LongVariable")
+          final RequestEmailVerificationUseCase requestEmailVerification) {
     this.useCase = useCase;
+    this.requestEmailVerification = requestEmailVerification;
   }
 
   @GetMapping
@@ -69,10 +79,14 @@ public class RegisterAccountController {
       return FORM_VIEW;
     }
 
+    final AccountId accountId;
     try {
-      useCase.handle(
-          new RegisterAccountCommand(
-              new OrganizationId(organizationId), new Email(form.getEmail()), form.getPassword()));
+      accountId =
+          useCase.handle(
+              new RegisterAccountCommand(
+                  new OrganizationId(organizationId),
+                  new Email(form.getEmail()),
+                  form.getPassword()));
     } catch (EmailAlreadyRegisteredException _) {
       // Never leaks the low-level exception message (which includes the raw organizationId
       // UUID) to the rendered page — a generic, field-scoped error only.
@@ -84,6 +98,12 @@ public class RegisterAccountController {
           "password", "password.tooWeak", "Password does not meet the minimum requirements");
       return FORM_VIEW;
     }
+
+    // TD-SEC-004: this is the fix — a real send, triggered directly from the request that just
+    // created the account, not left to an outbox row nothing drains yet (AccountRegisteredEvent's
+    // own Javadoc documents that this is a deliberate divergence from its "async via outbox"
+    // language, for exactly that reason).
+    requestEmailVerification.handle(new RequestEmailVerificationCommand(accountId));
 
     return "redirect:/o/" + organizationId + "/register/pending-verification";
   }
