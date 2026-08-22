@@ -66,9 +66,10 @@ class RequestPlatformAccountEmailVerificationServiceTest {
   void rejectsAnUnknownPlatformAccountId() {
     PlatformAccountId unknownId = PlatformAccountId.newId();
     when(accounts.findById(unknownId)).thenReturn(Optional.empty());
+    RequestPlatformAccountEmailVerificationCommand command =
+        new RequestPlatformAccountEmailVerificationCommand(unknownId);
 
     assertThatExceptionOfType(UnknownPlatformAccountException.class)
-        .isThrownBy(
-            () -> service.handle(new RequestPlatformAccountEmailVerificationCommand(unknownId)));
+        .isThrownBy(() -> service.handle(command));
   }
 }

@@ -73,11 +73,11 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
 
   @Test
   void rejectsAWeakNewPasswordBeforeConsumingTheToken() {
+    ConfirmPlatformAccountPasswordResetCommand command =
+        new ConfirmPlatformAccountPasswordResetCommand("any-token", "weak");
+
     assertThatExceptionOfType(WeakPasswordException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new ConfirmPlatformAccountPasswordResetCommand("any-token", "weak")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).findByTokenHash(any());
     verify(sessionRevoker, never()).revokeAllSessionsFor(any());
@@ -86,13 +86,11 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
   @Test
   void rejectsAnUnknownToken() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    ConfirmPlatformAccountPasswordResetCommand command =
+        new ConfirmPlatformAccountPasswordResetCommand("garbage", "a-Str0ng-Password!");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new ConfirmPlatformAccountPasswordResetCommand(
-                        "garbage", "a-Str0ng-Password!")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
     verify(sessionRevoker, never()).revokeAllSessionsFor(any());
@@ -108,13 +106,11 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plusSeconds(1800));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmPlatformAccountPasswordResetCommand command =
+        new ConfirmPlatformAccountPasswordResetCommand(rawToken, "a-Str0ng-Password!");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new ConfirmPlatformAccountPasswordResetCommand(
-                        rawToken, "a-Str0ng-Password!")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }

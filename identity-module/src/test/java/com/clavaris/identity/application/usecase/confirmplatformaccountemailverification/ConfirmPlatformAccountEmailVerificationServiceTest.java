@@ -58,10 +58,11 @@ class ConfirmPlatformAccountEmailVerificationServiceTest {
   @Test
   void rejectsAnUnknownToken() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    ConfirmPlatformAccountEmailVerificationCommand command =
+        new ConfirmPlatformAccountEmailVerificationCommand("garbage");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmPlatformAccountEmailVerificationCommand("garbage")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -76,10 +77,11 @@ class ConfirmPlatformAccountEmailVerificationServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plusSeconds(3600));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmPlatformAccountEmailVerificationCommand command =
+        new ConfirmPlatformAccountEmailVerificationCommand(rawToken);
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmPlatformAccountEmailVerificationCommand(rawToken)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }

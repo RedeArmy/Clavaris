@@ -7,8 +7,11 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccount;
+import com.clavaris.identity.domain.model.PlatformAccountId;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,12 +54,11 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
   @Test
   void rejectsAnUnknownEmail() {
     when(accounts.findByEmail(email)).thenReturn(Optional.empty());
+    AuthenticatePlatformAccountWithPasswordCommand command =
+        new AuthenticatePlatformAccountWithPasswordCommand(email, RAW_PASSWORD);
 
     assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticatePlatformAccountWithPasswordCommand(email, RAW_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -64,11 +66,36 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
     PlatformAccount account = accountWithCredential();
     when(accounts.findByEmail(email)).thenReturn(Optional.of(account));
     when(verifier.matches("wrong-password", "stored-hash")).thenReturn(false);
+    AuthenticatePlatformAccountWithPasswordCommand command =
+        new AuthenticatePlatformAccountWithPasswordCommand(email, "wrong-password");
 
     assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticatePlatformAccountWithPasswordCommand(email, "wrong-password")));
+        .isThrownBy(() -> service.handle(command));
+  }
+
+  @Test
+  void rejectsASuspendedAccountEvenWithTheCorrectPassword() {
+    PlatformAccount account =
+        PlatformAccount.reconstitute(
+            PlatformAccountId.newId(), email, Instant.now(), null, AccountStatus.SUSPENDED, null);
+    when(accounts.findByEmail(email)).thenReturn(Optional.of(account));
+    AuthenticatePlatformAccountWithPasswordCommand command =
+        new AuthenticatePlatformAccountWithPasswordCommand(email, RAW_PASSWORD);
+
+    assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
+        .isThrownBy(() -> service.handle(command));
+  }
+
+  @Test
+  void rejectsAnAccountWithNoPasswordCredentialAttached() {
+    PlatformAccount account =
+        PlatformAccount.reconstitute(
+            PlatformAccountId.newId(), email, Instant.now(), null, AccountStatus.ACTIVE, null);
+    when(accounts.findByEmail(email)).thenReturn(Optional.of(account));
+    AuthenticatePlatformAccountWithPasswordCommand command =
+        new AuthenticatePlatformAccountWithPasswordCommand(email, RAW_PASSWORD);
+
+    assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
+        .isThrownBy(() -> service.handle(command));
   }
 }
