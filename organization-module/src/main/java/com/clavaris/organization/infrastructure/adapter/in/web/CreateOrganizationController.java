@@ -37,7 +37,8 @@ class CreateOrganizationController {
   /* package */ ResponseEntity<CreateOrganizationResponse> create(
       @Valid @RequestBody final CreateOrganizationRequest request) {
     final CreateOrganizationResult result =
-        useCase.handle(new CreateOrganizationCommand(request.name()));
+        useCase.handle(
+            new CreateOrganizationCommand(request.name(), request.ownerPlatformAccountId()));
     return ResponseEntity.status(HttpStatus.CREATED).body(CreateOrganizationResponse.from(result));
   }
 }

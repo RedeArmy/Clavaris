@@ -23,14 +23,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- CreateOrganizationController (infrastructure/adapter/in/web) — the only REST controller
-             in this module so far. -->
+        <!-- CreateOrganizationController (infrastructure/adapter/in/web) — the REST controller;
+             PlatformOrganizationDashboardController (ADR-0012) is the Thymeleaf one, below. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- @NotBlank on CreateOrganizationRequest.name — starter-web alone doesn't pull in a
-             Bean Validation implementation (Hibernate Validator) since Spring Boot 3. -->
+        <!-- ADR-0012: PlatformOrganizationDashboardController's own hosted UI — same "server-side
+             rendered, not a SPA" convention as identity-module's own login/register pages. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!-- @NotBlank on CreateOrganizationRequest.name/CreateOrganizationForm.name — starter-web
+             alone doesn't pull in a Bean Validation implementation (Hibernate Validator) since
+             Spring Boot 3. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>

@@ -83,6 +83,7 @@ classDiagram
 - **Issuer** — ADR-0010 §5.1: each `Organization`'s issuer is `{clavarisBaseUrl}/o/{organizationId}`, path-based (not subdomain), resolved natively by Spring Authorization Server's per-request issuer support (ADR-0003). Every token's `iss` claim, and every `OAuthClient`'s discovery URL, is scoped under its own Organization's path.
 - **Key rotation (v1 scope)** — ADR-0010 §5.2: a manually-triggered, audited management-API operation per Organization (not a scheduler-driven job in v1) generates a new key and retires the previous one with overlap, same guarantee as `SigningKey`'s own invariant above, sized for a solo-developer-operated handful of tenants. Unattended scheduled rotation is v1.1.
 - **`PlatformSigningKey`** — ADR-0010 (Organization provisioning): a single, structurally separate key set signing tokens for the platform issuer only (`client-registry-module` §4a's `PlatformClient`), never for any tenant's `Account`. Kept as its own small table rather than a nullable `organizationId` on `SigningKey`, for the same reason `PlatformClient` is its own table — a forgotten null-check is a worse risk than one extra table. Same overlap-rotation guarantee as `SigningKey`.
+- **`PlatformAccount`** — ADR-0012: a human, self-service identity at the platform tier, owning zero or more `Organization`s (`organization-module`'s own `Organization.ownerPlatformAccountId`). Structurally parallel to `Account` (always scoped to one `Organization`) and to `PlatformClient` (a machine credential, belongs to no `Organization`) — three deliberately distinct identity types, never a shared type with an optional field. Has its own `PlatformPasswordCredential`/`PlatformVerificationToken` (mirroring `PasswordCredential`/`VerificationToken` exactly, minus any `Organization` scoping — `email` is globally unique here, unlike `accounts.(organization_id, email)`). Authenticates via a plain session (`/platform/login`), never an OAuth token — no `PlatformSession`/`PlatformRefreshToken` table exists; BR-ID-04's "revoke on reset" equivalent is enforced through Spring Security's own `SessionRegistry`, not a domain-level cascade.
 
 ## 3. `organization-module` — core entities
 
@@ -94,6 +95,7 @@ classDiagram
         +UUID id
         +String name
         +Instant createdAt
+        +UUID ownerPlatformAccountId
     }
     class RateLimitPolicy {
         +UUID id
@@ -133,6 +135,7 @@ classDiagram
 ```
 
 - **`Organization`** — ADR-0010: the tenant isolation boundary. One row per consuming system; owns a fully independent pool of `identity-module` `Account`s (§2) and of `client-registry-module` `OAuthClient`s (§4), its own `SigningKey`/JWKS (§2), and its own rate-limit budget. Organizations are mutually exclusive by construction — there is no query path from one Organization's data into another's.
+- **`Organization.ownerPlatformAccountId`** — ADR-0012: mandatory; exactly one owning `identity-module` `PlatformAccount` (§2) per Organization, a plain `UUID` (not a real foreign key — organization-module never depends on identity-module, same deliberate cross-module-FK gap already recorded on `accounts.organization_id`). One `PlatformAccount` may own many Organizations; no multi-owner model in v1.
 - **`RateLimitPolicy`** — ADR-0010 §6.2: **capacity layer only** (noisy-neighbor protection), an optional one-to-one override of the system-default per-`Organization` aggregate request ceiling. Absence of a row means "use the system default," never "unlimited," and no policy can ever exceed a hard system-wide cap. **v1: operator-managed only** — no self-service tenant editing yet, matching manual `OAuthClient` registration (`prd-mvp.md` §2.2); self-service arrives in v1.1 gated on audit logging of changes. Enforcement bucket keys in Redis are namespaced by `organization_id`.
 - **Anti-abuse layer (ADR-0010 §6.1, not a stored entity)** — fixed, system-defined thresholds keyed by `(organization_id, account_or_ip_identifier)`, applied uniformly to every Organization and never tenant-configurable, even in v1.1. This is the actual credential-stuffing defense BR-ID-06 exists for; `RateLimitPolicy` above governs capacity, not this.
 - **`Workspace.organizationId`** — mandatory; a Workspace always belongs to exactly one Organization. Renamed from the pre-ADR-0010 `Organization` entity — same semantics (a company/team grouping inside one consumer's usage), different name to avoid colliding with the new tenant-boundary meaning of "Organization."

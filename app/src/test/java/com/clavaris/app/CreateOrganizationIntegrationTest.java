@@ -54,8 +54,10 @@ class CreateOrganizationIntegrationTest {
   @Test
   void createsAnOrganizationWithAnActiveSigningKeyInTheSameOperation() throws Exception {
     String accessToken = requestPlatformAccessToken();
+    UUID ownerPlatformAccountId = UUID.randomUUID();
 
-    HttpResponse<String> response = createOrganization(accessToken, "JobSeeker");
+    HttpResponse<String> response =
+        createOrganization(accessToken, "JobSeeker", ownerPlatformAccountId);
     assertThat(response.statusCode()).isEqualTo(201);
 
     JsonNode body = objectMapper.readTree(response.body());
@@ -74,10 +76,12 @@ class CreateOrganizationIntegrationTest {
     // codebase to check for explicitly, not assume away).
     assertThat(
             jdbcTemplate.queryForObject(
-                "select count(*) from organizations where id = ? and name = ?",
+                "select count(*) from organizations"
+                    + " where id = ? and name = ? and owner_platform_account_id = ?",
                 Integer.class,
                 organizationId,
-                "JobSeeker"))
+                "JobSeeker",
+                ownerPlatformAccountId))
         .isEqualTo(1);
     assertThat(
             jdbcTemplate.queryForObject(
@@ -104,7 +108,22 @@ class CreateOrganizationIntegrationTest {
   void rejectsABlankOrganizationName() throws Exception {
     String accessToken = requestPlatformAccessToken();
 
-    HttpResponse<String> response = createOrganization(accessToken, "");
+    HttpResponse<String> response = createOrganization(accessToken, "", UUID.randomUUID());
+
+    assertThat(response.statusCode()).isEqualTo(400);
+  }
+
+  @Test
+  void rejectsAMissingOwnerPlatformAccountId() throws Exception {
+    String accessToken = requestPlatformAccessToken();
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/api/v1/admin/organizations"))
+            .header("Authorization", "Bearer " + accessToken)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"NoOwner\"}"))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
     assertThat(response.statusCode()).isEqualTo(400);
   }
@@ -125,13 +144,20 @@ class CreateOrganizationIntegrationTest {
     return objectMapper.readTree(response.body()).get("access_token").asString();
   }
 
-  private HttpResponse<String> createOrganization(String accessToken, String name)
+  private HttpResponse<String> createOrganization(
+      String accessToken, String name, UUID ownerPlatformAccountId)
       throws IOException, InterruptedException {
     HttpRequest request =
         HttpRequest.newBuilder(baseUri("/api/v1/admin/organizations"))
             .header("Authorization", "Bearer " + accessToken)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "{\"name\":\""
+                        + name
+                        + "\",\"ownerPlatformAccountId\":\""
+                        + ownerPlatformAccountId
+                        + "\"}"))
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }

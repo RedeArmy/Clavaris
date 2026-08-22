@@ -13,6 +13,9 @@ erDiagram
     ORGANIZATIONS ||--o{ SIGNING_KEYS : "isolates (ADR-0010)"
     ORGANIZATIONS ||--o| RATE_LIMIT_POLICIES : "overrides default (ADR-0010)"
     ORGANIZATIONS ||--o{ WORKSPACES : contains
+    PLATFORM_ACCOUNTS ||--o{ ORGANIZATIONS : "owns (ADR-0012)"
+    PLATFORM_ACCOUNTS ||--o{ PLATFORM_PASSWORD_CREDENTIALS : has
+    PLATFORM_ACCOUNTS ||--o{ PLATFORM_VERIFICATION_TOKENS : requests
     ACCOUNTS ||--o{ PASSWORD_CREDENTIALS : has
     ACCOUNTS ||--o{ SOCIAL_IDENTITIES : links
     ACCOUNTS ||--o{ SESSIONS : opens
@@ -103,10 +106,32 @@ erDiagram
         timestamptz expires_at
         timestamptz consumed_at
     }
+    PLATFORM_ACCOUNTS {
+        uuid id PK
+        varchar email UK
+        timestamptz email_verified_at
+        varchar status
+        timestamptz created_at
+    }
+    PLATFORM_PASSWORD_CREDENTIALS {
+        uuid id PK
+        uuid platform_account_id FK
+        varchar password_hash
+        timestamptz updated_at
+    }
+    PLATFORM_VERIFICATION_TOKENS {
+        uuid id PK
+        uuid platform_account_id FK
+        varchar type
+        varchar token_hash UK
+        timestamptz expires_at
+        timestamptz consumed_at
+    }
     ORGANIZATIONS {
         uuid id PK
         varchar name
         timestamptz created_at
+        uuid owner_platform_account_id
     }
     WORKSPACES {
         uuid id PK
@@ -216,6 +241,8 @@ erDiagram
 
 - **`accounts.organization_id`** — ADR-0010: mandatory FK to `organizations`, the tenant isolation boundary. `accounts.email` is **no longer** globally unique — uniqueness is `(organization_id, email)` (§3); the same email may exist as unrelated `Account` rows in different organizations. `status` is an enum (`ACTIVE`, `SUSPENDED`, `DELETED` — deletion per BR-DATA-03 is a hard delete in v1, so a `DELETED` status is transitional at most, present mainly for audit-log correlation before physical removal completes).
 - **`organizations`** — ADR-0010: one row per consuming system (tenant isolation boundary), not to be confused with `workspaces` below. Owns its own isolated `accounts` and `oauth_clients`.
+- **`organizations.owner_platform_account_id`** — ADR-0012: mandatory, the owning `platform_accounts` row. Plain `uuid`, no `REFERENCES` constraint — organization-module and identity-module stay schema-independent, same deliberate gap already recorded on `accounts.organization_id`.
+- **`platform_accounts`**/**`platform_password_credentials`**/**`platform_verification_tokens`** — ADR-0012: mirror `accounts`/`password_credentials`/`verification_tokens` exactly, minus any `organization_id` scoping — `platform_accounts.email` is globally unique (no Organization to scope it by). No `platform_sessions`/`platform_refresh_tokens` table exists: a `PlatformAccount` authenticates via a plain `HttpSession`, never an OAuth token, so there is nothing here for those tables to model.
 - **`workspaces`**, **`workspace_memberships`**, **`workspace_invitations`** — ADR-0010: renamed from the pre-ADR-0010 `organizations`/`memberships`/`invitations` tables (same "company/team grouping" semantics, renamed to free up "organization" for the new tenant-isolation meaning). `workspaces.organization_id` is mandatory — a workspace always belongs to exactly one tenant, and its memberships can only reference accounts already confined to that same tenant.
 - **`password_credentials`**, **`social_identities`** — deliberately separate tables from `accounts`, never a nullable `password_hash` column bolted onto `accounts` — keeps BR-ID-02 (multiple auth methods, never zero) a natural query (`COUNT` across both tables) rather than a null-check special case.
 - **`sessions.scopes`** — BR-ID-03, real (not placeholder) shape: `text` (JSON array, same convention as `oauth_clients.allowed_scopes`), fixed at open time — RFC 6749 §6 forbids a refresh grant from ever widening scope beyond what the original authorization actually granted, so every `refresh_tokens` row in this session's chain is validated against this same, unchanging set. Replaces this document's original placeholder `user_agent` column — no use case populates one yet (no "list your active sessions/devices" feature exists); add it, with the real HTTP plumbing behind it, only once one does.

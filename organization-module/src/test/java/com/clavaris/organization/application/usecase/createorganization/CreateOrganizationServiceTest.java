@@ -30,7 +30,7 @@ class CreateOrganizationServiceTest {
         .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
 
     final CreateOrganizationResult result =
-        service.handle(new CreateOrganizationCommand("JobSeeker"));
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID()));
 
     assertThat(result.organization().name()).isEqualTo("JobSeeker");
     verify(organizations).save(result.organization());
@@ -45,7 +45,7 @@ class CreateOrganizationServiceTest {
         .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
 
     final CreateOrganizationResult result =
-        service.handle(new CreateOrganizationCommand("JobSeeker"));
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID()));
 
     verify(keyProvisioner).provisionFor(result.organization().id());
     assertThat(result.signingKey().kid()).isEqualTo("a-kid");

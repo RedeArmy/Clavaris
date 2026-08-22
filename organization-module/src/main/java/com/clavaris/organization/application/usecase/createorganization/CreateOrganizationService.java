@@ -27,7 +27,8 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
   @Override
   @Transactional
   public CreateOrganizationResult handle(final CreateOrganizationCommand command) {
-    final Organization organization = Organization.register(command.name());
+    final Organization organization =
+        Organization.register(command.name(), command.ownerPlatformAccountId());
     organizations.save(organization);
 
     final SigningKeyProvisioner.ProvisionedSigningKey signingKey =
