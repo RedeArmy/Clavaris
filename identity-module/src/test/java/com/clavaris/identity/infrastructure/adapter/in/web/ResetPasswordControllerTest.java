@@ -1,6 +1,5 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -101,7 +100,7 @@ class ResetPasswordControllerTest {
   void anInvalidOrExpiredTokenRendersTheInvalidLinkPage() throws Exception {
     doThrow(new InvalidVerificationTokenException())
         .when(useCase)
-        .handle(eq(new ConfirmPasswordResetCommand("bad-token", "a-Str0ng-Password!")));
+        .handle(new ConfirmPasswordResetCommand("bad-token", "a-Str0ng-Password!"));
 
     mockMvc
         .perform(
@@ -117,7 +116,7 @@ class ResetPasswordControllerTest {
   void aWeakPasswordRejectedByTheUseCaseRerendersTheFormWithAFieldError() throws Exception {
     doThrow(new WeakPasswordException())
         .when(useCase)
-        .handle(eq(new ConfirmPasswordResetCommand("a-token", "aaaaaaaa")));
+        .handle(new ConfirmPasswordResetCommand("a-token", "aaaaaaaa"));
 
     mockMvc
         .perform(

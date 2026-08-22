@@ -67,9 +67,10 @@ class ConfirmEmailVerificationServiceTest {
   @Test
   void rejectsAnUnknownToken() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    ConfirmEmailVerificationCommand command = new ConfirmEmailVerificationCommand("garbage");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailVerificationCommand("garbage")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
     verify(outbox, never()).write(any(), any(), any());
@@ -86,9 +87,10 @@ class ConfirmEmailVerificationServiceTest {
             Instant.now().plusSeconds(3600));
     token.consume();
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmEmailVerificationCommand command = new ConfirmEmailVerificationCommand(rawToken);
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailVerificationCommand(rawToken)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -101,9 +103,10 @@ class ConfirmEmailVerificationServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmEmailVerificationCommand command = new ConfirmEmailVerificationCommand(rawToken);
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailVerificationCommand(rawToken)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -116,9 +119,10 @@ class ConfirmEmailVerificationServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plusSeconds(3600));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmEmailVerificationCommand command = new ConfirmEmailVerificationCommand(rawToken);
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailVerificationCommand(rawToken)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }

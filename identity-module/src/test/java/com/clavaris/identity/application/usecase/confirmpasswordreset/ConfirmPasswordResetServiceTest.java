@@ -93,8 +93,10 @@ class ConfirmPasswordResetServiceTest {
 
   @Test
   void rejectsAWeakNewPasswordBeforeConsumingTheToken() {
+    ConfirmPasswordResetCommand command = new ConfirmPasswordResetCommand("any-token", "weak");
+
     assertThatExceptionOfType(WeakPasswordException.class)
-        .isThrownBy(() -> service.handle(new ConfirmPasswordResetCommand("any-token", "weak")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).findByTokenHash(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
@@ -103,10 +105,11 @@ class ConfirmPasswordResetServiceTest {
   @Test
   void rejectsAnUnknownToken() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand("garbage", "a-Str0ng-Password!");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmPasswordResetCommand("garbage", "a-Str0ng-Password!")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
@@ -122,10 +125,11 @@ class ConfirmPasswordResetServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plusSeconds(1800));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -140,9 +144,10 @@ class ConfirmPasswordResetServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!");
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!")));
+        .isThrownBy(() -> service.handle(command));
   }
 }

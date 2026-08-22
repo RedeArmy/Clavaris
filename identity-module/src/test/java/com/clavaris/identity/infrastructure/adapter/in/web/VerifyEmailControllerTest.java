@@ -1,6 +1,5 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -67,7 +66,7 @@ class VerifyEmailControllerTest {
   void anInvalidTokenRendersTheInvalidLinkPage() throws Exception {
     doThrow(new InvalidVerificationTokenException())
         .when(useCase)
-        .handle(eq(new ConfirmEmailVerificationCommand("bad-token")));
+        .handle(new ConfirmEmailVerificationCommand("bad-token"));
 
     mockMvc
         .perform(

@@ -81,9 +81,10 @@ class RequestEmailVerificationServiceTest {
   void rejectsAnUnknownAccountId() {
     AccountId unknownId = new AccountId(UUID.randomUUID());
     when(accounts.findById(unknownId)).thenReturn(Optional.empty());
+    RequestEmailVerificationCommand command = new RequestEmailVerificationCommand(unknownId);
 
     assertThatExceptionOfType(UnknownAccountException.class)
-        .isThrownBy(() -> service.handle(new RequestEmailVerificationCommand(unknownId)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendEmailVerification(any(), any(), any());
