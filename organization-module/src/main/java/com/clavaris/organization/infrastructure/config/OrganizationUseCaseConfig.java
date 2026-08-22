@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.config;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationService;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
+import com.clavaris.organization.application.usecase.createorganization.PlatformAccountExistsChecker;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
@@ -24,10 +25,14 @@ class OrganizationUseCaseConfig {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
 
+  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ CreateOrganizationUseCase createOrganizationUseCase(
-      final OrganizationRepository organizations, final SigningKeyProvisioner keyProvisioner) {
-    return new CreateOrganizationService(organizations, keyProvisioner);
+      final OrganizationRepository organizations,
+      final SigningKeyProvisioner keyProvisioner,
+      final PlatformAccountExistsChecker platformAccountExistsChecker) {
+    return new CreateOrganizationService(
+        organizations, keyProvisioner, platformAccountExistsChecker);
   }
 
   @Bean

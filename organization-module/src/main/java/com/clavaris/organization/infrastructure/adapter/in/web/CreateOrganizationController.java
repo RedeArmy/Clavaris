@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationCommand;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
+import com.clavaris.organization.application.usecase.createorganization.PlatformAccountNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -28,17 +29,27 @@ class CreateOrganizationController {
     this.useCase = useCase;
   }
 
+  // Two exits (404 on a bogus ownerPlatformAccountId, 201 on success) is clearer here than forcing
+  // a single-return shape onto two genuinely different outcomes — same rationale as
+  // RegisterOAuthClientController's own suppression.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Create a new Organization (tenant isolation boundary, ADR-0010)")
   @ApiResponse(
       responseCode = "201",
       description =
           "Organization created; initial SigningKey generated and activated synchronously (BR-ORG-06)")
+  @ApiResponse(responseCode = "404", description = "No PlatformAccount exists with the given id")
   @PostMapping("/api/v1/admin/organizations")
   /* package */ ResponseEntity<CreateOrganizationResponse> create(
       @Valid @RequestBody final CreateOrganizationRequest request) {
-    final CreateOrganizationResult result =
-        useCase.handle(
-            new CreateOrganizationCommand(request.name(), request.ownerPlatformAccountId()));
+    final CreateOrganizationResult result;
+    try {
+      result =
+          useCase.handle(
+              new CreateOrganizationCommand(request.name(), request.ownerPlatformAccountId()));
+    } catch (final PlatformAccountNotFoundException _) {
+      return ResponseEntity.notFound().build();
+    }
     return ResponseEntity.status(HttpStatus.CREATED).body(CreateOrganizationResponse.from(result));
   }
 }

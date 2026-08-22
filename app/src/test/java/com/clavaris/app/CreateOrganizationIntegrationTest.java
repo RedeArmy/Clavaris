@@ -2,6 +2,9 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
+import com.clavaris.identity.domain.model.Email;
+import com.clavaris.identity.domain.model.PlatformAccount;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -47,6 +50,7 @@ class CreateOrganizationIntegrationTest {
   private int port;
 
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private PlatformAccountRepository platformAccounts;
 
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -54,7 +58,7 @@ class CreateOrganizationIntegrationTest {
   @Test
   void createsAnOrganizationWithAnActiveSigningKeyInTheSameOperation() throws Exception {
     String accessToken = requestPlatformAccessToken();
-    UUID ownerPlatformAccountId = UUID.randomUUID();
+    UUID ownerPlatformAccountId = registerAPlatformAccount();
 
     HttpResponse<String> response =
         createOrganization(accessToken, "JobSeeker", ownerPlatformAccountId);
@@ -113,6 +117,28 @@ class CreateOrganizationIntegrationTest {
     assertThat(response.statusCode()).isEqualTo(400);
   }
 
+  // Security finding (SDE-III review, 2026-08-22), regression test for its fix: before this fix,
+  // any UUID — real PlatformAccount or not — produced a real Organization with a real signing key.
+  // The migration's own comment claimed this was "enforced at the application layer only"; this
+  // proves that layer now actually exists, against real code, not a mocked assumption.
+  @Test
+  void rejectsCreationWithAnOwnerPlatformAccountIdThatDoesNotExist() throws Exception {
+    String accessToken = requestPlatformAccessToken();
+    UUID nonExistentPlatformAccountId = UUID.randomUUID();
+
+    HttpResponse<String> response =
+        createOrganization(accessToken, "Ghost Owner Co", nonExistentPlatformAccountId);
+
+    assertThat(response.statusCode()).isEqualTo(404);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from organizations where owner_platform_account_id = ?",
+                Integer.class,
+                nonExistentPlatformAccountId))
+        .as("no Organization row must exist for a non-existent owner, not even a partial one")
+        .isZero();
+  }
+
   @Test
   void rejectsAMissingOwnerPlatformAccountId() throws Exception {
     String accessToken = requestPlatformAccessToken();
@@ -164,5 +190,19 @@ class CreateOrganizationIntegrationTest {
 
   private URI baseUri(String path) {
     return URI.create("http://localhost:" + port + path);
+  }
+
+  // A real PlatformAccount row, written directly through the repository rather than the full
+  // /platform/register + /platform/verify-email HTTP flow — this suite only needs the row to
+  // exist, not to exercise registration itself (a separate suite's own job).
+  private UUID registerAPlatformAccount() {
+    PlatformAccount account =
+        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
+    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
+    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
+    // never logs in as this account, only needs its row to exist for the owner check.
+    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
+    platformAccounts.save(account);
+    return account.id().value();
   }
 }

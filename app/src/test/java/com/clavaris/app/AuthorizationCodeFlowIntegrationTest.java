@@ -6,6 +6,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.clavaris.app.support.TestMailSenderConfig;
+import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
+import com.clavaris.identity.domain.model.Email;
+import com.clavaris.identity.domain.model.PlatformAccount;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -83,6 +87,8 @@ class AuthorizationCodeFlowIntegrationTest {
 
   @Value("${local.server.port}")
   private int port;
+
+  @Autowired private PlatformAccountRepository platformAccounts;
 
   // One CookieManager for the whole test — the session established while fetching the login
   // page's CSRF token, and the one Spring Security persists the authenticated SecurityContext
@@ -283,11 +289,25 @@ class AuthorizationCodeFlowIntegrationTest {
                     "{\"name\":\""
                         + name
                         + "\",\"ownerPlatformAccountId\":\""
-                        + UUID.randomUUID()
+                        + registerAPlatformAccount()
                         + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
+  }
+
+  // A real PlatformAccount row, written directly through the repository rather than the full
+  // /platform/register + /platform/verify-email HTTP flow — CreateOrganizationService (security
+  // finding, SDE-III review, 2026-08-22) now validates ownerPlatformAccountId against a real row.
+  private UUID registerAPlatformAccount() {
+    PlatformAccount account =
+        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
+    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
+    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
+    // never logs in as this account, only needs its row to exist for the owner check.
+    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
+    platformAccounts.save(account);
+    return account.id().value();
   }
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)

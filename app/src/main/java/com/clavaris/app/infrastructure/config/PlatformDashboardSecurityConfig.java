@@ -78,10 +78,34 @@ class PlatformDashboardSecurityConfig {
                         "/platform/reset-password/success")
                     .permitAll()
                     .anyRequest()
-                    .authenticated())
+                    // Security finding (SDE-III review, 2026-08-22): this was `.authenticated()`,
+                    // which only checks "is there any SecurityContext" — since app-wide there is
+                    // exactly one SecurityContextRepository bean
+                    // (OrganizationAuthorizationServerConfig.securityContextRepository()), shared
+                    // by both this chain's SpringSecurityPlatformAuthenticatedSessionEstablisher
+                    // and the tenant tier's SpringSecurityAuthenticatedSessionEstablisher, a plain
+                    // tenant Account's session satisfied it too. Confirmed live before this fix: a
+                    // tenant Account, logged in only via /o/{organizationId}/login, could GET (and
+                    // POST to) /platform/dashboard and successfully create an Organization owned by
+                    // its own AccountId masquerading as a PlatformAccountId. hasAuthority, not
+                    // authenticated(), is what actually enforces "this session belongs to a
+                    // PlatformAccount" — the authority SpringSecurityPlatformAuthenticatedSession
+                    // Establisher grants and no tenant session ever carries.
+                    .hasAuthority("ROLE_PLATFORM_ACCOUNT"))
         .exceptionHandling(
             exceptions ->
-                exceptions.authenticationEntryPoint(new PlatformLoginRedirectEntryPoint()));
+                exceptions
+                    .authenticationEntryPoint(new PlatformLoginRedirectEntryPoint())
+                    // hasAuthority (unlike authenticated()) rejects an authenticated-but-wrong-tier
+                    // session via AccessDeniedException, not AuthenticationException — that path
+                    // only reaches authenticationEntryPoint above for the anonymous case. Without
+                    // this, a tenant session hitting /platform/dashboard would now get Spring
+                    // Security's default whitelabel 403 instead of a clean redirect; from this
+                    // session's own point of view it is simply not logged in to this tier, so it
+                    // gets sent to the same place an anonymous visitor would.
+                    .accessDeniedHandler(
+                        (request, response, _) ->
+                            response.sendRedirect(request.getContextPath() + "/platform/login")));
     return http.build();
   }
 }

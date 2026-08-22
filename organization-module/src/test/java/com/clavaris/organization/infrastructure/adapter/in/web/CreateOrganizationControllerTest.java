@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
+import com.clavaris.organization.application.usecase.createorganization.PlatformAccountNotFoundException;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
 import com.clavaris.organization.domain.model.Organization;
 import java.util.UUID;
@@ -70,6 +71,26 @@ class CreateOrganizationControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  // Security finding (SDE-III review, 2026-08-22), regression test for its fix: an over-length
+  // name must be rejected by Bean Validation (400), never reach the use case and risk an unhandled
+  // DataIntegrityViolationException (a raw 500) at the DB's own varchar(255) boundary.
+  @Test
+  void rejectsANameLongerThan255CharactersWithoutEverCallingTheUseCase() throws Exception {
+    String tooLong = "a".repeat(256);
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\""
+                        + tooLong
+                        + "\",\"ownerPlatformAccountId\":\""
+                        + UUID.randomUUID()
+                        + "\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
   @Test
   void rejectsAMissingOwnerPlatformAccountIdWithoutEverCallingTheUseCase() throws Exception {
     mockMvc
@@ -78,5 +99,23 @@ class CreateOrganizationControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"JobSeeker\"}"))
         .andExpect(status().isBadRequest());
+  }
+
+  // Security finding (SDE-III review, 2026-08-22), regression test for its fix: the controller's
+  // own half of CreateOrganizationService's new existence check — a well-formed request naming a
+  // PlatformAccount that doesn't exist must map to 404, not a raw 500 or a silently-created row.
+  @Test
+  void returns404WhenTheOwnerPlatformAccountDoesNotExist() throws Exception {
+    when(useCase.handle(any())).thenThrow(new PlatformAccountNotFoundException(UUID.randomUUID()));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"JobSeeker\",\"ownerPlatformAccountId\":\""
+                        + UUID.randomUUID()
+                        + "\"}"))
+        .andExpect(status().isNotFound());
   }
 }

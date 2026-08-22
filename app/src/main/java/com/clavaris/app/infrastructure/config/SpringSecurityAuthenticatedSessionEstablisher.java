@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -84,6 +85,13 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
     // time this method returned List.of()). PASSWORD_AUTHORITY names the mechanism actually used —
     // AuthenticateWithPasswordUseCase — Instant.now() is genuinely when it happened, not a filler
     // value.
+    // ROLE_ACCOUNT, alongside the FactorGrantedAuthority above: security finding (SDE-III review,
+    // 2026-08-22) — before this, a tenant Account's authentication carried no tier marker at all,
+    // only "how" it authenticated (PASSWORD_AUTHORITY), which is exactly what let this same
+    // Authentication be mistaken for a PlatformAccount's by anything checking authorities rather
+    // than authority-agnostic authenticated(). ROLE_ACCOUNT is the tenant-tier mirror of
+    // SpringSecurityPlatformAuthenticatedSessionEstablisher's own ROLE_PLATFORM_ACCOUNT — see
+    // TenantAccountOnlySecurityContextFilter, the chain that actually checks it.
     final Authentication authentication =
         UsernamePasswordAuthenticationToken.authenticated(
             accountId.toString(),
@@ -91,7 +99,8 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
             List.of(
                 FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
                     .issuedAt(Instant.now())
-                    .build()));
+                    .build(),
+                new SimpleGrantedAuthority("ROLE_ACCOUNT")));
     final SecurityContext context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(authentication);
     SecurityContextHolder.setContext(context);

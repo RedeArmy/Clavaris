@@ -2,6 +2,9 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
+import com.clavaris.identity.domain.model.Email;
+import com.clavaris.identity.domain.model.PlatformAccount;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -18,6 +21,7 @@ import java.text.ParseException;
 import java.util.Base64;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -59,6 +63,8 @@ class OrganizationOidcIssuerIntegrationTest {
 
   @Value("${local.server.port}")
   private int port;
+
+  @Autowired private PlatformAccountRepository platformAccounts;
 
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -197,11 +203,25 @@ class OrganizationOidcIssuerIntegrationTest {
                     "{\"name\":\""
                         + name
                         + "\",\"ownerPlatformAccountId\":\""
-                        + UUID.randomUUID()
+                        + registerAPlatformAccount()
                         + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
+  }
+
+  // A real PlatformAccount row, written directly through the repository rather than the full
+  // /platform/register + /platform/verify-email HTTP flow — CreateOrganizationService (security
+  // finding, SDE-III review, 2026-08-22) now validates ownerPlatformAccountId against a real row.
+  private UUID registerAPlatformAccount() {
+    PlatformAccount account =
+        PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
+    // JpaPlatformAccountRepository.save() rejects the credential-less intermediate state
+    // PlatformAccount.register() itself allows — a real hash is irrelevant here, this suite
+    // never logs in as this account, only needs its row to exist for the owner check.
+    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
+    platformAccounts.save(account);
+    return account.id().value();
   }
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)
