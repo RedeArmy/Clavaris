@@ -8,8 +8,9 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Everything not matched by {@link PlatformAuthorizationServerConfig} (/oauth2/**), {@link
- * AdminApiSecurityConfig} (/api/v1/admin/**), or {@link OrganizationAuthorizationServerConfig}
- * (/o/*&#47;oauth2/**, /o/*&#47;.well-known/**, /o/*&#47;userinfo) — the hosted UI ({@code
+ * AdminApiSecurityConfig} (/api/v1/admin/**), {@link OrganizationAuthorizationServerConfig}
+ * (/o/*&#47;oauth2/**, /o/*&#47;.well-known/**, /o/*&#47;userinfo), or {@link
+ * PlatformDashboardSecurityConfig} (/platform/**) — the hosted UI ({@code
  * /o/{organizationId}/register}, RegisterAccount's own Thymeleaf form) and Actuator health checks.
  * Adding Spring Security to app's classpath for the first time (needed for the two OAuth2-specific
  * chains above) activates its autoconfiguration for the *whole* application by default — without
@@ -36,7 +37,7 @@ class DefaultSecurityConfig {
   }
 
   @Bean
-  @Order(4)
+  @Order(5)
   /* package */ SecurityFilterChain defaultSecurityFilterChain(final HttpSecurity http) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
     return http.build();

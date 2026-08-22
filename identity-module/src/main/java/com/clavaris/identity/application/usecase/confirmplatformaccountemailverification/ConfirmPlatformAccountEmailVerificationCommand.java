@@ -1,0 +1,3 @@
+package com.clavaris.identity.application.usecase.confirmplatformaccountemailverification;
+
+public record ConfirmPlatformAccountEmailVerificationCommand(String presentedRawToken) {}
