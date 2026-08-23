@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.security;
 
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
+import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.security.KeyPair;
 import java.util.Map;
@@ -28,12 +29,13 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>This map/store holds at most one key pair per Organization at a time — a later call for the
  *       same {@link OrganizationId} (manual rotation, ADR-0010 §5.2) overwrites the previous entry
- *       immediately. The overlap requirement ("JWKS always exposes the previous key until every
- *       issued token under it has expired") is NOT yet satisfied by this class alone; real rotation
- *       support needs to retain retired keys until expiry, not just the metadata row {@code
- *       SigningKey.retire()} already tracks. Acceptable for {@code CreateOrganization} (a brand-new
- *       Organization has no previous key to overlap with) but must be closed before the rotation
- *       endpoint (`api-contract-overview.md` §3) goes live — tracked as TD-SEC-008.
+ *       immediately. That's fine for signing new tokens (which must always use the current key,
+ *       never a retired one), but JWKS <em>publishing</em> needs the overlap this cache alone can't
+ *       give it — closed (TD-SEC-008) not by changing this cache's shape, but by {@link
+ *       #keyPairForKid(String)} bypassing it entirely: {@link SigningKeyStore} already retains
+ *       every key it ever wrote, so a retired kid's material is still reachable directly, and
+ *       {@code OrganizationJwksPublishingSource} (app module) is what actually looks up every
+ *       still-in-window kid this way for the JWKS response.
  *   <li>Deliberately does NOT wire a per-Organization {@code SecurityFilterChain}/JWKS endpoint —
  *       that's the spike's Appendix A discovery-filter pattern, a separate slice ("don't build
  *       ahead of the use case that needs it"). This class only makes the key material exist and be
@@ -42,7 +44,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  */
 @Component
-public class OrganizationSigningKeyMaterialFactory {
+public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterialGenerator {
 
   private final Map<UUID, KeyPair> keyPairs = new ConcurrentHashMap<>();
   private final SigningKeyRepository signingKeys;
@@ -58,11 +60,24 @@ public class OrganizationSigningKeyMaterialFactory {
    * Generates and stores a brand-new key pair for {@code organizationId}, returning its {@code
    * kid}.
    */
+  @Override
   public String generateFor(final OrganizationId organizationId) {
     final String kid = UUID.randomUUID().toString();
     final KeyPair keyPair = keyStore.generate(kid);
     keyPairs.put(organizationId.value(), keyPair);
     return kid;
+  }
+
+  /**
+   * TD-SEC-008: looks up key material by {@code kid} directly, bypassing the per-Organization
+   * "current active key" cache entirely — the only way to reach a retired-but-still-in-the-JWKS-
+   * overlap-window key's material, since {@link #keyPairFor(OrganizationId)}'s cache holds at most
+   * one entry per Organization (the currently active one) by design. {@link SigningKeyStore} never
+   * deletes a key once written, so this works for any {@code kid} this process ever generated,
+   * active or retired alike.
+   */
+  public Optional<KeyPair> keyPairForKid(final String kid) {
+    return keyStore.find(kid);
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn") // early-return cache-hit path reads clearer than nesting

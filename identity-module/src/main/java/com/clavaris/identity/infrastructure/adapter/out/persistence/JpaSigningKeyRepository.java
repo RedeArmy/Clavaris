@@ -3,6 +3,8 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SigningKey;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -24,6 +26,14 @@ class JpaSigningKeyRepository implements SigningKeyRepository {
     return signingKeys
         .findFirstByOrganizationIdAndRetiredAtIsNull(organizationId.value())
         .map(this::toDomain);
+  }
+
+  @Override
+  public List<SigningKey> findActiveAndRetiredSince(
+      final OrganizationId organizationId, final Instant retiredAfter) {
+    return signingKeys.findActiveAndRetiredSince(organizationId.value(), retiredAfter).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   @Override

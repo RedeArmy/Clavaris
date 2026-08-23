@@ -24,6 +24,11 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 class AdminApiSecurityConfig {
 
+  // Spring Security's own fixed prefix for a JWT scope-derived GrantedAuthority — one constant,
+  // not five repeated literals that could silently drift apart (PMD.AvoidDuplicateLiterals).
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String SCOPE_AUTHORITY_PREFIX = "SCOPE_";
+
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ AdminApiSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
@@ -47,14 +52,27 @@ class AdminApiSecurityConfig {
                     // blanket platform-tier-only rule, matching the scope namespace
                     // PlatformScopes already reserves for this exact action.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations")
-                    .hasAuthority("SCOPE_" + PlatformScopes.ORGANIZATIONS_WRITE)
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ORGANIZATIONS_WRITE)
                     // ADR-0010 §6.2: tuning the capacity-layer ceiling is its own scope too, same
                     // defence-in-depth reasoning as Organization creation above — a platform
                     // token that can create Organizations doesn't automatically get to also
                     // change a running one's rate-limit ceiling.
                     .requestMatchers(
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/rate-limit-policy")
-                    .hasAuthority("SCOPE_" + PlatformScopes.RATE_LIMIT_POLICY_WRITE)
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.RATE_LIMIT_POLICY_WRITE)
+                    // TD-SEC-008/ADR-0010 §5.2: manually-triggered key rotation is its own scope
+                    // too, same defence-in-depth reasoning as the two rules above.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/organizations/*/signing-keys/rotate")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SIGNING_KEYS_ROTATE)
+                    // TD-SEC-018: rotating/revoking a PlatformClient — its own scopes too, same
+                    // defence-in-depth reasoning as every other admin-API rule above.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/platform-clients/*/rotate-secret")
+                    .hasAuthority(
+                        SCOPE_AUTHORITY_PREFIX + PlatformScopes.PLATFORM_CLIENTS_ROTATE_SECRET)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/platform-clients/*/revoke")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.PLATFORM_CLIENTS_REVOKE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

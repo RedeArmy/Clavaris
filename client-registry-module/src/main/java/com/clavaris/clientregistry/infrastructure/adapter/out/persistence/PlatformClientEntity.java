@@ -33,6 +33,9 @@ public class PlatformClientEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(nullable = false)
+  private boolean active;
+
   protected PlatformClientEntity() {}
 
   public PlatformClientEntity(
@@ -40,12 +43,14 @@ public class PlatformClientEntity {
       final String clientId,
       final String clientSecretHash,
       final String allowedScopes,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final boolean active) {
     this.id = id;
     this.clientId = clientId;
     this.clientSecretHash = clientSecretHash;
     this.allowedScopes = allowedScopes;
     this.createdAt = createdAt;
+    this.active = active;
   }
 
   public UUID getId() {
@@ -66,5 +71,9 @@ public class PlatformClientEntity {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public boolean isActive() {
+    return active;
   }
 }

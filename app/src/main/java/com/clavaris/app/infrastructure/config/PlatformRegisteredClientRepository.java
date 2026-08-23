@@ -48,6 +48,11 @@ class PlatformRegisteredClientRepository implements RegisteredClientRepository {
     // actually persists. The SPI's own null-for-not-found convention (mirrored by findByClientId
     // below) extends to a malformed id, same as "unknown client" — never an exception for a
     // not-found/malformed lookup, only for genuinely unsupported operations (save() above).
+    // Deliberately does NOT filter by active() here, unlike findByClientId below: this overload
+    // is what JdbcOAuth2AuthorizationService uses to reconstruct an ALREADY-ISSUED authorization
+    // row (e.g. to process /oauth2/revoke) — filtering it out for a now-revoked PlatformClient
+    // would break the ability to explicitly revoke that same client's own lingering tokens during
+    // an incident, the opposite of what revocation is for.
     try {
       return platformClients
           .findById(UUID.fromString(id))
@@ -58,9 +63,18 @@ class PlatformRegisteredClientRepository implements RegisteredClientRepository {
     }
   }
 
+  // TD-SEC-018: an inactive (revoked) PlatformClient must resolve to "not found," the SPI's own
+  // convention for "can't authenticate this" — same treatment findById above already gives one.
+  // This is what actually enforces DeactivatePlatformClientService's own consequence: the very
+  // next client_credentials attempt against a revoked client fails here, before Argon2 secret
+  // verification even runs.
   @Override
   public RegisteredClient findByClientId(final String clientId) {
-    return platformClients.findByClientId(clientId).map(this::toRegisteredClient).orElse(null);
+    return platformClients
+        .findByClientId(clientId)
+        .filter(PlatformClient::active)
+        .map(this::toRegisteredClient)
+        .orElse(null);
   }
 
   private RegisteredClient toRegisteredClient(final PlatformClient platformClient) {

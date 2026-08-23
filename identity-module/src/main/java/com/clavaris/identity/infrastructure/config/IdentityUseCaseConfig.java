@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyService;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyUseCase;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.PlatformSigningKeyRepository;
@@ -31,6 +32,9 @@ import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPas
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.RotateSigningKeyForOrganizationService;
+import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.RotateSigningKeyForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -85,6 +89,20 @@ class IdentityUseCaseConfig {
   /* package */ ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase(
       final SigningKeyRepository signingKeys) {
     return new ActivateSigningKeyForOrganizationService(signingKeys);
+  }
+
+  // TD-SEC-008: OrganizationSigningKeyMaterialFactory (infrastructure) already implements
+  // SigningKeyMaterialGenerator directly — Spring resolves this parameter to that same bean, no
+  // separate bridge class needed (unlike the cross-module CreateOrganizationSigningKeyBridge).
+  @Bean
+  /* package */ RotateSigningKeyForOrganizationUseCase rotateSigningKeyForOrganizationUseCase(
+      final SigningKeyRepository signingKeys,
+      final SigningKeyMaterialGenerator keyMaterial,
+      @SuppressWarnings("PMD.LongVariable")
+          final ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase,
+      final AuditEventRecorder auditEvents) {
+    return new RotateSigningKeyForOrganizationService(
+        signingKeys, keyMaterial, activateSigningKeyForOrganizationUseCase, auditEvents);
   }
 
   @Bean
