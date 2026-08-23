@@ -1,12 +1,17 @@
 package com.clavaris.app.infrastructure.config;
 
+import java.time.Duration;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 /**
@@ -51,10 +56,25 @@ class PlatformDashboardSecurityConfig {
     return new HttpSessionEventPublisher();
   }
 
+  // Descriptive @Value property names over PMD's default LongVariable threshold, same convention
+  // already used throughout this codebase (e.g. PlatformAuthorizationServerConfig's own
+  // tokenIssuanceLogger param) — a shortened identifier would only make this rule list harder to
+  // read.
+  @SuppressWarnings("PMD.LongVariable")
   @Bean
   @Order(4)
   /* package */ SecurityFilterChain platformDashboardSecurityFilterChain(
-      final HttpSecurity http, final SessionRegistry sessionRegistry) {
+      final HttpSecurity http,
+      final SessionRegistry sessionRegistry,
+      final RateLimiter rateLimiter,
+      @Value("${clavaris.rate-limit.login.per-account-limit:10}") final int loginPerAccountLimit,
+      @Value("${clavaris.rate-limit.login.per-ip-limit:30}") final int loginPerIpLimit,
+      @Value("${clavaris.rate-limit.platform-register.per-ip-limit:10}")
+          final int registerPerIpLimit,
+      @Value("${clavaris.rate-limit.platform-forgot-password.per-ip-limit:10}")
+          final int forgotPasswordPerIpLimit,
+      @Value("${clavaris.rate-limit.platform-create-organization.per-account-limit:10}")
+          final int createOrganizationPerAccountLimit) {
     http.securityMatcher("/platform/**")
         .sessionManagement(
             session ->
@@ -111,7 +131,67 @@ class PlatformDashboardSecurityConfig {
                     // gets sent to the same place an anonymous visitor would.
                     .accessDeniedHandler(
                         (request, response, _) ->
-                            response.sendRedirect(request.getContextPath() + PLATFORM_LOGIN_PATH)));
+                            response.sendRedirect(request.getContextPath() + PLATFORM_LOGIN_PATH)))
+        // ADR-0010 §6.1/BR-ID-06 widened (TD-SEC-001, SDE-III review, 2026-08-22): ADR-0010 itself
+        // predates ADR-0012, so its "login (/oauth2/token, password login)" wording never
+        // literally named this tier's own equivalents — the same anti-abuse reasoning obviously
+        // applies to them, and TD-SEC-001 already named exactly these endpoints as the widened
+        // gap this closes. No capacity-layer filter here — §6.2 is per-Organization, and none of
+        // these endpoints act within an already-created Organization's own scope.
+        .addFilterAfter(
+            new AntiAbuseRateLimitingFilter(
+                rateLimiter,
+                List.of(
+                    new RateLimitRule(
+                        "platform-login:account",
+                        HttpMethod.POST,
+                        PLATFORM_LOGIN_PATH,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::emailFormField,
+                        loginPerAccountLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "platform-login:ip",
+                        HttpMethod.POST,
+                        PLATFORM_LOGIN_PATH,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        loginPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    // IP-only, not per-account: registration has no existing account to key by,
+                    // and forgot-password is anti-enumeration by design (BR-ID-05) — keying it by
+                    // the submitted email would itself leak "this address is/isn't registered"
+                    // through which counter got consumed.
+                    new RateLimitRule(
+                        "platform-register:ip",
+                        HttpMethod.POST,
+                        "/platform/register",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        registerPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "platform-forgot-password:ip",
+                        HttpMethod.POST,
+                        "/platform/forgot-password",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::sourceIp,
+                        forgotPasswordPerIpLimit,
+                        Duration.ofMinutes(5)),
+                    // Self-service Organization creation (ADR-0012) — each call provisions a real
+                    // signing key, so this is a real-resource-consumption limit, not just an
+                    // anti-guessing one. Keyed by the authenticated PlatformAccount itself, not
+                    // IP: hasAuthority(ROLE_PLATFORM_ACCOUNT) above already guarantees a real
+                    // session by the time this rule's own request reaches it.
+                    new RateLimitRule(
+                        "platform-create-organization:account",
+                        HttpMethod.POST,
+                        "/platform/dashboard",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformAccountId,
+                        createOrganizationPerAccountLimit,
+                        Duration.ofMinutes(5)))),
+            SecurityContextHolderFilter.class);
     return http.build();
   }
 }

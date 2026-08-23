@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import java.io.IOException;
@@ -43,7 +44,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)
 @Testcontainers
-class PlatformAccountDashboardIntegrationTest {
+class PlatformAccountDashboardIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final Pattern CSRF_TOKEN_PATTERN =
       Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"");
