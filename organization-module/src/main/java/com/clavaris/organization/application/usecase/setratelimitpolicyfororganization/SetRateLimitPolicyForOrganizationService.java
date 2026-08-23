@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.setratelimitpolicyfororganization;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +10,11 @@ import org.springframework.transaction.annotation.Transactional;
  * the platform-tier management API ({@code AdminApiSecurityConfig}, {@code
  * PlatformScopes.RATE_LIMIT_POLICY_WRITE}), same separation of concerns as {@code
  * CreateOrganizationService}.
+ *
+ * <p>TD-SEC-007: also writes the {@code rate_limit_policy.set} audit event in the same transaction
+ * — named explicitly in the technical-debt register as a hard blocking dependency for v1.1's
+ * self-service tuning (TD-FUT-002), and a real gap today regardless: every operator change to a
+ * tenant's own capacity ceiling was previously unaudited.
  */
 public class SetRateLimitPolicyForOrganizationService
     implements SetRateLimitPolicyForOrganizationUseCase {
@@ -16,14 +22,17 @@ public class SetRateLimitPolicyForOrganizationService
   private final OrganizationRepository organizations;
   private final RateLimitPolicyRepository policies;
   private final int hardSystemWideCap;
+  private final AuditEventRecorder auditEvents;
 
   public SetRateLimitPolicyForOrganizationService(
       final OrganizationRepository organizations,
       final RateLimitPolicyRepository policies,
-      final int hardSystemWideCap) {
+      final int hardSystemWideCap,
+      final AuditEventRecorder auditEvents) {
     this.organizations = organizations;
     this.policies = policies;
     this.hardSystemWideCap = hardSystemWideCap;
+    this.auditEvents = auditEvents;
   }
 
   @Override
@@ -53,6 +62,14 @@ public class SetRateLimitPolicyForOrganizationService
                         command.organizationId(), command.requestsPerMinute(), hardSystemWideCap));
 
     policies.save(policy);
+
+    auditEvents.record(
+        command.actor(),
+        "rate_limit_policy.set",
+        "Organization",
+        command.organizationId().toString(),
+        "requestsPerMinute=" + command.requestsPerMinute());
+
     return new SetRateLimitPolicyForOrganizationResult(policy);
   }
 }

@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.createorganization;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.domain.model.Organization;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
  * connection/transaction manager despite crossing a module boundary — true atomicity, not a
  * best-effort saga. Deliberately does NOT create a {@code RateLimitPolicy} row
  * (BR-ORG-05/BR-ORG-06): a missing row already means "use the system default."
+ *
+ * <p>TD-SEC-007: also writes the {@code organization.created} audit event in this same transaction
+ * — this is the exact action the technical-debt register named as unaudited ("Every platform-tier
+ * action taken today (organization creation...)"), whether reached via the operator REST path or
+ * the self-service dashboard (ADR-0012).
  */
 @SuppressWarnings("PMD.LongVariable")
 public class CreateOrganizationService implements CreateOrganizationUseCase {
@@ -19,14 +25,17 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
   private final OrganizationRepository organizations;
   private final SigningKeyProvisioner keyProvisioner;
   private final PlatformAccountExistsChecker platformAccountExistsChecker;
+  private final AuditEventRecorder auditEvents;
 
   public CreateOrganizationService(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
-      final PlatformAccountExistsChecker platformAccountExistsChecker) {
+      final PlatformAccountExistsChecker platformAccountExistsChecker,
+      final AuditEventRecorder auditEvents) {
     this.organizations = organizations;
     this.keyProvisioner = keyProvisioner;
     this.platformAccountExistsChecker = platformAccountExistsChecker;
+    this.auditEvents = auditEvents;
   }
 
   @Override
@@ -49,6 +58,13 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
 
     final SigningKeyProvisioner.ProvisionedSigningKey signingKey =
         keyProvisioner.provisionFor(organization.id());
+
+    auditEvents.record(
+        command.actor(),
+        "organization.created",
+        "Organization",
+        organization.id().toString(),
+        "ownerPlatformAccountId=" + command.ownerPlatformAccountId());
 
     return new CreateOrganizationResult(organization, signingKey);
   }

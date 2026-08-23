@@ -11,15 +11,22 @@ import com.clavaris.organization.application.usecase.setratelimitpolicyfororgani
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationResult;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
+import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /** Standalone MockMvc setup — same rationale as CreateOrganizationControllerTest's own Javadoc. */
 class SetRateLimitPolicyControllerTest {
+
+  // TD-SEC-007: see CreateOrganizationControllerTest's own identical field for why this is
+  // needed now that the controller resolves an actor from the request's Authentication.
+  private static final Principal ACTING_PLATFORM_CLIENT =
+      new TestingAuthenticationToken("test-platform-client", null);
 
   private SetRateLimitPolicyForOrganizationUseCase useCase;
   private MockMvc mockMvc;
@@ -39,6 +46,7 @@ class SetRateLimitPolicyControllerTest {
     mockMvc
         .perform(
             put("/api/v1/admin/organizations/" + organizationId + "/rate-limit-policy")
+                .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"requestsPerMinute\":500}"))
         .andExpect(status().isOk())
@@ -53,6 +61,7 @@ class SetRateLimitPolicyControllerTest {
     mockMvc
         .perform(
             put("/api/v1/admin/organizations/" + UUID.randomUUID() + "/rate-limit-policy")
+                .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"requestsPerMinute\":500}"))
         .andExpect(status().isNotFound());
@@ -65,6 +74,7 @@ class SetRateLimitPolicyControllerTest {
     mockMvc
         .perform(
             put("/api/v1/admin/organizations/" + UUID.randomUUID() + "/rate-limit-policy")
+                .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"requestsPerMinute\":999999}"))
         .andExpect(status().isBadRequest());

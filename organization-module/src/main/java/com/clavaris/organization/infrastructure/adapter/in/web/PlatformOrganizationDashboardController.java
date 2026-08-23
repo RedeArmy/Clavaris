@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationCommand;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountQuery;
@@ -77,8 +78,13 @@ public class PlatformOrganizationDashboardController {
     // PlatformAccount existing is exactly what an authenticated session already guarantees. If
     // that guarantee is ever violated, an unhandled 500 here is a real, loud signal something
     // upstream is broken, same reasoning as requireCurrentPlatformAccount()'s own comment above.
+    // TD-SEC-007: on this path, actor and owner are always the same PlatformAccount — genuine
+    // self-service (ADR-0012), not an operator acting on someone else's behalf.
     createOrganization.handle(
-        new CreateOrganizationCommand(form.getName(), ownerPlatformAccountId));
+        new CreateOrganizationCommand(
+            form.getName(),
+            ownerPlatformAccountId,
+            AuditActor.platformAccount(ownerPlatformAccountId)));
 
     return "redirect:/platform/dashboard";
   }

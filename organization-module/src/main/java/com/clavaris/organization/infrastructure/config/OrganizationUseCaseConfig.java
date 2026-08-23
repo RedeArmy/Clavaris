@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.config;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationService;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
@@ -34,9 +35,10 @@ class OrganizationUseCaseConfig {
   /* package */ CreateOrganizationUseCase createOrganizationUseCase(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
-      final PlatformAccountExistsChecker platformAccountExistsChecker) {
+      final PlatformAccountExistsChecker platformAccountExistsChecker,
+      final AuditEventRecorder auditEvents) {
     return new CreateOrganizationService(
-        organizations, keyProvisioner, platformAccountExistsChecker);
+        organizations, keyProvisioner, platformAccountExistsChecker, auditEvents);
   }
 
   @Bean
@@ -62,7 +64,9 @@ class OrganizationUseCaseConfig {
       final OrganizationRepository organizations,
       final RateLimitPolicyRepository policies,
       @Value("${clavaris.rate-limit.capacity.hard-cap-requests-per-minute:6000}")
-          final int hardSystemWideCap) {
-    return new SetRateLimitPolicyForOrganizationService(organizations, policies, hardSystemWideCap);
+          final int hardSystemWideCap,
+      final AuditEventRecorder auditEvents) {
+    return new SetRateLimitPolicyForOrganizationService(
+        organizations, policies, hardSystemWideCap, auditEvents);
   }
 }
