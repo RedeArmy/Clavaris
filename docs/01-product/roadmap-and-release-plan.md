@@ -23,6 +23,8 @@ Three releases, sequenced by what unblocks a real consumer first, not by module 
 
 **Exit criterion:** JobSeeker completes a real login → token → `/userinfo` round trip against a deployed Clavaris instance, and the mandatory external security review has no open critical/high findings.
 
+**Gate items surfaced by the 2026-08-23 rate-limiting review** (`technical-debt-register.md` §2/§5 item 8, TD-SEC-022/TD-TEST-003): rate limiting itself is fully implemented and closed (TD-SEC-001), but what happens when its own Redis dependency is unavailable is currently undefined, and two of the three security chains carrying its rules have never been proven correctly wired by an end-to-end test. Both should close before the external security review is scheduled, not discovered by the reviewer.
+
 ## 3. v1.1 — Developer experience + hardening
 
 | Capability | Why deferred, not dropped |
@@ -33,6 +35,7 @@ Three releases, sequenced by what unblocks a real consumer first, not by module 
 | Session management UI polish | v1 ships a functional, not polished, version |
 | Webhooks (`webhook-module`) | 🟡 Proposed ADR-0007 — Clerk-style signed event delivery; needed once a second consumer exists to react to, not blocking JobSeeker's own login integration |
 | Passkeys, breached-password check, new-device step-up MFA, user impersonation | Sourced from `docs/00-vision/clerk-feature-analysis.md` §6/§7 — real gaps against a mature comparable system, none of them launch-blocking for JobSeeker's Wave 1 |
+| Rate-limit observability (per-rule/per-endpoint allow/block metrics and alerting) | `technical-debt-register.md` TD-FUT-011 — no observability stack exists anywhere in this codebase yet, not a rate-limiting-specific gap; natural to build once one is chosen rather than bolting metrics onto one feature ahead of the rest |
 | Embedded/branded login (iframe-modal + per-client custom domain + `ClientBranding`) | 🟡 Proposed ADR-0009 — real infra prerequisite (dynamic TLS, DNS verification); the plain full-page redirect login (already v1 scope) works with zero setup in the meantime, so this is additive, not blocking |
 
 ## 4. v2 — Enterprise-shaped features (no committed date)
