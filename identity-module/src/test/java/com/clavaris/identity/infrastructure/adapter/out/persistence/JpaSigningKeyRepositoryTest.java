@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SigningKey;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -82,6 +85,84 @@ class JpaSigningKeyRepositoryTest {
     repository.save(key);
 
     assertThat(repository.findActive(organizationId)).isEmpty();
+  }
+
+  // TD-SEC-008: proves findActiveAndRetiredSince returns both the active key and a recently-
+  // retired one still within the overlap window.
+  @Test
+  void findActiveAndRetiredSinceReturnsBothTheActiveKeyAndARecentlyRetiredOne() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    SigningKey retiredFiveMinutesAgo =
+        SigningKey.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            "retired-kid",
+            "RS256",
+            now.minus(1, ChronoUnit.HOURS),
+            now.minus(5, ChronoUnit.MINUTES));
+    SigningKey active =
+        SigningKey.reconstitute(
+            UUID.randomUUID(), organizationId, "active-kid", "RS256", now, null);
+    repository.save(retiredFiveMinutesAgo);
+    repository.save(active);
+
+    List<SigningKey> found =
+        repository.findActiveAndRetiredSince(organizationId, now.minus(1, ChronoUnit.DAYS));
+
+    assertThat(found)
+        .extracting(SigningKey::kid)
+        .containsExactlyInAnyOrder("retired-kid", "active-kid");
+  }
+
+  // TD-SEC-008: a key retired before the overlap cutoff must age out of the result — this is what
+  // keeps a compromised key's material from staying "live" in JWKS forever.
+  @Test
+  void findActiveAndRetiredSinceExcludesAKeyRetiredBeforeTheCutoff() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    SigningKey retiredTwoDaysAgo =
+        SigningKey.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            "long-retired-kid",
+            "RS256",
+            now.minus(3, ChronoUnit.DAYS),
+            now.minus(2, ChronoUnit.DAYS));
+    repository.save(retiredTwoDaysAgo);
+
+    List<SigningKey> found =
+        repository.findActiveAndRetiredSince(organizationId, now.minus(1, ChronoUnit.DAYS));
+
+    assertThat(found).isEmpty();
+  }
+
+  // TD-SEC-008: regression test for a real bug caught and fixed while writing this query — a
+  // derived Spring Data method name (findByOrganizationIdAndRetiredAtIsNullOrRetiredAtAfter)
+  // parses as (organizationId = X AND retiredAt IS NULL) OR retiredAt > Y, which would leak every
+  // OTHER Organization's still-in-window retired keys into this one's own JWKS. The @Query this
+  // repository actually uses must never regress to that shape.
+  @Test
+  void findActiveAndRetiredSinceNeverLeaksAnotherOrganizationsRetiredKey() {
+    OrganizationId thisOrganization = new OrganizationId(UUID.randomUUID());
+    OrganizationId otherOrganization = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    SigningKey otherOrganizationsRecentlyRetiredKey =
+        SigningKey.reconstitute(
+            UUID.randomUUID(),
+            otherOrganization,
+            "other-org-kid",
+            "RS256",
+            now.minus(1, ChronoUnit.HOURS),
+            now.minus(1, ChronoUnit.MINUTES));
+    repository.save(otherOrganizationsRecentlyRetiredKey);
+
+    List<SigningKey> found =
+        repository.findActiveAndRetiredSince(thisOrganization, now.minus(1, ChronoUnit.DAYS));
+
+    assertThat(found)
+        .as("a query bug here is a real cross-tenant signing-key-material leak, not cosmetic")
+        .isEmpty();
   }
 
   // @Import, not @ComponentScan: this package also holds JpaPlatformSigningKeyRepositoryTest's

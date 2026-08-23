@@ -132,7 +132,13 @@ class OrganizationAuthorizationServerConfig {
       @Value("${clavaris.rate-limit.token.refresh-per-client-limit:600}")
           final int tokenRefreshPerClientLimit,
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
-          final int capacityDefaultRequestsPerMinute) {
+          final int capacityDefaultRequestsPerMinute,
+      // TD-SEC-008/ADR-0010 §5.2: how long a retired key keeps being published in JWKS after
+      // rotation — generous relative to SAS's own default access-token TTL (5 minutes, per
+      // incident-response-signing-key-compromise.md's own decompiled-jar finding) to cover
+      // longer-lived ID tokens and real-world clock skew between this process and a verifier,
+      // without holding a compromised key's material "live" in JWKS indefinitely.
+      @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -148,11 +154,21 @@ class OrganizationAuthorizationServerConfig {
     // The dynamic counterpart to the platform tier's Appendix-B JWKSource: one instance, shared
     // across every Organization, that resolves the current tenant on every call instead of being
     // fixed to a single key pair at construction time.
-    final JWKSource<SecurityContext> jwkSource =
+    //
+    // TD-SEC-008: two DELIBERATELY DIFFERENT JWKSource instances, not one shared between them —
+    // see OrganizationJwksPublishingSource's own Javadoc for why NimbusJwtEncoder and the JWKS
+    // endpoint filter cannot safely share one. signingJwkSource (always exactly the current
+    // active key) feeds the encoder that signs new tokens; jwksPublishingSource (active + every
+    // still-in-overlap-window retired key) is what setSharedObject registers, which is what the
+    // JWKS endpoint filter itself actually resolves and serializes.
+    final JWKSource<SecurityContext> signingJwkSource =
         new OrganizationScopedJwkSource(signingKeys, keyMaterial);
-    http.setSharedObject(JWKSource.class, jwkSource);
+    final JWKSource<SecurityContext> jwksPublishingSource =
+        new OrganizationJwksPublishingSource(
+            signingKeys, keyMaterial, Duration.ofHours(jwksOverlapHours));
+    http.setSharedObject(JWKSource.class, jwksPublishingSource);
 
-    final JwtEncoder jwtEncoder = new NimbusJwtEncoder(jwkSource);
+    final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     // TD-SEC-016: every token any Organization issues (client_credentials and, far more commonly,
     // the interactive Authorization Code flow's access + ID tokens) gets a structured

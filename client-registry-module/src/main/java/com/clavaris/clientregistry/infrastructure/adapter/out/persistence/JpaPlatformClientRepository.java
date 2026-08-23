@@ -53,7 +53,8 @@ class JpaPlatformClientRepository implements PlatformClientRepository {
             platformClient.clientId(),
             platformClient.clientSecretHash(),
             objectMapper.writeValueAsString(platformClient.allowedScopes()),
-            platformClient.createdAt()));
+            platformClient.createdAt(),
+            platformClient.active()));
   }
 
   private PlatformClient toDomain(final PlatformClientEntity entity) {
@@ -64,6 +65,7 @@ class JpaPlatformClientRepository implements PlatformClientRepository {
         entity.getClientId(),
         entity.getClientSecretHash(),
         scopes,
-        entity.getCreatedAt());
+        entity.getCreatedAt(),
+        entity.isActive());
   }
 }

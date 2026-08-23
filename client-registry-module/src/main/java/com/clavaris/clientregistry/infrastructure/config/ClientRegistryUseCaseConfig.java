@@ -4,10 +4,16 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.B
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
+import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
+import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientService;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
+import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.PlatformClientSecretGenerator;
+import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretService;
+import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretUseCase;
+import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -38,5 +44,23 @@ class ClientRegistryUseCaseConfig {
       final OrganizationExistsChecker orgExistsChecker,
       final ClientSecretHasher hasher) {
     return new RegisterOAuthClientService(oauthClients, orgExistsChecker, hasher);
+  }
+
+  // TD-SEC-018
+  @Bean
+  /* package */ RotatePlatformClientSecretUseCase rotatePlatformClientSecretUseCase(
+      final PlatformClientRepository platformClients,
+      final ClientSecretHasher hasher,
+      final PlatformClientSecretGenerator secretGenerator,
+      final AuditEventRecorder auditEvents) {
+    return new RotatePlatformClientSecretService(
+        platformClients, hasher, secretGenerator, auditEvents);
+  }
+
+  // TD-SEC-018
+  @Bean
+  /* package */ DeactivatePlatformClientUseCase deactivatePlatformClientUseCase(
+      final PlatformClientRepository platformClients, final AuditEventRecorder auditEvents) {
+    return new DeactivatePlatformClientService(platformClients, auditEvents);
   }
 }

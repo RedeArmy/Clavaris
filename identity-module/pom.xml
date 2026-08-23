@@ -29,10 +29,33 @@
     </properties>
 
     <dependencies>
+        <!-- TD-SEC-007: AuditEventRecorder — RotateSigningKeyForOrganizationService writes a
+             signing_key.rotated audit row in the same transaction as the rotation itself. Same
+             threshold/rationale as organization-module's own identical dependency. -->
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Inbound web adapter (infrastructure/adapter/in/web) — @Controller, form binding. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- TD-SEC-008: RotateSigningKeyController reads the request's own Authentication to
+             resolve who is calling (AuditActor) — same rationale as organization-module's own
+             identical dependency, spring-security-core alone for the type, no filter chain here. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+        <!-- @Operation/@ApiResponse on RotateSigningKeyController (ADR-0008) — same convention as
+             organization-module/client-registry-module's own identical dependency; this module's
+             first genuine JSON @RestController, the rest of its web adapters are Thymeleaf forms. -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>2.2.52</version>
         </dependency>
         <!-- Hosted login/consent UI is server-side rendered Thymeleaf, not a SPA. -->
         <dependency>

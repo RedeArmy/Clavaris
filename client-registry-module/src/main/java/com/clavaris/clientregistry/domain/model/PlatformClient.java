@@ -14,13 +14,13 @@ import java.util.UUID;
  * Organization at all, not a nullable-{@code organizationId} row on the same table (data-model.md
  * §2).
  *
- * <p>PMD's DataClass/AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this
- * class for the same reason identity-module's {@code Account} suppresses them — the deliberate
- * record-style accessor convention used throughout this codebase's value objects, not an accidental
- * data-holder shape.
+ * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
+ * the same reason identity-module's {@code Account} suppresses them — the deliberate record-style
+ * accessor convention used throughout this codebase's value objects, not an accidental data-holder
+ * shape. DataClass itself is no longer flagged now that {@link #rotateSecret(String)}/{@link
+ * #deactivate()} give this class real behavior beyond plain accessors.
  */
 @SuppressWarnings({
-  "PMD.DataClass",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName"
@@ -32,13 +32,15 @@ public final class PlatformClient {
   private final String clientSecretHash;
   private final List<String> allowedScopes;
   private final Instant createdAt;
+  private final boolean active;
 
   private PlatformClient(
       final UUID id,
       final String clientId,
       final String clientSecretHash,
       final List<String> allowedScopes,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final boolean active) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
     this.clientSecretHash =
@@ -46,6 +48,7 @@ public final class PlatformClient {
     this.allowedScopes =
         List.copyOf(Objects.requireNonNull(allowedScopes, "allowedScopes must not be null"));
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+    this.active = active;
     if (clientId.isBlank()) {
       throw new IllegalArgumentException("clientId must not be blank");
     }
@@ -66,7 +69,7 @@ public final class PlatformClient {
   public static PlatformClient register(
       final String clientId, final String clientSecretHash, final List<String> allowedScopes) {
     return new PlatformClient(
-        UUID.randomUUID(), clientId, clientSecretHash, allowedScopes, Instant.now());
+        UUID.randomUUID(), clientId, clientSecretHash, allowedScopes, Instant.now(), true);
   }
 
   /**
@@ -83,8 +86,32 @@ public final class PlatformClient {
       final String clientId,
       final String clientSecretHash,
       final List<String> allowedScopes,
-      final Instant createdAt) {
-    return new PlatformClient(id, clientId, clientSecretHash, allowedScopes, createdAt);
+      final Instant createdAt,
+      final boolean active) {
+    return new PlatformClient(id, clientId, clientSecretHash, allowedScopes, createdAt, active);
+  }
+
+  /**
+   * TD-SEC-018: replaces the credential in place — same id/clientId/allowedScopes/createdAt, a
+   * fresh hash. The only way to rotate this credential today that isn't raw SQL against production.
+   * {@code newClientSecretHash} is already hashed, same "never see a raw secret" discipline as
+   * {@link #register}.
+   */
+  public PlatformClient rotateSecret(
+      @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
+    return new PlatformClient(id, clientId, newClientSecretHash, allowedScopes, createdAt, active);
+  }
+
+  /**
+   * TD-SEC-018: an inactive {@code PlatformClient} must never authenticate a new {@code
+   * client_credentials} exchange again — {@code PlatformRegisteredClientRepository} (app module) is
+   * what actually enforces this, treating an inactive client the same as a not-found one.
+   * Already-issued tokens are unaffected (bounded by their own short TTL, same residual window
+   * {@code incident-response-platform-client-compromise.md} already documents honestly) — this is
+   * revocation of the credential's ability to mint new tokens, not a live check on every request.
+   */
+  public PlatformClient deactivate() {
+    return new PlatformClient(id, clientId, clientSecretHash, allowedScopes, createdAt, false);
   }
 
   public UUID id() {
@@ -105,5 +132,9 @@ public final class PlatformClient {
 
   public Instant createdAt() {
     return createdAt;
+  }
+
+  public boolean active() {
+    return active;
   }
 }
