@@ -3,7 +3,6 @@ package com.clavaris.identity.application.usecase.rotatesigningkeyfororganizatio
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,22 +72,22 @@ class RotateSigningKeyForOrganizationServiceTest {
 
     verify(auditEvents)
         .write(
-            eq(ACTOR),
-            eq("signing_key.rotated"),
-            eq("Organization"),
-            eq(organizationId.value().toString()),
-            eq("newKid=new-kid previousKid=old-kid"));
+            ACTOR,
+            "signing_key.rotated",
+            "Organization",
+            organizationId.value().toString(),
+            "newKid=new-kid previousKid=old-kid");
   }
 
   @Test
   void rejectsAnOrganizationWithNoActiveKeyWithoutGeneratingAnythingOrRecordingAnAuditEvent() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     when(signingKeys.findActive(organizationId)).thenReturn(Optional.empty());
+    RotateSigningKeyForOrganizationCommand command =
+        new RotateSigningKeyForOrganizationCommand(organizationId, ACTOR);
 
     assertThatExceptionOfType(NoActiveSigningKeyException.class)
-        .isThrownBy(
-            () ->
-                service.handle(new RotateSigningKeyForOrganizationCommand(organizationId, ACTOR)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(keyMaterial, never()).generateFor(any());
     verifyNoInteractions(activate);

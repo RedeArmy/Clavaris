@@ -2,7 +2,6 @@ package com.clavaris.clientregistry.application.usecase.rotateplatformclientsecr
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -74,21 +73,17 @@ class RotatePlatformClientSecretServiceTest {
     service.handle(new RotatePlatformClientSecretCommand("target-client", ACTOR));
 
     verify(auditEvents)
-        .write(
-            eq(ACTOR),
-            eq("platform_client.secret_rotated"),
-            eq("PlatformClient"),
-            eq("target-client"),
-            eq(null));
+        .write(ACTOR, "platform_client.secret_rotated", "PlatformClient", "target-client", null);
   }
 
   @Test
   void rejectsAnUnknownClientIdWithoutGeneratingOrPersistingAnything() {
     when(platformClients.findByClientId("ghost-client")).thenReturn(Optional.empty());
+    RotatePlatformClientSecretCommand command =
+        new RotatePlatformClientSecretCommand("ghost-client", ACTOR);
 
     assertThatExceptionOfType(PlatformClientNotFoundException.class)
-        .isThrownBy(
-            () -> service.handle(new RotatePlatformClientSecretCommand("ghost-client", ACTOR)));
+        .isThrownBy(() -> service.handle(command));
 
     verifyNoInteractions(secretGenerator);
     verifyNoInteractions(hasher);

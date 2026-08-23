@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -55,21 +54,17 @@ class DeactivatePlatformClientServiceTest {
     service.handle(new DeactivatePlatformClientCommand("target-client", ACTOR));
 
     verify(auditEvents)
-        .write(
-            eq(ACTOR),
-            eq("platform_client.deactivated"),
-            eq("PlatformClient"),
-            eq("target-client"),
-            eq(null));
+        .write(ACTOR, "platform_client.deactivated", "PlatformClient", "target-client", null);
   }
 
   @Test
   void rejectsAnUnknownClientIdWithoutPersistingOrRecordingAnything() {
     when(platformClients.findByClientId("ghost-client")).thenReturn(Optional.empty());
+    DeactivatePlatformClientCommand command =
+        new DeactivatePlatformClientCommand("ghost-client", ACTOR);
 
     assertThatExceptionOfType(PlatformClientNotFoundException.class)
-        .isThrownBy(
-            () -> service.handle(new DeactivatePlatformClientCommand("ghost-client", ACTOR)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(platformClients, never()).save(any());
     verifyNoInteractions(auditEvents);
