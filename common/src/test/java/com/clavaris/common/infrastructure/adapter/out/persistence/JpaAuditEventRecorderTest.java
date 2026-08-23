@@ -44,7 +44,7 @@ class JpaAuditEventRecorderTest {
   void recordPersistsEveryFieldOfAPlatformAccountActedEvent() {
     UUID platformAccountId = UUID.randomUUID();
 
-    recorder.record(
+    recorder.write(
         AuditActor.platformAccount(platformAccountId),
         "organization.created",
         "Organization",
@@ -65,7 +65,7 @@ class JpaAuditEventRecorderTest {
 
   @Test
   void recordPersistsAPlatformClientActedEventWithANullTargetIdAndDetail() {
-    recorder.record(
+    recorder.write(
         AuditActor.platformClient("bootstrap-client"),
         "rate_limit_policy.set",
         "RateLimitPolicy",
@@ -83,8 +83,8 @@ class JpaAuditEventRecorderTest {
   void everyCallAppendsARowRatherThanUpdatingAPreviousOne() {
     AuditActor actor = AuditActor.platformAccount(UUID.randomUUID());
 
-    recorder.record(actor, "organization.created", "Organization", "org-1", null);
-    recorder.record(
+    recorder.write(actor, "organization.created", "Organization", "org-1", null);
+    recorder.write(
         actor, "rate_limit_policy.set", "RateLimitPolicy", "org-1", "requestsPerMinute=800");
 
     assertThat(springDataRepository.count())

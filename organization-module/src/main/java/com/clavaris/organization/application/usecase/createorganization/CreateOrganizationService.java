@@ -59,7 +59,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
     final SigningKeyProvisioner.ProvisionedSigningKey signingKey =
         keyProvisioner.provisionFor(organization.id());
 
-    auditEvents.record(
+    auditEvents.write(
         command.actor(),
         "organization.created",
         "Organization",

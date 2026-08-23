@@ -37,6 +37,11 @@ public class AuditEventEntity {
 
   protected AuditEventEntity() {}
 
+  // java:S107: a plain persistence-mapping data holder (this class's own Javadoc) — one
+  // constructor param per column is the correct shape here, not a sign this should be split or
+  // take a builder; same convention already accepted for every other multi-column JPA entity in
+  // this codebase.
+  @SuppressWarnings("java:S107")
   public AuditEventEntity(
       final UUID id,
       final String actorType,

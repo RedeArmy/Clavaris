@@ -81,7 +81,7 @@ class SetRateLimitPolicyForOrganizationServiceTest {
     service.handle(new SetRateLimitPolicyForOrganizationCommand(organizationId, 500, ACTOR));
 
     verify(auditEvents)
-        .record(
+        .write(
             eq(ACTOR),
             eq("rate_limit_policy.set"),
             eq("Organization"),

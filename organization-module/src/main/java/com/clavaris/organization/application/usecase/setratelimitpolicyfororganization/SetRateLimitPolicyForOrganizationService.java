@@ -63,7 +63,7 @@ public class SetRateLimitPolicyForOrganizationService
 
     policies.save(policy);
 
-    auditEvents.record(
+    auditEvents.write(
         command.actor(),
         "rate_limit_policy.set",
         "Organization",

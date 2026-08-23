@@ -24,18 +24,14 @@ class JpaAuditEventRecorder implements AuditEventRecorder {
     this.events = events;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
-  // own identical suppression: every logged argument below is a direct value-object accessor
-  // (enum name(), a plain String), never a constructed/formatted value expensive enough to guard.
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
-  public void record(
+  public void write(
       final AuditActor actor,
       final String action,
       final String targetType,
       final String targetId,
       final String detail) {
-    final AuditEvent event = AuditEvent.record(actor, action, targetType, targetId, detail);
+    final AuditEvent event = AuditEvent.of(actor, action, targetType, targetId, detail);
     events.save(
         new AuditEventEntity(
             event.id(),
@@ -46,15 +42,21 @@ class JpaAuditEventRecorder implements AuditEventRecorder {
             event.targetId().orElse(null),
             event.detail().orElse(null),
             event.occurredAt()));
+    // Guarded, not unconditional: same rationale as TokenRevocationEventLogger's own identical
+    // guard — SonarCloud (rule S2629, unlike PMD's GuardLogStatement elsewhere in this codebase,
+    // which treats plain accessor arguments as a false positive) won't assume the accessor chain
+    // below is free. isInfoEnabled() skips it entirely when INFO is disabled.
     // BR-DATA-01: actor_id/target_id are never raw PII by this port's own contract (a
     // PlatformAccountId/organizationId/client_id/kid, never an email) — safe to log directly, same
     // bar TD-SEC-014 already applies to accountId/organizationId elsewhere.
-    LOG.info(
-        "event=audit_recorded actor_type={} actor_id={} action={} target_type={} target_id={}",
-        event.actor().type(),
-        event.actor().id(),
-        event.action(),
-        event.targetType(),
-        event.targetId().orElse("-"));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(
+          "event=audit_recorded actor_type={} actor_id={} action={} target_type={} target_id={}",
+          event.actor().type(),
+          event.actor().id(),
+          event.action(),
+          event.targetType(),
+          event.targetId().orElse("-"));
+    }
   }
 }

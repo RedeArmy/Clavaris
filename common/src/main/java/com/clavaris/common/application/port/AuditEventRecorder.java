@@ -27,5 +27,9 @@ import com.clavaris.common.domain.model.AuditActor;
 @FunctionalInterface
 public interface AuditEventRecorder {
 
-  void record(AuditActor actor, String action, String targetType, String targetId, String detail);
+  // Named write(), not record() — same verb EventOutboxWriter already uses for an identically-
+  // shaped outbound port, and SonarCloud flags a bare `record` identifier as a restricted one
+  // (Java's own record-type keyword, contextual since Java 16) regardless of that this method
+  // legitimately compiles fine either way.
+  void write(AuditActor actor, String action, String targetType, String targetId, String detail);
 }

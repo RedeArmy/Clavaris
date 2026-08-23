@@ -14,7 +14,7 @@ class AuditEventTest {
     AuditActor actor = AuditActor.platformAccount(UUID.randomUUID());
 
     AuditEvent event =
-        AuditEvent.record(actor, "organization.created", "Organization", "org-1", "name=Acme");
+        AuditEvent.of(actor, "organization.created", "Organization", "org-1", "name=Acme");
 
     assertThat(event.id()).isNotNull();
     assertThat(event.actor()).isEqualTo(actor);
@@ -28,7 +28,7 @@ class AuditEventTest {
   @Test
   void targetIdAndDetailAreBothOptionalAndComeBackEmptyWhenOmitted() {
     AuditEvent event =
-        AuditEvent.record(
+        AuditEvent.of(
             AuditActor.platformClient("bootstrap-client"),
             "organization.created",
             "Organization",
@@ -43,8 +43,7 @@ class AuditEventTest {
   void rejectsABlankAction() {
     assertThatIllegalArgumentException()
         .isThrownBy(
-            () ->
-                AuditEvent.record(AuditActor.platformClient("c"), " ", "Organization", null, null));
+            () -> AuditEvent.of(AuditActor.platformClient("c"), " ", "Organization", null, null));
   }
 
   @Test
@@ -52,15 +51,14 @@ class AuditEventTest {
     assertThatIllegalArgumentException()
         .isThrownBy(
             () ->
-                AuditEvent.record(
+                AuditEvent.of(
                     AuditActor.platformClient("c"), "organization.created", "", null, null));
   }
 
   @Test
   void rejectsANullActor() {
     assertThatNullPointerException()
-        .isThrownBy(
-            () -> AuditEvent.record(null, "organization.created", "Organization", null, null));
+        .isThrownBy(() -> AuditEvent.of(null, "organization.created", "Organization", null, null));
   }
 
   @Test

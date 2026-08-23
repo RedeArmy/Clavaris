@@ -78,7 +78,7 @@ class CreateOrganizationServiceTest {
         service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
 
     verify(auditEvents)
-        .record(
+        .write(
             eq(ACTOR),
             eq("organization.created"),
             eq("Organization"),

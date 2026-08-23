@@ -59,9 +59,11 @@ public final class AuditEvent {
   /**
    * A brand-new event, timestamped now — the only way application code ever creates one; there is
    * deliberately no setter/mutator anywhere on this class, an audit trail that could be edited
-   * after the fact would defeat its own purpose.
+   * after the fact would defeat its own purpose. Named {@code of}, not {@code record}: SonarCloud
+   * flags a bare {@code record} identifier as a restricted one (Java's own record-type keyword,
+   * contextual since Java 16), even though a method legitimately named that still compiles.
    */
-  public static AuditEvent record(
+  public static AuditEvent of(
       final AuditActor actor,
       final String action,
       final String targetType,
