@@ -45,7 +45,7 @@ public class RotatePlatformClientSecretService implements RotatePlatformClientSe
 
     // Never the raw secret, never the hash — same BR-DATA-01 discipline as every other audited
     // action in this codebase.
-    auditEvents.record(
+    auditEvents.write(
         command.actor(),
         "platform_client.secret_rotated",
         "PlatformClient",

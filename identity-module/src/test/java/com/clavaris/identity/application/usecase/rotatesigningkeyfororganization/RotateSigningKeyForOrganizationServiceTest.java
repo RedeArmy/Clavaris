@@ -72,7 +72,7 @@ class RotateSigningKeyForOrganizationServiceTest {
     service.handle(new RotateSigningKeyForOrganizationCommand(organizationId, ACTOR));
 
     verify(auditEvents)
-        .record(
+        .write(
             eq(ACTOR),
             eq("signing_key.rotated"),
             eq("Organization"),

@@ -34,7 +34,7 @@ public class DeactivatePlatformClientService implements DeactivatePlatformClient
 
     platformClients.save(existing.deactivate());
 
-    auditEvents.record(
+    auditEvents.write(
         command.actor(), "platform_client.deactivated", "PlatformClient", command.clientId(), null);
   }
 }

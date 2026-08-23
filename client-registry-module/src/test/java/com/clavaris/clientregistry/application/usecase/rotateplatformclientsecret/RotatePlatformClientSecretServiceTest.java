@@ -74,7 +74,7 @@ class RotatePlatformClientSecretServiceTest {
     service.handle(new RotatePlatformClientSecretCommand("target-client", ACTOR));
 
     verify(auditEvents)
-        .record(
+        .write(
             eq(ACTOR),
             eq("platform_client.secret_rotated"),
             eq("PlatformClient"),

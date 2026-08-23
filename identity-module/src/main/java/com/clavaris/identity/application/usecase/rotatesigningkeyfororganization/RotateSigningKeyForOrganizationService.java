@@ -59,7 +59,7 @@ public class RotateSigningKeyForOrganizationService
     final String newKid = keyMaterial.generateFor(command.organizationId());
     final SigningKey rotated = activate.handle(command.organizationId(), newKid, ALGORITHM);
 
-    auditEvents.record(
+    auditEvents.write(
         command.actor(),
         "signing_key.rotated",
         "Organization",

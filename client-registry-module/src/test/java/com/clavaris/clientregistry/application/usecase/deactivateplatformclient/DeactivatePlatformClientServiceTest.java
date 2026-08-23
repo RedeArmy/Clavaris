@@ -55,7 +55,7 @@ class DeactivatePlatformClientServiceTest {
     service.handle(new DeactivatePlatformClientCommand("target-client", ACTOR));
 
     verify(auditEvents)
-        .record(
+        .write(
             eq(ACTOR),
             eq("platform_client.deactivated"),
             eq("PlatformClient"),
