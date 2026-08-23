@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
@@ -108,6 +109,40 @@ class RedisFixedWindowRateLimiterTest {
         .as(
             "a fresh window must start counting from 1 again, not carry over the expired one's count")
         .isEqualTo(1);
+  }
+
+  // TD-SEC-022: proves the fail-open contract against a real dead connection, not a mocked
+  // exception — a fresh LettuceConnectionFactory pointed at a port nothing listens on, so the
+  // very first command genuinely fails to connect (ECONNREFUSED on loopback is effectively
+  // immediate; the short commandTimeout below is a safety net for environments where it isn't).
+  @Test
+  void failsOpenWhenRedisIsUnreachable() {
+    LettuceClientConfiguration shortTimeout =
+        LettuceClientConfiguration.builder().commandTimeout(Duration.ofMillis(500)).build();
+    LettuceConnectionFactory deadFactory =
+        new LettuceConnectionFactory(
+            new RedisStandaloneConfiguration("127.0.0.1", 1), shortTimeout);
+    deadFactory.afterPropertiesSet();
+    StringRedisTemplate deadTemplate = new StringRedisTemplate(deadFactory);
+    deadTemplate.afterPropertiesSet();
+    RedisFixedWindowRateLimiter limiterAgainstDeadRedis =
+        new RedisFixedWindowRateLimiter(deadTemplate);
+
+    try {
+      RateLimitDecision decision =
+          limiterAgainstDeadRedis.tryConsume("test:unreachable", 1, Duration.ofMinutes(1));
+
+      assertThat(decision.allowed())
+          .as(
+              "TD-SEC-022: a Redis outage must fail OPEN — the caller must never be taken down "
+                  + "by the rate limiter's own dependency being unavailable")
+          .isTrue();
+      assertThat(decision.currentCount())
+          .as("a fail-open decision has no real count to report")
+          .isZero();
+    } finally {
+      deadFactory.destroy();
+    }
   }
 
   // TD-SEC-021's own live-verification standard applied here: don't just read the Lua script and
