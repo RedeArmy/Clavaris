@@ -11,5 +11,65 @@
     <artifactId>common</artifactId>
     <packaging>jar</packaging>
     <name>common</name>
-    <description>Shared kernel — base exceptions, value types. No business logic. Placeholder POM.</description>
+    <description>
+        Shared kernel — base exceptions, value types, and (TD-SEC-007, TD-ARCH-001 closed) the
+        AuditEvent recording port every business module writes admin/operator-action audit trail
+        entries through. Stayed an intentionally empty placeholder until a genuine third module
+        (identity-module, TD-SEC-008) needed the exact same cross-cutting concern
+        organization-module and client-registry-module already did — the threshold
+        client-registry-module's own pom.xml already names for when duplication stops being the
+        right call ("refactor into a shared utility only once a third module needs the same
+        thing").
+    </description>
+
+    <dependencies>
+        <!-- AuditEventEntity (infrastructure/adapter/out/persistence) — @Entity, Spring Data
+             repository. No web/security starter: this module has no inbound adapter of its own,
+             only an outbound persistence one every other module's use cases call into. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- test-strategy.md §2: the persistence adapter gets a real-Postgres integration test —
+             JpaAuditEventRecorderTest runs the actual audit_events migration (not a
+             Hibernate-generated schema), scoped to this module alone, same convention as every
+             other module's own persistence-adapter test. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

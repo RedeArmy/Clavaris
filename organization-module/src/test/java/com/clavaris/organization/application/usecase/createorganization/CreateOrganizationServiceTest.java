@@ -3,12 +3,15 @@ package com.clavaris.organization.application.usecase.createorganization;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,9 +19,12 @@ import org.junit.jupiter.api.Test;
 
 class CreateOrganizationServiceTest {
 
+  private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
+
   private OrganizationRepository organizations;
   private SigningKeyProvisioner keyProvisioner;
   private PlatformAccountExistsChecker platformAccountExistsChecker;
+  private AuditEventRecorder auditEvents;
   private CreateOrganizationService service;
 
   @BeforeEach
@@ -26,9 +32,11 @@ class CreateOrganizationServiceTest {
     organizations = mock(OrganizationRepository.class);
     keyProvisioner = mock(SigningKeyProvisioner.class);
     platformAccountExistsChecker = mock(PlatformAccountExistsChecker.class);
+    auditEvents = mock(AuditEventRecorder.class);
     when(platformAccountExistsChecker.exists(any())).thenReturn(true);
     service =
-        new CreateOrganizationService(organizations, keyProvisioner, platformAccountExistsChecker);
+        new CreateOrganizationService(
+            organizations, keyProvisioner, platformAccountExistsChecker, auditEvents);
   }
 
   @Test
@@ -37,7 +45,7 @@ class CreateOrganizationServiceTest {
         .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
 
     final CreateOrganizationResult result =
-        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID()));
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
 
     assertThat(result.organization().name()).isEqualTo("JobSeeker");
     verify(organizations).save(result.organization());
@@ -52,11 +60,30 @@ class CreateOrganizationServiceTest {
         .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
 
     final CreateOrganizationResult result =
-        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID()));
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
 
     verify(keyProvisioner).provisionFor(result.organization().id());
     assertThat(result.signingKey().kid()).isEqualTo("a-kid");
     assertThat(result.signingKey().algorithm()).isEqualTo("RS256");
+  }
+
+  // TD-SEC-007: this row is exactly what the technical-debt register named as unaudited before
+  // this class recorded it — a real regression test, not just "the code compiles".
+  @Test
+  void recordsAnAuditEventForTheNewlyCreatedOrganization() {
+    when(keyProvisioner.provisionFor(any()))
+        .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
+
+    final CreateOrganizationResult result =
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
+
+    verify(auditEvents)
+        .write(
+            eq(ACTOR),
+            eq("organization.created"),
+            eq("Organization"),
+            eq(result.organization().id().toString()),
+            any());
   }
 
   // Security finding (SDE-III review, 2026-08-22), regression test for its fix: before this fix,
@@ -66,12 +93,13 @@ class CreateOrganizationServiceTest {
     UUID nonExistentPlatformAccountId = UUID.randomUUID();
     when(platformAccountExistsChecker.exists(nonExistentPlatformAccountId)).thenReturn(false);
     CreateOrganizationCommand command =
-        new CreateOrganizationCommand("Ghost Owner Co", nonExistentPlatformAccountId);
+        new CreateOrganizationCommand("Ghost Owner Co", nonExistentPlatformAccountId, ACTOR);
 
     assertThatExceptionOfType(PlatformAccountNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(organizations, never()).save(any());
     verifyNoInteractions(keyProvisioner);
+    verifyNoInteractions(auditEvents);
   }
 }

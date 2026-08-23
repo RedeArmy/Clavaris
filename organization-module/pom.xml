@@ -19,9 +19,28 @@
     </description>
 
     <dependencies>
+        <!-- TD-SEC-007: AuditEventRecorder — CreateOrganizationService/SetRateLimitPolicyFor
+             OrganizationService both write an audit_events row in the same transaction as their
+             own domain write. The one cross-cutting concern this codebase's own YAGNI threshold
+             (client-registry-module's pom.xml: "refactor into a shared utility only once a third
+             module needs the same thing") is now met by — identity-module (TD-SEC-008) and
+             client-registry-module (TD-SEC-018) need the exact same port. -->
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- TD-SEC-007: CreateOrganizationController/SetRateLimitPolicyController both read the
+             request's own Authentication to resolve who is calling (AuditActor) — spring-security-
+             core alone for the Authentication type itself, not the full config/web starter this
+             module has no filter chain of its own to build. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
         </dependency>
         <!-- CreateOrganizationController (infrastructure/adapter/in/web) — the REST controller;
              PlatformOrganizationDashboardController (ADR-0012) is the Thymeleaf one, below. -->

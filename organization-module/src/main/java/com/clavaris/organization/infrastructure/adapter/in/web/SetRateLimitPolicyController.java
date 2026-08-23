@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.OrganizationNotFoundException;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationCommand;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationResult;
@@ -10,6 +11,7 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,13 +51,19 @@ class SetRateLimitPolicyController {
   @PutMapping("/api/v1/admin/organizations/{organizationId}/rate-limit-policy")
   /* package */ ResponseEntity<SetRateLimitPolicyResponse> set(
       @PathVariable final UUID organizationId,
-      @Valid @RequestBody final SetRateLimitPolicyRequest request) {
+      @Valid @RequestBody final SetRateLimitPolicyRequest request,
+      final Authentication authentication) {
     final SetRateLimitPolicyForOrganizationResult result;
     try {
       result =
           useCase.handle(
               new SetRateLimitPolicyForOrganizationCommand(
-                  organizationId, request.requestsPerMinute()));
+                  organizationId,
+                  request.requestsPerMinute(),
+                  // TD-SEC-007: AdminApiSecurityConfig gates this endpoint to a platform-tier
+                  // client_credentials token only — same actor-resolution rationale as
+                  // CreateOrganizationController's own REST path.
+                  AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final IllegalArgumentException _) {

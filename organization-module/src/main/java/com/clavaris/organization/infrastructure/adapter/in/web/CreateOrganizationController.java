@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationCommand;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,12 +43,21 @@ class CreateOrganizationController {
   @ApiResponse(responseCode = "404", description = "No PlatformAccount exists with the given id")
   @PostMapping("/api/v1/admin/organizations")
   /* package */ ResponseEntity<CreateOrganizationResponse> create(
-      @Valid @RequestBody final CreateOrganizationRequest request) {
+      @Valid @RequestBody final CreateOrganizationRequest request,
+      final Authentication authentication) {
     final CreateOrganizationResult result;
     try {
       result =
           useCase.handle(
-              new CreateOrganizationCommand(request.name(), request.ownerPlatformAccountId()));
+              new CreateOrganizationCommand(
+                  request.name(),
+                  request.ownerPlatformAccountId(),
+                  // TD-SEC-007: this endpoint is reachable only via a platform-tier
+                  // client_credentials token (AdminApiSecurityConfig) — Authentication#getName()
+                  // resolves to that token's own client_id, SAS's default `sub` claim for this
+                  // grant type, never a PlatformAccount (this is the operator/REST path, distinct
+                  // from the self-service dashboard's own actor below).
+                  AuditActor.platformClient(authentication.getName())));
     } catch (final PlatformAccountNotFoundException _) {
       return ResponseEntity.notFound().build();
     }

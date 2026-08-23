@@ -12,10 +12,12 @@ import com.clavaris.organization.application.usecase.createorganization.CreateOr
 import com.clavaris.organization.application.usecase.createorganization.PlatformAccountNotFoundException;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
 import com.clavaris.organization.domain.model.Organization;
+import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -27,6 +29,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * controller.
  */
 class CreateOrganizationControllerTest {
+
+  // TD-SEC-007: the controller now resolves an actor from the request's own Authentication —
+  // Spring MVC's built-in PrincipalMethodArgumentResolver only succeeds if the (standalone, no
+  // real Spring Security filter chain) MockHttpServletRequest actually carries one.
+  private static final Principal ACTING_PLATFORM_CLIENT =
+      new TestingAuthenticationToken("test-platform-client", null);
 
   private CreateOrganizationUseCase useCase;
   private MockMvc mockMvc;
@@ -48,6 +56,7 @@ class CreateOrganizationControllerTest {
     mockMvc
         .perform(
             post("/api/v1/admin/organizations")
+                .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"name\":\"JobSeeker\",\"ownerPlatformAccountId\":\""
@@ -111,6 +120,7 @@ class CreateOrganizationControllerTest {
     mockMvc
         .perform(
             post("/api/v1/admin/organizations")
+                .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"name\":\"JobSeeker\",\"ownerPlatformAccountId\":\""
