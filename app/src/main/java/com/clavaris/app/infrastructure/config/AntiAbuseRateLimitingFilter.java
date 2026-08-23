@@ -59,23 +59,10 @@ final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
     Duration longestRetryAfter = null;
 
     for (final RateLimitRule rule : rules) {
-      if (!matches(rule, request)) {
-        continue;
-      }
-      final String identifier = rule.keyExtractor().apply(request);
-      if (identifier == null) {
-        // Nothing to key this specific request on for this rule (e.g. no client_id presented at
-        // all) — skip it rather than count every such request against one shared "unknown" key,
-        // which would let one malformed-request flood exhaust a counter real requests also rely on.
-        continue;
-      }
-      final String redisKey = "ratelimit:" + rule.name() + ":" + hash(identifier);
-      final RateLimitDecision decision =
-          rateLimiter.tryConsume(redisKey, rule.limit(), rule.window());
-      if (!decision.allowed()
-          && (longestRetryAfter == null
-              || decision.retryAfter().compareTo(longestRetryAfter) > 0)) {
-        longestRetryAfter = decision.retryAfter();
+      final Duration retryAfter = evaluateRule(rule, request);
+      if (retryAfter != null
+          && (longestRetryAfter == null || retryAfter.compareTo(longestRetryAfter) > 0)) {
+        longestRetryAfter = retryAfter;
       }
     }
 
@@ -84,6 +71,29 @@ final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
       return;
     }
     filterChain.doFilter(request, response);
+  }
+
+  // Returns null when the rule doesn't apply/has nothing to key on/wasn't exceeded — a single
+  // return-based skip in one place, not scattered continue statements through the caller's loop
+  // (the SonarCloud finding this method exists to fix). PMD.OnlyOneReturn suppressed: same
+  // present/absent multi-exit shape RateLimitIdentifiers' own class-wide suppression already
+  // covers, not an organically grown method that should be restructured.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private Duration evaluateRule(final RateLimitRule rule, final HttpServletRequest request) {
+    if (!matches(rule, request)) {
+      return null;
+    }
+    final String identifier = rule.keyExtractor().apply(request);
+    if (identifier == null) {
+      // Nothing to key this specific request on for this rule (e.g. no client_id presented at
+      // all) — skip it rather than count every such request against one shared "unknown" key,
+      // which would let one malformed-request flood exhaust a counter real requests also rely on.
+      return null;
+    }
+    final String redisKey = "ratelimit:" + rule.name() + ":" + hash(identifier);
+    final RateLimitDecision decision =
+        rateLimiter.tryConsume(redisKey, rule.limit(), rule.window());
+    return decision.allowed() ? null : decision.retryAfter();
   }
 
   private boolean matches(final RateLimitRule rule, final HttpServletRequest request) {

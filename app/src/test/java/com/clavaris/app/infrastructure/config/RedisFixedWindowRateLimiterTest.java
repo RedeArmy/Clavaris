@@ -89,14 +89,17 @@ class RedisFixedWindowRateLimiterTest {
         .isTrue();
   }
 
+  // java:S2925: this waits for a real Redis TTL to actually expire, not for an async operation to
+  // finish — there is no state to poll for in the interim (tryConsume would keep returning the
+  // same decision until the TTL genuinely elapses), so Awaitility-style polling buys nothing over
+  // a plain sleep here; the whole point is proving the real EXPIRE, not a mocked clock.
+  @SuppressWarnings("java:S2925")
   @Test
   void theWindowExpiresAndAFreshOneStartsAtOne() throws InterruptedException {
     String key = "test:" + UUID.randomUUID();
     Duration oneSecondWindow = Duration.ofSeconds(1);
     rateLimiter.tryConsume(key, 1, oneSecondWindow);
 
-    // Real wall-clock wait, not a mocked clock — proving the actual TTL Redis applied, not an
-    // assumption about what the EXPIRE call was supposed to do.
     Thread.sleep(1500);
     RateLimitDecision afterExpiry = rateLimiter.tryConsume(key, 1, oneSecondWindow);
 

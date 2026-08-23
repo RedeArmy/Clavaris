@@ -20,6 +20,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @SuppressWarnings("PMD.OnlyOneReturn")
 final class RateLimitIdentifiers {
 
+  private static final String BASIC_AUTH_PREFIX = "Basic ";
+
   private RateLimitIdentifiers() {}
 
   /**
@@ -65,13 +67,14 @@ final class RateLimitIdentifiers {
 
   private static String clientIdFromBasicAuth(final HttpServletRequest request) {
     final String header = request.getHeader("Authorization");
-    if (header == null || !header.regionMatches(true, 0, "Basic ", 0, "Basic ".length())) {
+    if (header == null
+        || !header.regionMatches(true, 0, BASIC_AUTH_PREFIX, 0, BASIC_AUTH_PREFIX.length())) {
       return null;
     }
     try {
       final String decoded =
           new String(
-              Base64.getDecoder().decode(header.substring("Basic ".length())),
+              Base64.getDecoder().decode(header.substring(BASIC_AUTH_PREFIX.length())),
               StandardCharsets.UTF_8);
       final int colonIndex = decoded.indexOf(':');
       // A malformed Basic-Auth value (no colon, or not valid base64 — caught below) can't be
@@ -92,6 +95,10 @@ final class RateLimitIdentifiers {
    * PlatformDashboardSecurityConfig}'s own {@code hasAuthority(ROLE_PLATFORM_ACCOUNT)} check
    * already rejects those before this rule's outcome would matter.
    */
+  // java:S1172: the unused request parameter is structurally required — this method is used as a
+  // RateLimitRule#keyExtractor method reference, and that functional interface's shape is
+  // Function<HttpServletRequest, String>, the same as every other extractor in this class.
+  @SuppressWarnings("java:S1172")
   /* package */ static String authenticatedPlatformAccountId(final HttpServletRequest request) {
     final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     return (authentication == null || !authentication.isAuthenticated())
