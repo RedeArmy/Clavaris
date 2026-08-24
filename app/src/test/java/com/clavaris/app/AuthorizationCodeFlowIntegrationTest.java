@@ -252,9 +252,17 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(verify(parse(idToken), jwks)).isTrue();
 
     // ADR-0016 / ISO-IEC-29115: the real, signed ID token this exchange issued must carry acr/amr —
-    // AuthenticationContextClaimsCustomizerTest already proves the customizer's own isolated
-    // behaviour; this is the wiring proof, the same "prove it end to end, not just the unit" bar
-    // TD-SEC-016's own token_issued log assertion above already applies.
+    // extracted to its own helper (same pattern as assertOnlyTheHashedValueIsStored below), partly
+    // for readability and partly to keep this method's own direct assertion count under
+    // SonarCloud's S5961 threshold now that this flow has this many distinct properties to verify.
+    assertIdTokenCarriesAuthenticationContextClaims(idToken);
+  }
+
+  // AuthenticationContextClaimsCustomizerTest already proves the customizer's own isolated
+  // behaviour; this is the wiring proof, the same "prove it end to end, not just the unit" bar
+  // TD-SEC-016's own token_issued log assertion in the caller already applies.
+  private static void assertIdTokenCarriesAuthenticationContextClaims(final String idToken)
+      throws ParseException {
     JWTClaimsSet idTokenClaims = parse(idToken).getJWTClaimsSet();
     assertThat(idTokenClaims.getStringClaim("acr")).isEqualTo("urn:clavaris:loa:2");
     assertThat(idTokenClaims.getStringListClaim("amr")).containsExactly("pwd");
