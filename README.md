@@ -7,15 +7,15 @@ A standalone, self-hosted identity provider — OIDC/OAuth2-compliant, reusable 
 
 Built with Java 25 and Spring Boot 4.1 (Spring Authorization Server as the protocol-compliance foundation), PostgreSQL 16, and Redis. Consumers integrate via standard OIDC — no custom SDK required.
 
-> Project skeleton — module domain/application code hasn't been written yet. What exists so far is infrastructure scaffolding (Maven module wiring, health checks, the local Docker stack, CI) plus a fully designed and **spike-validated** architecture: multi-tenant issuer/JWKS on Spring Authorization Server is proven to work end-to-end (`docs/03-architecture/spikes/0001-spring-authorization-server-multitenancy.md`, **GO**), and `Organization` provisioning is fully designed (`ADR-0010`). The next work is the first real use case, not further design.
+> Working OIDC/OAuth2 identity provider, not a skeleton — real login, token issuance, and per-tenant isolation all run end to end against Postgres/Redis today, gated behind an unusually heavy CI bar (SonarCloud Quality Gate, OWASP dependency scan, Trivy image scan, full ArchUnit hexagonal-boundary enforcement). Zero P1 security findings open as of 2026-08-24 — see `docs/05-engineering/technical-debt-register.md`. Three v1-scoped features remain unbuilt: social login (Google/GitHub), `Workspace`/team-membership, and the admin account-deletion API — see `docs/01-product/roadmap-and-release-plan.md` §2 for the honest, per-row status.
 
 ## Modules
 
-- `identity-module` — accounts (each scoped to one `Organization`, ADR-0010), credentials (password, social identities), sessions, email verification, password recovery, token issuance
-- `organization-module` — `Organization` (tenant isolation boundary, one per consuming system) + `Workspace` (team/company grouping within one Organization — the old "organization" concept, renamed by ADR-0010)
-- `client-registry-module` — registered consuming applications (OAuth clients, each belonging to one Organization), authorization codes, plus the platform-tier `PlatformClient` that authenticates the management API itself (ADR-0010, Organization provisioning)
-- `app` — the Spring Boot bootstrap module: single deployable entry point, Actuator health checks, no domain code
-- `common` — shared kernel: base exceptions, value types, no business logic
+- `identity-module` — accounts (each scoped to one `Organization`, ADR-0010), password credentials, sessions, email verification, password recovery, refresh-token rotation with reuse detection, per-tenant signing-key (JWKS) management with rotation-with-overlap. Social login (Google/GitHub) is designed but not yet built.
+- `organization-module` — `Organization` (tenant isolation boundary, one per consuming system, implemented) + two-layer rate-limit policy management. `Workspace` (team/company grouping within one Organization — the old "organization" concept, renamed by ADR-0010) is designed (ADR-0010, `CLAUDE.md` §4) but has no code yet.
+- `client-registry-module` — registered consuming applications (OAuth clients, each belonging to one Organization), the full Authorization Code + PKCE flow (discovery/JWKS/userinfo/revoke), plus the platform-tier `PlatformClient` that authenticates the management API itself (ADR-0010, Organization provisioning) — implemented, including self-service rotate/revoke.
+- `app` — the Spring Boot bootstrap module: single deployable entry point, all Spring Security/OIDC filter-chain wiring, rate limiting, audit logging, Actuator health checks. No `domain/` of its own — every OIDC-protocol/security-config class here composes the business modules above, it doesn't own business rules.
+- `common` — shared kernel, given its first real content in `audit_events` (`AuditEvent`/`AuditEventRecorder`, consumed by 3 of the other 4 modules) once a third module actually needed the same thing (ADR-0001's own "no shared code until it's genuinely shared" principle).
 
 ## Running locally
 

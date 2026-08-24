@@ -13,6 +13,7 @@ import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 
 /**
@@ -61,5 +62,11 @@ class PlatformRegisteredClientRepositoryTest {
 
     assertThat(found).isNotNull();
     assertThat(found.getClientId()).isEqualTo("a-platform-client");
+    // ADR-0013: confidential clients only, platform tier included — same invariant
+    // OrganizationRegisteredClientRepositoryTest asserts for the tenant tier.
+    assertThat(found.getClientAuthenticationMethods())
+        .as(
+            "every PlatformClient must require client_secret_basic — never a public/PKCE-only client")
+        .containsExactly(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
   }
 }

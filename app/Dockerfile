@@ -30,7 +30,23 @@ WORKDIR /app
 
 # curl is not present in the base JRE image — installed explicitly and only
 # for the HEALTHCHECK below, before dropping to a non-root user.
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# ca-certificates/gnupg/apt-transport-https: prerequisites the Infisical apt-repo setup script
+# itself checks for (confirmed live) — needed regardless of curl, which was already required above.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates gnupg apt-transport-https \
+    && rm -rf /var/lib/apt/lists/*
+
+# ADR-0014 (TD-FUT-014): Infisical CLI, pinned to an exact version — same "no silently-drifting
+# tool version" discipline as TD-ARCH-006's Maven Wrapper and the JDK/JRE tags above, not
+# `curl | bash` with no record of what actually shipped in a given image. Version confirmed live by
+# actually running this exact install sequence in a real eclipse-temurin:25-jre container before
+# pinning it here, not copied from documentation alone (`apt-cache policy infisical` returned
+# exactly this version). docker-entrypoint.sh below is what actually invokes this — installed
+# unconditionally so a plain `INFISICAL_CLIENT_ID`/`INFISICAL_CLIENT_SECRET` env var is enough to
+# switch this same image onto the real secrets-manager path with no rebuild.
+RUN curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | bash \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends infisical=0.43.125 \
     && rm -rf /var/lib/apt/lists/*
 
 # TD-SEC-021: the base Ubuntu 26.04 image (eclipse-temurin:25-jre's own base, confirmed by pulling
@@ -51,6 +67,8 @@ RUN useradd --system --uid 10001 clavaris \
 USER clavaris
 
 COPY --from=build /workspace/app/target/clavaris-app.jar app.jar
+COPY --chown=clavaris:clavaris app/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8080
 
@@ -59,4 +77,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
     CMD curl -fsS http://localhost:8080/actuator/health/readiness || exit 1
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# ADR-0014: dual-mode — docker-entrypoint.sh's own header comment explains why this isn't a hard
+# cutover to `infisical run java -jar app.jar` directly.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

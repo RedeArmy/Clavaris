@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext;
 import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder;
@@ -88,6 +89,15 @@ class OrganizationRegisteredClientRepositoryTest {
 
     assertThat(found).isNotNull();
     assertThat(found.getClientId()).isEqualTo("a-client-id");
+    // ADR-0013: confidential clients only — no code path may ever hand back
+    // ClientAuthenticationMethod.NONE (a public/PKCE-only client). Asserted directly here rather
+    // than only implied by OAuthClient always carrying a non-blank clientSecretHash, since this is
+    // the one place that value actually turns into the authentication method SAS enforces at the
+    // protocol level — a regression here is exactly the kind of silent widening ADR-0013 exists to
+    // prevent.
+    assertThat(found.getClientAuthenticationMethods())
+        .as("every OAuthClient must require client_secret_basic — never a public/PKCE-only client")
+        .containsExactly(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
   }
 
   @Test

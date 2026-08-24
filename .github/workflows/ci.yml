@@ -85,6 +85,12 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 1
           ignore-unfixed: true
+          # TD-SEC-024: verified live (source, not assumed) that the action does NOT fall back to
+          # the underlying `trivy` CLI's own ".trivyignore in cwd" default — its entrypoint only
+          # sets TRIVY_IGNOREFILE when this input is explicitly given. Without it, the repo-root
+          # .trivyignore silently does nothing and the 7 already-risk-accepted Go-stdlib CVEs in
+          # the Infisical CLI binary (ADR-0014) fail this step every run.
+          trivyignores: .trivyignore
 
       - name: Upload Trivy report
         if: always()

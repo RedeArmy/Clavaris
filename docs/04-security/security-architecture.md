@@ -31,6 +31,7 @@ Bucket-based rate limiting (mirroring JobSeeker's own Bucket4j + Redis approach,
 
 - TLS required for every environment beyond local development — no exceptions for the OIDC surface, since tokens and authorization codes in transit are the entire attack surface PKCE and RS256 are designed to protect against.
 - Standard security headers (`Strict-Transport-Security`, `X-Content-Type-Options`, `Content-Security-Policy` on the hosted login/consent UI) — exact policy to be finalized alongside implementation, not yet written.
+- **CORS: deliberately none, on any endpoint (ADR-0013).** v1 supports confidential OAuth clients only — every `OAuthClient` requires `client_secret_basic` in addition to PKCE, enforced by `OrganizationRegisteredClientRepository`/`PlatformRegisteredClientRepository` unconditionally, with a dedicated regression test on each asserting no code path can ever produce a public/PKCE-only client. There is no legitimate cross-origin browser caller for `/oauth2/token` or any other endpoint, so a CORS allowlist would only ever be attack surface (a misconfigured origin entry leaking a token exchange) with no corresponding capability behind it.
 
 ## 6. Logging and observability
 
