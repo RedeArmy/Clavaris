@@ -5,11 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.HexFormat;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.AntPathMatcher;
@@ -30,23 +26,31 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Blocks with the longest {@code Retry-After} among every rule that was actually exceeded, so a
  * client that hit two different limits at once waits for the one that actually clears last.
  *
- * <p>Identifiers ({@code keyExtractor}'s own output — an email, an IP, a client_id) are SHA-256
- * hashed before becoming part of a Redis key, never stored raw — Redis is a secondary store this
- * project's own data-protection review doesn't cover the same way the primary Postgres schema does
- * (`data-model.md` §2's hash-only convention for every other secondary artifact), and an email
- * address is PII regardless of whether it's also a bearer secret.
+ * <p>Identifiers ({@code keyExtractor}'s own output — an email, an IP, a client_id) are HMAC-SHA256
+ * hashed (TD-SEC-023, {@link RateLimitKeyHasher}) before becoming part of a Redis key, never stored
+ * raw — Redis is a secondary store this project's own data-protection review doesn't cover the same
+ * way the primary Postgres schema does (`data-model.md` §2's hash-only convention for every other
+ * secondary artifact), and an email address is PII regardless of whether it's also a bearer secret.
+ * Keyed, not plain SHA-256: a plain digest of a known-format, low-entropy value like an email or an
+ * IPv4 is reversible via an offline dictionary attack by anyone who can read the Redis keyspace —
+ * see {@link RateLimitKeyHasher}'s own Javadoc for the full reasoning, including why this uses a
+ * dedicated secret rather than reusing {@code BearerTokenHasher}'s.
  */
 final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
   private final RateLimiter rateLimiter;
+  private final RateLimitKeyHasher keyHasher;
   private final List<RateLimitRule> rules;
 
   /* package */ AntiAbuseRateLimitingFilter(
-      final RateLimiter rateLimiter, final List<RateLimitRule> rules) {
+      final RateLimiter rateLimiter,
+      final RateLimitKeyHasher keyHasher,
+      final List<RateLimitRule> rules) {
     super();
     this.rateLimiter = rateLimiter;
+    this.keyHasher = keyHasher;
     this.rules = List.copyOf(rules);
   }
 
@@ -90,7 +94,7 @@ final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
       // which would let one malformed-request flood exhaust a counter real requests also rely on.
       return null;
     }
-    final String redisKey = "ratelimit:" + rule.name() + ":" + hash(identifier);
+    final String redisKey = "ratelimit:" + rule.name() + ":" + keyHasher.hash(identifier);
     final RateLimitDecision decision =
         rateLimiter.tryConsume(redisKey, rule.limit(), rule.window());
     return decision.allowed() ? null : decision.retryAfter();
@@ -113,18 +117,5 @@ final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
     // BR-DATA-01/anti-enumeration: identical for every rule this could have been — never reveals
     // which specific limit (account vs. IP, or which endpoint) was hit.
     response.getWriter().write("Too many requests. Please try again later.");
-  }
-
-  private static String hash(final String value) {
-    try {
-      final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      final byte[] hashed = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-      return HexFormat.of().formatHex(hashed);
-    } catch (final NoSuchAlgorithmException e) {
-      // Same "this is a programming/JVM-environment error, fail loudly" stance as SigningKeyStore's
-      // own equivalent catch — SHA-256 is a mandatory JDK algorithm, this can only happen if the
-      // JVM itself is broken.
-      throw new IllegalStateException("SHA-256 not available on this JVM", e);
-    }
   }
 }

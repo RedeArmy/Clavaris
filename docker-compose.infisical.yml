@@ -38,8 +38,12 @@ services:
 
   infisical-redis:
     image: redis:7
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+    # No `requirepass`, matching Clavaris's own `redis` service (docker-compose.yml) — Docker
+    # network isolation is the boundary for both, not an in-Redis password, so nothing to
+    # configure here. (An earlier version of this file set ALLOW_EMPTY_PASSWORD=yes, found and
+    # removed in review: that's a Bitnami-image-specific variable — this is the plain
+    # `redis:7` Docker Official Image, which ignores it entirely. Dead config, not a real
+    # security control either way.)
     volumes:
       - clavaris-infisical-redis-data:/data
 

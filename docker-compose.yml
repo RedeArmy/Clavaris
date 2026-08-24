@@ -75,6 +75,11 @@ services:
       # what keeps a Postgres compromise/backup leak from directly exposing every currently-valid
       # bearer token in oauth2_authorization.
       OAUTH2_TOKEN_HASH_SECRET: "${OAUTH2_TOKEN_HASH_SECRET:?OAUTH2_TOKEN_HASH_SECRET must be set explicitly in .env (see .env.example)}"
+      # TD-SEC-023: same "no silent default" posture as the two secrets above — a dedicated key,
+      # deliberately not OAUTH2_TOKEN_HASH_SECRET reused (RateLimitKeyHasher's own Javadoc), for the
+      # HMAC that keys every rate-limit identifier (email/IP/client_id) before it becomes part of a
+      # Redis key.
+      RATE_LIMIT_KEY_HASH_SECRET: "${RATE_LIMIT_KEY_HASH_SECRET:?RATE_LIMIT_KEY_HASH_SECRET must be set explicitly in .env (see .env.example)}"
       # ADR-0014 (docker-compose.infisical.yml): unset by default — docker-entrypoint.sh falls
       # back to reading the vars above directly (today's behavior, unchanged) when these two are
       # blank. Set both, per infisical-setup.md, to switch this same image onto the real

@@ -56,6 +56,12 @@ clavaris:
   # same convention as signing-key-store.password above.
   oauth2:
     token-hash-secret: ${OAUTH2_TOKEN_HASH_SECRET:dev-only-oauth2-token-hash-secret-change-in-real-deployments}
+  # TD-SEC-023: keys the HMAC-SHA256 digest AntiAbuseRateLimitingFilter computes for every rate-limit
+  # identifier (email, IP, client_id) before it becomes part of a Redis key (RateLimitKeyHasher's
+  # own Javadoc) — a dedicated secret, deliberately not oauth2.token-hash-secret reused (see that
+  # class for why). Same dev-only-literal convention as every secret above.
+  rate-limit:
+    key-hash-secret: ${RATE_LIMIT_KEY_HASH_SECRET:dev-only-rate-limit-key-hash-secret-change-in-real-deployments}
 
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;

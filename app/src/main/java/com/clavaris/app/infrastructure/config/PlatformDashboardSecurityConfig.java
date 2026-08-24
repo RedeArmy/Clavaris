@@ -79,6 +79,7 @@ class PlatformDashboardSecurityConfig {
       final HttpSecurity http,
       final SessionRegistry sessionRegistry,
       final RateLimiter rateLimiter,
+      final RateLimitKeyHasher rateLimitKeyHasher,
       @Value("${clavaris.rate-limit.login.per-account-limit:10}") final int loginPerAccountLimit,
       @Value("${clavaris.rate-limit.login.per-ip-limit:30}") final int loginPerIpLimit,
       @Value("${clavaris.rate-limit.platform-register.per-ip-limit:10}")
@@ -153,6 +154,7 @@ class PlatformDashboardSecurityConfig {
         .addFilterAfter(
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,
+                rateLimitKeyHasher,
                 List.of(
                     new RateLimitRule(
                         "platform-login:account",
