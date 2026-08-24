@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import java.io.IOException;
 import java.net.CookieManager;
@@ -31,11 +32,20 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>{@link TestMailSenderConfig}: a successful registration now really does trigger {@code
  * RequestEmailVerificationUseCase} (TD-SEC-004) — this test must never let that reach the real
  * Resend API.
+ *
+ * <p>Extends {@link RedisBackedIntegrationTest} (TD-ARCH-002 regression, found live in CI, not
+ * locally): {@code DistributedSessionConfig}'s {@code @EnableRedisIndexedHttpSession} registers
+ * {@code RedisIndexedHttpSessionConfiguration$EnableRedisKeyspaceNotificationsInitializer}, which
+ * eagerly opens a real Redis connection during context startup for every {@code @SpringBootTest}
+ * that boots the full app context — not only ones that exercise sessions. Locally this was masked
+ * the exact same way {@link RedisBackedIntegrationTest}'s own Javadoc already warns about for the
+ * rate-limiting filters: a real Redis happens to already be listening on {@code localhost:6379} via
+ * {@code docker-compose.yml}. CI has no such container, so the context failed to start at all.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)
 @Testcontainers
-class RegisterAccountCsrfIntegrationTest {
+class RegisterAccountCsrfIntegrationTest extends RedisBackedIntegrationTest {
 
   private static final Pattern CSRF_TOKEN_PATTERN =
       Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"");
