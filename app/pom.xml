@@ -136,6 +136,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!-- TD-ARCH-002 (closed): backs HttpSession with real, restart-surviving, cross-instance
+             Redis storage instead of servlet-container heap. Spring Boot autoconfigures the whole
+             SessionRepositoryFilter wiring once this is on the classpath and store-type: redis is
+             set (application.yml) — no manual @EnableRedisIndexedHttpSession needed. The "indexed"
+             repository-type (also set there) is what makes SpringSessionBackedSessionRegistry's
+             principal-name lookup below possible; the plain (non-indexed) repository this starter
+             would otherwise default to does not support it. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

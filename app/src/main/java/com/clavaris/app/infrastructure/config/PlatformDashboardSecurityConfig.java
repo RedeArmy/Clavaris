@@ -9,10 +9,11 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.session.SessionRegistry;
-import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
-import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
+import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 
 /**
  * ADR-0012: the {@code /platform/**} chain — {@code PlatformAccount}'s own register/login/verify/
@@ -21,13 +22,22 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
  * rationale as {@code DefaultSecurityConfig}'s own identical choice — this is cookie-session-backed
  * form POSTs throughout.
  *
- * <p>{@link SessionRegistry}/{@link HttpSessionEventPublisher}: needed so {@code
- * PlatformAccountSessionRevokerBridge}'s {@code expireNow()} call (BR-ID-04's ADR-0012 equivalent)
- * actually takes effect on the next request from that session, not just marks a registry entry
- * nobody checks — {@code ConcurrentSessionFilter}, wired in below via {@code sessionConcurrency},
- * is the piece that enforces it. {@code maximumSessions(-1)}: unlimited concurrent sessions per
- * {@code PlatformAccount} — this wiring exists for revocation, not to cap how many devices one
- * account may be signed into at once.
+ * <p>{@link SessionRegistry}: needed so {@code PlatformAccountSessionRevokerBridge}'s {@code
+ * expireNow()} call (BR-ID-04's ADR-0012 equivalent) actually takes effect on the next request from
+ * that session, not just marks a registry entry nobody checks — {@code ConcurrentSessionFilter},
+ * wired in below via {@code sessionConcurrency}, is the piece that enforces it. {@code
+ * maximumSessions(-1)}: unlimited concurrent sessions per {@code PlatformAccount} — this wiring
+ * exists for revocation, not to cap how many devices one account may be signed into at once.
+ *
+ * <p>TD-ARCH-002 (closed): {@link SpringSessionBackedSessionRegistry}, not the plain {@code
+ * SessionRegistryImpl} this class used before — that implementation is a local, in-JVM map
+ * populated via {@code HttpSessionEventPublisher}'s servlet-container lifecycle events, so a
+ * revocation issued against instance B would never see a session actually held by instance A once
+ * more than one instance runs. Spring Session's own registry queries the same Redis-backed,
+ * cross-instance-visible store every request's session already lives in (see {@code
+ * application.yml}'s {@code spring.session.*}) — {@code HttpSessionEventPublisher} is no longer
+ * needed alongside it (confirmed against Spring Security's own reference docs: Spring Session
+ * already keeps this registry's view current, the publisher's job under the old registry).
  */
 @Configuration
 class PlatformDashboardSecurityConfig {
@@ -43,17 +53,19 @@ class PlatformDashboardSecurityConfig {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
+  // TD-ARCH-002 (closed): backed by the same Redis-indexed repository every real HttpSession now
+  // lives in (application.yml's spring.session.redis.repository-type: indexed). Its
+  // findByIndexNameAndIndexValue(PRINCIPAL_NAME_INDEX_NAME, ...) is what
+  // PlatformAccountSessionRevokerBridge's getAllSessions(principalName, false) call resolves to
+  // under the hood, querying Redis live rather than a local in-JVM map — a revocation issued on
+  // one instance correctly sees (and expires) a session established on another. No
+  // HttpSessionEventPublisher bean needed alongside this — that publisher only exists to keep the
+  // old SessionRegistryImpl's local map in sync with real container events; this registry has no
+  // local map to keep in sync.
   @Bean
-  /* package */ SessionRegistry sessionRegistry() {
-    return new SessionRegistryImpl();
-  }
-
-  // Spring Boot auto-registers any HttpSessionListener bean with the embedded servlet container —
-  // confirmed live (a session survives past its establishing request and IS visible to
-  // SessionRegistry#getAllSessions in PlatformAccountSessionRevokerBridgeIntegrationTest).
-  @Bean
-  /* package */ HttpSessionEventPublisher httpSessionEventPublisher() {
-    return new HttpSessionEventPublisher();
+  /* package */ SessionRegistry sessionRegistry(
+      final FindByIndexNameSessionRepository<? extends Session> sessionRepository) {
+    return new SpringSessionBackedSessionRegistry<>(sessionRepository);
   }
 
   // Descriptive @Value property names over PMD's default LongVariable threshold, same convention

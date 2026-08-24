@@ -36,4 +36,16 @@ public abstract class RedisBackedIntegrationTest {
     registry.add("spring.data.redis.host", REDIS::getHost);
     registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
   }
+
+  // TD-ARCH-002: exposes this same shared container's real host/port to subclasses outside this
+  // package (REDIS itself stays package-private — no reason to widen the field's own visibility
+  // just so one test can point a second, independently-built Spring context at the identical
+  // Testcontainer instance to simulate a genuinely separate app process).
+  protected static String redisHost() {
+    return REDIS.getHost();
+  }
+
+  protected static int redisPort() {
+    return REDIS.getMappedPort(6379);
+  }
 }

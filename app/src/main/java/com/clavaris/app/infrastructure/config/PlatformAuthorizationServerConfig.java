@@ -56,7 +56,15 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 // "PMD.LongVariable" suppression string itself now repeats a 4th time (rate limiting's own new
 // param) — same descriptive-parameter-names reasoning as OrganizationAuthorizationServerConfig's
 // own identical comment, not worth a named constant purely to satisfy a check about a check.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
+// PMD.ExcessiveParameterList: TD-SEC-019 added bearerTokenHasher, tipping
+// platformAuthorizationServerSecurityFilterChain's own parameter count to the threshold — same
+// "wiring, not sprawl" reasoning as OrganizationAuthorizationServerConfig's own identical
+// suppression.
+@SuppressWarnings({
+  "PMD.ExcessiveImports",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.ExcessiveParameterList"
+})
 @Configuration
 class PlatformAuthorizationServerConfig {
 
@@ -72,6 +80,7 @@ class PlatformAuthorizationServerConfig {
       final RegisteredClientRepository registeredClients,
       final PlatformSigningKeyMaterial signingKey,
       final JdbcTemplate jdbcTemplate,
+      final BearerTokenHasher bearerTokenHasher,
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
       @SuppressWarnings("PMD.LongVariable")
@@ -110,9 +119,12 @@ class PlatformAuthorizationServerConfig {
     // (V20260821100000__create_oauth2_authorization_table.sql) for why this shares one physical
     // table with the Organization tier's own instance below, rather than the usual two-tables
     // pattern this codebase uses everywhere else platform/tenant state is split.
+    // TD-SEC-019: wrapped — see the Organization tier's own identical comment and
+    // HashedTokenOAuth2AuthorizationService's Javadoc for the full design.
     @SuppressWarnings("PMD.LongVariable")
     final OAuth2AuthorizationService authorizationService =
-        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients);
+        new HashedTokenOAuth2AuthorizationService(
+            new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
 
     http.securityMatcher("/oauth2/**")
         .with(

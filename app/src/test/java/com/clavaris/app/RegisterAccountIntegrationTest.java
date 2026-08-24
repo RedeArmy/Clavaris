@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -30,10 +31,19 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * constraint. first-vertical-slice-blueprint.md §2.5's integration-level requirement: prove the
  * unique constraint on accounts.(organization_id, email) actually throws under a genuine concurrent
  * double-insert, not a mocked assumption that it would (test-strategy.md §2).
+ *
+ * <p>Extends {@link RedisBackedIntegrationTest} (TD-ARCH-002 regression, found live in CI, not
+ * locally): {@code DistributedSessionConfig}'s {@code @EnableRedisIndexedHttpSession} registers
+ * {@code RedisIndexedHttpSessionConfiguration$EnableRedisKeyspaceNotificationsInitializer}, which
+ * eagerly opens a real Redis connection during context startup for every {@code @SpringBootTest}
+ * that boots the full app context — not only ones that exercise sessions. Locally this was masked
+ * the exact same way {@link RedisBackedIntegrationTest}'s own Javadoc already warns about for the
+ * rate-limiting filters: a real Redis happens to already be listening on {@code localhost:6379} via
+ * {@code docker-compose.yml}. CI has no such container, so the context failed to start at all.
  */
 @SpringBootTest
 @Testcontainers
-class RegisterAccountIntegrationTest {
+class RegisterAccountIntegrationTest extends RedisBackedIntegrationTest {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");

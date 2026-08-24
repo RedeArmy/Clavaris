@@ -32,10 +32,13 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -90,12 +94,19 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   private int port;
 
   @Autowired private PlatformAccountRepository platformAccounts;
+  @Autowired private JdbcTemplate jdbcTemplate;
+
+  // TD-SEC-019: application.yml's own dev-only fallback for clavaris.oauth2.token-hash-secret —
+  // not overridden by this class's @TestPropertySource, so this is the exact secret the running
+  // app is actually keying HashedTokenOAuth2AuthorizationService with.
+  private static final String TOKEN_HASH_SECRET =
+      "dev-only-oauth2-token-hash-secret-change-in-real-deployments";
 
   // One CookieManager for the whole test — the session established while fetching the login
   // page's CSRF token, and the one Spring Security persists the authenticated SecurityContext
   // into after login, must be the SAME session throughout, exactly as a real browser would carry
   // it across every hop below. Kept as a field (not just handed to the builder) so the test can
-  // also read the JSESSIONID cookie's own value directly — see currentSessionId() below.
+  // also read the SESSION cookie's own value directly — see currentSessionId() below.
   private final CookieManager cookieManager = new CookieManager();
   private final HttpClient httpClient =
       HttpClient.newBuilder()
@@ -192,6 +203,9 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     String code = queryParam(redirectWithCode, "code");
     assertThat(code).isNotBlank();
     assertThat(queryParam(redirectWithCode, "state")).isEqualTo(state);
+    // TD-SEC-019: the code SAS just handed the client back must already be hash-stored, not
+    // written in plaintext then hashed only later at exchange time.
+    assertOnlyTheHashedValueIsStored(Column.AUTHORIZATION_CODE_VALUE, code);
 
     // Isolate what's checked below to this exchange specifically — requestPlatformAccessToken()
     // above (bootstrapping the organization/client via the management API) already logged its own
@@ -208,6 +222,11 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(idToken)
         .as("scope=openid must yield a real ID token, not just an access token")
         .isNotBlank();
+    // TD-SEC-019: the token exchange's own two token types must equally never land in
+    // oauth2_authorization in plaintext — the platform tier's own access-token case is covered
+    // separately (PlatformTokenIssuanceIntegrationTest); this is the ID token's only coverage.
+    assertOnlyTheHashedValueIsStored(Column.ACCESS_TOKEN_VALUE, accessToken);
+    assertOnlyTheHashedValueIsStored(Column.OIDC_ID_TOKEN_VALUE, idToken);
     // TD-SEC-016: both the access token and the ID token this exchange just issued must have
     // logged their own event=token_issued line — proves the wiring, not just the customizer's own
     // isolated behaviour (TokenIssuanceEventLoggerTest covers that).
@@ -447,10 +466,12 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
   // Reads the real cookie the container sent, not an assumption about internal session-tracking
   // state — the only way to actually observe from outside the process whether the session ID
-  // changed, which is the entire point of the TD-SEC-012 regression checks above.
+  // changed, which is the entire point of the TD-SEC-012 regression checks above. "SESSION", not
+  // "JSESSIONID" — TD-ARCH-002 replaced the servlet container's own session tracking with Spring
+  // Session (DistributedSessionConfig), whose DefaultCookieSerializer names its cookie "SESSION".
   private String currentSessionId() {
     return cookieManager.getCookieStore().getCookies().stream()
-        .filter(cookie -> "JSESSIONID".equalsIgnoreCase(cookie.getName()))
+        .filter(cookie -> "SESSION".equalsIgnoreCase(cookie.getName()))
         .map(HttpCookie::getValue)
         .findFirst()
         .orElse(null);
@@ -485,6 +506,51 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
       }
     }
     return null;
+  }
+
+  // TD-SEC-019: computes the expected HMAC independently (javax.crypto.Mac, not
+  // BearerTokenHasher itself — that class is package-private to infrastructure.config and
+  // unreachable from this package, and duplicating the computation here also avoids a
+  // tautological test that would pass even if BearerTokenHasher itself were broken).
+  private void assertOnlyTheHashedValueIsStored(Column column, String rawValue) throws Exception {
+    String expectedHashedValue = hmacSha256Hex(TOKEN_HASH_SECRET, rawValue);
+
+    List<String> rowsMatchingTheRawValue =
+        jdbcTemplate.queryForList(column.selectByValueSql(), String.class, rawValue);
+    List<String> rowsMatchingTheExpectedHash =
+        jdbcTemplate.queryForList(column.selectByValueSql(), String.class, expectedHashedValue);
+
+    assertThat(rowsMatchingTheRawValue)
+        .as("the raw, directly-usable value must never appear in oauth2_authorization." + column)
+        .isEmpty();
+    assertThat(rowsMatchingTheExpectedHash)
+        .as("exactly the HMAC-SHA256 digest of the real value must be what was actually stored")
+        .hasSize(1);
+  }
+
+  // A fixed enum, not a raw column-name string, so the SQL built in selectByValueSql() is never
+  // built from arbitrary caller-supplied text — the three real oauth2_authorization columns
+  // HashedTokenOAuth2AuthorizationService actually hashes (its own Javadoc).
+  private enum Column {
+    AUTHORIZATION_CODE_VALUE("authorization_code_value"),
+    ACCESS_TOKEN_VALUE("access_token_value"),
+    OIDC_ID_TOKEN_VALUE("oidc_id_token_value");
+
+    private final String columnName;
+
+    Column(String columnName) {
+      this.columnName = columnName;
+    }
+
+    String selectByValueSql() {
+      return "SELECT id FROM oauth2_authorization WHERE " + columnName + " = ?";
+    }
+  }
+
+  private static String hmacSha256Hex(String secret, String value) throws Exception {
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+    return HexFormat.of().formatHex(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
   }
 
   private static SignedJWT parse(String token) {

@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.support.RedisBackedIntegrationTest;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,10 +19,19 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * migrations actually created, already fails the context load itself — the assertions below
  * additionally pin down *why* it loaded (SonarCloud S2699: a test with no assertion only proves
  * "nothing threw," not the specific claim in the class Javadoc above).
+ *
+ * <p>Extends {@link RedisBackedIntegrationTest} (TD-ARCH-002 regression, found live in CI, not
+ * locally): {@code DistributedSessionConfig}'s {@code @EnableRedisIndexedHttpSession} registers
+ * {@code RedisIndexedHttpSessionConfiguration$EnableRedisKeyspaceNotificationsInitializer}, which
+ * eagerly opens a real Redis connection during context startup for every {@code @SpringBootTest}
+ * that boots the full app context — not only ones that exercise sessions. Locally this was masked
+ * the exact same way {@link RedisBackedIntegrationTest}'s own Javadoc already warns about for the
+ * rate-limiting filters: a real Redis happens to already be listening on {@code localhost:6379} via
+ * {@code docker-compose.yml}. CI has no such container, so the context failed to start at all.
  */
 @SpringBootTest
 @Testcontainers
-class FlywayMigrationIntegrationTest {
+class FlywayMigrationIntegrationTest extends RedisBackedIntegrationTest {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");

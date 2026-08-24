@@ -87,8 +87,16 @@ import org.springframework.security.web.context.SecurityContextRepository;
 // names matching SAS's own naming, and the same "PMD.LongVariable" suppression literal repeated
 // per-parameter all follow directly from that, not from an organically grown class that should be
 // split. TD-SEC-003/BR-ID-03 added the JDBC-backed OAuth2AuthorizationService plus refresh-token
-// use case imports/parameters, tipping this over PMD's default thresholds.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.LongVariable", "PMD.ExcessiveParameterList"})
+// use case imports/parameters, tipping this over PMD's default thresholds. TD-SEC-019 added one
+// more collaborator (BearerTokenHasher), tipping CouplingBetweenObjects' own count from 20 to 21 —
+// same "wiring, not sprawl" reasoning, not worth splitting a class whose entire job is assembling
+// one SecurityFilterChain bean out of this many legitimately-distinct SAS/Spring Security types.
+@SuppressWarnings({
+  "PMD.ExcessiveImports",
+  "PMD.LongVariable",
+  "PMD.ExcessiveParameterList",
+  "PMD.CouplingBetweenObjects"
+})
 @Configuration
 class OrganizationAuthorizationServerConfig {
 
@@ -111,6 +119,19 @@ class OrganizationAuthorizationServerConfig {
     return new HttpSessionSecurityContextRepository();
   }
 
+  // TD-SEC-019: declared once, shared by this class's own authorizationService() wiring below and
+  // by PlatformAuthorizationServerConfig's identical need — same "share the instance explicitly"
+  // precedent as securityContextRepository() above. No default: an unset OAUTH2_TOKEN_HASH_SECRET
+  // must fail loudly at startup (TD-SEC-013's own "no silent default" discipline), same posture as
+  // TOKEN_SIGNING_KEY_STORE_PASSWORD/PLATFORM_BOOTSTRAP_CLIENT_SECRET — this secret is what stands
+  // between a compromised Postgres backup and every currently-valid access/ID token/authorization
+  // code being directly usable.
+  @Bean
+  /* package */ BearerTokenHasher bearerTokenHasher(
+      @Value("${clavaris.oauth2.token-hash-secret}") final String tokenHashSecret) {
+    return new BearerTokenHasher(tokenHashSecret);
+  }
+
   @Bean
   @Order(3)
   /* package */ SecurityFilterChain organizationAuthorizationServerSecurityFilterChain(
@@ -120,6 +141,7 @@ class OrganizationAuthorizationServerConfig {
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final SecurityContextRepository contextRepository,
       final JdbcTemplate jdbcTemplate,
+      final BearerTokenHasher bearerTokenHasher,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final IssueRefreshTokenUseCase issueRefreshToken,
@@ -190,9 +212,13 @@ class OrganizationAuthorizationServerConfig {
     // one physical oauth2_authorization table. This is the tier that actually matters most for
     // BR-ID-03 (refresh tokens): every Organization's interactive Authorization Code + PKCE
     // exchange, not just the low-volume platform client_credentials tier, now survives a restart.
+    // TD-SEC-019: wrapped, not passed to .authorizationService(...) directly — every bearer token
+    // value this tier ever writes here is HMAC-hashed before it reaches Postgres. See
+    // HashedTokenOAuth2AuthorizationService's own Javadoc for the full design.
     @SuppressWarnings("PMD.LongVariable")
     final OAuth2AuthorizationService authorizationService =
-        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients);
+        new HashedTokenOAuth2AuthorizationService(
+            new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
 
     http.securityMatcher(
             "/o/*/oauth2/**", "/o/*/.well-known/**", "/o/*/userinfo", LOGIN_PATH_PATTERN)

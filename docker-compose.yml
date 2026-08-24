@@ -71,6 +71,10 @@ services:
       # above — no silent default for a value this security-sensitive.
       TOKEN_SIGNING_KEY_STORE_PATH: /app/data/signing-keys.p12
       TOKEN_SIGNING_KEY_STORE_PASSWORD: "${TOKEN_SIGNING_KEY_STORE_PASSWORD:?TOKEN_SIGNING_KEY_STORE_PASSWORD must be set explicitly in .env (see .env.example)}"
+      # TD-SEC-019: same "no silent default" posture as the signing-key password above — this is
+      # what keeps a Postgres compromise/backup leak from directly exposing every currently-valid
+      # bearer token in oauth2_authorization.
+      OAUTH2_TOKEN_HASH_SECRET: "${OAUTH2_TOKEN_HASH_SECRET:?OAUTH2_TOKEN_HASH_SECRET must be set explicitly in .env (see .env.example)}"
     volumes:
       - clavaris-signing-keys-data:/app/data
     depends_on:
