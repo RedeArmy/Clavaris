@@ -30,7 +30,7 @@
 
 - Structured logs (JSON) for every authentication event (login success/failure, token issuance, token revocation, password reset requested/completed) — without ever logging the credential or token value itself (BR-DATA-01).
 - Metrics: login success/failure rate, token issuance latency, refresh token reuse-detection triggers (a reuse detection firing is a security signal worth alerting on, not just logging).
-- Full detail deferred to `docs/05-engineering/` once the observability stack is chosen (expected to mirror JobSeeker's Actuator/Micrometer/Prometheus/Grafana choice, not yet formalized as its own ADR here).
+- Stack chosen and formalized 2026-08-24: **ADR-0015** — Micrometer (already on the classpath via `spring-boot-starter-actuator`) + self-hosted Prometheus/Alertmanager/Grafana, mirroring JobSeeker's own already-running choice. Decision only, not yet implemented — see `technical-debt-register.md` TD-FUT-011 (still open) and ADR-0015's own Consequences for why the decision and the implementation are deliberately tracked separately.
 
 ## 6. Maintainability
 

@@ -7,7 +7,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
  * {@code kid}, without touching any metadata row (that's {@code
  * ActivateSigningKeyForOrganizationUseCase}'s own job, called separately). Deliberately doesn't
  * reference {@code infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory}
- * directly from this application-layer service — the hexagonal dependency rule (CLAUDE.md §7.2)
+ * directly from this application-layer service — this project's own hexagonal dependency rule
  * applies within one module too, not only across module boundaries. {@code
  * OrganizationSigningKeyMaterialFactory} implements this port directly; its own {@code
  * generateFor(OrganizationId)} method already has this exact shape, so no separate bridge class is
