@@ -14,9 +14,9 @@ import java.util.UUID;
  * needs to reason about the rotation chain, not just whichever token is currently active.
  *
  * <p>Deliberately distinct from the servlet-container {@code HttpSession} the hosted login/consent
- * UI uses (TD-ARCH-002) — this is the OAuth2/OIDC-level concept of "one continuous authorization,"
- * a business record, not in-process web-tier state. The two are related (a browser login opens
- * both) but neither implies the other's lifecycle.
+ * UI uses (Redis-backed since TD-ARCH-002 closed) — this is the OAuth2/OIDC-level concept of "one
+ * continuous authorization," a business record, not web-tier state. The two are related (a browser
+ * login opens both) but neither implies the other's lifecycle.
  *
  * <p>{@code scopes} is fixed at {@link #open}: RFC 6749 §6 forbids a refresh grant from ever
  * requesting more than what was originally authorized, so every {@link RefreshToken} issued under

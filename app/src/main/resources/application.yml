@@ -27,6 +27,12 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  # TD-ARCH-002 (closed): NOT spring.session.* — confirmed by inspecting the resolved
+  # spring-boot-autoconfigure-4.1.0 jar directly that Spring Boot 4.x ships zero session-related
+  # autoconfiguration classes (unlike the still-autoconfigured spring-boot-data-redis module
+  # RedisFixedWindowRateLimiter already depends on, confirmed present in the same jar). Any
+  # spring.session.* key here would be silently ignored, not a working config — DistributedSession
+  # Config's explicit @EnableRedisIndexedHttpSession is the actual, load-bearing configuration.
 
 # TD-SEC-002: TOKEN_SIGNING_KEY_STORE_PATH is now actually read — a PKCS12 file (SigningKeyStore)
 # holding the platform tier's and every Organization's RSA private key material, so a process
@@ -44,6 +50,12 @@ clavaris:
   mail:
     resend-api-key: ${RESEND_API_KEY:}
     from-address: ${MAIL_FROM_ADDRESS:}
+  # TD-SEC-019: keys the HMAC-SHA256 digest HashedTokenOAuth2AuthorizationService computes for
+  # every oauth2_authorization bearer token value before it reaches Postgres (BearerTokenHasher's
+  # own Javadoc). The dev-only literal below is exactly that — never used in a real deployment,
+  # same convention as signing-key-store.password above.
+  oauth2:
+    token-hash-secret: ${OAUTH2_TOKEN_HASH_SECRET:dev-only-oauth2-token-hash-secret-change-in-real-deployments}
 
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;

@@ -66,6 +66,14 @@ class SpringSecurityPlatformAuthenticatedSessionEstablisher
     // Bypassing the standard filter chain also bypasses RegisterSessionAuthenticationStrategy,
     // which normally does this registration automatically — PlatformAccountSessionRevokerBridge's
     // own expireNow() call (ADR-0012's BR-ID-04 equivalent) has nothing to find without it.
+    // TD-ARCH-002 (closed): under the SessionRegistry bean this project wires today
+    // (SpringSessionBackedSessionRegistry), this call is a documented no-op — confirmed by reading
+    // its own source, "we don't administer sessions ourselves." The real indexing happens
+    // automatically, driven by Spring Session's own PrincipalNameIndexResolver reading the
+    // authentication straight off the SPRING_SECURITY_CONTEXT attribute contextRepository.
+    // saveContext (above) already wrote — nothing else needs to call it. Left in, not deleted:
+    // harmless under the current registry, and still load-bearing if this project ever reverts to
+    // a plain in-memory SessionRegistryImpl.
     // PMD.LawOfDemeter: request.getSession() is the standard Servlet API shape for "the session
     // this request now carries" — there is no other way to reach it.
     @SuppressWarnings("PMD.LawOfDemeter")

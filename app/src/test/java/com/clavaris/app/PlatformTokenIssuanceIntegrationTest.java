@@ -18,16 +18,22 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -64,6 +70,14 @@ class PlatformTokenIssuanceIntegrationTest extends RedisBackedIntegrationTest {
 
   @Value("${local.server.port}")
   private int port;
+
+  // TD-SEC-019: application.yml's own dev-only fallback for clavaris.oauth2.token-hash-secret —
+  // not overridden by this class's @TestPropertySource, so this is the exact secret the running
+  // app is actually keying HashedTokenOAuth2AuthorizationService with.
+  private static final String TOKEN_HASH_SECRET =
+      "dev-only-oauth2-token-hash-secret-change-in-real-deployments";
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -186,6 +200,44 @@ class PlatformTokenIssuanceIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<String> response = requestToken("test-platform-client", "the-wrong-secret");
 
     assertThat(response.statusCode()).isEqualTo(401);
+  }
+
+  @Test
+  void storesTheAccessTokenValueHashedAtRestNeverInPlaintext() throws Exception {
+    // TD-SEC-019: the real proof this row exists to give — a Postgres compromise/backup leak
+    // must never hand over a directly-usable bearer credential. Computes the expected HMAC
+    // independently (javax.crypto.Mac, not BearerTokenHasher itself — that class is package-
+    // private to infrastructure.config and unreachable from this package, and duplicating the
+    // computation here also avoids a tautological test that would pass even if
+    // BearerTokenHasher itself were broken).
+    HttpResponse<String> tokenResponse =
+        requestToken("test-platform-client", "a-test-platform-secret");
+    String accessToken = objectMapper.readTree(tokenResponse.body()).get("access_token").asString();
+    String expectedHashedValue = hmacSha256Hex(TOKEN_HASH_SECRET, accessToken);
+
+    List<String> rowsMatchingTheRawToken =
+        jdbcTemplate.queryForList(
+            "SELECT id FROM oauth2_authorization WHERE access_token_value = ?",
+            String.class,
+            accessToken);
+    List<String> rowsMatchingTheExpectedHash =
+        jdbcTemplate.queryForList(
+            "SELECT id FROM oauth2_authorization WHERE access_token_value = ?",
+            String.class,
+            expectedHashedValue);
+
+    assertThat(rowsMatchingTheRawToken)
+        .as("the raw, directly-usable token value must never appear in oauth2_authorization")
+        .isEmpty();
+    assertThat(rowsMatchingTheExpectedHash)
+        .as("exactly the HMAC-SHA256 digest of the issued token must be what was actually stored")
+        .hasSize(1);
+  }
+
+  private static String hmacSha256Hex(String secret, String value) throws Exception {
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+    return HexFormat.of().formatHex(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
