@@ -48,6 +48,7 @@ Add each of these as a secret in the `clavaris` project's `dev` environment (Inf
 
 - `TOKEN_SIGNING_KEY_STORE_PASSWORD`
 - `OAUTH2_TOKEN_HASH_SECRET`
+- `RATE_LIMIT_KEY_HASH_SECRET`
 - `PLATFORM_BOOTSTRAP_CLIENT_ID` / `PLATFORM_BOOTSTRAP_CLIENT_SECRET`
 - `DB_DEV_PASSWORD` (and `DB_DEV_USER`/`DB_DEV_NAME` if you want Infisical to own those too, not just the password)
 - `RESEND_API_KEY` (once TD-SEC-004's email delivery is configured for this environment)

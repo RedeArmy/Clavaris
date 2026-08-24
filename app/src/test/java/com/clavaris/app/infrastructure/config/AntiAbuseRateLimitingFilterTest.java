@@ -25,12 +25,19 @@ import org.springframework.mock.web.MockHttpServletResponse;
  */
 class AntiAbuseRateLimitingFilterTest {
 
+  // A fixed test-only secret, matching every other RateLimitKeyHasher instantiation in this test
+  // class — the exact key value doesn't matter here (RateLimitKeyHasherTest already covers keying
+  // correctness in isolation), only that every rateLimiter.tryConsume(...) expectation below is
+  // computed against this same instance.
+  private static final RateLimitKeyHasher KEY_HASHER = new RateLimitKeyHasher("test-secret");
+
   @Test
   void allowsARequestThatMatchesNoRuleWithoutConsultingTheRateLimiterAtAll() throws Exception {
     RateLimiter rateLimiter = mock(RateLimiter.class);
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
+            KEY_HASHER,
             List.of(
                 new RateLimitRule(
                     "login:account",
@@ -58,6 +65,7 @@ class AntiAbuseRateLimitingFilterTest {
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
+            KEY_HASHER,
             List.of(
                 new RateLimitRule(
                     "login:account",
@@ -86,6 +94,7 @@ class AntiAbuseRateLimitingFilterTest {
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
+            KEY_HASHER,
             List.of(
                 new RateLimitRule(
                     "login:account",
@@ -115,6 +124,7 @@ class AntiAbuseRateLimitingFilterTest {
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
+            KEY_HASHER,
             List.of(
                 new RateLimitRule(
                     "login:account",
@@ -142,13 +152,15 @@ class AntiAbuseRateLimitingFilterTest {
     // per-account rule for the same request would have allowed it.
     RateLimiter rateLimiter = mock(RateLimiter.class);
     when(rateLimiter.tryConsume(
-            eq("ratelimit:login:account:" + sha256("user@example.com")), eq(10), any()))
+            eq("ratelimit:login:account:" + KEY_HASHER.hash("user@example.com")), eq(10), any()))
         .thenReturn(new RateLimitDecision(true, 1, Duration.ofMinutes(5)));
-    when(rateLimiter.tryConsume(eq("ratelimit:login:ip:" + sha256("127.0.0.1")), eq(30), any()))
+    when(rateLimiter.tryConsume(
+            eq("ratelimit:login:ip:" + KEY_HASHER.hash("127.0.0.1")), eq(30), any()))
         .thenReturn(new RateLimitDecision(false, 31, Duration.ofSeconds(17)));
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
+            KEY_HASHER,
             List.of(
                 new RateLimitRule(
                     "login:account",
@@ -187,6 +199,7 @@ class AntiAbuseRateLimitingFilterTest {
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
+            KEY_HASHER,
             List.of(
                 new RateLimitRule(
                     "login:account",
@@ -205,15 +218,5 @@ class AntiAbuseRateLimitingFilterTest {
     assertThat(response.getContentAsString())
         .doesNotContain("login:account", "user@example.com")
         .contains("Too many requests");
-  }
-
-  private static String sha256(final String value) {
-    try {
-      java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-      byte[] hashed = digest.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-      return java.util.HexFormat.of().formatHex(hashed);
-    } catch (java.security.NoSuchAlgorithmException e) {
-      throw new IllegalStateException(e);
-    }
   }
 }

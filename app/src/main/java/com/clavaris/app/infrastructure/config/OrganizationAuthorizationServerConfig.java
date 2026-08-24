@@ -88,9 +88,10 @@ import org.springframework.security.web.context.SecurityContextRepository;
 // per-parameter all follow directly from that, not from an organically grown class that should be
 // split. TD-SEC-003/BR-ID-03 added the JDBC-backed OAuth2AuthorizationService plus refresh-token
 // use case imports/parameters, tipping this over PMD's default thresholds. TD-SEC-019 added one
-// more collaborator (BearerTokenHasher), tipping CouplingBetweenObjects' own count from 20 to 21 —
-// same "wiring, not sprawl" reasoning, not worth splitting a class whose entire job is assembling
-// one SecurityFilterChain bean out of this many legitimately-distinct SAS/Spring Security types.
+// more collaborator (BearerTokenHasher), tipping CouplingBetweenObjects' own count from 20 to 21,
+// and TD-SEC-023 added a second (RateLimitKeyHasher) — same "wiring, not sprawl" reasoning, not
+// worth splitting a class whose entire job is assembling one SecurityFilterChain bean out of this
+// many legitimately-distinct SAS/Spring Security types.
 @SuppressWarnings({
   "PMD.ExcessiveImports",
   "PMD.LongVariable",
@@ -132,6 +133,17 @@ class OrganizationAuthorizationServerConfig {
     return new BearerTokenHasher(tokenHashSecret);
   }
 
+  // TD-SEC-023: declared once, shared by this class's own AntiAbuseRateLimitingFilter below and by
+  // PlatformAuthorizationServerConfig/PlatformDashboardSecurityConfig's identical need — same
+  // "share the instance explicitly" precedent as bearerTokenHasher() above. A dedicated secret
+  // (clavaris.rate-limit.key-hash-secret), never clavaris.oauth2.token-hash-secret reused — see
+  // RateLimitKeyHasher's own Javadoc for why the two must not share one key.
+  @Bean
+  /* package */ RateLimitKeyHasher rateLimitKeyHasher(
+      @Value("${clavaris.rate-limit.key-hash-secret}") final String rateLimitKeyHashSecret) {
+    return new RateLimitKeyHasher(rateLimitKeyHashSecret);
+  }
+
   @Bean
   @Order(3)
   /* package */ SecurityFilterChain organizationAuthorizationServerSecurityFilterChain(
@@ -142,6 +154,7 @@ class OrganizationAuthorizationServerConfig {
       final SecurityContextRepository contextRepository,
       final JdbcTemplate jdbcTemplate,
       final BearerTokenHasher bearerTokenHasher,
+      final RateLimitKeyHasher rateLimitKeyHasher,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final IssueRefreshTokenUseCase issueRefreshToken,
@@ -305,6 +318,7 @@ class OrganizationAuthorizationServerConfig {
         .addFilterAfter(
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,
+                rateLimitKeyHasher,
                 List.of(
                     new RateLimitRule(
                         "login:account",

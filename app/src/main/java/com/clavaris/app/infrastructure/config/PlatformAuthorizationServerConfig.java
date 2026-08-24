@@ -56,10 +56,10 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 // "PMD.LongVariable" suppression string itself now repeats a 4th time (rate limiting's own new
 // param) — same descriptive-parameter-names reasoning as OrganizationAuthorizationServerConfig's
 // own identical comment, not worth a named constant purely to satisfy a check about a check.
-// PMD.ExcessiveParameterList: TD-SEC-019 added bearerTokenHasher, tipping
-// platformAuthorizationServerSecurityFilterChain's own parameter count to the threshold — same
-// "wiring, not sprawl" reasoning as OrganizationAuthorizationServerConfig's own identical
-// suppression.
+// PMD.ExcessiveParameterList: TD-SEC-019 added bearerTokenHasher and TD-SEC-023 added
+// rateLimitKeyHasher, tipping platformAuthorizationServerSecurityFilterChain's own parameter count
+// further past the threshold — same "wiring, not sprawl" reasoning as
+// OrganizationAuthorizationServerConfig's own identical suppression.
 @SuppressWarnings({
   "PMD.ExcessiveImports",
   "PMD.AvoidDuplicateLiterals",
@@ -83,6 +83,7 @@ class PlatformAuthorizationServerConfig {
       final BearerTokenHasher bearerTokenHasher,
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
+      @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
       @SuppressWarnings("PMD.LongVariable")
           final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       @SuppressWarnings("PMD.LongVariable") final TokenRevocationEventLogger tokenRevocationLogger,
@@ -178,6 +179,7 @@ class PlatformAuthorizationServerConfig {
         .addFilterAfter(
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,
+                rateLimitKeyHasher,
                 List.of(
                     new RateLimitRule(
                         "platform-token:client",
