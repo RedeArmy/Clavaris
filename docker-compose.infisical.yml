@@ -1,0 +1,71 @@
+# ADR-0014 (TD-FUT-014): self-hosted Infisical, Phase 2 of the secrets-management plan (Phase 1,
+# already usable today with zero code, is a SOPS+age-encrypted .env — doc-only, nothing to run).
+#
+# A SEPARATE compose file, not a `profiles:` block inside docker-compose.yml — real bug caught
+# live: Compose interpolates every ${VAR:?...} required-variable check for every service defined
+# in a file at `docker compose config`/`up` time, *regardless* of whether that service's own
+# profile is active. Putting these three services in the main file with `profiles: ["infisical"]`
+# meant a plain `docker compose up` (no profile requested at all) still failed outright on
+# INFISICAL_DB_PASSWORD/etc. being unset — exactly the "default local-dev flow stays unchanged"
+# guarantee this ADR was supposed to keep. A file never passed via `-f` is never parsed at all,
+# which is what actually delivers that guarantee.
+#
+# Bring these up explicitly:
+#   docker compose -f docker-compose.yml -f docker-compose.infisical.yml up -d infisical-db infisical-redis infisical
+# Then follow the one-time bootstrap in docs/05-engineering/infisical-setup.md (admin account,
+# project, machine identity — steps that genuinely require a human in Infisical's own web UI,
+# nothing here can do them).
+#
+# Deliberately separate `infisical-db`/`infisical-redis` instances, not sharing Clavaris's own
+# `postgres`/`redis` (docker-compose.yml) — the same tenant-isolation-by-construction reasoning
+# ADR-0010 already applies to every Organization's own data extends here: Infisical's blast radius
+# must never touch Clavaris's own.
+
+services:
+  infisical-db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: ${INFISICAL_DB_USER:-infisical}
+      POSTGRES_PASSWORD: "${INFISICAL_DB_PASSWORD:?INFISICAL_DB_PASSWORD must be set explicitly in .env — see docs/05-engineering/infisical-setup.md}"
+      POSTGRES_DB: ${INFISICAL_DB_NAME:-infisical}
+    volumes:
+      - clavaris-infisical-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: "pg_isready --username=${INFISICAL_DB_USER:-infisical} && psql --username=${INFISICAL_DB_USER:-infisical} --list"
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  infisical-redis:
+    image: redis:7
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - clavaris-infisical-redis-data:/data
+
+  infisical:
+    # PIN THIS TO A SPECIFIC TAG (upstream's own docker-compose.prod.yml comment) — verified live
+    # against Docker Hub at the time this was written, not copied from documentation alone.
+    image: infisical/infisical:v0.162.24
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_started
+    ports:
+      - "${INFISICAL_PORT:-8081}:8080"
+    environment:
+      NODE_ENV: production
+      SITE_URL: ${INFISICAL_SITE_URL:-http://localhost:8081}
+      # Both required, both fixed once generated (infisical-setup.md §1) — rotating either after
+      # secrets already exist re-encrypts/re-signs against a key nothing else knows, the same
+      # "changing this is not a small config edit" bar TOKEN_SIGNING_KEY_STORE_PASSWORD already
+      # carries in docker-compose.yml for Clavaris's own signing keys.
+      ENCRYPTION_KEY: "${INFISICAL_ENCRYPTION_KEY:?INFISICAL_ENCRYPTION_KEY must be set explicitly in .env — see docs/05-engineering/infisical-setup.md §1}"
+      AUTH_SECRET: "${INFISICAL_AUTH_SECRET:?INFISICAL_AUTH_SECRET must be set explicitly in .env — see docs/05-engineering/infisical-setup.md §1}"
+      DB_CONNECTION_URI: "postgres://${INFISICAL_DB_USER:-infisical}:${INFISICAL_DB_PASSWORD}@infisical-db:5432/${INFISICAL_DB_NAME:-infisical}"
+      REDIS_URL: "redis://infisical-redis:6379"
+
+volumes:
+  clavaris-infisical-db-data:
+  clavaris-infisical-redis-data:

@@ -13,6 +13,8 @@ Two distinct API surfaces, per ADR-0006:
 
 **Every endpoint below is scoped under a per-`Organization` issuer path, `{clavarisBaseUrl}/o/{organizationId}` (ADR-0010 §5.1) — not a flat, Clavaris-wide path.** A consumer's `OAuthClient` belongs to exactly one `Organization`, and its discovery URL is `{clavarisBaseUrl}/o/{organizationId}/.well-known/openid-configuration`; every other endpoint below is discovered from that document, never hardcoded relative to a shared root.
 
+**`POST /oauth2/token` is confidential-client-only (ADR-0013)** — it requires `client_secret_basic`, so it must be called server-side by the consumer's own backend, never from browser JavaScript. There is no public/PKCE-only client type and no CORS policy on this or any other endpoint below.
+
 | Endpoint (relative to `/o/{organizationId}`) | Purpose |
 |---|---|
 | `GET /.well-known/openid-configuration` | Discovery document — every other endpoint URL is discoverable from here, no hardcoding expected in consumers |
