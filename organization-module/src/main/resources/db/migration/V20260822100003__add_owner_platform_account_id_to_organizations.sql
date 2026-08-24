@@ -8,7 +8,7 @@
 -- this column is enforced at the application layer only.
 --
 -- NOT NULL from the start, no backfill step needed: no production data exists yet at this project
--- phase (documentation-first, per CLAUDE.md §11).
+-- phase (documentation-first).
 ALTER TABLE organizations
     ADD COLUMN owner_platform_account_id uuid NOT NULL;
 

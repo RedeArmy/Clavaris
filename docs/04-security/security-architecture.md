@@ -38,9 +38,11 @@ Bucket-based rate limiting (mirroring JobSeeker's own Bucket4j + Redis approach,
 - Structured JSON logs for every authentication event, with credential/token values never included (BR-DATA-01) — full detail in `docs/01-product/nfr-quality-attributes.md` §5.
 - Refresh token reuse-detection firing is treated as a security signal worthy of alerting, not just logging (`nfr-quality-attributes.md` §5) — this is one of the few events in the system that indicates an active, not just potential, compromise.
 
-## 7. Account deletion (management API)
+## 7. Account deletion (management API) — designed, not yet built
 
-Clavaris exposes `POST /api/v1/admin/accounts/{id}:delete` (BR-DATA-02) for consumers to call once their own local data-handling process (e.g. JobSeeker's grace-period-then-anonymize flow, ADR-0013 there) completes. On call:
+**Corrected 2026-08-24** (SOC 2/ISO-27001-readiness gap analysis): this section previously described the endpoint below as if it existed. It does not — zero code, confirmed live via a repo-wide search. `roadmap-and-release-plan.md` §2 already lists the admin account-deletion API as one of three v1-scoped capabilities with no code behind them today; this document simply hadn't been corrected to match. Kept here as the intended design, not a claim of current behavior — see `technical-debt-register.md` TD-PROC-006 for the closure note.
+
+Once built, Clavaris will expose `POST /api/v1/admin/accounts/{id}:delete` (BR-DATA-02) for consumers to call once their own local data-handling process (e.g. JobSeeker's grace-period-then-anonymize flow, ADR-0013 there) completes. On call:
 
 | Step | Action |
 |---|---|

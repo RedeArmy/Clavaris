@@ -13,7 +13,7 @@ Investigating before deciding (not assuming either way) found the answer was alr
 - `RegisterOAuthClientService.handle(...)` always generates a fresh 256-bit secret server-side and always hashes it before persisting — no field exists anywhere in `RegisterOAuthClientCommand` to request a secret-less registration.
 - `OrganizationRegisteredClientRepository.toRegisteredClient(...)` hardcodes `.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)` on every `RegisteredClient` it builds — there is no code path anywhere that could ever produce `ClientAuthenticationMethod.NONE` (the SAS constant for a public client).
 - `integration-design.md` §1's own sequence diagram already draws the token exchange (`POST /oauth2/token`) as a call from "Consumer app (e.g. JobSeeker)" — a distinct participant from "End user (browser)" — never from the browser directly.
-- `CLAUDE.md` §3 already states the ecosystem this project was extracted from has a "no-SPA philosophy," consistent with every consumer (JobSeeker included) owning a real backend rather than being a backend-less SPA.
+- This project's own tech-stack notes already state the ecosystem it was extracted from has a "no-SPA philosophy," consistent with every consumer (JobSeeker included) owning a real backend rather than being a backend-less SPA.
 
 Every layer that would need to change to support a public client — the DB schema, the domain model, the use case, and the SAS wiring — independently already assumes a confidential client. This was never a real 50/50 open question; it was an unstated conclusion the codebase had already reached, surfaced as "undecided" only because nothing said so out loud.
 
@@ -31,7 +31,7 @@ A defense-in-depth regression test (`OrganizationRegisteredClientRepositoryTest`
 - **Positive:** simpler security model overall — every client that can complete a token exchange is, by construction, one that can also keep a secret confidential; PKCE remains mandatory on top (BR-CLIENT-03) as defense against authorization-code interception, not as the sole line of defense the way it has to be for a public client.
 - **Positive:** matches the reference integration pattern `integration-design.md` §3 already documents for JobSeeker (a real backend `auth-module` acting as the OIDC relying party, never a backend-less frontend) — this ADR generalizes what was already true for the one real consumer into an explicit rule for every future one.
 - **Negative:** a future consumer whose architecture is genuinely backend-less (a static SPA with no server component at all) cannot integrate with Clavaris as designed today — it would need to add a minimal backend-for-frontend (BFF) purely to hold the client secret and proxy the token exchange, or Clavaris would need a real v2 design effort (a distinct public-client `OAuthClient` type, a per-client registered-origin allowlist, real CORS wiring, and a security review of the resulting broadened attack surface) — not a small addition once needed.
-- **Negative:** this is now a locked decision per `CLAUDE.md` §10's convention — revisiting it requires an explicit new ADR, not a quiet code change the day a public-client consumer shows up.
+- **Negative:** this is now a locked decision per this project's own ADR conventions — revisiting it requires an explicit new ADR, not a quiet code change the day a public-client consumer shows up.
 
 ## Alternatives considered
 

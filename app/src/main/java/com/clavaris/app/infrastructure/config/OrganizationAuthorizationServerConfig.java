@@ -205,10 +205,22 @@ class OrganizationAuthorizationServerConfig {
 
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
+    // ADR-0016: ISO/IEC 29115 acr/amr claims on every ID token — see this customizer's own Javadoc
+    // for why it's constructed directly here rather than as a second Spring-managed
+    // OAuth2TokenCustomizer<JwtEncodingContext> bean.
+    final AuthenticationContextClaimsCustomizer authenticationContextClaims =
+        new AuthenticationContextClaimsCustomizer();
     // TD-SEC-016: every token any Organization issues (client_credentials and, far more commonly,
     // the interactive Authorization Code flow's access + ID tokens) gets a structured
-    // event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc.
-    jwtGenerator.setJwtCustomizer(tokenIssuanceLogger);
+    // event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc. JwtGenerator has
+    // exactly one customizer slot, so the ADR-0016 claims customizer above is composed into the
+    // same lambda rather than a second setJwtCustomizer(...) call, which would just silently
+    // overwrite this one.
+    jwtGenerator.setJwtCustomizer(
+        context -> {
+          tokenIssuanceLogger.customize(context);
+          authenticationContextClaims.customize(context);
+        });
     // BR-ID-03: the initial-issuance half of refresh-token support — JwtGenerator returns null
     // for the non-JWT REFRESH_TOKEN token type, so DelegatingOAuth2TokenGenerator falls through
     // to SessionBackedRefreshTokenGenerator for exactly that case, and only that case (see its

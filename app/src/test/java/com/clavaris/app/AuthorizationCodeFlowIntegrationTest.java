@@ -16,6 +16,7 @@ import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import java.io.IOException;
 import java.net.CookieManager;
@@ -249,6 +250,14 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     JWKSet jwks = parseJwkSet(getWithBody("/o/" + organizationId + "/oauth2/jwks").body());
     assertThat(verify(parse(accessToken), jwks)).isTrue();
     assertThat(verify(parse(idToken), jwks)).isTrue();
+
+    // ADR-0016 / ISO-IEC-29115: the real, signed ID token this exchange issued must carry acr/amr —
+    // AuthenticationContextClaimsCustomizerTest already proves the customizer's own isolated
+    // behaviour; this is the wiring proof, the same "prove it end to end, not just the unit" bar
+    // TD-SEC-016's own token_issued log assertion above already applies.
+    JWTClaimsSet idTokenClaims = parse(idToken).getJWTClaimsSet();
+    assertThat(idTokenClaims.getStringClaim("acr")).isEqualTo("urn:clavaris:loa:2");
+    assertThat(idTokenClaims.getStringListClaim("amr")).containsExactly("pwd");
   }
 
   @Test
