@@ -1,6 +1,6 @@
 # ADR-0015: Self-hosted Prometheus + Alertmanager + Grafana for observability, not a SaaS or a unified all-in-one
 
-**Status:** ✅ Aprobado (2026-08-24) — decision only, implementation deferred (see Consequences)
+**Status:** ✅ Aprobado (2026-08-24) — **implemented and live-verified 2026-08-24** (scope expanded same day to include full per-request tracing — see the addendum at the end of Decision and Consequences below; this is no longer decision-only).
 
 ## Context
 
@@ -30,13 +30,28 @@ Three real options evaluated on their own merits:
 - New Prometheus/Alertmanager/Grafana services in their own optional Compose file (`docker-compose.observability.yml`), the same separate-file pattern `docker-compose.infisical.yml` already established and for the identical reason: Compose validates every `${VAR:?...}` required-variable check for every service in a file regardless of profile activation, so a genuinely separate file — never parsed unless passed via `-f` — is what keeps the default `docker compose up` flow untouched, not a `profiles:` block inside `docker-compose.yml` itself.
 - Alert rules for the two P1-grade events (`rate_limit_fail_open`, `refresh_token_reuse_detected`) at minimum; `login_failure`/`platform_login_failure` get a rate-based threshold rule, not a fire-on-any-occurrence one, since some rate of ordinary failed logins is expected traffic, not a signal on its own.
 
+**Addendum, 2026-08-24 — scope expanded to full per-request tracing, on explicit request.** This
+ADR's own Context originally scoped out distributed tracing ("Clavaris is a modular monolith, one
+`app` deployable, so there is no cross-service request to trace yet") — correct as far as it went,
+but a real per-*request* trace (every filter/handler a single HTTP request passes through inside
+that one process) is still genuinely useful and was explicitly requested, so it's in scope now:
+Micrometer Tracing + Brave (`spring-boot-starter-zipkin` — the actual Spring Boot 4.1 starter, not
+the bare `micrometer-tracing-bridge-brave`/`zipkin-reporter-brave` library jars alone, which compile
+fine but ship zero Spring Boot autoconfiguration in this version — confirmed live the hard way, see
+`app/pom.xml`'s own comment on that dependency), 100% sampling (`management.tracing.sampling.
+probability: 1.0`, defensible only at v1's actual traffic volume), exported to a self-hosted Zipkin
+(`docker-compose.observability.yml`). `traceId`/`spanId` now appear as flat fields in every
+structured log line emitted during a traced request (Brave's `MDCScopeDecorator`, confirmed live
+against a real running instance's own JSON log output) — a log line and a Zipkin trace for the same
+request are now directly correlatable by that shared id.
+
 ## Consequences
 
 - **Positive:** closes the gap this ADR exists for — the four named security-relevant events become things a human is actually paged for, not log lines that only matter in hindsight during an incident review.
 - **Positive:** zero new vendor/trust boundary, consistent with every prior infrastructure decision in this project (ADR-0001, ADR-0014) — the metrics never leave infrastructure this project already operates.
 - **Positive:** mirrors JobSeeker's own already-running choice (`nfr-quality-attributes.md` §5) — proven at that project's own scale already, not a cold evaluation.
 - **Negative:** three more services to operate (Prometheus, Alertmanager, Grafana), each with its own config surface — real, ongoing operational cost for a solo developer, same class of tradeoff already accepted for Infisical.
-- **Deliberately deferred, not part of this decision:** **implementation is out of scope for this ADR** — this formalizes the *decision* (which stack, why, and why not the alternatives) so TD-FUT-011 has a documented direction; the actual Micrometer instrumentation, `docker-compose.observability.yml`, and specific Alertmanager rule thresholds are a separate, later piece of work. TD-FUT-011 stays open in `technical-debt-register.md` until that work lands — this ADR closes the *decision*, not the debt row.
+- ~~**Deliberately deferred, not part of this decision**~~ — **implemented same day, 2026-08-24, see `technical-debt-register.md` TD-FUT-011's own closure note for the full build-and-verify record**: real Micrometer instrumentation at every named call site (plus token issuance/revocation, rate-limit allow/block decisions — a superset of what this ADR's own Decision section named as the minimum), `docker-compose.observability.yml`, real Alertmanager rule thresholds with `for:`/`severity` tuned per event, and (per the addendum above) full per-request tracing. Every layer of this — metric → Prometheus scrape → alert rule → Alertmanager → real SMTP → a real inbox, and a full request trace with real per-filter timing in Zipkin — was verified against a real running `docker compose` stack, not just started and assumed working; two real bugs were caught and fixed in the process (a Grafana bind-mount conflict; two wrong property names for the Zipkin endpoint, one a genuinely nonexistent property, both confirmed via the actual resolved jars' own `spring-configuration-metadata.json`, not guessed from Boot 3.x-era memory).
 - **Negative:** like every ADR, revisiting this (e.g., moving to a managed open-source provider once real operational maturity or budget exists) requires an explicit new ADR per this project's own ADR conventions, not a quiet swap.
 
 ## Alternatives considered

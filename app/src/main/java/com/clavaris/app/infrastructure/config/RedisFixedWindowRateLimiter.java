@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;
@@ -49,9 +50,12 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
           List.class);
 
   private final StringRedisTemplate redisTemplate;
+  private final SecurityMetricsRecorder metrics;
 
-  /* package */ RedisFixedWindowRateLimiter(final StringRedisTemplate redisTemplate) {
+  /* package */ RedisFixedWindowRateLimiter(
+      final StringRedisTemplate redisTemplate, final SecurityMetricsRecorder metrics) {
     this.redisTemplate = redisTemplate;
+    this.metrics = metrics;
   }
 
   // PMD.GuardLogStatement false positive: every logged argument below is a direct accessor/cheap
@@ -81,11 +85,18 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
       // DataAccessException is Spring Data's own umbrella for every Redis-driver failure
       // (connection refused, timeout, pool exhaustion) — catching it here, not a narrower Lettuce-
       // specific type, means this stays correct if the underlying driver ever changes.
-      // TD-FUT-011 (rate-limit observability) is the eventual home for a real alertable metric
-      // here instead of a log line depending on someone watching it.
+      // TD-FUT-011: real, alertable metric alongside the log line above — alert-rules.yml fires on
+      // any occurrence at all, matching a Redis outage's own "this needs a human right now"
+      // severity, the same way refresh-token reuse detection does below.
       LOG.error(
           "event=rate_limit_fail_open key_prefix={} reason={}",
           keyPrefixForLogging(key),
+          e.getClass().getSimpleName());
+      metrics.increment(
+          "clavaris.rate_limit.fail_open",
+          "rule",
+          keyPrefixForLogging(key),
+          "reason",
           e.getClass().getSimpleName());
       return new RateLimitDecision(true, 0, Duration.ZERO);
     }
@@ -95,7 +106,17 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
     // Retry-After; clamping to the configured window is the safe fallback, not a crash.
     final long ttlSeconds = result.get(1);
     final Duration retryAfter = ttlSeconds > 0 ? Duration.ofSeconds(ttlSeconds) : window;
-    return new RateLimitDecision(currentCount <= limit, currentCount, retryAfter);
+    final boolean allowed = currentCount <= limit;
+    // TD-FUT-011: the exact "which rule/endpoint caused a block" attribution this row's own
+    // widened description named as missing — every decision, not just fail-open ones, now carries
+    // a real counter split by rule and outcome.
+    metrics.increment(
+        "clavaris.rate_limit.decision",
+        "rule",
+        keyPrefixForLogging(key),
+        "outcome",
+        allowed ? "allowed" : "blocked");
+    return new RateLimitDecision(allowed, currentCount, retryAfter);
   }
 
   // BR-DATA-01: the full key's own final segment is a SHA-256 hash of PII (an email/IP,

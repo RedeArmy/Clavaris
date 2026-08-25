@@ -1,7 +1,10 @@
 package com.clavaris.app.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +40,11 @@ class RedisFixedWindowRateLimiterTest {
   private static LettuceConnectionFactory connectionFactory;
   private static RedisFixedWindowRateLimiter rateLimiter;
 
+  // TD-FUT-011: a no-op recorder for every test that isn't specifically about metric emission —
+  // recordsRateLimitDecisionsAsRealMetrics below uses a Mockito mock instead, against this same
+  // real Redis, to prove the actual name/tags a decision emits.
+  private static final SecurityMetricsRecorder NO_OP_METRICS = (name, tags) -> {};
+
   @BeforeAll
   static void startRedisAndBuildLimiter() {
     REDIS.start();
@@ -46,7 +54,7 @@ class RedisFixedWindowRateLimiterTest {
     connectionFactory.afterPropertiesSet();
     StringRedisTemplate redisTemplate = new StringRedisTemplate(connectionFactory);
     redisTemplate.afterPropertiesSet();
-    rateLimiter = new RedisFixedWindowRateLimiter(redisTemplate);
+    rateLimiter = new RedisFixedWindowRateLimiter(redisTemplate, NO_OP_METRICS);
   }
 
   @AfterAll
@@ -126,7 +134,7 @@ class RedisFixedWindowRateLimiterTest {
     StringRedisTemplate deadTemplate = new StringRedisTemplate(deadFactory);
     deadTemplate.afterPropertiesSet();
     RedisFixedWindowRateLimiter limiterAgainstDeadRedis =
-        new RedisFixedWindowRateLimiter(deadTemplate);
+        new RedisFixedWindowRateLimiter(deadTemplate, NO_OP_METRICS);
 
     try {
       RateLimitDecision decision =
@@ -143,6 +151,36 @@ class RedisFixedWindowRateLimiterTest {
     } finally {
       deadFactory.destroy();
     }
+  }
+
+  // TD-FUT-011: real name/tags, against a real Redis — the exact "which rule/endpoint caused a
+  // block" attribution this row's own widened description named as missing.
+  @Test
+  void recordsRateLimitDecisionsAsRealMetrics() {
+    SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
+    StringRedisTemplate sharedTemplate = new StringRedisTemplate(connectionFactory);
+    sharedTemplate.afterPropertiesSet();
+    RedisFixedWindowRateLimiter instrumented =
+        new RedisFixedWindowRateLimiter(sharedTemplate, metrics);
+    String key = "ratelimit:login_account:" + UUID.randomUUID();
+
+    instrumented.tryConsume(key, 1, Duration.ofMinutes(1));
+    verify(metrics)
+        .increment(
+            "clavaris.rate_limit.decision",
+            "rule",
+            "ratelimit:login_account",
+            "outcome",
+            "allowed");
+
+    instrumented.tryConsume(key, 1, Duration.ofMinutes(1));
+    verify(metrics)
+        .increment(
+            "clavaris.rate_limit.decision",
+            "rule",
+            "ratelimit:login_account",
+            "outcome",
+            "blocked");
   }
 
   // TD-SEC-021's own live-verification standard applied here: don't just read the Lua script and

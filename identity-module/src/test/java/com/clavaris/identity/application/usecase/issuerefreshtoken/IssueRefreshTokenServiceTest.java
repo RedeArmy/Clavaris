@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.domain.model.AccountId;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -24,6 +25,7 @@ class IssueRefreshTokenServiceTest {
 
   private SessionRepository sessions;
   private RefreshTokenRepository refreshTokens;
+  private SecurityMetricsRecorder metrics;
   private IssueRefreshTokenService service;
 
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
@@ -32,7 +34,8 @@ class IssueRefreshTokenServiceTest {
   void setUp() {
     sessions = mock(SessionRepository.class);
     refreshTokens = mock(RefreshTokenRepository.class);
-    service = new IssueRefreshTokenService(sessions, refreshTokens);
+    metrics = mock(SecurityMetricsRecorder.class);
+    service = new IssueRefreshTokenService(sessions, refreshTokens, metrics);
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -62,6 +65,7 @@ class IssueRefreshTokenServiceTest {
     assertThat(result.sessionId()).isNotNull();
     verify(sessions).save(any());
     verify(refreshTokens).save(any());
+    verify(metrics).increment("clavaris.auth.token.issued", "tokenType", "refresh_token");
   }
 
   @Test

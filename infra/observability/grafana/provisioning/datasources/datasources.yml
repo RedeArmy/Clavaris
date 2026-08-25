@@ -1,0 +1,17 @@
+# TD-FUT-011 / ADR-0015: provisioned automatically at container start — no manual "add a
+# datasource" click-through needed to get a working Grafana.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  - name: Zipkin
+    type: zipkin
+    access: proxy
+    url: http://zipkin:9411
+    editable: true

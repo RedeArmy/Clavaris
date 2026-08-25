@@ -2,11 +2,13 @@ package com.clavaris.app.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +29,8 @@ class TokenIssuanceEventLoggerTest {
   private static final String TOKEN_VALUE_THAT_MUST_NEVER_APPEAR =
       "eyJhbGciOiJSUzI1NiJ9.super-secret-signed-payload.signature";
 
-  private final TokenIssuanceEventLogger logger = new TokenIssuanceEventLogger();
+  private final SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
+  private final TokenIssuanceEventLogger logger = new TokenIssuanceEventLogger(metrics);
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
 
   @BeforeEach
@@ -60,6 +63,13 @@ class TokenIssuanceEventLoggerTest {
         .contains("grantType=authorization_code")
         .contains("clientId=a-client-id")
         .contains("principal=an-account-id");
+    verify(metrics)
+        .increment(
+            "clavaris.auth.token.issued",
+            "tokenType",
+            "access_token",
+            "grantType",
+            "authorization_code");
   }
 
   @Test

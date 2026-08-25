@@ -1,0 +1,93 @@
+# TD-FUT-011 / ADR-0015: real observability + traceability + alerting, self-hosted, mirroring
+# JobSeeker's own already-running choice. A SEPARATE compose file, not folded into docker-compose.
+# yml — same reasoning as docker-compose.infisical.yml's own header comment (a `profiles:` block
+# inside the main file still evaluates every service's own `${VAR:?...}` checks regardless of
+# activation; a file never passed via `-f` is never parsed at all).
+#
+# Bring these up alongside the main stack (shares its default network by Compose's own multi-file
+# merge behavior, so "app" is reachable by that DNS name from prometheus.yml's own scrape target):
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# What's here: Prometheus (scrapes /actuator/prometheus, evaluates alert-rules.yml), Alertmanager
+# (routes firing alerts to real email — Mailpit by default, see alertmanager.yml's own header for
+# the real-SMTP production path), Grafana (auto-provisioned Prometheus + Zipkin datasources, one
+# real dashboard), Zipkin (full per-request trace visualization — every request gets a trace,
+# management.tracing.sampling.probability: 1.0 in application.yml), and Mailpit (a real SMTP
+# server with a web inbox, so "alerts actually send real email" is something you can open a browser
+# and verify, not just trust).
+
+services:
+  # Overrides docker-compose.yml's own "app" service — Compose merges same-named services across
+  # -f files, so this only adds the one env var below, it doesn't redefine the whole service.
+  # Real bug caught live running this for the first time: application.yml's own
+  # management.zipkin.tracing.endpoint default (http://localhost:9411/...) resolves to the "app"
+  # container itself once running in Docker, not to the separate "zipkin" container — "localhost"
+  # inside a container is that container. Traces were being sent nowhere (silently, no error in
+  # the app's own logs — Brave's AsyncReporter fails a send quietly by design) until this was
+  # found and fixed by actually checking Zipkin's own /api/v2/services for a result, not assumed.
+  app:
+    environment:
+      CLAVARIS_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/observability/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - clavaris-prometheus-data:/prometheus
+    ports:
+      - "${OBSERVABILITY_PROMETHEUS_PORT:-9090}:9090"
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    volumes:
+      # See alertmanager.yml's own header: real production SMTP credentials can't reach this file
+      # via env var substitution (Alertmanager's config format has none) — a real deployment
+      # bind-mounts infra/observability/alertmanager.prod.yml (gitignored) over this path instead
+      # of editing the dev/Mailpit default in place.
+      - ./infra/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "${OBSERVABILITY_ALERTMANAGER_PORT:-9093}:9093"
+
+  # TD-FUT-011: the dev-default SMTP receiver alertmanager.yml routes every alert to — real SMTP
+  # protocol, zero credentials needed, web inbox at http://localhost:8025 to actually watch an
+  # alert email land, not just trust that it would.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "${OBSERVABILITY_MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${OBSERVABILITY_MAILPIT_UI_PORT:-8025}:8025"
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - prometheus
+      - zipkin
+    environment:
+      # Dev-only literal, same convention as every other dev-default secret in this repo
+      # (TOKEN_SIGNING_KEY_STORE_PASSWORD, etc.) — never used in a real deployment, where this must
+      # be set explicitly.
+      GF_SECURITY_ADMIN_PASSWORD: ${OBSERVABILITY_GRAFANA_ADMIN_PASSWORD:-dev-only-grafana-password-change-in-real-deployments}
+    volumes:
+      - ./infra/observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infra/observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # Deliberately a sibling path, not a subdirectory of the mount just above — Docker can't
+      # create a mountpoint inside an already-mounted (read-only) bind mount's target, confirmed
+      # live: the original nested path failed the whole container with "read-only file system"
+      # the first time this was actually run, not assumed from reading the two mounts side by side.
+      - ./infra/observability/grafana/dashboards:/etc/grafana/provisioning/dashboards-json:ro
+      - clavaris-grafana-data:/var/lib/grafana
+    ports:
+      - "${OBSERVABILITY_GRAFANA_PORT:-3000}:3000"
+
+  # TD-FUT-011: full per-request traceability — application.yml's own management.zipkin.tracing.
+  # endpoint points here by default (http://localhost:9411/api/v2/spans), overridable via
+  # CLAVARIS_ZIPKIN_ENDPOINT for a real deployment's own tracing backend.
+  zipkin:
+    image: openzipkin/zipkin:latest
+    ports:
+      - "${OBSERVABILITY_ZIPKIN_PORT:-9411}:9411"
+
+volumes:
+  clavaris-prometheus-data:
+  clavaris-grafana-data:

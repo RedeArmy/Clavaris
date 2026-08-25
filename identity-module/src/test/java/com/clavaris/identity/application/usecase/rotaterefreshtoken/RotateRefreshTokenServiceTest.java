@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -45,6 +46,7 @@ class RotateRefreshTokenServiceTest {
   private AccountRepository accounts;
   private AccountTokenRevoker accountTokenRevoker;
   private EventOutboxWriter outbox;
+  private SecurityMetricsRecorder metrics;
   private RotateRefreshTokenService service;
 
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
@@ -56,9 +58,10 @@ class RotateRefreshTokenServiceTest {
     accounts = mock(AccountRepository.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
     outbox = mock(EventOutboxWriter.class);
+    metrics = mock(SecurityMetricsRecorder.class);
     service =
         new RotateRefreshTokenService(
-            refreshTokens, sessions, accounts, accountTokenRevoker, outbox);
+            refreshTokens, sessions, accounts, accountTokenRevoker, outbox, metrics);
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -113,6 +116,7 @@ class RotateRefreshTokenServiceTest {
     verify(refreshTokens, times(2)).save(any()); // once for the revoked old, once for the new
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
     verify(outbox, never()).write(any(), any(), any());
+    verify(metrics).increment("clavaris.auth.refresh_token.rotated");
   }
 
   @Test
@@ -183,6 +187,7 @@ class RotateRefreshTokenServiceTest {
             eq("refresh_token.reuse_detected"),
             eq(accountId),
             any(RefreshTokenReuseDetectedEvent.class));
+    verify(metrics).increment("clavaris.auth.refresh_token.reuse_detected");
   }
 
   @Test

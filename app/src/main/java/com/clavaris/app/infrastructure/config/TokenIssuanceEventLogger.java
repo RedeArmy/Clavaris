@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -36,9 +37,11 @@ class TokenIssuanceEventLogger implements OAuth2TokenCustomizer<JwtEncodingConte
 
   private static final Logger LOG = LoggerFactory.getLogger(TokenIssuanceEventLogger.class);
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ TokenIssuanceEventLogger() {
-    // Intentionally empty — this class holds no state, only the customize() method below.
+  private final SecurityMetricsRecorder metrics;
+
+  // Constructed only by Spring's own component scan.
+  /* package */ TokenIssuanceEventLogger(final SecurityMetricsRecorder metrics) {
+    this.metrics = metrics;
   }
 
   @Override
@@ -51,11 +54,18 @@ class TokenIssuanceEventLogger implements OAuth2TokenCustomizer<JwtEncodingConte
   @SuppressWarnings({"PMD.GuardLogStatement", "PMD.LawOfDemeter"})
   public void customize(final JwtEncodingContext context) {
     final Authentication principal = context.getPrincipal();
+    final String tokenType = context.getTokenType().getValue();
     LOG.info(
         "event=token_issued tokenType={} grantType={} clientId={} principal={}",
-        context.getTokenType().getValue(),
+        tokenType,
         context.getAuthorizationGrantType().getValue(),
         context.getRegisteredClient().getClientId(),
         principal.getName());
+    metrics.increment(
+        "clavaris.auth.token.issued",
+        "tokenType",
+        tokenType,
+        "grantType",
+        context.getAuthorizationGrantType().getValue());
   }
 }

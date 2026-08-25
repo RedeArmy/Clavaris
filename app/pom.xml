@@ -54,6 +54,41 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- TD-FUT-011 / ADR-0015: exposes /actuator/prometheus (real HTTP-per-endpoint latency
+             percentiles come free from Actuator's own WebMvcMetricsFilter once this is on the
+             classpath, JVM/HikariCP/Tomcat metrics likewise) for the self-hosted Prometheus in
+             docker-compose.observability.yml to scrape. Version managed by the Spring Boot BOM
+             (spring-boot-dependencies transitively imports the Micrometer BOM). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- TD-FUT-011 / ADR-0015: full per-request traceability — every HTTP request gets a
+             trace/span id, propagated automatically into every structured (ECS) log line emitted
+             during that request — confirmed live against a real running instance's own JSON log
+             output, not assumed from the mechanism's name: Brave's MDCScopeDecorator (brave-
+             context-slf4j, pulled in transitively by spring-boot-starter-zipkin) populates the
+             logging MDC with flat `traceId`/`spanId` keys, which Spring Boot's ECS structured-log
+             formatter (ElasticCommonSchemaStructuredLogFormatter) dumps as flat top-level JSON
+             fields — not nested under ECS's own `trace.id`/`transaction.id` convention, since that
+             nesting is this formatter's own choice to make per MDC key, not automatic — and
+             exported to Zipkin for visual
+             per-layer timing. Brave chosen over the OTel bridge — smaller dependency footprint,
+             and Zipkin's wire format is Brave's native one, no extra translation layer needed for
+             a single-process monolith with no cross-service propagation to worry about yet.
+
+             The real starter, not the bare micrometer-tracing-bridge-brave/zipkin-reporter-brave
+             jars — confirmed live (a real running instance's own Zipkin showed zero traces despite
+             those two compiling and starting cleanly) that Spring Boot 4.1 moved its tracing
+             autoconfiguration into its own dedicated modules (spring-boot-micrometer-tracing-brave,
+             spring-boot-zipkin), which this starter pulls in and the bare Micrometer jars alone do
+             not — unlike Boot 3.x, where spring-boot-actuator-autoconfigure carried this glue
+             itself. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-zipkin</artifactId>
+        </dependency>
+
         <!-- ADR-0003, ADR-0010 (Organization provisioning): issues the platform issuer's own
              client_credentials tokens (BR-PLATFORM-01) — wired here, not in identity-module or
              client-registry-module, because it needs both at once (client-registry-module's

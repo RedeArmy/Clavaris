@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -41,10 +42,11 @@ class TokenRevocationEventLogger implements AuthenticationSuccessHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(TokenRevocationEventLogger.class);
 
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ TokenRevocationEventLogger() {
-    // Intentionally empty — this class holds no state, only the onAuthenticationSuccess
-    // method below.
+  private final SecurityMetricsRecorder metrics;
+
+  // Constructed only by Spring's own component scan.
+  /* package */ TokenRevocationEventLogger(final SecurityMetricsRecorder metrics) {
+    this.metrics = metrics;
   }
 
   @Override
@@ -55,13 +57,21 @@ class TokenRevocationEventLogger implements AuthenticationSuccessHandler {
     // Guarded, not unconditional: clientIdOf(...) below calls into RegisteredClient, which
     // SonarCloud (rightly, unlike PMD's GuardLogStatement elsewhere in this codebase) won't assume
     // is free — isInfoEnabled() skips it entirely when INFO is disabled, rather than computing an
-    // argument nothing will use.
-    if (authentication instanceof OAuth2TokenRevocationAuthenticationToken revocation
-        && LOG.isInfoEnabled()) {
-      LOG.info(
-          "event=token_revoked tokenTypeHint={} clientId={}",
-          revocation.getTokenTypeHint(),
-          clientIdOf(revocation));
+    // argument nothing will use. The metric below is recorded unconditionally, outside this guard:
+    // a Counter increment is Micrometer's own cheap in-memory operation, not something worth
+    // skipping the same way an expensive log-argument computation is.
+    if (authentication instanceof OAuth2TokenRevocationAuthenticationToken revocation) {
+      if (LOG.isInfoEnabled()) {
+        LOG.info(
+            "event=token_revoked tokenTypeHint={} clientId={}",
+            revocation.getTokenTypeHint(),
+            clientIdOf(revocation));
+      }
+      final String tokenTypeHint = revocation.getTokenTypeHint();
+      metrics.increment(
+          "clavaris.auth.token.revoked",
+          "tokenTypeHint",
+          tokenTypeHint == null ? "unspecified" : tokenTypeHint);
     }
     // Replicates OAuth2TokenRevocationEndpointFilter's own default success response exactly
     // (confirmed via javap: it does nothing else) — this handler fully replaces the default,

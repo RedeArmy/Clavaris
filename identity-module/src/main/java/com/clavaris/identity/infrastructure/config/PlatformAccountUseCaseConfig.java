@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
@@ -49,8 +50,11 @@ class PlatformAccountUseCaseConfig {
   @Bean
   /* package */ AuthenticatePlatformAccountWithPasswordUseCase
       authenticatePlatformAccountWithPasswordUseCase(
-          final PlatformAccountRepository accounts, final PasswordVerifier passwordVerifier) {
-    return new AuthenticatePlatformAccountWithPasswordService(accounts, passwordVerifier);
+          final PlatformAccountRepository accounts,
+          final PasswordVerifier passwordVerifier,
+          final SecurityMetricsRecorder securityMetrics) {
+    return new AuthenticatePlatformAccountWithPasswordService(
+        accounts, passwordVerifier, securityMetrics);
   }
 
   @Bean

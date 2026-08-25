@@ -1,0 +1,90 @@
+# TD-FUT-011 / ADR-0015: real thresholds that actually fire — not dashboards nobody watches.
+# Metric names below follow Micrometer's own Counter→Prometheus naming (a dotted name like
+# `clavaris.auth.login` becomes `clavaris_auth_login_total`; `http.server.requests`, a Timer,
+# becomes `http_server_requests_seconds_bucket`/`_count`/`_sum` — confirmed against a real running
+# instance's own /actuator/prometheus output, not assumed from Micrometer's docs alone).
+groups:
+  - name: clavaris-security
+    rules:
+      # TD-SEC-022's own real-world consequence: Redis unreachable means the anti-abuse layer is
+      # currently blind. One occurrence is already worth paging — this is the exact event
+      # RedisFixedWindowRateLimiter's own Javadoc named as "logged loudly... so the outage is
+      # visible and prompts a fix, not silent and permanent."
+      - alert: RateLimitFailOpen
+        expr: increase(clavaris_rate_limit_fail_open_total[2m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis unreachable — rate limiting is failing open"
+          description: >-
+            {{ $labels.rule }} failed open ({{ $labels.reason }}) — Redis is unreachable and the
+            anti-abuse rate limiter is currently admitting every request unconditionally
+            (TD-SEC-022's own accepted availability-over-abuse-protection trade). Fix the Redis
+            outage; this is not self-healing on its own beyond that.
+
+      # BR-ID-03's own highest-severity security signal — a stolen refresh token in active use.
+      # Every active token for the account is already revoked by the time this fires (synchronous,
+      # not a side effect this alert waits on) — this is a "go investigate how it was stolen"
+      # signal, not a "go stop the bleeding" one.
+      - alert: RefreshTokenReuseDetected
+        expr: increase(clavaris_auth_refresh_token_reuse_detected_total[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Refresh token reuse detected — a stolen token was used"
+          description: >-
+            A revoked refresh token was presented again — BR-ID-03's reuse-detection cascade has
+            already revoked every active token for the affected account. Investigate how the
+            token was exfiltrated (client-side storage, a compromised consuming application, a
+            MITM) — the immediate blast radius is already contained by the system itself.
+
+      # A credential-stuffing/enumeration attempt in progress — distinct from an individual user
+      # mistyping a password, which this threshold is set well above.
+      - alert: HighLoginFailureRate
+        expr: sum(rate(clavaris_auth_login_total{outcome="failure"}[5m])) by (tier) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated login failure rate ({{ $labels.tier }} tier)"
+          description: >-
+            Sustained login failures above 1/sec (5m average) on the {{ $labels.tier }} tier —
+            check whether this is one Organization/IP concentrated (credential stuffing) or
+            spread out (a consuming application's own bug retrying bad credentials).
+
+      # nfr-quality-attributes.md §3's own p95 < 300ms target for /oauth2/token — TD-TEST-004's
+      # own real load test (load-testing/README.md) already proved this ceiling is real and close
+      # under concurrent load (TD-FUT-017); this alert is what makes a real, sustained breach of it
+      # visible in production instead of only known from a one-time manual load test.
+      - alert: TokenIssuanceLatencyHigh
+        expr: >-
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket{uri="/oauth2/token"}[5m])) by (le)
+          ) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "/oauth2/token p95 latency above the 300ms NFR target"
+          description: >-
+            p95 has exceeded nfr-quality-attributes.md §3's own 300ms target for 5 minutes
+            straight — TD-FUT-017 names Argon2id verification concurrency as the most likely
+            cause, not Postgres/Redis; check concurrent request volume against that row's own
+            measured ceiling before assuming a data-layer problem.
+
+      # The most basic possible signal — the app itself isn't answering scrapes at all. Kept last,
+      # deliberately: every alert above already implies the app is up enough to emit metrics about
+      # itself, so this is the genuine "nothing else here even applies" catch-all.
+      - alert: ClavarisAppDown
+        expr: up{job="clavaris-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Clavaris app is not responding to Prometheus scrapes"
+          description: >-
+            Every consumer's login/token flow depends directly on this instance
+            (nfr-quality-attributes.md §2) — this is the ≥99.5% availability target's own
+            most direct violation signal.

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -33,7 +34,8 @@ class TokenRevocationEventLoggerTest {
 
   private static final String TOKEN_VALUE_THAT_MUST_NEVER_APPEAR = "a-real-opaque-token-value";
 
-  private final TokenRevocationEventLogger logger = new TokenRevocationEventLogger();
+  private final SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
+  private final TokenRevocationEventLogger logger = new TokenRevocationEventLogger(metrics);
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
 
   @BeforeEach
@@ -81,6 +83,7 @@ class TokenRevocationEventLoggerTest {
         .contains("event=token_revoked")
         .contains("clientId=a-client-id")
         .doesNotContain(TOKEN_VALUE_THAT_MUST_NEVER_APPEAR);
+    verify(metrics).increment("clavaris.auth.token.revoked", "tokenTypeHint", "unspecified");
   }
 
   @Test

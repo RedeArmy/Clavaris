@@ -1,0 +1,48 @@
+# TD-FUT-011 / ADR-0015: DEV DEFAULT — routes every alert to Mailpit (docker-compose.observability.
+# yml's own bundled SMTP catcher, no credentials needed, real SMTP protocol end to end, inbox
+# readable at http://localhost:8025). This is what makes "real emails, not just dashboards" true
+# and verifiable in local dev without needing a real Resend account on hand.
+#
+# Alertmanager has no ${VAR} env-var substitution in its own config format (confirmed against its
+# real docs, not assumed) — unlike every other secret in this project (.env/.env.example), a real
+# production SMTP credential can't be injected here via environment variables. For a real
+# deployment: copy this file to infra/observability/alertmanager.prod.yml (gitignored, same
+# "names-only committed template, real file never committed" convention as .env/.env.example),
+# fill in Resend's real SMTP relay per the smtp_smarthost/smtp_auth_* block commented below, and
+# bind-mount that file over this one instead of editing this file in place.
+
+global:
+  # Resend's own documented SMTP relay (resend.com/docs/send-with-smtp), for reference in
+  # alertmanager.prod.yml — commented out here since this file's own job is the dev/Mailpit path:
+  #   smtp_smarthost: 'smtp.resend.com:587'
+  #   smtp_auth_username: 'resend'
+  #   smtp_auth_password: 'REPLACE_WITH_A_REAL_RESEND_API_KEY'
+  #   smtp_require_tls: true
+  smtp_smarthost: "mailpit:1025"
+  smtp_from: "clavaris-alerts@localhost"
+  smtp_require_tls: false
+
+route:
+  group_by: ["alertname"]
+  group_wait: 10s
+  group_interval: 2m
+  repeat_interval: 4h
+  receiver: email-alerts
+  routes:
+    # TD-SEC-022/BR-ID-03's own two highest-severity signals — no group_wait delay, repeats sooner
+    # than the default so a still-firing critical alert doesn't go quiet for 4 hours.
+    - matchers:
+        - severity="critical"
+      receiver: email-alerts
+      group_wait: 0s
+      repeat_interval: 30m
+
+receivers:
+  - name: email-alerts
+    email_configs:
+      # Alertmanager's own config format has no ${VAR} substitution (confirmed against its real
+      # docs — unlike this project's own env-var-everywhere convention elsewhere) — this recipient
+      # is a real, literal value in this file, not a placeholder resolved at container start.
+      # Change it directly here for dev, or in alertmanager.prod.yml for a real deployment.
+      - to: "ops@localhost"
+        send_resolved: true

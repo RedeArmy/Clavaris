@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -22,13 +23,21 @@ public class AuthenticatePlatformAccountWithPasswordService
   private static final Logger LOG =
       LoggerFactory.getLogger(AuthenticatePlatformAccountWithPasswordService.class);
 
+  // PMD.AvoidDuplicateLiterals: same rationale as AuthenticateWithPasswordService's own identical
+  // constant — one metric family repeated across every branch, not accidental duplication.
+  private static final String LOGIN_METRIC = "clavaris.auth.login";
+
   private final PlatformAccountRepository accounts;
   private final PasswordVerifier verifier;
+  private final SecurityMetricsRecorder metrics;
 
   public AuthenticatePlatformAccountWithPasswordService(
-      final PlatformAccountRepository accounts, final PasswordVerifier verifier) {
+      final PlatformAccountRepository accounts,
+      final PasswordVerifier verifier,
+      final SecurityMetricsRecorder metrics) {
     this.accounts = accounts;
     this.verifier = verifier;
+    this.metrics = metrics;
   }
 
   @SuppressWarnings("PMD.GuardLogStatement")
@@ -37,6 +46,7 @@ public class AuthenticatePlatformAccountWithPasswordService
     final Optional<PlatformAccount> found = accounts.findByEmail(command.email());
     if (found.isEmpty()) {
       LOG.info("event=platform_login_failure reason=unknown_account");
+      recordFailure("unknown_account");
       throw new InvalidPlatformCredentialsException();
     }
     final PlatformAccount account = found.get();
@@ -45,6 +55,7 @@ public class AuthenticatePlatformAccountWithPasswordService
       LOG.info(
           "event=platform_login_failure platformAccountId={} reason=inactive_account",
           account.id());
+      recordFailure("inactive_account");
       throw new InvalidPlatformCredentialsException();
     }
 
@@ -53,6 +64,7 @@ public class AuthenticatePlatformAccountWithPasswordService
       LOG.info(
           "event=platform_login_failure platformAccountId={} reason=no_password_credential",
           account.id());
+      recordFailure("no_password_credential");
       throw new InvalidPlatformCredentialsException();
     }
 
@@ -60,10 +72,16 @@ public class AuthenticatePlatformAccountWithPasswordService
       LOG.info(
           "event=platform_login_failure platformAccountId={} reason=invalid_password",
           account.id());
+      recordFailure("invalid_password");
       throw new InvalidPlatformCredentialsException();
     }
 
     LOG.info("event=platform_login_success platformAccountId={}", account.id());
+    metrics.increment(LOGIN_METRIC, "tier", "platform", "outcome", "success");
     return account.id();
+  }
+
+  private void recordFailure(final String reason) {
+    metrics.increment(LOGIN_METRIC, "tier", "platform", "outcome", "failure", "reason", reason);
   }
 }

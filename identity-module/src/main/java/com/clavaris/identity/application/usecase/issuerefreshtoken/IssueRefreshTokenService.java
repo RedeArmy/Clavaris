@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.issuerefreshtoken;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
@@ -23,11 +24,15 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
 
   private final SessionRepository sessions;
   private final RefreshTokenRepository refreshTokens;
+  private final SecurityMetricsRecorder metrics;
 
   public IssueRefreshTokenService(
-      final SessionRepository sessions, final RefreshTokenRepository refreshTokens) {
+      final SessionRepository sessions,
+      final RefreshTokenRepository refreshTokens,
+      final SecurityMetricsRecorder metrics) {
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
+    this.metrics = metrics;
   }
 
   // PMD.GuardLogStatement false positive, same reasoning as AuthenticateWithPasswordService's own
@@ -49,6 +54,7 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
         "event=token_issued tokenType=refresh_token accountId={} sessionId={}",
         command.accountId(),
         session.id());
+    metrics.increment("clavaris.auth.token.issued", "tokenType", "refresh_token");
 
     return new IssueRefreshTokenResult(session.id(), rawValue, command.expiresAt());
   }

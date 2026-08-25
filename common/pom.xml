@@ -31,6 +31,19 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <!-- TD-FUT-011 / ADR-0015: MicrometerSecurityMetricsRecorder (infrastructure/adapter/out)
+             implements SecurityMetricsRecorder against a real MeterRegistry — same "port lives here,
+             implementation colocated here too" precedent as AuditEventRecorder/JpaAuditEventRecorder
+             just above. Only the core API (Counter/MeterRegistry), not spring-boot-starter-actuator
+             itself — this module writes code that accepts a MeterRegistry, it doesn't create one;
+             the real, autoconfigured registry bean comes from app's own actuator/prometheus
+             dependency at runtime, the same way EntityManager is only truly wired from app's
+             context despite this module compiling code that depends on it. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

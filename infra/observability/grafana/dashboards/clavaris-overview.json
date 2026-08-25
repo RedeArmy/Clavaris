@@ -1,0 +1,132 @@
+{
+  "title": "Clavaris — Security & Traceability Overview",
+  "uid": "clavaris-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Login outcomes (rate/sec, by tier + outcome)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(clavaris_auth_login_total[5m])) by (tier, outcome)",
+          "legendFormat": "{{tier}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "/oauth2/token latency p50/p95/p99 (NFR target: 300ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(http_server_requests_seconds_bucket{uri=\"/oauth2/token\"}[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri=\"/oauth2/token\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri=\"/oauth2/token\"}[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Refresh token reuse detected (BR-ID-03 — one occurrence is an incident)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "increase(clavaris_auth_refresh_token_reuse_detected_total[5m])",
+          "legendFormat": "reuse detections"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Rate limit fail-open events (Redis outage signal, TD-SEC-022)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(clavaris_rate_limit_fail_open_total[5m])) by (rule)",
+          "legendFormat": "{{rule}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Rate limit decisions (allowed vs. blocked, by rule)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(clavaris_rate_limit_decision_total[5m])) by (rule, outcome)",
+          "legendFormat": "{{rule}} / {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Token issuance/revocation (rate/sec, by tokenType)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(clavaris_auth_token_issued_total[5m])) by (tokenType)",
+          "legendFormat": "issued / {{tokenType}}"
+        },
+        {
+          "expr": "sum(rate(clavaris_auth_token_revoked_total[5m])) by (tokenTypeHint)",
+          "legendFormat": "revoked / {{tokenTypeHint}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "HikariCP active connections (Postgres pool)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "hikaricp_connections_pending",
+          "legendFormat": "pending (waiting for a connection)"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "JVM heap used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "heap used"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      }
+    }
+  ]
+}
