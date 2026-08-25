@@ -237,12 +237,16 @@ class RefreshTokenRotationIntegrationTest extends RedisBackedIntegrationTest {
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)
       throws IOException, InterruptedException {
+    // requireConsent=false — TD-SEC-026/ADR-0017's default is true, but this suite is about
+    // refresh-token rotation, not consent; the real consent-required path has its own dedicated
+    // coverage in AuthorizationCodeFlowIntegrationTest.
     String requestBody =
         """
         {
           "redirectUris": ["%s"],
           "allowedGrantTypes": ["authorization_code", "refresh_token"],
-          "allowedScopes": ["openid", "profile"]
+          "allowedScopes": ["openid", "profile"],
+          "requireConsent": false
         }
         """
             .formatted(REDIRECT_URI);

@@ -35,13 +35,14 @@ import org.springframework.security.web.header.HeaderWriter;
  * Cancel button — a real, external requirement of code this project doesn't own the source of,
  * scoped as narrowly as that specific page's own real needs allow (one named CDN host, not
  * wildcarded; {@code 'unsafe-inline'} only for scripts, the one directive SAS's page can't function
- * without). <b>Genuinely dormant today, not just untested</b>: investigating this surfaced a real,
- * previously-undocumented finding (TD-SEC-026) — {@code requireAuthorizationConsent} is never set
- * to {@code true} anywhere in either {@code RegisteredClientRepository} adapter, so SAS's own
- * default ({@code false}) applies and this page structurally never renders for any client today.
- * This branch is unit-tested (its own path-matching logic is simple and deterministic) and stays
- * correctly scoped for the day either that changes or ADR-0009 replaces the page outright — not
- * live-verified against an actually-rendered consent screen, because none exists to render yet.
+ * without). <b>Investigating this originally surfaced TD-SEC-026</b> — {@code
+ * requireAuthorizationConsent} was never set to {@code true} anywhere, so this page structurally
+ * never rendered for any client. That's now closed (ADR-0017, TD-SEC-026): consent is a real,
+ * per-client {@code OAuthClient} attribute, defaulting to required, and this branch is
+ * live-verified against an actually-rendered consent screen (see {@code
+ * AuthorizationCodeFlowIntegrationTest}'s own consent-required test), not just unit-tested
+ * path-matching. Stays correctly scoped for the day ADR-0009 replaces this page with a
+ * project-owned, branded one (TD-SEC-011, still open).
  */
 final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 

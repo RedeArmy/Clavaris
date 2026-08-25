@@ -51,7 +51,8 @@ class JpaOAuthClientRepositoryTest {
             "argon2id$hashed",
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code", "refresh_token"),
-            List.of("openid", "profile"));
+            List.of("openid", "profile"),
+            false);
 
     repository.save(client);
     Optional<OAuthClient> found = repository.findByClientId("a-client-id");
@@ -65,6 +66,10 @@ class JpaOAuthClientRepositoryTest {
     assertThat(found.get().allowedGrantTypes())
         .containsExactly("authorization_code", "refresh_token");
     assertThat(found.get().allowedScopes()).containsExactly("openid", "profile");
+    // TD-SEC-026/ADR-0017: the boolean column must round-trip too — false chosen deliberately
+    // here (not the DB column's own default true) so this test cannot pass by accident if the
+    // column were never actually wired through JpaOAuthClientRepository at all.
+    assertThat(found.get().requireConsent()).isFalse();
   }
 
   @Test
@@ -84,7 +89,8 @@ class JpaOAuthClientRepositoryTest {
             "argon2id$hashed",
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
-            List.of("openid"));
+            List.of("openid"),
+            true);
     repository.save(client);
 
     Optional<OAuthClient> found = repository.findById(client.id());

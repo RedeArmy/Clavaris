@@ -97,8 +97,15 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
             // BR-CLIENT-03: PKCE is mandatory for every OAuthClient, confidential or not — enforced
             // here at SAS-config level rather than stored per-client in the domain (this is that
-            // task, per OAuthClient's own design notes).
-            .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+            // task, per OAuthClient's own design notes). TD-SEC-026/ADR-0017: consent, unlike
+            // PKCE, genuinely IS a per-client decision — requireAuthorizationConsent is now driven
+            // by the real, persisted OAuthClient.requireConsent() flag instead of being left unset
+            // (which silently applied SAS's own default of false, the real gap this closes).
+            .clientSettings(
+                ClientSettings.builder()
+                    .requireProofKey(true)
+                    .requireAuthorizationConsent(client.requireConsent())
+                    .build())
             // BR-ID-03: SAS's own default refreshTokenTimeToLive is 1 hour (confirmed live) — a
             // sensible access-token lifetime, but far too short for the token whose entire point
             // is letting a session outlive one access token's expiry. No business rule pins an

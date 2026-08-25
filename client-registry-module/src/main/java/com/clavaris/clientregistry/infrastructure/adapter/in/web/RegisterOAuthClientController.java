@@ -7,6 +7,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,7 +55,12 @@ class RegisterOAuthClientController {
                   organizationId,
                   request.redirectUris(),
                   request.allowedGrantTypes(),
-                  request.allowedScopes()));
+                  request.allowedScopes(),
+                  // TD-SEC-026/ADR-0017: an omitted requireConsent field means "safe default",
+                  // never "no consent" — resolved here, at the one boundary where "absent" is a
+                  // meaningful value, rather than pushed into the domain layer as an implicit
+                  // default it would have to guess at.
+                  Objects.requireNonNullElse(request.requireConsent(), Boolean.TRUE)));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
     }

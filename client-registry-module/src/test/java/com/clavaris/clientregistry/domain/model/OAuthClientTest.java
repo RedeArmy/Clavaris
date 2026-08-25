@@ -21,7 +21,8 @@ class OAuthClientTest {
             "argon2id$hashed",
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code", "refresh_token"),
-            List.of("openid", "profile"));
+            List.of("openid", "profile"),
+            true);
 
     assertThat(client.organizationId()).isEqualTo(organizationId);
     assertThat(client.clientId()).isEqualTo("jobseeker-web");
@@ -29,7 +30,25 @@ class OAuthClientTest {
     assertThat(client.redirectUris()).containsExactly("https://jobseeker.example.com/callback");
     assertThat(client.allowedGrantTypes()).containsExactly("authorization_code", "refresh_token");
     assertThat(client.allowedScopes()).containsExactly("openid", "profile");
+    assertThat(client.requireConsent()).isTrue();
     assertThat(client.createdAt()).isNotNull();
+  }
+
+  @Test
+  void registerCarriesRequireConsentFalseWhenExplicitlyOptedOut() {
+    // TD-SEC-026/ADR-0017: a trusted first-party client's opt-out is an explicit false, not an
+    // absence — this is that explicit value actually reaching the domain model.
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "trusted-client",
+            "argon2id$hashed",
+            List.of("https://trusted.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false);
+
+    assertThat(client.requireConsent()).isFalse();
   }
 
   @Test
@@ -43,7 +62,8 @@ class OAuthClientTest {
                     "argon2id$hashed",
                     List.of("https://example.com/callback"),
                     List.of("authorization_code"),
-                    List.of()));
+                    List.of(),
+                    true));
   }
 
   @Test
@@ -57,7 +77,8 @@ class OAuthClientTest {
                     " ",
                     List.of("https://example.com/callback"),
                     List.of("authorization_code"),
-                    List.of()));
+                    List.of(),
+                    true));
   }
 
   @Test
@@ -72,7 +93,8 @@ class OAuthClientTest {
                     "argon2id$hashed",
                     List.of(),
                     List.of("authorization_code"),
-                    List.of()));
+                    List.of(),
+                    true));
   }
 
   @Test
@@ -88,7 +110,8 @@ class OAuthClientTest {
                     "argon2id$hashed",
                     List.of("/callback"),
                     List.of("authorization_code"),
-                    List.of()));
+                    List.of(),
+                    true));
   }
 
   @Test
@@ -102,7 +125,8 @@ class OAuthClientTest {
                     "argon2id$hashed",
                     List.of("not a uri at all ::"),
                     List.of("authorization_code"),
-                    List.of()));
+                    List.of(),
+                    true));
   }
 
   @Test
@@ -116,7 +140,8 @@ class OAuthClientTest {
                     "argon2id$hashed",
                     List.of("https://example.com/callback"),
                     List.of(),
-                    List.of()));
+                    List.of(),
+                    true));
   }
 
   @Test
@@ -133,6 +158,7 @@ class OAuthClientTest {
             List.of("https://example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
+            true,
             persistedCreatedAt);
 
     assertThat(client.id()).isEqualTo(persistedId);

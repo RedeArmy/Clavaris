@@ -79,7 +79,8 @@ class OrganizationRegisteredClientRepositoryTest {
             "argon2id$hashed",
             List.of("https://example.com/callback"),
             List.of("authorization_code"),
-            List.of("openid"));
+            List.of("openid"),
+            true);
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     OrganizationRegisteredClientRepository repository =
@@ -98,6 +99,34 @@ class OrganizationRegisteredClientRepositoryTest {
     assertThat(found.getClientAuthenticationMethods())
         .as("every OAuthClient must require client_secret_basic — never a public/PKCE-only client")
         .containsExactly(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+    // TD-SEC-026/ADR-0017: the real gap this closed — requireAuthorizationConsent must actually
+    // reach ClientSettings, not just exist as a getter nothing reads.
+    assertThat(found.getClientSettings().isRequireAuthorizationConsent()).isTrue();
+  }
+
+  @Test
+  void findByIdWiresRequireAuthorizationConsentFalseForAnOptedOutClient() {
+    // TD-SEC-026/ADR-0017: the other direction — a trusted first-party client's explicit opt-out
+    // must reach ClientSettings too, not just the secure-default direction above.
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "a-trusted-client-id",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            false);
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findById(client.id().toString());
+
+    assertThat(found).isNotNull();
+    assertThat(found.getClientSettings().isRequireAuthorizationConsent()).isFalse();
   }
 
   @Test
@@ -113,7 +142,8 @@ class OrganizationRegisteredClientRepositoryTest {
             "argon2id$hashed",
             List.of("https://example.com/callback"),
             List.of("authorization_code"),
-            List.of("openid"));
+            List.of("openid"),
+            true);
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     OrganizationRegisteredClientRepository repository =

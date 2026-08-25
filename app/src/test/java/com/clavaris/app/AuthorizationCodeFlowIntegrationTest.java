@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
@@ -149,7 +150,11 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   void completesARealPkceAuthorizationCodeFlowWithRealLoginEndToEnd() throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Auth Code Co");
-    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    // TD-SEC-026/ADR-0017: requireConsent=false — a deliberately-trusted first-party client (the
+    // real shape JobSeeker's own registration would take), so this flow proves the no-friction
+    // path stays intact end to end. The consent-required path (the new default for any client
+    // that doesn't opt out) gets its own dedicated tests below, not folded into this one.
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
     registerAccount(organizationId, "user@example.com", "a-correct-password");
 
     String codeVerifier = generateCodeVerifier();
@@ -275,7 +280,9 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     // enough to redeem a token.
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "PKCE Co");
-    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    // requireConsent=false — this test is about PKCE verifier mismatch, not consent; skipping
+    // consent keeps it focused on the one thing it actually exercises.
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
     registerAccount(organizationId, "pkce-user@example.com", "a-correct-password");
 
     String realCodeVerifier = generateCodeVerifier();
@@ -297,6 +304,103 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         exchangeCode(organizationId, client, code, generateCodeVerifier());
 
     assertThat(tokenResponse.statusCode()).isEqualTo(400);
+  }
+
+  // TD-SEC-026/ADR-0017: the real, previously-dormant gap this closed — a client that doesn't opt
+  // out (the new default) must actually show SAS's own consent screen, and approving it must
+  // still complete a real, tokenizable authorization. Uses ["openid", "profile"] rather than
+  // ["openid"] alone: SAS's own DefaultConsentPage never renders a checkbox for "openid" itself
+  // (decompiled confirmation, DefaultConsentPage.generateConsentPage — treated as always-granted
+  // once anything else is approved), so a client requesting only "openid" would never present
+  // anything to actually consent to.
+  @Test
+  void completesARealPkceAuthorizationCodeFlowThroughARealConsentScreen() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    registerAccount(organizationId, "consent-user@example.com", "a-correct-password");
+
+    String codeVerifier = generateCodeVerifier();
+    String codeChallenge = deriveCodeChallenge(codeVerifier);
+
+    getAuthorize(organizationId, client.clientId(), codeChallenge, "state", "openid profile");
+    String loginCsrfToken = fetchLoginCsrfToken(organizationId);
+    HttpResponse<Void> loginResponse =
+        submitLogin(
+            organizationId, loginCsrfToken, "consent-user@example.com", "a-correct-password");
+    String backToAuthorize = loginResponse.headers().firstValue("Location").orElseThrow();
+
+    // Re-requesting the saved /authorize URL now renders SAS's own consent page instead of
+    // redirecting straight to a code — the exact behavior TD-SEC-026 found missing.
+    HttpResponse<String> consentPage = getAbsoluteWithBody(backToAuthorize);
+    assertThat(consentPage.statusCode()).isEqualTo(200);
+    assertThat(consentPage.body())
+        .as("SAS's own DefaultConsentPage — see this class's own header comment")
+        .contains("Consent required")
+        .contains("name=\"scope\" value=\"profile\"");
+    // TD-SEC-009: the consent page's own relaxed CSP must actually be present on this exact
+    // response, not just configured — live proof, not a read of ContentSecurityPolicyHeaderWriter.
+    assertThat(consentPage.headers().firstValue("Content-Security-Policy"))
+        .hasValueSatisfying(policy -> assertThat(policy).contains("stackpath.bootstrapcdn.com"));
+
+    HttpResponse<Void> approvedResponse =
+        submitConsent(
+            organizationId, client.clientId(), extractState(consentPage.body()), "profile");
+    assertThat(approvedResponse.statusCode()).isEqualTo(302);
+    String redirectWithCode = approvedResponse.headers().firstValue("Location").orElseThrow();
+    assertThat(redirectWithCode).startsWith(REDIRECT_URI);
+    String code = queryParam(redirectWithCode, "code");
+    assertThat(code).isNotBlank();
+
+    // The code approving consent just issued must exchange for real, cryptographically verifiable
+    // tokens — same bar as the no-consent flagship test, proving consent isn't a dead end that
+    // happens to redirect but never actually completes the grant.
+    HttpResponse<String> tokenResponse = exchangeCode(organizationId, client, code, codeVerifier);
+    assertThat(tokenResponse.statusCode()).isEqualTo(200);
+    JsonNode tokenBody = objectMapper.readTree(tokenResponse.body());
+    String accessToken = tokenBody.get("access_token").asString();
+    assertThat(accessToken).isNotBlank();
+    JWKSet jwks = parseJwkSet(getWithBody("/o/" + organizationId + "/oauth2/jwks").body());
+    assertThat(verify(parse(accessToken), jwks)).isTrue();
+  }
+
+  // TD-SEC-026/ADR-0017: the other real half of the invariant — a real user genuinely declining
+  // must NOT result in a code, matching DefaultConsentPage's own Cancel button (which resets the
+  // form, unchecking every scope, then submits — the same "no scope param at all" shape this test
+  // submits directly rather than driving the page's own JS).
+  @Test
+  void decliningConsentRedirectsWithAccessDeniedAndIssuesNoCode() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Consent Decline Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    registerAccount(organizationId, "decline-user@example.com", "a-correct-password");
+
+    String codeChallenge = deriveCodeChallenge(generateCodeVerifier());
+    getAuthorize(organizationId, client.clientId(), codeChallenge, "state", "openid profile");
+    String loginCsrfToken = fetchLoginCsrfToken(organizationId);
+    HttpResponse<Void> loginResponse =
+        submitLogin(
+            organizationId, loginCsrfToken, "decline-user@example.com", "a-correct-password");
+    String backToAuthorize = loginResponse.headers().firstValue("Location").orElseThrow();
+    HttpResponse<String> consentPage = getAbsoluteWithBody(backToAuthorize);
+    String state = extractState(consentPage.body());
+
+    // No "scope" parameter at all — an empty authorizedScopes set is exactly what SAS's own
+    // OAuth2AuthorizationConsentAuthenticationProvider treats as a declined consent (decompiled
+    // confirmation: an empty resulting authorities set removes the pending authorization and
+    // throws access_denied), the same effect the page's own Cancel button produces via JS.
+    HttpResponse<Void> declinedResponse =
+        submitConsent(organizationId, client.clientId(), state, null);
+
+    assertThat(declinedResponse.statusCode()).isEqualTo(302);
+    String redirect = declinedResponse.headers().firstValue("Location").orElseThrow();
+    assertThat(redirect).startsWith(REDIRECT_URI);
+    assertThat(queryParam(redirect, "error")).isEqualTo("access_denied");
+    assertThat(queryParam(redirect, "code"))
+        .as("a declined consent must never yield a code")
+        .isNull();
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
@@ -347,17 +451,27 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     return account.id().value();
   }
 
-  private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)
+  private ClientCredentials registerOAuthClient(
+      String platformToken, UUID organizationId, boolean requireConsent)
       throws IOException, InterruptedException {
+    return registerOAuthClient(platformToken, organizationId, requireConsent, List.of("openid"));
+  }
+
+  private ClientCredentials registerOAuthClient(
+      String platformToken, UUID organizationId, boolean requireConsent, List<String> allowedScopes)
+      throws IOException, InterruptedException {
+    String scopesJson =
+        allowedScopes.stream().map(scope -> "\"" + scope + "\"").collect(Collectors.joining(","));
     String requestBody =
         """
         {
           "redirectUris": ["%s"],
           "allowedGrantTypes": ["authorization_code"],
-          "allowedScopes": ["openid"]
+          "allowedScopes": [%s],
+          "requireConsent": %s
         }
         """
-            .formatted(REDIRECT_URI);
+            .formatted(REDIRECT_URI, scopesJson, requireConsent);
     HttpRequest request =
         HttpRequest.newBuilder(
                 baseUri("/api/v1/admin/organizations/" + organizationId + "/clients"))
@@ -402,13 +516,20 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   private HttpResponse<Void> getAuthorize(
       UUID organizationId, String clientId, String codeChallenge, String state)
       throws IOException, InterruptedException {
+    return getAuthorize(organizationId, clientId, codeChallenge, state, "openid");
+  }
+
+  private HttpResponse<Void> getAuthorize(
+      UUID organizationId, String clientId, String codeChallenge, String state, String scope)
+      throws IOException, InterruptedException {
     String query =
         "response_type=code"
             + "&client_id="
             + clientId
             + "&redirect_uri="
             + urlEncode(REDIRECT_URI)
-            + "&scope=openid"
+            + "&scope="
+            + urlEncode(scope)
             + "&code_challenge="
             + codeChallenge
             + "&code_challenge_method=S256"
@@ -472,9 +593,53 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     return httpClient.send(request, HttpResponse.BodyHandlers.discarding());
   }
 
+  // Same as getAbsoluteDiscardingBody, but keeps the body — needed once a real consent screen can
+  // render here instead of always redirecting straight through (TD-SEC-026/ADR-0017).
+  private HttpResponse<String> getAbsoluteWithBody(String absoluteUrl)
+      throws IOException, InterruptedException {
+    HttpRequest request = HttpRequest.newBuilder(URI.create(absoluteUrl)).GET().build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
   private HttpResponse<String> getWithBody(String path) throws IOException, InterruptedException {
     HttpRequest request = HttpRequest.newBuilder(baseUri(path)).GET().build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  // DefaultConsentPage's own hidden <input name="state" value="..."> — decompiled confirmation,
+  // this class's own header comment. The state value is an opaque token SAS itself minted (not
+  // the caller-supplied "state"/"opaque-state-value" query param from the original /authorize
+  // request — those are two different things SAS happens to both call "state"), so it must be
+  // read back from the page, never reconstructed by the test.
+  private static final Pattern CONSENT_STATE_PATTERN =
+      Pattern.compile("name=\"state\" value=\"([^\"]+)\"");
+
+  private static String extractState(String consentPageHtml) {
+    Matcher matcher = CONSENT_STATE_PATTERN.matcher(consentPageHtml);
+    assertThat(matcher.find()).as("consent page must render a hidden state input").isTrue();
+    return matcher.group(1);
+  }
+
+  // Posts back to SAS's own consent-handling endpoint — same URI the GET above was served from,
+  // per DefaultConsentPage's own <form action="{request.getRequestURI()}">. A null scope submits
+  // no "scope" parameter at all (the real shape of a declined consent, see
+  // decliningConsentRedirectsWithAccessDeniedAndIssuesNoCode's own comment) rather than an empty
+  // string, which is a different, not-equivalent form encoding.
+  private HttpResponse<Void> submitConsent(
+      UUID organizationId, String clientId, String state, String approvedScope)
+      throws IOException, InterruptedException {
+    String body =
+        "client_id="
+            + urlEncode(clientId)
+            + "&state="
+            + urlEncode(state)
+            + (approvedScope != null ? "&scope=" + urlEncode(approvedScope) : "");
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/authorize"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.discarding());
   }
 
   private URI baseUri(String path) {
