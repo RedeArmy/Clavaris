@@ -1,0 +1,177 @@
+name: Dependabot CI (secrets-gated checks)
+
+# TD-SEC-027: GitHub withholds repository secrets and grants only a read-only GITHUB_TOKEN to
+# `pull_request`-triggered workflow runs whose actor is dependabot[bot] — the same restriction
+# applied to fork PRs, deliberately, so a compromised/malicious dependency bump can't exfiltrate
+# secrets via CI. Documented GitHub behavior, confirmed live, not assumed: a real Dependabot PR's
+# ci.yml run failed both NVD_API_KEY and SONAR_TOKEN with "length of 0" (i.e. truly empty, not
+# malformed) — while the identical NVD_API_KEY worked correctly the same day under
+# nvd-cache-refresh.yml's own workflow_dispatch trigger, ruling out the secret itself as the
+# problem before concluding this was the trigger-type restriction.
+#
+# GitHub's own documented, safe pattern for exactly this case: `pull_request_target` instead of
+# `pull_request`. Two things make this safe specifically for Dependabot and NOT a general "run
+# untrusted fork code with secrets" hole:
+#   1. The WORKFLOW FILE itself always comes from the base branch (master) for `pull_request_target`
+#      — a PR (Dependabot's or anyone else's) cannot change what this file does, no matter what it
+#      changes in its own branch.
+#   2. Every job below is gated on `github.actor == 'dependabot[bot]'` — a value GitHub itself sets
+#      from the verified identity that opened/pushed the PR, which a PR author cannot spoof (unlike,
+#      say, a commit's own author field). For any other actor, this workflow does nothing at all: no
+#      checkout of that PR's own code ever happens, so there is nothing here for an untrusted fork
+#      PR to exploit even though the trigger technically fires for it too.
+#
+# Deliberately a SEPARATE workflow, not converting ci.yml's own trigger to `pull_request_target`
+# wholesale — that would hand secrets and a less-restricted token to `docker-build` (which runs
+# `docker build` against the PR's own Dockerfile — a real exfiltration vector if a fork PR could
+# reach it with secrets in the environment) and `build-and-test` too, widening the trust surface to
+# jobs that never needed a secret in the first place, for zero benefit. Only the two jobs that
+# actually require one move here.
+#
+# Because this lives in a different workflow file than ci.yml's own `ci-passed` aggregator, `needs:`
+# can't reach across files — this file's own `dependabot-security-gate` job is a SECOND required
+# status check (added to branch protection alongside "CI Passed", not replacing it), named
+# "Dependabot Security Gate" below. ci.yml's own dependency-scan/sonarcloud jobs are adjusted to
+# report a deliberate, explained "skipped" (not a failure) when the actor is dependabot[bot] — this
+# file is where the real check for that PR actually happens instead.
+
+on:
+  pull_request_target:
+    branches: [master]
+
+# Least-privilege: read-only contents is all any step below needs (checkout + build + scan). No job
+# here writes to the repository, comments on the PR, or requests any broader scope — same posture as
+# ci.yml's own top-level permissions block.
+permissions:
+  contents: read
+
+# Cancels a superseded run the moment Dependabot pushes a new commit to the same PR (e.g. its own
+# rebase) — avoids two overlapping runs burning real NVD API quota, and avoids a stale run's result
+# being what actually gates a merge.
+concurrency:
+  group: dependabot-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-scan:
+    name: Dependency vulnerability scan (Dependabot)
+    runs-on: ubuntu-latest
+    # The actual trust boundary — see this file's own header. Every step below only ever runs for
+    # the real, GitHub-verified dependabot[bot] actor; for anyone else this job is skipped outright,
+    # before even a checkout happens.
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Pinned to the exact reviewed commit SHA, not a mutable branch ref — closes the gap
+          # where a force-push between this run being scheduled and this step executing could swap
+          # in different content than what actually triggered the run.
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: temurin
+          cache: maven
+
+      - name: Compute cache week
+        id: week
+        run: echo "week=$(date +%Y-W%V)" >> "$GITHUB_OUTPUT"
+
+      # Same cache key ci.yml's own dependency-scan job and nvd-cache-refresh.yml both read/write —
+      # a Dependabot PR benefits from the same weekly-warmed cache, same reasoning as both of those.
+      - name: Cache OWASP Dependency-Check data
+        uses: actions/cache@v6
+        with:
+          path: ~/.dependency-check-data
+          key: depcheck-nvd-${{ steps.week.outputs.week }}
+          restore-keys: depcheck-nvd-
+
+      # Identical invocation to ci.yml's own dependency-scan step — see that file's own comments
+      # for why each flag is set the way it is; not repeated here.
+      - name: OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn -B package -DskipTests org.owasp:dependency-check-maven:13.0.0:check
+          -DfailBuildOnCVSS=7
+          -DdataDirectory=$HOME/.dependency-check-data
+          -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+          -DnvdApiDelay=2000
+
+      - name: Upload dependency-check report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependabot-dependency-check-report
+          path: "**/target/dependency-check-report.html"
+          if-no-files-found: ignore
+
+  sonarcloud:
+    name: SonarCloud analysis (Dependabot)
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          # SonarCloud's new-code/blame analysis needs real history, not the single-commit shallow
+          # clone checkout defaults to — same as ci.yml's own sonarcloud job.
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: temurin
+          cache: maven
+
+      - name: Cache SonarCloud analysis cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # Identical invocation to ci.yml's own sonarcloud step — see that file's own comments for the
+      # full reasoning behind each property; not repeated here.
+      - name: Build, test, and analyse
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+          -Dsonar.projectKey=RedeArmy_Clavaris
+          -Dsonar.organization=redearmy
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
+
+  dependabot-security-gate:
+    name: Dependabot Security Gate
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, sonarcloud]
+    # Always runs, same "if: always() — a skipped required job otherwise leaves the PR stuck
+    # pending forever, not a clear ✗" reasoning as ci.yml's own ci-passed job. Covers both real
+    # outcomes: a non-Dependabot actor (both needs are cleanly "skipped" by the actor gate above —
+    # nothing to report here, ci.yml's own "CI Passed" is the real gate for that PR) and an actual
+    # Dependabot PR (both needs must have genuinely succeeded).
+    if: always()
+    steps:
+      - name: Evaluate gate
+        env:
+          ACTOR: ${{ github.actor }}
+          DEPENDENCY_SCAN_RESULT: ${{ needs.dependency-scan.result }}
+          SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
+        run: |
+          echo "actor:            $ACTOR"
+          echo "dependency-scan:  $DEPENDENCY_SCAN_RESULT"
+          echo "sonarcloud:       $SONARCLOUD_RESULT"
+          if [ "$ACTOR" != "dependabot[bot]" ]; then
+            echo "Not a Dependabot PR — this gate does not apply here, passing."
+            exit 0
+          fi
+          if [ "$DEPENDENCY_SCAN_RESULT" != "success" ] || [ "$SONARCLOUD_RESULT" != "success" ]; then
+            echo "One or more required checks did not succeed for this Dependabot PR — failing."
+            exit 1
+          fi
