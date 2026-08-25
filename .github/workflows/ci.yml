@@ -103,6 +103,13 @@ jobs:
   dependency-scan:
     name: Dependency vulnerability scan
     runs-on: ubuntu-latest
+    # TD-SEC-027: GitHub withholds repository secrets from a pull_request run whose actor is
+    # dependabot[bot] (same restriction as a fork PR, confirmed live — see dependabot-ci.yml's own
+    # header for the full finding) — this job would otherwise run and fail on an empty NVD_API_KEY
+    # every time, not skip cleanly. dependabot-ci.yml's own dependency-scan job (pull_request_target,
+    # actor-gated) is the real check for a Dependabot PR instead; ci-passed below already knows to
+    # treat this specific skip as expected, not a failure.
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
 
@@ -201,6 +208,11 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
+    # TD-SEC-027: same reasoning as dependency-scan's own identical condition just above — SONAR_TOKEN
+    # is withheld from a dependabot[bot]-authored pull_request run too (confirmed live, the same run
+    # that surfaced this failed both secrets, not just NVD_API_KEY). dependabot-ci.yml's own
+    # sonarcloud job covers a Dependabot PR instead.
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -319,18 +331,49 @@ jobs:
     # an explicit, visible failure.
     if: always()
     steps:
+      # TD-SEC-027: dependency-scan/sonarcloud are now deliberately skipped, not run, on a
+      # dependabot[bot]-authored PR (see each job's own `if:` condition above) — a "skipped" result
+      # for those two specifically is expected and fine in that one case (dependabot-ci.yml's own
+      # "Dependabot Security Gate" required check is the real gate for them then), but must still
+      # fail this check for every other actor, and must still fail on any OTHER job's own skip —
+      # env:, not direct ${{ }} interpolation into the shell script, so github.actor never gets
+      # parsed as shell syntax.
       - name: Fail if any required job did not succeed
+        env:
+          ACTOR: ${{ github.actor }}
+          BUILD_AND_TEST_RESULT: ${{ needs.build-and-test.result }}
+          DOCKER_BUILD_RESULT: ${{ needs.docker-build.result }}
+          DEPENDENCY_SCAN_RESULT: ${{ needs.dependency-scan.result }}
+          DOC_CONSISTENCY_RESULT: ${{ needs.doc-consistency.result }}
+          SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
         run: |
-          echo "build-and-test:    ${{ needs.build-and-test.result }}"
-          echo "docker-build:      ${{ needs.docker-build.result }}"
-          echo "dependency-scan:   ${{ needs.dependency-scan.result }}"
-          echo "doc-consistency:   ${{ needs.doc-consistency.result }}"
-          echo "sonarcloud:        ${{ needs.sonarcloud.result }}"
-          if [ "${{ needs.build-and-test.result }}" != "success" ] ||
-             [ "${{ needs.docker-build.result }}" != "success" ] ||
-             [ "${{ needs.dependency-scan.result }}" != "success" ] ||
-             [ "${{ needs.doc-consistency.result }}" != "success" ] ||
-             [ "${{ needs.sonarcloud.result }}" != "success" ]; then
+          echo "actor:             $ACTOR"
+          echo "build-and-test:    $BUILD_AND_TEST_RESULT"
+          echo "docker-build:      $DOCKER_BUILD_RESULT"
+          echo "dependency-scan:   $DEPENDENCY_SCAN_RESULT"
+          echo "doc-consistency:   $DOC_CONSISTENCY_RESULT"
+          echo "sonarcloud:        $SONARCLOUD_RESULT"
+
+          FAILED=0
+          [ "$BUILD_AND_TEST_RESULT" = "success" ] || FAILED=1
+          [ "$DOCKER_BUILD_RESULT" = "success" ] || FAILED=1
+          [ "$DOC_CONSISTENCY_RESULT" = "success" ] || FAILED=1
+
+          if [ "$ACTOR" = "dependabot[bot]" ]; then
+            # Expected shape for this actor: both jobs skip themselves deliberately (their own `if:`
+            # is the exact complement of this one) — dependabot-ci.yml's own "Dependabot Security
+            # Gate" required check is the real result for them then. "success" is accepted too, not
+            # just "skipped" — deliberately not coupled tightly to the other jobs' own `if:`
+            # condition staying textually in sync with this one forever; only a genuine failure/
+            # cancellation should fail this check.
+            [ "$DEPENDENCY_SCAN_RESULT" = "skipped" ] || [ "$DEPENDENCY_SCAN_RESULT" = "success" ] || FAILED=1
+            [ "$SONARCLOUD_RESULT" = "skipped" ] || [ "$SONARCLOUD_RESULT" = "success" ] || FAILED=1
+          else
+            [ "$DEPENDENCY_SCAN_RESULT" = "success" ] || FAILED=1
+            [ "$SONARCLOUD_RESULT" = "success" ] || FAILED=1
+          fi
+
+          if [ "$FAILED" = "1" ]; then
             echo "One or more required jobs did not succeed — failing the aggregate check."
             exit 1
           fi
