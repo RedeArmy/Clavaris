@@ -20,6 +20,7 @@
 
 - Token issuance (`/oauth2/token`) p95 < 300ms under expected v1 load (single-digit consumers, not internet-scale) — generous relative to what Spring Authorization Server can do, deliberately not a target that forces premature optimization.
 - `/jwks.json` and the discovery document are cacheable (standard HTTP caching headers) — consumers should rarely need to hit them live per request.
+- **First real, measured data against the target above, 2026-08-24 (TD-TEST-004, `load-testing/README.md`)**: the raw HTTP/Postgres/Redis stack has real headroom (`/oauth2/jwks`, uncomplicated by password hashing: p95 56ms at 50 concurrent, p95 225ms at 100 concurrent, zero failures). `/oauth2/token` itself is a different story — Argon2id secret verification (ADR-0005, deliberately CPU/memory-hard) is the real bottleneck, not the database: p95 stayed under target only up to roughly single-digit concurrent requests on the 3-core machine this was measured on (p95 161ms at concurrency 1, already at the 300ms boundary by concurrency 3, 537ms at concurrency 10, a queueing-collapse 14.2s at concurrency 30). This is a real, load-bearing finding for capacity planning, not just a benchmark curiosity — tracked as **TD-FUT-017**, not silently left as a one-off number.
 
 ## 4. Portability / integration cost
 
