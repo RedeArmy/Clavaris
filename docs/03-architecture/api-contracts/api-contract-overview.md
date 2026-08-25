@@ -44,7 +44,7 @@ Since ADR-0010, `organization` (tenant isolation boundary) and `workspace` (team
 | `POST /api/v1/admin/organizations/{id}/workspaces` | Create a `Workspace` within this Organization (renamed from the pre-ADR-0010 "organization" concept) |
 | `POST /api/v1/admin/workspaces/{id}/invitations` | Invite a member to a workspace |
 | `DELETE /api/v1/admin/workspaces/{id}/members/{accountId}` | Remove workspace member (BR-WS-03: immediate access revocation) |
-| `POST /api/v1/admin/organizations/{id}/clients` | Register a new `OAuthClient` under this Organization (manual/admin-only in v1, per `prd-mvp.md` §2.2) |
+| `POST /api/v1/admin/organizations/{id}/clients` | Register a new `OAuthClient` under this Organization (manual/admin-only in v1, per `prd-mvp.md` §2.2). Optional `requireConsent` (default `true`, ADR-0017/TD-SEC-026) — an operator explicitly sets `false` to skip the end-user consent screen for a trusted first-party client. |
 | `POST /api/v1/admin/webhook-endpoints` | Register a webhook endpoint for the calling client — 🟡 proposed, see ADR-0007 |
 | `POST /api/v1/admin/webhook-endpoints/{id}/deliveries/{deliveryId}:replay` | Manually replay an `EXHAUSTED` delivery (BR-WEBHOOK-03) — 🟡 proposed, see ADR-0007 |
 

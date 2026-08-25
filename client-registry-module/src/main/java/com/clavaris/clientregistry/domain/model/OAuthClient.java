@@ -39,10 +39,11 @@ public final class OAuthClient {
   private final List<String> redirectUris;
   private final List<String> allowedGrantTypes;
   private final List<String> allowedScopes;
+  private final boolean requireConsent;
   private final Instant createdAt;
 
   // One parameter per persisted column — same rationale as this class's own TooManyMethods
-  // suppression above: a rehydration factory for an 8-column aggregate takes 8 parameters, not a
+  // suppression above: a rehydration factory for a 9-column aggregate takes 9 parameters, not a
   // sign this constructor does too much. Introducing a synthetic parameter-object purely to dodge
   // the threshold would add indirection without removing any real complexity.
   @SuppressWarnings("java:S107")
@@ -54,6 +55,7 @@ public final class OAuthClient {
       final List<String> redirectUris,
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
+      final boolean requireConsent,
       final Instant createdAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
@@ -63,12 +65,18 @@ public final class OAuthClient {
     this.allowedGrantTypes = List.copyOf(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
     this.allowedScopes =
         List.copyOf(Objects.requireNonNull(allowedScopes, "allowedScopes must not be null"));
+    this.requireConsent = requireConsent;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
   }
 
   /**
    * @param clientSecretHash the already-hashed value — this factory never sees or accepts a raw
    *     secret; hashing happens at the port boundary, same discipline as {@code PlatformClient}.
+   * @param requireConsent TD-SEC-026: whether SAS must show the end user a consent screen before
+   *     issuing an authorization code to this client. No implicit default at this layer — the web
+   *     adapter resolves an absent request field to {@code true} (secure by default, ADR-0017); the
+   *     domain factory itself takes an explicit value so a future caller can't add one without
+   *     consciously deciding it.
    */
   public static OAuthClient register(
       final UUID organizationId,
@@ -76,7 +84,8 @@ public final class OAuthClient {
       final String clientSecretHash,
       final List<String> redirectUris,
       final List<String> allowedGrantTypes,
-      final List<String> allowedScopes) {
+      final List<String> allowedScopes,
+      final boolean requireConsent) {
     return new OAuthClient(
         UUID.randomUUID(),
         organizationId,
@@ -85,6 +94,7 @@ public final class OAuthClient {
         redirectUris,
         allowedGrantTypes,
         allowedScopes,
+        requireConsent,
         Instant.now());
   }
 
@@ -101,6 +111,7 @@ public final class OAuthClient {
       final List<String> redirectUris,
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
+      final boolean requireConsent,
       final Instant createdAt) {
     return new OAuthClient(
         id,
@@ -110,6 +121,7 @@ public final class OAuthClient {
         redirectUris,
         allowedGrantTypes,
         allowedScopes,
+        requireConsent,
         createdAt);
   }
 
@@ -178,6 +190,10 @@ public final class OAuthClient {
 
   public List<String> allowedScopes() {
     return allowedScopes;
+  }
+
+  public boolean requireConsent() {
+    return requireConsent;
   }
 
   public Instant createdAt() {

@@ -42,7 +42,8 @@ class RegisterOAuthClientServiceTest {
                 organizationId,
                 List.of("https://jobseeker.example.com/callback"),
                 List.of("authorization_code"),
-                List.of("openid")));
+                List.of("openid"),
+                true));
 
     assertThat(result.client().organizationId()).isEqualTo(organizationId);
     assertThat(result.client().clientId()).isNotBlank();
@@ -59,7 +60,8 @@ class RegisterOAuthClientServiceTest {
                 organizationId,
                 List.of("https://jobseeker.example.com/callback"),
                 List.of("authorization_code"),
-                List.of("openid")));
+                List.of("openid"),
+                true));
 
     // The stored hash must never equal the raw secret handed back to the caller — that would mean
     // the "hasher" silently did nothing.
@@ -73,7 +75,8 @@ class RegisterOAuthClientServiceTest {
             organizationId,
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
-            List.of("openid"));
+            List.of("openid"),
+            true);
 
     RegisterOAuthClientResult first = service.handle(command);
     RegisterOAuthClientResult second = service.handle(command);
@@ -95,7 +98,8 @@ class RegisterOAuthClientServiceTest {
             unknownOrganizationId,
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
-            List.of("openid"));
+            List.of("openid"),
+            true);
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

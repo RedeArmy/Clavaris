@@ -51,7 +51,8 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
             hasher.hash(rawClientSecret),
             command.redirectUris(),
             command.allowedGrantTypes(),
-            command.allowedScopes());
+            command.allowedScopes(),
+            command.requireConsent());
 
     oauthClients.save(client);
     return new RegisterOAuthClientResult(client, rawClientSecret);

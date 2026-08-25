@@ -38,6 +38,10 @@ public class OAuthClientEntity {
   @Column(name = "allowed_scopes", nullable = false, columnDefinition = "text")
   private String allowedScopes;
 
+  // TD-SEC-026/ADR-0017: per-client consent requirement — see OAuthClient's own Javadoc.
+  @Column(name = "require_consent", nullable = false)
+  private boolean requireConsent;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -54,6 +58,7 @@ public class OAuthClientEntity {
       final String redirectUris,
       final String allowedGrantTypes,
       final String allowedScopes,
+      final boolean requireConsent,
       final Instant createdAt) {
     this.id = id;
     this.organizationId = organizationId;
@@ -62,6 +67,7 @@ public class OAuthClientEntity {
     this.redirectUris = redirectUris;
     this.allowedGrantTypes = allowedGrantTypes;
     this.allowedScopes = allowedScopes;
+    this.requireConsent = requireConsent;
     this.createdAt = createdAt;
   }
 
@@ -91,6 +97,10 @@ public class OAuthClientEntity {
 
   public String getAllowedScopes() {
     return allowedScopes;
+  }
+
+  public boolean isRequireConsent() {
+    return requireConsent;
   }
 
   public Instant getCreatedAt() {

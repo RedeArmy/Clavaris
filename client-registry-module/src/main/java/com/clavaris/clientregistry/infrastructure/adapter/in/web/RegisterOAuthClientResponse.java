@@ -23,6 +23,7 @@ public record RegisterOAuthClientResponse(
     List<String> redirectUris,
     List<String> allowedGrantTypes,
     List<String> allowedScopes,
+    boolean requireConsent,
     Instant createdAt) {
 
   public static RegisterOAuthClientResponse from(final RegisterOAuthClientResult result) {
@@ -35,6 +36,7 @@ public record RegisterOAuthClientResponse(
         client.redirectUris(),
         client.allowedGrantTypes(),
         client.allowedScopes(),
+        client.requireConsent(),
         client.createdAt());
   }
 
@@ -52,6 +54,8 @@ public record RegisterOAuthClientResponse(
         + allowedGrantTypes
         + ", allowedScopes="
         + allowedScopes
+        + ", requireConsent="
+        + requireConsent
         + ", createdAt="
         + createdAt
         + ']';
