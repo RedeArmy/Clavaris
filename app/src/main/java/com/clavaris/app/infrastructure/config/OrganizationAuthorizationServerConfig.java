@@ -386,7 +386,11 @@ class OrganizationAuthorizationServerConfig {
             AntiAbuseRateLimitingFilter.class)
         .exceptionHandling(
             exceptions ->
-                exceptions.authenticationEntryPoint(new OrganizationLoginRedirectEntryPoint()));
+                exceptions.authenticationEntryPoint(new OrganizationLoginRedirectEntryPoint()))
+        // TD-SEC-009: the one chain serving both this project's own /o/*/login template AND SAS's
+        // own default consent page — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
+        // each gets a different policy and how it tells them apart.
+        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
 
     return http.build();
   }
