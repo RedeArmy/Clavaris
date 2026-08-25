@@ -19,7 +19,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Bump to the latest 3.4.x patch at implementation time — pinned
              here only so the module tree resolves, not a deliberate patch choice. -->
-        <spring-boot.version>4.1.0</spring-boot.version>
+        <spring-boot.version>4.1.1</spring-boot.version>
         <!-- Overrides the Spring Boot BOM's own managed Testcontainers version:
              an old 1.20.4 default hardcoded Docker API 1.32 in its
              detection-phase ping, which recent Docker Engine builds (this dev
