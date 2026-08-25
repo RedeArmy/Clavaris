@@ -62,6 +62,12 @@ clavaris:
   # class for why). Same dev-only-literal convention as every secret above.
   rate-limit:
     key-hash-secret: ${RATE_LIMIT_KEY_HASH_SECRET:dev-only-rate-limit-key-hash-secret-change-in-real-deployments}
+  # TD-TEST-002: EventOutboxRetentionJob (identity-module) sweeps event_outbox rows older than this
+  # many days, daily. Deliberately wide by default — webhook-module (ADR-0007) has no dispatcher
+  # yet, so every row's published_at stays NULL forever; see that class's own Javadoc for why an
+  # age-based sweep is the honest interim policy rather than a no-op published-only one.
+  event-outbox:
+    retention-days: ${EVENT_OUTBOX_RETENTION_DAYS:90}
 
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;

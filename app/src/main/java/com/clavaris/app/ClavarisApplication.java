@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Single deployable entry point (system-design-document.md §3 — modular monolith, one process, not
@@ -20,10 +21,16 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * {@code @Repository} class that depends on it. This was a silent, latent gap since the very first
  * commit; nothing exercised it until this module's first {@code @Entity} and Spring Data repository
  * existed to prove it.
+ *
+ * <p>{@code @EnableScheduling} (TD-TEST-002): activates {@code @Scheduled} methods anywhere under
+ * {@code com.clavaris.*}, the same single-place-to-enable-a-cross-cutting-mechanism precedent as
+ * the two annotations above — {@code EventOutboxRetentionJob} (identity-module) is the first, not
+ * the only expected, consumer.
  */
 @SpringBootApplication(scanBasePackages = "com.clavaris")
 @EnableJpaRepositories(basePackages = "com.clavaris")
 @EntityScan(basePackages = "com.clavaris")
+@EnableScheduling
 public class ClavarisApplication {
 
   public static void main(final String[] args) {
