@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.rotaterefreshtoken;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -38,18 +39,21 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   private final AccountTokenRevoker accountTokenRevoker;
 
   private final EventOutboxWriter outbox;
+  private final SecurityMetricsRecorder metrics;
 
   public RotateRefreshTokenService(
       final RefreshTokenRepository refreshTokens,
       final SessionRepository sessions,
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      final SecurityMetricsRecorder metrics) {
     this.refreshTokens = refreshTokens;
     this.sessions = sessions;
     this.accounts = accounts;
     this.accountTokenRevoker = accountTokenRevoker;
     this.outbox = outbox;
+    this.metrics = metrics;
   }
 
   // PMD.GuardLogStatement false positive, same reasoning as AuthenticateWithPasswordService's own
@@ -116,6 +120,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         "event=refresh_token_rotated accountId={} sessionId={}",
         presented.accountId(),
         session.id());
+    metrics.increment("clavaris.auth.refresh_token.rotated");
 
     // RFC 6749 §6: the grantED scope for this specific access token is the requested subset when
     // present, never automatically re-widened back to the full session grant.
@@ -156,6 +161,11 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         "event=refresh_token_reuse_detected organizationId={} accountId={}",
         organizationId,
         accountId);
+    // TD-FUT-011 / ADR-0015: BR-ID-03's own highest-severity security signal — a stolen refresh
+    // token in active use — now has a real, alertable counter behind it, not just a log line
+    // depending on someone watching it. alert-rules.yml fires on any occurrence at all (>0 over
+    // a short window), matching this event's own "one occurrence is already an incident" severity.
+    metrics.increment("clavaris.auth.refresh_token.reuse_detected");
 
     outbox.write(
         "refresh_token.reuse_detected",

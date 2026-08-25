@@ -3,8 +3,10 @@ package com.clavaris.identity.application.usecase.authenticateplatformaccountwit
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -24,13 +26,15 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
 
   private PlatformAccountRepository accounts;
   private PasswordVerifier verifier;
+  private SecurityMetricsRecorder metrics;
   private AuthenticatePlatformAccountWithPasswordService service;
 
   @BeforeEach
   void setUp() {
     accounts = mock(PlatformAccountRepository.class);
     verifier = mock(PasswordVerifier.class);
-    service = new AuthenticatePlatformAccountWithPasswordService(accounts, verifier);
+    metrics = mock(SecurityMetricsRecorder.class);
+    service = new AuthenticatePlatformAccountWithPasswordService(accounts, verifier, metrics);
   }
 
   private PlatformAccount accountWithCredential() {
@@ -49,6 +53,7 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
         service.handle(new AuthenticatePlatformAccountWithPasswordCommand(email, RAW_PASSWORD));
 
     assertThat(id).isEqualTo(account.id());
+    verify(metrics).increment("clavaris.auth.login", "tier", "platform", "outcome", "success");
   }
 
   @Test
@@ -59,6 +64,16 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
 
     assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    verify(metrics)
+        .increment(
+            "clavaris.auth.login",
+            "tier",
+            "platform",
+            "outcome",
+            "failure",
+            "reason",
+            "unknown_account");
   }
 
   @Test

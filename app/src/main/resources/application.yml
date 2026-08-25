@@ -87,7 +87,48 @@ management:
         # Never "*" — the full Actuator surface (env, beans, heapdump, ...) is a
         # real information-disclosure risk if exposed by default (BR-DATA-01
         # discipline extended to operational endpoints, not just app logs).
-        include: health,info
+        # TD-FUT-011 / ADR-0015: "prometheus" added — a metrics *shape* dump
+        # (counter/gauge/histogram names and values), not the env/beans/heapdump
+        # surface this comment already refuses; carries no PII/credential values
+        # by the same discipline every counter added for this feature follows
+        # (SecurityMetrics's own Javadoc).
+        include: health,info,prometheus
+  metrics:
+    tags:
+      # Every metric this instance ever exports carries this tag — meaningful
+      # once TD-FUT-013 (a real deployment artifact) makes "more than one
+      # instance" a real scenario Prometheus needs to distinguish.
+      application: clavaris
+    distribution:
+      percentiles-histogram:
+        # Real p50/p95/p99 for every HTTP endpoint, not just averages — this is
+        # what makes nfr-quality-attributes.md §3's own p95 < 300ms target for
+        # /oauth2/token something Grafana/Alertmanager can actually watch,
+        # instead of a number nobody measures continuously. Comes from
+        # WebMvcMetricsFilter (auto-configured once micrometer-registry-
+        # prometheus is on the classpath) — zero custom instrumentation needed
+        # for this specific metric.
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+  tracing:
+    sampling:
+      # TD-FUT-011 / ADR-0015: 100% — every request gets a trace, not a sample
+      # of them. Defensible only at v1's actual traffic volume (single-digit
+      # consumers, nfr-quality-attributes.md §3); revisit downward once real
+      # traffic makes 100% sampling itself a real overhead, not before.
+      probability: 1.0
+    export:
+      # Confirmed live against a real running instance, not assumed from the property name's own
+      # shape: management.zipkin.tracing.endpoint (this project's first guess, matching the Boot
+      # 3.x-era property name) resolves to nothing in Boot 4.1's real spring-boot-zipkin module —
+      # its own spring-configuration-metadata.json shows the real key is nested under
+      # management.tracing.export.zipkin.*, not management.zipkin.tracing.*. Traces were silently
+      # sent to the property's own hardcoded Java-level default (localhost:9411, unreachable from
+      # inside the "app" container) until this was caught by actually checking Zipkin's own
+      # /api/v2/services for a result.
+      zipkin:
+        endpoint: ${CLAVARIS_ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
   endpoint:
     health:
       # Kubernetes-style liveness/readiness groups — closes the health/readiness

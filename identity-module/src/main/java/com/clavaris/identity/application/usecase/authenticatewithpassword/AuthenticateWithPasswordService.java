@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.authenticatewithpassword;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -33,13 +34,22 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticateWithPasswordService.class);
 
+  // PMD.AvoidDuplicateLiterals: the metric name/tag keys below are inherently repeated across
+  // every branch of this method (one metric family, several outcomes) — extracted into constants
+  // and the two recordX() helpers below, not repeated string literals PMD is right to flag.
+  private static final String LOGIN_METRIC = "clavaris.auth.login";
+
   private final AccountRepository accounts;
   private final PasswordVerifier verifier;
+  private final SecurityMetricsRecorder metrics;
 
   public AuthenticateWithPasswordService(
-      final AccountRepository accounts, final PasswordVerifier verifier) {
+      final AccountRepository accounts,
+      final PasswordVerifier verifier,
+      final SecurityMetricsRecorder metrics) {
     this.accounts = accounts;
     this.verifier = verifier;
+    this.metrics = metrics;
   }
 
   // PMD.GuardLogStatement false positive: every logged argument below is a direct value-object
@@ -58,6 +68,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
       // to detect once it exists.
       LOG.info(
           "event=login_failure organizationId={} reason=unknown_account", command.organizationId());
+      recordFailure("unknown_account");
       throw new InvalidCredentialsException();
     }
     final Account account = found.get();
@@ -70,6 +81,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
           "event=login_failure organizationId={} accountId={} reason=inactive_account",
           command.organizationId(),
           account.id());
+      recordFailure("inactive_account");
       throw new InvalidCredentialsException();
     }
 
@@ -79,6 +91,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
           "event=login_failure organizationId={} accountId={} reason=no_password_credential",
           command.organizationId(),
           account.id());
+      recordFailure("no_password_credential");
       throw new InvalidCredentialsException();
     }
 
@@ -87,6 +100,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
           "event=login_failure organizationId={} accountId={} reason=invalid_password",
           command.organizationId(),
           account.id());
+      recordFailure("invalid_password");
       throw new InvalidCredentialsException();
     }
 
@@ -94,6 +108,11 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
         "event=login_success organizationId={} accountId={}",
         command.organizationId(),
         account.id());
+    metrics.increment(LOGIN_METRIC, "tier", "organization", "outcome", "success");
     return account.id();
+  }
+
+  private void recordFailure(final String reason) {
+    metrics.increment(LOGIN_METRIC, "tier", "organization", "outcome", "failure", "reason", reason);
   }
 }

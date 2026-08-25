@@ -24,5 +24,9 @@ target/
 /app/data/
 *.p12
 
+# TD-FUT-011: real Alertmanager SMTP credentials (Resend's own relay) — never committed, same
+# "names-only .example template, real file gitignored" convention as .env/.env.example.
+/infra/observability/alertmanager.prod.yml
+
 # OS
 .DS_Store

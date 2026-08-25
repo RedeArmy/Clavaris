@@ -41,14 +41,21 @@ Reuses `threat-model-stride.md` §2's own severity scale — not a second, compe
 
 ## 3. Detection sources
 
-What this project actually has today, not an aspirational SIEM: structured JSON logs
-(`nfr-quality-attributes.md` §5) for every authentication event
-(`event=login_success`/`login_failure`/`token_issued`/`token_revoked`/
-`refresh_token_reuse_detected`/`rate_limit_fail_open`), manually reviewed — TD-FUT-011 (observability
-pipeline, ADR-0015) is the tracked gap that turns "manually reviewed" into "alerted on
-automatically," still open as of this writing. A report from a consuming application (JobSeeker or
-any future consumer) reporting unexplained account activity is an equally valid, equally weighted
-detection source — don't assume logs are the only way an incident surfaces.
+**Updated 2026-08-24 — TD-FUT-011/ADR-0015 closed, no longer "manually reviewed."** Every
+authentication event this project logs structurally (`event=login_success`/`login_failure`/
+`token_issued`/`token_revoked`/`refresh_token_reuse_detected`/`rate_limit_fail_open`) is now also a
+real Prometheus counter with a real Alertmanager rule behind the highest-severity ones
+(`RefreshTokenReuseDetected`, `RateLimitFailOpen` — both fire on any occurrence, real-email-verified
+end to end, `infra/observability/alert-rules.yml`) — a P0/P1 incident from this list should now
+usually announce itself via a real alert email, not require someone to be reading logs in real time.
+The structured logs themselves remain the detailed forensic record once an alert fires — this
+doesn't replace log review, it removes the requirement that a human be watching logs continuously
+for the incident to be *noticed* in the first place. Full per-request tracing (Zipkin, same
+ADR-0015) is a secondary detection/investigation aid — correlating a suspicious log line's own
+`traceId` to its full request timeline is now possible, not just the single event line. A report
+from a consuming application (JobSeeker or any future consumer) reporting unexplained account
+activity is an equally valid, equally weighted detection source — don't assume automated alerting
+is the only way an incident surfaces.
 
 ## 4. Process
 

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -35,6 +36,7 @@ class AuthenticateWithPasswordServiceTest {
 
   private AccountRepository accounts;
   private PasswordVerifier verifier;
+  private SecurityMetricsRecorder metrics;
   private AuthenticateWithPasswordService service;
 
   // TD-SEC-014: captures what AuthenticateWithPasswordService actually logs, the same way a real
@@ -46,7 +48,8 @@ class AuthenticateWithPasswordServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     verifier = mock(PasswordVerifier.class);
-    service = new AuthenticateWithPasswordService(accounts, verifier);
+    metrics = mock(SecurityMetricsRecorder.class);
+    service = new AuthenticateWithPasswordService(accounts, verifier, metrics);
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -79,6 +82,9 @@ class AuthenticateWithPasswordServiceTest {
         .contains("event=login_success")
         .contains(organizationId.toString())
         .contains(account.id().toString());
+    // TD-FUT-011: the log line above and this counter must both exist for the same event — proves
+    // the metrics wiring is real, not just present in the constructor signature.
+    verify(metrics).increment("clavaris.auth.login", "tier", "organization", "outcome", "success");
   }
 
   @Test
@@ -94,6 +100,15 @@ class AuthenticateWithPasswordServiceTest {
     assertThat(onlyLoggedMessage())
         .contains("event=login_failure")
         .contains("reason=unknown_account");
+    verify(metrics)
+        .increment(
+            "clavaris.auth.login",
+            "tier",
+            "organization",
+            "outcome",
+            "failure",
+            "reason",
+            "unknown_account");
   }
 
   @Test

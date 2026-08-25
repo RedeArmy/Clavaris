@@ -1,0 +1,13 @@
+# TD-FUT-011 / ADR-0015: auto-loads every dashboard JSON under grafana/dashboards/ at container
+# start — no manual import step.
+apiVersion: 1
+
+providers:
+  - name: clavaris
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards-json

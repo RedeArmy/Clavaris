@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.config;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyService;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyUseCase;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.PlatformSigningKeyRepository;
@@ -107,14 +108,19 @@ class IdentityUseCaseConfig {
 
   @Bean
   /* package */ AuthenticateWithPasswordUseCase authenticateWithPasswordUseCase(
-      final AccountRepository accountRepository, final PasswordVerifier passwordVerifier) {
-    return new AuthenticateWithPasswordService(accountRepository, passwordVerifier);
+      final AccountRepository accountRepository,
+      final PasswordVerifier passwordVerifier,
+      final SecurityMetricsRecorder securityMetrics) {
+    return new AuthenticateWithPasswordService(
+        accountRepository, passwordVerifier, securityMetrics);
   }
 
   @Bean
   /* package */ IssueRefreshTokenUseCase issueRefreshTokenUseCase(
-      final SessionRepository sessions, final RefreshTokenRepository refreshTokens) {
-    return new IssueRefreshTokenService(sessions, refreshTokens);
+      final SessionRepository sessions,
+      final RefreshTokenRepository refreshTokens,
+      final SecurityMetricsRecorder securityMetrics) {
+    return new IssueRefreshTokenService(sessions, refreshTokens, securityMetrics);
   }
 
   @Bean
@@ -123,9 +129,10 @@ class IdentityUseCaseConfig {
       final SessionRepository sessions,
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      final EventOutboxWriter eventOutboxWriter) {
+      final EventOutboxWriter eventOutboxWriter,
+      final SecurityMetricsRecorder securityMetrics) {
     return new RotateRefreshTokenService(
-        refreshTokens, sessions, accounts, accountTokenRevoker, eventOutboxWriter);
+        refreshTokens, sessions, accounts, accountTokenRevoker, eventOutboxWriter, securityMetrics);
   }
 
   @Bean
