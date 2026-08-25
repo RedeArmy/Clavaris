@@ -39,7 +39,12 @@ class DefaultSecurityConfig {
   @Bean
   @Order(5)
   /* package */ SecurityFilterChain defaultSecurityFilterChain(final HttpSecurity http) {
-    http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
+    http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+        // TD-SEC-009: this chain is where RegisterAccountController's own hosted Thymeleaf form
+        // (/o/{organizationId}/register) and every other non-SAS/non-dashboard hosted page lives —
+        // see ContentSecurityPolicyHeaderWriter's own Javadoc for why this is safe to add
+        // unconditionally even though this same chain also serves Actuator/non-HTML responses.
+        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
     return http.build();
   }
 }

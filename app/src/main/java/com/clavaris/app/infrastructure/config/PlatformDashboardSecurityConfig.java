@@ -205,7 +205,12 @@ class PlatformDashboardSecurityConfig {
                         RateLimitIdentifiers::authenticatedPlatformAccountId,
                         createOrganizationPerAccountLimit,
                         Duration.ofMinutes(5)))),
-            SecurityContextHolderFilter.class);
+            SecurityContextHolderFilter.class)
+        // TD-SEC-009: platform login/register/forgot-/reset-password/verify-email templates and
+        // the self-service dashboard (ADR-0012) all live on this chain — no interactive consent
+        // here (client_credentials only, BR-PLATFORM-01), so every HTML response this chain ever
+        // serves gets the strict policy (ContentSecurityPolicyHeaderWriter's own Javadoc).
+        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
     return http.build();
   }
 }
