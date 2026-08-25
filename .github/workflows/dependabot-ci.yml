@@ -1,11 +1,11 @@
 name: Dependabot CI (secrets-gated checks)
 
 # TD-SEC-027: GitHub withholds repository secrets and grants only a read-only GITHUB_TOKEN to
-# `pull_request`-triggered workflow runs whose actor is dependabot[bot] — the same restriction
-# applied to fork PRs, deliberately, so a compromised/malicious dependency bump can't exfiltrate
-# secrets via CI. Documented GitHub behavior, confirmed live, not assumed: a real Dependabot PR's
-# ci.yml run failed both NVD_API_KEY and SONAR_TOKEN with "length of 0" (i.e. truly empty, not
-# malformed) — while the identical NVD_API_KEY worked correctly the same day under
+# `pull_request`-triggered workflow runs whose PR was opened by dependabot[bot] — the same
+# restriction applied to fork PRs, deliberately, so a compromised/malicious dependency bump can't
+# exfiltrate secrets via CI. Documented GitHub behavior, confirmed live, not assumed: a real
+# Dependabot PR's ci.yml run failed both NVD_API_KEY and SONAR_TOKEN with "length of 0" (i.e. truly
+# empty, not malformed) — while the identical NVD_API_KEY worked correctly the same day under
 # nvd-cache-refresh.yml's own workflow_dispatch trigger, ruling out the secret itself as the
 # problem before concluding this was the trigger-type restriction.
 #
@@ -15,11 +15,17 @@ name: Dependabot CI (secrets-gated checks)
 #   1. The WORKFLOW FILE itself always comes from the base branch (master) for `pull_request_target`
 #      — a PR (Dependabot's or anyone else's) cannot change what this file does, no matter what it
 #      changes in its own branch.
-#   2. Every job below is gated on `github.actor == 'dependabot[bot]'` — a value GitHub itself sets
-#      from the verified identity that opened/pushed the PR, which a PR author cannot spoof (unlike,
-#      say, a commit's own author field). For any other actor, this workflow does nothing at all: no
-#      checkout of that PR's own code ever happens, so there is nothing here for an untrusted fork
-#      PR to exploit even though the trigger technically fires for it too.
+#   2. Every job below is gated on `github.event.pull_request.user.login == 'dependabot[bot]'` — the
+#      PR's own author field, which a PR author cannot spoof (unlike, say, a commit's own author
+#      field) and which stays stable no matter who later re-runs this workflow. Deliberately NOT
+#      `github.actor` — real bug caught live: that reflects who/what triggered THIS specific run,
+#      which becomes the maintainer's own username the instant anyone clicks "Re-run jobs" on the
+#      PR, even though the PR itself is still Dependabot's — `github.actor == 'dependabot[bot]'`
+#      silently stopped matching on every re-run, which is exactly when this workflow tends to get
+#      re-triggered (right after fixing the very secret it depends on). For any actor other than
+#      the PR's own dependabot[bot] author, this workflow does nothing at all: no checkout of that
+#      PR's own code ever happens, so there is nothing here for an untrusted fork PR to exploit even
+#      though the trigger technically fires for it too.
 #
 # Deliberately a SEPARATE workflow, not converting ci.yml's own trigger to `pull_request_target`
 # wholesale — that would hand secrets and a less-restricted token to `docker-build` (which runs
@@ -56,10 +62,11 @@ jobs:
   dependency-scan:
     name: Dependency vulnerability scan (Dependabot)
     runs-on: ubuntu-latest
-    # The actual trust boundary — see this file's own header. Every step below only ever runs for
-    # the real, GitHub-verified dependabot[bot] actor; for anyone else this job is skipped outright,
-    # before even a checkout happens.
-    if: github.actor == 'dependabot[bot]'
+    # The actual trust boundary — see this file's own header for why this checks the PR's own
+    # author, not github.actor. Every step below only ever runs when that author is the real,
+    # GitHub-verified dependabot[bot]; for anyone else this job is skipped outright, before even a
+    # checkout happens.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -111,7 +118,8 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis (Dependabot)
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    # Same PR-author check, same reasoning, as dependency-scan's own identical condition above.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -153,21 +161,23 @@ jobs:
     needs: [dependency-scan, sonarcloud]
     # Always runs, same "if: always() — a skipped required job otherwise leaves the PR stuck
     # pending forever, not a clear ✗" reasoning as ci.yml's own ci-passed job. Covers both real
-    # outcomes: a non-Dependabot actor (both needs are cleanly "skipped" by the actor gate above —
+    # outcomes: a non-Dependabot PR (both needs are cleanly "skipped" by the author gate above —
     # nothing to report here, ci.yml's own "CI Passed" is the real gate for that PR) and an actual
     # Dependabot PR (both needs must have genuinely succeeded).
     if: always()
     steps:
       - name: Evaluate gate
         env:
-          ACTOR: ${{ github.actor }}
+          # github.event.pull_request.user.login, NOT github.actor — same real bug/fix as both
+          # jobs' own `if:` above.
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           DEPENDENCY_SCAN_RESULT: ${{ needs.dependency-scan.result }}
           SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
         run: |
-          echo "actor:            $ACTOR"
+          echo "PR author:        $PR_AUTHOR"
           echo "dependency-scan:  $DEPENDENCY_SCAN_RESULT"
           echo "sonarcloud:       $SONARCLOUD_RESULT"
-          if [ "$ACTOR" != "dependabot[bot]" ]; then
+          if [ "$PR_AUTHOR" != "dependabot[bot]" ]; then
             echo "Not a Dependabot PR — this gate does not apply here, passing."
             exit 0
           fi

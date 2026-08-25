@@ -103,13 +103,20 @@ jobs:
   dependency-scan:
     name: Dependency vulnerability scan
     runs-on: ubuntu-latest
-    # TD-SEC-027: GitHub withholds repository secrets from a pull_request run whose actor is
+    # TD-SEC-027: GitHub withholds repository secrets from a pull_request run whose PR was opened by
     # dependabot[bot] (same restriction as a fork PR, confirmed live — see dependabot-ci.yml's own
     # header for the full finding) — this job would otherwise run and fail on an empty NVD_API_KEY
     # every time, not skip cleanly. dependabot-ci.yml's own dependency-scan job (pull_request_target,
     # actor-gated) is the real check for a Dependabot PR instead; ci-passed below already knows to
     # treat this specific skip as expected, not a failure.
-    if: github.actor != 'dependabot[bot]'
+    #
+    # github.event.pull_request.user.login, NOT github.actor — real bug caught live: github.actor
+    # is who/what triggered THIS specific run, which becomes the maintainer's own username the
+    # moment anyone clicks "Re-run jobs" on a Dependabot PR, even though the PR itself is still
+    # Dependabot's. The PR's own author field is stable across re-runs; the triggering actor isn't.
+    # Empty (not an error) on the `push` trigger, where pull_request doesn't exist at all — correctly
+    # never equals 'dependabot[bot]' there either, so this job runs normally on every push to master.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
 
@@ -208,11 +215,12 @@ jobs:
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
-    # TD-SEC-027: same reasoning as dependency-scan's own identical condition just above — SONAR_TOKEN
-    # is withheld from a dependabot[bot]-authored pull_request run too (confirmed live, the same run
-    # that surfaced this failed both secrets, not just NVD_API_KEY). dependabot-ci.yml's own
-    # sonarcloud job covers a Dependabot PR instead.
-    if: github.actor != 'dependabot[bot]'
+    # TD-SEC-027: same reasoning, and the same github.event.pull_request.user.login (not
+    # github.actor) fix, as dependency-scan's own identical condition just above — SONAR_TOKEN is
+    # withheld from a Dependabot-authored pull_request run too (confirmed live, the same run that
+    # surfaced this failed both secrets, not just NVD_API_KEY). dependabot-ci.yml's own sonarcloud
+    # job covers a Dependabot PR instead.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -332,22 +340,25 @@ jobs:
     if: always()
     steps:
       # TD-SEC-027: dependency-scan/sonarcloud are now deliberately skipped, not run, on a
-      # dependabot[bot]-authored PR (see each job's own `if:` condition above) — a "skipped" result
-      # for those two specifically is expected and fine in that one case (dependabot-ci.yml's own
+      # Dependabot-authored PR (see each job's own `if:` condition above) — a "skipped" result for
+      # those two specifically is expected and fine in that one case (dependabot-ci.yml's own
       # "Dependabot Security Gate" required check is the real gate for them then), but must still
-      # fail this check for every other actor, and must still fail on any OTHER job's own skip —
-      # env:, not direct ${{ }} interpolation into the shell script, so github.actor never gets
-      # parsed as shell syntax.
+      # fail this check for every other actor, and must still fail on any OTHER job's own skip.
+      # github.event.pull_request.user.login, NOT github.actor — same real bug/fix as both jobs'
+      # own `if:` above: github.actor is who triggered THIS run (the maintainer's own username on a
+      # manual re-run), not who opened the PR; this must stay keyed on the PR's own stable author.
+      # env:, not direct ${{ }} interpolation into the shell script, so this value never gets parsed
+      # as shell syntax.
       - name: Fail if any required job did not succeed
         env:
-          ACTOR: ${{ github.actor }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           BUILD_AND_TEST_RESULT: ${{ needs.build-and-test.result }}
           DOCKER_BUILD_RESULT: ${{ needs.docker-build.result }}
           DEPENDENCY_SCAN_RESULT: ${{ needs.dependency-scan.result }}
           DOC_CONSISTENCY_RESULT: ${{ needs.doc-consistency.result }}
           SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
         run: |
-          echo "actor:             $ACTOR"
+          echo "PR author:         $PR_AUTHOR"
           echo "build-and-test:    $BUILD_AND_TEST_RESULT"
           echo "docker-build:      $DOCKER_BUILD_RESULT"
           echo "dependency-scan:   $DEPENDENCY_SCAN_RESULT"
@@ -359,7 +370,7 @@ jobs:
           [ "$DOCKER_BUILD_RESULT" = "success" ] || FAILED=1
           [ "$DOC_CONSISTENCY_RESULT" = "success" ] || FAILED=1
 
-          if [ "$ACTOR" = "dependabot[bot]" ]; then
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
             # Expected shape for this actor: both jobs skip themselves deliberately (their own `if:`
             # is the exact complement of this one) — dependabot-ci.yml's own "Dependabot Security
             # Gate" required check is the real result for them then. "success" is accepted too, not
