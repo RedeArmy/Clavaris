@@ -15,6 +15,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.event.AccountDeletedEvent;
 import com.clavaris.identity.domain.model.Account;
@@ -33,6 +34,7 @@ class DeleteAccountServiceTest {
 
   private AccountRepository accounts;
   private AccountTokenRevoker accountTokenRevoker;
+  private AccountSessionRevoker accountSessionRevoker;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private DeleteAccountService service;
@@ -41,9 +43,12 @@ class DeleteAccountServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
+    accountSessionRevoker = mock(AccountSessionRevoker.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new DeleteAccountService(accounts, accountTokenRevoker, auditEvents, outbox);
+    service =
+        new DeleteAccountService(
+            accounts, accountTokenRevoker, accountSessionRevoker, auditEvents, outbox);
   }
 
   @Test
@@ -53,6 +58,7 @@ class DeleteAccountServiceTest {
     service.handle(new DeleteAccountCommand(account.id(), ACTOR));
 
     verify(accountTokenRevoker).revokeAllTokensFor(account.id());
+    verify(accountSessionRevoker).revokeAllSessionsFor(account.id());
     verify(auditEvents)
         .write(ACTOR, "account.deleted", "Account", account.id().value().toString(), null);
 
@@ -102,6 +108,7 @@ class DeleteAccountServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verifyNoInteractions(accountTokenRevoker);
+    verifyNoInteractions(accountSessionRevoker);
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
     verify(accounts, never()).deleteById(any());

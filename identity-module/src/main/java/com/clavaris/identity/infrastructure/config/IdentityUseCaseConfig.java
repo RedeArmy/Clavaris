@@ -32,6 +32,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
@@ -135,10 +136,17 @@ class IdentityUseCaseConfig {
       final SessionRepository sessions,
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter eventOutboxWriter,
       final SecurityMetricsRecorder securityMetrics) {
     return new RotateRefreshTokenService(
-        refreshTokens, sessions, accounts, accountTokenRevoker, eventOutboxWriter, securityMetrics);
+        refreshTokens,
+        sessions,
+        accounts,
+        accountTokenRevoker,
+        accountSessionRevoker,
+        eventOutboxWriter,
+        securityMetrics);
   }
 
   @Bean
@@ -174,6 +182,7 @@ class IdentityUseCaseConfig {
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher passwordHasher,
       final EventOutboxWriter eventOutboxWriter) {
     return new ConfirmPasswordResetService(
@@ -182,6 +191,7 @@ class IdentityUseCaseConfig {
         sessions,
         refreshTokens,
         accountTokenRevoker,
+        accountSessionRevoker,
         passwordHasher,
         eventOutboxWriter);
   }
@@ -190,8 +200,10 @@ class IdentityUseCaseConfig {
   /* package */ DeleteAccountUseCase deleteAccountUseCase(
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
-    return new DeleteAccountService(accounts, accountTokenRevoker, auditEvents, eventOutboxWriter);
+    return new DeleteAccountService(
+        accounts, accountTokenRevoker, accountSessionRevoker, auditEvents, eventOutboxWriter);
   }
 }

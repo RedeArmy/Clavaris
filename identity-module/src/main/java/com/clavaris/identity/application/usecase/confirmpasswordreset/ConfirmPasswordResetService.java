@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.event.PasswordResetCompletedEvent;
 import com.clavaris.identity.domain.model.Account;
@@ -27,7 +28,16 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>TD-FUT-009: logs {@code event=password_reset_completed} on success — the other half of {@code
  * RequestPasswordResetService}'s own logging, same convention, never the token/password.
+ *
+ * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added to the same
+ * cascade — BR-ID-04's "assume prior sessions may be compromised" is only actually true once the
+ * hosted-login-page's own {@code HttpSession} is revoked too, not just the SAS-managed token and
+ * this module's own {@code Session}/{@code RefreshToken} rows.
  */
+// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
+// parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
+// suppression for this exact PMD-annotation-string-as-literal false positive.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConfirmPasswordResetService.class);
@@ -41,6 +51,10 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
   // RotateRefreshTokenService's identical field.
   private final AccountTokenRevoker accountTokenRevoker;
 
+  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
+  // accountTokenRevoker above.
+  private final AccountSessionRevoker accountSessionRevoker;
+
   private final PasswordHasher hasher;
   private final EventOutboxWriter outbox;
 
@@ -53,6 +67,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
       final EventOutboxWriter outbox) {
     this.tokens = tokens;
@@ -60,6 +75,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
     this.accountTokenRevoker = accountTokenRevoker;
+    this.accountSessionRevoker = accountSessionRevoker;
     this.hasher = hasher;
     this.outbox = outbox;
   }
@@ -98,6 +114,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     sessions.revokeAllActiveForAccount(account.id());
     refreshTokens.revokeAllActiveForAccount(account.id());
     accountTokenRevoker.revokeAllTokensFor(account.id());
+    accountSessionRevoker.revokeAllSessionsFor(account.id());
 
     outbox.write(
         "password_reset.completed", account.id(), PasswordResetCompletedEvent.from(account));

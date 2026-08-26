@@ -4,6 +4,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -54,4 +55,12 @@ public interface AccountRepository {
    * password_credentials}/{@code sessions}/{@code refresh_tokens}/{@code verification_tokens}.
    */
   void deleteAllByOrganizationId(OrganizationId organizationId);
+
+  /**
+   * TD-SEC-031: {@code OrganizationIdentityDataEraserBridge}'s own read before it calls {@link
+   * #deleteAllByOrganizationId} — the ids are needed to revoke each Account's own live {@code
+   * HttpSession} (via {@code AccountSessionRevoker}) before the row it belongs to disappears, since
+   * a bulk delete alone has no per-account hook to do that from.
+   */
+  List<Account> findAllByOrganizationId(OrganizationId organizationId);
 }
