@@ -15,12 +15,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
@@ -34,9 +38,12 @@ import org.springframework.security.oauth2.server.authorization.token.JwtGenerat
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 /**
  * ADR-0010 §5: one dynamic {@code SecurityFilterChain} serving every {@code Organization}'s own
@@ -104,6 +111,16 @@ class OrganizationAuthorizationServerConfig {
   // Appears 4 times across securityMatcher/authorizeHttpRequests/two RateLimitRules below — one
   // constant, not four literals that could silently drift apart (PMD.AvoidDuplicateLiterals).
   private static final String LOGIN_PATH_PATTERN = "/o/*/login";
+
+  // TD-SEC-028: SAS's own default oidcLogoutEndpoint is "/connect/logout"
+  // (AuthorizationServerSettings
+  // itself, never overridden here — no reason to rename an endpoint clients only ever reach via the
+  // discovery document's own end_session_endpoint claim, never a hardcoded path). Was previously
+  // outside this chain's securityMatcher entirely — a request here fell through to
+  // DefaultSecurityConfig's catch-all chain, which has no SAS filters at all, so RP-Initiated
+  // Logout
+  // 404'd unconditionally despite the discovery document confidently advertising it.
+  private static final String LOGOUT_PATH_PATTERN = "/o/*/connect/logout";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ OrganizationAuthorizationServerConfig() {
@@ -203,6 +220,25 @@ class OrganizationAuthorizationServerConfig {
             signingKeys, keyMaterial, Duration.ofHours(jwksOverlapHours));
     http.setSharedObject(JWKSource.class, jwksPublishingSource);
 
+    // TD-SEC-028: OidcUserInfoEndpointFilter (registered by .oidc(...) below) reads a
+    // JwtAuthenticationToken from SecurityContextHolder, populated by resource-server Bearer-token
+    // authentication — SAS's own OAuth2AuthorizationServerConfigurer.init() DOES wire
+    // .oauth2ResourceServer(jwt(Customizer.withDefaults())) automatically once OidcUserInfoEndpoint
+    // is enabled (decompiled confirmation), but that default customizer expects a JwtDecoder bean
+    // to already exist — none did anywhere in this app, so /userinfo requests never authenticated
+    // and always fell through to a 401, unnoticed because nothing had ever called it with a real
+    // token. Reuses jwksPublishingSource, not signingJwkSource — a Bearer token presented here may
+    // have been signed under a since-rotated key still inside its overlap window (TD-SEC-008), the
+    // exact case jwksPublishingSource exists to keep verifiable. Explicitly re-set (not left at
+    // JwtValidators.createDefault(), the timestamp-only default) with a delegating validator adding
+    // OrganizationJwtIssuerValidator — defense in depth on top of the already-structural guarantee
+    // that a cross-tenant token's kid never resolves in a different Organization's own JWKS.
+    final NimbusJwtDecoder userInfoJwtDecoder =
+        NimbusJwtDecoder.withJwkSource(jwksPublishingSource).build();
+    userInfoJwtDecoder.setJwtValidator(
+        new DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefault(), new OrganizationJwtIssuerValidator()));
+
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     // ADR-0016: ISO/IEC 29115 acr/amr claims on every ID token — see this customizer's own Javadoc
@@ -246,7 +282,20 @@ class OrganizationAuthorizationServerConfig {
             new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
 
     http.securityMatcher(
-            "/o/*/oauth2/**", "/o/*/.well-known/**", "/o/*/userinfo", LOGIN_PATH_PATTERN)
+            "/o/*/oauth2/**",
+            "/o/*/.well-known/**",
+            "/o/*/userinfo",
+            LOGIN_PATH_PATTERN,
+            LOGOUT_PATH_PATTERN)
+        // TD-SEC-028: registered before .with(new OAuth2AuthorizationServerConfigurer(), ...)
+        // below so this decoder is already set by the time that configurer's own init() applies
+        // its internal .oauth2ResourceServer(jwt(Customizer.withDefaults())) call (decompiled
+        // confirmation: it targets the SAME configurer instance, not a second one) — Spring
+        // Security's DSL customizers compose, they don't overwrite, so SAS's own no-op default on
+        // top of this real decoder is harmless, live-verified end to end (userinfo returns real
+        // claims for a valid token, 401s for none).
+        .oauth2ResourceServer(
+            resourceServer -> resourceServer.jwt(jwt -> jwt.decoder(userInfoJwtDecoder)))
         .with(
             new OAuth2AuthorizationServerConfigurer(),
             server ->
@@ -301,6 +350,13 @@ class OrganizationAuthorizationServerConfig {
                                                         .defaultsForSpringSecurity_v5_8())))))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.
+        // /o/*/connect/logout (TD-SEC-028) is permitAll for the same class of reason, not by
+        // coincidence: OIDC RP-Initiated Logout is explicitly designed to still work once the
+        // browser's own session at this issuer has already expired or been cleared — the request's
+        // own id_token_hint parameter is what OidcLogoutAuthenticationProvider actually validates
+        // (decompiled confirmation: it accepts both an authenticated and an anonymous principal),
+        // not ambient session state, so gating this behind .anyRequest().authenticated() would
+        // reject exactly the case this endpoint exists to handle.
         //
         // .anyRequest().authenticated() below is NOT what protects /oauth2/authorize from a
         // cross-tier session (see TenantAccountOnlySecurityContextFilter's own Javadoc for why:
@@ -312,7 +368,7 @@ class OrganizationAuthorizationServerConfig {
         .authorizeHttpRequests(
             authorize ->
                 authorize
-                    .requestMatchers(LOGIN_PATH_PATTERN)
+                    .requestMatchers(LOGIN_PATH_PATTERN, LOGOUT_PATH_PATTERN)
                     .permitAll()
                     .anyRequest()
                     .authenticated())
@@ -384,9 +440,28 @@ class OrganizationAuthorizationServerConfig {
             new OrganizationCapacityRateLimitingFilter(
                 rateLimiter, rateLimitPolicies, capacityDefaultRequestsPerMinute),
             AntiAbuseRateLimitingFilter.class)
+        // TD-SEC-028: /userinfo is a Bearer-token-protected API endpoint, not a browser page — a
+        // real OIDC client calling it with a missing/invalid access token needs a clean 401,
+        // never OrganizationLoginRedirectEntryPoint's redirect-to-the-hosted-login-page (correct
+        // for every OTHER unauthenticated request on this chain, since those genuinely are
+        // browser navigations). Built directly, not via ExceptionHandlingConfigurer's own
+        // defaultAuthenticationEntryPointFor(...) DSL method — decompiled confirmation
+        // (ExceptionHandlingConfigurer.getAuthenticationEntryPoint(H)) that method is silently a
+        // no-op whenever .authenticationEntryPoint(...) is ALSO called on the same configurer (the
+        // plain entry point wins outright, unconditionally, if set at all) — this chain needs
+        // both a matcher-specific AND a fallback entry point, so the delegating dispatch has to be
+        // built once, here, and handed to .authenticationEntryPoint(...) as the single value.
+        // Live-verified: the first-ever test to call /userinfo with no token got back a 302, not
+        // a 401, before this was added — a real gap, not a hypothetical one.
         .exceptionHandling(
             exceptions ->
-                exceptions.authenticationEntryPoint(new OrganizationLoginRedirectEntryPoint()))
+                exceptions.authenticationEntryPoint(
+                    DelegatingAuthenticationEntryPoint.builder()
+                        .defaultEntryPoint(new OrganizationLoginRedirectEntryPoint())
+                        .addEntryPointFor(
+                            new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                            PathPatternRequestMatcher.pathPattern("/o/*/userinfo"))
+                        .build()))
         // TD-SEC-009: the one chain serving both this project's own /o/*/login template AND SAS's
         // own default consent page — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
         // each gets a different policy and how it tells them apart.

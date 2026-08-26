@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -77,6 +78,11 @@ class AuthenticationContextClaimsCustomizer implements OAuth2TokenCustomizer<Jwt
     if (!ID_TOKEN_TYPE.equals(context.getTokenType())) {
       return;
     }
-    context.getClaims().claim("acr", LOA2_URN).claim("amr", List.of("pwd"));
+    // TD-SEC-028: List.of(...) (java.util.ImmutableCollections$List12 at runtime) is rejected by
+    // JdbcOAuth2AuthorizationService's own Jackson3 PolymorphicTypeValidator the moment anything
+    // actually deserializes a persisted OAuth2Authorization's claims back out — never caught before
+    // because nothing had ever read an ID token's stored claims back until /userinfo (TD-SEC-028)
+    // was made to actually work. A plain ArrayList is on that validator's own allow-list.
+    context.getClaims().claim("acr", LOA2_URN).claim("amr", new ArrayList<>(List.of("pwd")));
   }
 }
