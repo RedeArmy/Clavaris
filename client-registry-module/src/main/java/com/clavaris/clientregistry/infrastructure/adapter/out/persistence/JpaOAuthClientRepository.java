@@ -51,6 +51,12 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
     return oauthClients.findById(id).map(this::toDomain);
   }
 
+  @Override
+  public void deleteAllByOrganizationId(final UUID organizationId) {
+    oauthClients.deleteAllByOrganizationId(organizationId);
+    oauthClients.flush();
+  }
+
   private OAuthClient toDomain(final OAuthClientEntity entity) {
     return OAuthClient.reconstitute(
         entity.getId(),

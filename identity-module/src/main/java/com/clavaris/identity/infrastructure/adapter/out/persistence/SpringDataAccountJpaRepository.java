@@ -13,4 +13,10 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   boolean existsByOrganizationIdAndEmail(UUID organizationId, String email);
 
   Optional<AccountEntity> findByOrganizationIdAndEmail(UUID organizationId, String email);
+
+  // BR-DATA-02/03's own organization-level equivalent: Spring Data's own deleteBy/deleteAllBy
+  // query derivation, natively a real DELETE, no @Modifying needed. Cascades at the database
+  // level (migration V20260826100000) to password_credentials/sessions/refresh_tokens/
+  // verification_tokens for every Account this removes.
+  void deleteAllByOrganizationId(UUID organizationId);
 }

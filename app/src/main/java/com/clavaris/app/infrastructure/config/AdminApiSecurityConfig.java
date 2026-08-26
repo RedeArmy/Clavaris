@@ -73,6 +73,16 @@ class AdminApiSecurityConfig {
                         SCOPE_AUTHORITY_PREFIX + PlatformScopes.PLATFORM_CLIENTS_ROTATE_SECRET)
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/platform-clients/*/revoke")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.PLATFORM_CLIENTS_REVOKE)
+                    // BR-DATA-02: hard-deleting an Account is its own scope too, same
+                    // defence-in-depth reasoning as every other admin-API rule above.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:delete")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_DELETE)
+                    // BR-DATA-02/03: hard-deleting an entire Organization — its own scope too,
+                    // deliberately separate from ACCOUNTS_DELETE (an entire tenant's whole
+                    // account pool vs. one identity), arguably the single most irreversible
+                    // action this whole surface exposes.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations/*:delete")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ORGANIZATIONS_DELETE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

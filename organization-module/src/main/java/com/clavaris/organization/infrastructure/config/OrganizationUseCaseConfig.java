@@ -6,6 +6,11 @@ import com.clavaris.organization.application.usecase.createorganization.CreateOr
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createorganization.PlatformAccountExistsChecker;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
+import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationService;
+import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationUseCase;
+import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
+import com.clavaris.organization.application.usecase.deleteorganization.OrganizationOAuthClientsEraser;
+import com.clavaris.organization.application.usecase.deleteorganization.OrganizationTokenRevoker;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
@@ -22,6 +27,10 @@ import org.springframework.context.annotation.Configuration;
  * default class-name-derived bean name collides the moment two modules sharing that plain name are
  * on the same classpath.
  */
+// Literals: the repeated string is "PMD.LongVariable" itself, reused across several @Bean
+// method parameters that legitimately share the same port name — same false positive
+// identity-module's own IdentityUseCaseConfig class-level suppression already documents.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Configuration
 class OrganizationUseCaseConfig {
 
@@ -68,5 +77,20 @@ class OrganizationUseCaseConfig {
       final AuditEventRecorder auditEvents) {
     return new SetRateLimitPolicyForOrganizationService(
         organizations, policies, hardSystemWideCap, auditEvents);
+  }
+
+  @Bean
+  /* package */ DeleteOrganizationUseCase deleteOrganizationUseCase(
+      final OrganizationRepository organizations,
+      @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
+      @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
+      final AuditEventRecorder auditEvents) {
+    return new DeleteOrganizationService(
+        organizations,
+        organizationTokenRevoker,
+        identityDataEraser,
+        oauthClientsEraser,
+        auditEvents);
   }
 }

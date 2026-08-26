@@ -42,6 +42,16 @@ class JpaOrganizationRepository implements OrganizationRepository {
         .toList();
   }
 
+  @Override
+  public void deleteById(final UUID organizationId) {
+    // .flush(), same "must actually reach Postgres now, not deferred to whenever the surrounding
+    // transaction happens to commit" reasoning as identity-module's own JpaAccountRepository
+    // .deleteById — a real footgun otherwise for any caller reading this same row through a
+    // different connection/path within the same transaction.
+    organizations.deleteById(organizationId);
+    organizations.flush();
+  }
+
   private Organization toDomain(final OrganizationEntity entity) {
     return Organization.reconstitute(
         entity.getId(),

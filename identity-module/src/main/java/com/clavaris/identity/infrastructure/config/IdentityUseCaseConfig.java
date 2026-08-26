@@ -15,6 +15,8 @@ import com.clavaris.identity.application.usecase.confirmemailverification.Confir
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
+import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
@@ -53,11 +55,15 @@ import org.springframework.context.annotation.Configuration;
 // Literals: the repeated string is "PMD.LongVariable" itself, used on six different parameters
 // across five methods — a real code smell would be a repeated business-logic string, not the same
 // suppression annotation value reused because the same port name (verificationTokens,
-// accountTokenRevoker) legitimately appears as a parameter that many times.
+// accountTokenRevoker) legitimately appears as a parameter that many times. TooManyMethods: one
+// @Bean method per use case is what this class's entire job looks like — deleteAccountUseCase
+// tipped this over PMD's default threshold, not a sign this class grew organically past its own
+// single responsibility.
 @SuppressWarnings({
   "PMD.ExcessiveImports",
   "PMD.CouplingBetweenObjects",
-  "PMD.AvoidDuplicateLiterals"
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.TooManyMethods"
 })
 @Configuration
 class IdentityUseCaseConfig {
@@ -178,5 +184,14 @@ class IdentityUseCaseConfig {
         accountTokenRevoker,
         passwordHasher,
         eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ DeleteAccountUseCase deleteAccountUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new DeleteAccountService(accounts, accountTokenRevoker, auditEvents, eventOutboxWriter);
   }
 }

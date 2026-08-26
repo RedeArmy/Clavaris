@@ -23,4 +23,9 @@ interface SpringDataSigningKeyJpaRepository extends JpaRepository<SigningKeyEnti
           + "AND (e.retiredAt IS NULL OR e.retiredAt > :retiredAfter)")
   List<SigningKeyEntity> findActiveAndRetiredSince(
       @Param("organizationId") UUID organizationId, @Param("retiredAfter") Instant retiredAfter);
+
+  // BR-DATA-02/03's own organization-level equivalent — every key this Organization ever
+  // rotated through, active or long-retired alike, not just what findActiveAndRetiredSince
+  // itself cares about for JWKS publishing.
+  void deleteAllByOrganizationId(UUID organizationId);
 }

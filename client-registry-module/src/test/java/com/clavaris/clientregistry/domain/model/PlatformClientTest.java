@@ -22,7 +22,9 @@ class PlatformClientTest {
             PlatformScopes.RATE_LIMIT_POLICY_WRITE,
             PlatformScopes.SIGNING_KEYS_ROTATE,
             PlatformScopes.PLATFORM_CLIENTS_ROTATE_SECRET,
-            PlatformScopes.PLATFORM_CLIENTS_REVOKE);
+            PlatformScopes.PLATFORM_CLIENTS_REVOKE,
+            PlatformScopes.ACCOUNTS_DELETE,
+            PlatformScopes.ORGANIZATIONS_DELETE);
     assertThat(client.createdAt()).isNotNull();
   }
 

@@ -39,4 +39,19 @@ public interface AccountRepository {
 
   /** Persists the account and its attached credential in one write. */
   void save(Account account);
+
+  /**
+   * BR-DATA-02/03: a real, permanent hard delete — the only delete this port (or any repository in
+   * this module) exposes. Cascades at the database level to every table whose own row exists only
+   * because this {@code Account} does (migration {@code V20260826100000}) — see {@code
+   * DeleteAccountService}'s own Javadoc for the full reasoning.
+   */
+  void deleteById(AccountId accountId);
+
+  /**
+   * BR-DATA-02/03's own organization-level equivalent — every {@code Account} this Organization
+   * owns, hard-deleted, cascading (same migration) to each one's own {@code
+   * password_credentials}/{@code sessions}/{@code refresh_tokens}/{@code verification_tokens}.
+   */
+  void deleteAllByOrganizationId(OrganizationId organizationId);
 }
