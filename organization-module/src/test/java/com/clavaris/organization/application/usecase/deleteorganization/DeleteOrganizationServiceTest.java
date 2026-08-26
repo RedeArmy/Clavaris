@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.deleteorganization;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -14,9 +15,14 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
+import com.clavaris.organization.domain.event.OrganizationDeletedEvent;
+import com.clavaris.organization.domain.model.Organization;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 class DeleteOrganizationServiceTest {
@@ -28,6 +34,7 @@ class DeleteOrganizationServiceTest {
   private OrganizationIdentityDataEraser identityDataEraser;
   private OrganizationOAuthClientsEraser oauthClientsEraser;
   private AuditEventRecorder auditEvents;
+  private EventOutboxWriter outbox;
   private DeleteOrganizationService service;
 
   @BeforeEach
@@ -37,19 +44,28 @@ class DeleteOrganizationServiceTest {
     identityDataEraser = mock(OrganizationIdentityDataEraser.class);
     oauthClientsEraser = mock(OrganizationOAuthClientsEraser.class);
     auditEvents = mock(AuditEventRecorder.class);
+    outbox = mock(EventOutboxWriter.class);
     service =
         new DeleteOrganizationService(
             organizations,
             organizationTokenRevoker,
             identityDataEraser,
             oauthClientsEraser,
-            auditEvents);
+            auditEvents,
+            outbox);
+  }
+
+  private Organization registeredOrganization(final UUID organizationId) {
+    Organization organization =
+        Organization.reconstitute(organizationId, "Acme", Instant.now(), UUID.randomUUID());
+    when(organizations.findById(organizationId)).thenReturn(Optional.of(organization));
+    return organization;
   }
 
   @Test
   void revokesTokensBeforeErasingSoTheRevokersOwnSubqueriesCanStillResolveTheRows() {
     UUID organizationId = UUID.randomUUID();
-    when(organizations.existsById(organizationId)).thenReturn(true);
+    registeredOrganization(organizationId);
 
     service.handle(new DeleteOrganizationCommand(organizationId, ACTOR));
 
@@ -65,7 +81,7 @@ class DeleteOrganizationServiceTest {
   @Test
   void erasesIdentityAndOAuthClientDataAndDeletesTheOrganizationRow() {
     UUID organizationId = UUID.randomUUID();
-    when(organizations.existsById(organizationId)).thenReturn(true);
+    registeredOrganization(organizationId);
 
     service.handle(new DeleteOrganizationCommand(organizationId, ACTOR));
 
@@ -77,7 +93,7 @@ class DeleteOrganizationServiceTest {
   @Test
   void recordsAnAuditEventForTheDeletedOrganization() {
     UUID organizationId = UUID.randomUUID();
-    when(organizations.existsById(organizationId)).thenReturn(true);
+    registeredOrganization(organizationId);
 
     service.handle(new DeleteOrganizationCommand(organizationId, ACTOR));
 
@@ -91,9 +107,26 @@ class DeleteOrganizationServiceTest {
   }
 
   @Test
+  void writesAnOrganizationDeletedOutboxEvent() {
+    // TD-ARCH-007: DeleteAccountService's own sibling behavior — this service never wrote one
+    // before this fix.
+    UUID organizationId = UUID.randomUUID();
+    Organization organization = registeredOrganization(organizationId);
+
+    service.handle(new DeleteOrganizationCommand(organizationId, ACTOR));
+
+    ArgumentCaptor<OrganizationDeletedEvent> event =
+        ArgumentCaptor.forClass(OrganizationDeletedEvent.class);
+    verify(outbox).write(eq("organization.deleted"), eq(organizationId), event.capture());
+    assertThat(event.getValue().organizationId()).isEqualTo(organizationId);
+    assertThat(event.getValue().name()).isEqualTo(organization.name());
+    assertThat(event.getValue().occurredAt()).isNotNull();
+  }
+
+  @Test
   void rejectsAnUnknownOrganizationWithoutRevokingOrDeletingAnything() {
     UUID unknownOrganizationId = UUID.randomUUID();
-    when(organizations.existsById(unknownOrganizationId)).thenReturn(false);
+    when(organizations.findById(unknownOrganizationId)).thenReturn(Optional.empty());
     DeleteOrganizationCommand command = new DeleteOrganizationCommand(unknownOrganizationId, ACTOR);
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
@@ -103,6 +136,7 @@ class DeleteOrganizationServiceTest {
     verifyNoInteractions(identityDataEraser);
     verifyNoInteractions(oauthClientsEraser);
     verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
     verify(organizations, never()).deleteById(any());
   }
 }

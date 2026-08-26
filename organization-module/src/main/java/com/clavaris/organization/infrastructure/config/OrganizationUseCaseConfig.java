@@ -8,6 +8,7 @@ import com.clavaris.organization.application.usecase.createorganization.Platform
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationService;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationUseCase;
+import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationOAuthClientsEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationTokenRevoker;
@@ -85,12 +86,14 @@ class OrganizationUseCaseConfig {
       @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
       @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
     return new DeleteOrganizationService(
         organizations,
         organizationTokenRevoker,
         identityDataEraser,
         oauthClientsEraser,
-        auditEvents);
+        auditEvents,
+        eventOutboxWriter);
   }
 }
