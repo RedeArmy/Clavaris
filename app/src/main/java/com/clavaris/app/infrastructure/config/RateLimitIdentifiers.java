@@ -105,4 +105,24 @@ final class RateLimitIdentifiers {
         ? null
         : authentication.getName();
   }
+
+  /**
+   * TD-SEC-030: the presented platform-tier {@code client_id} for an already-authenticated {@code
+   * /api/v1/admin/**} call — {@code AdminApiSecurityConfig}'s own resource-server chain sets {@code
+   * JwtAuthenticationToken#getName()} to the validated access token's {@code sub} claim, which
+   * SAS's own client_credentials issuance (confirmed live, {@code
+   * PlatformAuthorizationServerConfig}) populates with the requesting {@code PlatformClient}'s
+   * {@code client_id}. Same {@link SecurityContextHolder} read as {@link
+   * #authenticatedPlatformAccountId}, but a distinct method: the principal here is a machine
+   * client, never a human-owned {@code PlatformAccountId}, and the two must never be confused at a
+   * call site. Returns {@code null} for an unauthenticated request — {@code oauth2ResourceServer}'s
+   * own rejection already handles those before this rule's outcome would matter.
+   */
+  @SuppressWarnings("java:S1172")
+  /* package */ static String authenticatedPlatformClientId(final HttpServletRequest request) {
+    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    return (authentication == null || !authentication.isAuthenticated())
+        ? null
+        : authentication.getName();
+  }
 }
