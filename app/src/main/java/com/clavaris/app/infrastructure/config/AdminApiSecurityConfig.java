@@ -81,7 +81,7 @@ class AdminApiSecurityConfig {
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.admin-api.organizations-delete.per-client-limit:5}")
           final int organizationsDeletePerClientLimit) {
-    http.securityMatcher("/api/v1/admin/**")
+    http.securityMatcher(ADMIN_API_PATH_PATTERN)
         .authorizeHttpRequests(
             authorize ->
                 authorize

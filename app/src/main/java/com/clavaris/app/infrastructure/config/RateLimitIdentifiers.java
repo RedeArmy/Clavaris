@@ -87,6 +87,20 @@ final class RateLimitIdentifiers {
   }
 
   /**
+   * The shared read both {@link #authenticatedPlatformAccountId} and {@link
+   * #authenticatedPlatformClientId} are built on — same {@link SecurityContextHolder} lookup either
+   * way, only the caller's own principal-type assumption differs. Extracted so the two methods
+   * below stay distinct call sites (never confusable with one another, per their own Javadoc)
+   * without their implementations being a byte-for-byte duplicate of each other.
+   */
+  private static String currentAuthenticationName() {
+    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    return (authentication == null || !authentication.isAuthenticated())
+        ? null
+        : authentication.getName();
+  }
+
+  /**
    * The current session's authenticated {@code PlatformAccountId} — same principal-name source
    * {@code CurrentPlatformAccountResolverBridge} reads, but this filter runs before that bridge
    * would ever be reached (it protects {@code POST /platform/dashboard} itself), so it reads {@link
@@ -100,10 +114,7 @@ final class RateLimitIdentifiers {
   // Function<HttpServletRequest, String>, the same as every other extractor in this class.
   @SuppressWarnings("java:S1172")
   /* package */ static String authenticatedPlatformAccountId(final HttpServletRequest request) {
-    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    return (authentication == null || !authentication.isAuthenticated())
-        ? null
-        : authentication.getName();
+    return currentAuthenticationName();
   }
 
   /**
@@ -120,9 +131,6 @@ final class RateLimitIdentifiers {
    */
   @SuppressWarnings("java:S1172")
   /* package */ static String authenticatedPlatformClientId(final HttpServletRequest request) {
-    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    return (authentication == null || !authentication.isAuthenticated())
-        ? null
-        : authentication.getName();
+    return currentAuthenticationName();
   }
 }
