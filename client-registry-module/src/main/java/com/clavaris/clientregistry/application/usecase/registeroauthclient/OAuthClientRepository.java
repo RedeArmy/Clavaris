@@ -25,4 +25,10 @@ public interface OAuthClientRepository {
   // RegisteredClientRepository.findById's own parameter naming (the SPI this ultimately serves).
   @SuppressWarnings("PMD.ShortVariable")
   Optional<OAuthClient> findById(UUID id);
+
+  /**
+   * BR-DATA-02/03's own organization-level equivalent — every {@code OAuthClient} this Organization
+   * ever registered.
+   */
+  void deleteAllByOrganizationId(UUID organizationId);
 }

@@ -106,4 +106,27 @@ class JpaAccountRepository implements AccountRepository {
             credential.passwordHash(),
             credential.updatedAt()));
   }
+
+  @Override
+  public void deleteById(final AccountId accountId) {
+    // Deliberately not deleteById(...).orElseThrow(...) — the caller (DeleteAccountService)
+    // already did its own findById existence check before deciding to call this at all;
+    // Spring Data's own deleteById is a no-op, not an error, if the row is somehow already gone.
+    //
+    // .flush(), same "must actually reach Postgres now, not whenever the surrounding transaction
+    // happens to commit" reasoning as save()'s own saveAndFlush above — a plain deleteById()
+    // alone only stages the DELETE in the persistence context. Nothing in this class's own
+    // production call path strictly depends on that timing today, but leaving it deferred is a
+    // real footgun for any future caller (or test) that reads this same row through a different
+    // connection/path within the same transaction, exactly the class of bug save()'s own comment
+    // already flags.
+    accounts.deleteById(accountId.value());
+    accounts.flush();
+  }
+
+  @Override
+  public void deleteAllByOrganizationId(final OrganizationId organizationId) {
+    accounts.deleteAllByOrganizationId(organizationId.value());
+    accounts.flush();
+  }
 }

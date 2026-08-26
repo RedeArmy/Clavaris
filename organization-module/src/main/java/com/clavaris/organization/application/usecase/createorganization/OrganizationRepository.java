@@ -20,4 +20,14 @@ public interface OrganizationRepository {
 
   List<Organization> findAllOwnedBy(
       @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId);
+
+  /**
+   * BR-DATA-02/03's own organization-level equivalent: a real, permanent hard delete. Only cascades
+   * at the database level to this module's own {@code rate_limit_policies} (migration {@code
+   * V20260826110000}, same-module) — every other table this Organization owns (identity-module's
+   * {@code accounts}/{@code signing_keys}, client-registry-module's {@code oauth_clients}) is
+   * erased explicitly, at the application layer, before this method is called. See {@code
+   * DeleteOrganizationService}'s own Javadoc for the full reasoning.
+   */
+  void deleteById(UUID organizationId);
 }

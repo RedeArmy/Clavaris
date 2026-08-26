@@ -25,4 +25,10 @@ public interface SigningKeyRepository {
   List<SigningKey> findActiveAndRetiredSince(OrganizationId organizationId, Instant retiredAfter);
 
   void save(SigningKey signingKey);
+
+  /**
+   * BR-DATA-02/03's own organization-level equivalent — every key this Organization ever rotated
+   * through, active or long-retired alike.
+   */
+  void deleteAllByOrganizationId(OrganizationId organizationId);
 }

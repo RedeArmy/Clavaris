@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -44,6 +48,7 @@ class JpaAccountRepositoryTest {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
   @Autowired private AccountRepository repository;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
   void findsAnAccountWithItsAttachedPasswordCredential() {
@@ -85,6 +90,60 @@ class JpaAccountRepositoryTest {
             repository.findByOrganizationIdAndEmail(
                 organizationId, new Email("nobody@example.com")))
         .isEmpty();
+  }
+
+  // BR-DATA-02/03, TD-migration V20260826100000: proves the schema-level guarantee
+  // DeleteAccountService's own Javadoc relies on — every table whose only reason to exist is this
+  // Account's own data is really gone, not just the account row itself, and the delete doesn't
+  // throw a foreign-key violation partway through. Rows for sessions/refresh_tokens/
+  // verification_tokens are inserted directly via SQL rather than through their own repositories
+  // (not wired into this test's own narrow TestConfig) — this test is deliberately about the
+  // database's own cascade behavior, independent of any one repository's application code.
+  @Test
+  void deletingAnAccountCascadesToEveryTableThatOnlyExistsBecauseOfIt() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Email email = new Email("to-be-deleted@example.com");
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("argon2id$stored-hash");
+    repository.save(account);
+    AccountId accountId = account.id();
+
+    UUID sessionId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "insert into sessions (id, account_id, scopes) values (?, ?, ?)",
+        sessionId,
+        accountId.value(),
+        "[\"openid\"]");
+    jdbcTemplate.update(
+        "insert into refresh_tokens (id, session_id, account_id, token_hash, expires_at) values"
+            + " (?, ?, ?, ?, ?)",
+        UUID.randomUUID(),
+        sessionId,
+        accountId.value(),
+        "a".repeat(64),
+        Timestamp.from(Instant.now().plusSeconds(3600)));
+    jdbcTemplate.update(
+        "insert into verification_tokens (id, account_id, type, token_hash, expires_at) values"
+            + " (?, ?, ?, ?, ?)",
+        UUID.randomUUID(),
+        accountId.value(),
+        "EMAIL_VERIFICATION",
+        "b".repeat(64),
+        Timestamp.from(Instant.now().plusSeconds(3600)));
+
+    repository.deleteById(accountId);
+
+    assertThat(countWhere("accounts", accountId.value())).isZero();
+    assertThat(countWhere("password_credentials", accountId.value())).isZero();
+    assertThat(countWhere("sessions", accountId.value())).isZero();
+    assertThat(countWhere("refresh_tokens", accountId.value())).isZero();
+    assertThat(countWhere("verification_tokens", accountId.value())).isZero();
+  }
+
+  private Integer countWhere(String table, UUID accountId) {
+    String column = "accounts".equals(table) ? "id" : "account_id";
+    return jdbcTemplate.queryForObject(
+        "select count(*) from " + table + " where " + column + " = ?", Integer.class, accountId);
   }
 
   // Same @Import + narrowly-filtered @EnableJpaRepositories rationale as

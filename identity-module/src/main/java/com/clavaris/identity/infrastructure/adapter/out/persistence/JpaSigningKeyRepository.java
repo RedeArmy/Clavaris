@@ -48,6 +48,12 @@ class JpaSigningKeyRepository implements SigningKeyRepository {
             signingKey.retiredAt().orElse(null)));
   }
 
+  @Override
+  public void deleteAllByOrganizationId(final OrganizationId organizationId) {
+    signingKeys.deleteAllByOrganizationId(organizationId.value());
+    signingKeys.flush();
+  }
+
   private SigningKey toDomain(final SigningKeyEntity entity) {
     return SigningKey.reconstitute(
         entity.getId(),
