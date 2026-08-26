@@ -17,6 +17,7 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -40,6 +41,7 @@ class ConfirmPasswordResetServiceTest {
   private SessionRepository sessions;
   private RefreshTokenRepository refreshTokens;
   private AccountTokenRevoker accountTokenRevoker;
+  private AccountSessionRevoker accountSessionRevoker;
   private PasswordHasher hasher;
   private EventOutboxWriter outbox;
   private ConfirmPasswordResetService service;
@@ -51,11 +53,19 @@ class ConfirmPasswordResetServiceTest {
     sessions = mock(SessionRepository.class);
     refreshTokens = mock(RefreshTokenRepository.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
+    accountSessionRevoker = mock(AccountSessionRevoker.class);
     hasher = mock(PasswordHasher.class);
     outbox = mock(EventOutboxWriter.class);
     service =
         new ConfirmPasswordResetService(
-            tokens, accounts, sessions, refreshTokens, accountTokenRevoker, hasher, outbox);
+            tokens,
+            accounts,
+            sessions,
+            refreshTokens,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            hasher,
+            outbox);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
   }
 
@@ -88,6 +98,7 @@ class ConfirmPasswordResetServiceTest {
     verify(sessions).revokeAllActiveForAccount(account.id());
     verify(refreshTokens).revokeAllActiveForAccount(account.id());
     verify(accountTokenRevoker).revokeAllTokensFor(account.id());
+    verify(accountSessionRevoker).revokeAllSessionsFor(account.id());
     verify(outbox).write(eq("password_reset.completed"), eq(account.id()), any());
   }
 

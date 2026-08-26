@@ -45,6 +45,7 @@ class RotateRefreshTokenServiceTest {
   private SessionRepository sessions;
   private AccountRepository accounts;
   private AccountTokenRevoker accountTokenRevoker;
+  private AccountSessionRevoker accountSessionRevoker;
   private EventOutboxWriter outbox;
   private SecurityMetricsRecorder metrics;
   private RotateRefreshTokenService service;
@@ -57,11 +58,18 @@ class RotateRefreshTokenServiceTest {
     sessions = mock(SessionRepository.class);
     accounts = mock(AccountRepository.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
+    accountSessionRevoker = mock(AccountSessionRevoker.class);
     outbox = mock(EventOutboxWriter.class);
     metrics = mock(SecurityMetricsRecorder.class);
     service =
         new RotateRefreshTokenService(
-            refreshTokens, sessions, accounts, accountTokenRevoker, outbox, metrics);
+            refreshTokens,
+            sessions,
+            accounts,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            outbox,
+            metrics);
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -115,6 +123,7 @@ class RotateRefreshTokenServiceTest {
     assertThat(active.isRevoked()).isTrue();
     verify(refreshTokens, times(2)).save(any()); // once for the revoked old, once for the new
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
     verify(outbox, never()).write(any(), any(), any());
     verify(metrics).increment("clavaris.auth.refresh_token.rotated");
   }
@@ -128,6 +137,7 @@ class RotateRefreshTokenServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
   }
 
   @Test
@@ -149,6 +159,7 @@ class RotateRefreshTokenServiceTest {
 
     // Ordinary expiry is not the BR-ID-03 reuse signal — no mass revocation, no alert.
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
     verify(outbox, never()).write(any(), any(), any());
   }
@@ -182,6 +193,7 @@ class RotateRefreshTokenServiceTest {
     verify(refreshTokens).revokeAllActiveForAccount(accountId);
     verify(sessions).revokeAllActiveForAccount(accountId);
     verify(accountTokenRevoker).revokeAllTokensFor(accountId);
+    verify(accountSessionRevoker).revokeAllSessionsFor(accountId);
     verify(outbox)
         .write(
             eq("refresh_token.reuse_detected"),

@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.deleteaccount;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.event.AccountDeletedEvent;
 import com.clavaris.identity.domain.model.Account;
@@ -32,7 +33,16 @@ import org.springframework.transaction.annotation.Transactional;
  * revisited the day either one ships, not silently forgotten (TD-FUT-005 already names the
  * workspace half of that obligation for its own reasons; this is the same trigger reaching this
  * service too).
+ *
+ * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added alongside {@link
+ * AccountTokenRevoker} — a hard delete must also kill a stale-but-still-live hosted-login-page
+ * {@code HttpSession}, or a browser that was already past login could still mint a fresh
+ * authorization code for an {@code Account} whose row is already gone.
  */
+// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
+// parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
+// suppression for this exact PMD-annotation-string-as-literal false positive.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class DeleteAccountService implements DeleteAccountUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeleteAccountService.class);
@@ -43,16 +53,24 @@ public class DeleteAccountService implements DeleteAccountUseCase {
   // other caller of this port (RotateRefreshTokenService, ConfirmPasswordResetService).
   private final AccountTokenRevoker accountTokenRevoker;
 
+  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
+  // accountTokenRevoker above.
+  private final AccountSessionRevoker accountSessionRevoker;
+
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
+  // ConfirmPasswordResetService's own identical suppression.
   public DeleteAccountService(
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.accounts = accounts;
     this.accountTokenRevoker = accountTokenRevoker;
+    this.accountSessionRevoker = accountSessionRevoker;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -74,6 +92,7 @@ public class DeleteAccountService implements DeleteAccountUseCase {
     // revoked, since nothing here has any reason to retain a revoked-but-present row once the
     // account it belongs to is permanently gone).
     accountTokenRevoker.revokeAllTokensFor(account.id());
+    accountSessionRevoker.revokeAllSessionsFor(account.id());
 
     // BR-DATA-01: never the raw email in the audit detail or the log line — same discipline as
     // every other audited action in this codebase.

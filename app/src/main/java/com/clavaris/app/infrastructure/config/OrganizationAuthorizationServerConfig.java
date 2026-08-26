@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -178,6 +179,7 @@ class OrganizationAuthorizationServerConfig {
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final RateLimiter rateLimiter,
       final RateLimitPolicyRepository rateLimitPolicies,
+      final SessionRegistry sessionRegistry,
       @Value("${clavaris.rate-limit.login.per-account-limit:10}") final int loginPerAccountLimit,
       @Value("${clavaris.rate-limit.login.per-ip-limit:30}") final int loginPerIpLimit,
       @Value("${clavaris.rate-limit.token.per-client-limit:20}") final int tokenPerClientLimit,
@@ -440,6 +442,17 @@ class OrganizationAuthorizationServerConfig {
             new OrganizationCapacityRateLimitingFilter(
                 rateLimiter, rateLimitPolicies, capacityDefaultRequestsPerMinute),
             AntiAbuseRateLimitingFilter.class)
+        // TD-SEC-031 (SDE-III review, 2026-08-26): without this, AccountSessionRevoker's own
+        // expireNow() call marks a SessionRegistry entry nobody on this chain ever checked — same
+        // "expireNow() alone doesn't reject the next request" gap PlatformDashboardSecurityConfig's
+        // own ConcurrentSessionFilter wiring already closed for the platform tier. Wrapped, not the
+        // plain sessionManagement().sessionConcurrency() DSL — see TenantSessionConcurrencyFilter's
+        // own Javadoc for the real integration-test-caught regression that DSL's own unconditional
+        // reach caused against this chain's machine-authenticated endpoints, and why this exempts
+        // them explicitly rather than routing around the symptom.
+        .addFilterAfter(
+            new TenantSessionConcurrencyFilter(sessionRegistry),
+            OrganizationCapacityRateLimitingFilter.class)
         // TD-SEC-028: /userinfo is a Bearer-token-protected API endpoint, not a browser page — a
         // real OIDC client calling it with a missing/invalid access token needs a clean 401,
         // never OrganizationLoginRedirectEntryPoint's redirect-to-the-hosted-login-page (correct

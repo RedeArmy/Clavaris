@@ -24,7 +24,15 @@ import org.springframework.transaction.annotation.Transactional;
  * revocation cascade), or active (rotate). See {@link RefreshToken}'s own Javadoc for why "already
  * revoked" alone, without walking the {@code rotatedFromId} chain, is the correct and sufficient
  * reuse signal in this implementation.
+ *
+ * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added to the reuse
+ * cascade in {@link #handleReuse} — see that port's own Javadoc for why a token/session revocation
+ * cascade is incomplete without it.
  */
+// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
+// parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
+// suppression for this exact PMD-annotation-string-as-literal false positive.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RotateRefreshTokenService.class);
@@ -38,20 +46,31 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   @SuppressWarnings("PMD.LongVariable")
   private final AccountTokenRevoker accountTokenRevoker;
 
+  // TD-SEC-031 (SDE-III review, 2026-08-26): BR-ID-03's own reuse response revoked the SAS token
+  // and this module's own Session/RefreshToken rows, but never the hosted-login-page's own
+  // HttpSession — see AccountSessionRevoker's own Javadoc for the concrete consequence.
+  @SuppressWarnings("PMD.LongVariable")
+  private final AccountSessionRevoker accountSessionRevoker;
+
   private final EventOutboxWriter outbox;
   private final SecurityMetricsRecorder metrics;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
+  // ConfirmPasswordResetService's own identical suppression — BR-ID-03's reuse cascade genuinely
+  // needs every one of these, not excess complexity to hide.
   public RotateRefreshTokenService(
       final RefreshTokenRepository refreshTokens,
       final SessionRepository sessions,
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter outbox,
       final SecurityMetricsRecorder metrics) {
     this.refreshTokens = refreshTokens;
     this.sessions = sessions;
     this.accounts = accounts;
     this.accountTokenRevoker = accountTokenRevoker;
+    this.accountSessionRevoker = accountSessionRevoker;
     this.outbox = outbox;
     this.metrics = metrics;
   }
@@ -144,6 +163,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     refreshTokens.revokeAllActiveForAccount(accountId);
     sessions.revokeAllActiveForAccount(accountId);
     accountTokenRevoker.revokeAllTokensFor(accountId);
+    accountSessionRevoker.revokeAllSessionsFor(accountId);
 
     final OrganizationId organizationId =
         accounts

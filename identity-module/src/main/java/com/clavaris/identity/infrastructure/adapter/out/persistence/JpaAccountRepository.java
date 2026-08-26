@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -128,5 +129,12 @@ class JpaAccountRepository implements AccountRepository {
   public void deleteAllByOrganizationId(final OrganizationId organizationId) {
     accounts.deleteAllByOrganizationId(organizationId.value());
     accounts.flush();
+  }
+
+  @Override
+  public List<Account> findAllByOrganizationId(final OrganizationId organizationId) {
+    return accounts.findByOrganizationId(organizationId.value()).stream()
+        .map(this::toDomain)
+        .toList();
   }
 }
