@@ -104,6 +104,28 @@ class PlatformAccountDashboardIntegrationTest extends RedisBackedIntegrationTest
         .as("the created Organization must really be owned by this PlatformAccount, in the DB")
         .isEqualTo(1);
 
+    // TD-SEC-007: this self-service path (ADR-0012) must record its own real audit_events row,
+    // with actor_type=PLATFORM_ACCOUNT — not just the operator REST path
+    // (CreateOrganizationController
+    // already covers that one indirectly via requestPlatformAccessToken()-based tests elsewhere).
+    // Never asserted before this test existed to prove it; CreateOrganizationService's own Javadoc
+    // claimed this worked "whether reached via the operator REST path or the self-service
+    // dashboard" — this is that claim, checked against the real row, not just read from the code.
+    Integer auditRowsForThisAccountAction =
+        jdbcTemplate.queryForObject(
+            "select count(*) from audit_events where action = 'organization.created' and"
+                + " actor_type = 'PLATFORM_ACCOUNT' and actor_id ="
+                + " (select id::text from platform_accounts where email = ?) and target_id ="
+                + " (select id::text from organizations where name = ?)",
+            Integer.class,
+            email,
+            "Kiniela");
+    assertThat(auditRowsForThisAccountAction)
+        .as(
+            "self-service Organization creation via /platform/dashboard must audit the real"
+                + " PlatformAccount as the actor, not silently skip auditing or misattribute it")
+        .isEqualTo(1);
+
     // BR-ID-04's ADR-0012 equivalent: resetting the password signs the dashboard session out —
     // the very next request with the same session cookie must be rejected, not just accepted
     // with stale credentials.
