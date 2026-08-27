@@ -78,7 +78,7 @@ class OrganizationEventOutboxRetentionJobTest {
 
     Long remaining =
         jdbcTemplate.queryForObject("select count(*) from organization_event_outbox", Long.class);
-    assertThat(remaining).isEqualTo(0L);
+    assertThat(remaining).isZero();
   }
 
   private void insertRow(final Instant occurredAt, final Instant publishedAt) {

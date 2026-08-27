@@ -27,10 +27,13 @@ class JpaOrganizationEventOutboxWriterTest {
     // Jackson wraps it as a genuine JacksonException, the same as any real serialization failure.
     JpaOrganizationEventOutboxWriter writer =
         new JpaOrganizationEventOutboxWriter(outbox, new ObjectMapper());
+    // Built outside the lambda below on purpose: java:S5778 wants only the one invocation
+    // actually meant to throw (writer.write itself) inside isThrownBy's own lambda.
+    UUID aggregateId = UUID.randomUUID();
+    Unserializable payload = new Unserializable();
 
     assertThatExceptionOfType(IllegalStateException.class)
-        .isThrownBy(
-            () -> writer.write("organization.deleted", UUID.randomUUID(), new Unserializable()))
+        .isThrownBy(() -> writer.write("organization.deleted", aggregateId, payload))
         .withMessageContaining("organization.deleted");
 
     verifyNoInteractions(outbox);
