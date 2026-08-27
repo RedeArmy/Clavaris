@@ -1,47 +1,28 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import jakarta.persistence.Column;
+import com.clavaris.common.infrastructure.adapter.out.persistence.AbstractEventOutboxEntity;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
  * JPA row mapping for this module's own {@code organization_event_outbox} (ADR-0007 §1, migration
- * {@code V20260826120000}) — identity-module's own {@code EventOutboxEntity} mirror,
- * module-prefixed on purpose: see that migration's own comment for why a same-named class here
- * would collide (Hibernate's own JPQL entity-name namespace, plain-simple-name-derived by default)
- * with identity-module's own identically-shaped class once both are on the same classpath. Same
- * PMD.ShortVariable rationale as {@code AccountEntity}/identity-module's own {@code
- * EventOutboxEntity}.
+ * {@code V20260826120000}) — columns themselves live on {@link AbstractEventOutboxEntity}, shared
+ * with identity-module's own {@code EventOutboxEntity}. Module-prefixed class name, own
+ * {@code @Table}: see that migration's own comment for why a same-named table here would collide
+ * with identity-module's own {@code event_outbox} (Flyway's default {@code classpath:db/migration}
+ * location merges every module's migrations into one shared Postgres schema in the real running
+ * app) — this class only shares column boilerplate with identity-module's, never the table itself.
  */
 @SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "organization_event_outbox")
-public class OrganizationEventOutboxEntity {
+public class OrganizationEventOutboxEntity extends AbstractEventOutboxEntity {
 
-  @Id private UUID id;
-
-  @Column(name = "aggregate_type", nullable = false)
-  private String aggregateType;
-
-  @Column(name = "aggregate_id", nullable = false)
-  private UUID aggregateId;
-
-  @Column(name = "event_type", nullable = false)
-  private String eventType;
-
-  @Column(nullable = false, columnDefinition = "text")
-  private String payload;
-
-  @Column(name = "occurred_at", nullable = false)
-  private Instant occurredAt;
-
-  @Column(name = "published_at")
-  private Instant publishedAt;
-
-  protected OrganizationEventOutboxEntity() {}
+  protected OrganizationEventOutboxEntity() {
+    super();
+  }
 
   public OrganizationEventOutboxEntity(
       final UUID id,
@@ -50,12 +31,6 @@ public class OrganizationEventOutboxEntity {
       final String eventType,
       final String payload,
       final Instant occurredAt) {
-    this.id = id;
-    this.aggregateType = aggregateType;
-    this.aggregateId = aggregateId;
-    this.eventType = eventType;
-    this.payload = payload;
-    this.occurredAt = occurredAt;
-    // publishedAt starts null — set only once a future dispatcher (webhook-module) delivers it.
+    super(id, aggregateType, aggregateId, eventType, payload, occurredAt);
   }
 }

@@ -1,7 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import com.clavaris.common.infrastructure.adapter.out.persistence.EventOutboxRetentionSweeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
  * sweep on confirmed dispatcher lag) so it doesn't start silently discarding real, undelivered
  * webhooks. A still-unpublished row being swept is logged as a WARN specifically so that day is
  * visible in logs, not discovered as a missing webhook delivery.
+ *
+ * <p>The actual sweep-and-log decision lives on {@link EventOutboxRetentionSweeper} (shared with
+ * organization-module's own identical job, TD-ARCH-007) — this class only owns the bean/table/
+ * schedule wiring specific to {@code event_outbox}.
  */
 @Component
 class EventOutboxRetentionJob {
@@ -48,24 +51,6 @@ class EventOutboxRetentionJob {
   @Scheduled(cron = "0 30 3 * * *")
   @Transactional
   /* package */ void sweepExpiredRows() {
-    final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-    final long stillUnpublished = outbox.countByOccurredAtBeforeAndPublishedAtIsNull(cutoff);
-    final long deleted = outbox.deleteByOccurredAtBefore(cutoff);
-    if (deleted == 0) {
-      return;
-    }
-    if (stillUnpublished > 0) {
-      LOG.warn(
-          "event=event_outbox_retention_swept deletedCount={} stillUnpublishedCount={}"
-              + " retentionDays={}",
-          deleted,
-          stillUnpublished,
-          retentionDays);
-    } else {
-      LOG.info(
-          "event=event_outbox_retention_swept deletedCount={} retentionDays={}",
-          deleted,
-          retentionDays);
-    }
+    EventOutboxRetentionSweeper.sweep(LOG, outbox, retentionDays);
   }
 }

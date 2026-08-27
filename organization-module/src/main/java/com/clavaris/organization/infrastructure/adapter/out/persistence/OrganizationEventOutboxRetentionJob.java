@@ -1,7 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import com.clavaris.common.infrastructure.adapter.out.persistence.EventOutboxRetentionSweeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
  * deliberately — there is no reason the two policies would ever need to diverge). Module-prefixed
  * class name, same collision reason as {@link OrganizationEventOutboxEntity}'s own Javadoc. See
  * identity-module's own class for the full "why age, not published_at" reasoning; identical here.
+ *
+ * <p>The actual sweep-and-log decision lives on {@link EventOutboxRetentionSweeper} (shared with
+ * identity-module's own job) — this class only owns the bean/table/schedule wiring specific to
+ * {@code organization_event_outbox}.
  */
 @Component
 class OrganizationEventOutboxRetentionJob {
@@ -38,24 +41,6 @@ class OrganizationEventOutboxRetentionJob {
   @Scheduled(cron = "0 30 3 * * *")
   @Transactional
   /* package */ void sweepExpiredRows() {
-    final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-    final long stillUnpublished = outbox.countByOccurredAtBeforeAndPublishedAtIsNull(cutoff);
-    final long deleted = outbox.deleteByOccurredAtBefore(cutoff);
-    if (deleted == 0) {
-      return;
-    }
-    if (stillUnpublished > 0) {
-      LOG.warn(
-          "event=event_outbox_retention_swept deletedCount={} stillUnpublishedCount={}"
-              + " retentionDays={}",
-          deleted,
-          stillUnpublished,
-          retentionDays);
-    } else {
-      LOG.info(
-          "event=event_outbox_retention_swept deletedCount={} retentionDays={}",
-          deleted,
-          retentionDays);
-    }
+    EventOutboxRetentionSweeper.sweep(LOG, outbox, retentionDays);
   }
 }
