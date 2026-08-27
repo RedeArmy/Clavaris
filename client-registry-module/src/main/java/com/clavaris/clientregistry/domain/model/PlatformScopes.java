@@ -59,6 +59,35 @@ public final class PlatformScopes {
   public static final String ORGANIZATIONS_DELETE = "platform:organizations:delete";
 
   /**
+   * BR-WS: creating a {@code Workspace} within an Organization — its own scope, same
+   * defence-in-depth reasoning as every other admin-API rule here.
+   */
+  public static final String WORKSPACES_WRITE = "platform:workspaces:write";
+
+  /**
+   * BR-WS-04/05: adding a member (provisions a real {@code Account}) or changing an existing
+   * member's role — grouped under one scope, same risk tier (both mutate workspace membership,
+   * neither is independently destructive the way removal is).
+   */
+  public static final String WORKSPACE_MEMBERS_WRITE = "platform:workspace-members:write";
+
+  /**
+   * BR-WS-03: removing a member — its own scope, deliberately separate from {@link
+   * #WORKSPACE_MEMBERS_WRITE}, same defence-in-depth reasoning {@link #ACCOUNTS_DELETE} already
+   * establishes relative to the other admin-API scopes (a token that can add/promote members
+   * doesn't automatically get to also remove one).
+   */
+  public static final String WORKSPACE_MEMBERS_REMOVE = "platform:workspace-members:remove";
+
+  /**
+   * Reversible ban/unban ({@code SuspendAccountController}/{@code ReactivateAccountController}) —
+   * one shared scope for both directions, same "grouped under one scope for same-risk-tier actions"
+   * precedent {@link #WORKSPACE_MEMBERS_WRITE} already establishes: suspend and reactivate are
+   * symmetric, reversible, much lower stakes than {@link #ACCOUNTS_DELETE}'s permanent hard delete.
+   */
+  public static final String ACCOUNTS_SUSPEND = "platform:accounts:suspend";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -70,7 +99,11 @@ public final class PlatformScopes {
           PLATFORM_CLIENTS_ROTATE_SECRET,
           PLATFORM_CLIENTS_REVOKE,
           ACCOUNTS_DELETE,
-          ORGANIZATIONS_DELETE);
+          ORGANIZATIONS_DELETE,
+          WORKSPACES_WRITE,
+          WORKSPACE_MEMBERS_WRITE,
+          WORKSPACE_MEMBERS_REMOVE,
+          ACCOUNTS_SUSPEND);
 
   private PlatformScopes() {}
 }

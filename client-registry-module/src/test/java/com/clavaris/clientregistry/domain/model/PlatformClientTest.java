@@ -24,7 +24,11 @@ class PlatformClientTest {
             PlatformScopes.PLATFORM_CLIENTS_ROTATE_SECRET,
             PlatformScopes.PLATFORM_CLIENTS_REVOKE,
             PlatformScopes.ACCOUNTS_DELETE,
-            PlatformScopes.ORGANIZATIONS_DELETE);
+            PlatformScopes.ORGANIZATIONS_DELETE,
+            PlatformScopes.WORKSPACES_WRITE,
+            PlatformScopes.WORKSPACE_MEMBERS_WRITE,
+            PlatformScopes.WORKSPACE_MEMBERS_REMOVE,
+            PlatformScopes.ACCOUNTS_SUSPEND);
     assertThat(client.createdAt()).isNotNull();
   }
 

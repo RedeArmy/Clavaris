@@ -143,4 +143,76 @@ class AccountTest {
 
     assertThat(account.passwordCredential()).isEmpty();
   }
+
+  @Test
+  void suspendTransitionsAnActiveAccountToSuspended() {
+    Account account = Account.register(organizationId, email);
+
+    account.suspend();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
+  }
+
+  @Test
+  void suspendIsIdempotent_reSuspendingAnAlreadySuspendedAccountIsANoOp() {
+    Account account = Account.register(organizationId, email);
+    account.suspend();
+
+    account.suspend();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
+  }
+
+  @Test
+  void suspendDoesNothingToADeletedAccount_terminalStatusNeverReversed() {
+    Account account =
+        Account.reconstitute(
+            new AccountId(UUID.randomUUID()),
+            organizationId,
+            email,
+            Instant.now(),
+            null,
+            AccountStatus.DELETED,
+            null);
+
+    account.suspend();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.DELETED);
+  }
+
+  @Test
+  void reactivateTransitionsASuspendedAccountBackToActive() {
+    Account account = Account.register(organizationId, email);
+    account.suspend();
+
+    account.reactivate();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.ACTIVE);
+  }
+
+  @Test
+  void reactivateIsIdempotent_reactivatingAnAlreadyActiveAccountIsANoOp() {
+    Account account = Account.register(organizationId, email);
+
+    account.reactivate();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.ACTIVE);
+  }
+
+  @Test
+  void reactivateDoesNothingToADeletedAccount_terminalStatusNeverReversed() {
+    Account account =
+        Account.reconstitute(
+            new AccountId(UUID.randomUUID()),
+            organizationId,
+            email,
+            Instant.now(),
+            null,
+            AccountStatus.DELETED,
+            null);
+
+    account.reactivate();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.DELETED);
+  }
 }

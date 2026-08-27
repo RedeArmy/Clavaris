@@ -23,7 +23,6 @@ erDiagram
     SESSIONS ||--o{ REFRESH_TOKENS : issues
     ACCOUNTS ||--o{ WORKSPACE_MEMBERSHIPS : "belongs to"
     WORKSPACES ||--o{ WORKSPACE_MEMBERSHIPS : has
-    WORKSPACES ||--o{ WORKSPACE_INVITATIONS : issues
     OAUTH_CLIENTS ||--o{ OAUTH2_AUTHORIZATION : authorizes
     OAUTH_CLIENTS ||--o{ WEBHOOK_ENDPOINTS : registers
     OAUTH_CLIENTS ||--o| CLIENT_DOMAIN_CONFIGS : embeds_via
@@ -142,18 +141,9 @@ erDiagram
     WORKSPACE_MEMBERSHIPS {
         uuid id PK
         uuid workspace_id FK
-        uuid account_id FK
+        uuid account_id "no FK - cross-module, see table notes"
         varchar role
-        timestamptz joined_at
-    }
-    WORKSPACE_INVITATIONS {
-        uuid id PK
-        uuid workspace_id FK
-        varchar invited_email
-        varchar proposed_role
-        varchar token_hash UK
-        timestamptz expires_at
-        timestamptz consumed_at
+        timestamptz created_at
     }
     OAUTH_CLIENTS {
         uuid id PK
@@ -244,7 +234,7 @@ erDiagram
 - **`organizations`** — ADR-0010: one row per consuming system (tenant isolation boundary), not to be confused with `workspaces` below. Owns its own isolated `accounts` and `oauth_clients`.
 - **`organizations.owner_platform_account_id`** — ADR-0012: mandatory, the owning `platform_accounts` row. Plain `uuid`, no `REFERENCES` constraint — organization-module and identity-module stay schema-independent, same deliberate gap already recorded on `accounts.organization_id`.
 - **`platform_accounts`**/**`platform_password_credentials`**/**`platform_verification_tokens`** — ADR-0012: mirror `accounts`/`password_credentials`/`verification_tokens` exactly, minus any `organization_id` scoping — `platform_accounts.email` is globally unique (no Organization to scope it by). No `platform_sessions`/`platform_refresh_tokens` table exists: a `PlatformAccount` authenticates via a plain `HttpSession`, never an OAuth token, so there is nothing here for those tables to model.
-- **`workspaces`**, **`workspace_memberships`**, **`workspace_invitations`** — ADR-0010: renamed from the pre-ADR-0010 `organizations`/`memberships`/`invitations` tables (same "company/team grouping" semantics, renamed to free up "organization" for the new tenant-isolation meaning). `workspaces.organization_id` is mandatory — a workspace always belongs to exactly one tenant, and its memberships can only reference accounts already confined to that same tenant.
+- **`workspaces`**, **`workspace_memberships`** — ADR-0010 §3 addendum (2026-08-27): renamed from the pre-ADR-0010 `organizations`/`memberships` tables (same "company/team grouping" semantics, renamed to free up "organization" for the new tenant-isolation meaning). `workspaces.organization_id` is mandatory and has a real `REFERENCES organizations (id) ON DELETE CASCADE` FK — both tables are this same module's own, no cross-module test-isolation concern applies (same reasoning `rate_limit_policies.organization_id` already established). `workspace_memberships.workspace_id` likewise has a real, same-module, `ON DELETE CASCADE` FK to `workspaces`. `workspace_memberships.account_id` has **no** FK — it references identity-module's `accounts` table, same cross-module test-isolation gap already recorded on `accounts.organization_id`; a dangling row is prevented at the application layer instead (`WorkspaceMembershipEraserBridge`, called synchronously from `DeleteAccountService` before an Account row disappears — ADR-0007). `role` is `ADMIN | MEMBER` only in v1 (no `OWNER`, no DB check constraint — enforced at the application layer, `business-rules.md` BR-WS-01/05). `workspace_invitations` is **deferred to v1.1+, not built** — v1 provisions members directly (BR-WS-04); no invitation table exists yet.
 - **`password_credentials`**, **`social_identities`** — deliberately separate tables from `accounts`, never a nullable `password_hash` column bolted onto `accounts` — keeps BR-ID-02 (multiple auth methods, never zero) a natural query (`COUNT` across both tables) rather than a null-check special case.
 - **`sessions.scopes`** — BR-ID-03, real (not placeholder) shape: `text` (JSON array, same convention as `oauth_clients.allowed_scopes`), fixed at open time — RFC 6749 §6 forbids a refresh grant from ever widening scope beyond what the original authorization actually granted, so every `refresh_tokens` row in this session's chain is validated against this same, unchanging set. Replaces this document's original placeholder `user_agent` column — no use case populates one yet (no "list your active sessions/devices" feature exists); add it, with the real HTTP plumbing behind it, only once one does.
 - **`refresh_tokens.token_hash`** — the token itself is never stored, only its hash (same principle as `verification_tokens.token_hash` and `authorization_codes.code_hash`, and the same principle JobSeeker applied to its own retired refresh-token design before this module absorbed it). Deliberately never looked up via `oauth2_authorization` below, even though that table also tracks a `refresh_token_value` column — BR-ID-03's rotation/reuse-detection logic is fully decoupled from SAS's own table, which is what kept this one hash-only from day one, before TD-SEC-019 (below) closed the same gap for `oauth2_authorization` itself.
@@ -275,8 +265,8 @@ erDiagram
 | `signing_keys` | `(organization_id)` where `retired_at IS NULL` | active-key lookup for token signing at issuance time |
 | `rate_limit_policies` | unique `(organization_id)` | one capacity-ceiling override per tenant (ADR-0010 §6.2) |
 | `workspaces` | `(organization_id)` | list a tenant's workspaces |
-| `workspace_memberships` | unique `(workspace_id, account_id)` | BR-WS uniqueness |
-| `workspace_invitations` | `(workspace_id, invited_email)` where `consumed_at IS NULL` | pending-invitation lookup |
+| `workspace_memberships` | unique `(workspace_id, account_id)` | BR-WS uniqueness — one Account provisioned once per Workspace (v1 has no re-add flow) |
+| `workspace_memberships` | `(account_id)` | `WorkspaceMembershipEraserBridge`'s own cross-module cascade query (ADR-0007) |
 | `oauth_clients` | unique `(client_id)` | client lookup at `/authorize` and `/token` |
 | `oauth_clients` | `(organization_id)` | list a tenant's registered clients |
 | `platform_clients` | unique `(client_id)` | client lookup at the platform issuer's `/oauth2/token` (ADR-0010, Organization provisioning) |

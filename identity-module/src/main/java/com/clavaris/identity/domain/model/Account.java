@@ -35,10 +35,10 @@ public final class Account {
   private final Instant createdAt;
   private Instant emailVerifiedAt;
 
-  // Not final: PMD flags this as immutable-in-this-slice (nothing here mutates it yet), but it's
-  // deliberately a mutable field — a future use case (e.g. SuspendAccount) will need to transition
-  // it, and marking it final now would have to be undone the moment that use case is built.
-  @SuppressWarnings("PMD.ImmutableField")
+  // Not final: mutated by suspend()/reactivate() (BR-ID-08) — the future use case this field's own
+  // comment used to anticipate has now arrived, so the PMD.ImmutableField suppression that used to
+  // sit here is gone too (PMD's own UnnecessaryWarningSuppression rule correctly flags a
+  // suppression for a violation that no longer fires).
   private AccountStatus status;
 
   private PasswordCredential passwordCredential;
@@ -172,5 +172,33 @@ public final class Account {
     this.passwordCredential =
         PasswordCredential.reconstitute(
             this.passwordCredential.id(), id, newPasswordHash, Instant.now());
+  }
+
+  /**
+   * Reversible ban/suspend — {@code SuspendAccountService}'s own state transition. {@code
+   * AuthenticateWithPasswordService} already rejects any non-{@link AccountStatus#ACTIVE} account
+   * before touching the password hash at all, so this method's only job is the transition itself;
+   * killing an already-live session/token is the calling service's own responsibility (same "domain
+   * mutates state, use case orchestrates side effects" split every other mutator here follows).
+   * Idempotent, same reasoning as {@link #verifyEmail()}: re-suspending an already-{@code
+   * SUSPENDED} account is a harmless no-op, not an error worth failing the request over. Does
+   * nothing to a {@link AccountStatus#DELETED} account — that status is terminal (BR-DATA-03, a
+   * hard delete in v1), never reversible by this method.
+   */
+  public void suspend() {
+    if (this.status == AccountStatus.ACTIVE) {
+      this.status = AccountStatus.SUSPENDED;
+    }
+  }
+
+  /**
+   * Reverses {@link #suspend()} — {@code ReactivateAccountService}'s own state transition.
+   * Idempotent, same reasoning as {@link #suspend()}. Does nothing to a {@link
+   * AccountStatus#DELETED} account, same terminal-status reasoning as {@link #suspend()}.
+   */
+  public void reactivate() {
+    if (this.status == AccountStatus.SUSPENDED) {
+      this.status = AccountStatus.ACTIVE;
+    }
   }
 }

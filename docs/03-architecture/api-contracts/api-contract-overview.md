@@ -20,7 +20,7 @@ Two distinct API surfaces, per ADR-0006:
 | `GET /.well-known/openid-configuration` | Discovery document — every other endpoint URL is discoverable from here, no hardcoding expected in consumers |
 | `GET /oauth2/authorize` | Authorization Code flow entry point (PKCE `code_challenge` required — BR-CLIENT-03) |
 | `POST /oauth2/token` | Code exchange, refresh token rotation |
-| `GET /userinfo` | Authenticated account claims, per requested scopes |
+| `GET /userinfo` | Authenticated account claims, per requested scopes. BR-WS-06: also carries `workspace_id`/`workspace_role` (not scope-gated) for any Account with a Workspace membership — the login-time signal a consuming application uses to decide whether to show its own admin panel; same claims already present on the ID token and access token from the preceding code exchange |
 | `GET /oauth2/jwks` | Public keys for access/ID token signature verification (RS256 — ADR-0002), scoped to this Organization only (ADR-0010 §5) |
 | `POST /oauth2/revoke` | Token revocation |
 | `GET /connect/logout` | End-session (OIDC RP-initiated logout) |
@@ -38,13 +38,18 @@ Since ADR-0010, `organization` (tenant isolation boundary) and `workspace` (team
 | Endpoint | Purpose |
 |---|---|
 | `POST /api/v1/admin/accounts/{id}:delete` | Account deletion, cascades per BR-DATA-03 — this is the endpoint JobSeeker's own ADR-0013 cascade calls once its local anonymization completes |
+| `POST /api/v1/admin/accounts/{id}:suspend` | BR-ID-08: reversible ban — revokes live sessions/tokens immediately, blocks future logins |
+| `POST /api/v1/admin/accounts/{id}:reactivate` | BR-ID-08: reverses a previous suspension |
 | `POST /api/v1/admin/organizations` | Create a new `Organization` (tenant isolation boundary, ADR-0010) — operator-only in v1, mirroring manual `OAuthClient` registration; provisions the initial `SigningKey` and default `RateLimitPolicy` |
 | `POST /api/v1/admin/organizations/{id}:delete` | Hard-delete an `Organization` and its entire owned account pool (BR-DATA-02/03's own organization-level equivalent) — the single most destructive operation this management API exposes, its own dedicated scope, deliberately separate from account deletion above |
 | `POST /api/v1/admin/organizations/{id}/signing-keys:rotate` | Manually trigger signing-key rotation with overlap for this Organization (ADR-0010 §5.2) — audited; scheduled/unattended rotation is v1.1 |
 | `PUT /api/v1/admin/organizations/{id}/rate-limit-policy` | Set this Organization's capacity-ceiling override (ADR-0010 §6.2) — operator-only in v1; never governs the fixed anti-abuse layer (§6.1), which is not configurable by anyone |
 | `POST /api/v1/admin/organizations/{id}/workspaces` | Create a `Workspace` within this Organization (renamed from the pre-ADR-0010 "organization" concept) |
-| `POST /api/v1/admin/workspaces/{id}/invitations` | Invite a member to a workspace |
-| `DELETE /api/v1/admin/workspaces/{id}/members/{accountId}` | Remove workspace member (BR-WS-03: immediate access revocation) |
+| `GET /api/v1/admin/organizations/{id}/workspaces` | List this Organization's `Workspace`s — read-only, no dedicated scope |
+| `POST /api/v1/admin/workspaces/{id}/members` | BR-WS-04: add a member — provisions a real `Account` and triggers its password-reset email; there is no invitation step in v1 (BR-WS-02, deferred) |
+| `GET /api/v1/admin/workspaces/{id}/members` | List a `Workspace`'s members — read-only, no dedicated scope |
+| `PUT /api/v1/admin/workspaces/{id}/members/{accountId}/role` | Change a member's role (`ADMIN`/`MEMBER` only, BR-WS-05) — rejected if it would leave zero `ADMIN`s (BR-WS-01) |
+| `POST /api/v1/admin/workspaces/{id}/members/{accountId}:remove` | Remove a workspace member (BR-WS-03) — removes only the membership, never the `Account` itself; rejected if it would leave zero `ADMIN`s (BR-WS-01). `:remove` custom-method naming, same precedent as `:delete` above |
 | `POST /api/v1/admin/organizations/{id}/clients` | Register a new `OAuthClient` under this Organization (manual/admin-only in v1, per `prd-mvp.md` §2.2). Optional `requireConsent` (default `true`, ADR-0017/TD-SEC-026) — an operator explicitly sets `false` to skip the end-user consent screen for a trusted first-party client. |
 | `POST /api/v1/admin/webhook-endpoints` | Register a webhook endpoint for the calling client — 🟡 proposed, see ADR-0007 |
 | `POST /api/v1/admin/webhook-endpoints/{id}/deliveries/{deliveryId}:replay` | Manually replay an `EXHAUSTED` delivery (BR-WEBHOOK-03) — 🟡 proposed, see ADR-0007 |
