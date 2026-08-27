@@ -2,6 +2,7 @@ package com.clavaris.organization.application.usecase.createorganization;
 
 import com.clavaris.organization.domain.model.Organization;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -17,6 +18,14 @@ public interface OrganizationRepository {
   void save(Organization organization);
 
   boolean existsById(UUID organizationId);
+
+  /**
+   * TD-ARCH-007: {@code DeleteOrganizationService}'s own read — needs the full {@code Organization}
+   * (specifically its {@code name}) to build {@code OrganizationDeletedEvent}, the same reason
+   * identity-module's own {@code DeleteAccountService} reads the full {@code Account} rather than
+   * just checking {@code existsById}.
+   */
+  Optional<Organization> findById(UUID organizationId);
 
   List<Organization> findAllOwnedBy(
       @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId);

@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
@@ -32,6 +33,11 @@ class JpaOrganizationRepository implements OrganizationRepository {
   @Override
   public boolean existsById(final UUID organizationId) {
     return organizations.existsById(organizationId);
+  }
+
+  @Override
+  public Optional<Organization> findById(final UUID organizationId) {
+    return organizations.findById(organizationId).map(this::toDomain);
   }
 
   @Override

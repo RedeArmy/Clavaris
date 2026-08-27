@@ -2,6 +2,8 @@ package com.clavaris.organization.application.usecase.deleteorganization;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
+import com.clavaris.organization.domain.event.OrganizationDeletedEvent;
+import com.clavaris.organization.domain.model.Organization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,16 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>No `Workspace`/`WorkspaceMembership` step exists here either</b>, same reason {@code
  * DeleteAccountService} doesn't have one — zero code exists for that feature yet
  * (`roadmap-and-release-plan.md` §2). Revisit the day it ships.
+ *
+ * <p>TD-ARCH-007 (SDE-III review, 2026-08-26): {@link EventOutboxWriter}/{@link
+ * OrganizationDeletedEvent} added — this class's identity-module sibling, {@code
+ * DeleteAccountService}, already wrote an outbox event on delete; this one never did, a real
+ * inconsistency between two structurally parallel services now closed. Functionally inert today
+ * (webhook-module doesn't exist yet), same "write-only until a dispatcher exists" posture as every
+ * other outbox write in this codebase. The read this needs ({@link
+ * OrganizationRepository#findById}) replaces the plain {@code existsById} check this class used
+ * before — the full {@code Organization} (specifically its {@code name}) is needed to build the
+ * event payload.
  */
 // Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's four
 // port parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
@@ -60,18 +72,24 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
   private final OrganizationOAuthClientsEraser oauthClientsEraser;
 
   private final AuditEventRecorder auditEvents;
+  private final EventOutboxWriter outbox;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
+  // identity-module's DeleteAccountService/ConfirmPasswordResetService's own identical
+  // suppression: this cascade genuinely needs every one of these, not excess complexity to hide.
   public DeleteOrganizationService(
       final OrganizationRepository organizations,
       @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
       @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox) {
     this.organizations = organizations;
     this.organizationTokenRevoker = organizationTokenRevoker;
     this.identityDataEraser = identityDataEraser;
     this.oauthClientsEraser = oauthClientsEraser;
     this.auditEvents = auditEvents;
+    this.outbox = outbox;
   }
 
   // PMD.GuardLogStatement false positive — same rationale as every other logging call site in
@@ -80,9 +98,13 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
   @Override
   @Transactional
   public void handle(final DeleteOrganizationCommand command) {
-    if (!organizations.existsById(command.organizationId())) {
-      throw new OrganizationNotFoundException(command.organizationId());
-    }
+    // findById, not the plain existsById this class used before TD-ARCH-007: the full
+    // Organization (specifically its name) is needed below to build OrganizationDeletedEvent —
+    // same reasoning identity-module's own DeleteAccountService already established for Account.
+    final Organization organization =
+        organizations
+            .findById(command.organizationId())
+            .orElseThrow(() -> new OrganizationNotFoundException(command.organizationId()));
 
     // Must run before the erasure calls below remove the accounts/oauth_clients rows this port's
     // own implementation queries by organizationId — see this class's own Javadoc.
@@ -98,6 +120,9 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
         "Organization",
         command.organizationId().toString(),
         null);
+
+    outbox.write(
+        "organization.deleted", organization.id(), OrganizationDeletedEvent.from(organization));
 
     LOG.info("event=organization_deleted organizationId={}", command.organizationId());
 
