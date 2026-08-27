@@ -26,13 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code accounts} at all (same reasoning {@code ConfirmPasswordResetService}'s own identical call
  * already established for BR-ID-04's cascade).
  *
- * <p><b>Deliberately narrower than `security-architecture.md` §7's own 4-step design today</b>:
- * that design's steps 2 (remove `WorkspaceMembership` rows) and 3 (delete `SocialIdentity` links)
- * describe features that don't exist in this codebase yet (`Workspace`/social login, both v1-scoped
- * but zero code — CLAUDE.md §11). Nothing to clean up where nothing exists yet; this class must be
- * revisited the day either one ships, not silently forgotten (TD-FUT-005 already names the
- * workspace half of that obligation for its own reasons; this is the same trigger reaching this
- * service too).
+ * <p><b>{@code security-architecture.md} §7's own 4-step design, step 2, now implemented</b>
+ * (Workspace feature, 2026-08-27): {@link WorkspaceMembershipEraser} closes the gap this class used
+ * to document explicitly — before {@code Workspace} existed there was nothing to erase; now every
+ * {@code WorkspaceMembership} row referencing this {@code Account} is removed before the account
+ * itself disappears, so none is ever left dangling. Step 3 (delete {@code SocialIdentity} links)
+ * remains narrower than that design — social login is still genuinely unbuilt, zero code
+ * (`roadmap-and-release-plan.md` §2) — and must be revisited the day it ships.
  *
  * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added alongside {@link
  * AccountTokenRevoker} — a hard delete must also kill a stale-but-still-live hosted-login-page
@@ -57,6 +57,10 @@ public class DeleteAccountService implements DeleteAccountUseCase {
   // accountTokenRevoker above.
   private final AccountSessionRevoker accountSessionRevoker;
 
+  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
+  // accountTokenRevoker/accountSessionRevoker above.
+  private final WorkspaceMembershipEraser workspaceMembershipEraser;
+
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
@@ -66,11 +70,14 @@ public class DeleteAccountService implements DeleteAccountUseCase {
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      @SuppressWarnings("PMD.LongVariable")
+          final WorkspaceMembershipEraser workspaceMembershipEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.accounts = accounts;
     this.accountTokenRevoker = accountTokenRevoker;
     this.accountSessionRevoker = accountSessionRevoker;
+    this.workspaceMembershipEraser = workspaceMembershipEraser;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -93,6 +100,11 @@ public class DeleteAccountService implements DeleteAccountUseCase {
     // account it belongs to is permanently gone).
     accountTokenRevoker.revokeAllTokensFor(account.id());
     accountSessionRevoker.revokeAllSessionsFor(account.id());
+
+    // ADR-0007: "workspace-membership removal on account deletion... performed synchronously,
+    // inside the same use-case transaction... before the corresponding event is raised" — must run
+    // before the outbox write below, and before the account row itself disappears.
+    workspaceMembershipEraser.eraseAllMembershipsFor(account.id());
 
     // BR-DATA-01: never the raw email in the audit detail or the log line — same discipline as
     // every other audited action in this codebase.

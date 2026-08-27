@@ -33,7 +33,8 @@ class JpaOrganizationEventOutboxWriterTest {
     Unserializable payload = new Unserializable();
 
     assertThatExceptionOfType(IllegalStateException.class)
-        .isThrownBy(() -> writer.write("organization.deleted", aggregateId, payload))
+        .isThrownBy(
+            () -> writer.write("Organization", "organization.deleted", aggregateId, payload))
         .withMessageContaining("organization.deleted");
 
     verifyNoInteractions(outbox);

@@ -122,7 +122,10 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
         null);
 
     outbox.write(
-        "organization.deleted", organization.id(), OrganizationDeletedEvent.from(organization));
+        "Organization",
+        "organization.deleted",
+        organization.id(),
+        OrganizationDeletedEvent.from(organization));
 
     LOG.info("event=organization_deleted organizationId={}", command.organizationId());
 
