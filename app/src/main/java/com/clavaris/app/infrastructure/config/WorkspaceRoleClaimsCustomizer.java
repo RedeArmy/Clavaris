@@ -74,10 +74,11 @@ class WorkspaceRoleClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncoding
     final UUID accountId;
     try {
       accountId = UUID.fromString(principal.getName());
-    } catch (final IllegalArgumentException notAnAccountId) {
+    } catch (final IllegalArgumentException _) {
       // A principal name that isn't a UUID can't be an accountId — same "malformed input surfaces
       // as absent, never an exception" convention as CurrentPlatformAccountResolverBridge's own
-      // identical guard.
+      // identical guard. Unnamed pattern: same AddWorkspaceMemberController's own precedent —
+      // nothing in this catch block ever needs the exception itself.
       return;
     }
 

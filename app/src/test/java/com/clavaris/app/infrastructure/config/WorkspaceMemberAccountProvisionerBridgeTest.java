@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,7 +57,7 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
 
     ArgumentCaptor<RegisterAccountCommand> commands =
         ArgumentCaptor.forClass(RegisterAccountCommand.class);
-    verify(registerAccount, org.mockito.Mockito.times(2)).handle(commands.capture());
+    verify(registerAccount, times(2)).handle(commands.capture());
     String firstPassword = commands.getAllValues().get(0).rawPassword();
     String secondPassword = commands.getAllValues().get(1).rawPassword();
     assertThat(firstPassword).hasSizeBetween(8, 128);
