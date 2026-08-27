@@ -87,6 +87,20 @@ final class RateLimitIdentifiers {
   }
 
   /**
+   * The shared read both {@link #authenticatedPlatformAccountId} and {@link
+   * #authenticatedPlatformClientId} are built on — same {@link SecurityContextHolder} lookup either
+   * way, only the caller's own principal-type assumption differs. Extracted so the two methods
+   * below stay distinct call sites (never confusable with one another, per their own Javadoc)
+   * without their implementations being a byte-for-byte duplicate of each other.
+   */
+  private static String currentAuthenticationName() {
+    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    return (authentication == null || !authentication.isAuthenticated())
+        ? null
+        : authentication.getName();
+  }
+
+  /**
    * The current session's authenticated {@code PlatformAccountId} — same principal-name source
    * {@code CurrentPlatformAccountResolverBridge} reads, but this filter runs before that bridge
    * would ever be reached (it protects {@code POST /platform/dashboard} itself), so it reads {@link
@@ -100,9 +114,23 @@ final class RateLimitIdentifiers {
   // Function<HttpServletRequest, String>, the same as every other extractor in this class.
   @SuppressWarnings("java:S1172")
   /* package */ static String authenticatedPlatformAccountId(final HttpServletRequest request) {
-    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    return (authentication == null || !authentication.isAuthenticated())
-        ? null
-        : authentication.getName();
+    return currentAuthenticationName();
+  }
+
+  /**
+   * TD-SEC-030: the presented platform-tier {@code client_id} for an already-authenticated {@code
+   * /api/v1/admin/**} call — {@code AdminApiSecurityConfig}'s own resource-server chain sets {@code
+   * JwtAuthenticationToken#getName()} to the validated access token's {@code sub} claim, which
+   * SAS's own client_credentials issuance (confirmed live, {@code
+   * PlatformAuthorizationServerConfig}) populates with the requesting {@code PlatformClient}'s
+   * {@code client_id}. Same {@link SecurityContextHolder} read as {@link
+   * #authenticatedPlatformAccountId}, but a distinct method: the principal here is a machine
+   * client, never a human-owned {@code PlatformAccountId}, and the two must never be confused at a
+   * call site. Returns {@code null} for an unauthenticated request — {@code oauth2ResourceServer}'s
+   * own rejection already handles those before this rule's outcome would matter.
+   */
+  @SuppressWarnings("java:S1172")
+  /* package */ static String authenticatedPlatformClientId(final HttpServletRequest request) {
+    return currentAuthenticationName();
   }
 }

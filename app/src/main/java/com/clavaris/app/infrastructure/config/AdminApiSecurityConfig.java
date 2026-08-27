@@ -3,6 +3,9 @@ package com.clavaris.app.infrastructure.config;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.identity.infrastructure.adapter.out.security.PlatformSigningKeyMaterial;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -12,6 +15,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -20,7 +24,26 @@ import org.springframework.security.web.SecurityFilterChain;
  * Organization. Validates the incoming Bearer token's signature directly against {@link
  * PlatformSigningKeyMaterial}'s own public key — no HTTP round-trip to this same process's own
  * {@code /oauth2/jwks} endpoint, since the key is already in memory right here.
+ *
+ * <p>TD-SEC-030 (SDE-III review, 2026-08-26): before this, zero rate limiting existed anywhere on
+ * this surface — confirmed by grep, this was the only security chain in the whole app with no
+ * {@code AntiAbuseRateLimitingFilter} at all. A compromised or over-scoped {@code PlatformClient}
+ * token could loop indefinitely against, e.g., {@code POST /organizations/*:delete} (the single
+ * most destructive call this system exposes) with zero friction and no anomaly signal. Keyed by the
+ * authenticated {@code client_id} ({@link RateLimitIdentifiers#authenticatedPlatformClientId}), not
+ * source IP: every caller here is a backend service (an operator's tooling, or a consuming
+ * application's own backend), not a browser — IP is not a meaningful identity axis for
+ * machine-to-machine traffic, same reasoning {@code PlatformAuthorizationServerConfig}'s own {@code
+ * platform-token:client} rule already established for {@code client_credentials} calls. Two layers,
+ * same ADR-0010 §6.1 "defence in depth per rule" shape already used for this file's own scopes: a
+ * generous blanket ceiling across the whole surface, plus a much tighter ceiling specifically on
+ * the two {@code :delete} endpoints — the operations where a runaway loop does irreversible damage
+ * fastest.
  */
+// Literals: the repeated string is "PMD.LongVariable" itself, used on several descriptively-named
+// fields/parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
+// suppression for this exact PMD-annotation-string-as-literal false positive.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Configuration
 class AdminApiSecurityConfig {
 
@@ -28,6 +51,9 @@ class AdminApiSecurityConfig {
   // not five repeated literals that could silently drift apart (PMD.AvoidDuplicateLiterals).
   @SuppressWarnings("PMD.LongVariable")
   private static final String SCOPE_AUTHORITY_PREFIX = "SCOPE_";
+
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String ADMIN_API_PATH_PATTERN = "/api/v1/admin/**";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ AdminApiSecurityConfig() {
@@ -42,8 +68,20 @@ class AdminApiSecurityConfig {
   @Bean
   @Order(2)
   /* package */ SecurityFilterChain adminApiSecurityFilterChain(
-      final HttpSecurity http, final JwtDecoder jwtDecoder) {
-    http.securityMatcher("/api/v1/admin/**")
+      final HttpSecurity http,
+      final JwtDecoder jwtDecoder,
+      final RateLimiter rateLimiter,
+      @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
+      @SuppressWarnings("PMD.LongVariable")
+          @Value("${clavaris.rate-limit.admin-api.per-client-limit:120}")
+          final int adminApiPerClientLimit,
+      @SuppressWarnings("PMD.LongVariable")
+          @Value("${clavaris.rate-limit.admin-api.accounts-delete.per-client-limit:30}")
+          final int accountsDeletePerClientLimit,
+      @SuppressWarnings("PMD.LongVariable")
+          @Value("${clavaris.rate-limit.admin-api.organizations-delete.per-client-limit:5}")
+          final int organizationsDeletePerClientLimit) {
+    http.securityMatcher(ADMIN_API_PATH_PATTERN)
         .authorizeHttpRequests(
             authorize ->
                 authorize
@@ -86,6 +124,58 @@ class AdminApiSecurityConfig {
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
+        // TD-SEC-030: anchored AFTER BearerTokenAuthenticationFilter, not before — the key
+        // extractor (RateLimitIdentifiers::authenticatedPlatformClientId) reads the authenticated
+        // client_id off SecurityContextHolder, which only that filter (part of the
+        // oauth2ResourceServer() wiring above) populates. An unauthenticated request skips every
+        // rule here (null identifier) and is rejected moments later by
+        // .anyRequest().authenticated()
+        // above regardless — same "malformed/absent input is skipped, not counted" convention as
+        // every other AntiAbuseRateLimitingFilter rule in this codebase.
+        .addFilterAfter(
+            new AntiAbuseRateLimitingFilter(
+                rateLimiter,
+                rateLimitKeyHasher,
+                List.of(
+                    new RateLimitRule(
+                        "admin-api-post:client",
+                        HttpMethod.POST,
+                        ADMIN_API_PATH_PATTERN,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        adminApiPerClientLimit,
+                        Duration.ofMinutes(1)),
+                    new RateLimitRule(
+                        "admin-api-put:client",
+                        HttpMethod.PUT,
+                        ADMIN_API_PATH_PATTERN,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        adminApiPerClientLimit,
+                        Duration.ofMinutes(1)),
+                    // BR-DATA-02: individual accounts — a routine call for a consuming
+                    // application's own backend (e.g. per-user deletion requests), so this ceiling
+                    // stays well above the blanket rule above rather than redundantly tighter.
+                    new RateLimitRule(
+                        "admin-api-accounts-delete:client",
+                        HttpMethod.POST,
+                        "/api/v1/admin/accounts/*:delete",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        accountsDeletePerClientLimit,
+                        Duration.ofMinutes(5)),
+                    // BR-DATA-02/03: an entire Organization's whole account pool — the single most
+                    // irreversible call this surface exposes (this file's own scope-check comment
+                    // above), so this is the tightest ceiling on this whole chain, deliberately.
+                    new RateLimitRule(
+                        "admin-api-organizations-delete:client",
+                        HttpMethod.POST,
+                        "/api/v1/admin/organizations/*:delete",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        organizationsDeletePerClientLimit,
+                        Duration.ofMinutes(5)))),
+            BearerTokenAuthenticationFilter.class)
         // Resource server, STATELESS session policy below, and securityMatcher already scopes
         // this whole chain to /api/v1/admin/** — every request reaching this point authenticates
         // via a Bearer token, never a cookie-based session, so there's no CSRF token to carry in
