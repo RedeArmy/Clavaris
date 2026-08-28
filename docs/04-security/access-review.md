@@ -13,10 +13,10 @@ rather than describing a review board that doesn't exist.
 Two distinct categories, deliberately not conflated:
 
 - **Operator access** — who can reach production infrastructure, secrets, and raw data: the
-  `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET`, the Postgres/Redis instances, Infisical (once configured,
-  ADR-0014), the GitHub repository (source, Actions secrets), the eventual hosting provider console
-  (TD-FUT-013, not chosen yet). Today, exactly one person has all of this — there is no team to
-  review access *within*.
+  `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET`, the Postgres/Redis instances, the production VM itself
+  (TD-FUT-013, closed 2026-08-28), the GitHub repository (source, Actions secrets, GHCR image
+  registry). Today, exactly one person has all of this — there is no team to review access
+  *within*.
 - **Tenant access** — who can act as a given `Organization`'s administrator inside Clavaris itself
   (create `OAuthClient`s, view that Organization's own audit log). This is the access model
   Clavaris's own product actually governs (`domain-model.md`, `data-model.md`) — reviewed as part of
@@ -28,11 +28,9 @@ Two distinct categories, deliberately not conflated:
 
 | System | Who has access | Review trigger |
 |---|---|---|
-| `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` | Engineering (sole developer); env-seeded, never via an HTTP endpoint (§5, root CLAUDE.md) | Rotate on any suspected exposure (`incident-response-platform-client-compromise.md`); no routine rotation schedule exists yet — a real, named gap, not an oversight |
-| GitHub repository (source, Actions secrets, branch settings) | Engineering (sole developer) | Reviewed whenever a collaborator is added — none exist today |
-| Docker Hub / registry credentials (if any are used beyond anonymous pulls) | Engineering (sole developer) | Same as above |
-| Infisical machine identity (`INFISICAL_CLIENT_ID`/`SECRET`, ADR-0014) | Engineering (sole developer); scoped to this project's own Infisical project, not shared across other work | Reviewed alongside the `PlatformClient` credential — see `incident-response-platform-client-compromise.md`'s own framing of both as this project's highest-value credentials |
-| Production hosting console (TD-FUT-013, not chosen yet) | N/A — doesn't exist yet | Must be added to this table as part of closing TD-FUT-013, not deferred past that point |
+| `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` | Engineering (sole developer); env-seeded, never via an HTTP endpoint (§5, root CLAUDE.md); delivered via `.env` on the production VM, `chmod 600`, deploy-user-owned (ADR-0019) | Rotate on any suspected exposure (`incident-response-platform-client-compromise.md`); no routine rotation schedule exists yet — a real, named gap, not an oversight |
+| GitHub repository (source, Actions secrets, branch settings, GHCR image registry) | Engineering (sole developer) | Reviewed whenever a collaborator is added — none exist today |
+| Production VM (SSH access, `.env` on disk) — TD-FUT-013, closed 2026-08-28 | Engineering (sole developer); provider/host not yet named in this document | Reviewed alongside the `PlatformClient` credential above — same file, same access boundary |
 
 **Honest bottom line for §2**: with one person holding every credential above, "access review" today
 means confirming those credentials still live only where they're supposed to (never in code, never

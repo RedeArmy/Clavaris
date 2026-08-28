@@ -1,0 +1,28 @@
+# TD-FUT-013: TLS termination for the single-VM production deployment (docker-compose.prod.yml).
+# Caddy over nginx/Traefik: automatic Let's Encrypt certificate issuance and renewal with zero
+# manual cert management — the operator sets one DNS record and one env var, nothing else, matching
+# this project's own "don't build what a well-tested tool already does correctly" philosophy
+# (ADR-0001's own reasoning for Spring Authorization Server, applied here to TLS).
+#
+# {$CLAVARIS_DOMAIN} is substituted from docker-compose.prod.yml's own environment block — Caddy's
+# native env-var substitution, no separate templating step needed.
+
+{$CLAVARIS_DOMAIN} {
+	# Reverses to the app service by its Docker-network name — never localhost, since Caddy and
+	# app are two separate containers on the same compose network, not two processes on one host.
+	reverse_proxy app:8080
+
+	# security-architecture.md §5: standard security headers are already Spring Security's own
+	# zero-config default at the application layer (X-Content-Type-Options/X-Frame-Options/CSP).
+	# Strict-Transport-Security is added here instead, at the edge — it only makes sense once TLS
+	# actually terminates somewhere, which is Caddy, not the app container.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Real access logs to stdout — same "structured JSON, not opaque text" posture
+	# nfr-quality-attributes.md/TD-SEC-017 already established for the app's own logs, captured by
+	# `docker compose logs caddy` / whatever log shipper the host forwards container logs through.
+	log {
+		output stdout
+		format json
+	}
+}

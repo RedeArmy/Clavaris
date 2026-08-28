@@ -1,6 +1,6 @@
 # Security Architecture — Clavaris
 
-🟡 En revisión
+✅ Aprobado (2026-08-28) — SDE-III review confirmed no substantive blocker remained: `threat-model-stride.md` §6's own gap list is clean except MFA, explicitly risk-accepted for v1. First document promoted out of `🟡 En revisión` in this project's history (TD-PROC-002), on the recommendation named across four prior reviews. Every future edit to this document should re-open review status only if it introduces a real, unresolved gap — not reset to `🟡` reflexively on every routine update.
 
 ## 1. Scope
 
@@ -128,4 +128,4 @@ Standard practice expected (not yet formalized as an ADR): automated dependency 
 
 ## 9. External review gate
 
-Non-negotiable: no consumer sends real user traffic to Clavaris until an external security review finds zero open critical/high findings. This document, `threat-model-stride.md`, and the known-gaps list in both are the primary inputs to that review — closing the gaps listed in `threat-model-stride.md` §5 is a precondition for scheduling it, not something to be discovered during it. `risk-register.md`, `incident-response-plan.md`, `access-review.md`, `vendor-management.md`, and `asset-inventory.md` (TD-FUT-016) are secondary inputs — the organizational/governance layer an ISO 27001/SOC 2 readiness review would also expect, distinct from this document's own technical-control scope.
+Non-negotiable: no consumer sends real user traffic to Clavaris until an external security review finds zero open critical/high findings. This document, `threat-model-stride.md`, and the known-gaps list in both are the primary inputs to that review — closing the gaps listed in `threat-model-stride.md` §6 (corrected 2026-08-28 — this reference pointed at §5, "Lessons from Clerk's disclosed CVEs," a threat/test table, not the actual gap list) is a precondition for scheduling it, not something to be discovered during it. As of 2026-08-28, §6's own gap list is clean except for one explicitly risk-accepted item (MFA absence, deferred to v1.1 per `prd-mvp.md`) — every other gap that section ever named is resolved. `risk-register.md`, `incident-response-plan.md`, `access-review.md`, `vendor-management.md`, and `asset-inventory.md` (TD-FUT-016) are secondary inputs — the organizational/governance layer an ISO 27001/SOC 2 readiness review would also expect, distinct from this document's own technical-control scope.

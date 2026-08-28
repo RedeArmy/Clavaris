@@ -1,0 +1,132 @@
+# TD-FUT-013: single-VM production deployment — deliberately not Kubernetes/Helm/Terraform.
+# nfr-quality-attributes.md §3's own expected v1 load (single-digit consuming applications) doesn't
+# yet justify multi-instance orchestration; TD-FUT-004 (the architectural blocker to horizontal
+# scaling — stateless sessions via Redis, no in-memory state) is already closed, so scaling up to a
+# real orchestrator later is additive, not a rewrite, the day traffic actually justifies it. This
+# file is a production-hardened variant of the same docker-compose.yml every developer already
+# runs locally, not a parallel design — same services, same volumes, same health checks.
+#
+# Deploy (see docs/05-engineering/deployment-runbook.md for the full first-time walkthrough):
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# What's different from docker-compose.yml (local dev):
+#   - "app" pulls a real, CI-built, Trivy-scanned image from GHCR (ci.yml's own docker-build job)
+#     instead of building from source on the host.
+#   - postgres/redis no longer publish a host port at all — reachable only on the internal Docker
+#     network, the same "don't expose what nothing outside this stack needs to reach" posture
+#     AdminApiSecurityConfig already applies at the application layer, extended to the network layer.
+#   - restart: unless-stopped everywhere — a host reboot or a crashed container comes back without
+#     a human needing to run `docker compose up` by hand; explicitly not "always", which would also
+#     restart a container an operator deliberately stopped for maintenance.
+#   - caddy: the one new service — TLS termination (security-architecture.md §5's own "TLS
+#     required for every environment beyond local development" requirement), automatic
+#     Let's-Encrypt certificate issuance/renewal, and the only service that publishes a host port
+#     at all (80/443). "app" is reached only via the internal network (caddy -> app:8080), never
+#     directly from outside this stack.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_PROD_USER:?DB_PROD_USER must be set explicitly in .env}
+      POSTGRES_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
+      POSTGRES_DB: ${DB_PROD_NAME:?DB_PROD_NAME must be set explicitly in .env}
+    volumes:
+      - clavaris-postgres-data:/var/lib/postgresql/data
+      - ./infra/docker/postgres:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${DB_PROD_USER} -d $${DB_PROD_NAME}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    volumes:
+      - clavaris-redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  app:
+    # :latest by default; pin to a specific ci.yml-pushed :<git-sha> tag for a reproducible
+    # rollback target instead of whatever :latest happens to point at right now — see
+    # deployment-runbook.md's own "rolling back" section.
+    image: ghcr.io/${GHCR_IMAGE_OWNER:?GHCR_IMAGE_OWNER must be set explicitly in .env — the lowercase GitHub org/user that owns this repo}/clavaris:${CLAVARIS_IMAGE_TAG:-latest}
+    environment:
+      # No application-prod.yml exists, deliberately — application.yml's own base defaults are
+      # already production-safe (TD-SEC-013's own closure note); this profile name's only job is
+      # to positively rule out "dev" (relaxed Actuator detail, DEBUG logging) ever being active
+      # here, not to load profile-specific overrides that don't exist.
+      SPRING_PROFILES_ACTIVE: prod
+      CLAVARIS_BASE_URL: ${CLAVARIS_BASE_URL:?CLAVARIS_BASE_URL must be set explicitly in .env — the real https:// domain this instance is reachable at}
+      DB_DEV_HOST: postgres
+      DB_DEV_PORT: 5432
+      DB_DEV_NAME: ${DB_PROD_NAME:?DB_PROD_NAME must be set explicitly in .env}
+      DB_DEV_USER: ${DB_PROD_USER:?DB_PROD_USER must be set explicitly in .env}
+      DB_DEV_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TOKEN_SIGNING_KEY_STORE_PATH: /app/data/signing-keys.p12
+      TOKEN_SIGNING_KEY_STORE_PASSWORD: ${TOKEN_SIGNING_KEY_STORE_PASSWORD:?TOKEN_SIGNING_KEY_STORE_PASSWORD must be set explicitly in .env}
+      OAUTH2_TOKEN_HASH_SECRET: ${OAUTH2_TOKEN_HASH_SECRET:?OAUTH2_TOKEN_HASH_SECRET must be set explicitly in .env}
+      RATE_LIMIT_KEY_HASH_SECRET: ${RATE_LIMIT_KEY_HASH_SECRET:?RATE_LIMIT_KEY_HASH_SECRET must be set explicitly in .env}
+      PLATFORM_BOOTSTRAP_CLIENT_ID: ${PLATFORM_BOOTSTRAP_CLIENT_ID:?PLATFORM_BOOTSTRAP_CLIENT_ID must be set explicitly in .env}
+      PLATFORM_BOOTSTRAP_CLIENT_SECRET: ${PLATFORM_BOOTSTRAP_CLIENT_SECRET:?PLATFORM_BOOTSTRAP_CLIENT_SECRET must be set explicitly in .env}
+      RESEND_API_KEY: ${RESEND_API_KEY:?RESEND_API_KEY must be set explicitly in .env}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?MAIL_FROM_ADDRESS must be set explicitly in .env}
+    volumes:
+      - clavaris-signing-keys-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    # Deliberately no "ports:" here — unlike docker-compose.yml's own 8080:8080, "app" is reached
+    # only via the internal Docker network (caddy -> http://app:8080), never directly from outside
+    # this host. One less thing exposed to the internet than local dev has.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - clavaris-caddy-data:/data
+      - clavaris-caddy-config:/config
+    environment:
+      # Deliberately a separate variable from the app's own CLAVARIS_BASE_URL (which is a full
+      # https:// URL, the OIDC issuer's own base) — Caddy's site address needs a bare hostname,
+      # not a URL to parse apart. Must resolve to this host's public IP before first `up`, or
+      # Let's Encrypt's own HTTP-01 challenge fails and Caddy falls back to a self-signed cert.
+      CLAVARIS_DOMAIN: ${CLAVARIS_DOMAIN:?CLAVARIS_DOMAIN must be set explicitly in .env — the bare hostname (no scheme), e.g. auth.example.com}
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  clavaris-postgres-data:
+  clavaris-redis-data:
+  clavaris-signing-keys-data:
+  clavaris-caddy-data:
+  clavaris-caddy-config:

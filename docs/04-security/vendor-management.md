@@ -28,9 +28,6 @@ this table by oversight.
 
 ## 3. Infrastructure that is not a subprocessor, by design
 
-- **Infisical** (ADR-0014) — self-hosted (`docker-compose.infisical.yml`), on the operator's own
-  infrastructure. Not a third party with independent access to secrets; listed here only to state
-  explicitly why it's excluded from §2, since a *hosted* secrets manager would belong in that table.
 - **PostgreSQL / Redis** — self-hosted (`docker-compose.yml`) today. The moment either becomes a
   managed cloud service (a real possibility once TD-FUT-013's deployment artifact exists), that
   provider becomes a real subprocessor and belongs in §2 — flagged here so that day isn't missed.
