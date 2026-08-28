@@ -60,8 +60,55 @@ clavaris:
   # identifier (email, IP, client_id) before it becomes part of a Redis key (RateLimitKeyHasher's
   # own Javadoc) — a dedicated secret, deliberately not oauth2.token-hash-secret reused (see that
   # class for why). Same dev-only-literal convention as every secret above.
+  #
+  # TD-PROC-003: every tuning knob below already existed as an inline `@Value(...:default)` in Java
+  # — functionally unchanged by this block (every value here matches its own code-side default
+  # exactly), but previously undiscoverable without reading source across four config classes. An
+  # operator can now find and override every one of these the normal Spring Boot way (edit this
+  # file, or set the equivalent CLAVARIS_RATE_LIMIT_* env var — relaxed binding, no extra wiring
+  # needed) instead of grepping `@Value`. ADR-0010 §6's own two-layer design: the anti-abuse rows
+  # below (`login`/`token`/`platform-*`) are the fixed, system-defined layer no tenant can ever
+  # loosen; `capacity.*` is the separate per-Organization capacity ceiling, operator-managed only
+  # in v1 (self-service tuning is TD-FUT-002, deliberately deferred to v1.1).
   rate-limit:
     key-hash-secret: ${RATE_LIMIT_KEY_HASH_SECRET:dev-only-rate-limit-key-hash-secret-change-in-real-deployments}
+    # Interactive login (both tiers — OrganizationAuthorizationServerConfig/PlatformDashboardSecurityConfig
+    # share these same two property names), keyed per account and per IP (BR-ID credential-stuffing
+    # defense, ADR-0010 §6.1).
+    login:
+      per-account-limit: 10
+      per-ip-limit: 30
+    # client_credentials/refresh-token exchange (per PlatformClient/OAuthClient).
+    token:
+      per-client-limit: 20
+      refresh-per-client-limit: 600
+    # Platform-tier self-service endpoints (PlatformDashboardSecurityConfig) — each its own row
+    # rather than sharing token's own limit, since these are unauthenticated-by-design entry points
+    # (registration, password reset) with their own real abuse shape.
+    platform-register:
+      per-ip-limit: 10
+    platform-forgot-password:
+      per-ip-limit: 10
+    platform-create-organization:
+      per-account-limit: 10
+    # /api/v1/admin/** (AdminApiSecurityConfig) — a blanket ceiling plus tighter, endpoint-specific
+    # rows for the side-effect-bearing actions (real hard deletes, a real provisioned Account + a
+    # real outbound email), same "side-effect-bearing endpoint gets its own tighter ceiling"
+    # precedent BR-WS-04's own comment already documents.
+    admin-api:
+      per-client-limit: 120
+      accounts-delete:
+        per-client-limit: 30
+      organizations-delete:
+        per-client-limit: 5
+      workspace-members-write:
+        per-client-limit: 60
+    # ADR-0010 §6.2: the per-Organization capacity ceiling — default-requests-per-minute is what
+    # every Organization gets unless explicitly tuned (operator-only in v1, TD-FUT-002);
+    # hard-cap-requests-per-minute is the system-wide maximum no operator override can ever exceed.
+    capacity:
+      default-requests-per-minute: 600
+      hard-cap-requests-per-minute: 6000
   # TD-TEST-002: EventOutboxRetentionJob (identity-module) sweeps event_outbox rows older than this
   # many days, daily. Deliberately wide by default — webhook-module (ADR-0007) has no dispatcher
   # yet, so every row's published_at stays NULL forever; see that class's own Javadoc for why an
@@ -156,3 +203,16 @@ management:
       enabled: true
     readinessState:
       enabled: true
+
+# TD-SEC-015: makes the current, already-secure default an explicitly owned setting instead of an
+# implicit one — Spring Boot's own default already suppresses these, but a future framework version
+# changing that default, or a stray server.error.* override, would previously have gone unnoticed.
+# GlobalExceptionHandler (app/infrastructure/config) is the owned safety net for the REST/JSON side
+# of the codebase; this block is what backs the remaining Thymeleaf-rendered hosted-UI controllers,
+# which fall through to Spring Boot's own BasicErrorController, never this project's own code.
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
