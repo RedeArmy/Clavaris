@@ -101,7 +101,7 @@ class PerTenantConcurrencyIntegrationTest extends RedisBackedIntegrationTest {
               try {
                 startGate.await();
                 assertIssuerBelongsToItsOwnOrganization(organizationId, mismatches);
-              } catch (final InterruptedException e) {
+              } catch (final InterruptedException _) {
                 Thread.currentThread().interrupt();
               } finally {
                 doneLatch.countDown();
