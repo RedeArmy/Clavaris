@@ -31,6 +31,17 @@ Given this system's security-critical nature, this standard is applied with part
 - Never construct a SQL query by string concatenation — JPA/parameterized queries only, no exceptions for "trusted" internal input.
 - Every new endpoint on the management API surface must have an explicit authorization check reviewed against the roles table in `domain-model.md` §3 — no endpoint ships relying on "nothing calls this without a token" as its only protection.
 
-## 5. Relevant ADR range
+## 5. When cross-module duplication moves into `common` (TD-ARCH-008)
+
+CLAUDE.md §4 scopes `common` to "shared code only (base exceptions, utilities, common value types) — no business logic." Two real cross-module duplication findings have each been resolved differently, and until now neither precedent explained *why* — this is that explanation, written before a third instance gets decided ad hoc.
+
+- **TD-ARCH-001 (a deliberate per-module mirror, not shared)**: two modules independently implement the same-shaped rate-limiting/audit logic. Left as a documented, intentional duplicate — each module's own version can diverge the day one module's own domain needs something the other doesn't (a different retention window, a different audit-event shape), without that divergence being a breaking change to a shared type both modules depend on.
+- **TD-ARCH-007 (extracted into `common`)**: `AbstractEventOutboxEntity` and `EventOutboxRetentionSweeper` — identity-module's and organization-module's own event-outbox retention sweep were byte-for-byte the same logic (age-based cutoff, same delete query shape, same log line), flagged as SonarCloud duplication. Extracted, not mirrored.
+
+**The actual rule, stated once so it doesn't have to be re-derived per instance**: share via `common` when the duplication is pure structural/persistence boilerplate with zero domain meaning of its own — the two copies would only ever change in lockstep, and a future divergence between them would be a bug, not a legitimate design choice. Keep the deliberate per-module mirror when the duplicated code encodes anything a future domain-specific change might plausibly need to diverge on — retention policy, audit semantics, business timing — even if the two copies happen to read identically today. `EventOutboxRetentionSweeper`'s own age-based cutoff is genuinely the same operational decision in both modules (neither has any webhook dispatcher yet, per its own Javadoc) — that sameness is *why* extraction was correct there, not a coincidence the rule ignores. If a future divergence is even plausible, mirror; if the two copies converging is the only outcome that would ever make sense, share.
+
+A `common` addition under this rule still needs the same one-line-in-the-class comment discipline (§3 above) explaining which side of this rule justified it — not just that it removed a Sonar finding.
+
+## 6. Relevant ADR range
 
 ADRs 0001-0006 (`docs/03-architecture/adr/`) — all currently locked, considered settled unless a new ADR explicitly revisits one of them.
