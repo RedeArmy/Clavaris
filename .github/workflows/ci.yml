@@ -55,12 +55,16 @@ jobs:
     name: Build the app image
     runs-on: ubuntu-latest
     needs: build-and-test
+    # TD-FUT-013: this job's own image now leaves the runner — needs write access to this repo's
+    # own GHCR namespace, opted into explicitly (top-level default stays contents: read).
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
-      # Not pushed anywhere yet — this job exists to catch Dockerfile/pom
-      # drift (a Dockerfile that stops building) as a CI failure instead of
-      # a surprise the first time someone tries to deploy.
+      # Tagged clavaris-app:ci first (untagged for a registry) so the Trivy scan below and every
+      # existing step keep working unchanged regardless of whether this run pushes anywhere.
       - name: Build app image
         run: docker build -f app/Dockerfile -t clavaris-app:ci .
 
@@ -99,6 +103,33 @@ jobs:
           name: trivy-report
           path: trivy-report.txt
           if-no-files-found: ignore
+
+      # TD-FUT-013: real registry, not a local-only build. Gated to push-to-master only — never a
+      # PR build (a fork's PR wouldn't have packages: write anyway; same-repo PR branches still
+      # shouldn't publish an unmerged, unreviewed image under the :latest tag a production host
+      # would pull). GHCR over Docker Hub: no new account/secret to provision — GITHUB_TOKEN
+      # already has package-registry scope once this job opts into packages: write above, and the
+      # image lives next to the source it was built from.
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Two tags, not one: :latest is what docker-compose.prod.yml pulls by default (deployment-
+      # runbook.md's own documented flow); :<git-sha> is what an operator pins to for a
+      # reproducible rollback target — "which image is actually running" should never depend on
+      # remembering when :latest was last pushed.
+      - name: Tag and push image to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/clavaris"
+          docker tag clavaris-app:ci "${IMAGE,,}:latest"
+          docker tag clavaris-app:ci "${IMAGE,,}:${{ github.sha }}"
+          docker push "${IMAGE,,}:latest"
+          docker push "${IMAGE,,}:${{ github.sha }}"
 
   dependency-scan:
     name: Dependency vulnerability scan
