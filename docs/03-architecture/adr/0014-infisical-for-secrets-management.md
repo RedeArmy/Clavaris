@@ -1,6 +1,6 @@
 # ADR-0014: Infisical (self-hosted) for secrets management, not HashiCorp Vault or a custom build
 
-**Status:** ✅ Aprobado (2026-08-24)
+**Status:** ❌ Superseded by ADR-0019 (2026-08-28) — Infisical removed entirely; ADR-0018 decided `.env` is the real production path, leaving this decision's own Phase 2 built but never actually exercised. Content below is preserved as an honest record of what was true and why on 2026-08-24, not edited to match the later decision.
 
 ## Context
 

@@ -24,7 +24,7 @@ source of truth for structure).
 |---|---|---|---|
 | Password hashes (`PasswordCredential`) | Postgres | **Restricted** | Argon2id (ADR-0005); never returned in any API response, never logged |
 | Signing key private material | PKCS12 keystore file (`TOKEN_SIGNING_KEY_STORE_PATH`) | **Restricted** | Never in Postgres, never in a log — `security-architecture.md` §3 |
-| `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` | Environment / Infisical | **Restricted** | This project's single highest-value credential — §5, root CLAUDE.md |
+| `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` | Environment (`.env`, `chmod 600` — ADR-0019) | **Restricted** | This project's single highest-value credential — §5, root CLAUDE.md |
 | Bearer token values (access/refresh/authorization code/ID token) | Postgres (hashed, TD-SEC-019), Redis (session cache) | **Restricted** while live | Only a keyed HMAC digest persists in Postgres; the raw value exists only in transit and briefly in memory (`security-architecture.md` §2) |
 | Client secrets (`OAuthClient`, `PlatformClient`) | Postgres | **Restricted** | Hashed at rest, same principle as passwords |
 | Account email addresses | Postgres | **Confidential** | Real PII; scoped to one `Organization`'s account pool, never linked across tenants (ADR-0010) |

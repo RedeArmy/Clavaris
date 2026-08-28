@@ -86,12 +86,6 @@ services:
       PLATFORM_BOOTSTRAP_CLIENT_SECRET: ${PLATFORM_BOOTSTRAP_CLIENT_SECRET:?PLATFORM_BOOTSTRAP_CLIENT_SECRET must be set explicitly in .env}
       RESEND_API_KEY: ${RESEND_API_KEY:?RESEND_API_KEY must be set explicitly in .env}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?MAIL_FROM_ADDRESS must be set explicitly in .env}
-      # Unset by default, same ADR-0014 dual-mode fallback as docker-compose.yml — set all four to
-      # switch this same image onto Infisical instead of the plaintext env vars above.
-      INFISICAL_CLIENT_ID: ${INFISICAL_CLIENT_ID:-}
-      INFISICAL_CLIENT_SECRET: ${INFISICAL_CLIENT_SECRET:-}
-      INFISICAL_PROJECT_ID: ${INFISICAL_PROJECT_ID:-}
-      INFISICAL_ENVIRONMENT: ${INFISICAL_ENVIRONMENT:-prod}
     volumes:
       - clavaris-signing-keys-data:/app/data
     depends_on:

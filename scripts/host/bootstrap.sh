@@ -31,8 +31,8 @@ fi
 log "Installing Docker Engine + Compose plugin (if not already present)"
 if ! command -v docker >/dev/null 2>&1; then
   # Official convenience script — same "trust a named, well-vetted install path over a hand-rolled
-  # one" reasoning this project already applies elsewhere (ADR-0001, the Infisical CLI install in
-  # app/Dockerfile), not something worth reimplementing per-distro apt/dnf logic for.
+  # one" reasoning this project already applies elsewhere (ADR-0001), not something worth
+  # reimplementing per-distro apt/dnf logic for.
   curl -fsSL https://get.docker.com | sh
 else
   echo "Docker already installed ($(docker --version)) — skipping."

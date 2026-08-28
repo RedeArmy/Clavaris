@@ -80,18 +80,6 @@ services:
       # HMAC that keys every rate-limit identifier (email/IP/client_id) before it becomes part of a
       # Redis key.
       RATE_LIMIT_KEY_HASH_SECRET: "${RATE_LIMIT_KEY_HASH_SECRET:?RATE_LIMIT_KEY_HASH_SECRET must be set explicitly in .env (see .env.example)}"
-      # ADR-0014 (docker-compose.infisical.yml): unset by default — docker-entrypoint.sh falls
-      # back to reading the vars above directly (today's behavior, unchanged) when these two are
-      # blank. Set both, per infisical-setup.md, to switch this same image onto the real
-      # secrets-manager path; every secret above then comes from Infisical instead, and these four
-      # required-var lines become dead weight to remove in a later pass, not something read at the
-      # same time as Infisical's own values (docker-entrypoint.sh's own `exec` replaces the
-      # process, it doesn't merge).
-      INFISICAL_CLIENT_ID: ${INFISICAL_CLIENT_ID:-}
-      INFISICAL_CLIENT_SECRET: ${INFISICAL_CLIENT_SECRET:-}
-      INFISICAL_PROJECT_ID: ${INFISICAL_PROJECT_ID:-}
-      INFISICAL_ENVIRONMENT: ${INFISICAL_ENVIRONMENT:-dev}
-      INFISICAL_DOMAIN: ${INFISICAL_DOMAIN:-http://infisical:8080/api}
     volumes:
       - clavaris-signing-keys-data:/app/data
     depends_on:

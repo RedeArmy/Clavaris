@@ -115,7 +115,7 @@ commit is merged — pinning is a deliberate, temporary override, not the normal
   `incident-response-platform-client-compromise.md`) for the containment procedure itself; this
   runbook only covers routine, non-incident deploys.
 - **Observability** — `docker-compose.observability.yml` (Prometheus/Alertmanager/Grafana/Zipkin)
-  is a separate, optional compose file, not merged into `docker-compose.prod.yml` by default (same
-  "a file never passed via `-f` is never parsed at all" pattern `docker-compose.infisical.yml`
-  already establishes) — bring it up alongside this one explicitly if this host should page on the
-  alert rules `infra/observability/alert-rules.yml` already defines.
+  is a separate, optional compose file, not merged into `docker-compose.prod.yml` by default (a
+  file never passed via `-f` is never parsed at all) — bring it up alongside this one explicitly
+  if this host should page on the alert rules `infra/observability/alert-rules.yml` already
+  defines.

@@ -1,8 +1,8 @@
 # TD-FUT-011 / ADR-0015: real observability + traceability + alerting, self-hosted, mirroring
 # JobSeeker's own already-running choice. A SEPARATE compose file, not folded into docker-compose.
-# yml — same reasoning as docker-compose.infisical.yml's own header comment (a `profiles:` block
-# inside the main file still evaluates every service's own `${VAR:?...}` checks regardless of
-# activation; a file never passed via `-f` is never parsed at all).
+# yml — a `profiles:` block inside the main file still evaluates every service's own
+# `${VAR:?...}` checks regardless of activation; a file never passed via `-f` is never parsed at
+# all (the same real bug this exact pattern was chosen to avoid, confirmed live once already).
 #
 # Bring these up alongside the main stack (shares its default network by Compose's own multi-file
 # merge behavior, so "app" is reachable by that DNS name from prometheus.yml's own scrape target):
