@@ -104,7 +104,69 @@ proof TD-TEST-003 didn't have — that specific row only ever proved the filter 
 right chain via sequential unit tests; this is the same rule holding correctly under genuine
 concurrent contention against real Redis, not a mocked `RateLimiter`.
 
+### 4. Argon2 parameter comparison (2026-08-28) — real data for TD-FUT-017's own open "options to evaluate"
+
+TD-FUT-017's own text named "tuning Argon2's own cost parameters within OWASP's recommended
+range" as an unevaluated option. This run evaluates it for real, against real concurrent Argon2id
+verification (`Argon2ConcurrencyBenchmark.java`, this directory) — isolating the exact mechanism
+(Argon2 CPU/memory contention, not Tomcat/Postgres/Redis, already shown above to have headroom) by
+calling `Argon2PasswordEncoder.matches` directly, at the same concurrency levels (1/3/10/30) as §2
+above, on the same 3-core machine.
+
+**Confirmed live, not assumed, before comparing anything**: decoded a real hash produced by
+`Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()` against this project's own resolved
+`spring-security-crypto:7.1.1` — the actual current parameters are `m=16384` (16 MiB), `t=2`,
+`p=1`, not a number taken from documentation.
+
+| Concurrency | CURRENT p95 (m=16384,t=2,p=1) | CURRENT throughput | LOWER_MEMORY p95 (m=9216,t=4,p=1) | LOWER_MEMORY throughput |
+|---|---|---|---|---|
+| 1 | 65.7ms | 19.6/s | 69.8ms | 20.0/s |
+| 3 | 129.3ms | 32.0/s | **112.4ms** | **47.2/s** |
+| 10 | 597.7ms | 32.0/s | 552.3ms | **39.0/s** |
+| 30 | 1117.5ms | 26.6/s | **1620.1ms** | 31.1/s |
+
+**Honest reading, not a clean win either way**:
+
+- At **moderate concurrency (c=3, c=10)** — the realistic near-term range this row's own "roughly
+  single-digit concurrency" framing names — the lower-memory alternative is a real, measured
+  improvement: +47% throughput at c=3, both p95 figures modestly better. Smaller per-verification
+  memory footprint does appear to reduce contention in this range, on this hardware.
+- At **severe oversubscription (c=30, already a "queueing collapse" regime for both variants)**,
+  the lower-memory alternative is measurably *worse* on p95 (1620ms vs. 1118ms) — more iterations
+  (`t=4` vs. `t=2`) means more total queued CPU-bound work once every core is already saturated
+  many times over.
+- **Neither variant moves where the ceiling actually sits**: both still fail the 300ms p95 NFR
+  target at c=10. This benchmark measures pure in-process Argon2 cost only (no Tomcat/Postgres
+  round trip), so its own numbers are systematically lower than §2's real HTTP-level ones — the
+  *shape* of the finding (a hard ceiling exists, tuning shifts it, doesn't remove it) is what
+  transfers, not a claim that either parameter set alone clears the NFR target.
+
+**What this does and does not change**: TD-FUT-017 stays open, correctly — its blocking dependency
+(TD-FUT-013, no production host to make a real tuning decision against) is unrelated to this data
+and still doesn't exist, and the row's own trigger condition (real concurrent traffic actually
+occurring) still hasn't happened. What changes is that "tune Argon2 parameters" is no longer a
+purely theoretical option in that row's own text — it's now a real, measured trade-off (helps at
+c=3–10, hurts at c=30) on record for whoever makes that call once a production host exists.
+**Production parameters were deliberately left unchanged** — `Argon2PasswordHasher`/
+`Argon2PasswordVerifier` still use `defaultsForSpringSecurity_v5_8()`; changing a live password
+hash's own cost parameters is a real security/performance decision, not something to flip as a
+side effect of gathering evidence for it.
+
 ## Files
 
 - `run.sh` — the exact `ab` invocations behind every number above, runnable against any instance.
 - `results/*.txt` — raw `ab` output from the 2026-08-24 run, kept as the historical baseline.
+- `Argon2ConcurrencyBenchmark.java` — the standalone Argon2-only concurrency benchmark behind §4
+  above. Compile/run against the exact classpath this project resolves (no Maven plugin
+  configured for this — it's a deliberately standalone tool, not part of the build):
+  ```bash
+  cd load-testing
+  CP=$(find ~/.m2 -name "spring-security-crypto-7.1.1.jar" | grep -v sources):\
+$(find ~/.m2 -name "bcprov-jdk18on-*.jar" | grep -v sources | head -1):\
+$(find ~/.m2 -name "commons-logging-*.jar" | grep -v sources | head -1):\
+$(find ~/.m2 -name "spring-core-7.0.9.jar" | grep -v sources)
+  javac -cp "$CP" Argon2ConcurrencyBenchmark.java
+  java -cp "$CP:." Argon2ConcurrencyBenchmark
+  ```
+  Re-check the resolved `spring-security-crypto`/`spring-core` versions (`mvn -pl identity-module
+  dependency:tree`) before reusing this command verbatim — they will drift over time.
