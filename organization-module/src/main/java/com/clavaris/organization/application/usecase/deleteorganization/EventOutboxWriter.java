@@ -13,9 +13,15 @@ import java.util.UUID;
  * (not a direct event bus publish) from inside its own {@code @Transactional} method. Write-only in
  * this slice: the dispatcher that drains {@code event_outbox} and actually delivers webhooks
  * belongs to {@code webhook-module} (ADR-0007, 🟡 proposed), not yet built.
+ *
+ * <p>{@code aggregateType} added (Workspace feature, 2026-08-27): this port used to hardcode {@code
+ * "Organization"} internally since {@code Organization} was this module's only aggregate — {@code
+ * Workspace}/{@code WorkspaceMembership} now share this same table/port, so the caller must say
+ * which aggregate the row describes, same convention identity-module would need the day it ever
+ * grows a second aggregate of its own.
  */
 @FunctionalInterface
 public interface EventOutboxWriter {
 
-  void write(String eventType, UUID aggregateId, Object payload);
+  void write(String aggregateType, String eventType, UUID aggregateId, Object payload);
 }

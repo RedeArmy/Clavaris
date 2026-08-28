@@ -80,7 +80,14 @@ class AdminApiSecurityConfig {
           final int accountsDeletePerClientLimit,
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.admin-api.organizations-delete.per-client-limit:5}")
-          final int organizationsDeletePerClientLimit) {
+          final int organizationsDeletePerClientLimit,
+      // BR-WS-04: this endpoint provisions a real Account and sends a real email — same
+      // "side-effect-bearing endpoint gets its own tighter ceiling" precedent as the two limits
+      // above, moderate rather than as tight as the :delete endpoints since adding members is a
+      // routine, non-destructive operation.
+      @SuppressWarnings("PMD.LongVariable")
+          @Value("${clavaris.rate-limit.admin-api.workspace-members-write.per-client-limit:60}")
+          final int workspaceMembersWritePerClientLimit) {
     http.securityMatcher(ADMIN_API_PATH_PATTERN)
         .authorizeHttpRequests(
             authorize ->
@@ -115,12 +122,33 @@ class AdminApiSecurityConfig {
                     // defence-in-depth reasoning as every other admin-API rule above.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:delete")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_DELETE)
+                    // Reversible ban/unban — one shared scope for both directions, see
+                    // PlatformScopes.ACCOUNTS_SUSPEND's own Javadoc for why.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:suspend")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:reactivate")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
                     // BR-DATA-02/03: hard-deleting an entire Organization — its own scope too,
                     // deliberately separate from ACCOUNTS_DELETE (an entire tenant's whole
                     // account pool vs. one identity), arguably the single most irreversible
                     // action this whole surface exposes.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations/*:delete")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ORGANIZATIONS_DELETE)
+                    // BR-WS: creating a Workspace — its own scope, same defence-in-depth
+                    // reasoning as every other admin-API rule above.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations/*/workspaces")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACES_WRITE)
+                    // BR-WS-04/05: adding a member or changing an existing member's role —
+                    // grouped under one scope, see PlatformScopes.WORKSPACE_MEMBERS_WRITE's own
+                    // Javadoc for why.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/workspaces/*/members")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_MEMBERS_WRITE)
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/admin/workspaces/*/members/*/role")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_MEMBERS_WRITE)
+                    // BR-WS-03: removing a member — its own scope, deliberately separate from
+                    // WORKSPACE_MEMBERS_WRITE, same defence-in-depth reasoning as ACCOUNTS_DELETE.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/workspaces/*/members/*:remove")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_MEMBERS_REMOVE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
@@ -174,6 +202,17 @@ class AdminApiSecurityConfig {
                         RateLimitRule.always(),
                         RateLimitIdentifiers::authenticatedPlatformClientId,
                         organizationsDeletePerClientLimit,
+                        Duration.ofMinutes(5)),
+                    // BR-WS-04: a real Account + a real outbound email per call — its own tighter
+                    // ceiling than the blanket admin-api-post:client rule above, same
+                    // "side-effect-bearing endpoint" precedent as the two :delete rules.
+                    new RateLimitRule(
+                        "admin-api-workspace-members-write:client",
+                        HttpMethod.POST,
+                        "/api/v1/admin/workspaces/*/members",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        workspaceMembersWritePerClientLimit,
                         Duration.ofMinutes(5)))),
             BearerTokenAuthenticationFilter.class)
         // Resource server, STATELESS session policy below, and securityMatcher already scopes

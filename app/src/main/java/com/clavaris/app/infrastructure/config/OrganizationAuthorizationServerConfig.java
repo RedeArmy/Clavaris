@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -17,7 +18,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
@@ -175,6 +175,7 @@ class OrganizationAuthorizationServerConfig {
       final RateLimitKeyHasher rateLimitKeyHasher,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
+      final WorkspaceMembershipRepository workspaceMemberships,
       final IssueRefreshTokenUseCase issueRefreshToken,
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final RateLimiter rateLimiter,
@@ -248,16 +249,23 @@ class OrganizationAuthorizationServerConfig {
     // OAuth2TokenCustomizer<JwtEncodingContext> bean.
     final AuthenticationContextClaimsCustomizer authenticationContextClaims =
         new AuthenticationContextClaimsCustomizer();
+    // Workspace feature follow-up: workspace_id/workspace_role claims, on both the ID token and
+    // the access token (so /userinfo carries them too) — see this customizer's own Javadoc for the
+    // full rationale. Same hand-constructed, not-a-second-@Component-bean pattern as
+    // authenticationContextClaims above, for the same reason.
+    final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
+        new WorkspaceRoleClaimsCustomizer(workspaceMemberships);
     // TD-SEC-016: every token any Organization issues (client_credentials and, far more commonly,
     // the interactive Authorization Code flow's access + ID tokens) gets a structured
     // event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc. JwtGenerator has
-    // exactly one customizer slot, so the ADR-0016 claims customizer above is composed into the
-    // same lambda rather than a second setJwtCustomizer(...) call, which would just silently
-    // overwrite this one.
+    // exactly one customizer slot, so every claims customizer above is composed into the same
+    // lambda rather than a second setJwtCustomizer(...) call, which would just silently overwrite
+    // the previous one.
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
           authenticationContextClaims.customize(context);
+          workspaceRoleClaims.customize(context);
         });
     // BR-ID-03: the initial-issuance half of refresh-token support — JwtGenerator returns null
     // for the non-JWT REFRESH_TOKEN token type, so DelegatingOAuth2TokenGenerator falls through
@@ -331,8 +339,16 @@ class OrganizationAuthorizationServerConfig {
                     // A genuine OIDC discovery document (/.well-known/openid-configuration), not
                     // just plain OAuth2 authorization server metadata — ADR-0010 §5 requires every
                     // Organization to have its own *OIDC* issuer, and this is what makes the
-                    // discovery filter advertise itself as one.
-                    .oidc(Customizer.withDefaults())
+                    // discovery filter advertise itself as one. Custom userInfoMapper (Workspace
+                    // feature follow-up): SAS's own default one silently drops workspace_id/
+                    // workspace_role from /userinfo — see WorkspaceAwareOidcUserInfoMapper's own
+                    // Javadoc for why, confirmed live via javap, not assumed.
+                    .oidc(
+                        oidc ->
+                            oidc.userInfoEndpoint(
+                                userInfo ->
+                                    userInfo.userInfoMapper(
+                                        new WorkspaceAwareOidcUserInfoMapper())))
                     // Same fix as the platform tier's chain, same root cause: SAS's default
                     // ClientSecretAuthenticationProvider uses Spring Security's
                     // DelegatingPasswordEncoder, which expects an "{id}" bracket prefix; Argon2-

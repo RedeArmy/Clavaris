@@ -13,6 +13,7 @@ Rule IDs are referenced from code comments per this project's own commenting sta
 - **BR-ID-05** — Email verification and password reset tokens are delivered only to the email address of record at time of request, never returned in an API response body — the token must not be observable by anything except the recipient's inbox.
 - **BR-ID-06** — Rate limiting on login and token endpoints is mandatory from the first deployment, not added later once abuse is observed. Rate limiting must never throttle a legitimate token-refresh cycle for an already-active session — a documented failure mode in a comparable system (`clerk-feature-analysis.md` §7 item 2) that turned rate limiting into a self-inflicted outage. Since ADR-0010 §6, this is two layers, not one: a fixed, system-defined anti-abuse threshold per `(organization_id, account_or_ip_identifier)` that no tenant can loosen (the actual credential-stuffing defense), plus a separate per-`organization_id` capacity ceiling (tunable within a system-wide cap, operator-only in v1, BR-ORG-05) so one tenant's attack or traffic spike can never exhaust another tenant's budget.
 - **BR-ID-07** — 🟡 v1.1, see `prd-mvp.md` §2.1. A password is checked against a breached-password corpus (k-anonymity range query, e.g. HIBP-style — the full password never leaves the server, only a truncated hash prefix) at registration and password-change time; a match is rejected with a generic "choose a different password" message, never revealing the source of the match.
+- **BR-ID-08** — An `Account` can be reversibly suspended (banned) via the admin API, distinct from BR-DATA-02/03's permanent hard delete. Suspension revokes every live session/token immediately (same revocation ports the hard-delete path already uses) and blocks all future logins for that account until reactivated — enforced by the existing "reject any non-`ACTIVE` account" check in the login flow, not a separate gate. Reactivation reverses it; both transitions are audited.
 
 ## Organizations — tenant isolation (`BR-ORG`) — 🟡 see ADR-0010
 
@@ -34,9 +35,41 @@ Rule IDs are referenced from code comments per this project's own commenting sta
 
 ## Workspaces (`BR-WS`) — renamed from the pre-ADR-0010 `BR-ORG` rules; a Workspace is a team/company grouping *inside* one Organization's account pool, not the tenant boundary itself
 
-- **BR-WS-01** — Every workspace has exactly one `OWNER` at all times; ownership transfer is atomic (the previous owner becomes `ADMIN` in the same operation, never a moment with zero owners).
-- **BR-WS-02** — An invitation is scoped to a specific email address and workspace, expires after a configurable window, and is consumed exactly once. Because the invited `Account` already belongs to the same `Organization` as the workspace (BR-ORG-01), an invitation can never cross a tenant boundary.
-- **BR-WS-03** — Removing a member revokes that member's access to the workspace's resources immediately — not on next token refresh, since a token already issued could otherwise remain valid for the workspace's scope until natural expiry.
+**v1 scope note (ADR-0010 §3 addendum, 2026-08-27):** BR-WS-01 and BR-WS-02 below are rewritten from
+their original design (`OWNER`/`ADMIN`/`MEMBER` + invitations) to match an explicit, deliberate v1
+scope decision — see the addendum for the full rationale. The renumbering keeps `BR-WS-03`'s ID
+stable since its substance (immediate revocation on removal) is unchanged, only clarified.
+
+- **BR-WS-01** — A workspace must always retain at least one `ADMIN` member; a role change or
+  removal that would leave zero `ADMIN`s is rejected. Enforced at the application layer, not left to
+  a database constraint alone. Replaces the original `OWNER`-with-atomic-transfer design — v1 has no
+  `OWNER` role, only `ADMIN`/`MEMBER` (BR-WS-05).
+- **BR-WS-02 (deferred to v1.1+)** — An invite-by-email-then-accept flow is not built in v1; see
+  BR-WS-04 for the v1 mechanism (direct provisioning). Kept as a placeholder ID so a future
+  `WorkspaceInvitation` doesn't have to renumber anything else in this section.
+- **BR-WS-03** — Removing a member revokes that member's access to the workspace's resources
+  immediately, **stated honestly for v1**: there is no workspace-scoped token/authorization concept
+  in Clavaris yet (tokens are Account/OAuthClient-scoped per Organization, not per-Workspace) — in
+  v1, "immediate" means the admin-API listing and the corresponding outbox event fire synchronously
+  with the removal, not that a live token is invalidated (none exists to invalidate). A consuming
+  application that gates its own authorization by workspace membership must re-check membership
+  itself, or subscribe to the outbox event once `webhook-module` (ADR-0007) exists.
+- **BR-WS-04** — A workspace member is provisioned directly: adding a member creates a real
+  `Account` (identity-module) scoped to the workspace's own Organization and immediately triggers
+  that Organization's existing password-reset-request flow, so the new member sets their own
+  password on first login. There is no invitation-accept step in v1 (see BR-WS-02).
+- **BR-WS-05** — Workspace roles are Clavaris-internal only: `ADMIN` (can manage the workspace's own
+  membership) or `MEMBER` (cannot) — nothing else. Any business/product-domain role (e.g.
+  "recruiter", "candidate") is explicitly out of scope here; that differentiation belongs entirely to
+  the consuming application (e.g. JobSeeker), never to Clavaris.
+- **BR-WS-06** — A member's current `workspace_id`/`workspace_role` are carried as claims on every
+  ID token and access token the interactive Authorization Code flow issues for that Account, and on
+  the corresponding `/userinfo` response — the mechanism a consuming application uses to know, at
+  login time, whether that user should see its own admin surface. Refreshed on every login and on
+  every silent token refresh (both reissue through the same token-generation path); there is no
+  separate polling or webhook step required to observe a role change for an account that's about to
+  authenticate again. Omitted entirely (not a null/empty claim) for an Account with no Workspace
+  membership.
 
 ## Client registry (`BR-CLIENT`)
 

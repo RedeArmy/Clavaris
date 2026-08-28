@@ -17,10 +17,13 @@ import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPas
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
+import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
+import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountService;
+import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -39,6 +42,8 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefres
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.RotateSigningKeyForOrganizationService;
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.RotateSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
+import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountService;
+import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -201,9 +206,35 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      @SuppressWarnings("PMD.LongVariable")
+          final WorkspaceMembershipEraser workspaceMembershipEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new DeleteAccountService(
+        accounts,
+        accountTokenRevoker,
+        accountSessionRevoker,
+        workspaceMembershipEraser,
+        auditEvents,
+        eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ SuspendAccountUseCase suspendAccountUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new SuspendAccountService(
         accounts, accountTokenRevoker, accountSessionRevoker, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ ReactivateAccountUseCase reactivateAccountUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new ReactivateAccountService(accounts, auditEvents, eventOutboxWriter);
   }
 }

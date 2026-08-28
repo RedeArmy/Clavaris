@@ -35,6 +35,7 @@ class DeleteAccountServiceTest {
   private AccountRepository accounts;
   private AccountTokenRevoker accountTokenRevoker;
   private AccountSessionRevoker accountSessionRevoker;
+  private WorkspaceMembershipEraser workspaceMembershipEraser;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private DeleteAccountService service;
@@ -44,11 +45,17 @@ class DeleteAccountServiceTest {
     accounts = mock(AccountRepository.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
     accountSessionRevoker = mock(AccountSessionRevoker.class);
+    workspaceMembershipEraser = mock(WorkspaceMembershipEraser.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
     service =
         new DeleteAccountService(
-            accounts, accountTokenRevoker, accountSessionRevoker, auditEvents, outbox);
+            accounts,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            workspaceMembershipEraser,
+            auditEvents,
+            outbox);
   }
 
   @Test
@@ -59,6 +66,7 @@ class DeleteAccountServiceTest {
 
     verify(accountTokenRevoker).revokeAllTokensFor(account.id());
     verify(accountSessionRevoker).revokeAllSessionsFor(account.id());
+    verify(workspaceMembershipEraser).eraseAllMembershipsFor(account.id());
     verify(auditEvents)
         .write(ACTOR, "account.deleted", "Account", account.id().value().toString(), null);
 
@@ -109,6 +117,7 @@ class DeleteAccountServiceTest {
 
     verifyNoInteractions(accountTokenRevoker);
     verifyNoInteractions(accountSessionRevoker);
+    verifyNoInteractions(workspaceMembershipEraser);
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
     verify(accounts, never()).deleteById(any());

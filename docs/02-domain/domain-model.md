@@ -115,32 +115,27 @@ classDiagram
         +UUID id
         +UUID workspaceId
         +UUID accountId
-        +MembershipRole role
-        +Instant joinedAt
-    }
-    class WorkspaceInvitation {
-        +UUID id
-        +UUID workspaceId
-        +String invitedEmail
-        +MembershipRole proposedRole
-        +String tokenHash
-        +Instant expiresAt
-        +Instant consumedAt
+        +WorkspaceRole role
+        +Instant createdAt
     }
 
     Organization "1" --> "0..*" Workspace : contains
     Organization "1" --> "0..1" RateLimitPolicy : overrides default with
     Workspace "1" --> "1..*" WorkspaceMembership : has
-    Workspace "1" --> "0..*" WorkspaceInvitation : issues
 ```
+
+`WorkspaceInvitation` (invite-by-email-then-accept) is **deferred to v1.1+**, not built — see the
+ADR-0010 §3 addendum below and `business-rules.md` BR-WS-02/04. v1 provisions members directly, so
+no invitation entity exists in this diagram yet.
 
 - **`Organization`** — ADR-0010: the tenant isolation boundary. One row per consuming system; owns a fully independent pool of `identity-module` `Account`s (§2) and of `client-registry-module` `OAuthClient`s (§4), its own `SigningKey`/JWKS (§2), and its own rate-limit budget. Organizations are mutually exclusive by construction — there is no query path from one Organization's data into another's.
 - **`Organization.ownerPlatformAccountId`** — ADR-0012: mandatory; exactly one owning `identity-module` `PlatformAccount` (§2) per Organization, a plain `UUID` (not a real foreign key — organization-module never depends on identity-module, same deliberate cross-module-FK gap already recorded on `accounts.organization_id`). One `PlatformAccount` may own many Organizations; no multi-owner model in v1.
 - **`RateLimitPolicy`** — ADR-0010 §6.2: **capacity layer only** (noisy-neighbor protection), an optional one-to-one override of the system-default per-`Organization` aggregate request ceiling. Absence of a row means "use the system default," never "unlimited," and no policy can ever exceed a hard system-wide cap. **v1: operator-managed only** — no self-service tenant editing yet, matching manual `OAuthClient` registration (`prd-mvp.md` §2.2); self-service arrives in v1.1 gated on audit logging of changes. Enforcement bucket keys in Redis are namespaced by `organization_id`.
 - **Anti-abuse layer (ADR-0010 §6.1, not a stored entity)** — fixed, system-defined thresholds keyed by `(organization_id, account_or_ip_identifier)`, applied uniformly to every Organization and never tenant-configurable, even in v1.1. This is the actual credential-stuffing defense BR-ID-06 exists for; `RateLimitPolicy` above governs capacity, not this.
 - **`Workspace.organizationId`** — mandatory; a Workspace always belongs to exactly one Organization. Renamed from the pre-ADR-0010 `Organization` entity — same semantics (a company/team grouping inside one consumer's usage), different name to avoid colliding with the new tenant-boundary meaning of "Organization."
-- **`WorkspaceMembership.role`** — `OWNER | ADMIN | MEMBER`, fixed enum in v1 (BR-WS-01: exactly one `OWNER` at all times, enforced at the application layer, not left to a database constraint alone since ownership transfer is a two-row atomic operation).
-- **`WorkspaceInvitation`** — BR-WS-02: scoped to one email + one workspace, expires, single-use (`consumedAt`).
+- **`WorkspaceMembership.role`** — `ADMIN | MEMBER`, fixed enum in v1 (BR-WS-01/05: at least one `ADMIN` at all times, enforced at the application layer, not left to a database constraint alone). **v1 scope note (ADR-0010 §3 addendum, 2026-08-27)**: this supersedes the originally-documented `OWNER | ADMIN | MEMBER` design — no `OWNER` role or ownership-transfer machinery exists in v1. Any business/product-domain role (e.g. "recruiter", "candidate") is explicitly out of scope here (BR-WS-05); that differentiation belongs entirely to the consuming application.
+- **`WorkspaceMembership.accountId`** — BR-WS-04: a plain `UUID`, not an identity-module type — organization-module never depends on identity-module (same cross-module-reference discipline `Organization.ownerPlatformAccountId` already follows). Provisioned directly by `AddWorkspaceMemberService` (a real `Account` created for every new member), never linked from a pre-existing `Account` — v1 has no "attach an existing Account to a second Workspace" flow.
+- **`WorkspaceInvitation`** — BR-WS-02: **deferred to v1.1+, not built.** Members are provisioned directly in v1 (BR-WS-04); this entity would scope one email + one workspace, expire, and be single-use (`consumedAt`) if/when it's added.
 
 ## 4. `client-registry-module` — core entities
 
@@ -278,8 +273,11 @@ Since ADR-0010, two more cross-module references follow this same discipline and
 | `PasswordResetRequestedEvent` | `identity-module` | Best-effort: triggers reset email send | ❌ (internal only — a reset request is not a fact a consumer needs) |
 | `PasswordResetCompletedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: all active sessions/refresh tokens are revoked synchronously, same transaction (BR-ID-04) | ❌ (internal only) |
 | `RefreshTokenReuseDetectedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: full-account token revocation, synchronous (BR-ID-03). The security alert (NFR §5) is a separate best-effort side effect, not a gate on the revocation itself | ✅ → `refresh_token.reuse_detected`, so a consumer can react (e.g. force logout its own session) |
-| `AccountDeletedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: `organization-module`'s workspace memberships are removed synchronously via a direct port call in the same transaction (BR-DATA-03) — never via an event listener reacting to this event later | ✅ → `account.deleted` |
-| `WorkspaceInvitationAcceptedEvent` | `organization-module` | **Invariant, already completed before this event is raised**: the corresponding `WorkspaceMembership` is created synchronously by the same use case that accepts the invitation, not by a listener reacting to this event | ✅ → `membership.created` |
+| `AccountDeletedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: `organization-module`'s workspace memberships are removed synchronously via a direct port call in the same transaction (BR-DATA-03) — never via an event listener reacting to this event later. **Live since the Workspace feature, 2026-08-27** (`WorkspaceMembershipEraserBridge`) — this row described the intended design before the feature existed to implement it; it now does. | ✅ → `account.deleted` |
+| `WorkspaceCreatedEvent` | `organization-module` | — | ✅ → `workspace.created` |
+| `WorkspaceMemberAddedEvent` | `organization-module` | Best-effort side effect (BR-WS-04): provisioning the new member's `Account` and triggering their password-reset email both already completed, outside any transaction, before this is raised — see `AddWorkspaceMemberService`'s own Javadoc | ✅ → `workspace_membership.added` |
+| `WorkspaceMemberRoleChangedEvent` | `organization-module` | — | ✅ → `workspace_membership.role_changed` |
+| `WorkspaceMemberRemovedEvent` | `organization-module` | — | ✅ → `workspace_membership.removed` |
 
 Not every internal domain event becomes a webhook — only the ones a consumer plausibly needs to react to (ADR-0007 §3). This table is the seed of the event catalog in `prd-mvp.md` §2.3; extending it is additive (BR-WEBHOOK area) and does not require an ADR revision by itself. **When adding a new row, classify it as one of the two reaction kinds above explicitly — don't leave a new ambiguous "triggers X" without saying which.**
 
