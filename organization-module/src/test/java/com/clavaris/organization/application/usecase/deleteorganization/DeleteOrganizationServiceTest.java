@@ -18,6 +18,7 @@ import com.clavaris.organization.application.usecase.createorganization.Organiza
 import com.clavaris.organization.domain.event.OrganizationDeletedEvent;
 import com.clavaris.organization.domain.model.Organization;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,8 @@ class DeleteOrganizationServiceTest {
 
   private Organization registeredOrganization(final UUID organizationId) {
     Organization organization =
-        Organization.reconstitute(organizationId, "Acme", Instant.now(), UUID.randomUUID());
+        Organization.reconstitute(
+            organizationId, "Acme", Instant.now(), UUID.randomUUID(), false, List.of());
     when(organizations.findById(organizationId)).thenReturn(Optional.of(organization));
     return organization;
   }

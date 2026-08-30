@@ -68,6 +68,25 @@ class JpaAccountRepositoryTest {
         .isEqualTo("argon2id$stored-hash");
   }
 
+  // ADR-0020 (Phase 6, live-verified): AuthenticateWithSocialProviderService#linkBrandNewAccount
+  // saves an Account with no PasswordCredential at all for a brand-new social signup — BR-ID-02's
+  // real invariant (never zero auth methods) is upheld by that same transaction also saving a
+  // SocialIdentity, not by this repository requiring a password specifically. Confirmed here
+  // against real Postgres, not just inspection — the prior version of save() threw on exactly this
+  // case, a real 500 this phase's own end-to-end test caught live.
+  @Test
+  void savesAndReconstitutesASocialOnlyAccountWithNoPasswordCredential() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Email email = new Email("social-only@example.com");
+    Account account = Account.register(organizationId, email);
+
+    repository.save(account);
+    Optional<Account> found = repository.findByOrganizationIdAndEmail(organizationId, email);
+
+    assertThat(found).isPresent();
+    assertThat(found.get().passwordCredential()).isEmpty();
+  }
+
   @Test
   void lookupIsScopedToOneOrganizationOnly() {
     // BR-ORG-02: the same email in a different Organization must never be resolvable here.

@@ -60,10 +60,15 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 // rateLimitKeyHasher, tipping platformAuthorizationServerSecurityFilterChain's own parameter count
 // further past the threshold — same "wiring, not sprawl" reasoning as
 // OrganizationAuthorizationServerConfig's own identical suppression.
+// PMD.LongVariable: authorizationServerConfigurer is SAS's own type name
+// (OAuth2AuthorizationServerConfigurer) spelled out in full, needed as a local now that its
+// getEndpointsMatcher() is read before .with(...) — same descriptive-over-abbreviated reasoning as
+// every other PMD.LongVariable suppression in this class.
 @SuppressWarnings({
   "PMD.ExcessiveImports",
   "PMD.AvoidDuplicateLiterals",
-  "PMD.ExcessiveParameterList"
+  "PMD.ExcessiveParameterList",
+  "PMD.LongVariable"
 })
 @Configuration
 class PlatformAuthorizationServerConfig {
@@ -127,14 +132,22 @@ class PlatformAuthorizationServerConfig {
         new HashedTokenOAuth2AuthorizationService(
             new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
 
-    http.securityMatcher("/oauth2/**")
+    // Spring Security 7.x (Spring Boot 4.1's own dependency, resolved 7.1.0 — a major jump from
+    // the spike's 1.4.1) replaced the old static OAuth2AuthorizationServerConfigurer
+    // .authorizationServer() factory with a plain public constructor — confirmed by decompiling
+    // the actual resolved jar, not assumed from the spike's now-outdated example.
+    final OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+        new OAuth2AuthorizationServerConfigurer();
+    // Phase 6 (ADR-0020) found the previous hand-rolled "/oauth2/**" matcher live: it also swept
+    // up the OAuth2 *client* half's own /oauth2/authorization/{registrationId} redirect-initiation
+    // path (SocialLoginConfig, @Order(4)) into this tier's authenticated()-only policy, since this
+    // chain is @Order(1) and wins the match first — a real, previously-undetected collision, not a
+    // hypothetical one. getEndpointsMatcher() is SAS's own precise matcher for exactly the
+    // endpoints this configurer registers, so it can never again drift into a path some other
+    // chain owns.
+    http.securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
         .with(
-            // Spring Security 7.x (Spring Boot 4.1's own dependency, resolved 7.1.0 — a major
-            // jump from the spike's 1.4.1) replaced the old static
-            // OAuth2AuthorizationServerConfigurer.authorizationServer() factory with a plain
-            // public constructor — confirmed by decompiling the actual resolved jar, not assumed
-            // from the spike's now-outdated example.
-            new OAuth2AuthorizationServerConfigurer(),
+            authorizationServerConfigurer,
             server ->
                 server
                     .registeredClientRepository(registeredClients)

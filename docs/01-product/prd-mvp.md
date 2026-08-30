@@ -86,5 +86,5 @@ SAML, SCIM provisioning, self-service client registration console, configurable 
 
 ## 5. Open questions
 
-- Social-login account-linking-by-email: is matching by verified email alone sufficient, or does it need an explicit "confirm this is you" step to prevent a scenario where an attacker who controls a not-yet-verified email pre-registers to intercept a future social login? Needs resolution before social login ships, not after.
+- ~~Social-login account-linking-by-email~~ — **resolved 2026-08-28, ADR-0020**: explicit confirmation step, not automatic linking by verified email alone. `RegisterAccountController`'s own self-service registration is ungated (an unverified email can be pre-registered today), so automatic linking would let an attacker who pre-registers an email they don't control silently intercept the real owner's first social login. See ADR-0020 Decision 1 for the full reasoning.
 - Should unverified accounts be allowed to issue tokens at all, or should Clavaris itself gate on `email_verified_at` rather than leaving it to consumers? Currently leaning "leave it to consumers" (Clavaris has no product opinion), but worth revisiting once JobSeeker's own verification requirements are finalized.

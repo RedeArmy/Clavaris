@@ -149,6 +149,12 @@ class AdminApiSecurityConfig {
                     // WORKSPACE_MEMBERS_WRITE, same defence-in-depth reasoning as ACCOUNTS_DELETE.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/workspaces/*/members/*:remove")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_MEMBERS_REMOVE)
+                    // ADR-0020 Decision 3, BR-ID-12: turning per-Organization social login on/off
+                    // and choosing its providers — its own scope, same defence-in-depth reasoning
+                    // as every other admin-API rule above.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/social-login-policy")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

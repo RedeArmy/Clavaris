@@ -1,6 +1,7 @@
 package com.clavaris.identity.application.usecase.requestemailverification;
 
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
 
 /**
  * Outbound port — implemented by {@code infrastructure/adapter/out/mail/ResendMailSender}. One port
@@ -18,4 +19,13 @@ public interface MailSender {
   void sendEmailVerification(String toAddress, OrganizationId organizationId, String rawToken);
 
   void sendPasswordReset(String toAddress, OrganizationId organizationId, String rawToken);
+
+  /**
+   * ADR-0020 Decision 1, BR-ID-09: {@code AuthenticateWithSocialProviderService}'s confirmation
+   * step — delivered only to the account's existing email of record, never to whatever address the
+   * social provider itself reported (that's the entire point: proving the account holder still
+   * controls the email a pre-existing account was registered with).
+   */
+  void sendSocialLinkConfirmation(
+      String toAddress, OrganizationId organizationId, SocialProvider provider, String rawToken);
 }

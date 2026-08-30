@@ -27,6 +27,34 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  # ADR-0020 Decision 4: one Clavaris-owned shared OAuth app per provider, not bring-your-own —
+  # SocialLoginConfig (app) is what actually wires oauth2Login() against these registrations.
+  # Dev-only placeholder defaults, same convention as signing-key-store.password/oauth2.token-hash-
+  # secret above — confirmed live these can't be left blank like RESEND_API_KEY: Spring Boot's own
+  # OAuth2ClientProperties.validate() unconditionally rejects an empty client-id for any *declared*
+  # registration at ApplicationContext startup (a real, whole-app-breaking failure caught live, not
+  # by inspection — every endpoint in the app failed, not just social login's own). The placeholder
+  # values below satisfy that check without being real, working credentials — any actual
+  # /oauth2/authorization/{google,github} attempt still fails cleanly against the provider itself
+  # until real values are set.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_OAUTH_CLIENT_ID:dev-only-google-client-id-change-in-real-deployments}
+            client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:dev-only-google-client-secret-change-in-real-deployments}
+            # CommonOAuth2Provider.GOOGLE's own default scope (openid,profile,email) is already
+            # exactly what ADR-0020 Decision 1 needs — a stable `sub` plus a genuinely verified
+            # `email`/`email_verified` claim — no override needed.
+          github:
+            client-id: ${GITHUB_OAUTH_CLIENT_ID:dev-only-github-client-id-change-in-real-deployments}
+            client-secret: ${GITHUB_OAUTH_CLIENT_SECRET:dev-only-github-client-secret-change-in-real-deployments}
+            # CommonOAuth2Provider.GITHUB's own default scope is read:user only — user:email added
+            # explicitly: GitHubVerifiedEmailUserService's own GET /user/emails call (the only way
+            # to learn whether a GitHub account's email is actually verified — the base /user
+            # response has no verified flag at all) needs it, or the call comes back empty.
+            scope: read:user,user:email
   # TD-ARCH-002 (closed): NOT spring.session.* — confirmed by inspecting the resolved
   # spring-boot-autoconfigure-4.1.0 jar directly that Spring Boot 4.x ships zero session-related
   # autoconfiguration classes (unlike the still-autoconfigured spring-boot-data-redis module
@@ -56,6 +84,15 @@ clavaris:
   # same convention as signing-key-store.password above.
   oauth2:
     token-hash-secret: ${OAUTH2_TOKEN_HASH_SECRET:dev-only-oauth2-token-hash-secret-change-in-real-deployments}
+    github:
+      # GitHubVerifiedEmailUserService's own GET /user/emails call target (GitHubVerifiedEmailUser
+      # Service's own Javadoc for why this call exists at all) — not part of Spring Boot's own
+      # spring.security.oauth2.client.provider.github schema above, since that only covers the
+      # standard OAuth2/OIDC endpoints and this is a GitHub-API-specific extra call with no
+      # standard equivalent. Real GitHub API by default; SocialLoginIntegrationTest overrides this
+      # to its own local stub server the same way it already overrides the provider's own
+      # authorization-uri/token-uri/user-info-uri.
+      emails-uri: ${GITHUB_EMAILS_API_URI:https://api.github.com/user/emails}
   # TD-SEC-023: keys the HMAC-SHA256 digest AntiAbuseRateLimitingFilter computes for every rate-limit
   # identifier (email, IP, client_id) before it becomes part of a Redis key (RateLimitKeyHasher's
   # own Javadoc) — a dedicated secret, deliberately not oauth2.token-hash-secret reused (see that
@@ -91,6 +128,12 @@ clavaris:
       per-ip-limit: 10
     platform-create-organization:
       per-account-limit: 10
+    # SocialLoginConfig's chain (ADR-0020) — IP-only, one shared limit across all four of its own
+    # unauthenticated GET endpoints (initiate, provider callback, and both tiers' landing pages):
+    # code review finding, this chain originally shipped with no AntiAbuseRateLimitingFilter at
+    # all, unlike every sibling login-shaped chain.
+    social-login:
+      per-ip-limit: 30
     # /api/v1/admin/** (AdminApiSecurityConfig) — a blanket ceiling plus tighter, endpoint-specific
     # rows for the side-effect-bearing actions (real hard deletes, a real provisioned Account + a
     # real outbound email), same "side-effect-bearing endpoint gets its own tighter ceiling"

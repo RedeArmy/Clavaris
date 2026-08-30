@@ -92,20 +92,34 @@ class JpaAccountRepository implements AccountRepository {
     // exited and the exception would surface somewhere the service never expects it.
     accounts.saveAndFlush(entity);
 
-    final PasswordCredential credential =
-        account
-            .passwordCredential()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "Attempted to save an Account with no password credential attached — "
-                            + "BR-ID-02 invariant violated before reaching persistence"));
-    credentials.saveAndFlush(
-        new PasswordCredentialEntity(
-            credential.id(),
-            credential.accountId().value(),
-            credential.passwordHash(),
-            credential.updatedAt()));
+    // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider
+    // Service#linkBrandNewAccount) saves an Account with no PasswordCredential at all — BR-ID-02's
+    // real "never zero auth methods" invariant is upheld one level up, by that same transaction
+    // also saving a SocialIdentity for the same account, not by this repository unconditionally
+    // requiring a password specifically. Account.reconstitute's own Javadoc already documented a
+    // null credential as a legitimate social-only state; this method previously still threw on it —
+    // a real, previously-undetected gap this phase's own integration test caught live (a 500 on the
+    // very first real social signup), not a hypothetical one. Only persist a row here if the
+    // aggregate actually carries one.
+    //
+    // Code review finding: this removes the persistence layer's own fail-fast enforcement of
+    // BR-ID-02 for every caller, not just the social-login ones — every current caller happens to
+    // also save a SocialIdentity/PasswordCredential in the same transaction, so nothing breaks
+    // today, but nothing here would catch a future regression that doesn't. A synchronous guard
+    // can't work here regardless (see AccountAuthMethodIntegrityCheckJob's own Javadoc for why the
+    // ordering makes that structurally impossible) — AccountAuthMethodIntegrityCheckJob is the
+    // compensating control, a daily sweep that surfaces such a regression within 24h instead of
+    // leaving it undetected indefinitely.
+    account
+        .passwordCredential()
+        .ifPresent(
+            credential ->
+                credentials.saveAndFlush(
+                    new PasswordCredentialEntity(
+                        credential.id(),
+                        credential.accountId().value(),
+                        credential.passwordHash(),
+                        credential.updatedAt())));
   }
 
   @Override

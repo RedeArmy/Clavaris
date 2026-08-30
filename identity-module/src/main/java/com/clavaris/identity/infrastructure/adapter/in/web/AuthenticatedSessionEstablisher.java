@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
@@ -17,7 +18,8 @@ import java.util.UUID;
  * authenticated session," so the redirected-to {@code /oauth2/authorize} request (or whatever
  * protected URL triggered the login redirect in the first place) sees an authenticated principal.
  */
-@FunctionalInterface
+// No longer @FunctionalInterface — ADR-0020 added establishViaSocialLogin as a second abstract
+// method, both implemented by the same SpringSecurityAuthenticatedSessionEstablisher class.
 public interface AuthenticatedSessionEstablisher {
 
   /**
@@ -28,4 +30,18 @@ public interface AuthenticatedSessionEstablisher {
    */
   String establish(
       HttpServletRequest request, HttpServletResponse response, UUID accountId, String fallbackUrl);
+
+  /**
+   * ADR-0020: same contract as {@link #establish}, for a session established via {@code
+   * AuthenticateWithSocialProviderUseCase} rather than a password — {@code provider} is what lets
+   * the implementation mark the resulting {@code Authentication} with the actual mechanism used, so
+   * {@code AuthenticationContextClaimsCustomizer} can compute a real OIDC {@code amr} claim instead
+   * of always hardcoding {@code ["pwd"]}.
+   */
+  String establishViaSocialLogin(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      UUID accountId,
+      SocialProvider provider,
+      String fallbackUrl);
 }
