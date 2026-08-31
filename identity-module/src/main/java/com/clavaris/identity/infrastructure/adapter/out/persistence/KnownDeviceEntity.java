@@ -7,7 +7,10 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** JPA row mapping for {@code known_devices} (data-model.md, new-device-login notification). */
+/**
+ * JPA row mapping for {@code known_devices} (data-model.md, new-device-login notification,
+ * TD-SEC-033).
+ */
 @SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "known_devices")
@@ -21,6 +24,9 @@ public class KnownDeviceEntity {
   @Column(name = "user_agent", nullable = false, length = 512)
   private String userAgent;
 
+  @Column(name = "device_token_hash")
+  private String deviceTokenHash;
+
   @Column(name = "first_seen_at", nullable = false)
   private Instant firstSeenAt;
 
@@ -29,15 +35,18 @@ public class KnownDeviceEntity {
 
   protected KnownDeviceEntity() {}
 
+  @SuppressWarnings("java:S107")
   public KnownDeviceEntity(
       final UUID id,
       final UUID accountId,
       final String userAgent,
+      final String deviceTokenHash,
       final Instant firstSeenAt,
       final Instant lastSeenAt) {
     this.id = id;
     this.accountId = accountId;
     this.userAgent = userAgent;
+    this.deviceTokenHash = deviceTokenHash;
     this.firstSeenAt = firstSeenAt;
     this.lastSeenAt = lastSeenAt;
   }
@@ -52,6 +61,10 @@ public class KnownDeviceEntity {
 
   public String getUserAgent() {
     return userAgent;
+  }
+
+  public String getDeviceTokenHash() {
+    return deviceTokenHash;
   }
 
   public Instant getFirstSeenAt() {

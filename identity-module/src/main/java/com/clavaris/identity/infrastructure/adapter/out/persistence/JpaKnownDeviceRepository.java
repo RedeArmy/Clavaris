@@ -20,18 +20,26 @@ class JpaKnownDeviceRepository implements KnownDeviceRepository {
   }
 
   @Override
-  public Optional<KnownDevice> findByAccountIdAndUserAgent(
-      final AccountId accountId, final String userAgent) {
-    return devices.findByAccountIdAndUserAgent(accountId.value(), userAgent).map(this::toDomain);
+  public Optional<KnownDevice> findByAccountIdAndDeviceTokenHash(
+      final AccountId accountId, final String deviceTokenHash) {
+    return devices
+        .findByAccountIdAndDeviceTokenHash(accountId.value(), deviceTokenHash)
+        .map(this::toDomain);
   }
 
   @Override
   public void save(final KnownDevice device) {
-    devices.save(
+    // saveAndFlush, not save: the unique constraint on known_devices.(account_id,
+    // device_token_hash) must throw synchronously, right here, so RecordAccountLoginDeviceService's
+    // own try/catch around this call actually catches it — same "plain save() only stages the
+    // insert in the persistence context, deferring execution past the caller's own try/catch"
+    // rationale JpaAccountRepository's own identical saveAndFlush already documents.
+    devices.saveAndFlush(
         new KnownDeviceEntity(
             device.id(),
             device.accountId().value(),
             device.userAgent(),
+            device.deviceTokenHash(),
             device.firstSeenAt(),
             device.lastSeenAt()));
   }
@@ -41,6 +49,7 @@ class JpaKnownDeviceRepository implements KnownDeviceRepository {
         entity.getId(),
         new AccountId(entity.getAccountId()),
         entity.getUserAgent(),
+        entity.getDeviceTokenHash(),
         entity.getFirstSeenAt(),
         entity.getLastSeenAt());
   }

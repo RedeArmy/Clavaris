@@ -194,6 +194,15 @@ class OrganizationAuthorizationServerConfig {
           final int tokenRefreshPerClientLimit,
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
           final int capacityDefaultRequestsPerMinute,
+      // TD-SEC-035: the sessions/devices page previously had no fixed per-account anti-abuse
+      // rule of its own, only the generic, per-tenant-tunable capacity ceiling — a real gap
+      // relative to every other sensitive endpoint on this chain (login, token). Listing is the
+      // more generous limit (a legitimate user refreshing the page), revoking is deliberately
+      // tighter (not something a real user does often).
+      @Value("${clavaris.rate-limit.account-sessions.list-per-account-limit:60}")
+          final int accountSessionsListPerAccountLimit,
+      @Value("${clavaris.rate-limit.account-sessions.revoke-per-account-limit:20}")
+          final int accountSessionsRevokePerAccountLimit,
       // TD-SEC-008/ADR-0010 §5.2: how long a retired key keeps being published in JWKS after
       // rotation — generous relative to SAS's own default access-token TTL (5 minutes, per
       // incident-response-signing-key-compromise.md's own decompiled-jar finding) to cover
@@ -467,6 +476,29 @@ class OrganizationAuthorizationServerConfig {
                         request -> "refresh_token".equals(request.getParameter("grant_type")),
                         RateLimitIdentifiers::oauthClientId,
                         tokenRefreshPerClientLimit,
+                        Duration.ofMinutes(5)),
+                    // TD-SEC-035: keyed by the already-authenticated AccountId, not IP — every
+                    // request this rule ever sees has already passed
+                    // hasAuthority(ROLE_ACCOUNT) (this filter runs after
+                    // TenantAccountOnlySecurityContextFilter), so there is always a real
+                    // principal to key by, same convention
+                    // PlatformDashboardSecurityConfig's own create-organization rule already
+                    // establishes for its own tier.
+                    new RateLimitRule(
+                        "account-sessions:list",
+                        HttpMethod.GET,
+                        "/o/*/account/sessions",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedAccountId,
+                        accountSessionsListPerAccountLimit,
+                        Duration.ofMinutes(5)),
+                    new RateLimitRule(
+                        "account-sessions:revoke",
+                        HttpMethod.POST,
+                        "/o/*/account/sessions/*/revoke",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedAccountId,
+                        accountSessionsRevokePerAccountLimit,
                         Duration.ofMinutes(5)))),
             // Anchored after TenantAccountOnlySecurityContextFilter, not SecurityContextHolder
             // Filter directly — real bug, confirmed live: three separate addFilterAfter calls all

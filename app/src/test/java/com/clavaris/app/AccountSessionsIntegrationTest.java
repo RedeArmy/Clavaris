@@ -62,6 +62,12 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
   @Value("${local.server.port}")
   private int port;
 
+  @Value("${clavaris.rate-limit.account-sessions.list-per-account-limit:60}")
+  private int listPerAccountLimit;
+
+  @Value("${clavaris.rate-limit.account-sessions.revoke-per-account-limit:20}")
+  private int revokePerAccountLimit;
+
   @Autowired private PlatformAccountRepository platformAccounts;
   @Autowired private MailSender mailSender;
 
@@ -83,15 +89,18 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   @Test
-  void aSecondLoginFromTheSameDeviceSendsNoAdditionalNotification() throws Exception {
+  void aSecondLoginFromTheSameDeviceCookieSendsNoAdditionalNotification() throws Exception {
+    // TD-SEC-033: "same device" now means "the same DeviceCookie the browser already holds," not
+    // "the same User-Agent string" — the same HttpClient/CookieManager is reused across both
+    // logins here, a fresh HttpSession each time (a real, separate login) but the SAME
+    // clavaris_device cookie already set by the first one.
     UUID organizationId = createOrganization();
     String email = "same-device@example.com";
     registerAccount(organizationId, email, "a-correct-password");
+    HttpClient client = newSessionBackedClient();
 
-    login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
-    // A brand-new HttpSession/cookie jar (a fresh "login instance") but the identical User-Agent
-    // fingerprint — the whole point of KnownDevice outliving any one HttpSession.
-    login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
+    login(client, organizationId, email, "a-correct-password", "device-A");
+    login(client, organizationId, email, "a-correct-password", "device-A");
 
     verify(mailSender, times(1))
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
@@ -110,6 +119,28 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
     verify(mailSender)
         .sendNewDeviceLoginNotification(eq(email), any(), eq("device-B"), any(), any());
+  }
+
+  // TD-SEC-033's own reason for existing: proves the actual security property, not just the
+  // happy path above. A stolen-session attacker (or a credential-stuffing probe) sending the
+  // victim's own real User-Agent string from a browser that never received the real device
+  // cookie must still be treated as new — the old User-Agent-only fingerprint would have let
+  // this exact spoof suppress the notification outright.
+  @Test
+  void aDifferentBrowserWithASpoofedMatchingUserAgentStillTriggersItsOwnNotification()
+      throws Exception {
+    UUID organizationId = createOrganization();
+    String email = "spoofed-user-agent@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+
+    login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
+    // A genuinely different browser (its own fresh cookie jar, never received the real device
+    // cookie) presenting the exact same User-Agent string as the first — the only thing an
+    // attacker who merely knows/guesses the victim's User-Agent could actually forge.
+    login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
+
+    verify(mailSender, times(2))
+        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
   }
 
   @Test
@@ -132,6 +163,55 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<String> afterRevoke = getSessionsPageRaw(client, organizationId);
     assertThat(afterRevoke.statusCode()).isEqualTo(302);
     assertThat(afterRevoke.headers().firstValue("Location").orElseThrow()).contains("/login");
+  }
+
+  // TD-SEC-035: real, end-to-end proof the two new anti-abuse rules are actually wired onto this
+  // chain, not just correct in isolation — same "prove the real registration, not just the rule
+  // logic" discipline PlatformTierRateLimitingIntegrationTest already established for its own
+  // tier, after this exact codebase found a real bug where three addFilterAfter calls anchored at
+  // the same shared filter class silently kept only the last-registered one.
+  @Test
+  void blocksAccountSessionsListingWith429AfterThePerAccountLimitIsExceeded() throws Exception {
+    UUID organizationId = createOrganization();
+    String email = "sessions-list-rate-limit@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+    HttpClient client = newSessionBackedClient();
+    login(client, organizationId, email, "a-correct-password", "device-A");
+
+    HttpResponse<String> lastAllowed = null;
+    for (int attempt = 1; attempt <= listPerAccountLimit; attempt++) {
+      lastAllowed = getSessionsPageRaw(client, organizationId);
+    }
+    assertThat(lastAllowed.statusCode()).isEqualTo(200);
+
+    HttpResponse<String> overLimit = getSessionsPageRaw(client, organizationId);
+
+    assertThat(overLimit.statusCode()).isEqualTo(429);
+  }
+
+  @Test
+  void blocksAccountSessionsRevokeWith429AfterThePerAccountLimitIsExceeded() throws Exception {
+    UUID organizationId = createOrganization();
+    String email = "sessions-revoke-rate-limit@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+    HttpClient client = newSessionBackedClient();
+    login(client, organizationId, email, "a-correct-password", "device-A");
+    // A CSRF token, fetched once — never a real sessionId, this rule fires at the filter level
+    // regardless of whether the target session actually exists (RevokeAccountSessionService's own
+    // SessionNotFoundException handling is what turns a bogus id into a benign 302, not this
+    // filter's own concern).
+    String csrfToken = extractCsrfToken(getSessionsPage(client, organizationId));
+
+    HttpResponse<String> lastAllowed = null;
+    for (int attempt = 1; attempt <= revokePerAccountLimit; attempt++) {
+      lastAllowed = revoke(client, organizationId, "nonexistent-session-" + attempt, csrfToken);
+    }
+    assertThat(lastAllowed.statusCode()).isEqualTo(302);
+
+    HttpResponse<String> overLimit =
+        revoke(client, organizationId, "one-attempt-too-many", csrfToken);
+
+    assertThat(overLimit.statusCode()).isEqualTo(429);
   }
 
   private HttpClient newSessionBackedClient() {

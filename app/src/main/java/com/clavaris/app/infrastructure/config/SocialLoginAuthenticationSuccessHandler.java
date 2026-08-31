@@ -16,6 +16,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
+import com.clavaris.identity.infrastructure.adapter.in.web.DeviceCookie;
 import com.clavaris.identity.infrastructure.adapter.in.web.PlatformAuthenticatedSessionEstablisher;
 import com.clavaris.identity.infrastructure.adapter.in.web.SocialLoginRedirectController;
 import jakarta.servlet.http.HttpServletRequest;
@@ -189,10 +190,17 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
               request, response, accountId.value(), provider, fallbackUrl);
       // New-device login email notification — same call LoginController's own password-login
       // path makes, right after establishing the session; see
-      // RecordAccountLoginDeviceService's own Javadoc for why this never throws.
-      recordLoginDevice.handle(
-          new RecordAccountLoginDeviceCommand(
-              accountId, request.getHeader("User-Agent"), request.getRemoteAddr()));
+      // RecordAccountLoginDeviceService's own Javadoc for why this never throws. A present
+      // return value means an unrecognized/absent DeviceCookie just got a fresh one minted for
+      // it — write it back onto the response so the browser actually keeps it.
+      recordLoginDevice
+          .handle(
+              new RecordAccountLoginDeviceCommand(
+                  accountId,
+                  request.getHeader("User-Agent"),
+                  request.getRemoteAddr(),
+                  DeviceCookie.read(request).orElse(null)))
+          .ifPresent(rawDeviceToken -> DeviceCookie.write(request, response, rawDeviceToken));
       redirectStrategy.sendRedirect(request, response, target);
     } else {
       redirectStrategy.sendRedirect(

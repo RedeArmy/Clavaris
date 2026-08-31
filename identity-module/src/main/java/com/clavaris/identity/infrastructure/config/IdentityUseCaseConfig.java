@@ -300,8 +300,8 @@ class IdentityUseCaseConfig {
 
   @Bean
   /* package */ RevokeAccountSessionUseCase revokeAccountSessionUseCase(
-      final AccountActiveSessionsRepository activeSessions) {
-    return new RevokeAccountSessionService(activeSessions);
+      final AccountActiveSessionsRepository activeSessions, final AuditEventRecorder auditEvents) {
+    return new RevokeAccountSessionService(activeSessions, auditEvents);
   }
 
   // New-device login email notification.
@@ -309,7 +309,8 @@ class IdentityUseCaseConfig {
   /* package */ RecordAccountLoginDeviceUseCase recordAccountLoginDeviceUseCase(
       final KnownDeviceRepository knownDevices,
       final AccountRepository accounts,
-      final MailSender mailSender) {
-    return new RecordAccountLoginDeviceService(knownDevices, accounts, mailSender);
+      final MailSender mailSender,
+      final AuditEventRecorder auditEvents) {
+    return new RecordAccountLoginDeviceService(knownDevices, accounts, mailSender, auditEvents);
   }
 }

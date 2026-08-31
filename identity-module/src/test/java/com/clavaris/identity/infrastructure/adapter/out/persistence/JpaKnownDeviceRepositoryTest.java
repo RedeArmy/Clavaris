@@ -26,7 +26,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * test-strategy.md §2: a real-Postgres integration test for the {@code KnownDevice} adapter — same
- * shape as {@code JpaVerificationTokenRepositoryTest}.
+ * shape as {@code JpaVerificationTokenRepositoryTest}. TD-SEC-033: proves the real match key is now
+ * {@code device_token_hash}, not {@code user_agent}.
  */
 @SpringBootTest(classes = JpaKnownDeviceRepositoryTest.TestConfig.class)
 @Testcontainers
@@ -53,34 +54,52 @@ class JpaKnownDeviceRepositoryTest {
   }
 
   @Test
-  void savesAndFindsByAccountIdAndUserAgent() {
-    KnownDevice device = KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser");
+  void savesAndFindsByAccountIdAndDeviceTokenHash() {
+    KnownDevice device =
+        KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "a-token-hash");
 
     repository.save(device);
     Optional<KnownDevice> found =
-        repository.findByAccountIdAndUserAgent(accountId, "Mozilla/5.0 Test Browser");
+        repository.findByAccountIdAndDeviceTokenHash(accountId, "a-token-hash");
 
     assertThat(found).isPresent();
     assertThat(found.get().id()).isEqualTo(device.id());
     assertThat(found.get().accountId()).isEqualTo(accountId);
     assertThat(found.get().userAgent()).isEqualTo("Mozilla/5.0 Test Browser");
+    assertThat(found.get().deviceTokenHash()).isEqualTo("a-token-hash");
   }
 
   @Test
-  void findByAccountIdAndUserAgentIsEmptyForAnUnknownDevice() {
-    assertThat(repository.findByAccountIdAndUserAgent(accountId, "Never Seen Browser")).isEmpty();
+  void findByAccountIdAndDeviceTokenHashIsEmptyForAnUnknownToken() {
+    assertThat(repository.findByAccountIdAndDeviceTokenHash(accountId, "never-issued")).isEmpty();
   }
 
   @Test
-  void savingTheSameAccountIdAndUserAgentTwiceUpdatesTheExistingRow() {
-    KnownDevice device = KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser");
+  void twoDevicesWithTheSameUserAgentButDifferentTokensAreBothStoredIndependently() {
+    // TD-SEC-033: the old UNIQUE(account_id, user_agent) constraint is gone — the same browser/OS
+    // string legitimately appears twice if cookies were cleared between visits, and that must not
+    // be a constraint violation any more.
+    KnownDevice first = KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "hash-one");
+    KnownDevice second = KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "hash-two");
+
+    repository.save(first);
+    repository.save(second);
+
+    assertThat(repository.findByAccountIdAndDeviceTokenHash(accountId, "hash-one")).isPresent();
+    assertThat(repository.findByAccountIdAndDeviceTokenHash(accountId, "hash-two")).isPresent();
+  }
+
+  @Test
+  void savingTheSameAccountIdAndDeviceTokenHashTwiceUpdatesTheExistingRow() {
+    KnownDevice device =
+        KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "a-token-hash");
     repository.save(device);
     device.touch();
 
     repository.save(device);
 
     KnownDevice found =
-        repository.findByAccountIdAndUserAgent(accountId, "Mozilla/5.0 Test Browser").orElseThrow();
+        repository.findByAccountIdAndDeviceTokenHash(accountId, "a-token-hash").orElseThrow();
     assertThat(found.id()).isEqualTo(device.id());
     assertThat(found.lastSeenAt()).isAfterOrEqualTo(found.firstSeenAt());
   }

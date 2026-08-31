@@ -111,10 +111,17 @@ public class LoginController {
         sessions.establish(request, response, accountId.value(), fallbackUrl);
 
     // New-device login email notification — after establish(), same accountId/request already in
-    // scope; see RecordAccountLoginDeviceService's own Javadoc for why this never throws.
-    recordLoginDevice.handle(
-        new RecordAccountLoginDeviceCommand(
-            accountId, request.getHeader("User-Agent"), request.getRemoteAddr()));
+    // scope; see RecordAccountLoginDeviceService's own Javadoc for why this never throws. A
+    // present return value means an unrecognized/absent DeviceCookie just got a fresh one minted
+    // for it — write it back onto the response so the browser actually keeps it.
+    recordLoginDevice
+        .handle(
+            new RecordAccountLoginDeviceCommand(
+                accountId,
+                request.getHeader("User-Agent"),
+                request.getRemoteAddr(),
+                DeviceCookie.read(request).orElse(null)))
+        .ifPresent(rawDeviceToken -> DeviceCookie.write(request, response, rawDeviceToken));
 
     return "redirect:" + redirectTarget;
   }
