@@ -23,6 +23,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,9 +87,10 @@ class LoginControllerTest {
 
   @Test
   void getShowsOnlyTheProvidersTheOrganizationHasEnabled() throws Exception {
-    when(policyProvider.isProviderAllowed(
-            new OrganizationId(ORGANIZATION_ID), SocialProvider.GOOGLE))
-        .thenReturn(true);
+    // Code review finding (TD-SEC-032, closed): the controller now calls allowedProviders() once
+    // per render, not isProviderAllowed() once per known SocialProvider.
+    when(policyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(EnumSet.of(SocialProvider.GOOGLE));
 
     mockMvc
         .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))

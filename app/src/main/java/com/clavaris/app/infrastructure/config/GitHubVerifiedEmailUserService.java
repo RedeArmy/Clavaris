@@ -166,8 +166,16 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
       return cached.email();
     }
     final String verifiedEmail = fetchPrimaryVerifiedEmail(accessToken);
-    verifiedEmailCache.put(
-        githubUserId, new CachedVerifiedEmail(verifiedEmail, now.plus(VERIFIED_EMAIL_CACHE_TTL)));
+    // Code review finding: only cache a real, positive result. Caching a null (no primary
+    // verified email found) for the full TTL would incorrectly reject a retry from a user who
+    // verifies their email on GitHub's own side and signs in again within that window — the
+    // negative result has no reason to be trusted for as long as a positive one does, and the
+    // whole point of this cache (absorbing a *returning* user's repeat login) only ever applies
+    // to the positive case in the first place.
+    if (verifiedEmail != null) {
+      verifiedEmailCache.put(
+          githubUserId, new CachedVerifiedEmail(verifiedEmail, now.plus(VERIFIED_EMAIL_CACHE_TTL)));
+    }
     return verifiedEmail;
   }
 

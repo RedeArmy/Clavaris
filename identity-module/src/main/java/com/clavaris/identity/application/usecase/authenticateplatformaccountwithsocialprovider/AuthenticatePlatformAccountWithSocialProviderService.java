@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -105,27 +106,41 @@ public class AuthenticatePlatformAccountWithSocialProviderService
 
   private AuthenticatePlatformAccountWithSocialProviderResult linkBrandNewAccount(
       final AuthenticatePlatformAccountWithSocialProviderCommand command) {
-    return transactionTemplate.execute(
-        status -> {
-          final PlatformAccount account = PlatformAccount.register(command.email());
-          // The provider already proved control of this email (guarded above) — no reason to
-          // make a brand-new social signup go through email verification a second time.
-          account.verifyEmail();
-          accounts.save(account);
+    try {
+      return transactionTemplate.execute(
+          status -> {
+            final PlatformAccount account = PlatformAccount.register(command.email());
+            // The provider already proved control of this email (guarded above) — no reason to
+            // make a brand-new social signup go through email verification a second time.
+            account.verifyEmail();
+            accounts.save(account);
 
-          final PlatformSocialIdentity identity =
-              PlatformSocialIdentity.link(
-                  account.id(), command.provider(), command.providerUserId());
-          socialIdentities.save(identity);
+            final PlatformSocialIdentity identity =
+                PlatformSocialIdentity.link(
+                    account.id(), command.provider(), command.providerUserId());
+            socialIdentities.save(identity);
 
-          LOG.info(
-              "event=platform_login_success platformAccountId={} provider={} outcome=new_signup",
-              account.id(),
-              command.provider());
-          recordOutcome(command.provider().name(), "new_signup");
+            LOG.info(
+                "event=platform_login_success platformAccountId={} provider={} outcome=new_signup",
+                account.id(),
+                command.provider());
+            recordOutcome(command.provider().name(), "new_signup");
 
-          return new AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn(account.id());
-        });
+            return new AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn(account.id());
+          });
+    } catch (final DataIntegrityViolationException e) {
+      // Code review finding: this tier was missing the same TOCTOU-race guard the tenant-tier
+      // sibling already has — two concurrent first-time platform social logins for the same email
+      // but different providers can both observe existingAccount.isEmpty()==true and both race
+      // into this method. The transaction above already rolled back cleanly; the account that won
+      // the race is now visible, so fall back to the same "account already exists" branch handle()
+      // would have taken had it observed it first, instead of letting the loser surface as an
+      // unhandled 500 (SocialLoginAuthenticationSuccessHandler.onPlatformLogin has no try/catch of
+      // its own, and GlobalExceptionHandler is @RestController-scoped and never sees this path).
+      final PlatformAccount winningAccount =
+          accounts.findByEmail(command.email()).orElseThrow(() -> e);
+      return raisePendingLinkForExistingAccount(command, winningAccount);
+    }
   }
 
   private AuthenticatePlatformAccountWithSocialProviderResult raisePendingLinkForExistingAccount(

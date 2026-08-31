@@ -12,4 +12,11 @@ public final class InvalidPendingPlatformSocialLinkException extends RuntimeExce
   public InvalidPendingPlatformSocialLinkException() {
     super("Invalid or expired social link confirmation token");
   }
+
+  // Code review finding: same rationale as the tenant-tier sibling's own identical constructor —
+  // a losing confirmation in the two-active-links race surfaces as a real constraint violation,
+  // preserved here as the cause.
+  public InvalidPendingPlatformSocialLinkException(final Throwable cause) {
+    super("Invalid or expired social link confirmation token", cause);
+  }
 }

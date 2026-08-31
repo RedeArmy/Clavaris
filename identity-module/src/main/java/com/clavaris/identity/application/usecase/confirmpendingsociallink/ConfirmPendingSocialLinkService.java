@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -79,7 +80,18 @@ public class ConfirmPendingSocialLinkService implements ConfirmPendingSocialLink
             account.organizationId(),
             pendingLink.provider(),
             pendingLink.providerUserId());
-    socialIdentities.save(identity);
+    try {
+      socialIdentities.save(identity);
+    } catch (final DataIntegrityViolationException e) {
+      // Code review finding: two separate, still-active pending links for the same
+      // (account, provider) can both pass their own isActive() check (e.g. a user retries and
+      // gets two valid confirmation emails, or a link-prescanner auto-visits both) — the first
+      // confirm succeeds, the second violates ux_social_identities_account_id_provider. Translate
+      // into the same "invalid/expired" outcome ConfirmSocialLinkController already renders,
+      // instead of letting the raw constraint violation surface as an unhandled 500 (this
+      // Thymeleaf controller has no GlobalExceptionHandler coverage — that's @RestController-only).
+      throw new InvalidPendingSocialLinkException(e);
+    }
 
     outbox.write(
         "social_identity.linked",

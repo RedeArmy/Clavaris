@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.OrganizationNotFoundException;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationResult;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SocialLoginEnabledWithNoProvidersException;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.UnknownSocialProviderException;
 import com.clavaris.organization.domain.model.Organization;
 import java.security.Principal;
@@ -81,6 +82,21 @@ class SetSocialLoginPolicyControllerTest {
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"enabled\":true,\"providers\":[\"MICROSOFT\"]}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void returns400WhenEnabledWithNoProviders() throws Exception {
+    // Code review finding: the use case's own new validation, proven reachable through the real
+    // HTTP layer, not just at the unit level.
+    when(useCase.handle(any())).thenThrow(new SocialLoginEnabledWithNoProvidersException());
+
+    mockMvc
+        .perform(
+            put("/api/v1/admin/organizations/" + UUID.randomUUID() + "/social-login-policy")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"providers\":[]}"))
         .andExpect(status().isBadRequest());
   }
 }

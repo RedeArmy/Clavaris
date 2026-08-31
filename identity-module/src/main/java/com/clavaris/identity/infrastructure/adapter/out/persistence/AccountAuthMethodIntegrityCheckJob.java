@@ -6,22 +6,22 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * BR-ID-02 ("never zero auth methods") compensating control — a code review finding on ADR-0020
- * Phase 6 flagged that {@link JpaAccountRepository#save} had to stop unconditionally requiring a
- * {@code PasswordCredential} once social-only accounts became real: a brand-new social signup
- * legitimately saves an {@code Account} with no credential, then a {@code SocialIdentity} for it,
- * in that exact order (the FK on {@code social_identities.account_id} makes the reverse order
- * impossible). That ordering means a synchronous, mid-transaction guard at either repository's own
- * {@code save()} call can never see both rows at once, so it can never correctly distinguish "the
- * legitimate in-flight social signup" from "a future regression that never attaches either" — the
- * blanket throw removed in that fix cannot be reintroduced there without breaking the legitimate
- * case it exists to support.
+ * BR-ID-02 ("never zero auth methods") — <b>secondary</b> safety net as of migration {@code
+ * V20260830110000} (SDE-III design, Phase 2 #8): the primary enforcement is now {@code
+ * trg_account_has_auth_method}/{@code trg_platform_account_has_auth_method}, a {@code DEFERRABLE
+ * INITIALLY DEFERRED} Postgres constraint trigger that fires at transaction commit — real,
+ * synchronous, transactional rejection of the whole insert, not a same-day-eventual alarm. See that
+ * migration's own comment for why a deferred trigger, not a mid-transaction application-layer
+ * guard, is what actually works here (the ordering problem {@link JpaAccountRepository#save}'s own
+ * comment documents: the FK on {@code social_identities.account_id} forces the accounts row to
+ * exist first, so a check at accounts-insert time can never see the same transaction's own
+ * not-yet-run identity insert).
  *
- * <p>With no synchronous guard possible, this is the compensating control: a daily sweep that
- * surfaces such a regression loudly within 24h via a log line, instead of it going unnoticed until
- * the affected {@code Account}'s owner discovers they can never actually authenticate. Deliberately
- * logs only the count, never which accounts (BR-DATA-01) — an operator who sees a non-zero count
- * investigates via a direct DB query; this job's own job is only "raise the alarm."
+ * <p>This job stays wired regardless — a second, independent detector that a future raw-SQL admin
+ * script bypassing the trigger, or a migration that somehow drops it, would not otherwise surface
+ * until an affected {@code Account}'s owner discovers they can never actually authenticate.
+ * Deliberately logs only the count, never which accounts (BR-DATA-01) — an operator who sees a
+ * non-zero count investigates via a direct DB query; this job's own job is only "raise the alarm."
  */
 @Component
 class AccountAuthMethodIntegrityCheckJob {

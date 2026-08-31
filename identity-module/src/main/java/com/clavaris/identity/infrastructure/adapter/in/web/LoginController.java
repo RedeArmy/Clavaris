@@ -107,14 +107,14 @@ public class LoginController {
     return "redirect:" + redirectTarget;
   }
 
+  // Code review finding (TD-SEC-032, closed): one allowedProviders() call per render, not one
+  // isProviderAllowed() call per known SocialProvider — see that port method's own Javadoc for
+  // why this reduction doesn't weaken BR-ID-12 (the requirement that call re-verifies is
+  // AuthenticateWithSocialProviderService's own single-provider check at the moment a login is
+  // actually attempted, never how many times a page render reads the same enabled-providers set).
   private void addEnabledSocialProviders(final UUID organizationId, final Model model) {
     final OrganizationId orgId = new OrganizationId(organizationId);
-    final List<SocialProvider> enabled = new ArrayList<>();
-    for (final SocialProvider provider : SocialProvider.values()) {
-      if (policyProvider.isProviderAllowed(orgId, provider)) {
-        enabled.add(provider);
-      }
-    }
+    final List<SocialProvider> enabled = new ArrayList<>(policyProvider.allowedProviders(orgId));
     model.addAttribute("socialProviders", enabled);
   }
 }

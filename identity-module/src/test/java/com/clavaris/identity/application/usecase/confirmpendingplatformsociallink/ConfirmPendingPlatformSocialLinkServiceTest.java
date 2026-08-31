@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.confirmpendingplatformsocialli
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,6 +23,7 @@ import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class ConfirmPendingPlatformSocialLinkServiceTest {
 
@@ -62,6 +64,37 @@ class ConfirmPendingPlatformSocialLinkServiceTest {
     verify(pendingLinks).save(pendingLink);
     verify(socialIdentities).save(any(PlatformSocialIdentity.class));
     verify(accounts).save(account);
+  }
+
+  @Test
+  void translatesAConstraintViolationOnASecondConcurrentConfirmationIntoInvalidLink() {
+    // Code review finding: same race as the tenant-tier sibling's own identical test — two
+    // separate, still-active pending links for the same (platformAccount, provider) can both
+    // pass isActive(); the second must present the same "invalid/expired" outcome, not an
+    // unhandled constraint-violation exception.
+    PlatformAccount account = PlatformAccount.register(new Email("founder@example.com"));
+    String rawToken = "a-losing-confirmation-token";
+    PendingPlatformSocialLink pendingLink =
+        PendingPlatformSocialLink.raise(
+            account.id(),
+            SocialProvider.GOOGLE,
+            "google-sub-123",
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(3600));
+    when(pendingLinks.findByConfirmationTokenHash(RefreshTokenSecret.hash(rawToken)))
+        .thenReturn(Optional.of(pendingLink));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
+        .when(socialIdentities)
+        .save(any());
+    // Sonar S5778: the lambda below must contain only the one call actually expected to throw —
+    // built here, same as every other test in this class, rather than inline in the lambda where
+    // the command constructor itself would also count as a possibly-throwing invocation.
+    ConfirmPendingPlatformSocialLinkCommand command =
+        new ConfirmPendingPlatformSocialLinkCommand(rawToken);
+
+    assertThatExceptionOfType(InvalidPendingPlatformSocialLinkException.class)
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test

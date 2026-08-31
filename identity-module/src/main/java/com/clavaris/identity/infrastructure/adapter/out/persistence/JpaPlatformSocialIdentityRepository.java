@@ -31,7 +31,13 @@ class JpaPlatformSocialIdentityRepository implements PlatformSocialIdentityRepos
 
   @Override
   public void save(final PlatformSocialIdentity identity) {
-    identities.save(
+    // Code review finding: saveAndFlush, not save — same "must throw synchronously, right here"
+    // reasoning JpaAccountRepository.save()/JpaSocialIdentityRepository.save() already document
+    // for the identical problem: a plain save() only stages the insert, deferring the actual
+    // unique-constraint check until the surrounding transaction commits, well after
+    // ConfirmPendingPlatformSocialLinkService's own try/catch around this call would have already
+    // returned.
+    identities.saveAndFlush(
         new PlatformSocialIdentityEntity(
             identity.id(),
             identity.platformAccountId().value(),

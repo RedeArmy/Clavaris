@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformPasswordCredential;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implements the outbound port; mirrors {@link JpaAccountRepository} exactly, minus {@code
@@ -60,7 +61,14 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
         credential);
   }
 
+  // Code review finding (SDE-III design, Phase 2 #8): same fix as JpaAccountRepository's own
+  // identical save() — that class's own Javadoc/comment has the full reasoning. This one was
+  // missed on the first pass (the exact class of divergence this whole session kept finding
+  // between the tenant and platform tiers), found live when migration V20260830110000's own
+  // deferred trigger rejected several integration tests' own test-fixture helpers that call this
+  // method directly, outside any @Transactional caller.
   @Override
+  @Transactional
   public void save(final PlatformAccount account) {
     final PlatformAccountEntity entity =
         new PlatformAccountEntity(
