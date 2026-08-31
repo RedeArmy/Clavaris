@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,7 +77,8 @@ class AccountActiveSessionsRepositoryBridgeTest {
     when(sessionRegistry.getSessionInformation("already-gone")).thenReturn(null);
 
     // Must not throw — same "already gone is a benign race, not an error" contract this port's
-    // own Javadoc documents.
-    bridge.revoke("already-gone");
+    // own Javadoc documents. An explicit assertion, not just "the test method returned" (Sonar
+    // java:S2699) — this is the one real outcome worth proving for a genuinely no-op path.
+    assertThatCode(() -> bridge.revoke("already-gone")).doesNotThrowAnyException();
   }
 }
