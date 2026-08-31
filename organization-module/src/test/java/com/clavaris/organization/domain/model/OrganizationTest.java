@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -63,11 +64,32 @@ class OrganizationTest {
 
     final Organization organization =
         Organization.reconstitute(
-            persistedId, "JobSeeker", persistedCreatedAt, ownerPlatformAccountId);
+            persistedId, "JobSeeker", persistedCreatedAt, ownerPlatformAccountId, false, List.of());
 
     assertThat(organization.id()).isEqualTo(persistedId);
     assertThat(organization.name()).isEqualTo("JobSeeker");
     assertThat(organization.createdAt()).isEqualTo(persistedCreatedAt);
     assertThat(organization.ownerPlatformAccountId()).isEqualTo(ownerPlatformAccountId);
+  }
+
+  @Test
+  void registerStartsWithSocialLoginDisabledAndNoProviders() {
+    final Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
+
+    assertThat(organization.socialLoginEnabled()).isFalse();
+    assertThat(organization.allowedSocialProviders()).isEmpty();
+  }
+
+  @Test
+  void withSocialLoginPolicyReturnsANewInstanceWithTheUpdatedPolicy() {
+    final Organization original = Organization.register("JobSeeker", ownerPlatformAccountId);
+
+    final Organization updated = original.withSocialLoginPolicy(true, List.of("GOOGLE", "GITHUB"));
+
+    assertThat(updated.socialLoginEnabled()).isTrue();
+    assertThat(updated.allowedSocialProviders()).containsExactly("GOOGLE", "GITHUB");
+    // The original instance is untouched — same immutable-update shape RateLimitPolicy's own
+    // withRequestsPerMinute already establishes.
+    assertThat(original.socialLoginEnabled()).isFalse();
   }
 }

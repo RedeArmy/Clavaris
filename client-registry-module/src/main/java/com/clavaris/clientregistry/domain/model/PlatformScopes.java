@@ -88,6 +88,14 @@ public final class PlatformScopes {
   public static final String ACCOUNTS_SUSPEND = "platform:accounts:suspend";
 
   /**
+   * ADR-0020 Decision 3, BR-ID-12: turning per-Organization social login on/off and choosing its
+   * allowed providers — operator-managed only in v1, its own scope for the same defence-in-depth
+   * reasoning as every other admin-API rule here. Structurally cannot touch email/password
+   * availability at all (that's never gated by anything this scope reaches).
+   */
+  public static final String SOCIAL_LOGIN_POLICY_WRITE = "platform:social-login-policy:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -103,7 +111,8 @@ public final class PlatformScopes {
           WORKSPACES_WRITE,
           WORKSPACE_MEMBERS_WRITE,
           WORKSPACE_MEMBERS_REMOVE,
-          ACCOUNTS_SUSPEND);
+          ACCOUNTS_SUSPEND,
+          SOCIAL_LOGIN_POLICY_WRITE);
 
   private PlatformScopes() {}
 }

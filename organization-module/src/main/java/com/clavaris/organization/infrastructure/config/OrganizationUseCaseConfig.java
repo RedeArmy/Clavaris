@@ -32,6 +32,8 @@ import com.clavaris.organization.application.usecase.removeworkspacemember.Remov
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -179,5 +181,15 @@ class OrganizationUseCaseConfig {
   /* package */ ListWorkspaceMembersUseCase listWorkspaceMembersUseCase(
       final WorkspaceMembershipRepository memberships) {
     return new ListWorkspaceMembersService(memberships);
+  }
+
+  // PMD.LinguisticNaming: same false positive SetRateLimitPolicyForOrganizationUseCase's own
+  // @Bean method already documents above — this bean's name mirrors the use case's own name.
+  @SuppressWarnings({"PMD.LinguisticNaming"})
+  @Bean
+  /* package */ SetSocialLoginPolicyForOrganizationUseCase
+      setSocialLoginPolicyForOrganizationUseCase(
+          final OrganizationRepository organizations, final AuditEventRecorder auditEvents) {
+    return new SetSocialLoginPolicyForOrganizationService(organizations, auditEvents);
   }
 }

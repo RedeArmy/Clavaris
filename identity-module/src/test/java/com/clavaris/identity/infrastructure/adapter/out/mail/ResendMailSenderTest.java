@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -98,6 +99,25 @@ class ResendMailSenderTest {
   }
 
   @Test
+  void sendsAWellFormedRequestForASocialLinkConfirmation() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+    UUID organizationId = UUID.randomUUID();
+
+    sender.sendSocialLinkConfirmation(
+        "user@example.com",
+        new OrganizationId(organizationId),
+        SocialProvider.GOOGLE,
+        "the-raw-token");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("Confirm linking your GOOGLE account");
+    assertThat(body.get("html").asString())
+        .as("the same tenant-scoped /o/{organizationId}/... link shape as every other tenant email")
+        .contains(BASE_URL + "/o/" + organizationId + "/confirm-social-link?token=the-raw-token");
+  }
+
+  @Test
   void urlEncodesTheTokenInTheLinkItBuilds() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
@@ -110,6 +130,21 @@ class ResendMailSenderTest {
         .as("a raw token containing URL-significant characters must never reach the link unencoded")
         .contains("token=a+token%2Fwith%2Bspecial%3Dchars")
         .doesNotContain("token=a token/with+special=chars");
+  }
+
+  @Test
+  void sendsAWellFormedRequestForAPlatformSocialLinkConfirmation() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendPlatformSocialLinkConfirmation(
+        "founder@example.com", SocialProvider.GITHUB, "the-raw-token");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("Confirm linking your GITHUB account");
+    assertThat(body.get("html").asString())
+        .as("the platform tier's own link has no organizationId segment at all")
+        .contains(BASE_URL + "/platform/confirm-social-link?token=the-raw-token");
   }
 
   @Test

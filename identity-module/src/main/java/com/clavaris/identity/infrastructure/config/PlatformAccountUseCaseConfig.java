@@ -3,7 +3,13 @@ package com.clavaris.identity.infrastructure.config;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.AuthenticatePlatformAccountWithSocialProviderService;
+import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.AuthenticatePlatformAccountWithSocialProviderUseCase;
+import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.PendingPlatformSocialLinkRepository;
+import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.PlatformSocialIdentityRepository;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.confirmpendingplatformsociallink.ConfirmPendingPlatformSocialLinkService;
+import com.clavaris.identity.application.usecase.confirmpendingplatformsociallink.ConfirmPendingPlatformSocialLinkUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountemailverification.ConfirmPlatformAccountEmailVerificationService;
 import com.clavaris.identity.application.usecase.confirmplatformaccountemailverification.ConfirmPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetService;
@@ -21,6 +27,8 @@ import com.clavaris.identity.application.usecase.requestplatformaccountpasswordr
 import com.clavaris.identity.application.usecase.requestplatformaccountpasswordreset.RequestPlatformAccountPasswordResetUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * ADR-0012: wires {@code PlatformAccount}'s own use cases to Spring's context — split out from
@@ -97,5 +105,35 @@ class PlatformAccountUseCaseConfig {
           final PasswordHasher passwordHasher) {
     return new ConfirmPlatformAccountPasswordResetService(
         verificationTokens, accounts, sessionRevoker, passwordHasher);
+  }
+
+  // ADR-0020 Decision 1/2: same TransactionTemplate rationale as the tenant-tier sibling's own
+  // @Bean method (organization-module's AddWorkspaceMemberUseCase set the original precedent).
+  @SuppressWarnings("java:S107")
+  @Bean
+  /* package */ AuthenticatePlatformAccountWithSocialProviderUseCase
+      authenticatePlatformAccountWithSocialProviderUseCase(
+          final PlatformAccountRepository accounts,
+          final PlatformSocialIdentityRepository socialIdentities,
+          final PendingPlatformSocialLinkRepository pendingLinks,
+          final PlatformMailSender mailSender,
+          final SecurityMetricsRecorder securityMetrics,
+          @SuppressWarnings("PMD.LongVariable")
+              final PlatformTransactionManager transactionManager) {
+    return new AuthenticatePlatformAccountWithSocialProviderService(
+        accounts,
+        socialIdentities,
+        pendingLinks,
+        mailSender,
+        securityMetrics,
+        new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  /* package */ ConfirmPendingPlatformSocialLinkUseCase confirmPendingPlatformSocialLinkUseCase(
+      final PendingPlatformSocialLinkRepository pendingLinks,
+      final PlatformSocialIdentityRepository socialIdentities,
+      final PlatformAccountRepository accounts) {
+    return new ConfirmPendingPlatformSocialLinkService(pendingLinks, socialIdentities, accounts);
   }
 }

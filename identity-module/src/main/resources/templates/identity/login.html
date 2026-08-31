@@ -9,6 +9,7 @@
     <h1>Sign in</h1>
 
     <p th:if="${loginError}">Invalid email or password.</p>
+    <p th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
 
     <form th:action="@{''}" th:object="${form}" method="post">
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -27,6 +28,16 @@
 
         <button type="submit">Sign in</button>
     </form>
+
+    <!-- ADR-0020 Decision 3, BR-ID-12: only ever the providers this Organization has actually
+         enabled — email/password above is never gated by this, always shown regardless. -->
+    <div th:if="${not #lists.isEmpty(socialProviders)}">
+        <p>Or sign in with:</p>
+        <p th:each="provider : ${socialProviders}">
+            <a th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}}"
+               th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
+        </p>
+    </div>
 
     <p><a th:href="@{forgot-password}">Forgot your password?</a></p>
 </main>

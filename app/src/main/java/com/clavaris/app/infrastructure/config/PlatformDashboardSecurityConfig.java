@@ -74,7 +74,7 @@ class PlatformDashboardSecurityConfig {
   // read.
   @SuppressWarnings("PMD.LongVariable")
   @Bean
-  @Order(4)
+  @Order(5)
   /* package */ SecurityFilterChain platformDashboardSecurityFilterChain(
       final HttpSecurity http,
       final SessionRegistry sessionRegistry,

@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
@@ -41,6 +43,11 @@ import org.springframework.stereotype.Component;
  * under the same ID, or an attacker who fixed that ID beforehand inherits it. {@link #establish}
  * rotates the session ID itself, the same defense {@code ChangeSessionIdAuthenticationStrategy}
  * applies in the standard filter chain.
+ *
+ * <p>ADR-0020: {@link #establishViaSocialLogin}, invoked from {@code
+ * SocialLoginAuthenticationSuccessHandler} instead of {@code LoginController}, shares every one of
+ * the concerns above — same CWE-384 fix, same manual {@link SecurityContext} population — with a
+ * different {@code FactorGrantedAuthority}/AMR marker to reflect the real authentication mechanism.
  */
 @Component
 class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSessionEstablisher {
@@ -64,6 +71,57 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
       final HttpServletResponse response,
       final UUID accountId,
       final String fallbackUrl) {
+    // A FactorGrantedAuthority, not an empty authority list: SAS's own JwtGenerator computes the
+    // OIDC auth_time claim by scanning the Authentication's authorities for one of these and
+    // reading its issuedAt — confirmed live (a 500, "authenticationTime cannot be null", the first
+    // time this method returned List.of()). PASSWORD_AUTHORITY names the mechanism actually used —
+    // AuthenticateWithPasswordUseCase — Instant.now() is genuinely when it happened, not a filler
+    // value.
+    return establishWithAuthorities(
+        request,
+        response,
+        accountId,
+        List.of(
+            FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
+                .issuedAt(Instant.now())
+                .build(),
+            new SimpleGrantedAuthority("ROLE_ACCOUNT")),
+        fallbackUrl);
+  }
+
+  @Override
+  public String establishViaSocialLogin(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID accountId,
+      final SocialProvider provider,
+      final String fallbackUrl) {
+    // ADR-0020: FACTOR_AUTHORIZATION_CODE — the standard Spring Security authority for "an OAuth2
+    // Authorization Code exchange authenticated this session," exactly what a social login via
+    // Google/GitHub actually is under the hood, same auth_time role as PASSWORD_AUTHORITY above.
+    // The AMR_-prefixed authority alongside it carries the specific provider — see
+    // AuthenticationContextClaimsCustomizer's own Javadoc for how it turns this into a real OIDC
+    // amr claim instead of always hardcoding ["pwd"].
+    return establishWithAuthorities(
+        request,
+        response,
+        accountId,
+        List.of(
+            FactorGrantedAuthority.withAuthority(
+                    FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY)
+                .issuedAt(Instant.now())
+                .build(),
+            new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+            new SimpleGrantedAuthority("AMR_" + provider.name())),
+        fallbackUrl);
+  }
+
+  private String establishWithAuthorities(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID accountId,
+      final List<GrantedAuthority> authorities,
+      final String fallbackUrl) {
     // CWE-384 fix: rotate the session ID before the SecurityContext is attached to it, exactly as
     // ChangeSessionIdAuthenticationStrategy does for the standard filter-based login path. Only a
     // pre-existing session is at risk of fixation — request.getSession(false) never creates one, so
@@ -79,28 +137,15 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
       request.changeSessionId();
     }
 
-    // A FactorGrantedAuthority, not an empty authority list: SAS's own JwtGenerator computes the
-    // OIDC auth_time claim by scanning the Authentication's authorities for one of these and
-    // reading its issuedAt — confirmed live (a 500, "authenticationTime cannot be null", the first
-    // time this method returned List.of()). PASSWORD_AUTHORITY names the mechanism actually used —
-    // AuthenticateWithPasswordUseCase — Instant.now() is genuinely when it happened, not a filler
-    // value.
-    // ROLE_ACCOUNT, alongside the FactorGrantedAuthority above: security finding (SDE-III review,
-    // 2026-08-22) — before this, a tenant Account's authentication carried no tier marker at all,
-    // only "how" it authenticated (PASSWORD_AUTHORITY), which is exactly what let this same
-    // Authentication be mistaken for a PlatformAccount's by anything checking authorities rather
-    // than authority-agnostic authenticated(). ROLE_ACCOUNT is the tenant-tier mirror of
+    // ROLE_ACCOUNT (present in both callers' authority lists above): security finding (SDE-III
+    // review, 2026-08-22) — before this, a tenant Account's authentication carried no tier marker
+    // at all, only "how" it authenticated, which is exactly what let this same Authentication be
+    // mistaken for a PlatformAccount's by anything checking authorities rather than
+    // authority-agnostic authenticated(). ROLE_ACCOUNT is the tenant-tier mirror of
     // SpringSecurityPlatformAuthenticatedSessionEstablisher's own ROLE_PLATFORM_ACCOUNT — see
     // TenantAccountOnlySecurityContextFilter, the chain that actually checks it.
     final Authentication authentication =
-        UsernamePasswordAuthenticationToken.authenticated(
-            accountId.toString(),
-            null,
-            List.of(
-                FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
-                    .issuedAt(Instant.now())
-                    .build(),
-                new SimpleGrantedAuthority("ROLE_ACCOUNT")));
+        UsernamePasswordAuthenticationToken.authenticated(accountId.toString(), null, authorities);
     final SecurityContext context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(authentication);
     SecurityContextHolder.setContext(context);

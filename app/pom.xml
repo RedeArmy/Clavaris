@@ -111,6 +111,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
+        <!-- ADR-0020 (social login): Clavaris itself as an OAuth2/OIDC CLIENT of Google/GitHub —
+             the opposite role from the two starters above (which make Clavaris a server/resource
+             server). Provides the oauth2Login() DSL, ClientRegistrationRepository autoconfiguration
+             (driven by spring.security.oauth2.client.registration.* in application.yml), and the
+             default OidcUserService/DefaultOAuth2UserService SocialLoginConfig builds on. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
         <!-- ADR-0008: springdoc generates /v3/api-docs + Swagger UI from the @Operation/
              @ApiResponse annotations already on organization-module's CreateOrganizationController
              — the runtime doc-serving endpoint only needs to exist on app's own classpath (the

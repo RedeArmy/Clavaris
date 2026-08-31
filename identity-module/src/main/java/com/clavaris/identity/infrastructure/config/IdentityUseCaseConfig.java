@@ -11,10 +11,17 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderService;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkService;
+import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
@@ -46,6 +53,8 @@ import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountSe
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Wires application-layer use cases to Spring's context. Deliberately kept out of {@code
@@ -236,5 +245,40 @@ class IdentityUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new ReactivateAccountService(accounts, auditEvents, eventOutboxWriter);
+  }
+
+  // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for
+  // exactly the reason AddWorkspaceMemberUseCase's own @Bean method already documents — one branch
+  // of this flow needs an atomic multi-write, another needs a write followed by a real mail send.
+  @SuppressWarnings("java:S107")
+  @Bean
+  /* package */ AuthenticateWithSocialProviderUseCase authenticateWithSocialProviderUseCase(
+      final AccountRepository accounts,
+      final SocialIdentityRepository socialIdentities,
+      final PendingSocialLinkRepository pendingLinks,
+      final OrganizationSocialLoginPolicyProvider policyProvider,
+      final MailSender mailSender,
+      final EventOutboxWriter eventOutboxWriter,
+      final SecurityMetricsRecorder securityMetrics,
+      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
+    return new AuthenticateWithSocialProviderService(
+        accounts,
+        socialIdentities,
+        pendingLinks,
+        policyProvider,
+        mailSender,
+        eventOutboxWriter,
+        securityMetrics,
+        new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  /* package */ ConfirmPendingSocialLinkUseCase confirmPendingSocialLinkUseCase(
+      final PendingSocialLinkRepository pendingLinks,
+      final SocialIdentityRepository socialIdentities,
+      final AccountRepository accounts,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new ConfirmPendingSocialLinkService(
+        pendingLinks, socialIdentities, accounts, eventOutboxWriter);
   }
 }

@@ -18,9 +18,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordCommand;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,12 +44,14 @@ class LoginControllerTest {
 
   private AuthenticateWithPasswordUseCase useCase;
   private AuthenticatedSessionEstablisher sessionEstablisher;
+  private OrganizationSocialLoginPolicyProvider policyProvider;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     useCase = mock(AuthenticateWithPasswordUseCase.class);
     sessionEstablisher = mock(AuthenticatedSessionEstablisher.class);
+    policyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -63,18 +68,32 @@ class LoginControllerTest {
     viewResolver.setTemplateEngine(templateEngine);
 
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new LoginController(useCase, sessionEstablisher))
+        MockMvcBuilders.standaloneSetup(
+                new LoginController(useCase, sessionEstablisher, policyProvider))
             .setViewResolvers(viewResolver)
             .build();
   }
 
   @Test
-  void getShowsTheLoginForm() throws Exception {
+  void getShowsTheLoginFormWithNoSocialButtonsWhenNoneAreEnabled() throws Exception {
     mockMvc
         .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/login"))
-        .andExpect(model().attributeExists("form"));
+        .andExpect(model().attributeExists("form"))
+        .andExpect(model().attribute("socialProviders", List.of()));
+  }
+
+  @Test
+  void getShowsOnlyTheProvidersTheOrganizationHasEnabled() throws Exception {
+    when(policyProvider.isProviderAllowed(
+            new OrganizationId(ORGANIZATION_ID), SocialProvider.GOOGLE))
+        .thenReturn(true);
+
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("socialProviders", List.of(SocialProvider.GOOGLE)));
   }
 
   @Test

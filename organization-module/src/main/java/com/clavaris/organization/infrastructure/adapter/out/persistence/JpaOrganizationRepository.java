@@ -2,22 +2,31 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Implements the outbound port; maps between {@code domain.model.Organization} and {@link
- * OrganizationEntity}.
+ * OrganizationEntity}. {@code allowedSocialProviders} (ADR-0020) is (de)serialized here, same
+ * {@link ObjectMapper}-injection convention {@code JpaOAuthClientRepository}'s own {@code
+ * allowedScopes} column already establishes — null-safe, unlike that class's own helper, since an
+ * Organization that has never configured social login has a genuinely {@code NULL} column, not
+ * merely an empty JSON array.
  */
 @Repository
 class JpaOrganizationRepository implements OrganizationRepository {
 
   private final SpringDataOrganizationJpaRepository organizations;
+  private final ObjectMapper objectMapper;
 
-  /* package */ JpaOrganizationRepository(final SpringDataOrganizationJpaRepository organizations) {
+  /* package */ JpaOrganizationRepository(
+      final SpringDataOrganizationJpaRepository organizations, final ObjectMapper objectMapper) {
     this.organizations = organizations;
+    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -27,7 +36,9 @@ class JpaOrganizationRepository implements OrganizationRepository {
             organization.id(),
             organization.name(),
             organization.createdAt(),
-            organization.ownerPlatformAccountId()));
+            organization.ownerPlatformAccountId(),
+            organization.socialLoginEnabled(),
+            writeJsonArray(organization.allowedSocialProviders())));
   }
 
   @Override
@@ -63,6 +74,16 @@ class JpaOrganizationRepository implements OrganizationRepository {
         entity.getId(),
         entity.getName(),
         entity.getCreatedAt(),
-        entity.getOwnerPlatformAccountId());
+        entity.getOwnerPlatformAccountId(),
+        entity.isSocialLoginEnabled(),
+        readJsonArray(entity.getAllowedSocialProviders()));
+  }
+
+  private String writeJsonArray(final List<String> values) {
+    return values.isEmpty() ? null : objectMapper.writeValueAsString(values);
+  }
+
+  private List<String> readJsonArray(final String json) {
+    return json == null ? List.of() : Arrays.asList(objectMapper.readValue(json, String[].class));
   }
 }

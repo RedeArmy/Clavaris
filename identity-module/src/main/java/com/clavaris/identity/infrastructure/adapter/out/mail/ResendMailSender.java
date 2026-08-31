@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.out.mail;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -118,6 +119,24 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   }
 
   @Override
+  public void sendSocialLinkConfirmation(
+      final String toAddress,
+      final OrganizationId organizationId,
+      final SocialProvider provider,
+      final String rawToken) {
+    final String link = link(organizationId, "confirm-social-link", rawToken);
+    send(
+        toAddress,
+        "Confirm linking your " + provider + " account",
+        "<p>Someone tried to sign in to this account using "
+            + provider
+            + ". If this was you, confirm the link:</p>"
+            + htmlButton(link, "Confirm link")
+            + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
+            + " this, you can safely ignore it — no account changes will be made.</p>");
+  }
+
+  @Override
   public void sendPlatformAccountEmailVerification(final String toAddress, final String rawToken) {
     final String link = platformLink("verify-email", rawToken);
     send(
@@ -126,6 +145,21 @@ class ResendMailSender implements MailSender, PlatformMailSender {
         "<p>Confirm your email address to finish setting up your Clavaris account:</p>"
             + htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
+  }
+
+  @Override
+  public void sendPlatformSocialLinkConfirmation(
+      final String toAddress, final SocialProvider provider, final String rawToken) {
+    final String link = platformLink("confirm-social-link", rawToken);
+    send(
+        toAddress,
+        "Confirm linking your " + provider + " account",
+        "<p>Someone tried to sign in to your Clavaris account using "
+            + provider
+            + ". If this was you, confirm the link:</p>"
+            + htmlButton(link, "Confirm link")
+            + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
+            + " this, you can safely ignore it — no account changes will be made.</p>");
   }
 
   @Override
