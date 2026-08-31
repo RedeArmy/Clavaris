@@ -172,11 +172,13 @@ class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   // Code review finding, ADR-0010 §6.2: SocialLoginConfig's own chain shipped with only the
-  // per-IP anti-abuse layer, missing this second layer entirely — every other /o/{organizationId}
-  // /... endpoint in this codebase carries both. Reuses this same test class's own
-  // createOrganization/setRateLimitPolicy helpers to prove the capacity ceiling now actually
-  // engages on that chain too, not just that OrganizationCapacityRateLimitingFilter's own path
-  // regex matches it in isolation.
+  // per-IP anti-abuse layer, missing this second layer entirely — every other tenant endpoint
+  // under the organization path prefix in this codebase carries both. Reuses this same test
+  // class's own createOrganization/setRateLimitPolicy helpers to prove the capacity ceiling now
+  // actually engages on that chain too, not just that OrganizationCapacityRateLimitingFilter's
+  // own path matching covers it in isolation.
+  // Sonar S125 false positive: the previous wording split a path-like token across lines in a
+  // way the commented-out-code heuristic misread as source, not prose — same substance, reworded.
   @Test
   void theCapacityLayerAlsoBlocksTheSocialLoginConfirmationRequiredLandingPage() throws Exception {
     String platformToken = requestPlatformAccessToken();

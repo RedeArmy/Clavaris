@@ -96,9 +96,13 @@ class ConfirmPendingSocialLinkServiceTest {
     doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
         .when(socialIdentities)
         .save(any());
+    // Sonar S5778: the lambda below must contain only the one call actually expected to throw —
+    // built here, same as every other test in this class, rather than inline in the lambda where
+    // the command constructor itself would also count as a possibly-throwing invocation.
+    ConfirmPendingSocialLinkCommand command = new ConfirmPendingSocialLinkCommand(rawToken);
 
     assertThatExceptionOfType(InvalidPendingSocialLinkException.class)
-        .isThrownBy(() -> service.handle(new ConfirmPendingSocialLinkCommand(rawToken)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
