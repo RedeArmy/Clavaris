@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.PlatformSocialIdentity;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -59,7 +60,16 @@ public class ConfirmPendingPlatformSocialLinkService
     final PlatformSocialIdentity identity =
         PlatformSocialIdentity.link(
             pendingLink.platformAccountId(), pendingLink.provider(), pendingLink.providerUserId());
-    socialIdentities.save(identity);
+    try {
+      socialIdentities.save(identity);
+    } catch (final DataIntegrityViolationException e) {
+      // Code review finding: same race as the tenant-tier sibling's own identical catch — two
+      // separate, still-active pending links for the same (platformAccount, provider) can both
+      // pass isActive(); the second violates
+      // ux_platform_social_identities_platform_account_id_provider. Translate into the same
+      // "invalid/expired" outcome ConfirmPlatformSocialLinkController already renders.
+      throw new InvalidPendingPlatformSocialLinkException(e);
+    }
 
     // Same "clicking the emailed confirmation link is itself proof of email control" reasoning as
     // the tenant-tier sibling's own identical lookup.

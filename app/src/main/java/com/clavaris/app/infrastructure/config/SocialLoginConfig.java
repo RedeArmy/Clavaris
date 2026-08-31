@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,7 +60,10 @@ class SocialLoginConfig {
   // across all four paths, not four independently tuned rows: they're all one login flow's own
   // steps (initiate → provider redirect → callback → landing page), not four functionally
   // distinct endpoints with different abuse shapes.
-  @SuppressWarnings("PMD.LongVariable")
+  @SuppressWarnings({"PMD.LongVariable", "java:S107", "PMD.ExcessiveParameterList"}) // one
+  // parameter per collaborating bean/tunable — same rationale as
+  // OrganizationAuthorizationServerConfig's own identical suppression on its own
+  // securityFilterChain method, which wires the same two rate-limiting layers.
   @Bean
   @Order(4)
   /* package */ SecurityFilterChain socialLoginSecurityFilterChain(
@@ -70,7 +74,10 @@ class SocialLoginConfig {
       final SocialLoginAuthenticationFailureHandler failureHandler,
       final RateLimiter rateLimiter,
       final RateLimitKeyHasher rateLimitKeyHasher,
-      @Value("${clavaris.rate-limit.social-login.per-ip-limit:30}") final int perIpLimit) {
+      final RateLimitPolicyRepository rateLimitPolicies,
+      @Value("${clavaris.rate-limit.social-login.per-ip-limit:30}") final int perIpLimit,
+      @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
+          final int capacityDefaultRequestsPerMinute) {
     http.securityMatcher(
             "/oauth2/authorization/**",
             "/login/oauth2/code/**",
@@ -103,6 +110,19 @@ class SocialLoginConfig {
                         "/platform/login/social/**",
                         perIpLimit))),
             SecurityContextHolderFilter.class)
+        // Code review finding, ADR-0010 §6.2: the second rate-limiting layer — the
+        // per-Organization capacity ceiling — was missing from this chain entirely, unlike every
+        // other /o/{organizationId}/... endpoint in this codebase. OrganizationCapacityRateLimit
+        // ingFilter's own path regex (^/o/([^/]+)/.*) already covers /o/*/login/social/** with no
+        // new logic needed; it no-ops (via its own null-organizationId early-return) for this
+        // chain's other three paths, which carry no organizationId path segment at all — the org
+        // context for those travels via SocialLoginRedirectController's own session attribute,
+        // not the URL, so this layer structurally can't reach them by design, same as it can't
+        // reach any non-/o/-prefixed path on any other chain.
+        .addFilterAfter(
+            new OrganizationCapacityRateLimitingFilter(
+                rateLimiter, rateLimitPolicies, capacityDefaultRequestsPerMinute),
+            AntiAbuseRateLimitingFilter.class)
         .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
     return http.build();
   }

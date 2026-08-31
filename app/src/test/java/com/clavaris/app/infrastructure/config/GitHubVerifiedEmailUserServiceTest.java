@@ -90,6 +90,39 @@ class GitHubVerifiedEmailUserServiceTest {
   }
 
   @Test
+  void doesNotCacheANegativeResultAndRetriesOnTheNextLogin() {
+    // Code review finding: caching a negative result (no verified email found) for the full TTL
+    // would incorrectly reject a retry from a user who verifies their email on GitHub's own side
+    // and signs in again within that window — only a positive result is worth trusting for the
+    // TTL, so a cold/negative attempt must always make a real call again next time.
+    AtomicInteger emailsCallCount = new AtomicInteger();
+    stubServer.createContext(
+        "/user/emails",
+        exchange -> {
+          int callNumber = emailsCallCount.incrementAndGet();
+          String body =
+              callNumber == 1
+                  ? "[{\"email\":\"unverified@example.com\",\"primary\":true,\"verified\":false}]"
+                  : "[{\"email\":\"now-verified@example.com\",\"primary\":true,\"verified\":true}]";
+          respond(exchange, 200, body);
+        });
+    GitHubVerifiedEmailUserService service = serviceWith(HttpClient.newHttpClient());
+
+    OAuth2User first = service.loadUser(userRequest());
+    OAuth2User second = service.loadUser(userRequest());
+
+    assertThat(first.<String>getAttribute(GitHubVerifiedEmailUserService.VERIFIED_EMAIL_ATTRIBUTE))
+        .isNull();
+    assertThat(second.<String>getAttribute(GitHubVerifiedEmailUserService.VERIFIED_EMAIL_ATTRIBUTE))
+        .isEqualTo("now-verified@example.com");
+    assertThat(emailsCallCount.get())
+        .as(
+            "a negative result must never be served from cache — the second attempt has to make"
+                + " a real call")
+        .isEqualTo(2);
+  }
+
+  @Test
   void delegatesUnmodifiedForANonGitHubRegistration() {
     stubServer.createContext(
         "/other-user", exchange -> respond(exchange, 200, "{\"sub\":\"abc\"}"));

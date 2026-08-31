@@ -97,7 +97,9 @@ public final class Organization {
    * regardless of {@code providers} (email/password never depends on this at all); {@code enabled =
    * true} with an empty {@code providers} list is also structurally valid but a real no-op
    * configuration state — left for the use case layer to flag as a likely operator mistake, not
-   * rejected here as invalid.
+   * rejected here as invalid. {@code
+   * setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationService} is that flag
+   * (code review finding: actually implemented, not just named as future work).
    */
   public Organization withSocialLoginPolicy(final boolean enabled, final List<String> providers) {
     return new Organization(id, name, createdAt, ownerPlatformAccountId, enabled, providers);

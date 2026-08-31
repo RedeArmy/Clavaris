@@ -41,6 +41,12 @@ public class SetSocialLoginPolicyForOrganizationService
         throw new UnknownSocialProviderException(provider);
       }
     }
+    // Code review finding: Organization.withSocialLoginPolicy's own Javadoc already named this
+    // combination "a real no-op configuration state... left for the use case layer to flag" —
+    // that flag was never actually implemented until now.
+    if (command.enabled() && command.providers().isEmpty()) {
+      throw new SocialLoginEnabledWithNoProvidersException();
+    }
 
     final Organization organization =
         organizations

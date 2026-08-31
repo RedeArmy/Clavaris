@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.PasswordCredential;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implements the outbound port; maps between {@code domain.model} (framework-free) and the
@@ -73,7 +74,25 @@ class JpaAccountRepository implements AccountRepository {
         credential);
   }
 
+  // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
+  // own deferred trigger started enforcing BR-ID-02 for real): this method's own two writes
+  // (accounts.saveAndFlush, then — if present — credentials.saveAndFlush) previously relied
+  // entirely on the CALLER already having an open @Transactional boundary spanning both. Every
+  // real production call site does (RegisterAccountService, AuthenticateWithSocialProviderService
+  // — both @Transactional), but test-fixture code calling this repository directly, with no
+  // surrounding transaction, does not: each saveAndFlush then becomes its own auto-committing
+  // unit of work (Spring Data's own default propagation on SimpleJpaRepository methods), so the
+  // account row's own commit — the deferred trigger's own firing point — happens before the
+  // credential row's separate, later commit ever runs, tripping the trigger even when the caller
+  // did everything else right. @Transactional here, not just at the caller, guarantees both writes
+  // always share one commit boundary regardless of caller — REQUIRED propagation (Spring's own
+  // default) joins an already-open transaction with zero behavior change for every real caller,
+  // and creates one for a bare caller that previously had none. A real correctness fix, not just a
+  // test-fixture accommodation: a bare caller crashing between the two previously-separate commits
+  // could have left a genuinely orphaned, permanently unauthenticatable Account row in production
+  // too, not only in a test.
   @Override
+  @Transactional
   public void save(final Account account) {
     final AccountEntity entity =
         new AccountEntity(
@@ -105,11 +124,14 @@ class JpaAccountRepository implements AccountRepository {
     // Code review finding: this removes the persistence layer's own fail-fast enforcement of
     // BR-ID-02 for every caller, not just the social-login ones — every current caller happens to
     // also save a SocialIdentity/PasswordCredential in the same transaction, so nothing breaks
-    // today, but nothing here would catch a future regression that doesn't. A synchronous guard
-    // can't work here regardless (see AccountAuthMethodIntegrityCheckJob's own Javadoc for why the
-    // ordering makes that structurally impossible) — AccountAuthMethodIntegrityCheckJob is the
-    // compensating control, a daily sweep that surfaces such a regression within 24h instead of
-    // leaving it undetected indefinitely.
+    // today, but nothing here would catch a future regression that doesn't. An application-layer
+    // synchronous guard can't work at this exact call site regardless — a genuinely synchronous
+    // guard now does exist, just not here: migration V20260830110000's own DEFERRABLE INITIALLY
+    // DEFERRED constraint trigger fires at transaction commit (after this same transaction's own
+    // SocialIdentity/PasswordCredential insert has already run, whichever order they happened in)
+    // and rejects the whole insert. AccountAuthMethodIntegrityCheckJob remains a second,
+    // independent daily sweep on top of that trigger, not the primary control anymore — see
+    // either one's own Javadoc for the full reasoning.
     account
         .passwordCredential()
         .ifPresent(

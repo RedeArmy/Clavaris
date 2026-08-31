@@ -171,6 +171,39 @@ class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(429);
   }
 
+  // Code review finding, ADR-0010 §6.2: SocialLoginConfig's own chain shipped with only the
+  // per-IP anti-abuse layer, missing this second layer entirely — every other /o/{organizationId}
+  // /... endpoint in this codebase carries both. Reuses this same test class's own
+  // createOrganization/setRateLimitPolicy helpers to prove the capacity ceiling now actually
+  // engages on that chain too, not just that OrganizationCapacityRateLimitingFilter's own path
+  // regex matches it in isolation.
+  @Test
+  void theCapacityLayerAlsoBlocksTheSocialLoginConfirmationRequiredLandingPage() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Low Capacity Social Co");
+    setRateLimitPolicy(platformToken, organizationId, 2);
+
+    HttpResponse<String> withinCeiling = fetchSocialLoginConfirmationRequiredPage(organizationId);
+    assertThat(withinCeiling.statusCode()).isEqualTo(200);
+    HttpResponse<String> stillWithinCeiling =
+        fetchSocialLoginConfirmationRequiredPage(organizationId);
+    assertThat(stillWithinCeiling.statusCode()).isEqualTo(200);
+
+    HttpResponse<String> overCeiling = fetchSocialLoginConfirmationRequiredPage(organizationId);
+
+    assertThat(overCeiling.statusCode()).isEqualTo(429);
+  }
+
+  private HttpResponse<String> fetchSocialLoginConfirmationRequiredPage(final UUID organizationId)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(
+                baseUri("/o/" + organizationId + "/login/social/confirmation-required"))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
   // Fetched once per test, not once per attempt: the CSRF token stays valid for the whole
   // session regardless of how many failed logins follow (only a *successful* login rotates the
   // session), and fetching it just once means every OrganizationCapacityRateLimitingFilter

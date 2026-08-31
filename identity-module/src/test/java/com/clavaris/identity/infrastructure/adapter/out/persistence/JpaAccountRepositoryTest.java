@@ -115,9 +115,15 @@ class JpaAccountRepositoryTest {
   // DeleteAccountService's own Javadoc relies on — every table whose only reason to exist is this
   // Account's own data is really gone, not just the account row itself, and the delete doesn't
   // throw a foreign-key violation partway through. Rows for sessions/refresh_tokens/
-  // verification_tokens are inserted directly via SQL rather than through their own repositories
-  // (not wired into this test's own narrow TestConfig) — this test is deliberately about the
-  // database's own cascade behavior, independent of any one repository's application code.
+  // verification_tokens/social_identities/pending_social_links are inserted directly via SQL
+  // rather than through their own repositories (not wired into this test's own narrow
+  // TestConfig) — this test is deliberately about the database's own cascade behavior,
+  // independent of any one repository's application code.
+  //
+  // Code review finding, TD-migration V20260830100000: social_identities/pending_social_links
+  // (added by ADR-0020) shipped with no ON DELETE CASCADE at all — this test would have caught it
+  // live (a real FK-violation on delete) had it been extended when those tables shipped, same gap
+  // DeleteAccountService's own Javadoc already flagged as "must be revisited the day it ships."
   @Test
   void deletingAnAccountCascadesToEveryTableThatOnlyExistsBecauseOfIt() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
@@ -149,6 +155,21 @@ class JpaAccountRepositoryTest {
         "EMAIL_VERIFICATION",
         "b".repeat(64),
         Timestamp.from(Instant.now().plusSeconds(3600)));
+    jdbcTemplate.update(
+        "insert into social_identities"
+            + " (id, account_id, organization_id, provider, provider_user_id) values"
+            + " (?, ?, ?, 'GOOGLE', 'to-be-deleted-google-sub')",
+        UUID.randomUUID(),
+        accountId.value(),
+        organizationId.value());
+    jdbcTemplate.update(
+        "insert into pending_social_links"
+            + " (id, account_id, provider, provider_user_id, confirmation_token_hash, expires_at)"
+            + " values (?, ?, 'GITHUB', 'to-be-deleted-gh-sub', ?, ?)",
+        UUID.randomUUID(),
+        accountId.value(),
+        "c".repeat(64),
+        Timestamp.from(Instant.now().plusSeconds(3600)));
 
     repository.deleteById(accountId);
 
@@ -157,6 +178,8 @@ class JpaAccountRepositoryTest {
     assertThat(countWhere("sessions", accountId.value())).isZero();
     assertThat(countWhere("refresh_tokens", accountId.value())).isZero();
     assertThat(countWhere("verification_tokens", accountId.value())).isZero();
+    assertThat(countWhere("social_identities", accountId.value())).isZero();
+    assertThat(countWhere("pending_social_links", accountId.value())).isZero();
   }
 
   private Integer countWhere(String table, UUID accountId) {

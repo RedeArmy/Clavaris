@@ -35,7 +35,13 @@ class JpaSocialIdentityRepository implements SocialIdentityRepository {
 
   @Override
   public void save(final SocialIdentity identity) {
-    identities.save(
+    // Code review finding: saveAndFlush, not save — a plain save() only stages the insert in the
+    // persistence context, deferring the actual INSERT (and any unique-constraint check) until
+    // the surrounding transaction commits, well after ConfirmPendingSocialLinkService's own
+    // try/catch around this call would have already returned. Same "must throw synchronously,
+    // right here" reasoning JpaAccountRepository.save() already documents for the identical
+    // problem.
+    identities.saveAndFlush(
         new SocialIdentityEntity(
             identity.id(),
             identity.accountId().value(),

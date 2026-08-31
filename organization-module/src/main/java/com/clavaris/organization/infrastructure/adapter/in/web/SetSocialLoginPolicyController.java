@@ -5,6 +5,7 @@ import com.clavaris.organization.application.usecase.setsocialloginpolicyfororga
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationCommand;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationResult;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SocialLoginEnabledWithNoProvidersException;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.UnknownSocialProviderException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,7 +44,9 @@ class SetSocialLoginPolicyController {
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(
       responseCode = "400",
-      description = "providers names a provider outside the known allowlist")
+      description =
+          "providers names a provider outside the known allowlist, or enabled=true with an"
+              + " empty providers list")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
   @PutMapping("/api/v1/admin/organizations/{organizationId}/social-login-policy")
   /* package */ ResponseEntity<SetSocialLoginPolicyResponse> set(
@@ -64,7 +67,7 @@ class SetSocialLoginPolicyController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
-    } catch (final UnknownSocialProviderException _) {
+    } catch (final UnknownSocialProviderException | SocialLoginEnabledWithNoProvidersException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
     return ResponseEntity.ok(SetSocialLoginPolicyResponse.from(result.organization()));

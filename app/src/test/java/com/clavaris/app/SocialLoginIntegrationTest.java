@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
+import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -146,6 +147,7 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private MailSender mailSender;
+  @Autowired private PlatformAccountRepository platformAccounts;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -337,19 +339,20 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
   }
 
-  // A real platform_accounts row, written via a raw insert rather than the repository — this
-  // suite never logs in as this account, only needs its row to exist for
-  // CreateOrganizationService's
-  // own owner check, so skipping JpaPlatformAccountRepository (which requires a password credential
-  // attached first, same as AuthorizationCodeFlowIntegrationTest's own identical helper documents)
-  // avoids a second, unused table row this suite has no other reason to create.
+  // A real platform_accounts row, written directly through the repository rather than the full
+  // /platform/register + /platform/verify-email HTTP flow — this suite never logs in as this
+  // account, only needs its row to exist for CreateOrganizationService's own owner check. Code
+  // review finding: this previously skipped JpaPlatformAccountRepository entirely via a raw
+  // insert with no credential row at all, on the reasoning that the credential JPA requires would
+  // just be "a second, unused table row" — true functionally, but structurally invalid per
+  // BR-ID-02 (never zero auth methods), a real gap migration V20260830110000's own deferred
+  // constraint trigger now catches live. Same "not a real hash, this test never logs in" pattern
+  // CreateOrganizationIntegrationTest's own identical helper already establishes.
   private UUID registerAPlatformAccount() {
     final PlatformAccount account =
         PlatformAccount.register(new Email("owner-" + UUID.randomUUID() + "@example.test"));
-    jdbcTemplate.update(
-        "insert into platform_accounts (id, email, status, created_at) values (?, ?, 'ACTIVE', now())",
-        account.id().value(),
-        account.email().value());
+    account.attachPasswordCredential("not-a-real-hash-this-test-never-logs-in");
+    platformAccounts.save(account);
     return account.id().value();
   }
 

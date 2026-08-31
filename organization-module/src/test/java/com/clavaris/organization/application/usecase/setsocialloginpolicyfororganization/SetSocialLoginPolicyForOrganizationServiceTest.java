@@ -102,6 +102,23 @@ class SetSocialLoginPolicyForOrganizationServiceTest {
   }
 
   @Test
+  void rejectsEnabledWithNoProvidersWithoutTouchingTheRepositoryAtAll() {
+    // Code review finding: Organization.withSocialLoginPolicy's own Javadoc already named this
+    // combination "a real no-op configuration state... left for the use case layer to flag" —
+    // proving that flag is now real, not just documented as future work. Same "validate the
+    // payload before ever touching the repository" precedent
+    // rejectsAnUnknownProviderWithoutPersistingAnything already establishes for the sibling
+    // validation failure — no findById stub needed, this must never be reached.
+    SetSocialLoginPolicyForOrganizationCommand command =
+        new SetSocialLoginPolicyForOrganizationCommand(UUID.randomUUID(), true, List.of(), ACTOR);
+
+    assertThatExceptionOfType(SocialLoginEnabledWithNoProvidersException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(organizations, auditEvents);
+  }
+
+  @Test
   void rejectsANonExistentOrganizationWithoutPersistingAnything() {
     UUID nonExistentOrganizationId = UUID.randomUUID();
     when(organizations.findById(nonExistentOrganizationId)).thenReturn(Optional.empty());
