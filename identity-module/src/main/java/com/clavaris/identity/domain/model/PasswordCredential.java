@@ -1,7 +1,6 @@
 package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -10,35 +9,22 @@ import java.util.UUID;
  * Account}, not a nullable field on it (data-model.md §2): keeps BR-ID-02 (never zero auth methods)
  * a natural fact about which credential rows exist for an account, not a null-check special case.
  *
- * <p>Same record-style-accessor rationale as {@link Account} for the PMD suppressions below.
+ * <p>Shared state (every field except {@link #accountId()}) lives on {@link
+ * AbstractPasswordCredential} — see its own Javadoc for why this pair shares a base (TD-ARCH-009).
+ *
+ * <p>PMD.ShortVariable: {@code id} names exactly what it is — same convention {@link
+ * AbstractPasswordCredential}'s own identical suppression already documents for this same
+ * constructor parameter.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
-public final class PasswordCredential {
-
-  private final UUID id;
-  private final AccountId accountId;
-  private final String passwordHash;
-  private final Instant updatedAt;
+@SuppressWarnings("PMD.ShortVariable")
+public final class PasswordCredential extends AbstractPasswordCredential<AccountId> {
 
   private PasswordCredential(
       final UUID id,
       final AccountId accountId,
       final String passwordHash,
       final Instant updatedAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
-    this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash must not be null");
-    this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
-    if (passwordHash.isBlank()) {
-      // Guards against a hasher implementation bug producing an empty hash reaching persistence
-      // silently — an account that "authenticates" against an empty hash is a security bug, not
-      // a validation nicety.
-      throw new IllegalArgumentException("passwordHash must not be blank");
-    }
+    super(id, accountId, passwordHash, updatedAt);
   }
 
   /**
@@ -64,19 +50,7 @@ public final class PasswordCredential {
     return new PasswordCredential(id, accountId, passwordHash, updatedAt);
   }
 
-  public UUID id() {
-    return id;
-  }
-
   public AccountId accountId() {
-    return accountId;
-  }
-
-  public String passwordHash() {
-    return passwordHash;
-  }
-
-  public Instant updatedAt() {
-    return updatedAt;
+    return owningId();
   }
 }

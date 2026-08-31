@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.sun.net.httpserver.HttpExchange;
@@ -15,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,6 +117,44 @@ class ResendMailSenderTest {
     assertThat(body.get("html").asString())
         .as("the same tenant-scoped /o/{organizationId}/... link shape as every other tenant email")
         .contains(BASE_URL + "/o/" + organizationId + "/confirm-social-link?token=the-raw-token");
+  }
+
+  @Test
+  void sendsAWellFormedRequestForANewDeviceLoginNotification() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendNewDeviceLoginNotification(
+        "user@example.com",
+        new OrganizationId(UUID.randomUUID()),
+        "Mozilla/5.0 Test Browser",
+        "203.0.113.5",
+        Instant.parse("2026-08-31T10:00:00Z"));
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("New sign-in to your account");
+    assertThat(body.get("html").asString())
+        .contains("Mozilla/5.0 Test Browser")
+        .contains("203.0.113.5");
+  }
+
+  @Test
+  void escapesTheUserAgentAndIpBeforeInterpolatingThemIntoTheEmailHtml() {
+    // userAgent/sourceIp are the first values this method interpolates that this server did NOT
+    // generate itself — a raw request header. Confirms HtmlUtils.htmlEscape actually runs, not
+    // just documented as intent.
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendNewDeviceLoginNotification(
+        "user@example.com",
+        new OrganizationId(UUID.randomUUID()),
+        "<script>alert(1)</script>",
+        "1.2.3.4",
+        Instant.now());
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("html").asString()).doesNotContain("<script>").contains("&lt;script&gt;");
   }
 
   @Test

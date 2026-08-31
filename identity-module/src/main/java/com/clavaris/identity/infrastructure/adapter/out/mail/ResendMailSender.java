@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.mail;
 
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -12,11 +13,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.HtmlUtils;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -33,6 +36,10 @@ import tools.jackson.databind.ObjectMapper;
  * branding instead of a per-Organization one, {@code {clavarisBaseUrl}/platform/...} links instead
  * of {@code /o/{organizationId}/...}.
  */
+// TooManyMethods: implements both MailSender (4 send* methods) and PlatformMailSender (3 more)
+// in one class — deliberately, same "one class, same HTTP mechanics, two ports" design this
+// class's own Javadoc already explains, not an organically grown class that should be split.
+@SuppressWarnings("PMD.TooManyMethods")
 @Component
 class ResendMailSender implements MailSender, PlatformMailSender {
 
@@ -134,6 +141,39 @@ class ResendMailSender implements MailSender, PlatformMailSender {
             + htmlButton(link, "Confirm link")
             + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
             + " this, you can safely ignore it — no account changes will be made.</p>");
+  }
+
+  @Override
+  public void sendNewDeviceLoginNotification(
+      final String toAddress,
+      final OrganizationId organizationId,
+      final String userAgent,
+      final String sourceIp,
+      final Instant occurredAt) {
+    // Plain informational email, no action link — see MailSender's own Javadoc for why a "this
+    // wasn't me" flow is deliberately out of scope for now. organizationId is accepted (matches
+    // every other tenant-tier method's own signature here) but unused in the body itself: the
+    // recipient already knows which product they're logging into, this notification doesn't need
+    // to brand itself per-Organization the way a confirmation link's own redirect target does.
+    //
+    // userAgent/sourceIp are the first values this class has ever interpolated into an email body
+    // that this server itself did NOT generate — a raw HTTP request header, fully attacker-
+    // controlled. HtmlUtils.htmlEscape guards against HTML injection into the sent email; every
+    // other send* method here only ever interpolates a link/token this server built itself, so
+    // this is the first method that needs it.
+    send(
+        toAddress,
+        "New sign-in to your account",
+        "<p>Your account was just signed in to from a new device or browser:</p>"
+            + "<ul><li>Device: "
+            + HtmlUtils.htmlEscape(userAgent)
+            + "</li><li>IP address: "
+            + HtmlUtils.htmlEscape(sourceIp)
+            + "</li><li>Time: "
+            + occurredAt
+            + "</li></ul>"
+            + "<p>If this was you, no action is needed. If you don't recognize this activity,"
+            + " change your password and review your active sessions.</p>");
   }
 
   @Override

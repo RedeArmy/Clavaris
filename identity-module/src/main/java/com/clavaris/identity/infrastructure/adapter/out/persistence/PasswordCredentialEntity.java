@@ -2,54 +2,34 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * JPA row mapping for {@code password_credentials} (data-model.md §2). See {@link AccountEntity}
- * for why PMD.DataClass/ShortVariable are suppressed here too.
+ * JPA row mapping for {@code password_credentials} (data-model.md §2). Shared columns live on
+ * {@link AbstractPasswordCredentialEntity} — only {@code account_id} is declared here (TD-ARCH-009,
+ * closed 2026-08-31).
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
+@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "password_credentials")
-public class PasswordCredentialEntity {
-
-  @Id private UUID id;
+public class PasswordCredentialEntity extends AbstractPasswordCredentialEntity {
 
   @Column(name = "account_id", nullable = false)
   private UUID accountId;
 
-  @Column(name = "password_hash", nullable = false)
-  private String passwordHash;
-
-  @Column(name = "updated_at", nullable = false)
-  private Instant updatedAt;
-
-  protected PasswordCredentialEntity() {}
+  protected PasswordCredentialEntity() {
+    super();
+  }
 
   public PasswordCredentialEntity(
       final UUID id, final UUID accountId, final String passwordHash, final Instant updatedAt) {
-    this.id = id;
+    super(id, passwordHash, updatedAt);
     this.accountId = accountId;
-    this.passwordHash = passwordHash;
-    this.updatedAt = updatedAt;
-  }
-
-  public UUID getId() {
-    return id;
   }
 
   public UUID getAccountId() {
     return accountId;
-  }
-
-  public String getPasswordHash() {
-    return passwordHash;
-  }
-
-  public Instant getUpdatedAt() {
-    return updatedAt;
   }
 }

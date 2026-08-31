@@ -1,7 +1,6 @@
 package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -10,34 +9,23 @@ import java.util.UUID;
  * reason {@link PlatformAccountId} is its own type: platform-tier and tenant-tier identities are
  * deliberately never mixed, even where the shape is identical.
  *
- * <p>Same record-style-accessor rationale as {@link PasswordCredential} for the PMD suppressions
- * below.
+ * <p>Shared state lives on {@link AbstractPasswordCredential} — see its own Javadoc for why this
+ * pair shares a base (TD-ARCH-009).
+ *
+ * <p>PMD.ShortVariable: {@code id} names exactly what it is — same convention {@link
+ * AbstractPasswordCredential}'s own identical suppression already documents for this same
+ * constructor parameter.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
-public final class PlatformPasswordCredential {
-
-  private final UUID id;
-  private final PlatformAccountId platformAccountId;
-  private final String passwordHash;
-  private final Instant updatedAt;
+@SuppressWarnings("PMD.ShortVariable")
+public final class PlatformPasswordCredential
+    extends AbstractPasswordCredential<PlatformAccountId> {
 
   private PlatformPasswordCredential(
       final UUID id,
       final PlatformAccountId platformAccountId,
       final String passwordHash,
       final Instant updatedAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    this.platformAccountId =
-        Objects.requireNonNull(platformAccountId, "platformAccountId must not be null");
-    this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash must not be null");
-    this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
-    if (passwordHash.isBlank()) {
-      throw new IllegalArgumentException("passwordHash must not be blank");
-    }
+    super(id, platformAccountId, passwordHash, updatedAt);
   }
 
   public static PlatformPasswordCredential issue(
@@ -54,19 +42,7 @@ public final class PlatformPasswordCredential {
     return new PlatformPasswordCredential(id, platformAccountId, passwordHash, updatedAt);
   }
 
-  public UUID id() {
-    return id;
-  }
-
   public PlatformAccountId platformAccountId() {
-    return platformAccountId;
-  }
-
-  public String passwordHash() {
-    return passwordHash;
-  }
-
-  public Instant updatedAt() {
-    return updatedAt;
+    return owningId();
   }
 }

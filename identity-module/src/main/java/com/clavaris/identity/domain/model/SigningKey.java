@@ -2,7 +2,6 @@ package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -13,23 +12,18 @@ import java.util.UUID;
  * from {@link PlatformSigningKey} on purpose (ADR-0010, Organization provisioning) — a
  * platform-tier key and a tenant's own key must never be confusable with each other.
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason {@link Account} suppresses them — the deliberate record-style accessor convention
- * used throughout this codebase's value objects, not an accidental data-holder shape.
+ * <p>Shared state/lifecycle (everything except {@link #organizationId()}) lives on {@link
+ * AbstractSigningKey} — see its own Javadoc for why this pair shares a base without a generic
+ * owning-id type parameter (TD-ARCH-009).
+ *
+ * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable rules flag this class for the same reason
+ * {@link Account} suppresses them — the deliberate record-style accessor convention used throughout
+ * this codebase's value objects.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
-public final class SigningKey {
+@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortVariable"})
+public final class SigningKey extends AbstractSigningKey {
 
-  private final UUID id;
   private final OrganizationId organizationId;
-  private final String kid;
-  private final String algorithm;
-  private final Instant activeFrom;
-  private Instant retiredAt;
 
   private SigningKey(
       final UUID id,
@@ -38,12 +32,8 @@ public final class SigningKey {
       final String algorithm,
       final Instant activeFrom,
       final Instant retiredAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
+    super(id, kid, algorithm, activeFrom, retiredAt);
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
-    this.kid = Objects.requireNonNull(kid, "kid must not be null");
-    this.algorithm = Objects.requireNonNull(algorithm, "algorithm must not be null");
-    this.activeFrom = Objects.requireNonNull(activeFrom, "activeFrom must not be null");
-    this.retiredAt = retiredAt;
   }
 
   // BR-ORG-06: called synchronously as part of Organization creation — an Organization that
@@ -63,35 +53,7 @@ public final class SigningKey {
     return new SigningKey(id, organizationId, kid, algorithm, activeFrom, retiredAt);
   }
 
-  /**
-   * Retiring stops it signing new tokens; JWKS still serves it until every token issued under it
-   * expires.
-   */
-  public void retire() {
-    this.retiredAt = Instant.now();
-  }
-
-  public UUID id() {
-    return id;
-  }
-
   public OrganizationId organizationId() {
     return organizationId;
-  }
-
-  public String kid() {
-    return kid;
-  }
-
-  public String algorithm() {
-    return algorithm;
-  }
-
-  public Instant activeFrom() {
-    return activeFrom;
-  }
-
-  public Optional<Instant> retiredAt() {
-    return Optional.ofNullable(retiredAt);
   }
 }

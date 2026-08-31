@@ -4,6 +4,8 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Authen
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -51,14 +53,17 @@ public class LoginController {
   private final AuthenticateWithPasswordUseCase useCase;
   private final AuthenticatedSessionEstablisher sessions;
   private final OrganizationSocialLoginPolicyProvider policyProvider;
+  private final RecordAccountLoginDeviceUseCase recordLoginDevice;
 
   public LoginController(
       final AuthenticateWithPasswordUseCase useCase,
       final AuthenticatedSessionEstablisher sessions,
-      final OrganizationSocialLoginPolicyProvider policyProvider) {
+      final OrganizationSocialLoginPolicyProvider policyProvider,
+      final RecordAccountLoginDeviceUseCase recordLoginDevice) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.policyProvider = policyProvider;
+    this.recordLoginDevice = recordLoginDevice;
   }
 
   @GetMapping
@@ -104,6 +109,13 @@ public class LoginController {
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
     final String redirectTarget =
         sessions.establish(request, response, accountId.value(), fallbackUrl);
+
+    // New-device login email notification — after establish(), same accountId/request already in
+    // scope; see RecordAccountLoginDeviceService's own Javadoc for why this never throws.
+    recordLoginDevice.handle(
+        new RecordAccountLoginDeviceCommand(
+            accountId, request.getHeader("User-Agent"), request.getRemoteAddr()));
+
     return "redirect:" + redirectTarget;
   }
 

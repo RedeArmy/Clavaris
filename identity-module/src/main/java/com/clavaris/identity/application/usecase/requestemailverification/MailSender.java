@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.requestemailverification;
 
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 
 /**
  * Outbound port — implemented by {@code infrastructure/adapter/out/mail/ResendMailSender}. One port
@@ -28,4 +29,20 @@ public interface MailSender {
    */
   void sendSocialLinkConfirmation(
       String toAddress, OrganizationId organizationId, SocialProvider provider, String rawToken);
+
+  /**
+   * {@code recordaccountlogindevice.RecordAccountLoginDeviceService}'s own notification — a plain
+   * informational email, no action link/token (a "this wasn't me" flow is real additional scope,
+   * deliberately deferred, not built speculatively ahead of a real need — see
+   * technical-debt-register.md). Callers must be prepared for {@link MailDeliveryException} to
+   * propagate exactly like every other method here — {@code RecordAccountLoginDeviceService} is the
+   * one caller that deliberately catches it instead of letting it propagate; see that class's own
+   * Javadoc for why.
+   */
+  void sendNewDeviceLoginNotification(
+      String toAddress,
+      OrganizationId organizationId,
+      String userAgent,
+      String sourceIp,
+      Instant occurredAt);
 }

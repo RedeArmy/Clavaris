@@ -22,11 +22,15 @@ import java.util.UUID;
  * requesting more than what was originally authorized, so every {@link RefreshToken} issued under
  * this session's chain is validated against this same, unchanging set.
  *
- * <p><b>Known, deliberate simplification:</b> data-model.md's original sketch of {@code sessions}
- * included a {@code user_agent} column; this implementation doesn't populate one — rotation and
- * reuse detection (BR-ID-03) don't need it, and nothing yet consumes it (no "list your active
- * sessions/devices" feature exists). Add it, and the real HTTP request plumbing to populate it,
- * only once a use case actually needs it — not speculatively ahead of one.
+ * <p><b>Known, deliberate simplification, still true:</b> data-model.md's original sketch of {@code
+ * sessions} included a {@code user_agent} column; this implementation still doesn't populate one —
+ * rotation and reuse detection (BR-ID-03) still don't need it. The "list your active
+ * sessions/devices" self-service page this comment used to say didn't exist now does ({@code
+ * AccountSessionsController}) — but it's built on the Spring-Session-backed {@code HttpSession}
+ * store instead (see {@code SessionDeviceAttributes}/{@code KnownDevice}), not on this aggregate.
+ * This class and that page track two genuinely different things (see this class's own note above
+ * about the two not implying each other's lifecycle); this column staying unpopulated was never
+ * actually blocking that feature.
  *
  * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
  * the same reason {@code Account} suppresses them — the deliberate record-style accessor convention

@@ -8,6 +8,8 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.UnverifiedProviderEmailException;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -85,6 +87,7 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
   private final AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase;
   private final AuthenticatedSessionEstablisher tenantSessions;
   private final PlatformAuthenticatedSessionEstablisher platformSessions;
+  private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
@@ -94,11 +97,13 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
       final AuthenticateWithSocialProviderUseCase tenantUseCase,
       final AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase,
       final AuthenticatedSessionEstablisher tenantSessions,
-      final PlatformAuthenticatedSessionEstablisher platformSessions) {
+      final PlatformAuthenticatedSessionEstablisher platformSessions,
+      final RecordAccountLoginDeviceUseCase recordLoginDevice) {
     this.tenantUseCase = tenantUseCase;
     this.platformUseCase = platformUseCase;
     this.tenantSessions = tenantSessions;
     this.platformSessions = platformSessions;
+    this.recordLoginDevice = recordLoginDevice;
   }
 
   @Override
@@ -182,6 +187,12 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
       final String target =
           tenantSessions.establishViaSocialLogin(
               request, response, accountId.value(), provider, fallbackUrl);
+      // New-device login email notification — same call LoginController's own password-login
+      // path makes, right after establishing the session; see
+      // RecordAccountLoginDeviceService's own Javadoc for why this never throws.
+      recordLoginDevice.handle(
+          new RecordAccountLoginDeviceCommand(
+              accountId, request.getHeader("User-Agent"), request.getRemoteAddr()));
       redirectStrategy.sendRedirect(request, response, target);
     } else {
       redirectStrategy.sendRedirect(
