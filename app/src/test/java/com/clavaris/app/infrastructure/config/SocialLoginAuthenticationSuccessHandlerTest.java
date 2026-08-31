@@ -14,6 +14,7 @@ import com.clavaris.identity.application.usecase.authenticateplatformaccountwith
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderResult;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
@@ -41,6 +42,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
   private AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase;
   private AuthenticatedSessionEstablisher tenantSessions;
   private PlatformAuthenticatedSessionEstablisher platformSessions;
+  private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private SocialLoginAuthenticationSuccessHandler handler;
 
   @BeforeEach
@@ -49,9 +51,10 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     platformUseCase = mock(AuthenticatePlatformAccountWithSocialProviderUseCase.class);
     tenantSessions = mock(AuthenticatedSessionEstablisher.class);
     platformSessions = mock(PlatformAuthenticatedSessionEstablisher.class);
+    recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
     handler =
         new SocialLoginAuthenticationSuccessHandler(
-            tenantUseCase, platformUseCase, tenantSessions, platformSessions);
+            tenantUseCase, platformUseCase, tenantSessions, platformSessions, recordLoginDevice);
   }
 
   private OAuth2AuthenticationToken googleToken(final String email, final boolean verified) {
@@ -106,6 +109,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
                 .getAttribute(SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE))
         .isNull();
     verifyNoInteractions(platformUseCase);
+    // New-device login email notification — fired after a successful social login too.
+    verify(recordLoginDevice).handle(any());
   }
 
   @Test
@@ -127,6 +132,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/o/" + organizationId + "/login/social/confirmation-required");
     verify(tenantSessions, never()).establishViaSocialLogin(any(), any(), any(), any(), any());
+    verifyNoInteractions(recordLoginDevice);
   }
 
   @Test

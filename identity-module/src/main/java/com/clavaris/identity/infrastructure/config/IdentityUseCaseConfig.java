@@ -29,8 +29,14 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshT
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountService;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountService;
 import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountUseCase;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceService;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -42,6 +48,8 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionService;
+import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
@@ -280,5 +288,28 @@ class IdentityUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter) {
     return new ConfirmPendingSocialLinkService(
         pendingLinks, socialIdentities, accounts, eventOutboxWriter);
+  }
+
+  // Self-service sessions/devices page — see AccountActiveSessionsRepository's own Javadoc for
+  // why this one port backs both this bean and revokeAccountSessionUseCase below.
+  @Bean
+  /* package */ ListActiveSessionsForAccountUseCase listActiveSessionsForAccountUseCase(
+      final AccountActiveSessionsRepository activeSessions) {
+    return new ListActiveSessionsForAccountService(activeSessions);
+  }
+
+  @Bean
+  /* package */ RevokeAccountSessionUseCase revokeAccountSessionUseCase(
+      final AccountActiveSessionsRepository activeSessions) {
+    return new RevokeAccountSessionService(activeSessions);
+  }
+
+  // New-device login email notification.
+  @Bean
+  /* package */ RecordAccountLoginDeviceUseCase recordAccountLoginDeviceUseCase(
+      final KnownDeviceRepository knownDevices,
+      final AccountRepository accounts,
+      final MailSender mailSender) {
+    return new RecordAccountLoginDeviceService(knownDevices, accounts, mailSender);
   }
 }

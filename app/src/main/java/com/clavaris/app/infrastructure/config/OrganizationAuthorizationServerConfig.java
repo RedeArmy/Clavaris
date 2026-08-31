@@ -123,6 +123,12 @@ class OrganizationAuthorizationServerConfig {
   // 404'd unconditionally despite the discovery document confidently advertising it.
   private static final String LOGOUT_PATH_PATTERN = "/o/*/connect/logout";
 
+  // Self-service sessions/devices page (AccountSessionsController) — appears in both
+  // securityMatcher and authorizeHttpRequests below, same "one constant, not two literals that
+  // could drift" reasoning as LOGIN_PATH_PATTERN/LOGOUT_PATH_PATTERN above.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String ACCOUNT_SELF_SERVICE_PATH_PATTERN = "/o/*/account/**";
+
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ OrganizationAuthorizationServerConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
@@ -296,7 +302,12 @@ class OrganizationAuthorizationServerConfig {
             "/o/*/.well-known/**",
             "/o/*/userinfo",
             LOGIN_PATH_PATTERN,
-            LOGOUT_PATH_PATTERN)
+            LOGOUT_PATH_PATTERN,
+            // Self-service sessions/devices page (AccountSessionsController) — narrow and
+            // specific, same as every other pattern already listed here; does not widen this
+            // matcher to the broad /o/** this class's own Javadoc explains would shadow
+            // DefaultSecurityConfig's register/forgot-/reset-password chain.
+            ACCOUNT_SELF_SERVICE_PATH_PATTERN)
         // TD-SEC-028: registered before .with(new OAuth2AuthorizationServerConfigurer(), ...)
         // below so this decoder is already set by the time that configurer's own init() applies
         // its internal .oauth2ResourceServer(jwt(Customizer.withDefaults())) call (decompiled
@@ -388,6 +399,15 @@ class OrganizationAuthorizationServerConfig {
                 authorize
                     .requestMatchers(LOGIN_PATH_PATTERN, LOGOUT_PATH_PATTERN)
                     .permitAll()
+                    // Explicit hasAuthority, not left to fall under the generic
+                    // .anyRequest().authenticated() below — technically redundant given
+                    // TenantAccountOnlySecurityContextFilter already strips a wrong-tier context
+                    // earlier in this exact chain, but this codebase's own security history (the
+                    // PlatformDashboardSecurityConfig .authenticated()-vs-hasAuthority incident,
+                    // SDE-III review 2026-08-22) is reason enough for real defense-in-depth on a
+                    // brand-new page that lists/revokes live sessions.
+                    .requestMatchers(ACCOUNT_SELF_SERVICE_PATH_PATTERN)
+                    .hasAuthority("ROLE_ACCOUNT")
                     .anyRequest()
                     .authenticated())
         .securityContext(context -> context.securityContextRepository(contextRepository))

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Your sessions — Clavaris</title>
+</head>
+<body>
+<main>
+    <h1>Your active sessions</h1>
+    <p>These are the devices/browsers currently signed in to your account. If you don't recognize
+        one, close it.</p>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Device</th>
+            <th>IP address</th>
+            <th>First seen</th>
+            <th>Last active</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="userSession : ${sessions}">
+            <td>
+                <span th:text="${userSession.userAgent()} ?: 'Unknown device'">User agent</span>
+                <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
+            </td>
+            <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
+            <td th:text="${userSession.createdAt()}">Created at</td>
+            <td th:text="${userSession.lastAccessedAt()}">Last active</td>
+            <td>
+                <form method="post"
+                      th:action="@{/o/{organizationId}/account/sessions/{sessionId}/revoke(organizationId=${organizationId},sessionId=${userSession.sessionId()})}">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit">Cerrar sesión</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(sessions)}">
+            <td colspan="5">No active sessions.</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

@@ -155,6 +155,17 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
     // an authentication filter, is this call's job alone.
     contextRepository.saveContext(context, request, response);
 
+    // Self-service sessions/devices page: saveContext above guarantees a real HttpSession now
+    // exists (creating one if request arrived with none) — this is the one place both tenant login
+    // paths converge, so it's the only place that needs to populate these two attributes.
+    // AccountActiveSessionsRepositoryBridge is the sole reader; see SessionDeviceAttributes' own
+    // Javadoc for why plain Strings and why one shared constants holder.
+    final HttpSession session = request.getSession(false);
+    if (session != null) {
+      session.setAttribute(SessionDeviceAttributes.USER_AGENT, request.getHeader("User-Agent"));
+      session.setAttribute(SessionDeviceAttributes.SOURCE_IP, request.getRemoteAddr());
+    }
+
     final SavedRequest savedRequest = requestCache.getRequest(request, response);
     return savedRequest != null ? savedRequest.getRedirectUrl() : fallbackUrl;
   }

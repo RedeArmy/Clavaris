@@ -111,7 +111,15 @@ class JpaSigningKeyRepositoryTest {
         repository.findActiveAndRetiredSince(organizationId, now.minus(1, ChronoUnit.DAYS));
 
     assertThat(found)
-        .extracting(SigningKey::kid)
+        // TD-ARCH-009 (SigningKey/PlatformSigningKey extraction): kid() is inherited from the
+        // package-private AbstractSigningKey — a SigningKey::kid method reference from this
+        // different package fails at runtime (LambdaConversionException: "MethodHandle is not
+        // direct or cannot be cracked", a known JDK limitation cracking a direct method handle
+        // for a method whose declaring class isn't accessible to the caller, even though the
+        // method itself is public and reachable through the public SigningKey subclass). A plain
+        // lambda calling key.kid() compiles to ordinary virtual-dispatch bytecode instead and
+        // doesn't hit this path.
+        .extracting(key -> key.kid())
         .containsExactlyInAnyOrder("retired-kid", "active-kid");
   }
 

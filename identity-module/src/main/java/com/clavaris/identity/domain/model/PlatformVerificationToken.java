@@ -1,8 +1,6 @@
 package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -12,21 +10,15 @@ import java.util.UUID;
  * EMAIL_VERIFICATION}/{@code PASSWORD_RESET}, are identical in meaning at either tier) — only the
  * owning-id type differs, which is exactly the one thing a shared type couldn't express safely.
  *
- * <p>Same record-style-accessor PMD suppressions as {@link VerificationToken}, same rationale.
+ * <p>Shared state/lifecycle lives on {@link AbstractVerificationToken} — see its own Javadoc for
+ * why this pair shares a base (TD-ARCH-009).
+ *
+ * <p>PMD.ShortVariable: {@code id} names exactly what it is — same convention {@link
+ * AbstractVerificationToken}'s own identical suppression already documents for this same
+ * constructor parameter.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
-public final class PlatformVerificationToken {
-
-  private final UUID id;
-  private final PlatformAccountId platformAccountId;
-  private final VerificationTokenType type;
-  private final String tokenHash;
-  private final Instant expiresAt;
-  private Instant consumedAt;
+@SuppressWarnings("PMD.ShortVariable")
+public final class PlatformVerificationToken extends AbstractVerificationToken<PlatformAccountId> {
 
   private PlatformVerificationToken(
       final UUID id,
@@ -35,13 +27,7 @@ public final class PlatformVerificationToken {
       final String tokenHash,
       final Instant expiresAt,
       final Instant consumedAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    this.platformAccountId =
-        Objects.requireNonNull(platformAccountId, "platformAccountId must not be null");
-    this.type = Objects.requireNonNull(type, "type must not be null");
-    this.tokenHash = Objects.requireNonNull(tokenHash, "tokenHash must not be null");
-    this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt must not be null");
-    this.consumedAt = consumedAt;
+    super(id, platformAccountId, type, tokenHash, expiresAt, consumedAt);
   }
 
   public static PlatformVerificationToken issue(
@@ -64,35 +50,7 @@ public final class PlatformVerificationToken {
         id, platformAccountId, type, tokenHash, expiresAt, consumedAt);
   }
 
-  public void consume() {
-    this.consumedAt = Instant.now();
-  }
-
-  public boolean isActive() {
-    return consumedAt == null && expiresAt.isAfter(Instant.now());
-  }
-
-  public UUID id() {
-    return id;
-  }
-
   public PlatformAccountId platformAccountId() {
-    return platformAccountId;
-  }
-
-  public VerificationTokenType type() {
-    return type;
-  }
-
-  public String tokenHash() {
-    return tokenHash;
-  }
-
-  public Instant expiresAt() {
-    return expiresAt;
-  }
-
-  public Optional<Instant> consumedAt() {
-    return Optional.ofNullable(consumedAt);
+    return owningId();
   }
 }

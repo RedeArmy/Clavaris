@@ -19,6 +19,7 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Authen
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -46,6 +47,7 @@ class LoginControllerTest {
   private AuthenticateWithPasswordUseCase useCase;
   private AuthenticatedSessionEstablisher sessionEstablisher;
   private OrganizationSocialLoginPolicyProvider policyProvider;
+  private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -53,6 +55,7 @@ class LoginControllerTest {
     useCase = mock(AuthenticateWithPasswordUseCase.class);
     sessionEstablisher = mock(AuthenticatedSessionEstablisher.class);
     policyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
+    recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -70,7 +73,7 @@ class LoginControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new LoginController(useCase, sessionEstablisher, policyProvider))
+                new LoginController(useCase, sessionEstablisher, policyProvider, recordLoginDevice))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -119,6 +122,8 @@ class LoginControllerTest {
                 new OrganizationId(ORGANIZATION_ID),
                 new Email("user@example.com"),
                 "correct-password"));
+    // New-device login email notification — fired after a successful login, same accountId.
+    verify(recordLoginDevice).handle(any());
   }
 
   @Test
@@ -134,6 +139,7 @@ class LoginControllerTest {
 
     verifyNoInteractions(useCase);
     verifyNoInteractions(sessionEstablisher);
+    verifyNoInteractions(recordLoginDevice);
   }
 
   @Test
@@ -167,5 +173,6 @@ class LoginControllerTest {
         .andExpect(model().attributeHasNoErrors("form"));
 
     verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verifyNoInteractions(recordLoginDevice);
   }
 }
