@@ -1,8 +1,6 @@
 package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -12,25 +10,16 @@ import java.util.UUID;
  * type differs here, same mirroring convention {@link PlatformVerificationToken} already
  * establishes for its own pair.
  *
- * <p>Same record-style-accessor PMD suppressions as every other value object in this codebase.
- * PMD.LongVariable: same {@code confirmationTokenHash} rationale {@link PendingSocialLink}'s own
- * identical suppression documents.
+ * <p>Shared state/lifecycle lives on {@link AbstractPendingSocialLink} — see its own Javadoc for
+ * why this pair shares a base while the sibling {@code
+ * AuthenticatePlatformAccountWithSocialProviderService} pair does not.
+ *
+ * <p>PMD.ShortVariable/PMD.LongVariable: {@code id}/{@code confirmationTokenHash} name exactly what
+ * they are — same convention {@link AbstractPendingSocialLink}'s own identical suppression already
+ * documents for these same two constructor parameters.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable"
-})
-public final class PendingPlatformSocialLink {
-
-  private final UUID id;
-  private final PlatformAccountId platformAccountId;
-  private final SocialProvider provider;
-  private final String providerUserId;
-  private final String confirmationTokenHash;
-  private final Instant expiresAt;
-  private Instant consumedAt;
+@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
+public final class PendingPlatformSocialLink extends AbstractPendingSocialLink<PlatformAccountId> {
 
   private PendingPlatformSocialLink(
       final UUID id,
@@ -40,15 +29,14 @@ public final class PendingPlatformSocialLink {
       final String confirmationTokenHash,
       final Instant expiresAt,
       final Instant consumedAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    this.platformAccountId =
-        Objects.requireNonNull(platformAccountId, "platformAccountId must not be null");
-    this.provider = Objects.requireNonNull(provider, "provider must not be null");
-    this.providerUserId = Objects.requireNonNull(providerUserId, "providerUserId must not be null");
-    this.confirmationTokenHash =
-        Objects.requireNonNull(confirmationTokenHash, "confirmationTokenHash must not be null");
-    this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt must not be null");
-    this.consumedAt = consumedAt;
+    super(
+        id,
+        platformAccountId,
+        provider,
+        providerUserId,
+        confirmationTokenHash,
+        expiresAt,
+        consumedAt);
   }
 
   public static PendingPlatformSocialLink raise(
@@ -85,39 +73,7 @@ public final class PendingPlatformSocialLink {
         consumedAt);
   }
 
-  public void consume() {
-    this.consumedAt = Instant.now();
-  }
-
-  public boolean isActive() {
-    return consumedAt == null && expiresAt.isAfter(Instant.now());
-  }
-
-  public UUID id() {
-    return id;
-  }
-
   public PlatformAccountId platformAccountId() {
-    return platformAccountId;
-  }
-
-  public SocialProvider provider() {
-    return provider;
-  }
-
-  public String providerUserId() {
-    return providerUserId;
-  }
-
-  public String confirmationTokenHash() {
-    return confirmationTokenHash;
-  }
-
-  public Instant expiresAt() {
-    return expiresAt;
-  }
-
-  public Optional<Instant> consumedAt() {
-    return Optional.ofNullable(consumedAt);
+    return owningId();
   }
 }

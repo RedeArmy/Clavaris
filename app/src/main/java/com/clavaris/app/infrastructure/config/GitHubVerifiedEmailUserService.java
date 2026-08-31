@@ -20,7 +20,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -53,12 +53,14 @@ import tools.jackson.databind.ObjectMapper;
 // PMD.OnlyOneReturn: loadUser (delegate-vs-GitHub-specific) and findPrimaryVerifiedEmail
 // (found-vs-none) each have two real, distinct outcomes — same "each outcome needs its own exit"
 // rationale as SetRateLimitPolicyController's own identical suppression.
-// @Component, not @Service, is intentional here — every infrastructure/config bean in this
-// package (bridges, handlers, jobs, this one) uses @Component uniformly, regardless of how much
-// logic it carries; this codebase reserves @Service-shaped semantics for actual domain/application
-// use cases (application/usecase/**), which this OAuth2UserService adapter is not one of.
+// @Service, not @Component: SonarCloud flagged the mismatch between this class's own name
+// (ending in "Service", mirroring the Spring Security OAuth2UserService interface it implements —
+// same convention as Spring's own DefaultOAuth2UserService) and a bare @Component annotation.
+// Every other infrastructure/config bean in this package uses @Component (none of their names end
+// in "Service"), so this is a one-off, deliberately not renamed away from matching the framework
+// interface it implements just to keep @Component consistent with its siblings.
 @SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
-@Component
+@Service
 class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
   /**
