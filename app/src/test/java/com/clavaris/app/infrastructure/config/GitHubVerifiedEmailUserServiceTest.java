@@ -118,9 +118,10 @@ class GitHubVerifiedEmailUserServiceTest {
             HttpClient.newHttpClient(),
             objectMapper,
             URI.create(stubServerUri() + "/user/emails-malformed"));
+    OAuth2UserRequest request = userRequest();
 
     assertThatExceptionOfType(OAuth2AuthenticationException.class)
-        .isThrownBy(() -> service.loadUser(userRequest()));
+        .isThrownBy(() -> service.loadUser(request));
   }
 
   @Test
@@ -156,9 +157,10 @@ class GitHubVerifiedEmailUserServiceTest {
             HttpClient.newHttpClient(),
             objectMapper,
             URI.create(stubServerUri() + "/emails-forbidden"));
+    OAuth2UserRequest request = userRequest();
 
     assertThatExceptionOfType(OAuth2AuthenticationException.class)
-        .isThrownBy(() -> service.loadUser(userRequest()))
+        .isThrownBy(() -> service.loadUser(request))
         .withMessageContaining("403");
   }
 
@@ -169,9 +171,10 @@ class GitHubVerifiedEmailUserServiceTest {
     IOException networkFailure = new IOException("connection reset");
     when(httpClient.send(any(), any())).thenThrow(networkFailure);
     GitHubVerifiedEmailUserService service = serviceWith(httpClient);
+    OAuth2UserRequest request = userRequest();
 
     assertThatExceptionOfType(OAuth2AuthenticationException.class)
-        .isThrownBy(() -> service.loadUser(userRequest()))
+        .isThrownBy(() -> service.loadUser(request))
         .withCause(networkFailure);
   }
 
@@ -180,10 +183,11 @@ class GitHubVerifiedEmailUserServiceTest {
     HttpClient httpClient = mock(HttpClient.class);
     when(httpClient.send(any(), any())).thenThrow(new InterruptedException("interrupted mid-send"));
     GitHubVerifiedEmailUserService service = serviceWith(httpClient);
+    OAuth2UserRequest request = userRequest();
 
     try {
       assertThatExceptionOfType(OAuth2AuthenticationException.class)
-          .isThrownBy(() -> service.loadUser(userRequest()));
+          .isThrownBy(() -> service.loadUser(request));
       assertThat(Thread.interrupted()).isTrue();
     } finally {
       Thread.interrupted();

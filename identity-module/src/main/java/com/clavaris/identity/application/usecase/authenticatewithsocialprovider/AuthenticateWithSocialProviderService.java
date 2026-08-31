@@ -69,6 +69,10 @@ public class AuthenticateWithSocialProviderService
   // across every metrics.increment() call below.
   private static final String OUTCOME_TAG = "outcome";
 
+  // Same reasoning as OUTCOME_TAG above — removes the "provider" tag key literal's own
+  // duplication (SonarCloud java:S1192) across every metrics.increment() call below.
+  private static final String PROVIDER_TAG = "provider";
+
   private final AccountRepository accounts;
   private final SocialIdentityRepository socialIdentities;
   private final PendingSocialLinkRepository pendingLinks;
@@ -135,7 +139,7 @@ public class AuthenticateWithSocialProviderService
           identity.accountId(),
           command.provider());
       metrics.increment(
-          LOGIN_METRIC, "provider", command.provider().name(), OUTCOME_TAG, "returning");
+          LOGIN_METRIC, PROVIDER_TAG, command.provider().name(), OUTCOME_TAG, "returning");
       return new AuthenticateWithSocialProviderResult.LoggedIn(identity.accountId());
     }
 
@@ -179,7 +183,7 @@ public class AuthenticateWithSocialProviderService
                 account.id(),
                 command.provider());
             metrics.increment(
-                LOGIN_METRIC, "provider", command.provider().name(), OUTCOME_TAG, "new_signup");
+                LOGIN_METRIC, PROVIDER_TAG, command.provider().name(), OUTCOME_TAG, "new_signup");
 
             return new AuthenticateWithSocialProviderResult.LoggedIn(account.id());
           });
@@ -224,7 +228,11 @@ public class AuthenticateWithSocialProviderService
         account.id(),
         command.provider());
     metrics.increment(
-        LOGIN_METRIC, "provider", command.provider().name(), OUTCOME_TAG, "confirmation_required");
+        LOGIN_METRIC,
+        PROVIDER_TAG,
+        command.provider().name(),
+        OUTCOME_TAG,
+        "confirmation_required");
 
     return new AuthenticateWithSocialProviderResult.ConfirmationRequired();
   }

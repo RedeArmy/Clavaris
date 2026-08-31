@@ -8,8 +8,10 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.UnverifiedProviderEmailException;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
 import com.clavaris.identity.infrastructure.adapter.in.web.PlatformAuthenticatedSessionEstablisher;
@@ -58,7 +60,22 @@ import org.springframework.stereotype.Component;
 // early-exit error path vs. the real result) — same "each outcome needs its own exit" rationale
 // as SetRateLimitPolicyController's own identical suppression. The formerly-repeated "/o/" literal
 // is now TENANT_PATH_PREFIX below, so no PMD.AvoidDuplicateLiterals suppression is needed either.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
+// java:S1075: every redirect target in this class ("/platform/dashboard" and its siblings below)
+// is a route this server-rendered app owns and serves itself, not an external URI a deployment
+// should be able to repoint — same "these are code, not runtime config" reasoning as every other
+// hardcoded path already in this class (TENANT_PATH_PREFIX, the confirmation-required/error
+// redirects), not an oversight specific to this one literal. PMD.ExcessiveImports: this class
+// genuinely orchestrates both tiers' own use case/command/result/session-establisher types plus
+// the record-pattern accountId/platformAccountId types the code review's own record-pattern fix
+// added — same "wiring together many distinct types is the job" reasoning
+// RefreshTokenRotationAuthenticationProvider's own identical suppression already documents.
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.LawOfDemeter",
+  "PMD.OnlyOneReturn",
+  "java:S1075",
+  "PMD.ExcessiveImports"
+})
 @Component
 class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
 
@@ -160,11 +177,11 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
       return;
     }
 
-    if (result instanceof AuthenticateWithSocialProviderResult.LoggedIn loggedIn) {
+    if (result instanceof AuthenticateWithSocialProviderResult.LoggedIn(AccountId accountId)) {
       final String fallbackUrl = TENANT_PATH_PREFIX + organizationId + "/login?authenticated";
       final String target =
           tenantSessions.establishViaSocialLogin(
-              request, response, loggedIn.accountId().value(), provider, fallbackUrl);
+              request, response, accountId.value(), provider, fallbackUrl);
       redirectStrategy.sendRedirect(request, response, target);
     } else {
       redirectStrategy.sendRedirect(
@@ -186,10 +203,13 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
             new AuthenticatePlatformAccountWithSocialProviderCommand(
                 provider, providerUserId, new Email(verifiedEmail), true));
 
-    if (result instanceof AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn loggedIn) {
+    if (result
+        instanceof
+        AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn(
+            PlatformAccountId platformAccountId)) {
       final String target =
           platformSessions.establish(
-              request, response, loggedIn.platformAccountId().value(), "/platform/dashboard");
+              request, response, platformAccountId.value(), "/platform/dashboard");
       redirectStrategy.sendRedirect(request, response, target);
     } else {
       redirectStrategy.sendRedirect(
@@ -211,7 +231,7 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
   private SocialProvider resolveProvider(final String registrationId) {
     try {
       return SocialProvider.valueOf(registrationId.toUpperCase(Locale.ROOT));
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
   }

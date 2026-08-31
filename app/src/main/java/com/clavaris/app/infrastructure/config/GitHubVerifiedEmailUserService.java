@@ -53,6 +53,10 @@ import tools.jackson.databind.ObjectMapper;
 // PMD.OnlyOneReturn: loadUser (delegate-vs-GitHub-specific) and findPrimaryVerifiedEmail
 // (found-vs-none) each have two real, distinct outcomes — same "each outcome needs its own exit"
 // rationale as SetRateLimitPolicyController's own identical suppression.
+// @Component, not @Service, is intentional here — every infrastructure/config bean in this
+// package (bridges, handlers, jobs, this one) uses @Component uniformly, regardless of how much
+// logic it carries; this codebase reserves @Service-shaped semantics for actual domain/application
+// use cases (application/usecase/**), which this OAuth2UserService adapter is not one of.
 @SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
 @Component
 class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
