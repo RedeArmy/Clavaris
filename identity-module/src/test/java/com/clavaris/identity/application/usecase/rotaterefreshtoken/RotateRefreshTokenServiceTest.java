@@ -19,9 +19,7 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.RefreshTokenReuseDetectedEvent;
-import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
-import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
@@ -176,8 +174,7 @@ class RotateRefreshTokenServiceTest {
     alreadyRotatedAway.revoke(); // simulates a prior successful rotation having already happened
     when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash("stolen-old-value")))
         .thenReturn(Optional.of(alreadyRotatedAway));
-    when(accounts.findById(accountId))
-        .thenReturn(Optional.of(Account.register(organizationId, new Email("victim@example.com"))));
+    when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.of(organizationId));
     RotateRefreshTokenCommand command =
         commandFor("stolen-old-value", Instant.now().plusSeconds(3600));
 

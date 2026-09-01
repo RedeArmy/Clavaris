@@ -51,6 +51,11 @@ class JpaAccountRepository implements AccountRepository {
     return accounts.findById(accountId.value()).map(this::toDomain);
   }
 
+  @Override
+  public Optional<OrganizationId> findOrganizationIdById(final AccountId accountId) {
+    return accounts.findOrganizationIdById(accountId.value()).map(OrganizationId::new);
+  }
+
   private Account toDomain(final AccountEntity entity) {
     final AccountId accountId = new AccountId(entity.getId());
     // A password-only login attempt against an account that only has a social identity attached

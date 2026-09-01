@@ -38,6 +38,15 @@ public interface AccountRepository {
    */
   Optional<Account> findById(AccountId accountId);
 
+  /**
+   * Code review finding (2026-09-01): a scalar projection for callers that only need {@code
+   * organizationId} — the one fact a bare {@link AccountId} can't carry — without paying for the
+   * full {@link Account} (and its own separate {@code PasswordCredential} lookup) {@link #findById}
+   * always hydrates. {@code RevokeAccountSessionService}/{@code RotateRefreshTokenService} both
+   * used to call {@link #findById} for exactly this one field.
+   */
+  Optional<OrganizationId> findOrganizationIdById(AccountId accountId);
+
   /** Persists the account and its attached credential in one write. */
   void save(Account account);
 

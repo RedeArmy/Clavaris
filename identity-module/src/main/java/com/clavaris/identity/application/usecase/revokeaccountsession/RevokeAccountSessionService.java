@@ -4,29 +4,49 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BestEffortEventPublisher;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.domain.event.AccountSessionRevokedEvent;
+import com.clavaris.identity.domain.model.AccountId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Orchestration for {@link RevokeAccountSessionUseCase}. Reuses {@code
  * listactivesessionsforaccount}'s own {@link AccountActiveSessionsRepository} rather than a
  * dedicated port — same "one port, several use cases" precedent as {@code AccountRepository}.
  *
- * <p>TD-SEC-034 (SDE-III review, 2026-08-31): audits every real revocation — {@code
- * SuspendAccountService}/{@code ReactivateAccountService}/{@code DeleteAccountService} all leave an
- * audit trail for the security-relevant account mutation they perform; an Account ending its own
- * live session is exactly the class of event an incident investigation would want reconstructed
- * later ("when was this session actually killed, from where"), and this class previously left none.
- * Always {@link AuditActor#account} — {@code command.accountId()} is both the actor and the target
- * here, genuine self-service, never an operator acting on someone else's behalf.
+ * <p>TD-SEC-034: audits every real revocation, same as {@code SuspendAccountService}/{@code
+ * ReactivateAccountService}/{@code DeleteAccountService} do for their own security-relevant
+ * mutations. Always {@link AuditActor#account} — genuine self-service, never an operator acting on
+ * someone else's behalf.
+ *
+ * <p><b>TD-SEC-036: deliberately NOT {@code @Transactional}.</b> {@link
+ * AccountActiveSessionsRepository#revoke} is a Redis call, already irreversible before any Postgres
+ * write below it runs — wrapping a transaction around the writes that follow would only risk
+ * rolling back an already-completed revoke's own audit trail if one of them failed. {@link
+ * #recordRevocation} isolates each write independently via {@link BestEffortEventPublisher} / its
+ * own try/catch — see technical-debt-register.md TD-SEC-036 for the full incident history.
  */
 public class RevokeAccountSessionService implements RevokeAccountSessionUseCase {
 
+  private static final Logger LOG = LoggerFactory.getLogger(RevokeAccountSessionService.class);
+
   private final AccountActiveSessionsRepository activeSessions;
+  private final AccountRepository accounts;
   private final AuditEventRecorder auditEvents;
+  private final EventOutboxWriter outbox;
 
   public RevokeAccountSessionService(
-      final AccountActiveSessionsRepository activeSessions, final AuditEventRecorder auditEvents) {
+      final AccountActiveSessionsRepository activeSessions,
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox) {
     this.activeSessions = activeSessions;
+    this.accounts = accounts;
     this.auditEvents = auditEvents;
+    this.outbox = outbox;
   }
 
   @Override
@@ -40,13 +60,45 @@ public class RevokeAccountSessionService implements RevokeAccountSessionUseCase 
             .findByAccountIdAndSessionId(command.accountId(), command.sessionId())
             .orElseThrow(() -> new SessionNotFoundException(command.sessionId()));
 
+    // The real, irreversible action, first and unconditionally — never gated on Postgres health.
     activeSessions.revoke(session.sessionId());
 
-    auditEvents.write(
-        AuditActor.account(command.accountId().value()),
-        "account.session_revoked",
-        "Session",
-        session.sessionId(),
-        null);
+    recordRevocation(command.accountId(), session.sessionId());
+  }
+
+  // Audit and outbox are isolated independently (TD-SEC-036) — neither may propagate, and a
+  // failure in one must never suppress the other's own attempt.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // AuditEventRecorder/AccountRepository
+  // can each throw a Spring DataAccessException like any other DB call.
+  private void recordRevocation(final AccountId accountId, final String sessionId) {
+    try {
+      auditEvents.write(
+          AuditActor.account(accountId.value()),
+          "account.session_revoked",
+          "Session",
+          sessionId,
+          null);
+    } catch (final RuntimeException e) {
+      LOG.warn("event=account_session_revoked_audit_write_failed", e);
+    }
+
+    // findOrganizationIdById, not findById: the outbox event only needs this one field, not the
+    // full Account + its own separate PasswordCredential lookup.
+    try {
+      accounts
+          .findOrganizationIdById(accountId)
+          .ifPresentOrElse(
+              organizationId ->
+                  BestEffortEventPublisher.publish(
+                      LOG,
+                      outbox,
+                      "account.session_revoked",
+                      accountId,
+                      AccountSessionRevokedEvent.of(accountId, organizationId, sessionId),
+                      "event=account_session_revoked_outbox_write_failed"),
+              () -> LOG.warn("event=account_session_revoked_outbox_skipped_account_not_found"));
+    } catch (final RuntimeException e) {
+      LOG.warn("event=account_session_revoked_account_lookup_failed", e);
+    }
   }
 }

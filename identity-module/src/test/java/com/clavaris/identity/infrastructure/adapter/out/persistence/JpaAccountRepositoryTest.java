@@ -101,6 +101,26 @@ class JpaAccountRepositoryTest {
     assertThat(repository.findByOrganizationIdAndEmail(otherOrganizationId, email)).isEmpty();
   }
 
+  // Code review finding (2026-09-01): findOrganizationIdById exists specifically so a caller that
+  // only needs this one field (RevokeAccountSessionService, RotateRefreshTokenService) never pays
+  // for the full findById()/toDomain() round trip, including its own separate
+  // password_credentials query — proven against real Postgres, not just inspected.
+  @Test
+  void findsOrganizationIdByIdWithoutHydratingTheFullAccount() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account account = Account.register(organizationId, new Email("scalar-lookup@example.com"));
+    repository.save(account);
+
+    Optional<OrganizationId> found = repository.findOrganizationIdById(account.id());
+
+    assertThat(found).contains(organizationId);
+  }
+
+  @Test
+  void findOrganizationIdByIdReturnsEmptyForAnUnknownAccount() {
+    assertThat(repository.findOrganizationIdById(AccountId.newId())).isEmpty();
+  }
+
   @Test
   void returnsEmptyForAnUnknownEmail() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());

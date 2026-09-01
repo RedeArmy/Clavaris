@@ -6,7 +6,6 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.RefreshTokenReuseDetectedEvent;
-import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
@@ -165,10 +164,12 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     accountTokenRevoker.revokeAllTokensFor(accountId);
     accountSessionRevoker.revokeAllSessionsFor(accountId);
 
+    // findOrganizationIdById, not findById (code review, 2026-09-01): the only field this method
+    // ever needed from the Account — a scalar projection avoids the full entity plus its own
+    // separate PasswordCredential lookup findById would otherwise cost, for a field never used.
     final OrganizationId organizationId =
         accounts
-            .findById(accountId)
-            .map(Account::organizationId)
+            .findOrganizationIdById(accountId)
             .orElseThrow(
                 () ->
                     new IllegalStateException(
