@@ -32,8 +32,10 @@ public final class DeviceCookie {
 
   /* package */ static final String COOKIE_NAME = "clavaris_device";
 
-  // Long-lived on purpose — this is "remember this browser," not a session-lifetime artifact;
+  // Long-lived on purpose: this is "remember this browser," not a session-lifetime artifact.
   // 365 days stays safely under Chrome's own 400-day hard cap on any cookie's Max-Age.
+  // (Sonar S125 false positive on the original wording — semicolon-terminated line read as
+  // commented-out source, not prose; reworded, same substance.)
   private static final Duration MAX_AGE = Duration.ofDays(365);
 
   private DeviceCookie() {
