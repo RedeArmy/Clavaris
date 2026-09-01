@@ -10,6 +10,11 @@ import com.clavaris.identity.domain.model.AccountId;
  * {@code webhook-module} (ADR-0007, 🟡 proposed), not yet built — a row written here simply waits
  * until that module exists to drain it, same as any other outbox consumer coming online later
  * would.
+ *
+ * <p><b>Named exception (TD-SEC-036):</b> a caller whose own state change isn't itself a database
+ * write (e.g. {@code RevokeAccountSessionService}'s real action is a Redis call) has no transaction
+ * to put this write inside — see {@link BestEffortEventPublisher} for that narrow, isolated-write
+ * pattern. Every other caller still owes the same-transaction guarantee above.
  */
 @FunctionalInterface
 public interface EventOutboxWriter {

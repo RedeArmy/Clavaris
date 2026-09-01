@@ -3,12 +3,17 @@ package com.clavaris.identity.application.usecase.recordaccountlogindevice;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BestEffortEventPublisher;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.domain.event.AccountNewDeviceDetectedEvent;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.KnownDevice;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -19,24 +24,21 @@ import org.springframework.dao.DataIntegrityViolationException;
  * absent cookie → mint a fresh device token, persist the new {@link KnownDevice} row, attempt the
  * "new device login" notification email, and hand the caller the raw token to set as a new cookie.
  *
- * <p><b>Never lets a mail failure propagate</b> — a deliberate departure from {@code
- * RequestEmailVerificationService}'s own style (which lets {@link MailDeliveryException}
- * propagate): there, a failed send *is* the whole point of that request and the caller needs to
- * know. Here, the caller is mid-login (this runs right after {@code
- * AuthenticatedSessionEstablisher#establish}/{@code establishViaSocialLogin} already succeeded) — a
- * Resend hiccup must never turn an otherwise-successful login into a failed request. The device row
- * is persisted, and its token returned for the caller to set as a cookie, before the send attempt —
- * a failed notification never also loses the "we've now seen this device" bookkeeping.
+ * <p><b>Never lets a side-channel write fail an otherwise-successful login</b> — a deliberate
+ * departure from {@code RequestEmailVerificationService}'s own style (there, a failed send *is* the
+ * point of the request). The device row is persisted, and its token returned, before any of the
+ * audit/outbox/mail steps below run — a failure in any of them never loses that bookkeeping.
+ * Neither {@code LoginController} nor {@code SocialLoginAuthenticationSuccessHandler} wraps this
+ * use case's own {@code handle} call in a try/catch, trusting this guarantee.
  *
- * <p><b>TD-SEC-033 (SDE-III review, 2026-08-31):</b> device recognition moved from the raw {@code
- * User-Agent} header to an opaque, unforgeable device token — see {@code KnownDevice}'s own Javadoc
- * for why. One structural side effect worth calling out explicitly: the classic TOCTOU race this
- * class used to guard against (two concurrent logins from the same brand-new {@code (accountId,
- * userAgent)} both racing into the insert) can no longer actually happen the same way — each
- * concurrent request now mints its own independent, high-entropy random token, so there is no
- * shared key for two requests to collide on. The {@link DataIntegrityViolationException} catch
- * below is kept anyway, purely as defense-in-depth against a statistically negligible token
- * collision (or any other cause of that exact constraint firing) — see its own comment.
+ * <p><b>TD-SEC-033:</b> device recognition uses an opaque, unforgeable device token, not the raw
+ * {@code User-Agent} header — see {@code KnownDevice}'s own Javadoc for why. The {@link
+ * DataIntegrityViolationException} catch below is defense-in-depth against a statistically
+ * negligible token collision, kept from the era this class was still User-Agent-keyed.
+ *
+ * <p><b>TD-SEC-036:</b> audit, account lookup, and outbox write are each isolated independently
+ * (via {@link BestEffortEventPublisher} for the outbox, a local try/catch for the rest) — see
+ * technical-debt-register.md TD-SEC-036 for the full incident history.
  */
 public class RecordAccountLoginDeviceService implements RecordAccountLoginDeviceUseCase {
 
@@ -52,16 +54,21 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   private final AccountRepository accounts;
   private final MailSender mailSender;
   private final AuditEventRecorder auditEvents;
+  private final EventOutboxWriter outbox;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
+  // DeleteAccountService's own identical suppression.
   public RecordAccountLoginDeviceService(
       final KnownDeviceRepository knownDevices,
       final AccountRepository accounts,
       final MailSender mailSender,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox) {
     this.knownDevices = knownDevices;
     this.accounts = accounts;
     this.mailSender = mailSender;
     this.auditEvents = auditEvents;
+    this.outbox = outbox;
   }
 
   // Three genuinely distinct outcomes (recognized via cookie / lost the negligible token-
@@ -95,28 +102,24 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
       knownDevices.save(device);
     } catch (final DataIntegrityViolationException e) {
       // Statistically negligible under this design (two independent 256-bit random values
-      // colliding) — a real hit here would mean something is actually wrong (e.g. a broken
-      // SecureRandom), not an expected, benign race the old UA-keyed version of this catch used
-      // to recover from. Degrades to "no notification this time" rather than an unhandled 500,
-      // same "never let this path fail an otherwise-successful login" guarantee this class's own
-      // header paragraph establishes.
+      // colliding) — degrades to "no notification this time" rather than an unhandled 500.
       LOG.warn("event=known_device_token_collision", e);
       return Optional.empty();
     }
 
-    auditEvents.write(
-        AuditActor.account(command.accountId().value()),
-        "account.new_device_detected",
-        "KnownDevice",
-        device.id().toString(),
-        null);
+    recordAudit(command.accountId(), device.id());
 
-    // Defensive only — a real Account is guaranteed to exist by the time this runs (this is only
-    // ever called right after that same Account just authenticated); an unresolvable id here
-    // would mean something upstream is already badly broken, not a case worth blocking the new
-    // cookie on.
-    final Account account = accounts.findById(command.accountId()).orElse(null);
+    // Defensive only — a real Account is guaranteed to exist right after it just authenticated;
+    // a thrown or genuinely unresolved lookup both degrade to null, skipping outbox and mail.
+    final Account account = findAccountOrNull(command.accountId());
     if (account != null) {
+      BestEffortEventPublisher.publish(
+          LOG,
+          outbox,
+          "account.new_device_detected",
+          command.accountId(),
+          AccountNewDeviceDetectedEvent.from(device, account.organizationId()),
+          "event=account_new_device_detected_outbox_write_failed");
       try {
         mailSender.sendNewDeviceLoginNotification(
             account.email().value(),
@@ -131,6 +134,37 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
     }
 
     return Optional.of(rawDeviceToken);
+  }
+
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // AuditEventRecorder can throw a Spring
+  // DataAccessException like any other DB write; must never propagate (see class Javadoc).
+  private void recordAudit(final AccountId accountId, final UUID deviceId) {
+    try {
+      auditEvents.write(
+          AuditActor.account(accountId.value()),
+          "account.new_device_detected",
+          "KnownDevice",
+          deviceId.toString(),
+          null);
+    } catch (final RuntimeException e) {
+      LOG.warn("event=account_new_device_detected_audit_write_failed", e);
+    }
+  }
+
+  // Two genuinely distinct exits (resolved / lookup failed), same "each outcome needs its own
+  // exit" rationale as this class's own handle() method above.
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException", // AccountRepository#findById can throw a Spring
+    // DataAccessException like any other read; must never propagate (see class Javadoc).
+    "PMD.OnlyOneReturn"
+  })
+  private Account findAccountOrNull(final AccountId accountId) {
+    try {
+      return accounts.findById(accountId).orElse(null);
+    } catch (final RuntimeException e) {
+      LOG.warn("event=account_new_device_detected_account_lookup_failed", e);
+      return null;
+    }
   }
 
   private static String normalizedUserAgent(final String userAgent) {

@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Spring Data's own repository interface — kept separate from the outbound port ({@code
@@ -15,6 +16,13 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   boolean existsByOrganizationIdAndEmail(UUID organizationId, String email);
 
   Optional<AccountEntity> findByOrganizationIdAndEmail(UUID organizationId, String email);
+
+  // Code review finding (2026-09-01): a scalar projection, not the full entity + its own separate
+  // password_credentials round trip findById()/toDomain() costs — for the several callers (e.g.
+  // RevokeAccountSessionService, RotateRefreshTokenService) that only ever need organizationId,
+  // the only fact a bare AccountId can't carry on its own.
+  @Query("select a.organizationId from AccountEntity a where a.id = :accountId")
+  Optional<UUID> findOrganizationIdById(@Param("accountId") UUID accountId);
 
   // TD-SEC-031: full entities, not an id-only projection — "correct and simple first," same
   // precedent as OrganizationCapacityRateLimitingFilter's own Javadoc for reading a whole row over

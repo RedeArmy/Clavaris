@@ -61,6 +61,11 @@
              consistent with every other plugin version in this file already
              being explicit, not left to Maven's own discretion. -->
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <!-- Pinned explicitly (TD-TEST-005), same "every other plugin version in this file is
+             explicit" rationale as maven-compiler-plugin above — this is the version Maven was
+             already resolving unpinned before this row existed, confirmed via a real build's own
+             "maven-surefire-plugin:3.5.4:test" log line, not guessed. -->
+        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
         <!-- CVE overrides (security-architecture.md §8 — zero critical/high
              findings open, non-negotiable): spring-boot-
              dependencies 4.1.0 manages versions with real, live CVSS ≥ 7
@@ -326,6 +331,29 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+
+            <!-- TD-TEST-005/006 (technical-debt-register.md carries the full investigation, four
+                 rounds): bounds the "Surefire is going to kill self fork JVM" build noise — stale
+                 @SpringBootTest contexts closing at JVM shutdown against Testcontainers containers
+                 already torn down. socketTimeout bounds each pgjdbc close attempt; cache.maxSize
+                 forces frequent context eviction so that cost is paid throughout the run instead
+                 of piling up in one final sweep (safe only because Lettuce auto-reconnect is off
+                 in tests too, below); forkedProcessExitTimeoutInSeconds is a safety margin on top.
+                 systemPropertyVariables, not a per-module test/resources/application.yml: the
+                 latter would fully shadow app's own real src/main/resources/application.yml rather
+                 than merge with it. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
+                    <systemPropertyVariables>
+                        <spring.datasource.hikari.data-source-properties.socketTimeout>3</spring.datasource.hikari.data-source-properties.socketTimeout>
+                        <spring.test.context.cache.maxSize>4</spring.test.context.cache.maxSize>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>
