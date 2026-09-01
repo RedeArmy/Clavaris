@@ -12,16 +12,19 @@ class KnownDeviceTest {
 
   @Test
   void recognizeCarriesTheGivenFieldsAndStartsWithFirstSeenEqualToLastSeen() {
-    KnownDevice device = KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser");
+    KnownDevice device =
+        KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "a-token-hash");
 
     assertThat(device.accountId()).isEqualTo(accountId);
     assertThat(device.userAgent()).isEqualTo("Mozilla/5.0 Test Browser");
+    assertThat(device.deviceTokenHash()).isEqualTo("a-token-hash");
     assertThat(device.firstSeenAt()).isEqualTo(device.lastSeenAt());
   }
 
   @Test
   void touchAdvancesLastSeenAtWithoutAffectingFirstSeenAt() {
-    KnownDevice device = KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser");
+    KnownDevice device =
+        KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "a-token-hash");
     Instant originalFirstSeenAt = device.firstSeenAt();
 
     device.touch();
@@ -37,9 +40,11 @@ class KnownDeviceTest {
     Instant lastSeenAt = Instant.parse("2026-01-02T00:00:00Z");
 
     KnownDevice device =
-        KnownDevice.reconstitute(persistedId, accountId, "Some UA", firstSeenAt, lastSeenAt);
+        KnownDevice.reconstitute(
+            persistedId, accountId, "Some UA", "a-token-hash", firstSeenAt, lastSeenAt);
 
     assertThat(device.id()).isEqualTo(persistedId);
+    assertThat(device.deviceTokenHash()).isEqualTo("a-token-hash");
     assertThat(device.firstSeenAt()).isEqualTo(firstSeenAt);
     assertThat(device.lastSeenAt()).isEqualTo(lastSeenAt);
   }

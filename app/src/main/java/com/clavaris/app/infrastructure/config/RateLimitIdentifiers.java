@@ -133,4 +133,18 @@ final class RateLimitIdentifiers {
   /* package */ static String authenticatedPlatformClientId(final HttpServletRequest request) {
     return currentAuthenticationName();
   }
+
+  /**
+   * TD-SEC-035: the current session's authenticated tenant {@code AccountId} — same principal-name
+   * source {@code CurrentAccountResolverBridge} reads, but this filter runs before that bridge
+   * would ever be reached (it protects {@code /o/{organizationId}/account/**} itself), so it reads
+   * {@link SecurityContextHolder} directly, same convention {@link #authenticatedPlatformAccountId}
+   * already establishes for its own tier. Returns {@code null} for an unauthenticated request —
+   * {@code OrganizationAuthorizationServerConfig}'s own {@code hasAuthority(ROLE_ACCOUNT)} check
+   * already rejects those before this rule's outcome would matter.
+   */
+  @SuppressWarnings("java:S1172")
+  /* package */ static String authenticatedAccountId(final HttpServletRequest request) {
+    return currentAuthenticationName();
+  }
 }

@@ -5,8 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
 import com.clavaris.identity.domain.model.AccountId;
@@ -18,11 +21,12 @@ class RevokeAccountSessionServiceTest {
 
   private final AccountActiveSessionsRepository activeSessions =
       mock(AccountActiveSessionsRepository.class);
+  private final AuditEventRecorder auditEvents = mock(AuditEventRecorder.class);
   private final RevokeAccountSessionService service =
-      new RevokeAccountSessionService(activeSessions);
+      new RevokeAccountSessionService(activeSessions, auditEvents);
 
   @Test
-  void revokesASessionTheAccountActuallyOwns() {
+  void revokesASessionTheAccountActuallyOwnsAndAuditsIt() {
     AccountId accountId = AccountId.newId();
     ActiveAccountSession session =
         new ActiveAccountSession("real-session", "UA", "1.2.3.4", Instant.now(), Instant.now());
@@ -32,6 +36,13 @@ class RevokeAccountSessionServiceTest {
     service.handle(new RevokeAccountSessionCommand(accountId, "real-session"));
 
     verify(activeSessions).revoke("real-session");
+    verify(auditEvents)
+        .write(
+            AuditActor.account(accountId.value()),
+            "account.session_revoked",
+            "Session",
+            "real-session",
+            null);
   }
 
   @Test
@@ -48,5 +59,6 @@ class RevokeAccountSessionServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(activeSessions, never()).revoke(any());
+    verifyNoInteractions(auditEvents);
   }
 }
