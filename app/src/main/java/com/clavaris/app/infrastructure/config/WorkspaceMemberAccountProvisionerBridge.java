@@ -1,5 +1,8 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountCommand;
+import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -41,13 +44,16 @@ class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
 
   private final RegisterAccountUseCase registerAccount;
   private final RequestPasswordResetUseCase requestPasswordReset;
+  private final DeleteAccountUseCase deleteAccount;
   private final SecureRandom secureRandom = new SecureRandom();
 
   /* package */ WorkspaceMemberAccountProvisionerBridge(
       final RegisterAccountUseCase registerAccount,
-      final RequestPasswordResetUseCase requestPasswordReset) {
+      final RequestPasswordResetUseCase requestPasswordReset,
+      final DeleteAccountUseCase deleteAccount) {
     this.registerAccount = registerAccount;
     this.requestPasswordReset = requestPasswordReset;
+    this.deleteAccount = deleteAccount;
   }
 
   @Override
@@ -74,6 +80,16 @@ class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
     requestPasswordReset.handle(new RequestPasswordResetCommand(orgId, memberEmail));
 
     return new ProvisionedAccount(accountId.value());
+  }
+
+  // TD-WS-001: 100% reuse of the already-built, already-tested admin-API hard-delete use case —
+  // same "no new mechanism" precedent provisionAndSendWelcome's own Javadoc already establishes
+  // for its own reuse of RegisterAccountUseCase/RequestPasswordResetUseCase. Any failure here
+  // propagates as-is — AddWorkspaceMemberService's own catch around this call is what contains it
+  // (logs event=workspace_member_account_deprovision_failed), not this bridge.
+  @Override
+  public void deprovision(final UUID accountId, final AuditActor actor) {
+    deleteAccount.handle(new DeleteAccountCommand(new AccountId(accountId), actor));
   }
 
   private String generateRandomPassword() {

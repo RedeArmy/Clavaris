@@ -12,10 +12,17 @@ import java.util.UUID;
  * @param requireConsent TD-SEC-026/ADR-0017: resolved by the web adapter, which defaults an absent
  *     request field to {@code true} — this command always carries an explicit value, never an
  *     implicit one.
+ * @param postLogoutRedirectUris TD-FUT-018: resolved by the web adapter, which defaults an absent
+ *     request field to an empty list — same "always explicit, never implicit" discipline as {@code
+ *     requireConsent} above. Empty means "not configured," not an error.
  */
+// PMD.LongVariable: postLogoutRedirectUris is the exact OIDC spec term (post_logout_redirect_uris)
+// — same "the name is right, not arbitrarily long" precedent as PlatformScopes' own suppression.
+@SuppressWarnings("PMD.LongVariable")
 public record RegisterOAuthClientCommand(
     UUID organizationId,
     List<String> redirectUris,
     List<String> allowedGrantTypes,
     List<String> allowedScopes,
-    boolean requireConsent) {}
+    boolean requireConsent,
+    List<String> postLogoutRedirectUris) {}

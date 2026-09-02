@@ -10,6 +10,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountCommand;
+import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -29,8 +32,10 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
   private final RegisterAccountUseCase registerAccount = mock(RegisterAccountUseCase.class);
   private final RequestPasswordResetUseCase requestPasswordReset =
       mock(RequestPasswordResetUseCase.class);
+  private final DeleteAccountUseCase deleteAccount = mock(DeleteAccountUseCase.class);
   private final WorkspaceMemberAccountProvisionerBridge bridge =
-      new WorkspaceMemberAccountProvisionerBridge(registerAccount, requestPasswordReset);
+      new WorkspaceMemberAccountProvisionerBridge(
+          registerAccount, requestPasswordReset, deleteAccount);
 
   @Test
   void registersTheAccountThenTriggersThePasswordResetEmail_inThatOrder() {
@@ -101,5 +106,33 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
         .isThrownBy(() -> bridge.provisionAndSendWelcome(organizationId, "taken@example.com"));
 
     verify(requestPasswordReset, never()).handle(any());
+  }
+
+  // TD-WS-001: deprovision() is a thin, 100%-reuse delegate to DeleteAccountUseCase — these two
+  // tests prove the delegation itself, not DeleteAccountService's own behavior (already covered by
+  // DeleteAccountServiceTest/DeleteAccountIntegrationTest).
+  @Test
+  void deprovisionDelegatesToDeleteAccountUseCaseWithTheGivenAccountIdAndActor() {
+    UUID accountId = UUID.randomUUID();
+    AuditActor actor = AuditActor.platformClient("test-platform-client");
+
+    bridge.deprovision(accountId, actor);
+
+    ArgumentCaptor<DeleteAccountCommand> command =
+        ArgumentCaptor.forClass(DeleteAccountCommand.class);
+    verify(deleteAccount).handle(command.capture());
+    assertThat(command.getValue().accountId()).isEqualTo(new AccountId(accountId));
+    assertThat(command.getValue().actor()).isEqualTo(actor);
+  }
+
+  @Test
+  void deprovisionLetsADeleteAccountUseCaseFailurePropagateUnchanged() {
+    UUID accountId = UUID.randomUUID();
+    RuntimeException deleteFailure = new RuntimeException("delete failed");
+    org.mockito.Mockito.doThrow(deleteFailure).when(deleteAccount).handle(any());
+
+    assertThatExceptionOfType(RuntimeException.class)
+        .isThrownBy(() -> bridge.deprovision(accountId, AuditActor.platformClient("client")))
+        .isSameAs(deleteFailure);
   }
 }

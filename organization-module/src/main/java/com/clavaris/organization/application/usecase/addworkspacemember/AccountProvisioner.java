@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.addworkspacemember;
 
+import com.clavaris.common.domain.model.AuditActor;
 import java.util.UUID;
 
 /**
@@ -16,8 +17,10 @@ import java.util.UUID;
  * to identity-module's own database (its own, already-committing transaction) and sends a real
  * email over the network — same "no DB transaction held open across a network call" discipline
  * identity-module's own {@code RequestPasswordResetService} already documents for itself.
+ *
+ * <p>No longer a {@code @FunctionalInterface}: TD-WS-001's own {@link #deprovision} compensating
+ * action is a second, genuinely distinct abstract method — see its own Javadoc.
  */
-@FunctionalInterface
 public interface AccountProvisioner {
 
   /**
@@ -26,6 +29,26 @@ public interface AccountProvisioner {
    *     EmailAlreadyRegisteredException}, never let to cross the module boundary as-is.
    */
   ProvisionedAccount provisionAndSendWelcome(UUID organizationId, String email);
+
+  /**
+   * TD-WS-001: compensating action — reverses {@link #provisionAndSendWelcome} when the
+   * immediately-following {@code WorkspaceMembership} write fails, so a DB blip in that instant
+   * doesn't leave a permanent orphan {@code Account} with no membership pointing at it (previously
+   * the accepted, undocumented-as-automated cost: "an operator would need to notice and hand-delete
+   * via the existing account-deletion admin endpoint" — this automates exactly that same call, not
+   * a new mechanism). See {@code AddWorkspaceMemberService}'s own Javadoc for the full saga shape.
+   *
+   * <p>May throw if the compensating delete itself fails — {@code AddWorkspaceMemberService} is
+   * what contains that failure (catches it, logs, and rethrows the *original* {@code
+   * WorkspaceMembership} failure unchanged), not this method's own contract. A double failure falls
+   * back to exactly today's existing manual remediation path, not a worse outcome than before this
+   * method existed.
+   *
+   * @param actor the same actor that requested the original {@code AddWorkspaceMemberCommand} —
+   *     this compensating delete is attributed to that same request, not a separate "system" actor
+   *     type this codebase doesn't otherwise have a concept of.
+   */
+  void deprovision(UUID accountId, AuditActor actor);
 
   /** Just enough to attach a {@code WorkspaceMembership} row to the new Account. */
   record ProvisionedAccount(UUID accountId) {}

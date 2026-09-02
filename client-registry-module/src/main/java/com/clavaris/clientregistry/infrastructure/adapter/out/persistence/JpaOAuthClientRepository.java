@@ -37,6 +37,7 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
             objectMapper.writeValueAsString(client.allowedGrantTypes()),
             objectMapper.writeValueAsString(client.allowedScopes()),
             client.requireConsent(),
+            objectMapper.writeValueAsString(client.postLogoutRedirectUris()),
             client.createdAt()));
   }
 
@@ -67,6 +68,7 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
         readJsonArray(entity.getAllowedGrantTypes()),
         readJsonArray(entity.getAllowedScopes()),
         entity.isRequireConsent(),
+        readJsonArray(entity.getPostLogoutRedirectUris()),
         entity.getCreatedAt());
   }
 

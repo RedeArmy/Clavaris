@@ -49,7 +49,8 @@ class RegisterOAuthClientControllerTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
     when(useCase.handle(any())).thenReturn(new RegisterOAuthClientResult(client, "the-raw-secret"));
 
     mockMvc
@@ -79,7 +80,8 @@ class RegisterOAuthClientControllerTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
     when(useCase.handle(any())).thenReturn(new RegisterOAuthClientResult(client, "the-raw-secret"));
 
     mockMvc
@@ -107,7 +109,8 @@ class RegisterOAuthClientControllerTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            false);
+            false,
+            List.of());
     when(useCase.handle(any())).thenReturn(new RegisterOAuthClientResult(client, "the-raw-secret"));
 
     mockMvc
@@ -150,5 +153,70 @@ class RegisterOAuthClientControllerTest {
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
                         + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[]}"))
         .andExpect(status().isNotFound());
+  }
+
+  // TD-FUT-018: same "assert on the command the controller actually built" bar as
+  // omittingRequireConsentInTheRequestBodyResolvesToTheSecureDefault above.
+  @Test
+  void omittingPostLogoutRedirectUrisInTheRequestBodyResolvesToAnEmptyList() throws Exception {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    when(useCase.handle(any())).thenReturn(new RegisterOAuthClientResult(client, "the-raw-secret"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}"))
+        .andExpect(status().isCreated());
+
+    ArgumentCaptor<RegisterOAuthClientCommand> captor =
+        ArgumentCaptor.forClass(RegisterOAuthClientCommand.class);
+    verify(useCase).handle(captor.capture());
+    assertThat(captor.getValue().postLogoutRedirectUris()).isEmpty();
+  }
+
+  @Test
+  void anExplicitPostLogoutRedirectUriReachesTheCommandUnchanged() throws Exception {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of("https://jobseeker.example.com/logged-out"));
+    when(useCase.handle(any())).thenReturn(new RegisterOAuthClientResult(client, "the-raw-secret"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/organizations/" + organizationId + "/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"],"
+                        + "\"postLogoutRedirectUris\":[\"https://jobseeker.example.com/logged-out\"]}"))
+        .andExpect(status().isCreated())
+        .andExpect(
+            jsonPath("$.postLogoutRedirectUris[0]")
+                .value("https://jobseeker.example.com/logged-out"));
+
+    ArgumentCaptor<RegisterOAuthClientCommand> captor =
+        ArgumentCaptor.forClass(RegisterOAuthClientCommand.class);
+    verify(useCase).handle(captor.capture());
+    assertThat(captor.getValue().postLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/logged-out");
   }
 }

@@ -154,4 +154,48 @@ class AddWorkspaceMemberServiceTest {
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
   }
+
+  // TD-WS-001: the compensating-action saga — a DB failure right after the Account is provisioned
+  // must not leave a permanent orphan.
+  @Test
+  void deprovisionsTheAccountAndRethrowsTheOriginalFailureWhenTheMembershipWriteFails() {
+    UUID accountId = UUID.randomUUID();
+    when(accountProvisioner.provisionAndSendWelcome(any(), any()))
+        .thenReturn(new AccountProvisioner.ProvisionedAccount(accountId));
+    RuntimeException membershipFailure = new RuntimeException("membership save failed");
+    org.mockito.Mockito.doThrow(membershipFailure).when(memberships).save(any());
+    AddWorkspaceMemberCommand command =
+        new AddWorkspaceMemberCommand(
+            workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+
+    assertThatExceptionOfType(RuntimeException.class)
+        .isThrownBy(() -> service.handle(command))
+        .isSameAs(membershipFailure);
+
+    verify(accountProvisioner).deprovision(accountId, ACTOR);
+    verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
+  }
+
+  // The compensating action itself failing must never mask the original failure that triggered
+  // it — a double failure is exactly today's pre-existing manual-remediation fallback, not a
+  // worse or different outcome than before this saga existed.
+  @Test
+  void stillRethrowsTheOriginalFailureWhenTheCompensatingDeprovisionAlsoFails() {
+    UUID accountId = UUID.randomUUID();
+    when(accountProvisioner.provisionAndSendWelcome(any(), any()))
+        .thenReturn(new AccountProvisioner.ProvisionedAccount(accountId));
+    RuntimeException membershipFailure = new RuntimeException("membership save failed");
+    org.mockito.Mockito.doThrow(membershipFailure).when(memberships).save(any());
+    org.mockito.Mockito.doThrow(new RuntimeException("deprovision also failed"))
+        .when(accountProvisioner)
+        .deprovision(any(), any());
+    AddWorkspaceMemberCommand command =
+        new AddWorkspaceMemberCommand(
+            workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+
+    assertThatExceptionOfType(RuntimeException.class)
+        .isThrownBy(() -> service.handle(command))
+        .isSameAs(membershipFailure);
+  }
 }

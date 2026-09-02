@@ -43,7 +43,8 @@ class RegisterOAuthClientServiceTest {
                 List.of("https://jobseeker.example.com/callback"),
                 List.of("authorization_code"),
                 List.of("openid"),
-                true));
+                true,
+                List.of()));
 
     assertThat(result.client().organizationId()).isEqualTo(organizationId);
     assertThat(result.client().clientId()).isNotBlank();
@@ -61,7 +62,8 @@ class RegisterOAuthClientServiceTest {
                 List.of("https://jobseeker.example.com/callback"),
                 List.of("authorization_code"),
                 List.of("openid"),
-                true));
+                true,
+                List.of()));
 
     // The stored hash must never equal the raw secret handed back to the caller — that would mean
     // the "hasher" silently did nothing.
@@ -76,7 +78,8 @@ class RegisterOAuthClientServiceTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
 
     RegisterOAuthClientResult first = service.handle(command);
     RegisterOAuthClientResult second = service.handle(command);
@@ -99,11 +102,30 @@ class RegisterOAuthClientServiceTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(oauthClients, never()).save(any());
+  }
+
+  // TD-FUT-018: the real, load-bearing behavior — the command's own value actually reaches the
+  // persisted OAuthClient, not silently dropped between the two.
+  @Test
+  void passesThroughTheGivenPostLogoutRedirectUris() {
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of("https://jobseeker.example.com/logged-out")));
+
+    assertThat(result.client().postLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/logged-out");
   }
 }

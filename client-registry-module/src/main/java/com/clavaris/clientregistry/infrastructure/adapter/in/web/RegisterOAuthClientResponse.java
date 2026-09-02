@@ -14,7 +14,9 @@ import java.util.UUID;
  * HTTP response, not a reason to relax the "never in logs" discipline for any other path this
  * object might travel.
  */
-@SuppressWarnings("PMD.ShortVariable")
+// PMD.LongVariable: postLogoutRedirectUris is the exact OIDC spec term, not arbitrarily long —
+// same precedent as OAuthClient's own identical suppression.
+@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
 public record RegisterOAuthClientResponse(
     UUID id,
     UUID organizationId,
@@ -24,6 +26,7 @@ public record RegisterOAuthClientResponse(
     List<String> allowedGrantTypes,
     List<String> allowedScopes,
     boolean requireConsent,
+    List<String> postLogoutRedirectUris,
     Instant createdAt) {
 
   public static RegisterOAuthClientResponse from(final RegisterOAuthClientResult result) {
@@ -37,6 +40,7 @@ public record RegisterOAuthClientResponse(
         client.allowedGrantTypes(),
         client.allowedScopes(),
         client.requireConsent(),
+        client.postLogoutRedirectUris(),
         client.createdAt());
   }
 
@@ -56,6 +60,8 @@ public record RegisterOAuthClientResponse(
         + allowedScopes
         + ", requireConsent="
         + requireConsent
+        + ", postLogoutRedirectUris="
+        + postLogoutRedirectUris
         + ", createdAt="
         + createdAt
         + ']';
