@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -163,7 +164,7 @@ class AddWorkspaceMemberServiceTest {
     when(accountProvisioner.provisionAndSendWelcome(any(), any()))
         .thenReturn(new AccountProvisioner.ProvisionedAccount(accountId));
     RuntimeException membershipFailure = new RuntimeException("membership save failed");
-    org.mockito.Mockito.doThrow(membershipFailure).when(memberships).save(any());
+    doThrow(membershipFailure).when(memberships).save(any());
     AddWorkspaceMemberCommand command =
         new AddWorkspaceMemberCommand(
             workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
@@ -186,8 +187,8 @@ class AddWorkspaceMemberServiceTest {
     when(accountProvisioner.provisionAndSendWelcome(any(), any()))
         .thenReturn(new AccountProvisioner.ProvisionedAccount(accountId));
     RuntimeException membershipFailure = new RuntimeException("membership save failed");
-    org.mockito.Mockito.doThrow(membershipFailure).when(memberships).save(any());
-    org.mockito.Mockito.doThrow(new RuntimeException("deprovision also failed"))
+    doThrow(membershipFailure).when(memberships).save(any());
+    doThrow(new RuntimeException("deprovision also failed"))
         .when(accountProvisioner)
         .deprovision(any(), any());
     AddWorkspaceMemberCommand command =

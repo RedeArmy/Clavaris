@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -128,11 +129,12 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
   @Test
   void deprovisionLetsADeleteAccountUseCaseFailurePropagateUnchanged() {
     UUID accountId = UUID.randomUUID();
+    AuditActor actor = AuditActor.platformClient("client");
     RuntimeException deleteFailure = new RuntimeException("delete failed");
-    org.mockito.Mockito.doThrow(deleteFailure).when(deleteAccount).handle(any());
+    doThrow(deleteFailure).when(deleteAccount).handle(any());
 
     assertThatExceptionOfType(RuntimeException.class)
-        .isThrownBy(() -> bridge.deprovision(accountId, AuditActor.platformClient("client")))
+        .isThrownBy(() -> bridge.deprovision(accountId, actor))
         .isSameAs(deleteFailure);
   }
 }
