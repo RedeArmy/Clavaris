@@ -109,6 +109,7 @@ class RecordAccountLoginDeviceServiceTest {
         .write(
             eq("account.new_device_detected"),
             eq(account.id()),
+            any(),
             any(AccountNewDeviceDetectedEvent.class));
   }
 
@@ -125,7 +126,7 @@ class RecordAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(mailSender).sendNewDeviceLoginNotification(any(), any(), any(), any(), any());
-    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any());
+    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
   }
 
   @Test
@@ -141,7 +142,8 @@ class RecordAccountLoginDeviceServiceTest {
     assertThat(blankResult).isPresent();
     assertThat(nullResult).isPresent();
     verify(knownDevices, times(2)).save(any(KnownDevice.class));
-    verify(outbox, times(2)).write(eq("account.new_device_detected"), eq(account.id()), any());
+    verify(outbox, times(2))
+        .write(eq("account.new_device_detected"), eq(account.id()), any(), any());
   }
 
   // The one case this whole class exists to prove: unlike RequestEmailVerificationService, a
@@ -159,7 +161,7 @@ class RecordAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(knownDevices).save(any(KnownDevice.class));
-    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any());
+    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
   }
 
   // TD-SEC-036 (SDE-III review, self-caught same day): the very case the first version of this
@@ -169,7 +171,7 @@ class RecordAccountLoginDeviceServiceTest {
   // attempted afterward, unaffected by the outbox write's own failure.
   @Test
   void anOutboxWriteFailureNeverPropagatesAndTheMailSendIsStillAttempted() {
-    doThrow(new RuntimeException("Postgres hiccup")).when(outbox).write(any(), any(), any());
+    doThrow(new RuntimeException("Postgres hiccup")).when(outbox).write(any(), any(), any(), any());
 
     Optional<String> result =
         service.handle(
@@ -201,7 +203,7 @@ class RecordAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(knownDevices).save(any(KnownDevice.class));
-    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any());
+    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
     verify(mailSender)
         .sendNewDeviceLoginNotification(
             eq(account.email().value()),
@@ -316,7 +318,8 @@ class RecordAccountLoginDeviceServiceTest {
     verify(mailSender)
         .sendNewDeviceLoginNotification(
             eq(preExistingAccount.email().value()), any(), any(), any(), any());
-    verify(outbox).write(eq("account.new_device_detected"), eq(preExistingAccount.id()), any());
+    verify(outbox)
+        .write(eq("account.new_device_detected"), eq(preExistingAccount.id()), any(), any());
   }
 
   // A brand-new signup (created after the cutover) has no migration artifact to suppress — its
@@ -344,7 +347,7 @@ class RecordAccountLoginDeviceServiceTest {
     verify(mailSender)
         .sendNewDeviceLoginNotification(
             eq(brandNewAccount.email().value()), any(), any(), any(), any());
-    verify(outbox).write(eq("account.new_device_detected"), eq(brandNewAccount.id()), any());
+    verify(outbox).write(eq("account.new_device_detected"), eq(brandNewAccount.id()), any(), any());
   }
 
   @Test

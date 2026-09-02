@@ -2,10 +2,12 @@ package com.clavaris.organization.application.usecase.removeworkspacemember;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceMemberRemovedEvent;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -22,14 +24,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCase {
 
   private final WorkspaceMembershipRepository memberships;
+  private final WorkspaceRepository workspaces;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
   public RemoveWorkspaceMemberService(
       final WorkspaceMembershipRepository memberships,
+      final WorkspaceRepository workspaces,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.memberships = memberships;
+    this.workspaces = workspaces;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -50,6 +55,20 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
       throw new CannotRemoveLastAdminException(command.workspaceId());
     }
 
+    // webhook-module's own EventOutboxWriter needs organizationId — resolved before the delete
+    // below so a concurrently-deleted Workspace (no v1 use case does this today, but nothing at
+    // this layer forbids it) can't leave this lookup with nothing to find.
+    final UUID organizationId =
+        workspaces
+            .findOrganizationIdById(membership.workspaceId())
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "WorkspaceMembership references workspaceId "
+                            + membership.workspaceId()
+                            + " that doesn't exist — data integrity violated before reaching this"
+                            + " use case"));
+
     memberships.deleteById(membership.id());
 
     auditEvents.write(
@@ -63,6 +82,7 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
         "WorkspaceMembership",
         "workspace_membership.removed",
         membership.id(),
+        organizationId,
         WorkspaceMemberRemovedEvent.of(
             membership.id(), membership.workspaceId(), membership.accountId()));
   }

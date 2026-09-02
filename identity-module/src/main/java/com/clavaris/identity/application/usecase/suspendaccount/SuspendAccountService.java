@@ -67,6 +67,10 @@ public class SuspendAccountService implements SuspendAccountUseCase {
     auditEvents.write(
         command.actor(), "account.suspended", "Account", account.id().value().toString(), null);
 
-    outbox.write("account.suspended", account.id(), AccountSuspendedEvent.from(account));
+    outbox.write(
+        "account.suspended",
+        account.id(),
+        account.organizationId(),
+        AccountSuspendedEvent.from(account));
   }
 }

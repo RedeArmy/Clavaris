@@ -1,6 +1,7 @@
 package com.clavaris.identity.application.usecase.registeraccount;
 
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.OrganizationId;
 import org.slf4j.Logger;
 
 /**
@@ -20,10 +21,11 @@ public final class BestEffortEventPublisher {
       final EventOutboxWriter outbox,
       final String eventType,
       final AccountId aggregateId,
+      final OrganizationId organizationId,
       final Object payload,
       final String failureLogEvent) {
     try {
-      outbox.write(eventType, aggregateId, payload);
+      outbox.write(eventType, aggregateId, organizationId, payload);
     } catch (final IllegalStateException e) {
       log.error(failureLogEvent, e);
     } catch (final RuntimeException e) {

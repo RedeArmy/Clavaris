@@ -74,7 +74,7 @@ class DeleteAccountServiceTest {
     // be asserted with a plain equals() against a value built here — captured and checked
     // field-by-field instead.
     ArgumentCaptor<AccountDeletedEvent> event = ArgumentCaptor.forClass(AccountDeletedEvent.class);
-    verify(outbox).write(eq("account.deleted"), eq(account.id()), event.capture());
+    verify(outbox).write(eq("account.deleted"), eq(account.id()), any(), event.capture());
     assertThat(event.getValue().accountId()).isEqualTo(account.id());
     assertThat(event.getValue().organizationId()).isEqualTo(account.organizationId());
     assertThat(event.getValue().email()).isEqualTo(account.email().value());

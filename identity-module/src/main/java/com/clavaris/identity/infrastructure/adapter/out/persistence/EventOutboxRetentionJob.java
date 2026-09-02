@@ -13,17 +13,16 @@ import org.springframework.transaction.annotation.Transactional;
  * no cleanup job at all before this, and every {@code AccountRegisteredEvent}/etc. written by a
  * real registration would otherwise accumulate forever.
  *
- * <p><b>Why age, not {@code published_at}:</b> {@code webhook-module} (ADR-0007) isn't built yet,
- * so every row's {@code published_at} stays permanently {@code NULL} — a policy that only ever
- * deleted published rows would delete nothing today and this row would stay open in name only.
- * Age-based sweeping is the honest interim policy: it accepts that any row this job deletes was
- * never going to be delivered to anyone, because nothing subscribes to this table yet. {@code
- * retentionDays} defaults wide (90 days) specifically so that once a real dispatcher exists, its
- * own poll interval only has to stay well inside that window to never lose an event to this job —
- * but the day webhook-module ships, this class must be revisited (widen the window, or gate the
- * sweep on confirmed dispatcher lag) so it doesn't start silently discarding real, undelivered
- * webhooks. A still-unpublished row being swept is logged as a WARN specifically so that day is
- * visible in logs, not discovered as a missing webhook delivery.
+ * <p><b>Why age, not {@code published_at}:</b> webhook-module's own dispatcher (ADR-0007) now
+ * exists and marks rows published within seconds of being written (its default poll interval is
+ * {@code clavaris.webhook.dispatch-fixed-delay-ms}, a few seconds) — but this job still sweeps by
+ * age, not {@code published_at IS NOT NULL}, because a still-unpublished row past the retention
+ * window is itself a real operational signal (the dispatcher has been stuck/down for the entire
+ * window, an incident worth surfacing) rather than something to silently exclude from cleanup.
+ * {@code retentionDays} defaults wide (90 days) specifically so the dispatcher's own real,
+ * seconds-scale poll interval sits nowhere near this margin under normal operation. A
+ * still-unpublished row being swept is logged as a WARN precisely so that incident is visible in
+ * logs, not discovered later as a silently missing webhook delivery.
  *
  * <p>The actual sweep-and-log decision lives on {@link EventOutboxRetentionSweeper} (shared with
  * organization-module's own identical job, TD-ARCH-007) — this class only owns the bean/table/

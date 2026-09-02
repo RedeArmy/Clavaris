@@ -37,16 +37,16 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 | Embedded, branded login (iframe-modal + per-client custom domain) | ❌ v1.1/v2, see ADR-0009 | Requires DNS/proxy domain verification and dynamic TLS — real infra work, not a UI-only feature |
 | Per-client branding (logo, color, app name on hosted login/consent UI) | ❌ v1.1/v2, see ADR-0009 | `ClientBranding` entity, bundled with the custom-domain feature above |
 
-### 2.3 `webhook-module` — 🟡 proposed, see ADR-0007
+### 2.3 `webhook-module` — ✅ shipped 2026-09-02, see ADR-0007
 
 | Capability | v1 | Notes |
 |---|---|---|
-| Register a webhook endpoint per OAuth client | ✅ | URL + subscribed event types; auto-generated signing secret shown once at creation, only its hash stored (`data-model.md` §2 principle) |
-| Signed event delivery | ✅ | HMAC-SHA256, `Clavaris-Signature` header, at-least-once (BR-WEBHOOK-01/02) |
-| Event catalog v1 | ✅ | `account.created`, `account.email_verified`, `account.deleted`, `session.revoked`, `refresh_token.reuse_detected`, `membership.created`, `membership.removed`, `invitation.accepted` — mirrors `domain-model.md` §6's domain events |
+| Register a webhook endpoint per Organization | ✅ | One Organization may register several endpoints; URL (`https://` only) + subscribed event types; auto-generated signing secret shown once at creation or rotation, stored reversibly encrypted (AES-256-GCM) — not a hash, since the secret must be recoverable in cleartext to compute an outbound HMAC at delivery time |
+| Signed event delivery | ✅ | HMAC-SHA256, `Clavaris-Signature` header, at-least-once (BR-WEBHOOK-01/02); two `v1=` signatures during a secret-rotation overlap window |
+| Event catalog v1 | ✅ | Every real domain event in `identity-module`'s and `organization-module`'s own outbox writes it a row for — `account.created/suspended/reactivated/deleted/email_verified/new_device_detected`, `account.session_revoked`, `password_reset.requested/completed`, `social_identity.linked`, `refresh_token.reuse_detected`, `workspace.created`, `workspace_membership.added/removed/role_changed`, `organization.deleted`. No separate curated "catalog" — any event a producer module writes to its outbox is deliverable to a subscribed endpoint. |
 | Retry with backoff + manual replay | ✅ | BR-WEBHOOK-03; replay available via management API, never a silent drop |
-| Signing secret rotation | ❌ backlog | Flagged as an open question in ADR-0007; needed before that ADR can move to Aprobado |
-| Delivery log UI (list/inspect past deliveries) | ❌ backlog | v1 exposes this via the management API only, no dedicated UI |
+| Signing secret rotation | ✅ | Dual-secret overlap window, resolved as ADR-0007's own first open question |
+| Delivery log UI (list/inspect past deliveries) | ❌ backlog | v1 exposes this via the management API only (`GET .../deliveries`), no dedicated UI |
 
 ### 2.4 `organization-module` — 🟡 redefined by ADR-0010
 

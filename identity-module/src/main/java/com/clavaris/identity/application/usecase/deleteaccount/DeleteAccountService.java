@@ -111,7 +111,11 @@ public class DeleteAccountService implements DeleteAccountUseCase {
     auditEvents.write(
         command.actor(), "account.deleted", "Account", account.id().value().toString(), null);
 
-    outbox.write("account.deleted", account.id(), AccountDeletedEvent.from(account));
+    outbox.write(
+        "account.deleted",
+        account.id(),
+        account.organizationId(),
+        AccountDeletedEvent.from(account));
 
     // Captured before the delete, same reasoning as AccountDeletedEvent's own Javadoc — after
     // this call the row this log line describes no longer exists to re-read.

@@ -42,6 +42,11 @@
             <artifactId>client-registry-module</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.clavaris</groupId>
+            <artifactId>webhook-module</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Actuator: health checks from day one (DB + Redis + liveness/readiness probes),
              per the gap flagged in nfr-quality-attributes.md §7. -->
@@ -266,7 +271,8 @@
                  classes at a flat 0.0% as a result, despite being covered by a real
                  integration test. report-aggregate fixes this the standard way for a
                  multi-module Maven reactor: run only here, where every business module
-                 (common, identity-module, organization-module, client-registry-module)
+                 (common, identity-module, organization-module, client-registry-module,
+                 webhook-module)
                  is already a declared dependency, it combines every reactor module's
                  exec data against every dependency's own compiled classes into one
                  report — ci.yml's sonarcloud job points

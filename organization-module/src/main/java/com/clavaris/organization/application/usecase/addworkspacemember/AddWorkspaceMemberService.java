@@ -110,6 +110,7 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
                 "WorkspaceMembership",
                 "workspace_membership.added",
                 membership.id(),
+                workspace.organizationId(),
                 WorkspaceMemberAddedEvent.from(membership));
 
             return membership;

@@ -80,7 +80,10 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
             Instant.now().plus(TOKEN_TTL));
     tokens.save(token);
     outbox.write(
-        "password_reset.requested", account.id(), PasswordResetRequestedEvent.from(account));
+        "password_reset.requested",
+        account.id(),
+        account.organizationId(),
+        PasswordResetRequestedEvent.from(account));
 
     mailSender.sendPasswordReset(account.email().value(), account.organizationId(), rawToken);
     LOG.info(

@@ -19,9 +19,21 @@ import java.util.UUID;
  * Workspace}/{@code WorkspaceMembership} now share this same table/port, so the caller must say
  * which aggregate the row describes, same convention identity-module would need the day it ever
  * grows a second aggregate of its own.
+ *
+ * <p>{@code organizationId} (webhook-module dispatcher, ADR-0007 §1): captured explicitly, not
+ * parsed back out of {@code payload} — see identity-module's own {@code EventOutboxWriter} for the
+ * full "why explicit, not parsed" reasoning. Every caller resolves it one way or another (directly
+ * from the command, from the {@code Workspace}/{@code Organization} aggregate, or via {@code
+ * WorkspaceRepository#findOrganizationIdById} for the two call sites that only had a {@code
+ * WorkspaceMembership} in scope).
  */
 @FunctionalInterface
 public interface EventOutboxWriter {
 
-  void write(String aggregateType, String eventType, UUID aggregateId, Object payload);
+  void write(
+      String aggregateType,
+      String eventType,
+      UUID aggregateId,
+      UUID organizationId,
+      Object payload);
 }

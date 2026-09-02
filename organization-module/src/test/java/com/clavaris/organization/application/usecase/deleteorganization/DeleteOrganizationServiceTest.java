@@ -120,7 +120,12 @@ class DeleteOrganizationServiceTest {
     ArgumentCaptor<OrganizationDeletedEvent> event =
         ArgumentCaptor.forClass(OrganizationDeletedEvent.class);
     verify(outbox)
-        .write(eq("Organization"), eq("organization.deleted"), eq(organizationId), event.capture());
+        .write(
+            eq("Organization"),
+            eq("organization.deleted"),
+            eq(organizationId),
+            eq(organizationId),
+            event.capture());
     assertThat(event.getValue().organizationId()).isEqualTo(organizationId);
     assertThat(event.getValue().name()).isEqualTo(organization.name());
     assertThat(event.getValue().occurredAt()).isNotNull();

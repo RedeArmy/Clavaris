@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
@@ -26,6 +27,7 @@ class ChangeWorkspaceMemberRoleServiceTest {
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
 
   private WorkspaceMembershipRepository memberships;
+  private WorkspaceRepository workspaces;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private ChangeWorkspaceMemberRoleService service;
@@ -33,9 +35,11 @@ class ChangeWorkspaceMemberRoleServiceTest {
   @BeforeEach
   void setUp() {
     memberships = mock(WorkspaceMembershipRepository.class);
+    workspaces = mock(WorkspaceRepository.class);
+    when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(UUID.randomUUID()));
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new ChangeWorkspaceMemberRoleService(memberships, auditEvents, outbox);
+    service = new ChangeWorkspaceMemberRoleService(memberships, workspaces, auditEvents, outbox);
   }
 
   private WorkspaceMembership existingMembership(
@@ -118,6 +122,7 @@ class ChangeWorkspaceMemberRoleServiceTest {
             eq("WorkspaceMembership"),
             eq("workspace_membership.role_changed"),
             eq(updated.id()),
+            any(),
             any());
   }
 
@@ -134,6 +139,26 @@ class ChangeWorkspaceMemberRoleServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(memberships, never()).save(any());
+    verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
+  }
+
+  @Test
+  void refusesToProceedWhenTheMembershipsOwnWorkspaceNoLongerExists() {
+    // The role change itself is already saved by the time this lookup runs (see the service's
+    // own field order) — unlike RemoveWorkspaceMemberService, where the equivalent lookup runs
+    // before the mutating deleteById call. Only the outbox-adjacent side effects that come after
+    // the lookup are what this exception must still prevent.
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    when(workspaces.findOrganizationIdById(workspaceId)).thenReturn(Optional.empty());
+    ChangeWorkspaceMemberRoleCommand command =
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, WorkspaceRole.ADMIN, ACTOR);
+
+    assertThatExceptionOfType(IllegalStateException.class)
+        .isThrownBy(() -> service.handle(command));
+
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
   }

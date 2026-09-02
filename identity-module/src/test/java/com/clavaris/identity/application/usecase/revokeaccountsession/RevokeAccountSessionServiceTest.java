@@ -59,7 +59,11 @@ class RevokeAccountSessionServiceTest {
     // AccountSessionRevokedEvent.of stamps its own Instant.now(), which will never exactly equal
     // the one the service's own call captured a moment earlier.
     verify(outbox)
-        .write(eq("account.session_revoked"), eq(accountId), any(AccountSessionRevokedEvent.class));
+        .write(
+            eq("account.session_revoked"),
+            eq(accountId),
+            any(),
+            any(AccountSessionRevokedEvent.class));
   }
 
   @Test
@@ -118,7 +122,7 @@ class RevokeAccountSessionServiceTest {
         new ActiveAccountSession("real-session", "UA", "1.2.3.4", Instant.now(), Instant.now());
     when(activeSessions.findByAccountIdAndSessionId(accountId, "real-session"))
         .thenReturn(Optional.of(session));
-    doThrow(new RuntimeException("Postgres hiccup")).when(outbox).write(any(), any(), any());
+    doThrow(new RuntimeException("Postgres hiccup")).when(outbox).write(any(), any(), any(), any());
     RevokeAccountSessionCommand command =
         new RevokeAccountSessionCommand(accountId, "real-session");
 
@@ -155,7 +159,11 @@ class RevokeAccountSessionServiceTest {
 
     verify(activeSessions).revoke("real-session");
     verify(outbox)
-        .write(eq("account.session_revoked"), eq(accountId), any(AccountSessionRevokedEvent.class));
+        .write(
+            eq("account.session_revoked"),
+            eq(accountId),
+            any(),
+            any(AccountSessionRevokedEvent.class));
   }
 
   // Code review (2026-09-01): same gap, one call earlier still — the

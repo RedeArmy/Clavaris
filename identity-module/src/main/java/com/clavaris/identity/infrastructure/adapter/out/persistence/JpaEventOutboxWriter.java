@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.OrganizationId;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -27,7 +28,11 @@ class JpaEventOutboxWriter implements EventOutboxWriter {
   }
 
   @Override
-  public void write(final String eventType, final AccountId aggregateId, final Object payload) {
+  public void write(
+      final String eventType,
+      final AccountId aggregateId,
+      final OrganizationId organizationId,
+      final Object payload) {
     // Jackson 3: writeValueAsString throws the unchecked JacksonException, not a checked
     // JsonProcessingException (Jackson 2's API) — caught anyway, to translate it into a message
     // that names the failing event type rather than a bare stack trace.
@@ -50,6 +55,7 @@ class JpaEventOutboxWriter implements EventOutboxWriter {
     outbox.save(
         new EventOutboxEntity(
             UUID.randomUUID(),
+            organizationId.value(),
             "Account",
             aggregateId.value(),
             eventType,

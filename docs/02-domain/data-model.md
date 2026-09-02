@@ -24,7 +24,7 @@ erDiagram
     ACCOUNTS ||--o{ WORKSPACE_MEMBERSHIPS : "belongs to"
     WORKSPACES ||--o{ WORKSPACE_MEMBERSHIPS : has
     OAUTH_CLIENTS ||--o{ OAUTH2_AUTHORIZATION : authorizes
-    OAUTH_CLIENTS ||--o{ WEBHOOK_ENDPOINTS : registers
+    ORGANIZATIONS ||--o{ WEBHOOK_ENDPOINTS : registers
     OAUTH_CLIENTS ||--o| CLIENT_DOMAIN_CONFIGS : embeds_via
     OAUTH_CLIENTS ||--o| CLIENT_BRANDINGS : themes
     WEBHOOK_ENDPOINTS ||--o{ WEBHOOK_DELIVERIES : receives
@@ -179,36 +179,49 @@ erDiagram
         text refresh_token_value
         timestamptz refresh_token_expires_at
     }
+    %% EVENT_OUTBOX below is a composite sketch — shipped 2026-09-02 as two genuinely separate
+    %% physical tables (event_outbox in identity-module, organization_event_outbox in
+    %% organization-module, ADR-0007 §1), each with this same shape plus an organization_id
+    %% column (migrations V20260902110000/V20260902110001) added after this diagram was first
+    %% drawn. No schema_version column was ever actually built — see §2's own note.
     EVENT_OUTBOX {
         uuid id PK
+        uuid organization_id
         varchar aggregate_type
         uuid aggregate_id
         varchar event_type
-        jsonb payload
-        int schema_version
+        text payload
         timestamptz occurred_at
         timestamptz published_at
     }
     WEBHOOK_ENDPOINTS {
         uuid id PK
-        uuid oauth_client_id FK
+        uuid organization_id
         varchar url
-        varchar secret_hash
+        varchar description
         text subscribed_event_types
-        varchar status
+        text current_secret_encrypted
+        text previous_secret_encrypted
+        timestamptz previous_secret_expires_at
+        boolean active
         timestamptz created_at
     }
     WEBHOOK_DELIVERIES {
         uuid id PK
-        uuid webhook_endpoint_id FK
-        uuid event_id FK
+        uuid endpoint_id FK
+        uuid organization_id
+        uuid outbox_event_id
+        varchar aggregate_type
+        uuid aggregate_id
         varchar event_type
-        jsonb payload
+        text payload
         varchar status
         int attempt_count
-        int response_status_code
+        int last_response_status
+        varchar last_error
         timestamptz next_attempt_at
         timestamptz last_attempt_at
+        timestamptz created_at
     }
     CLIENT_DOMAIN_CONFIGS {
         uuid id PK
@@ -252,9 +265,9 @@ erDiagram
 - **`oauth2_authorization`** — TD-SEC-003 (closed): backs Spring Authorization Server's own `JdbcOAuth2AuthorizationService`, not a bespoke table this project designed — every authorization code, access token, refresh token, and OIDC ID token either issuer tier issues, one row per authorization. Its real shape is the framework's own upstream schema (Postgres-adapted per that file's own embedded instructions), richer than this document's original placeholder sketch (`AUTHORIZATION_CODES`, now retired) since it tracks every token type SAS itself tracks per grant, not just the authorization code. **Deliberately one shared table for both the platform tier and every Organization**, not the usual two-tables-per-tier split this document uses everywhere else (`platform_clients`/`oauth_clients`, `platform_signing_keys`/`signing_keys`) — `JdbcOAuth2AuthorizationService` hardcodes its own table name internally, so two differently-named tables aren't supported without forking the class; `registered_client_id` still fully separates platform-tier rows from Organization-tier rows, since the two tiers' client id spaces are already structurally disjoint. Bearer values (`*_value` columns): **TD-SEC-019 (closed)** — now HMAC-SHA256-hashed, matching this project's own `password_credentials`/`refresh_tokens` convention after all. `JdbcOAuth2AuthorizationService.findByToken` itself gives no knob for this (a fixed, non-overridable SQL `WHERE` clause comparing the literal presented value), so a wrapping `HashedTokenOAuth2AuthorizationService` (`app` module, keyed by `clavaris.oauth2.token-hash-secret`) hashes the value before it ever reaches this table and, on lookup, hashes the search term, queries, then restores the raw value in memory for the one matching token slot SAS's own revocation/introspection providers immediately re-compare it against — never re-persisted in that form. `refresh_token_value`/`user_code_value`/`device_code_value`/`state` are never populated by this codebase's own grant wiring (refresh tokens use `refresh_tokens.token_hash` above instead, fully decoupled from this table) and are passed through unhashed on the rare off-chance a lookup ever targets them. BR-ID-03's refresh-grant handling (`RefreshTokenRotationAuthenticationProvider`) saves a brand-new row here on every rotation rather than updating the previous grant's row in place — TD-ARCH-005, unbounded row growth on a long-lived, frequently-refreshed session, tracked rather than silently accepted.
 - **`platform_clients`** / **`platform_signing_keys`** — ADR-0010 (Organization provisioning). Deliberately **no** `organization_id` column, not even nullable — these authenticate the operations that create/manage `organizations` rows themselves, so making them belong to one would be circular and would reopen the exact cross-tenant blast-radius risk ADR-0010 §1–§2 close for everything else. The first `platform_clients` row is seeded from `PLATFORM_BOOTSTRAP_CLIENT_ID`/`PLATFORM_BOOTSTRAP_CLIENT_SECRET` (`.env.example`) via an idempotent startup check, not an HTTP endpoint. `allowed_scopes` values are namespaced `platform:*`, reserved and disjoint from any per-organization management scope.
 - **`workspace_memberships`** — composite uniqueness on `(workspace_id, account_id)` — one membership row per account per workspace, role changes update the row rather than creating a new one.
-- **`event_outbox`** — 🟡 proposed, see ADR-0007. Written in the same transaction as the domain state change it records (BR-WEBHOOK-05); `published_at IS NULL` marks a row still waiting for the `webhook-module` dispatcher to fan it out. `payload` is the event's own versioned JSON shape (`schema_version`), independent of the management API's URL-based versioning (ADR-0008).
-- **`webhook_endpoints.secret_hash`** — same hash-not-plaintext principle as `oauth_clients.client_secret_hash`; the raw secret is shown exactly once, at creation.
-- **`webhook_deliveries`** — one row per `(webhook_endpoint, event)` pair; `status` is `PENDING | SUCCEEDED | FAILED | EXHAUSTED` (BR-WEBHOOK-03). A unique constraint on `(webhook_endpoint_id, event_id)` makes delivery-row creation itself idempotent — the dispatcher can safely re-scan `event_outbox` after a crash without creating duplicate deliveries.
+- **`event_outbox`** — ✅ shipped 2026-09-02, ADR-0007. Written in the same transaction as the domain state change it records (BR-WEBHOOK-05); `published_at IS NULL` marks a row still waiting for `webhook-module`'s dispatcher to fan it out (now real, not hypothetical). Two genuinely separate physical tables in practice — `event_outbox` (identity-module) and `organization_event_outbox` (organization-module), same name collision reasoning as `oauth2_authorization`'s own split elsewhere in this document — each carrying an explicit `organization_id` column (migrations `V20260902110000`/`V20260902110001`) so the dispatcher can fan out by tenant without parsing either producer's own payload shape; see `AbstractEventOutboxEntity`'s own Javadoc. No `schema_version` column was ever actually built — the ERD above kept it as a speculative field from before implementation; `payload` is plain `text` (a JSON string), versioned only by each event type's own record shape in code, not a DB column.
+- **`webhook_endpoints`** — ✅ shipped, `organization_id`-scoped (not `oauth_client_id` — one Organization may register several endpoints, none tied to a specific `OAuthClient`). `current_secret_encrypted`/`previous_secret_encrypted` are reversibly encrypted (AES-256-GCM, `WEBHOOK_SECRET_ENCRYPTION_KEY`), not a one-way hash like `oauth_clients.client_secret_hash` — the secret must be recoverable in cleartext at delivery time to compute an outbound HMAC signature, so a hash was never viable here; the raw secret is still shown exactly once, at creation or rotation. `previous_secret_encrypted`/`previous_secret_expires_at` hold the outgoing secret during a rotation's overlap window (ADR-0007's own "resolved" open question). `active` (boolean) replaces the originally-sketched `status` enum — `deactivate`/`activate` are both reversible.
+- **`webhook_deliveries`** — one row per `(endpoint, outbox event)` pair; `status` is `PENDING | SUCCEEDED | FAILED | EXHAUSTED` (BR-WEBHOOK-03). A unique constraint on `(endpoint_id, outbox_event_id)` makes delivery-row creation itself idempotent — the dispatcher can safely re-scan the outbox tables after a crash without creating duplicate deliveries. `organization_id` is denormalized from the owning endpoint (same "explicit column over a join" reasoning as the outbox tables themselves) so per-tenant queries never need to join back to `webhook_endpoints`.
 - **`client_domain_configs`** — 🟡 proposed, see ADR-0009. One-to-one with `oauth_clients` (unique `oauth_client_id`), same "optional, never a nullable column on the core entity" convention as `password_credentials`. `custom_domain` is globally unique (two clients can't claim the same subdomain). `verification_status` is `PENDING | VERIFIED | FAILED`; BR-CLIENT-04 requires `VERIFIED` before the embedded login experience is usable in production.
 - **`client_brandings`** — 🟡 proposed, see ADR-0009. One-to-one with `oauth_clients`; read by the Thymeleaf hosted-UI templates to theme the login/consent screens (logo, primary color, display name).
 
@@ -277,9 +290,13 @@ erDiagram
 | `platform_clients` | unique `(client_id)` | client lookup at the platform issuer's `/oauth2/token` (ADR-0010, Organization provisioning) |
 | `platform_signing_keys` | unique `(kid)` | JWKS lookup for the platform issuer — globally unique since there is only ever one platform tier |
 | `authorization_codes` | unique `(code_hash)` | code exchange lookup |
-| `event_outbox` | `(published_at)` where `published_at IS NULL` | dispatcher poll query — partial index keeps it small regardless of total outbox history |
-| `webhook_deliveries` | unique `(webhook_endpoint_id, event_id)` | idempotent delivery-row creation on dispatcher re-scan |
-| `webhook_deliveries` | `(status, next_attempt_at)` where `status IN ('PENDING','FAILED')` | retry-scheduler poll query |
+| `event_outbox` / `organization_event_outbox` | `(published_at)` where `published_at IS NULL` | dispatcher poll query — partial index keeps it small regardless of total outbox history |
+| `event_outbox` / `organization_event_outbox` | `(occurred_at)` | each producer module's own retention-sweep query (`EventOutboxRetentionJob`/`OrganizationEventOutboxRetentionJob`) |
+| `event_outbox` / `organization_event_outbox` | `(organization_id)` | dispatcher's own per-organization fan-out lookup |
+| `webhook_endpoints` | `(organization_id)` where `active = true` | dispatcher's own fan-out lookup — active endpoints for one Organization |
+| `webhook_deliveries` | unique `(endpoint_id, outbox_event_id)` | idempotent delivery-row creation on dispatcher re-scan |
+| `webhook_deliveries` | `(next_attempt_at)` where `status IN ('PENDING','FAILED')` | retry-scheduler poll query (`SELECT ... FOR UPDATE SKIP LOCKED`) |
+| `webhook_deliveries` | `(endpoint_id, created_at DESC)` | per-endpoint delivery-history listing |
 | `client_domain_configs` | unique `(oauth_client_id)`, unique `(custom_domain)` | one config per client; no two clients can claim the same subdomain |
 
 ## 4. Migrations
@@ -296,4 +313,4 @@ Flyway (`org.flywaydb:flyway-core` + `flyway-database-postgresql`, versions mana
 - ADR-0010's own open questions (the system-wide rate-limit ceiling value, automated key-rotation trigger criteria) directly affect `rate_limit_policies` — tracked in the ADR, not duplicated here.
 - Whether `sessions`/`refresh_tokens` need partitioning or an aggressive TTL-based cleanup job once volume grows — not a concern at current expected scale (single-digit consumers), flagged for revisit once real usage data exists.
 - Exact representation of `redirect_uris`/`allowed_grant_types`/`allowed_scopes` (JSON text column vs. normalized child tables) — deferred to implementation time, noted as a real open design choice rather than settled.
-- `event_outbox` retention **is now designed and shipped** (TD-TEST-002, 2026-08-24): `EventOutboxRetentionJob` (identity-module) sweeps rows older than `clavaris.event-outbox.retention-days` (90 by default) daily, by age alone — not by `published_at`, since `webhook-module`'s dispatcher doesn't exist yet and every row's `published_at` stays `NULL` regardless of age. See that class's own Javadoc for why this is the honest interim policy and what has to be revisited the day `webhook-module` ships. `webhook_deliveries` retention remains genuinely undesigned — that table doesn't exist yet (same "revisit once real usage data exists" stance, ADR-0007's own open questions).
+- `event_outbox`/`organization_event_outbox` retention **is designed and shipped** (TD-TEST-002, 2026-08-24): `EventOutboxRetentionJob`/`OrganizationEventOutboxRetentionJob` sweep rows older than `clavaris.event-outbox.retention-days` (90 by default) daily, by age alone — `webhook-module`'s own dispatcher now exists (ADR-0007, shipped 2026-09-02) and marks rows `published_at` within seconds under normal operation, well inside that 90-day margin; a still-unpublished row past the window is swept anyway and logged as a WARN, since at that point it's a real operational signal (the dispatcher stuck/down for the whole window), not something to silently exclude. `webhook_deliveries` retention is **also shipped**: `WebhookDeliveryRetentionJob` sweeps only terminal rows (`SUCCEEDED`/`EXHAUSTED`) older than `clavaris.webhook.delivery-retention-days` (90 by default) — `PENDING`/`FAILED` rows are never touched by age alone, since a `FAILED` row's own `next_attempt_at` may still be legitimately in the future.

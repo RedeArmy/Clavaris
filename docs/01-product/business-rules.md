@@ -59,7 +59,9 @@ stable since its substance (immediate revocation on removal) is unchanged, only 
   v1, "immediate" means the admin-API listing and the corresponding outbox event fire synchronously
   with the removal, not that a live token is invalidated (none exists to invalidate). A consuming
   application that gates its own authorization by workspace membership must re-check membership
-  itself, or subscribe to the outbox event once `webhook-module` (ADR-0007) exists.
+  itself, or subscribe to the corresponding webhook event (`workspace_membership.removed`/
+  `.role_changed`, now real — `webhook-module`, ADR-0007, shipped 2026-09-02) — see
+  `api-contract-overview.md` §6 (TD-WS-002) for the full, concrete integration guidance.
 - **BR-WS-04** — A workspace member is provisioned directly: adding a member creates a real
   `Account` (identity-module) scoped to the workspace's own Organization and immediately triggers
   that Organization's existing password-reset-request flow, so the new member sets their own
@@ -101,10 +103,12 @@ BR-DATA-02/03 previously flagged an open question: what happens if the *same per
 - **BR-ADMIN-01** — User impersonation (an operator signing in *as* an account to debug a reported issue) requires its own elevated management-API scope, is logged as a distinct audit-log event type (account, operator, start/end time), and expires after a short fixed inactivity timeout (mirrors the gap already flagged in `threat-model-stride.md` §5 — audit logging for the management API — built together with this feature, not after it).
 - **BR-ADMIN-02** — An impersonation session is never indistinguishable from the real account's own session to anything downstream: any token issued during impersonation carries a claim marking it as such, so a consumer application can choose to restrict what an impersonated session is allowed to do (e.g. block payment actions), rather than this being silently invisible.
 
-## Webhooks (`BR-WEBHOOK`) — 🟡 proposed with ADR-0007, not yet implemented
+## Webhooks (`BR-WEBHOOK`) — ✅ shipped 2026-09-02, `webhook-module` (ADR-0007)
 
-- **BR-WEBHOOK-01** — Every webhook payload is signed HMAC-SHA256 with the receiving endpoint's own secret (`Clavaris-Signature` header, timestamp + signature); a consumer that does not verify this signature is trusting an unauthenticated HTTP request, so the signing step is never optional or skippable per-endpoint.
-- **BR-WEBHOOK-02** — Delivery is at-least-once, never at-most-once. Every event carries a stable `event.id`; consumers are responsible for deduplicating on it. Clavaris does not promise exactly-once delivery — that promise cannot be made honestly over plain HTTP with retries.
-- **BR-WEBHOOK-03** — A failed delivery (non-2xx response or timeout) retries with exponential backoff and jitter up to a fixed attempt limit; after the final attempt it is marked `EXHAUSTED`, never silently dropped, and stays visible for manual replay via the management API.
+- **BR-WEBHOOK-01** — Every webhook payload is signed HMAC-SHA256 with the receiving endpoint's own secret (`Clavaris-Signature` header, timestamp + signature); a consumer that does not verify this signature is trusting an unauthenticated HTTP request, so the signing step is never optional or skippable per-endpoint. During a secret rotation's overlap window, a delivery carries one `v1=` signature per still-valid secret (current and previous), never just one, so a consumer verifying against either is never wrongly rejected mid-rotation.
+- **BR-WEBHOOK-02** — Delivery is at-least-once, never at-most-once. Every event carries a stable `event.id` (`Clavaris-Event-Id` header — the source outbox row's own id); consumers are responsible for deduplicating on it. Clavaris does not promise exactly-once delivery — that promise cannot be made honestly over plain HTTP with retries.
+- **BR-WEBHOOK-03** — A failed delivery (non-2xx response or timeout) retries with exponential backoff and jitter up to a fixed attempt limit (default 8); after the final attempt it is marked `EXHAUSTED`, never silently dropped, and stays visible for manual replay via the management API (`POST .../deliveries/{id}:replay`).
 - **BR-WEBHOOK-04** — Clavaris never writes directly to a consumer's database, filesystem, or infrastructure. The only integration surfaces are the signed webhook payload and the standard OIDC/management APIs — preserves the "any language, no special access" reusability goal (ADR-0001, ADR-0006).
 - **BR-WEBHOOK-05** — The outbox row for a domain event is written in the same database transaction as the state change that produced it (ADR-0007 §1) — an event is never observably lost because the process crashed between "state committed" and "event published."
+- **BR-WEBHOOK-06** — A `WebhookEndpoint` is only ever sent an event type it explicitly subscribed to at registration; an endpoint registered for `account.created` never receives `account.deleted`.
+- **BR-WEBHOOK-07** — A `WebhookEndpoint`'s own URL must use `https`; a plain-`http` registration is rejected outright. Signing proves authenticity and integrity, not confidentiality — a plain-http delivery would still expose the payload in transit to any network observer.

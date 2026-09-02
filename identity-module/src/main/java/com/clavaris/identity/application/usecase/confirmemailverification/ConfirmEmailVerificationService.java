@@ -54,6 +54,10 @@ public class ConfirmEmailVerificationService implements ConfirmEmailVerification
     account.verifyEmail();
     accounts.save(account);
 
-    outbox.write("account.email_verified", account.id(), AccountEmailVerifiedEvent.from(account));
+    outbox.write(
+        "account.email_verified",
+        account.id(),
+        account.organizationId(),
+        AccountEmailVerifiedEvent.from(account));
   }
 }

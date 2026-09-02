@@ -78,6 +78,15 @@ clavaris:
   mail:
     resend-api-key: ${RESEND_API_KEY:}
     from-address: ${MAIL_FROM_ADDRESS:}
+  # ADR-0007: AesGcmWebhookSigningSecretCipher (webhook-module) — the one key every Organization's
+  # every WebhookEndpoint signing secret is encrypted under at rest (WebhookSigningSecretCipher's
+  # own Javadoc: this secret must be recoverable in cleartext at delivery time, so it can't be a
+  # one-way hash). Same "one trust root, dev-only literal below, real deployments must override"
+  # convention as signing-key-store.password/oauth2.token-hash-secret above — a compromise of this
+  # key exposes every Organization's every webhook signing secret at once, so treat it with the
+  # same care as those.
+  webhook:
+    secret-encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY:diTPilg0FPoKG/oUGVKSErBJYG5OYR+Y4TU1FQ2hqvo=}
   # TD-SEC-019: keys the HMAC-SHA256 digest HashedTokenOAuth2AuthorizationService computes for
   # every oauth2_authorization bearer token value before it reaches Postgres (BearerTokenHasher's
   # own Javadoc). The dev-only literal below is exactly that — never used in a real deployment,
@@ -152,10 +161,12 @@ clavaris:
     capacity:
       default-requests-per-minute: 600
       hard-cap-requests-per-minute: 6000
-  # TD-TEST-002: EventOutboxRetentionJob (identity-module) sweeps event_outbox rows older than this
-  # many days, daily. Deliberately wide by default — webhook-module (ADR-0007) has no dispatcher
-  # yet, so every row's published_at stays NULL forever; see that class's own Javadoc for why an
-  # age-based sweep is the honest interim policy rather than a no-op published-only one.
+  # TD-TEST-002: EventOutboxRetentionJob (identity-module)/OrganizationEventOutboxRetentionJob
+  # (organization-module) sweep event_outbox/organization_event_outbox rows older than this many
+  # days, daily. webhook-module's own dispatcher now exists (ADR-0007) and polls every few seconds
+  # by default (clavaris.webhook.dispatch-fixed-delay-ms) — 90 days remains a wide, deliberate
+  # safety margin around that real poll interval, not a "nothing reads this yet" placeholder
+  # anymore; see either retention job's own Javadoc.
   event-outbox:
     retention-days: ${EVENT_OUTBOX_RETENTION_DAYS:90}
   # KnownDeviceRetentionJob's own sweep window, and RecordAccountLoginDeviceService's migration

@@ -51,8 +51,13 @@ Since ADR-0010, `organization` (tenant isolation boundary) and `workspace` (team
 | `PUT /api/v1/admin/workspaces/{id}/members/{accountId}/role` | Change a member's role (`ADMIN`/`MEMBER` only, BR-WS-05) — rejected if it would leave zero `ADMIN`s (BR-WS-01) |
 | `POST /api/v1/admin/workspaces/{id}/members/{accountId}:remove` | Remove a workspace member (BR-WS-03) — removes only the membership, never the `Account` itself; rejected if it would leave zero `ADMIN`s (BR-WS-01). `:remove` custom-method naming, same precedent as `:delete` above |
 | `POST /api/v1/admin/organizations/{id}/clients` | Register a new `OAuthClient` under this Organization (manual/admin-only in v1, per `prd-mvp.md` §2.2). Optional `requireConsent` (default `true`, ADR-0017/TD-SEC-026) — an operator explicitly sets `false` to skip the end-user consent screen for a trusted first-party client. |
-| `POST /api/v1/admin/webhook-endpoints` | Register a webhook endpoint for the calling client — 🟡 proposed, see ADR-0007 |
-| `POST /api/v1/admin/webhook-endpoints/{id}/deliveries/{deliveryId}:replay` | Manually replay an `EXHAUSTED` delivery (BR-WEBHOOK-03) — 🟡 proposed, see ADR-0007 |
+| `POST /api/v1/admin/organizations/{id}/webhook-endpoints` | Register a `WebhookEndpoint` under this Organization — ✅ shipped, ADR-0007. Returns the raw `signingSecret` exactly once. |
+| `GET /api/v1/admin/organizations/{id}/webhook-endpoints` | List this Organization's `WebhookEndpoint`s — read-only, no dedicated scope; never returns a secret |
+| `POST /api/v1/admin/webhook-endpoints/{id}:rotate-secret` | Rotate a `WebhookEndpoint`'s signing secret (dual-secret overlap window, ADR-0007) — returns the new raw secret exactly once |
+| `POST /api/v1/admin/webhook-endpoints/{id}:deactivate` | Reversibly stop delivering to this endpoint (its own configuration/history is untouched) |
+| `POST /api/v1/admin/webhook-endpoints/{id}:activate` | Reverse `:deactivate` |
+| `GET /api/v1/admin/webhook-endpoints/{id}/deliveries` | List recent deliveries for one endpoint (debugging/observability), newest first |
+| `POST /api/v1/admin/webhook-endpoints/{id}/deliveries/{deliveryId}:replay` | Manually replay a past delivery (BR-WEBHOOK-03) — ✅ shipped, ADR-0007 |
 
 ## 4. Authentication for the management API
 
@@ -62,7 +67,44 @@ Every management API call requires a valid access token issued via the `client_c
 
 Standard OAuth2 error responses (`error`, `error_description`) for the OIDC surface, per RFC 6749 §5.2. Management API errors follow a consistent JSON problem-detail shape (`type`, `title`, `status`, `detail`) — exact schema to be finalized alongside `docs/05-engineering/coding-standards.md`.
 
-## 6. Open questions
+## 6. Workspace membership changes are not instant token revocation (TD-WS-002)
+
+**Read this before gating any of your own application's authorization decisions on Workspace
+membership.** Clavaris tokens (access/ID/refresh) are `Account`-scoped per `Organization`
+(ADR-0010) — **never** `Workspace`-scoped. There is no per-Workspace grant for Clavaris to revoke,
+by design (BR-WS-03): v1 deliberately has no workspace-scoped token/authorization concept at all.
+Concretely, this means:
+
+- Removing a member from a `Workspace` (`POST /api/v1/admin/workspaces/{id}/members/{accountId}:remove`)
+  or changing their role (`PUT .../role`) updates the `Workspace`'s own membership list
+  immediately and fires a `workspace_membership.removed`/`workspace_membership.role_changed` event
+  (outbox row, and — once you register a `WebhookEndpoint`, ADR-0007 — a real signed webhook
+  delivery) synchronously with the change.
+- It does **not** invalidate any access/ID/refresh token already issued to that `Account`. A
+  still-valid token remains cryptographically valid, and any `workspace_id`/`workspace_role` claim
+  it carries (BR-WS-06) reflects membership as of the moment that token/claim was minted, not
+  necessarily right now — the claim is refreshed on the account's *next* login or token refresh,
+  not pushed out to tokens that already exist.
+
+**What your application must do if it gates authorization by Workspace membership:**
+
+1. **Preferred — subscribe to the webhook events.** Register a `WebhookEndpoint` (§3 above)
+   subscribed to `workspace_membership.removed` and `workspace_membership.role_changed`, and on
+   receipt, immediately stop honouring that account's old Workspace-scoped access in your own
+   system — do not wait for its Clavaris token to expire or refresh. This is near-real-time (the
+   dispatcher polls on a few-second interval, ADR-0007) but is still eventually consistent, not a
+   synchronous revocation — treat delivery latency and the retry window (BR-WEBHOOK-03) as real,
+   not zero.
+2. **Belt-and-suspenders — re-check membership on sensitive actions.** For anything where stale
+   authorization would be a real problem (not just cosmetic), call
+   `GET /api/v1/admin/workspaces/{id}/members` (or track membership via the webhook events above)
+   rather than trusting a token's own `workspace_role` claim alone for that decision.
+
+Neither path is optional if your application's own security model depends on Workspace membership
+being current — the `workspace_id`/`workspace_role` claim (BR-WS-06) is a convenience signal for
+UI decisions (e.g. "show this account's own admin panel"), not a revocation mechanism.
+
+## 7. Open questions
 
 - Exact scope naming convention for the management API (`org:write`, `org.write`, etc.) — not yet decided, low-risk to defer to implementation time.
 - ~~Whether springdoc-openapi is worth adopting for the management API~~ — **resolved**: yes, decided in **ADR-0008** (OpenAPI 3.1 generated from code via springdoc-openapi, Swagger UI in dev/local only). The OIDC surface itself still doesn't need it — already self-describing via the discovery document.

@@ -69,7 +69,7 @@ class RegisterAccountServiceTest {
     AccountId id =
         service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD));
 
-    verify(outbox).write(eq("account.created"), eq(id), any());
+    verify(outbox).write(eq("account.created"), eq(id), any(), any());
   }
 
   @Test
@@ -84,7 +84,7 @@ class RegisterAccountServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 
   @Test
@@ -97,7 +97,7 @@ class RegisterAccountServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 
   @Test
@@ -113,6 +113,6 @@ class RegisterAccountServiceTest {
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 }

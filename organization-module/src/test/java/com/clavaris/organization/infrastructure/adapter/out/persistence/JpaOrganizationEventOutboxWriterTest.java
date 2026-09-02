@@ -30,11 +30,14 @@ class JpaOrganizationEventOutboxWriterTest {
     // Built outside the lambda below on purpose: java:S5778 wants only the one invocation
     // actually meant to throw (writer.write itself) inside isThrownBy's own lambda.
     UUID aggregateId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
     Unserializable payload = new Unserializable();
 
     assertThatExceptionOfType(IllegalStateException.class)
         .isThrownBy(
-            () -> writer.write("Organization", "organization.deleted", aggregateId, payload))
+            () ->
+                writer.write(
+                    "Organization", "organization.deleted", aggregateId, organizationId, payload))
         .withMessageContaining("organization.deleted");
 
     verifyNoInteractions(outbox);

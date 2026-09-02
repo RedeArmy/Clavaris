@@ -117,8 +117,8 @@ class AuthenticateWithSocialProviderServiceTest {
     assertThat(result).isInstanceOf(AuthenticateWithSocialProviderResult.LoggedIn.class);
     verify(accounts).save(any(Account.class));
     verify(socialIdentities).save(any(SocialIdentity.class));
-    verify(outbox).write(eq("account.created"), any(), any());
-    verify(outbox).write(eq("social_identity.linked"), any(), any());
+    verify(outbox).write(eq("account.created"), any(), any(), any());
+    verify(outbox).write(eq("social_identity.linked"), any(), any(), any());
     verifyNoInteractions(mailSender);
   }
 

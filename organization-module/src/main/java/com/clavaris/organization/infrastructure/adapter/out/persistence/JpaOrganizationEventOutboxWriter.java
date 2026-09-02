@@ -34,6 +34,7 @@ class JpaOrganizationEventOutboxWriter implements EventOutboxWriter {
       final String aggregateType,
       final String eventType,
       final UUID aggregateId,
+      final UUID organizationId,
       final Object payload) {
     // Jackson 3: writeValueAsString throws the unchecked JacksonException, not a checked
     // JsonProcessingException (Jackson 2's API) — same rationale as identity-module's own
@@ -52,6 +53,7 @@ class JpaOrganizationEventOutboxWriter implements EventOutboxWriter {
     outbox.save(
         new OrganizationEventOutboxEntity(
             UUID.randomUUID(),
+            organizationId,
             aggregateType,
             aggregateId,
             eventType,

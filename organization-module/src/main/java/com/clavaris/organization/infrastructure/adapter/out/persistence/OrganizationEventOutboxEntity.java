@@ -26,11 +26,12 @@ public class OrganizationEventOutboxEntity extends AbstractEventOutboxEntity {
 
   public OrganizationEventOutboxEntity(
       final UUID id,
+      final UUID organizationId,
       final String aggregateType,
       final UUID aggregateId,
       final String eventType,
       final String payload,
       final Instant occurredAt) {
-    super(id, aggregateType, aggregateId, eventType, payload, occurredAt);
+    super(id, organizationId, aggregateType, aggregateId, eventType, payload, occurredAt);
   }
 }

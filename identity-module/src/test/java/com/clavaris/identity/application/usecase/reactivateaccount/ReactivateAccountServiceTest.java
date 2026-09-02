@@ -69,7 +69,7 @@ class ReactivateAccountServiceTest {
 
     verify(auditEvents)
         .write(ACTOR, "account.reactivated", "Account", account.id().value().toString(), null);
-    verify(outbox).write(eq("account.reactivated"), eq(account.id()), any());
+    verify(outbox).write(eq("account.reactivated"), eq(account.id()), any(), any());
   }
 
   @Test

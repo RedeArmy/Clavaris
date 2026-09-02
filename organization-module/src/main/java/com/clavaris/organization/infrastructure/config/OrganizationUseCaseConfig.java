@@ -158,17 +158,21 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ ChangeWorkspaceMemberRoleUseCase changeWorkspaceMemberRoleUseCase(
       final WorkspaceMembershipRepository memberships,
+      final WorkspaceRepository workspaces,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
-    return new ChangeWorkspaceMemberRoleService(memberships, auditEvents, eventOutboxWriter);
+    return new ChangeWorkspaceMemberRoleService(
+        memberships, workspaces, auditEvents, eventOutboxWriter);
   }
 
   @Bean
   /* package */ RemoveWorkspaceMemberUseCase removeWorkspaceMemberUseCase(
       final WorkspaceMembershipRepository memberships,
+      final WorkspaceRepository workspaces,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
-    return new RemoveWorkspaceMemberService(memberships, auditEvents, eventOutboxWriter);
+    return new RemoveWorkspaceMemberService(
+        memberships, workspaces, auditEvents, eventOutboxWriter);
   }
 
   @Bean

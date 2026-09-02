@@ -57,7 +57,7 @@ class RequestPasswordResetServiceTest {
     assertThat(captor.getValue().accountId()).isEqualTo(account.id());
     assertThat(captor.getValue().type()).isEqualTo(VerificationTokenType.PASSWORD_RESET);
     verify(mailSender).sendPasswordReset(eq(email.value()), eq(organizationId), any());
-    verify(outbox).write(eq("password_reset.requested"), eq(account.id()), any());
+    verify(outbox).write(eq("password_reset.requested"), eq(account.id()), any(), any());
   }
 
   @Test
@@ -70,6 +70,6 @@ class RequestPasswordResetServiceTest {
 
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendPasswordReset(any(), any(), any());
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 }
