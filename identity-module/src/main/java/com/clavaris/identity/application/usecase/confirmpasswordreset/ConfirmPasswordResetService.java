@@ -117,7 +117,10 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     accountSessionRevoker.revokeAllSessionsFor(account.id());
 
     outbox.write(
-        "password_reset.completed", account.id(), PasswordResetCompletedEvent.from(account));
+        "password_reset.completed",
+        account.id(),
+        account.organizationId(),
+        PasswordResetCompletedEvent.from(account));
     LOG.info("event=password_reset_completed accountId={}", account.id());
   }
 }

@@ -37,6 +37,10 @@ public class ReactivateAccountService implements ReactivateAccountUseCase {
     auditEvents.write(
         command.actor(), "account.reactivated", "Account", account.id().value().toString(), null);
 
-    outbox.write("account.reactivated", account.id(), AccountReactivatedEvent.from(account));
+    outbox.write(
+        "account.reactivated",
+        account.id(),
+        account.organizationId(),
+        AccountReactivatedEvent.from(account));
   }
 }

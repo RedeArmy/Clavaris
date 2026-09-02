@@ -83,9 +83,10 @@ class OrganizationEventOutboxRetentionJobTest {
 
   private void insertRow(final Instant occurredAt, final Instant publishedAt) {
     jdbcTemplate.update(
-        "insert into organization_event_outbox (id, aggregate_type, aggregate_id, event_type,"
-            + " payload, occurred_at, published_at) values (?, 'Organization', ?,"
-            + " 'organization.deleted', '{}', ?, ?)",
+        "insert into organization_event_outbox (id, organization_id, aggregate_type,"
+            + " aggregate_id, event_type, payload, occurred_at, published_at) values (?, ?,"
+            + " 'Organization', ?, 'organization.deleted', '{}', ?, ?)",
+        UUID.randomUUID(),
         UUID.randomUUID(),
         UUID.randomUUID(),
         Timestamp.from(occurredAt),

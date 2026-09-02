@@ -122,7 +122,7 @@ class RotateRefreshTokenServiceTest {
     verify(refreshTokens, times(2)).save(any()); // once for the revoked old, once for the new
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
     verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
     verify(metrics).increment("clavaris.auth.refresh_token.rotated");
   }
 
@@ -159,7 +159,7 @@ class RotateRefreshTokenServiceTest {
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
     verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 
   @Test
@@ -195,6 +195,7 @@ class RotateRefreshTokenServiceTest {
         .write(
             eq("refresh_token.reuse_detected"),
             eq(accountId),
+            eq(organizationId),
             any(RefreshTokenReuseDetectedEvent.class));
     verify(metrics).increment("clavaris.auth.refresh_token.reuse_detected");
   }

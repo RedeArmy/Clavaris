@@ -2,24 +2,29 @@ package com.clavaris.organization.application.usecase.changeworkspacememberrole;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceMemberRoleChangedEvent;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Orchestration for {@link ChangeWorkspaceMemberRoleUseCase}. */
 public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRoleUseCase {
 
   private final WorkspaceMembershipRepository memberships;
+  private final WorkspaceRepository workspaces;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
   public ChangeWorkspaceMemberRoleService(
       final WorkspaceMembershipRepository memberships,
+      final WorkspaceRepository workspaces,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.memberships = memberships;
+    this.workspaces = workspaces;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -49,6 +54,19 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
     final WorkspaceMembership updated = membership.withRole(command.newRole());
     memberships.save(updated);
 
+    // webhook-module's own EventOutboxWriter needs organizationId — see
+    // RemoveWorkspaceMemberService's own identical lookup for the full reasoning.
+    final UUID organizationId =
+        workspaces
+            .findOrganizationIdById(updated.workspaceId())
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "WorkspaceMembership references workspaceId "
+                            + updated.workspaceId()
+                            + " that doesn't exist — data integrity violated before reaching this"
+                            + " use case"));
+
     auditEvents.write(
         command.actor(),
         "workspace_membership.role_changed",
@@ -60,6 +78,7 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
         "WorkspaceMembership",
         "workspace_membership.role_changed",
         updated.id(),
+        organizationId,
         WorkspaceMemberRoleChangedEvent.of(
             updated.id(),
             updated.workspaceId(),

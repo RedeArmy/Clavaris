@@ -48,7 +48,11 @@ public class CreateWorkspaceService implements CreateWorkspaceUseCase {
         "organizationId=" + command.organizationId());
 
     outbox.write(
-        "Workspace", "workspace.created", workspace.id(), WorkspaceCreatedEvent.from(workspace));
+        "Workspace",
+        "workspace.created",
+        workspace.id(),
+        workspace.organizationId(),
+        WorkspaceCreatedEvent.from(workspace));
 
     return workspace;
   }

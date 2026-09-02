@@ -96,6 +96,7 @@ public class ConfirmPendingSocialLinkService implements ConfirmPendingSocialLink
     outbox.write(
         "social_identity.linked",
         pendingLink.accountId(),
+        account.organizationId(),
         SocialIdentityLinkedEvent.from(identity, account.organizationId()));
 
     return pendingLink.accountId();

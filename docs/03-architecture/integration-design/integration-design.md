@@ -44,11 +44,11 @@ Per JobSeeker's own `security-architecture.md` §2: JobSeeker's `auth-module` ac
 
 When a consumer's own data-deletion process (e.g. JobSeeker's ADR-0013 grace-period-then-anonymize flow) completes, it calls Clavaris's management API (`POST /api/v1/admin/accounts/{id}:delete`, `api-contract-overview.md` §3) to delete the underlying identity. Clavaris does not run its own independent grace period for this — the consumer owns that policy decision entirely (BR-DATA-02).
 
-## 5. Webhook integration (push from Clavaris to the consumer) — 🟡 proposed, see ADR-0007
+## 5. Webhook integration (push from Clavaris to the consumer) — ✅ shipped 2026-09-02, see ADR-0007
 
 Unlike every flow above (consumer → Clavaris), this is the one direction where Clavaris pushes to the consumer, so a consumer can react to identity/org events without polling:
 
-1. Register a webhook endpoint (`POST /api/v1/admin/webhook-endpoints`) with a URL and the event types to receive (`prd-mvp.md` §2.3's event catalog) — receive the signing secret exactly once, store it securely on the consumer's side.
+1. Register a webhook endpoint (`POST /api/v1/admin/organizations/{organizationId}/webhook-endpoints`) with a URL and the event types to receive (`prd-mvp.md` §2.3's event catalog) — receive the signing secret exactly once, store it securely on the consumer's side.
 2. For every incoming `POST`, verify the `Clavaris-Signature` header (HMAC-SHA256, BR-WEBHOOK-01) before trusting the payload — treat an unverified request as untrusted input, same as any other public webhook endpoint.
 3. Respond `2xx` quickly (process asynchronously on the consumer's side if the reaction is slow) — a timeout counts as a failed delivery and triggers a retry (BR-WEBHOOK-03).
 4. Deduplicate on `event.id` (BR-WEBHOOK-02) — delivery is at-least-once, so the same event can arrive more than once.
@@ -58,4 +58,4 @@ This is the reference pattern any future consumer should follow to keep a local 
 ## 6. Open questions
 
 - Should Clavaris publish a reference integration example (a minimal working consumer app, even a toy one) rather than relying purely on prose documentation? Would directly support the "under a day" integration-cost goal (`nfr-quality-attributes.md` §4) — not yet built, worth prioritizing early in v1.1.
-- ~~Webhook/event notification from Clavaris to consumers is not designed~~ — **resolved**: see §5 above and **ADR-0007**. Remaining open items (signing secret rotation, delivery log retention) are tracked in that ADR, not here.
+- ~~Webhook/event notification from Clavaris to consumers is not designed~~ — **resolved and shipped 2026-09-02**: see §5 above and **ADR-0007**, whose own three open items (signing secret rotation, delivery log retention, outbox cleanup) are now all resolved there too.

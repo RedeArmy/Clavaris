@@ -94,6 +94,7 @@ public class RevokeAccountSessionService implements RevokeAccountSessionUseCase 
                       outbox,
                       "account.session_revoked",
                       accountId,
+                      organizationId,
                       AccountSessionRevokedEvent.of(accountId, organizationId, sessionId),
                       "event=account_session_revoked_outbox_write_failed"),
               () -> LOG.warn("event=account_session_revoked_outbox_skipped_account_not_found"));

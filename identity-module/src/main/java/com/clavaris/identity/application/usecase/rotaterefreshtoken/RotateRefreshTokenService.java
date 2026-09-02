@@ -191,6 +191,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     outbox.write(
         "refresh_token.reuse_detected",
         accountId,
+        organizationId,
         RefreshTokenReuseDetectedEvent.of(accountId, organizationId));
   }
 }

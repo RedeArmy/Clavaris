@@ -20,4 +20,11 @@ public interface WorkspaceRepository {
   Optional<Workspace> findById(UUID workspaceId);
 
   List<Workspace> findAllByOrganizationId(UUID organizationId);
+
+  // webhook-module's EventOutboxWriter needs organizationId, not the full Workspace — same
+  // "scalar projection over full-entity lookup" precedent as AccountRepository's own identical
+  // method (code review, 2026-09-01). The only two callers (RemoveWorkspaceMemberService,
+  // ChangeWorkspaceMemberRoleService) start from a WorkspaceMembership, which only carries
+  // workspaceId, not organizationId.
+  Optional<UUID> findOrganizationIdById(UUID workspaceId);
 }

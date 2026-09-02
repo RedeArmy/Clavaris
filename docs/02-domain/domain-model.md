@@ -215,7 +215,7 @@ classDiagram
 - **`ClientDomainConfig`** and **`ClientBranding`** are separate tables from `OAuthClient`, same "no nullable column bolted onto the core entity" convention as `PasswordCredential`/`SocialIdentity` on `Account` (`data-model.md` §2) — most clients never configure either, and BR-CLIENT-04 gates production use of the embedded experience on `verificationStatus = VERIFIED`.
 - **`DomainMode`** — `CNAME | PROXY | SHARED` (ADR-0009 §2); `SHARED` (Clavaris's own domain, the only mode that exists today) is the default and the only mode valid outside production.
 
-## 5. `webhook-module` — core entities — 🟡 proposed, see ADR-0007
+## 5. `webhook-module` — core entities — ✅ shipped 2026-09-02, see ADR-0007
 
 ```mermaid
 classDiagram
@@ -258,6 +258,28 @@ classDiagram
 - **`EventOutboxEntry`** — written in the *same transaction* as the domain state change it records (ADR-0007 §1, BR-WEBHOOK-05); `identity-module`/`organization-module` write these rows, `webhook-module`'s dispatcher only ever reads them — this is how the two producing modules stay unaware that `webhook-module` exists at all, preserving the hexagonal dependency rule.
 - **`WebhookDelivery.status`** — `PENDING | SUCCEEDED | FAILED | EXHAUSTED` (BR-WEBHOOK-03); `EXHAUSTED` is a terminal state requiring manual replay, never a silent drop.
 
+**Where the shipped implementation diverges from this design-time sketch** (kept as-is above for
+its own historical value, not redrawn field-by-field):
+
+- `WebhookEndpoint` is scoped by `organizationId` directly, not `oauthClientId` — an endpoint
+  belongs to an `Organization` (one Organization may register several endpoints), never to one
+  specific `OAuthClient`.
+- `WebhookEndpoint.secretHash` shipped as `currentSecretEncrypted`/`previousSecretEncrypted`
+  (reversible AES-256-GCM encryption, not a one-way hash) plus `previousSecretExpiresAt` — the
+  secret must be recoverable in cleartext at delivery time to compute an outbound HMAC, so a
+  one-way hash (this diagram's original assumption) was never viable; see `WebhookEndpoint`'s own
+  Javadoc for the rotation/overlap-window mechanism this enables.
+- `WebhookEndpoint.status` shipped as a plain `active` boolean (`deactivate`/`activate`, both
+  reversible), not a separate status enum.
+- `EventOutboxEntry` above is a composite sketch — the real shape is two genuinely separate
+  physical tables (`event_outbox` in identity-module, `organization_event_outbox` in
+  organization-module, ADR-0007 §1), each now also carrying an explicit `organization_id` column
+  (migrations `V20260902110000`/`V20260902110001`) so `webhook-module`'s dispatcher can fan out by
+  tenant without parsing either producer's own payload shape.
+- `WebhookDelivery` also carries a denormalized `organizationId` (not shown above) and
+  `outboxEventId` (not `eventId`), and gains an `endpointId` FK to `WebhookEndpoint`
+  (`ON DELETE CASCADE`).
+
 ## 6. Cross-context relationships
 
 `WorkspaceMembership.accountId` and `AuthorizationCode.accountId` both reference `identity-module`'s `Account` — but per the hexagonal dependency rule, no module holds a live object reference across the boundary. Cross-module reads go through each module's own port, keyed by the shared `accountId` UUID, exactly as JobSeeker's own modules avoid leaking internal types across bounded contexts. `WebhookEndpoint.oauthClientId` follows the same rule (§5).
@@ -292,4 +314,4 @@ Not every internal domain event becomes a webhook — only the ones a consumer p
 - ~~Should `Session` and `RefreshToken` be merged into one aggregate, or kept separate?~~ — resolved by building BR-ID-03 for real: kept separate, and it held up without friction. The reuse check that motivated keeping them separate ended up not even needing to walk the `rotatedFromId` chain at runtime (a presented token's own `revokedAt` is sufficient — see `RefreshToken`'s own Javadoc) — but `Session` still earned its keep as the anchor `scopes`/`createdAt` (for OIDC `auth_time` continuity across rotations) actually needed to live on, distinct from any one `RefreshToken` in the chain.
 - ~~Multi-consumer identity scenario flagged in `business-rules.md` (BR-DATA-03 open question)~~ — resolved by ADR-0010: `Account` is now `Organization`-scoped, so "the same Clavaris account used to log into two consumers" is structurally impossible, not an open design question.
 - ADR-0010's own open questions (Organization provisioning ownership, system-wide rate-limit ceiling value, automated key-rotation tooling) are tracked there, not duplicated here.
-- `webhook-module` (§5) is new and carries its own open questions — see ADR-0007's own open-questions section (secret rotation, delivery log retention, outbox cleanup) rather than duplicating them here.
+- ~~`webhook-module` (§5) is new and carries its own open questions~~ — **resolved 2026-09-02**: all three of ADR-0007's own open questions (secret rotation, delivery log retention, outbox cleanup) are answered and shipped — see that ADR's own "Open questions — resolved" section, not duplicated here.

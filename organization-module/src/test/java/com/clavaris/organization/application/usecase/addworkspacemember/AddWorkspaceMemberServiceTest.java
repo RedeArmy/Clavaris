@@ -116,6 +116,7 @@ class AddWorkspaceMemberServiceTest {
             eq("WorkspaceMembership"),
             eq("workspace_membership.added"),
             eq(membership.id()),
+            any(),
             any());
   }
 

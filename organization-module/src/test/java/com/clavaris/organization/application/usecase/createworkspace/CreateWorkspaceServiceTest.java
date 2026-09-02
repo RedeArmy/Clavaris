@@ -63,7 +63,8 @@ class CreateWorkspaceServiceTest {
             eq("Workspace"),
             eq(workspace.id().toString()),
             any());
-    verify(outbox).write(eq("Workspace"), eq("workspace.created"), eq(workspace.id()), any());
+    verify(outbox)
+        .write(eq("Workspace"), eq("workspace.created"), eq(workspace.id()), any(), any());
   }
 
   @Test

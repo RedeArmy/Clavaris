@@ -15,6 +15,7 @@ COPY common ./common
 COPY identity-module ./identity-module
 COPY organization-module ./organization-module
 COPY client-registry-module ./client-registry-module
+COPY webhook-module ./webhook-module
 COPY app ./app
 
 # TD-ARCH-006: Maven Wrapper, not `apt-get install maven` — that installed whatever version apt's

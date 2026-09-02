@@ -125,6 +125,7 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
         "Organization",
         "organization.deleted",
         organization.id(),
+        organization.id(),
         OrganizationDeletedEvent.from(organization));
 
     LOG.info("event=organization_deleted organizationId={}", command.organizationId());

@@ -99,7 +99,7 @@ class ConfirmPasswordResetServiceTest {
     verify(refreshTokens).revokeAllActiveForAccount(account.id());
     verify(accountTokenRevoker).revokeAllTokensFor(account.id());
     verify(accountSessionRevoker).revokeAllSessionsFor(account.id());
-    verify(outbox).write(eq("password_reset.completed"), eq(account.id()), any());
+    verify(outbox).write(eq("password_reset.completed"), eq(account.id()), any(), any());
   }
 
   @Test

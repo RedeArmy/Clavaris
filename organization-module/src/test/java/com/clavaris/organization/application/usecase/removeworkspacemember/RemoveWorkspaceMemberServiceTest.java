@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
@@ -25,6 +26,7 @@ class RemoveWorkspaceMemberServiceTest {
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
 
   private WorkspaceMembershipRepository memberships;
+  private WorkspaceRepository workspaces;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private RemoveWorkspaceMemberService service;
@@ -32,9 +34,11 @@ class RemoveWorkspaceMemberServiceTest {
   @BeforeEach
   void setUp() {
     memberships = mock(WorkspaceMembershipRepository.class);
+    workspaces = mock(WorkspaceRepository.class);
+    when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(UUID.randomUUID()));
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new RemoveWorkspaceMemberService(memberships, auditEvents, outbox);
+    service = new RemoveWorkspaceMemberService(memberships, workspaces, auditEvents, outbox);
   }
 
   private WorkspaceMembership existingMembership(
@@ -109,6 +113,7 @@ class RemoveWorkspaceMemberServiceTest {
             eq("WorkspaceMembership"),
             eq("workspace_membership.removed"),
             eq(membership.id()),
+            any(),
             any());
   }
 
@@ -122,6 +127,23 @@ class RemoveWorkspaceMemberServiceTest {
         new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceMembershipNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(memberships, never()).deleteById(any());
+    verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
+  }
+
+  @Test
+  void refusesToProceedWhenTheMembershipsOwnWorkspaceNoLongerExists() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    when(workspaces.findOrganizationIdById(workspaceId)).thenReturn(Optional.empty());
+    RemoveWorkspaceMemberCommand command =
+        new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR);
+
+    assertThatExceptionOfType(IllegalStateException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(memberships, never()).deleteById(any());

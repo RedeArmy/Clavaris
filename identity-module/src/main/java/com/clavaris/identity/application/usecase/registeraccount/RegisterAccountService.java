@@ -63,7 +63,11 @@ public class RegisterAccountService implements RegisterAccountUseCase {
     // ADR-0007 §1: outbox row written in the SAME transaction as the account insert —
     // @Transactional above covers both, so a crash between the two is impossible; either both
     // commit or neither does.
-    outbox.write("account.created", account.id(), AccountRegisteredEvent.from(account));
+    outbox.write(
+        "account.created",
+        account.id(),
+        account.organizationId(),
+        AccountRegisteredEvent.from(account));
 
     return account.id();
   }

@@ -86,7 +86,7 @@ class SuspendAccountServiceTest {
 
     verify(auditEvents)
         .write(ACTOR, "account.suspended", "Account", account.id().value().toString(), null);
-    verify(outbox).write(eq("account.suspended"), eq(account.id()), any());
+    verify(outbox).write(eq("account.suspended"), eq(account.id()), any(), any());
   }
 
   @Test

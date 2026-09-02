@@ -152,6 +152,7 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
             outbox,
             "account.new_device_detected",
             command.accountId(),
+            account.organizationId(),
             AccountNewDeviceDetectedEvent.from(device, account.organizationId()),
             "event=account_new_device_detected_outbox_write_failed");
         try {

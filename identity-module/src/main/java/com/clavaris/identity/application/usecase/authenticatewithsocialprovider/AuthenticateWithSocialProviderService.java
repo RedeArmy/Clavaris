@@ -170,10 +170,15 @@ public class AuthenticateWithSocialProviderService
                     command.providerUserId());
             socialIdentities.save(identity);
 
-            outbox.write("account.created", account.id(), AccountRegisteredEvent.from(account));
+            outbox.write(
+                "account.created",
+                account.id(),
+                command.organizationId(),
+                AccountRegisteredEvent.from(account));
             outbox.write(
                 "social_identity.linked",
                 account.id(),
+                command.organizationId(),
                 SocialIdentityLinkedEvent.from(identity, command.organizationId()));
 
             LOG.info(

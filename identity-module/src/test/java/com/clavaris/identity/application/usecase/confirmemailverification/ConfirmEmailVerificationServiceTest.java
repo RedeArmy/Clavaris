@@ -61,7 +61,7 @@ class ConfirmEmailVerificationServiceTest {
     assertThat(account.emailVerifiedAt()).isPresent();
     verify(tokens).save(token);
     verify(accounts).save(account);
-    verify(outbox).write(eq("account.email_verified"), eq(account.id()), any());
+    verify(outbox).write(eq("account.email_verified"), eq(account.id()), any(), any());
   }
 
   @Test
@@ -73,7 +73,7 @@ class ConfirmEmailVerificationServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
-    verify(outbox, never()).write(any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 
   @Test

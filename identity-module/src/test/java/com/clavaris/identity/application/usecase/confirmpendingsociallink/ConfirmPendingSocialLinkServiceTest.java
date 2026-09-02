@@ -70,7 +70,7 @@ class ConfirmPendingSocialLinkServiceTest {
     verify(pendingLinks).save(pendingLink);
     verify(socialIdentities).save(any(SocialIdentity.class));
     verify(accounts).save(account);
-    verify(outbox).write(eq("social_identity.linked"), eq(account.id()), any());
+    verify(outbox).write(eq("social_identity.linked"), eq(account.id()), any(), any());
   }
 
   @Test

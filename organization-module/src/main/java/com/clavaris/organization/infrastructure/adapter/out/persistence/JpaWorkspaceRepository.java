@@ -37,6 +37,11 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
     return workspaces.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
   }
 
+  @Override
+  public Optional<UUID> findOrganizationIdById(final UUID workspaceId) {
+    return workspaces.findOrganizationIdById(workspaceId);
+  }
+
   private Workspace toDomain(final WorkspaceEntity entity) {
     return Workspace.reconstitute(
         entity.getId(), entity.getOrganizationId(), entity.getName(), entity.getCreatedAt());

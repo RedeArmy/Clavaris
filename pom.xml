@@ -372,6 +372,7 @@
         <module>identity-module</module>
         <module>organization-module</module>
         <module>client-registry-module</module>
+        <module>webhook-module</module>
         <module>app</module>
     </modules>
 
