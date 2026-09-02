@@ -80,7 +80,8 @@ class OrganizationRegisteredClientRepositoryTest {
             List.of("https://example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     OrganizationRegisteredClientRepository repository =
@@ -117,7 +118,8 @@ class OrganizationRegisteredClientRepositoryTest {
             List.of("https://example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            false);
+            false,
+            List.of());
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     OrganizationRegisteredClientRepository repository =
@@ -143,7 +145,8 @@ class OrganizationRegisteredClientRepositoryTest {
             List.of("https://example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
     OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
     when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
     OrganizationRegisteredClientRepository repository =
@@ -152,6 +155,57 @@ class OrganizationRegisteredClientRepositoryTest {
     RegisteredClient found = repository.findById(client.id().toString());
 
     assertThat(found).isNull();
+  }
+
+  // TD-FUT-018: the real, load-bearing behavior — a configured post-logout redirect URI actually
+  // reaches the RegisteredClient SAS's own RP-Initiated Logout validator reads, not just exists
+  // as an unread getter on OAuthClient.
+  @Test
+  void findByIdWiresThePostLogoutRedirectUriWhenOneIsConfigured() {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "a-client-id",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of("https://example.com/logged-out"));
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findById(client.id().toString());
+
+    assertThat(found).isNotNull();
+    assertThat(found.getPostLogoutRedirectUris()).containsExactly("https://example.com/logged-out");
+  }
+
+  @Test
+  void findByIdLeavesPostLogoutRedirectUrisEmptyWhenNoneIsConfigured() {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "a-client-id",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findById(client.id().toString());
+
+    assertThat(found).isNotNull();
+    assertThat(found.getPostLogoutRedirectUris()).isEmpty();
   }
 
   private static void setOrganizationContext(final UUID organizationId) {

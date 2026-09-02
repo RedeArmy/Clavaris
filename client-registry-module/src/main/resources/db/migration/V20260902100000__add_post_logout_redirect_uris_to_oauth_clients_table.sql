@@ -1,0 +1,11 @@
+-- TD-FUT-018: RegisteredClient.postLogoutRedirectUri(...) was never called anywhere — every
+-- OAuthClient fell back to Spring Authorization Server's own bare default (redirect to
+-- {clavarisBaseUrl}/) once RP-Initiated Logout (TD-SEC-028) completed. Same "safe default on an
+-- ALTER, opt out explicitly per row" convention as require_consent's own migration — defaults to
+-- an empty JSON array for every already-registered client (identical behavior to today, since SAS
+-- only reads this at all when the request itself presents a matching post_logout_redirect_uri —
+-- an empty allowlist keeps every existing client on the exact same bare-default redirect it
+-- already gets). Same text/JSON-array storage convention as redirect_uris/allowed_grant_types/
+-- allowed_scopes on this same table — see OAuthClientEntity's own Javadoc for why serialization
+-- happens in JpaOAuthClientRepository, not here.
+ALTER TABLE oauth_clients ADD COLUMN post_logout_redirect_uris text NOT NULL DEFAULT '[]';

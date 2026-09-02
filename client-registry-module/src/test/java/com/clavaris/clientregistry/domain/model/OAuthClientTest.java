@@ -22,7 +22,8 @@ class OAuthClientTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code", "refresh_token"),
             List.of("openid", "profile"),
-            true);
+            true,
+            List.of());
 
     assertThat(client.organizationId()).isEqualTo(organizationId);
     assertThat(client.clientId()).isEqualTo("jobseeker-web");
@@ -31,6 +32,7 @@ class OAuthClientTest {
     assertThat(client.allowedGrantTypes()).containsExactly("authorization_code", "refresh_token");
     assertThat(client.allowedScopes()).containsExactly("openid", "profile");
     assertThat(client.requireConsent()).isTrue();
+    assertThat(client.postLogoutRedirectUris()).isEmpty();
     assertThat(client.createdAt()).isNotNull();
   }
 
@@ -46,9 +48,29 @@ class OAuthClientTest {
             List.of("https://trusted.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            false);
+            false,
+            List.of());
 
     assertThat(client.requireConsent()).isFalse();
+  }
+
+  // TD-FUT-018: the real, load-bearing behavior — a present, non-empty allowlist actually reaches
+  // the domain model, not just an absent/empty one.
+  @Test
+  void registerCarriesAnExplicitPostLogoutRedirectUri() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "jobseeker-web",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of("https://jobseeker.example.com/logged-out"));
+
+    assertThat(client.postLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/logged-out");
   }
 
   @Test
@@ -63,7 +85,8 @@ class OAuthClientTest {
                     List.of("https://example.com/callback"),
                     List.of("authorization_code"),
                     List.of(),
-                    true));
+                    true,
+                    List.of()));
   }
 
   @Test
@@ -78,7 +101,8 @@ class OAuthClientTest {
                     List.of("https://example.com/callback"),
                     List.of("authorization_code"),
                     List.of(),
-                    true));
+                    true,
+                    List.of()));
   }
 
   @Test
@@ -94,7 +118,8 @@ class OAuthClientTest {
                     List.of(),
                     List.of("authorization_code"),
                     List.of(),
-                    true));
+                    true,
+                    List.of()));
   }
 
   @Test
@@ -111,7 +136,8 @@ class OAuthClientTest {
                     List.of("/callback"),
                     List.of("authorization_code"),
                     List.of(),
-                    true));
+                    true,
+                    List.of()));
   }
 
   @Test
@@ -126,7 +152,8 @@ class OAuthClientTest {
                     List.of("not a uri at all ::"),
                     List.of("authorization_code"),
                     List.of(),
-                    true));
+                    true,
+                    List.of()));
   }
 
   @Test
@@ -141,7 +168,43 @@ class OAuthClientTest {
                     List.of("https://example.com/callback"),
                     List.of(),
                     List.of(),
-                    true));
+                    true,
+                    List.of()));
+  }
+
+  // TD-FUT-018: same well-formed/absolute requirement as redirectUris, applied here — unlike
+  // redirectUris, an empty list is valid (see registerCarriesTheGivenFields above); a malformed
+  // entry never is.
+  @Test
+  void rejectsAMalformedPostLogoutRedirectUri() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OAuthClient.register(
+                    organizationId,
+                    "a-client",
+                    "argon2id$hashed",
+                    List.of("https://example.com/callback"),
+                    List.of("authorization_code"),
+                    List.of(),
+                    true,
+                    List.of("not a uri at all ::")));
+  }
+
+  @Test
+  void rejectsARelativePostLogoutRedirectUri() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OAuthClient.register(
+                    organizationId,
+                    "a-client",
+                    "argon2id$hashed",
+                    List.of("https://example.com/callback"),
+                    List.of("authorization_code"),
+                    List.of(),
+                    true,
+                    List.of("/logged-out")));
   }
 
   @Test
@@ -159,6 +222,7 @@ class OAuthClientTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
+            List.of(),
             persistedCreatedAt);
 
     assertThat(client.id()).isEqualTo(persistedId);

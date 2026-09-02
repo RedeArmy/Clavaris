@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -153,5 +154,49 @@ class AddWorkspaceMemberServiceTest {
     verify(memberships, never()).save(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+  }
+
+  // TD-WS-001: the compensating-action saga — a DB failure right after the Account is provisioned
+  // must not leave a permanent orphan.
+  @Test
+  void deprovisionsTheAccountAndRethrowsTheOriginalFailureWhenTheMembershipWriteFails() {
+    UUID accountId = UUID.randomUUID();
+    when(accountProvisioner.provisionAndSendWelcome(any(), any()))
+        .thenReturn(new AccountProvisioner.ProvisionedAccount(accountId));
+    RuntimeException membershipFailure = new RuntimeException("membership save failed");
+    doThrow(membershipFailure).when(memberships).save(any());
+    AddWorkspaceMemberCommand command =
+        new AddWorkspaceMemberCommand(
+            workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+
+    assertThatExceptionOfType(RuntimeException.class)
+        .isThrownBy(() -> service.handle(command))
+        .isSameAs(membershipFailure);
+
+    verify(accountProvisioner).deprovision(accountId, ACTOR);
+    verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
+  }
+
+  // The compensating action itself failing must never mask the original failure that triggered
+  // it — a double failure is exactly today's pre-existing manual-remediation fallback, not a
+  // worse or different outcome than before this saga existed.
+  @Test
+  void stillRethrowsTheOriginalFailureWhenTheCompensatingDeprovisionAlsoFails() {
+    UUID accountId = UUID.randomUUID();
+    when(accountProvisioner.provisionAndSendWelcome(any(), any()))
+        .thenReturn(new AccountProvisioner.ProvisionedAccount(accountId));
+    RuntimeException membershipFailure = new RuntimeException("membership save failed");
+    doThrow(membershipFailure).when(memberships).save(any());
+    doThrow(new RuntimeException("deprovision also failed"))
+        .when(accountProvisioner)
+        .deprovision(any(), any());
+    AddWorkspaceMemberCommand command =
+        new AddWorkspaceMemberCommand(
+            workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+
+    assertThatExceptionOfType(RuntimeException.class)
+        .isThrownBy(() -> service.handle(command))
+        .isSameAs(membershipFailure);
   }
 }

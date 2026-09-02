@@ -23,9 +23,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * test-strategy.md §2: a real-Postgres integration test for the tenant-scoped OAuth client adapter
- * — proves {@code toDomain()} really calls {@code OAuthClient.reconstitute(...)} and that all three
- * JSON-serialized list columns (redirect_uris, allowed_grant_types, allowed_scopes) round-trip
- * correctly against the real migrated schema.
+ * — proves {@code toDomain()} really calls {@code OAuthClient.reconstitute(...)} and that all
+ * JSON-serialized list columns (redirect_uris, allowed_grant_types, allowed_scopes,
+ * post_logout_redirect_uris) round-trip correctly against the real migrated schema.
  *
  * <p>Deliberately NOT {@code @DataJpaTest} — see {@code JpaPlatformClientRepositoryTest}'s own
  * Javadoc for the full finding (removed in Spring Boot 4.1). {@code @Import}, not
@@ -52,7 +52,8 @@ class JpaOAuthClientRepositoryTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code", "refresh_token"),
             List.of("openid", "profile"),
-            false);
+            false,
+            List.of("https://jobseeker.example.com/logged-out"));
 
     repository.save(client);
     Optional<OAuthClient> found = repository.findByClientId("a-client-id");
@@ -70,6 +71,9 @@ class JpaOAuthClientRepositoryTest {
     // here (not the DB column's own default true) so this test cannot pass by accident if the
     // column were never actually wired through JpaOAuthClientRepository at all.
     assertThat(found.get().requireConsent()).isFalse();
+    // TD-FUT-018: same "prove it's really wired, not just present" bar as requireConsent above.
+    assertThat(found.get().postLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/logged-out");
   }
 
   @Test
@@ -90,7 +94,8 @@ class JpaOAuthClientRepositoryTest {
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
-            true);
+            true,
+            List.of());
     repository.save(client);
 
     Optional<OAuthClient> found = repository.findById(client.id());

@@ -6,6 +6,8 @@ import com.clavaris.organization.application.usecase.deleteorganization.EventOut
 import com.clavaris.organization.domain.event.WorkspaceMemberAddedEvent;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -24,19 +26,36 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       the {@code WorkspaceMembership} row and write the audit/outbox events for it atomically.
  * </ol>
  *
- * <p>Known, accepted edge case: if step 2 fails immediately after step 1 succeeds, the new {@code
- * Account} exists with no {@code WorkspaceMembership} yet — an orphan. Rare (a DB failure in the
- * instant after a prior, unrelated write already committed), not one of the security invariants
- * ADR-0007 treats as unacceptable eventual-consistency (that bar is reserved for session/token
- * revocation); tracked as its own technical-debt row rather than engineered around with a saga this
- * v1 scope doesn't otherwise need.
+ * <p><b>TD-WS-001, closed:</b> if step 2 fails immediately after step 1 succeeds, the new {@code
+ * Account} would exist with no {@code WorkspaceMembership} yet — an orphan. Rare (a DB failure in
+ * the instant after a prior, unrelated write already committed), still not one of the security
+ * invariants ADR-0007 treats as unacceptable eventual-consistency (that bar is reserved for
+ * session/token revocation) — but real enough, and cheap enough to close, that it no longer needs
+ * an operator to notice and hand-delete the orphan via the admin API. {@link
+ * AccountProvisioner#deprovision} is the compensating action (a saga, not a distributed
+ * transaction): on any failure in step 2, this class calls it to reverse step 1, then rethrows the
+ * original failure unchanged — the caller still sees the real error, the orphan just no longer
+ * outlives it.
  */
 // PMD.LongVariable: accountProvisioner/transactionTemplate match their own collaborator type
 // names exactly — same convention every other port field in this codebase follows (e.g.
 // accountTokenRevoker, workspaceMembershipEraser), not an organically long name that should
-// shrink.
-@SuppressWarnings("PMD.LongVariable")
+// shrink. PMD.AvoidCatchingGenericException: TD-WS-001's own compensating-action saga needs both
+// catches to be this broad — the membership-write step can fail for any reason a real transaction
+// can (constraint violation, connection loss, ...), and the compensating deprovision() call can
+// likewise fail for any reason a real cross-module use-case call can; narrowing either to a
+// specific exception type would leave some real failure mode uncompensated/unlogged, defeating
+// the whole point of this catch. PMD.GuardLogStatement: same false positive every other logging
+// call site in this module already documents — accountId is a cheap in-memory accessor, not an
+// expensive computation the WARN level should be checked before evaluating.
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.AvoidCatchingGenericException",
+  "PMD.GuardLogStatement"
+})
 public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AddWorkspaceMemberService.class);
 
   private final WorkspaceRepository workspaces;
   private final WorkspaceMembershipRepository memberships;
@@ -73,26 +92,41 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
     final AccountProvisioner.ProvisionedAccount account =
         accountProvisioner.provisionAndSendWelcome(workspace.organizationId(), command.email());
 
-    return transactionTemplate.execute(
-        status -> {
-          final WorkspaceMembership membership =
-              WorkspaceMembership.join(workspace.id(), account.accountId(), command.role());
-          memberships.save(membership);
+    try {
+      return transactionTemplate.execute(
+          status -> {
+            final WorkspaceMembership membership =
+                WorkspaceMembership.join(workspace.id(), account.accountId(), command.role());
+            memberships.save(membership);
 
-          auditEvents.write(
-              command.actor(),
-              "workspace_membership.added",
-              "WorkspaceMembership",
-              membership.id().toString(),
-              "workspaceId=" + workspace.id() + " role=" + command.role());
+            auditEvents.write(
+                command.actor(),
+                "workspace_membership.added",
+                "WorkspaceMembership",
+                membership.id().toString(),
+                "workspaceId=" + workspace.id() + " role=" + command.role());
 
-          outbox.write(
-              "WorkspaceMembership",
-              "workspace_membership.added",
-              membership.id(),
-              WorkspaceMemberAddedEvent.from(membership));
+            outbox.write(
+                "WorkspaceMembership",
+                "workspace_membership.added",
+                membership.id(),
+                WorkspaceMemberAddedEvent.from(membership));
 
-          return membership;
-        });
+            return membership;
+          });
+    } catch (final RuntimeException membershipWriteFailed) {
+      // TD-WS-001: step 1 (the Account) already committed — compensate rather than leave an
+      // orphan. deprovision() may itself fail (see its own Javadoc) — contained here, never
+      // allowed to mask or replace the original failure below.
+      try {
+        accountProvisioner.deprovision(account.accountId(), command.actor());
+      } catch (final RuntimeException deprovisionFailed) {
+        LOG.warn(
+            "event=workspace_member_account_deprovision_failed accountId={}",
+            account.accountId(),
+            deprovisionFailed);
+      }
+      throw membershipWriteFailed;
+    }
   }
 }

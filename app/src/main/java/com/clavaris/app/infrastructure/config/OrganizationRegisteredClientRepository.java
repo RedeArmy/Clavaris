@@ -120,6 +120,10 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
         .forEach(grant -> builder.authorizationGrantType(new AuthorizationGrantType(grant)));
     client.allowedScopes().forEach(builder::scope);
     client.redirectUris().forEach(builder::redirectUri);
+    // TD-FUT-018: empty for any client that never configured one — SAS's own Builder.build()
+    // (decompiled/read, 7.1.0) tolerates an empty postLogoutRedirectUris set fine (only validates
+    // entries that exist), so this is a genuine no-op for every already-registered client.
+    client.postLogoutRedirectUris().forEach(builder::postLogoutRedirectUri);
     return builder.build();
   }
 }
