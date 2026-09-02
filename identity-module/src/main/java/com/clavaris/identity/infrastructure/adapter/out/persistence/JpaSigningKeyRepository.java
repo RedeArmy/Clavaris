@@ -37,6 +37,13 @@ class JpaSigningKeyRepository implements SigningKeyRepository {
   }
 
   @Override
+  public Optional<SigningKey> findByKid(final OrganizationId organizationId, final String kid) {
+    return signingKeys
+        .findFirstByOrganizationIdAndKid(organizationId.value(), kid)
+        .map(this::toDomain);
+  }
+
+  @Override
   public void save(final SigningKey signingKey) {
     signingKeys.save(
         new SigningKeyEntity(

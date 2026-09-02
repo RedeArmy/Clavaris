@@ -110,6 +110,11 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.POST, "/api/v1/admin/organizations/*/signing-keys/rotate")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SIGNING_KEYS_ROTATE)
+                    // TD-SEC-029: the emergency zero-overlap purge — its own scope, deliberately
+                    // separate from SIGNING_KEYS_ROTATE (see that scope's own Javadoc).
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/organizations/*/signing-keys/*:purge")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SIGNING_KEYS_PURGE)
                     // TD-SEC-018: rotating/revoking a PlatformClient — its own scopes too, same
                     // defence-in-depth reasoning as every other admin-API rule above.
                     .requestMatchers(
@@ -155,6 +160,27 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/social-login-policy")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE)
+                    // ADR-0007: registering an endpoint, rotating its secret, or (de)activating it
+                    // — one shared scope, same "grouped under one scope for same-risk-tier actions"
+                    // precedent WORKSPACE_MEMBERS_WRITE already establishes.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/organizations/*/webhook-endpoints")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WEBHOOK_ENDPOINTS_WRITE)
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/webhook-endpoints/*:rotate-secret")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WEBHOOK_ENDPOINTS_WRITE)
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/webhook-endpoints/*:deactivate")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WEBHOOK_ENDPOINTS_WRITE)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/webhook-endpoints/*:activate")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WEBHOOK_ENDPOINTS_WRITE)
+                    // ADR-0007: replaying a delivery — its own scope, deliberately separate from
+                    // WEBHOOK_ENDPOINTS_WRITE, same defence-in-depth reasoning
+                    // WORKSPACE_MEMBERS_REMOVE already establishes relative to
+                    // WORKSPACE_MEMBERS_WRITE.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/webhook-endpoints/*/deliveries/*:replay")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WEBHOOK_DELIVERIES_REPLAY)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

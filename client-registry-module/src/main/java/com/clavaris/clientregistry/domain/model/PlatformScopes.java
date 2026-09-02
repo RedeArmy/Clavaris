@@ -32,6 +32,16 @@ public final class PlatformScopes {
   public static final String SIGNING_KEYS_ROTATE = "platform:signing-keys:rotate";
 
   /**
+   * TD-SEC-029: the emergency, zero-overlap purge for a confirmed compromise
+   * (`incident-response-signing-key-compromise.md` §3.6) — its own scope, deliberately separate
+   * from {@link #SIGNING_KEYS_ROTATE}, same defence-in-depth reasoning {@link
+   * #WORKSPACE_MEMBERS_REMOVE} already establishes relative to {@link #WORKSPACE_MEMBERS_WRITE} (a
+   * token that can rotate a key on a routine schedule doesn't automatically get to also force an
+   * immediate, breaking, zero-overlap eviction).
+   */
+  public static final String SIGNING_KEYS_PURGE = "platform:signing-keys:purge";
+
+  /**
    * TD-SEC-018: rotating another {@code PlatformClient}'s secret — the real, code-driven
    * replacement for raw SQL against production named in {@code
    * incident-response-platform-client-compromise.md} §3a.
@@ -96,6 +106,21 @@ public final class PlatformScopes {
   public static final String SOCIAL_LOGIN_POLICY_WRITE = "platform:social-login-policy:write";
 
   /**
+   * ADR-0007: registering/deactivating a {@code WebhookEndpoint} or rotating its signing secret —
+   * grouped under one scope, same "same risk tier" precedent as {@link #WORKSPACE_MEMBERS_WRITE}
+   * (all three mutate one endpoint's own configuration; none reaches another Organization's data).
+   */
+  public static final String WEBHOOK_ENDPOINTS_WRITE = "platform:webhook-endpoints:write";
+
+  /**
+   * ADR-0007: manually replaying one {@code WebhookDelivery} — its own scope, deliberately separate
+   * from {@link #WEBHOOK_ENDPOINTS_WRITE}, same defence-in-depth reasoning {@link
+   * #WORKSPACE_MEMBERS_REMOVE} already establishes (a token that can register/rotate an endpoint
+   * doesn't automatically get to also re-trigger delivery of an arbitrary past event to it).
+   */
+  public static final String WEBHOOK_DELIVERIES_REPLAY = "platform:webhook-deliveries:replay";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -104,6 +129,7 @@ public final class PlatformScopes {
           ORGANIZATIONS_WRITE,
           RATE_LIMIT_POLICY_WRITE,
           SIGNING_KEYS_ROTATE,
+          SIGNING_KEYS_PURGE,
           PLATFORM_CLIENTS_ROTATE_SECRET,
           PLATFORM_CLIENTS_REVOKE,
           ACCOUNTS_DELETE,
@@ -112,7 +138,9 @@ public final class PlatformScopes {
           WORKSPACE_MEMBERS_WRITE,
           WORKSPACE_MEMBERS_REMOVE,
           ACCOUNTS_SUSPEND,
-          SOCIAL_LOGIN_POLICY_WRITE);
+          SOCIAL_LOGIN_POLICY_WRITE,
+          WEBHOOK_ENDPOINTS_WRITE,
+          WEBHOOK_DELIVERIES_REPLAY);
 
   private PlatformScopes() {}
 }

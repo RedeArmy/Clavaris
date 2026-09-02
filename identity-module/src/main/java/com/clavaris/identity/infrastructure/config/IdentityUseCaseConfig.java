@@ -32,6 +32,8 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountService;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
+import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationService;
+import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountService;
 import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
@@ -134,6 +136,18 @@ class IdentityUseCaseConfig {
           final ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase,
       final AuditEventRecorder auditEvents) {
     return new RotateSigningKeyForOrganizationService(
+        signingKeys, keyMaterial, activateSigningKeyForOrganizationUseCase, auditEvents);
+  }
+
+  // TD-SEC-029
+  @Bean
+  /* package */ PurgeSigningKeyForOrganizationUseCase purgeSigningKeyForOrganizationUseCase(
+      final SigningKeyRepository signingKeys,
+      final SigningKeyMaterialGenerator keyMaterial,
+      @SuppressWarnings("PMD.LongVariable")
+          final ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase,
+      final AuditEventRecorder auditEvents) {
+    return new PurgeSigningKeyForOrganizationService(
         signingKeys, keyMaterial, activateSigningKeyForOrganizationUseCase, auditEvents);
   }
 

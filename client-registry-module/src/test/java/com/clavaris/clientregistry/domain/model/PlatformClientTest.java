@@ -21,6 +21,7 @@ class PlatformClientTest {
             PlatformScopes.ORGANIZATIONS_WRITE,
             PlatformScopes.RATE_LIMIT_POLICY_WRITE,
             PlatformScopes.SIGNING_KEYS_ROTATE,
+            PlatformScopes.SIGNING_KEYS_PURGE,
             PlatformScopes.PLATFORM_CLIENTS_ROTATE_SECRET,
             PlatformScopes.PLATFORM_CLIENTS_REVOKE,
             PlatformScopes.ACCOUNTS_DELETE,
@@ -29,7 +30,9 @@ class PlatformClientTest {
             PlatformScopes.WORKSPACE_MEMBERS_WRITE,
             PlatformScopes.WORKSPACE_MEMBERS_REMOVE,
             PlatformScopes.ACCOUNTS_SUSPEND,
-            PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE);
+            PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE,
+            PlatformScopes.WEBHOOK_ENDPOINTS_WRITE,
+            PlatformScopes.WEBHOOK_DELIVERIES_REPLAY);
     assertThat(client.createdAt()).isNotNull();
   }
 
