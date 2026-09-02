@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 
@@ -19,41 +20,51 @@ import org.springframework.http.ResponseCookie;
  *
  * <p>{@code Secure} mirrors {@code request.isSecure()} rather than being hardcoded — same adaptive
  * default Spring Session's own {@code DefaultCookieSerializer} applies to the session cookie itself
- * when nothing overrides it, confirmed by inspecting that class: local HTTP dev keeps working,
- * production HTTPS gets the flag automatically, with no environment-specific config needed here.
- * {@code Path=/}, not scoped to {@code /o/{organizationId}}: the social-login callback this cookie
- * must also be readable from ({@code SocialLoginConfig}'s own {@code /login/oauth2/code/**}) lives
- * outside that prefix entirely — a narrower path would silently never reach it. This doesn't weaken
- * cross-Organization isolation: the token's own hash is only ever looked up scoped to one specific
- * {@code accountId} server-side, and no two Organizations' account pools ever share a row
- * (ADR-0010) for a stray cookie value to spuriously match against.
+ * when nothing overrides it. {@code Path=/}, not scoped to {@code /o/{organizationId}}: the
+ * social-login callback this cookie must also be readable from ({@code SocialLoginConfig}'s own
+ * {@code /login/oauth2/code/**}) lives outside that prefix entirely — a narrower path would
+ * silently never reach it.
+ *
+ * <p><b>Code review finding (2026-09-01), fixed same day:</b> the cookie <i>name</i> is namespaced
+ * per {@code organizationId} — a single global name, combined with {@code Path=/}, meant a browser
+ * used to log into two different Organizations (ADR-0010: a real, unrelated-account-pool scenario,
+ * not a hypothetical) had its one cookie perpetually overwritten by whichever Organization
+ * authenticated last, so alternating between them triggered a "new device" email on every single
+ * login. Each Organization now gets its own independent cookie in the same browser, coexisting
+ * under the shared {@code Path=/} without colliding — the actual cross-Organization isolation this
+ * class's own Javadoc already relied on server-side ({@code deviceTokenHash} is only ever looked up
+ * scoped to one {@code accountId}) now also holds for the cookie itself.
  */
 public final class DeviceCookie {
 
-  /* package */ static final String COOKIE_NAME = "clavaris_device";
+  @SuppressWarnings("PMD.LongVariable") // matches the cookie name it prefixes, not arbitrarily
+  // long — same precedent as other Clavaris-prefixed constants elsewhere in this codebase.
+  private static final String COOKIE_NAME_PREFIX = "clavaris_device_";
 
   // Long-lived on purpose: this is "remember this browser," not a session-lifetime artifact.
   // 365 days stays safely under Chrome's own 400-day hard cap on any cookie's Max-Age.
-  // (Sonar S125 false positive on the original wording — semicolon-terminated line read as
-  // commented-out source, not prose; reworded, same substance.)
   private static final Duration MAX_AGE = Duration.ofDays(365);
 
   private DeviceCookie() {
     // Static utility — not instantiable.
   }
 
-  /** Empty when the request carries no cookie of this name at all — never thrown for that case. */
-  // "No cookies at all on this request" vs. "cookies present but none match" are two distinct,
-  // equally-valid exits — same "each outcome needs its own exit" rationale as e.g.
+  /**
+   * Empty when the request carries no cookie for this exact {@code organizationId} — never thrown
+   * for that case, and never matches a different Organization's own cookie in the same browser.
+   */
+  // "No cookies at all on this request" vs. "cookies present but none match this Organization" are
+  // two distinct, equally-valid exits — same "each outcome needs its own exit" rationale as e.g.
   // RegisterAccountController's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
-  public static Optional<String> read(final HttpServletRequest request) {
+  public static Optional<String> read(final HttpServletRequest request, final UUID organizationId) {
     final Cookie[] cookies = request.getCookies();
     if (cookies == null) {
       return Optional.empty();
     }
+    final String cookieName = cookieName(organizationId);
     return Arrays.stream(cookies)
-        .filter(cookie -> COOKIE_NAME.equals(cookie.getName()))
+        .filter(cookie -> cookieName.equals(cookie.getName()))
         .map(Cookie::getValue)
         .findFirst();
   }
@@ -67,9 +78,10 @@ public final class DeviceCookie {
   public static void write(
       final HttpServletRequest request,
       final HttpServletResponse response,
+      final UUID organizationId,
       final String rawDeviceToken) {
     final ResponseCookie cookie =
-        ResponseCookie.from(COOKIE_NAME, rawDeviceToken)
+        ResponseCookie.from(cookieName(organizationId), rawDeviceToken)
             .httpOnly(true)
             .secure(request.isSecure())
             .sameSite("Lax")
@@ -77,5 +89,11 @@ public final class DeviceCookie {
             .maxAge(MAX_AGE)
             .build();
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+  }
+
+  // UUID's own canonical string form (hex digits + hyphens) is already a valid RFC 6265
+  // cookie-name token — no further sanitizing/encoding needed.
+  private static String cookieName(final UUID organizationId) {
+    return COOKIE_NAME_PREFIX + organizationId;
   }
 }

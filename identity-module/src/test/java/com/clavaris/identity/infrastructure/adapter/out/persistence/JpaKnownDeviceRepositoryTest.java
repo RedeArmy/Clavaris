@@ -104,6 +104,34 @@ class JpaKnownDeviceRepositoryTest {
     assertThat(found.lastSeenAt()).isAfterOrEqualTo(found.firstSeenAt());
   }
 
+  // Code review finding (2026-09-01): backs RecordAccountLoginDeviceService's migration
+  // grandfather suppression — "does this Account have any known device row at all yet."
+  @Test
+  void existsByAccountIdIsFalseBeforeAnyDeviceIsSaved() {
+    assertThat(repository.existsByAccountId(accountId)).isFalse();
+  }
+
+  @Test
+  void existsByAccountIdIsTrueOnceADeviceHasBeenSaved() {
+    repository.save(KnownDevice.recognize(accountId, "Mozilla/5.0 Test Browser", "a-token-hash"));
+
+    assertThat(repository.existsByAccountId(accountId)).isTrue();
+  }
+
+  @Test
+  void existsByAccountIdIsScopedToThisAccountOnly() {
+    AccountId otherAccountId = new AccountId(UUID.randomUUID());
+    jdbcTemplate.update(
+        "insert into accounts (id, organization_id, email, status, created_at) "
+            + "values (?, ?, ?, 'ACTIVE', now())",
+        otherAccountId.value(),
+        UUID.randomUUID(),
+        "known-device-owner-" + otherAccountId.value() + "@example.com");
+    repository.save(KnownDevice.recognize(otherAccountId, "Mozilla/5.0 Test Browser", "hash"));
+
+    assertThat(repository.existsByAccountId(accountId)).isFalse();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(

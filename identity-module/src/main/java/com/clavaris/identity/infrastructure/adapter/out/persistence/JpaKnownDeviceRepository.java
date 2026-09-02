@@ -28,6 +28,11 @@ class JpaKnownDeviceRepository implements KnownDeviceRepository {
   }
 
   @Override
+  public boolean existsByAccountId(final AccountId accountId) {
+    return devices.existsByAccountId(accountId.value());
+  }
+
+  @Override
   public void save(final KnownDevice device) {
     // saveAndFlush, not save: the unique constraint on known_devices.(account_id,
     // device_token_hash) must throw synchronously, right here, so RecordAccountLoginDeviceService's

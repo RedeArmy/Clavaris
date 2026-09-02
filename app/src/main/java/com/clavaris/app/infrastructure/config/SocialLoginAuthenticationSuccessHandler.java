@@ -199,8 +199,10 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
                   accountId,
                   request.getHeader("User-Agent"),
                   request.getRemoteAddr(),
-                  DeviceCookie.read(request).orElse(null)))
-          .ifPresent(rawDeviceToken -> DeviceCookie.write(request, response, rawDeviceToken));
+                  DeviceCookie.read(request, organizationId).orElse(null)))
+          .ifPresent(
+              rawDeviceToken ->
+                  DeviceCookie.write(request, response, organizationId, rawDeviceToken));
       redirectStrategy.sendRedirect(request, response, target);
     } else {
       redirectStrategy.sendRedirect(

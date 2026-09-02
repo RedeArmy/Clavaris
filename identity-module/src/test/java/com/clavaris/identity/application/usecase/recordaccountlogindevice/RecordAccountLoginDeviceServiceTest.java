@@ -21,10 +21,12 @@ import com.clavaris.identity.application.usecase.requestemailverification.MailSe
 import com.clavaris.identity.domain.event.AccountNewDeviceDetectedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.KnownDevice;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 class RecordAccountLoginDeviceServiceTest {
+
+  private static final Instant MIGRATION_CUTOVER_AT = Instant.parse("2026-08-31T10:00:00Z");
 
   private KnownDeviceRepository knownDevices;
   private AccountRepository accounts;
@@ -50,8 +54,11 @@ class RecordAccountLoginDeviceServiceTest {
     outbox = mock(EventOutboxWriter.class);
     service =
         new RecordAccountLoginDeviceService(
-            knownDevices, accounts, mailSender, auditEvents, outbox);
+            knownDevices, accounts, mailSender, auditEvents, outbox, MIGRATION_CUTOVER_AT);
 
+    // Registered "now" (well after the cutover) — every existing test in this class exercises
+    // ordinary, non-grandfathered behavior; the migration-suppression tests below build their own
+    // pre-cutover Account explicitly instead of relying on this one.
     account =
         Account.register(new OrganizationId(UUID.randomUUID()), new Email("user@example.com"));
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
@@ -242,6 +249,102 @@ class RecordAccountLoginDeviceServiceTest {
     verifyNoInteractions(mailSender);
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+  }
+
+  // Code review finding (2026-09-01): the actual regression this migration grandfather exists to
+  // prevent — a pre-existing Account's very first row after the DeviceCookie migration must not
+  // read as a "new device" alarm to a user who has been logging in from the same browser for
+  // months. The row is still persisted and audited (real, useful bookkeeping); only the
+  // outward-facing outbox event and email are suppressed, and only this once.
+  @Test
+  void
+      aPreExistingAccountsFirstPostMigrationDeviceSuppressesNotificationButStillRecordsTheDevice() {
+    Account preExistingAccount =
+        Account.reconstitute(
+            AccountId.newId(),
+            new OrganizationId(UUID.randomUUID()),
+            new Email("long-time-user@example.com"),
+            MIGRATION_CUTOVER_AT.minusSeconds(3600), // created an hour before the migration
+            null,
+            AccountStatus.ACTIVE,
+            null);
+    when(accounts.findById(preExistingAccount.id())).thenReturn(Optional.of(preExistingAccount));
+    when(knownDevices.existsByAccountId(preExistingAccount.id())).thenReturn(false);
+
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(
+                preExistingAccount.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(knownDevices).save(any(KnownDevice.class));
+    verify(auditEvents)
+        .write(
+            eq(AuditActor.account(preExistingAccount.id().value())),
+            eq("account.new_device_detected"),
+            eq("KnownDevice"),
+            any(),
+            isNull());
+    verifyNoInteractions(mailSender);
+    verifyNoInteractions(outbox);
+  }
+
+  // The grandfather suppression must never apply more than once: a pre-existing Account's own
+  // second (genuinely new) device, discovered after the migration already recorded its first one,
+  // is exactly as notification-worthy as it always was.
+  @Test
+  void aPreExistingAccountsSecondDeviceAfterTheMigrationStillNotifiesNormally() {
+    Account preExistingAccount =
+        Account.reconstitute(
+            AccountId.newId(),
+            new OrganizationId(UUID.randomUUID()),
+            new Email("long-time-user@example.com"),
+            MIGRATION_CUTOVER_AT.minusSeconds(3600),
+            null,
+            AccountStatus.ACTIVE,
+            null);
+    when(accounts.findById(preExistingAccount.id())).thenReturn(Optional.of(preExistingAccount));
+    // Already has a row from an earlier, already-suppressed migration-artifact login.
+    when(knownDevices.existsByAccountId(preExistingAccount.id())).thenReturn(true);
+
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(
+                preExistingAccount.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(mailSender)
+        .sendNewDeviceLoginNotification(
+            eq(preExistingAccount.email().value()), any(), any(), any(), any());
+    verify(outbox).write(eq("account.new_device_detected"), eq(preExistingAccount.id()), any());
+  }
+
+  // A brand-new signup (created after the cutover) has no migration artifact to suppress — its
+  // first-ever device is real news, same as this class's own pre-existing behavior.
+  @Test
+  void aBrandNewAccountCreatedAfterTheCutoverStillNotifiesOnItsFirstDevice() {
+    Account brandNewAccount =
+        Account.reconstitute(
+            AccountId.newId(),
+            new OrganizationId(UUID.randomUUID()),
+            new Email("new-signup@example.com"),
+            MIGRATION_CUTOVER_AT.plusSeconds(3600), // registered an hour after the migration
+            null,
+            AccountStatus.ACTIVE,
+            null);
+    when(accounts.findById(brandNewAccount.id())).thenReturn(Optional.of(brandNewAccount));
+    when(knownDevices.existsByAccountId(brandNewAccount.id())).thenReturn(false);
+
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(
+                brandNewAccount.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(mailSender)
+        .sendNewDeviceLoginNotification(
+            eq(brandNewAccount.email().value()), any(), any(), any(), any());
+    verify(outbox).write(eq("account.new_device_detected"), eq(brandNewAccount.id()), any());
   }
 
   @Test

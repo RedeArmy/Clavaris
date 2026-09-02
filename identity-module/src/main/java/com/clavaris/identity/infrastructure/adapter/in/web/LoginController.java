@@ -120,8 +120,10 @@ public class LoginController {
                 accountId,
                 request.getHeader("User-Agent"),
                 request.getRemoteAddr(),
-                DeviceCookie.read(request).orElse(null)))
-        .ifPresent(rawDeviceToken -> DeviceCookie.write(request, response, rawDeviceToken));
+                DeviceCookie.read(request, organizationId).orElse(null)))
+        .ifPresent(
+            rawDeviceToken ->
+                DeviceCookie.write(request, response, organizationId, rawDeviceToken));
 
     return "redirect:" + redirectTarget;
   }

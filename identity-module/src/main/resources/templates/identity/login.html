@@ -11,7 +11,7 @@
     <p th:if="${loginError}">Invalid email or password.</p>
     <p th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
 
-    <form th:action="@{''}" th:object="${form}" method="post">
+    <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
         <div>
@@ -41,5 +41,9 @@
 
     <p><a th:href="@{forgot-password}">Forgot your password?</a></p>
 </main>
+<!-- Code review finding (2026-09-01): client-side, same-origin-only cross-tab submit guard — see
+     ContentSecurityPolicyHeaderWriter's own Javadoc and login-submit-guard.js's own header comment
+     for the full rationale. -->
+<script th:src="@{/js/login-submit-guard.js}" defer></script>
 </body>
 </html>

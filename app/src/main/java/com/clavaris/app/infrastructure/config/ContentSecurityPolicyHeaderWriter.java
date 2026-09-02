@@ -24,25 +24,38 @@ import org.springframework.security.web.header.HeaderWriter;
  * responses sharing the same chains, without needing to enumerate every hosted-UI path by hand and
  * keep that list in sync as pages are added.
  *
- * <p>Two policies, not one, because this project's own templates and Spring Authorization Server's
- * own default consent page have genuinely different real needs — confirmed by decompiling SAS's
- * {@code DefaultConsentPage} (spring-security-oauth2-authorization-server 7.1.0), not assumed:
- * every template this project owns (grep confirms zero {@code <script>}, {@code <style>}, or
- * external-host reference anywhere under {@code identity-module}'s/{@code organization-module}'s
- * own {@code resources/templates}) gets the strict policy below; SAS's own unbranded consent page
- * (TD-SEC-011, still open) loads Bootstrap from a CDN (with Subresource Integrity already on that
- * {@code <link>} tag) and uses one inline {@code <script>} plus {@code onclick} handlers for its
- * Cancel button — a real, external requirement of code this project doesn't own the source of,
- * scoped as narrowly as that specific page's own real needs allow (one named CDN host, not
- * wildcarded; {@code 'unsafe-inline'} only for scripts, the one directive SAS's page can't function
- * without). <b>Investigating this originally surfaced TD-SEC-026</b> — {@code
- * requireAuthorizationConsent} was never set to {@code true} anywhere, so this page structurally
- * never rendered for any client. That's now closed (ADR-0017, TD-SEC-026): consent is a real,
- * per-client {@code OAuthClient} attribute, defaulting to required, and this branch is
- * live-verified against an actually-rendered consent screen (see {@code
+ * <p>Three policies, not one, because this project's own templates and Spring Authorization
+ * Server's own default consent page have genuinely different real needs — confirmed by decompiling
+ * SAS's {@code DefaultConsentPage} (spring-security-oauth2-authorization-server 7.1.0), not
+ * assumed: every template this project owns other than the login page below (grep confirms zero
+ * {@code <script>}, {@code <style>}, or external-host reference anywhere else under {@code
+ * identity-module}'s/{@code organization-module}'s own {@code resources/templates}) gets the strict
+ * policy; SAS's own unbranded consent page (TD-SEC-011, still open) loads Bootstrap from a CDN
+ * (with Subresource Integrity already on that {@code <link>} tag) and uses one inline {@code
+ * <script>} plus {@code onclick} handlers for its Cancel button — a real, external requirement of
+ * code this project doesn't own the source of, scoped as narrowly as that specific page's own real
+ * needs allow (one named CDN host, not wildcarded; {@code 'unsafe-inline'} only for scripts, the
+ * one directive SAS's page can't function without). <b>Investigating this originally surfaced
+ * TD-SEC-026</b> — {@code requireAuthorizationConsent} was never set to {@code true} anywhere, so
+ * this page structurally never rendered for any client. That's now closed (ADR-0017, TD-SEC-026):
+ * consent is a real, per-client {@code OAuthClient} attribute, defaulting to required, and this
+ * branch is live-verified against an actually-rendered consent screen (see {@code
  * AuthorizationCodeFlowIntegrationTest}'s own consent-required test), not just unit-tested
  * path-matching. Stays correctly scoped for the day ADR-0009 replaces this page with a
  * project-owned, branded one (TD-SEC-011, still open).
+ *
+ * <p><b>Code review finding (2026-09-01), the login page's own real script:</b> {@code
+ * identity/login.html} ({@code LoginController}'s {@code /o/{organizationId}/login}) now loads one
+ * same-origin, external script — {@code login-submit-guard.js}, a client-side, cross-tab mutex
+ * against the duplicate-notification race documented on {@code KnownDevice}'s own Javadoc ("two
+ * concurrent logins... producing two rows and two notifications for what's really one physical
+ * device"). This is the one category of fix for that finding that doesn't reopen TD-SEC-033 — it
+ * runs entirely inside the victim's own browser, coordinating via {@code localStorage}, which a
+ * different origin (an attacker's own browser) structurally cannot read or write — so it earns its
+ * own policy, scoped no wider than {@code script-src 'self'}: same-origin only, and deliberately
+ * without {@code 'unsafe-inline'}, unlike the consent page above (that page's inline script is
+ * SAS's own code this project doesn't control; this one is project-owned and has no reason to be
+ * inline).
  */
 final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
@@ -65,6 +78,19 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // the platform tier (client_credentials only, BR-PLATFORM-01, no interactive consent to render).
   private static final Pattern CONSENT_PAGE_PATH = Pattern.compile("^/o/[^/]+/oauth2/authorize$");
 
+  // TD-SEC-009 addendum, see this class's own Javadoc: the one project-owned template that now
+  // loads a real, same-origin script. Unlike CONSENT_PAGE_POLICY above, this name is short enough
+  // that PMD's LongVariable rule never flags it — no suppression needed.
+  private static final String LOGIN_PAGE_POLICY =
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+          + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+
+  // Matches only LoginController's own GET/POST /o/{organizationId}/login — never
+  // /o/*/login/social/** (SocialLoginConfig's plain links, nothing to double-submit) or the
+  // platform tier's own login template (a different page, no such script).
+  private static final Pattern LOGIN_PAGE_PATH = Pattern.compile("^/o/[^/]+/login$");
+
   // Constructed only by each SecurityFilterChain builder's own `new
   // ContentSecurityPolicyHeaderWriter()` call — no state to initialize, same convention as this
   // package's other stateless writers/filters.
@@ -78,11 +104,20 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     if (response.containsHeader(HEADER_NAME) || !isHtml(response)) {
       return;
     }
-    response.setHeader(
-        HEADER_NAME,
-        CONSENT_PAGE_PATH.matcher(request.getRequestURI()).matches()
-            ? CONSENT_PAGE_POLICY
-            : STRICT_POLICY);
+    response.setHeader(HEADER_NAME, policyFor(request.getRequestURI()));
+  }
+
+  // Three-way, not a ternary any more — see this class's own Javadoc for why each path pattern
+  // gets its own real policy rather than one being folded into "everything else".
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private static String policyFor(final String requestUri) {
+    if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
+      return CONSENT_PAGE_POLICY;
+    }
+    if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
+      return LOGIN_PAGE_POLICY;
+    }
+    return STRICT_POLICY;
   }
 
   private static boolean isHtml(final HttpServletResponse response) {

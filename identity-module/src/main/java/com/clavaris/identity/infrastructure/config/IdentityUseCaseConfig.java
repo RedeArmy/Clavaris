@@ -59,6 +59,8 @@ import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountService;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
+import java.time.Instant;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -309,13 +311,20 @@ class IdentityUseCaseConfig {
 
   // New-device login email notification.
   @Bean
+  // Code review finding (2026-09-01): the migration grandfather cutoff — see
+  // RecordAccountLoginDeviceService's own Javadoc. Defaults to V20260831100000's own timestamp,
+  // the actual moment the DeviceCookie mechanism replaced User-Agent fingerprinting; overridable
+  // only in case this ever needs re-running against a differently-timed deployment.
+  @SuppressWarnings("PMD.LongVariable") // matches that class's own identical suppression.
   /* package */ RecordAccountLoginDeviceUseCase recordAccountLoginDeviceUseCase(
       final KnownDeviceRepository knownDevices,
       final AccountRepository accounts,
       final MailSender mailSender,
       final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      @Value("${clavaris.known-device.migration-cutover-at:2026-08-31T10:00:00Z}")
+          final Instant deviceCookieMigrationCutoverAt) {
     return new RecordAccountLoginDeviceService(
-        knownDevices, accounts, mailSender, auditEvents, outbox);
+        knownDevices, accounts, mailSender, auditEvents, outbox, deviceCookieMigrationCutoverAt);
   }
 }
