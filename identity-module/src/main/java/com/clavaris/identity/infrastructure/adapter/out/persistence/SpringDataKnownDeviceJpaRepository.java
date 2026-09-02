@@ -13,6 +13,8 @@ interface SpringDataKnownDeviceJpaRepository extends JpaRepository<KnownDeviceEn
   Optional<KnownDeviceEntity> findByAccountIdAndDeviceTokenHash(
       UUID accountId, String deviceTokenHash);
 
+  boolean existsByAccountId(UUID accountId);
+
   // TD-PERF-002 (KnownDeviceRetentionJob): a bulk JPQL DELETE, not Spring Data's derived
   // deleteBy...(...) convention — same "one round trip against the database, not one row at a
   // time through the persistence context" rationale

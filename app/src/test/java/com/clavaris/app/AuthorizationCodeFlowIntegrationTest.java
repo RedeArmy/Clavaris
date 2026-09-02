@@ -365,6 +365,38 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(verify(parse(accessToken), jwks)).isTrue();
   }
 
+  // Code review finding (2026-09-01): the login page's own CSP carve-out and its real static
+  // script must both actually be live on a real running instance, not just configured — same
+  // "live proof, not a read of ContentSecurityPolicyHeaderWriter" bar as the consent-page CSP
+  // assertion above (TD-SEC-009).
+  @Test
+  void theLoginPageLoadsItsOwnSubmitGuardScriptUnderItsOwnRelaxedCsp() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Submit Guard Co");
+
+    HttpResponse<String> loginPage = getWithBody("/o/" + organizationId + "/login");
+    assertThat(loginPage.statusCode()).isEqualTo(200);
+    assertThat(loginPage.body())
+        .as("login.html must wire up the mutex on its own form and load the script")
+        .contains("data-login-form")
+        .contains("/js/login-submit-guard.js");
+    // The login page's own policy: real script-src, same-origin only — neither the strict
+    // default (script-src 'none') nor the consent page's ('unsafe-inline').
+    assertThat(loginPage.headers().firstValue("Content-Security-Policy"))
+        .hasValueSatisfying(
+            policy ->
+                assertThat(policy).contains("script-src 'self'").doesNotContain("unsafe-inline"));
+
+    // The script itself must actually be reachable — DefaultSecurityConfig's catch-all chain is
+    // what's expected to serve it (see ContentSecurityPolicyHeaderWriter's own Javadoc), not
+    // assumed from Spring Boot's default static-resource wiring alone.
+    HttpResponse<String> script = getWithBody("/js/login-submit-guard.js");
+    assertThat(script.statusCode()).isEqualTo(200);
+    assertThat(script.body())
+        .as("must be this project's own guard script, not an empty/placeholder 404 page")
+        .contains("clavaris_login_submit_lock");
+  }
+
   // TD-SEC-026/ADR-0017: the other real half of the invariant — a real user genuinely declining
   // must NOT result in a code, matching DefaultConsentPage's own Cancel button (which resets the
   // form, unchecking every scope, then submits — the same "no scope param at all" shape this test

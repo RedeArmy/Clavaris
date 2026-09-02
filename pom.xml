@@ -342,7 +342,16 @@
                  in tests too, below); forkedProcessExitTimeoutInSeconds is a safety margin on top.
                  systemPropertyVariables, not a per-module test/resources/application.yml: the
                  latter would fully shadow app's own real src/main/resources/application.yml rather
-                 than merge with it. -->
+                 than merge with it.
+
+                 Code review finding (2026-09-01): socketTimeout is a hard read timeout on every
+                 pgjdbc socket operation for the WHOLE test run, not only the post-teardown closes
+                 it was introduced to bound — 3s risked aborting a legitimately slow-but-passing
+                 query/migration under real CI load (container contention, GC pauses) with a
+                 SocketTimeoutException, the exact new flakiness this whole fix set out to remove.
+                 Raised back to 10s (round 1's own original, already-proven-safe value): round 4's
+                 real fix (cache.maxSize) already solved the aggregation problem this value doesn't
+                 need to compensate for anymore. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -350,7 +359,7 @@
                 <configuration>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                     <systemPropertyVariables>
-                        <spring.datasource.hikari.data-source-properties.socketTimeout>3</spring.datasource.hikari.data-source-properties.socketTimeout>
+                        <spring.datasource.hikari.data-source-properties.socketTimeout>10</spring.datasource.hikari.data-source-properties.socketTimeout>
                         <spring.test.context.cache.maxSize>4</spring.test.context.cache.maxSize>
                     </systemPropertyVariables>
                 </configuration>

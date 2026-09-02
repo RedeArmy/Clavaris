@@ -158,6 +158,11 @@ clavaris:
   # age-based sweep is the honest interim policy rather than a no-op published-only one.
   event-outbox:
     retention-days: ${EVENT_OUTBOX_RETENTION_DAYS:90}
+  # KnownDeviceRetentionJob's own sweep window, and RecordAccountLoginDeviceService's migration
+  # grandfather cutoff (code review, 2026-09-01) — see either class's own Javadoc.
+  known-device:
+    retention-days: ${KNOWN_DEVICE_RETENTION_DAYS:400}
+    migration-cutover-at: ${KNOWN_DEVICE_MIGRATION_CUTOVER_AT:2026-08-31T10:00:00Z}
 
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;

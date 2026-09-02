@@ -10,18 +10,15 @@ import com.clavaris.organization.application.usecase.setratelimitpolicyfororgani
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import java.time.Duration;
-import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
@@ -29,7 +26,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
-import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -369,23 +365,13 @@ class OrganizationAuthorizationServerConfig {
                                 userInfo ->
                                     userInfo.userInfoMapper(
                                         new WorkspaceAwareOidcUserInfoMapper())))
-                    // Same fix as the platform tier's chain, same root cause: SAS's default
-                    // ClientSecretAuthenticationProvider uses Spring Security's
-                    // DelegatingPasswordEncoder, which expects an "{id}" bracket prefix; Argon2-
-                    // hashed secrets (Argon2ClientSecretHasher, ADR-0005) don't carry one.
+                    // Same fix as the platform tier's chain, same root cause — extracted to
+                    // Argon2ClientAuthenticationSupport (code review finding: this exact block was
+                    // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
                             clientAuth.authenticationProviders(
-                                providers ->
-                                    providers.stream()
-                                        .filter(
-                                            ClientSecretAuthenticationProvider.class::isInstance)
-                                        .map(ClientSecretAuthenticationProvider.class::cast)
-                                        .forEach(
-                                            provider ->
-                                                provider.setPasswordEncoder(
-                                                    Argon2PasswordEncoder
-                                                        .defaultsForSpringSecurity_v5_8())))))
+                                Argon2ClientAuthenticationSupport::useArgon2PasswordEncoder)))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.
         // /o/*/connect/logout (TD-SEC-028) is permitAll for the same class of reason, not by
@@ -434,72 +420,17 @@ class OrganizationAuthorizationServerConfig {
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,
                 rateLimitKeyHasher,
-                List.of(
-                    new RateLimitRule(
-                        "login:account",
-                        HttpMethod.POST,
-                        LOGIN_PATH_PATTERN,
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::emailFormField,
-                        loginPerAccountLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "login:ip",
-                        HttpMethod.POST,
-                        LOGIN_PATH_PATTERN,
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::sourceIp,
-                        loginPerIpLimit,
-                        Duration.ofMinutes(5)),
-                    // Non-refresh grants (authorization_code, and any future grant this endpoint
-                    // ever accepts) — the credential-adjacent, actually-guessable half of this
-                    // endpoint's traffic.
-                    new RateLimitRule(
-                        "token:client",
-                        HttpMethod.POST,
-                        "/o/*/oauth2/token",
-                        request -> !"refresh_token".equals(request.getParameter("grant_type")),
-                        RateLimitIdentifiers::oauthClientId,
-                        tokenPerClientLimit,
-                        Duration.ofMinutes(5)),
-                    // BR-ID-06: "must never throttle a legitimate token-refresh cycle for an
-                    // already-active session" — a separate, deliberately much higher ceiling, not
-                    // an exemption outright (a genuinely runaway/looping client still deserves a
-                    // backstop). Per-client, not per-account: this endpoint has no email field to
-                    // key by, and decoding the presented refresh token just to identify its owner
-                    // would mean a DB lookup inside a rate-limit filter, which the reuse-detection
-                    // check already occurring downstream (BR-ID-03) makes redundant here.
-                    new RateLimitRule(
-                        "token:refresh",
-                        HttpMethod.POST,
-                        "/o/*/oauth2/token",
-                        request -> "refresh_token".equals(request.getParameter("grant_type")),
-                        RateLimitIdentifiers::oauthClientId,
-                        tokenRefreshPerClientLimit,
-                        Duration.ofMinutes(5)),
-                    // TD-SEC-035: keyed by the already-authenticated AccountId, not IP — every
-                    // request this rule ever sees has already passed
-                    // hasAuthority(ROLE_ACCOUNT) (this filter runs after
-                    // TenantAccountOnlySecurityContextFilter), so there is always a real
-                    // principal to key by, same convention
-                    // PlatformDashboardSecurityConfig's own create-organization rule already
-                    // establishes for its own tier.
-                    new RateLimitRule(
-                        "account-sessions:list",
-                        HttpMethod.GET,
-                        "/o/*/account/sessions",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::authenticatedAccountId,
-                        accountSessionsListPerAccountLimit,
-                        Duration.ofMinutes(5)),
-                    new RateLimitRule(
-                        "account-sessions:revoke",
-                        HttpMethod.POST,
-                        "/o/*/account/sessions/*/revoke",
-                        RateLimitRule.always(),
-                        RateLimitIdentifiers::authenticatedAccountId,
-                        accountSessionsRevokePerAccountLimit,
-                        Duration.ofMinutes(5)))),
+                // Code review finding: this rule list is pure configuration data, extracted to
+                // OrganizationRateLimitRules — see that class's own Javadoc. Same rules, same
+                // order, same parameters as before, just no longer inline here.
+                OrganizationRateLimitRules.all(
+                    LOGIN_PATH_PATTERN,
+                    loginPerAccountLimit,
+                    loginPerIpLimit,
+                    tokenPerClientLimit,
+                    tokenRefreshPerClientLimit,
+                    accountSessionsListPerAccountLimit,
+                    accountSessionsRevokePerAccountLimit)),
             // Anchored after TenantAccountOnlySecurityContextFilter, not SecurityContextHolder
             // Filter directly — real bug, confirmed live: three separate addFilterAfter calls all
             // anchored at the same filter class silently only kept the last-registered one, so the

@@ -18,6 +18,14 @@ public interface KnownDeviceRepository {
       AccountId accountId, String deviceTokenHash);
 
   /**
+   * Code review finding (2026-09-01): lets {@code RecordAccountLoginDeviceService} tell "this
+   * Account's very first known device, ever" apart from "just another new device for an Account
+   * we've already seen at least one device for" — the distinction the TD-SEC-033 migration
+   * grandfather suppression needs (see that class's own Javadoc).
+   */
+  boolean existsByAccountId(AccountId accountId);
+
+  /**
    * @throws org.springframework.dao.DataIntegrityViolationException synchronously, on a {@code
    *     UNIQUE(account_id, device_token_hash)} violation — implementations must flush immediately,
    *     not defer to the surrounding transaction's own commit, so {@link

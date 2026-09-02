@@ -1,34 +1,27 @@
 package com.clavaris.identity.infrastructure.adapter.out.mail;
 
-import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Implements {@link MailSender} against Resend's HTTP API (plain {@link HttpClient}, not the Resend
- * SDK — a single POST endpoint doesn't justify an extra dependency, same reasoning already applied
- * to every other outbound HTTP integration in this codebase). The sending domain itself (whatever
- * {@code MAIL_FROM_ADDRESS} resolves to) is provisioned and DNS-verified with Resend outside this
- * codebase — nothing here assumes a specific registrar.
+ * Implements {@link MailSender} against Resend's HTTP API — the actual "speak Resend's API"
+ * mechanics (request building, error translation) live in {@link ResendHttpClient} (code review
+ * finding, 2026-09-01: extracted so this class only ever needs to know what a Clavaris email says,
+ * never how the HTTP call to Resend itself works). The sending domain itself (whatever {@code
+ * MAIL_FROM_ADDRESS} resolves to) is provisioned and DNS-verified with Resend outside this codebase
+ * — nothing here assumes a specific registrar.
  *
  * <p>Builds the actual {@code {clavarisBaseUrl}/o/{organizationId}/...} link here, not in the
  * application layer — see {@link MailSender}'s own Javadoc for why that split exists. Also
@@ -36,31 +29,19 @@ import tools.jackson.databind.ObjectMapper;
  * branding instead of a per-Organization one, {@code {clavarisBaseUrl}/platform/...} links instead
  * of {@code /o/{organizationId}/...}.
  */
-// TooManyMethods: implements both MailSender (4 send* methods) and PlatformMailSender (3 more)
-// in one class — deliberately, same "one class, same HTTP mechanics, two ports" design this
-// class's own Javadoc already explains, not an organically grown class that should be split.
-@SuppressWarnings("PMD.TooManyMethods")
+// Implements both MailSender (4 send* methods) and PlatformMailSender (3 more) in one class —
+// deliberately, same "one class, same HTTP mechanics, two ports" design this class's own Javadoc
+// already explains. No PMD.TooManyMethods suppression needed any more: extracting the shared HTTP
+// mechanics to ResendHttpClient (code review finding, 2026-09-01) brought this class's own method
+// count back under PMD's default threshold.
 @Component
 class ResendMailSender implements MailSender, PlatformMailSender {
 
   @SuppressWarnings("PMD.LongVariable")
   private static final URI DEFAULT_RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
 
-  private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
-
-  // Resend's API never redirects on a real request — treating 3xx as failure too, not just 4xx/5xx,
-  // is deliberate: a redirect here means something is misconfigured (wrong host/path), not success.
-  // Descriptive over PMD's default LongVariable threshold, same precedent as RefreshTokenSecret's
-  // own RAW_VALUE_BYTE_LENGTH.
-  @SuppressWarnings("PMD.LongVariable")
-  private static final int FIRST_ERROR_STATUS = 300;
-
-  private final HttpClient httpClient;
-  private final ObjectMapper objectMapper;
-  private final String apiKey;
-  private final String fromAddress;
+  private final ResendHttpClient httpClient;
   private final String baseUrl;
-  private final URI resendEndpoint;
 
   // Package-private: constructed only by Spring's own component scan (via @Component above) —
   // MailSender (the port) is what every caller outside this package should depend on. @Autowired
@@ -84,7 +65,9 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   // Test-only (TD-SEC-020): lets ResendMailSenderTest point this at a local stub HTTP server —
   // never the real Resend API — and inject a fully-controlled HttpClient to simulate IOException/
   // InterruptedException deterministically, without real network flakiness. Never invoked by
-  // Spring itself; @Autowired on the constructor above resolves the ambiguity unambiguously.
+  // Spring itself; @Autowired on the constructor above resolves the ambiguity unambiguously. Same
+  // parameter shape as before ResendHttpClient's own extraction — ResendMailSenderTest constructs
+  // this directly and must keep working unmodified.
   /* package */ ResendMailSender(
       final HttpClient httpClient,
       final ObjectMapper objectMapper,
@@ -92,23 +75,20 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String fromAddress,
       final String baseUrl,
       final URI resendEndpoint) {
-    this.httpClient = httpClient;
-    this.objectMapper = objectMapper;
-    this.apiKey = apiKey;
-    this.fromAddress = fromAddress;
+    this.httpClient =
+        new ResendHttpClient(httpClient, objectMapper, apiKey, fromAddress, resendEndpoint);
     this.baseUrl = baseUrl;
-    this.resendEndpoint = resendEndpoint;
   }
 
   @Override
   public void sendEmailVerification(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
     final String link = link(organizationId, "verify-email", rawToken);
-    send(
+    httpClient.send(
         toAddress,
         "Verify your email address",
         "<p>Confirm your email address to finish setting up your account:</p>"
-            + htmlButton(link, "Verify email")
+            + ResendHttpClient.htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
   }
 
@@ -116,11 +96,11 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   public void sendPasswordReset(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
     final String link = link(organizationId, "reset-password", rawToken);
-    send(
+    httpClient.send(
         toAddress,
         "Reset your password",
         "<p>A password reset was requested for this account:</p>"
-            + htmlButton(link, "Reset password")
+            + ResendHttpClient.htmlButton(link, "Reset password")
             + "<p>This link expires in 30 minutes and can only be used once. If you didn't request"
             + " this, you can safely ignore it — your password will not be changed.</p>");
   }
@@ -132,13 +112,13 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final SocialProvider provider,
       final String rawToken) {
     final String link = link(organizationId, "confirm-social-link", rawToken);
-    send(
+    httpClient.send(
         toAddress,
         "Confirm linking your " + provider + " account",
         "<p>Someone tried to sign in to this account using "
             + provider
             + ". If this was you, confirm the link:</p>"
-            + htmlButton(link, "Confirm link")
+            + ResendHttpClient.htmlButton(link, "Confirm link")
             + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
             + " this, you can safely ignore it — no account changes will be made.</p>");
   }
@@ -161,7 +141,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     // controlled. HtmlUtils.htmlEscape guards against HTML injection into the sent email; every
     // other send* method here only ever interpolates a link/token this server built itself, so
     // this is the first method that needs it.
-    send(
+    httpClient.send(
         toAddress,
         "New sign-in to your account",
         "<p>Your account was just signed in to from a new device or browser:</p>"
@@ -179,11 +159,11 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   @Override
   public void sendPlatformAccountEmailVerification(final String toAddress, final String rawToken) {
     final String link = platformLink("verify-email", rawToken);
-    send(
+    httpClient.send(
         toAddress,
         "Verify your email address",
         "<p>Confirm your email address to finish setting up your Clavaris account:</p>"
-            + htmlButton(link, "Verify email")
+            + ResendHttpClient.htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
   }
 
@@ -191,13 +171,13 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   public void sendPlatformSocialLinkConfirmation(
       final String toAddress, final SocialProvider provider, final String rawToken) {
     final String link = platformLink("confirm-social-link", rawToken);
-    send(
+    httpClient.send(
         toAddress,
         "Confirm linking your " + provider + " account",
         "<p>Someone tried to sign in to your Clavaris account using "
             + provider
             + ". If this was you, confirm the link:</p>"
-            + htmlButton(link, "Confirm link")
+            + ResendHttpClient.htmlButton(link, "Confirm link")
             + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
             + " this, you can safely ignore it — no account changes will be made.</p>");
   }
@@ -205,21 +185,13 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   @Override
   public void sendPlatformAccountPasswordReset(final String toAddress, final String rawToken) {
     final String link = platformLink("reset-password", rawToken);
-    send(
+    httpClient.send(
         toAddress,
         "Reset your password",
         "<p>A password reset was requested for your Clavaris account:</p>"
-            + htmlButton(link, "Reset password")
+            + ResendHttpClient.htmlButton(link, "Reset password")
             + "<p>This link expires in 30 minutes and can only be used once. If you didn't request"
             + " this, you can safely ignore it — your password will not be changed.</p>");
-  }
-
-  // Extracted purely to remove the "<p><a href=\"" literal's duplication
-  // (PMD.AvoidDuplicateLiterals)
-  // — the four send*() methods above all render one clickable action link, just with a different
-  // surrounding message.
-  private String htmlButton(final String link, final String label) {
-    return "<p><a href=\"" + link + "\">" + label + "</a></p>";
   }
 
   private String link(
@@ -239,47 +211,5 @@ class ResendMailSender implements MailSender, PlatformMailSender {
         + path
         + "?token="
         + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
-  }
-
-  private void send(final String toAddress, final String subject, final String html) {
-    final Map<String, Object> requestBody =
-        Map.of("from", fromAddress, "to", List.of(toAddress), "subject", subject, "html", html);
-
-    final String jsonBody;
-    try {
-      jsonBody = objectMapper.writeValueAsString(requestBody);
-    } catch (final JacksonException e) {
-      // Same "this is a programming error, fail loudly" stance as JpaEventOutboxWriter's own
-      // equivalent catch — every field here is a plain String/List this system itself built.
-      throw new MailDeliveryException("Failed to serialize Resend request body", e);
-    }
-
-    final HttpRequest request =
-        HttpRequest.newBuilder(resendEndpoint)
-            .timeout(REQUEST_TIMEOUT)
-            .header("Authorization", "Bearer " + apiKey)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-            .build();
-
-    final HttpResponse<String> response;
-    try {
-      response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    } catch (final IOException e) {
-      throw new MailDeliveryException("Resend request failed (network/IO)", e);
-    } catch (final InterruptedException e) {
-      // Standard JDK pattern for a checked InterruptedException: restore the interrupt flag
-      // before rethrowing as unchecked, so the interruption isn't silently swallowed for
-      // whatever code is further up the call stack.
-      Thread.currentThread().interrupt();
-      throw new MailDeliveryException("Resend request interrupted", e);
-    }
-
-    if (response.statusCode() >= FIRST_ERROR_STATUS) {
-      // BR-DATA-01: never log the request body itself (it carries the recipient's email address)
-      // — only the status code, which is enough to distinguish "Resend is down/misconfigured"
-      // from a real delivery success.
-      throw new MailDeliveryException("Resend responded with status " + response.statusCode());
-    }
   }
 }

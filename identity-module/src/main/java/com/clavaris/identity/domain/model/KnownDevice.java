@@ -23,6 +23,26 @@ import java.util.UUID;
  * the full reasoning. Same hash-not-plaintext principle as {@link RefreshToken}/{@code
  * VerificationToken} — the raw token value is never persisted, only its hash.
  *
+ * <p><b>Code review finding (2026-09-01), deliberately NOT fixed — read before "fixing" this:</b>
+ * two concurrent logins with no presented cookie (e.g. two browser tabs racing) each mint their own
+ * independent random token and both insert successfully, producing two rows and two notifications
+ * for what's really one physical device. This is a direct, necessary consequence of TD-SEC-033
+ * above, not an oversight: any attempt to correlate or merge concurrent inserts for the same
+ * Account (by timing, request metadata, etc.) would reopen the exact hole TD-SEC-033 closed — an
+ * attacker timing a stolen-session login to coincide with the real owner's own genuine login could
+ * get their own device silently merged into "the same" notification, suppressing it. A rare,
+ * low-severity double email is the correct, accepted cost of an anti-spoofing property that must
+ * never depend on timing.
+ *
+ * <p><b>Client-side mitigation added (2026-09-01):</b> {@code identity/login.html}'s own {@code
+ * login-submit-guard.js} now coordinates the common real-world instance of this race — the same
+ * browser's own two tabs both submitting the login form — via a {@code localStorage} mutex that
+ * runs entirely inside the browser, before any request is sent. This is safe where a server-side
+ * fix isn't: an attacker's browser is a different origin's storage and structurally cannot read or
+ * write this one's lock, so it cannot be timed or spoofed the way any server-side correlation could
+ * be. It narrows the practical frequency of this race without touching the server-side invariant
+ * above at all — two genuinely different devices still notify independently, correctly.
+ *
  * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
  * the same reason {@code Session}/{@code Account} suppress them — the deliberate record-style
  * accessor convention used throughout this codebase's value objects.

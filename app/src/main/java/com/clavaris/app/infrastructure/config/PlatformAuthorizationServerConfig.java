@@ -20,12 +20,10 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
-import org.springframework.security.oauth2.server.authorization.authentication.ClientSecretAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
@@ -159,29 +157,13 @@ class PlatformAuthorizationServerConfig {
                     // own Javadoc for why this replaces (not adds to) SAS's own default handler.
                     .tokenRevocationEndpoint(
                         revocation -> revocation.revocationResponseHandler(tokenRevocationLogger))
-                    // Confirmed live: without this, every client_credentials request failed with
-                    // "Given that there is no default password encoder configured, each password
-                    // must have a password encoding prefix" — SAS's default
-                    // ClientSecretAuthenticationProvider uses Spring Security's
-                    // DelegatingPasswordEncoder, which expects a "{id}" bracket prefix on stored
-                    // hashes to route to the right algorithm. Argon2PasswordEncoder (ADR-0005,
-                    // same one client-registry-module's Argon2ClientSecretHasher already hashes
-                    // with) produces bare "$argon2id$..." output with no such prefix — this swaps
-                    // the provider's encoder to match what's actually stored, rather than
-                    // reformatting every stored hash to fit the delegating wrapper's convention.
+                    // Same fix as the Organization tier's chain, same root cause — extracted to
+                    // Argon2ClientAuthenticationSupport (code review finding: this exact block was
+                    // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
                             clientAuth.authenticationProviders(
-                                providers ->
-                                    providers.stream()
-                                        .filter(
-                                            ClientSecretAuthenticationProvider.class::isInstance)
-                                        .map(ClientSecretAuthenticationProvider.class::cast)
-                                        .forEach(
-                                            provider ->
-                                                provider.setPasswordEncoder(
-                                                    Argon2PasswordEncoder
-                                                        .defaultsForSpringSecurity_v5_8())))))
+                                Argon2ClientAuthenticationSupport::useArgon2PasswordEncoder)))
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         // ADR-0010 §6.1/BR-ID-06: this tier's own client_credentials-only anti-abuse layer — no
         // refresh_token grant exists here at all (BR-PLATFORM-04: PlatformAccount never issues an
