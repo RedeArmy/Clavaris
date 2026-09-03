@@ -158,9 +158,16 @@ clavaris:
     # ADR-0010 §6.2: the per-Organization capacity ceiling — default-requests-per-minute is what
     # every Organization gets unless explicitly tuned (operator-only in v1, TD-FUT-002);
     # hard-cap-requests-per-minute is the system-wide maximum no operator override can ever exceed.
+    #
+    # TD-FUT-012 (closed 2026-09-02): policy-cache-ttl-seconds bounds how stale
+    # OrganizationCapacityRateLimitingFilter's own RateLimitPolicy read is allowed to be —
+    # CachingRateLimitPolicyRepository caches every read for this long, and additionally
+    # write-throughs on every SetRateLimitPolicyController change, so this TTL only ever bounds the
+    # (rare, operator-only) cold-start case, not a real staleness window on writes.
     capacity:
       default-requests-per-minute: 600
       hard-cap-requests-per-minute: 6000
+      policy-cache-ttl-seconds: 30
   # TD-TEST-002: EventOutboxRetentionJob (identity-module)/OrganizationEventOutboxRetentionJob
   # (organization-module) sweep event_outbox/organization_event_outbox rows older than this many
   # days, daily. webhook-module's own dispatcher now exists (ADR-0007) and polls every few seconds

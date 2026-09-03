@@ -98,25 +98,96 @@ class RedisFixedWindowRateLimiterTest {
         .isTrue();
   }
 
-  // java:S2925: this waits for a real Redis TTL to actually expire, not for an async operation to
-  // finish — there is no state to poll for in the interim (tryConsume would keep returning the
-  // same decision until the TTL genuinely elapses), so Awaitility-style polling buys nothing over
-  // a plain sleep here; the whole point is proving the real EXPIRE, not a mocked clock.
+  // java:S2925: this waits for real Redis-clock buckets to actually roll over, not for an async
+  // operation to finish — there is no state to poll for in the interim, so Awaitility-style
+  // polling buys nothing over a plain sleep here; the whole point is proving real elapsed time
+  // against Redis's own TIME command, not a mocked clock.
+  //
+  // TD-FUT-010: sleeping just past one window's length (the old assertion here, 1.5×) is no
+  // longer sufficient to prove a full reset — that is now the *expected*, no-longer-buggy
+  // behavior: the whole fix is that the bucket immediately after a burst still weighs some of
+  // that burst against it. A true, zero-carryover reset needs the *previous* bucket (current
+  // bucket - 1) to be a bucket nothing ever touched, which needs at least two full window-widths
+  // of real elapsed time, not one.
   @SuppressWarnings("java:S2925")
   @Test
-  void theWindowExpiresAndAFreshOneStartsAtOne() throws InterruptedException {
+  void aFreshWindowTwoBucketsLaterStartsAtOneWithNoCarryover() throws InterruptedException {
     String key = "test:" + UUID.randomUUID();
     Duration oneSecondWindow = Duration.ofSeconds(1);
     rateLimiter.tryConsume(key, 1, oneSecondWindow);
 
-    Thread.sleep(1500);
-    RateLimitDecision afterExpiry = rateLimiter.tryConsume(key, 1, oneSecondWindow);
+    Thread.sleep(2200);
+    RateLimitDecision afterTwoWindows = rateLimiter.tryConsume(key, 1, oneSecondWindow);
 
-    assertThat(afterExpiry.allowed()).isTrue();
-    assertThat(afterExpiry.currentCount())
+    assertThat(afterTwoWindows.allowed()).isTrue();
+    assertThat(afterTwoWindows.currentCount())
         .as(
-            "a fresh window must start counting from 1 again, not carry over the expired one's count")
+            "a bucket two full window-widths later must start counting from 1 again, with no "
+                + "carryover from a burst that old")
         .isEqualTo(1);
+  }
+
+  // TD-FUT-010: this is the actual bug this row named — a burst timed against a real Redis-clock
+  // window boundary. Landing two calls deterministically on opposite sides of a boundary without
+  // flaking on real Redis timing is impractical (see the class-under-test's own Javadoc on
+  // #isAllowed), so this proves the fix at the level that actually matters: the pure weighting
+  // function tryConsume delegates to, exercised directly against hand-picked boundary values.
+  @Test
+  void isAllowedWeighsAFullPreviousBurstAgainstAFreshBucketRightAtTheBoundary() {
+    long windowMicros = 60_000_000L; // 60s window, in microseconds
+    int limit = 20;
+    // A prior window that used its full limit, and we're at the very first instant of the next
+    // window (elapsed=0) — the previous burst is still maximally "recent" and must count in full.
+    boolean allowedRightAtBoundary =
+        RedisFixedWindowRateLimiter.isAllowed(1, limit, 0, windowMicros, limit);
+
+    assertThat(allowedRightAtBoundary)
+        .as(
+            "TD-FUT-010: a client that already spent the full limit in the previous window must "
+                + "not immediately get another full limit's worth right at the boundary — this is "
+                + "exactly the ~2x-limit burst this row exists to close")
+        .isFalse();
+  }
+
+  @Test
+  void isAllowedIgnoresAPreviousBurstOnceItsWeightHasFullyDecayed() {
+    long windowMicros = 60_000_000L; // 60s window, in microseconds
+    int limit = 20;
+    // Right at the end of the current bucket (elapsed == windowMicros, the instant before the
+    // *next* bucket begins), the previous bucket's weight has decayed to zero — a fresh limit,
+    // unrelated to that old burst, must be allowed again.
+    boolean allowedAtBucketEnd =
+        RedisFixedWindowRateLimiter.isAllowed(limit, limit, windowMicros, windowMicros, limit);
+
+    assertThat(allowedAtBucketEnd)
+        .as("once the previous bucket's weight has fully decayed, a fresh limit is allowed again")
+        .isTrue();
+  }
+
+  @Test
+  void isAllowedNeverAllowsMoreThanTheLimitWhenNothingPrecededTheCurrentBucket() {
+    long windowMicros = 60_000_000L; // 60s window, in microseconds
+    int limit = 20;
+
+    // No previous-bucket activity at all (previousCount=0, the common case for most keys most of
+    // the time) — the weighting must fall away entirely and this must behave exactly like the old
+    // plain fixed window: allowed up to and including the limit, blocked the moment it's exceeded,
+    // regardless of how far into the bucket the attempt lands.
+    for (long elapsedMicros = 0; elapsedMicros <= windowMicros; elapsedMicros += windowMicros / 4) {
+      assertThat(
+              RedisFixedWindowRateLimiter.isAllowed(limit, 0, elapsedMicros, windowMicros, limit))
+          .as(
+              "the %dth attempt with no prior bucket must still be allowed (elapsed=%d)",
+              limit, elapsedMicros)
+          .isTrue();
+      assertThat(
+              RedisFixedWindowRateLimiter.isAllowed(
+                  limit + 1, 0, elapsedMicros, windowMicros, limit))
+          .as(
+              "the (limit+1)th attempt with no prior bucket must still be blocked (elapsed=%d)",
+              elapsedMicros)
+          .isFalse();
+    }
   }
 
   // TD-SEC-022: proves the fail-open contract against a real dead connection, not a mocked
