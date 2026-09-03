@@ -48,6 +48,7 @@ class JpaOutboxEventReader implements OutboxEventReader {
               row.getAggregateId(),
               row.getEventType(),
               row.getPayload(),
+              row.getTraceId(),
               row.getOccurredAt()));
     }
     for (final OrganizationOutboxRowEntity row :
@@ -61,6 +62,7 @@ class JpaOutboxEventReader implements OutboxEventReader {
               row.getAggregateId(),
               row.getEventType(),
               row.getPayload(),
+              row.getTraceId(),
               row.getOccurredAt()));
     }
     return claimed;

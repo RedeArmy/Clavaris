@@ -37,6 +37,7 @@ class DispatchOutboxEventsServiceTest {
             UUID.randomUUID(),
             "account.created",
             "{}",
+            "trace-abc123",
             Instant.now());
     when(outboxEvents.claimUnpublishedBatch(200)).thenReturn(List.of(event));
     WebhookEndpoint matchingEndpoint =
@@ -52,6 +53,7 @@ class DispatchOutboxEventsServiceTest {
     assertThat(captor.getValue().endpointId()).isEqualTo(matchingEndpoint.id());
     assertThat(captor.getValue().organizationId()).isEqualTo(organizationId);
     assertThat(captor.getValue().outboxEventId()).isEqualTo(event.id());
+    assertThat(captor.getValue().traceId()).isEqualTo("trace-abc123");
     verify(outboxEvents).markPublished(event);
   }
 
@@ -66,6 +68,7 @@ class DispatchOutboxEventsServiceTest {
             UUID.randomUUID(),
             "workspace.created",
             "{}",
+            null,
             Instant.now());
     when(outboxEvents.claimUnpublishedBatch(200)).thenReturn(List.of(event));
     when(endpoints.findActiveByOrganizationIdAndEventType(any(), any())).thenReturn(List.of());

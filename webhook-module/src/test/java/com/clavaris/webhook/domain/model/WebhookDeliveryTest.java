@@ -18,13 +18,49 @@ class WebhookDeliveryTest {
             "Account",
             UUID.randomUUID(),
             "account.created",
-            "{}");
+            "{}",
+            "trace-abc123");
 
     assertThat(delivery.status()).isEqualTo(WebhookDeliveryStatus.PENDING);
     assertThat(delivery.attemptCount()).isZero();
     assertThat(delivery.nextAttemptAt()).isNotNull();
     assertThat(delivery.lastAttemptAt()).isNull();
     assertThat(delivery.lastResponseStatus()).isNull();
+    assertThat(delivery.traceId()).isEqualTo("trace-abc123");
+  }
+
+  @Test
+  void scheduleAcceptsANullTraceIdForAnUntracedOrPreMigrationSourceEvent() {
+    WebhookDelivery delivery =
+        WebhookDelivery.schedule(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null);
+
+    assertThat(delivery.traceId()).isNull();
+  }
+
+  @Test
+  void traceIdSurvivesEveryCopyOnWriteMutationUnchanged() {
+    WebhookDelivery delivery = scheduled();
+
+    WebhookDelivery leased = delivery.lease(Instant.now().plusSeconds(300));
+    WebhookDelivery succeeded = delivery.recordSuccess(200, Instant.now());
+    WebhookDelivery failed = delivery.recordFailure(500, "boom", Instant.now(), Instant.now());
+    WebhookDelivery exhausted = delivery.recordFailure(500, "boom", Instant.now(), null);
+    WebhookDelivery replayed = exhausted.resetForReplay(Instant.now());
+
+    assertThat(leased.traceId())
+        .isEqualTo(succeeded.traceId())
+        .isEqualTo(failed.traceId())
+        .isEqualTo(exhausted.traceId())
+        .isEqualTo(replayed.traceId())
+        .isEqualTo(delivery.traceId());
   }
 
   @Test
@@ -98,6 +134,7 @@ class WebhookDeliveryTest {
         "Account",
         UUID.randomUUID(),
         "account.created",
-        "{}");
+        "{}",
+        "trace-abc123");
   }
 }

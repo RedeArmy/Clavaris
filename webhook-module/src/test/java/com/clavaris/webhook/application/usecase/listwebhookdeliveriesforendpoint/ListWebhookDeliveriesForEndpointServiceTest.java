@@ -37,7 +37,8 @@ class ListWebhookDeliveriesForEndpointServiceTest {
             "Account",
             UUID.randomUUID(),
             "x",
-            "{}");
+            "{}",
+            null);
     when(deliveries.findAllByEndpointId(endpoint.id(), 100)).thenReturn(List.of(delivery));
 
     List<WebhookDelivery> result =

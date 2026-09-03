@@ -12,8 +12,13 @@ import java.util.UUID;
  * {@code status} is a plain {@code String}, not the domain's {@code WebhookDeliveryStatus} enum —
  * same convention as {@code SocialIdentityEntity.provider}: this entity never references a {@code
  * domain.model} type at all, {@link JpaWebhookDeliveryRepository} owns the conversion.
+ *
+ * <p>PMD.TooManyFields: fifteen columns, one field each — the SDE-III webhook traceability review
+ * that added {@code traceId} tipped this over PMD's default field-count threshold; same
+ * "persistence-mapping data holder, not organically grown sprawl" reasoning PMD.DataClass already
+ * documents on this class.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable"})
+@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable", "PMD.TooManyFields"})
 @Entity
 @Table(name = "webhook_deliveries")
 public class WebhookDeliveryEntity {
@@ -40,6 +45,9 @@ public class WebhookDeliveryEntity {
 
   @Column(columnDefinition = "text")
   private String payload;
+
+  @Column(name = "trace_id", length = 32)
+  private String traceId;
 
   @Column(nullable = false, length = 20)
   private String status;
@@ -74,6 +82,7 @@ public class WebhookDeliveryEntity {
       final UUID aggregateId,
       final String eventType,
       final String payload,
+      final String traceId,
       final String status,
       final int attemptCount,
       final Instant nextAttemptAt,
@@ -89,6 +98,7 @@ public class WebhookDeliveryEntity {
     this.aggregateId = aggregateId;
     this.eventType = eventType;
     this.payload = payload;
+    this.traceId = traceId;
     this.status = status;
     this.attemptCount = attemptCount;
     this.nextAttemptAt = nextAttemptAt;
@@ -128,6 +138,10 @@ public class WebhookDeliveryEntity {
 
   public String getPayload() {
     return payload;
+  }
+
+  public String getTraceId() {
+    return traceId;
   }
 
   public String getStatus() {

@@ -59,6 +59,7 @@ class JpaWebhookDeliveryRepositoryTest {
     assertThat(found.outboxEventId()).isEqualTo(delivery.outboxEventId());
     assertThat(found.eventType()).isEqualTo("account.created");
     assertThat(found.status()).isEqualTo(delivery.status());
+    assertThat(found.traceId()).isEqualTo(delivery.traceId()).isEqualTo("trace-abc123");
   }
 
   @Test
@@ -171,7 +172,8 @@ class JpaWebhookDeliveryRepositoryTest {
         "Account",
         UUID.randomUUID(),
         "account.created",
-        "{}");
+        "{}",
+        "trace-abc123");
   }
 
   private UUID newPersistedEndpointId() {

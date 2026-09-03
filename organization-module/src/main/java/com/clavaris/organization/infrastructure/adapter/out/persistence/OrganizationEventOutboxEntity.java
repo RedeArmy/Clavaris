@@ -24,6 +24,7 @@ public class OrganizationEventOutboxEntity extends AbstractEventOutboxEntity {
     super();
   }
 
+  @SuppressWarnings("java:S107")
   public OrganizationEventOutboxEntity(
       final UUID id,
       final UUID organizationId,
@@ -31,7 +32,8 @@ public class OrganizationEventOutboxEntity extends AbstractEventOutboxEntity {
       final UUID aggregateId,
       final String eventType,
       final String payload,
+      final String traceId,
       final Instant occurredAt) {
-    super(id, organizationId, aggregateType, aggregateId, eventType, payload, occurredAt);
+    super(id, organizationId, aggregateType, aggregateId, eventType, payload, traceId, occurredAt);
   }
 }

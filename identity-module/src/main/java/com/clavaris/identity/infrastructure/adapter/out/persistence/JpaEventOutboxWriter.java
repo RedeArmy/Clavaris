@@ -5,6 +5,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -12,6 +13,12 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Implements {@link EventOutboxWriter} (ADR-0007 §1) — write-only until webhook-module's dispatcher
  * exists.
+ *
+ * <p>Reads the current distributed-tracing id off SLF4J's own MDC (see {@code
+ * AbstractEventOutboxEntity}'s own Javadoc for why MDC, not an injected {@code Tracer} bean) rather
+ * than accepting it as a caller parameter — every one of this port's existing call sites
+ * (RegisterAccountService and every use case after it) would otherwise need to learn about tracing,
+ * a cross-cutting concern this write-side adapter can absorb on its own without widening the port.
  */
 @Repository
 class JpaEventOutboxWriter implements EventOutboxWriter {
@@ -60,6 +67,7 @@ class JpaEventOutboxWriter implements EventOutboxWriter {
             aggregateId.value(),
             eventType,
             serializedPayload,
+            MDC.get("traceId"),
             Instant.now()));
   }
 }

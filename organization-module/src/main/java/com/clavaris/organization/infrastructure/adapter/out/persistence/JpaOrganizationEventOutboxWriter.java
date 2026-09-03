@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -13,6 +14,9 @@ import tools.jackson.databind.ObjectMapper;
  * organization_event_outbox} table. Module-prefixed class name, same collision reason as {@link
  * OrganizationEventOutboxEntity}'s own Javadoc. Write-only until webhook-module's dispatcher
  * exists.
+ *
+ * <p>Reads the current distributed-tracing id off SLF4J's own MDC — same "MDC, not an injected
+ * {@code Tracer} bean" reasoning as identity-module's own {@code JpaEventOutboxWriter}.
  */
 @Repository
 class JpaOrganizationEventOutboxWriter implements EventOutboxWriter {
@@ -58,6 +62,7 @@ class JpaOrganizationEventOutboxWriter implements EventOutboxWriter {
             aggregateId,
             eventType,
             serializedPayload,
+            MDC.get("traceId"),
             Instant.now()));
   }
 }

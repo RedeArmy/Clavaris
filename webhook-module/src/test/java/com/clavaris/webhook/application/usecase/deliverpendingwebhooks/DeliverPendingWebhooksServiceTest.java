@@ -115,6 +115,49 @@ class DeliverPendingWebhooksServiceTest {
   }
 
   @Test
+  void sendsClavarisTraceIdHeaderWhenTheDeliveryCarriesOne() {
+    WebhookEndpoint endpoint = registeredEndpoint();
+    WebhookDelivery delivery = scheduledDelivery(endpoint.id());
+    when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
+    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(sender.send(any(), anyMap(), anyString()))
+        .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
+
+    service.deliverDueDeliveries();
+
+    ArgumentCaptor<Map<String, String>> headersCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(sender).send(eq(endpoint.url()), headersCaptor.capture(), anyString());
+    assertThat(headersCaptor.getValue()).containsEntry("Clavaris-Trace-Id", "trace-abc123");
+  }
+
+  @Test
+  void omitsClavarisTraceIdHeaderWhenTheDeliveryHasNone() {
+    WebhookEndpoint endpoint = registeredEndpoint();
+    WebhookDelivery delivery =
+        WebhookDelivery.schedule(
+            endpoint.id(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null);
+    when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
+    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(sender.send(any(), anyMap(), anyString()))
+        .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
+
+    service.deliverDueDeliveries();
+
+    ArgumentCaptor<Map<String, String>> headersCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(sender).send(eq(endpoint.url()), headersCaptor.capture(), anyString());
+    assertThat(headersCaptor.getValue()).doesNotContainKey("Clavaris-Trace-Id");
+  }
+
+  @Test
   void aMissingEndpointFailsTheDeliveryWithoutSchedulingAFutureRetry() {
     UUID vanishedEndpointId = UUID.randomUUID();
     WebhookDelivery delivery = scheduledDelivery(vanishedEndpointId);
@@ -144,7 +187,8 @@ class DeliverPendingWebhooksServiceTest {
         "Account",
         UUID.randomUUID(),
         "account.created",
-        "{}");
+        "{}",
+        "trace-abc123");
   }
 
   private WebhookDelivery captureSaved() {

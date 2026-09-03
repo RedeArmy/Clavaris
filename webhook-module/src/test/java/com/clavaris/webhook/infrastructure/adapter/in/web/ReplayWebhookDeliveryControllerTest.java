@@ -9,7 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryUseCase;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotFoundException;
+import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotReplayableException;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
+import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +55,8 @@ class ReplayWebhookDeliveryControllerTest {
             "Account",
             UUID.randomUUID(),
             "account.created",
-            "{}");
+            "{}",
+            null);
     when(useCase.handle(any())).thenReturn(replayed);
 
     mockMvc
@@ -71,5 +74,18 @@ class ReplayWebhookDeliveryControllerTest {
     mockMvc
         .perform(post(path(endpointId, deliveryId)).principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void returns409WhenTheDeliveryIsNotInATerminalState() throws Exception {
+    UUID endpointId = UUID.randomUUID();
+    UUID deliveryId = UUID.randomUUID();
+    when(useCase.handle(any()))
+        .thenThrow(
+            new WebhookDeliveryNotReplayableException(deliveryId, WebhookDeliveryStatus.PENDING));
+
+    mockMvc
+        .perform(post(path(endpointId, deliveryId)).principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isConflict());
   }
 }

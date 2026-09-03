@@ -22,6 +22,15 @@ import java.util.UUID;
  * must stay separate (a shared {@code event_outbox} name would collide the moment both modules'
  * Flyway migrations ran against the same schema).
  *
+ * <p>{@code traceId} (end-to-end traceability, SDE-III webhook review): the distributed-tracing id
+ * of the inbound request that produced this row, captured at write time from SLF4J's own MDC
+ * (Spring Boot's Brave auto-configuration already populates the {@code "traceId"} MDC key on every
+ * traced thread via {@code MDCScopeDecorator} — deliberately read from MDC rather than injecting a
+ * {@code Tracer} bean directly, since {@code spring-boot-starter-zipkin} is only on {@code app}'s
+ * own classpath and neither identity-module nor organization-module may take on that dependency
+ * just to stamp this one column). {@code null} whenever the write happens off a traced thread (a
+ * scheduled job, a test) — always optional, never assumed present.
+ *
  * <p>No abstract method of its own — same PMD.AbstractClassWithoutAbstractMethod rationale as
  * identity-module's own {@code EmailPasswordForm}: the point of abstractness here is "never map
  * this on its own" ({@code @MappedSuperclass} has no {@code @Table}), not "force subclasses to
@@ -59,6 +68,9 @@ public abstract class AbstractEventOutboxEntity {
   @Column(nullable = false, columnDefinition = "text")
   protected String payload;
 
+  @Column(name = "trace_id", length = 32)
+  protected String traceId;
+
   @Column(name = "occurred_at", nullable = false)
   protected Instant occurredAt;
 
@@ -77,6 +89,7 @@ public abstract class AbstractEventOutboxEntity {
       final UUID aggregateId,
       final String eventType,
       final String payload,
+      final String traceId,
       final Instant occurredAt) {
     this.id = id;
     this.organizationId = organizationId;
@@ -84,6 +97,7 @@ public abstract class AbstractEventOutboxEntity {
     this.aggregateId = aggregateId;
     this.eventType = eventType;
     this.payload = payload;
+    this.traceId = traceId;
     this.occurredAt = occurredAt;
     // publishedAt starts null — set only once webhook-module's dispatcher delivers it.
   }
@@ -116,6 +130,10 @@ public abstract class AbstractEventOutboxEntity {
 
   public String getPayload() {
     return payload;
+  }
+
+  public String getTraceId() {
+    return traceId;
   }
 
   public Instant getOccurredAt() {
