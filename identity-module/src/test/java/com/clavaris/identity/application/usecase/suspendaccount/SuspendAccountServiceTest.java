@@ -12,6 +12,8 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
@@ -31,6 +33,8 @@ class SuspendAccountServiceTest {
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
 
   private AccountRepository accounts;
+  private SessionRepository sessions;
+  private RefreshTokenRepository refreshTokens;
   private AccountTokenRevoker accountTokenRevoker;
   private AccountSessionRevoker accountSessionRevoker;
   private AuditEventRecorder auditEvents;
@@ -40,13 +44,21 @@ class SuspendAccountServiceTest {
   @BeforeEach
   void setUp() {
     accounts = mock(AccountRepository.class);
+    sessions = mock(SessionRepository.class);
+    refreshTokens = mock(RefreshTokenRepository.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
     accountSessionRevoker = mock(AccountSessionRevoker.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
     service =
         new SuspendAccountService(
-            accounts, accountTokenRevoker, accountSessionRevoker, auditEvents, outbox);
+            accounts,
+            sessions,
+            refreshTokens,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            auditEvents,
+            outbox);
   }
 
   private Account registeredAccount() {
@@ -79,6 +91,20 @@ class SuspendAccountServiceTest {
   }
 
   @Test
+  void revokesEveryActiveSessionAndRefreshTokenRowSoAHeldTokenCannotKeepRotating() {
+    // Real gap this test guards against (SDE-III review, 2026-09-03): a client already holding a
+    // refresh token kept minting fresh access/refresh pairs after suspension, because this
+    // module's own Session/RefreshToken rows were never revoked here — only the SAS token and the
+    // hosted-login HttpSession were.
+    Account account = registeredAccount();
+
+    service.handle(new SuspendAccountCommand(account.id(), ACTOR));
+
+    verify(sessions).revokeAllActiveForAccount(account.id());
+    verify(refreshTokens).revokeAllActiveForAccount(account.id());
+  }
+
+  @Test
   void recordsAnAuditEventAndAnOutboxEvent() {
     Account account = registeredAccount();
 
@@ -99,6 +125,8 @@ class SuspendAccountServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
+    verifyNoInteractions(sessions);
+    verifyNoInteractions(refreshTokens);
     verifyNoInteractions(accountTokenRevoker);
     verifyNoInteractions(accountSessionRevoker);
     verifyNoInteractions(auditEvents);

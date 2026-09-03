@@ -54,6 +54,25 @@ class JpaPlatformAccountRepositoryTest {
         .isEqualTo("argon2id$stored-hash");
   }
 
+  // SDE-III review, 2026-09-03 — real bug found and closed: AuthenticatePlatformAccountWith
+  // SocialProviderService#linkBrandNewAccount saves a PlatformAccount with no
+  // PlatformPasswordCredential at all for a brand-new social signup — BR-ID-02's real invariant
+  // is upheld by that same transaction also saving a PlatformSocialIdentity, not by this
+  // repository requiring a password specifically. Confirmed here against real Postgres — the
+  // prior version of save() threw IllegalStateException on exactly this case, an uncaught 500 on
+  // every first-time "Sign in with Google/GitHub" against /platform/login/social/{provider}.
+  @Test
+  void savesAndReconstitutesASocialOnlyPlatformAccountWithNoPasswordCredential() {
+    Email email = new Email("social-only-founder@example.com");
+    PlatformAccount account = PlatformAccount.register(email);
+
+    repository.save(account);
+    Optional<PlatformAccount> found = repository.findByEmail(email);
+
+    assertThat(found).isPresent();
+    assertThat(found.get().passwordCredential()).isEmpty();
+  }
+
   @Test
   void findsByIdToo() {
     Email email = new Email("by-id-founder@example.com");

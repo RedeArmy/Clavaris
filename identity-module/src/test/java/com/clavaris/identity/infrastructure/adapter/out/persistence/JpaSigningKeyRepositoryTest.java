@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -74,6 +75,26 @@ class JpaSigningKeyRepositoryTest {
 
     assertThat(repository.findActive(first)).isPresent();
     assertThat(repository.findActive(second)).isEmpty();
+  }
+
+  // SDE-III review, 2026-09-03: proves lockForRotation is a real, callable Postgres advisory-lock
+  // query (not a typo'd native SQL string that would only surface at first real use) — the actual
+  // serialization behavior is proven end-to-end, real concurrent HTTP calls, by
+  // SigningKeyRotationIntegrationTest; a single-threaded test here can't demonstrate blocking.
+  @Test
+  void lockForRotationCompletesWithoutErrorAndDoesNotBlockASubsequentCallInTheSameTransaction() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    // Postgres advisory locks are re-entrant within the same session/transaction — a second call
+    // here must not deadlock against the first, and (SonarCloud finding) this is now a real
+    // assertion, not just two unchecked calls: a deadlock or a malformed query would surface as a
+    // thrown exception, which this explicitly asserts never happens.
+    assertThatCode(
+            () -> {
+              repository.lockForRotation(organizationId);
+              repository.lockForRotation(organizationId);
+            })
+        .doesNotThrowAnyException();
   }
 
   @Test

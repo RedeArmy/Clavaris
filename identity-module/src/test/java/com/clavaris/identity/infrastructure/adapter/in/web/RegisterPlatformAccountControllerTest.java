@@ -128,9 +128,7 @@ class RegisterPlatformAccountControllerTest {
 
   @Test
   void alreadyRegisteredEmailRerendersTheFormWithAFieldError() throws Exception {
-    when(useCase.handle(any()))
-        .thenThrow(
-            new PlatformAccountEmailAlreadyRegisteredException(new Email("taken@example.com")));
+    when(useCase.handle(any())).thenThrow(new PlatformAccountEmailAlreadyRegisteredException());
 
     mockMvc
         .perform(

@@ -35,6 +35,19 @@ import java.util.UUID;
 })
 public final class OAuthClient {
 
+  /**
+   * RFC 8252 §7.3: the only {@code http} scheme exception — loopback traffic never leaves the
+   * device, so there's nothing on the network path to intercept, unlike a plaintext {@code http://}
+   * redirect to an arbitrary host. {@code PMD.AvoidUsingHardCodedIP}: this is a validation literal
+   * being compared against, never a real network endpoint this class connects to — the pattern that
+   * rule exists to catch (a hardcoded address baked into outbound connection logic) doesn't apply
+   * here.
+   */
+  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
+  private static final String LOOPBACK_IP = "127.0.0.1";
+
+  private static final String LOCALHOST = "localhost";
+
   private final UUID id;
   private final UUID organizationId;
   private final String clientId;
@@ -157,6 +170,54 @@ public final class OAuthClient {
     return values;
   }
 
+  private static boolean isInsecureHttp(final URI uri) {
+    return "http".equalsIgnoreCase(uri.getScheme())
+        && !LOCALHOST.equalsIgnoreCase(uri.getHost())
+        && !LOOPBACK_IP.equals(uri.getHost());
+  }
+
+  /**
+   * SDE-III review, 2026-09-03 — real bug found and closed: neither caller below used to restrict
+   * scheme at all, only "well-formed and absolute" — a client could register a plaintext {@code
+   * http://} redirect URI against an arbitrary network-reachable host, exposing the authorization
+   * code (or, for {@code postLogoutRedirectUris}, the {@code id_token_hint}-bearing RP-initiated
+   * logout redirect) to interception by anything on the network path. Extracted as one shared
+   * per-entry validator, not duplicated per caller ({@code PMD.CyclomaticComplexity} was already at
+   * this codebase's own threshold on both callers before this fix even landed) — permits {@code
+   * http} against {@code localhost}/{@code 127.0.0.1} (RFC 8252 §7.3 — native-app loopback
+   * redirects are exempt everywhere else in the OAuth ecosystem for exactly this reason: loopback
+   * traffic never leaves the device, so there's nothing to intercept), and any non-http(s) scheme
+   * untouched (a native app's own custom scheme, e.g. {@code com.example.app://callback} — this
+   * class's own Javadoc already scopes "web + mobile" clients as in-scope, and a custom scheme was
+   * never interceptable over the network to begin with, unlike plaintext HTTP).
+   *
+   * <p>{@code PMD.CyclomaticComplexity}: four genuinely distinct validation rules (blank,
+   * malformed, relative, insecure-scheme), each its own branch with its own distinct error message
+   * — already the extraction that brought both callers back under this threshold; splitting this
+   * single per-entry validator further would fragment one cohesive check into several without
+   * removing any real complexity, not reduce it.
+   */
+  @SuppressWarnings("PMD.CyclomaticComplexity")
+  private static void requireWellFormedAbsoluteSecureUri(final String uri, final String fieldName) {
+    if (uri == null || uri.isBlank()) {
+      throw new IllegalArgumentException(fieldName + " must not contain a blank entry");
+    }
+    final URI parsed;
+    try {
+      parsed = URI.create(uri);
+    } catch (final IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          fieldName + " must contain only well-formed URIs: " + uri, e);
+    }
+    if (!parsed.isAbsolute()) {
+      throw new IllegalArgumentException(fieldName + " must contain only absolute URIs: " + uri);
+    }
+    if (isInsecureHttp(parsed)) {
+      throw new IllegalArgumentException(
+          fieldName + " must use https, or http only against localhost/127.0.0.1: " + uri);
+    }
+  }
+
   // BR-CLIENT-01: redirect_uris are an exact-match allowlist — no wildcard/partial matching is
   // ever applied at /authorize time. That guarantee only means something if what's stored here is
   // itself a well-formed, absolute URI to begin with; a malformed entry would be un-matchable
@@ -164,45 +225,19 @@ public final class OAuthClient {
   private static List<String> requireValidRedirectUris(final List<String> redirectUris) {
     requireNonEmpty(redirectUris, "redirectUris");
     for (final String redirectUri : redirectUris) {
-      if (redirectUri == null || redirectUri.isBlank()) {
-        throw new IllegalArgumentException("redirectUris must not contain a blank entry");
-      }
-      final URI parsed;
-      try {
-        parsed = URI.create(redirectUri);
-      } catch (final IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            "redirectUris must contain only well-formed URIs: " + redirectUri, e);
-      }
-      if (!parsed.isAbsolute()) {
-        throw new IllegalArgumentException(
-            "redirectUris must contain only absolute URIs: " + redirectUri);
-      }
+      requireWellFormedAbsoluteSecureUri(redirectUri, "redirectUris");
     }
     return List.copyOf(redirectUris);
   }
 
-  // TD-FUT-018: same well-formed/absolute requirement as requireValidRedirectUris above, minus
-  // its non-empty requirement — unlike redirectUris (meaningless empty, BR-CLIENT-01 has nothing
-  // to match against), an empty post-logout allowlist is the genuinely valid "not configured"
-  // state, not an error.
+  // TD-FUT-018: same well-formed/absolute/secure requirement as requireValidRedirectUris above,
+  // minus its non-empty requirement — unlike redirectUris (meaningless empty, BR-CLIENT-01 has
+  // nothing to match against), an empty post-logout allowlist is the genuinely valid "not
+  // configured" state, not an error.
   private static List<String> requireValidAbsoluteUris(final List<String> uris) {
     Objects.requireNonNull(uris, "postLogoutRedirectUris must not be null");
     for (final String uri : uris) {
-      if (uri == null || uri.isBlank()) {
-        throw new IllegalArgumentException("postLogoutRedirectUris must not contain a blank entry");
-      }
-      final URI parsed;
-      try {
-        parsed = URI.create(uri);
-      } catch (final IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            "postLogoutRedirectUris must contain only well-formed URIs: " + uri, e);
-      }
-      if (!parsed.isAbsolute()) {
-        throw new IllegalArgumentException(
-            "postLogoutRedirectUris must contain only absolute URIs: " + uri);
-      }
+      requireWellFormedAbsoluteSecureUri(uri, "postLogoutRedirectUris");
     }
     return List.copyOf(uris);
   }

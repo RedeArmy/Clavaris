@@ -21,11 +21,13 @@ import java.net.http.HttpResponse;
 import java.text.ParseException;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -57,6 +59,7 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
   private int port;
 
   @Autowired private PlatformAccountRepository platformAccounts;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -94,7 +97,8 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
             .getHeader()
             .getKeyID();
 
-    rotateSigningKey(platformToken, organizationId);
+    HttpResponse<String> rotateResponse = rotateSigningKey(platformToken, organizationId);
+    assertThat(rotateResponse.statusCode()).isEqualTo(200);
     SignedJWT postRotationJwt =
         parse(accessTokenOf(requestOrganizationToken(organizationId, client)));
     String postRotationKid = postRotationJwt.getHeader().getKeyID();
@@ -127,6 +131,51 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(jwksOfB.getKeyByKeyId(kidBBeforeRotatingA))
         .as("rotating Organization A's key must never retire or otherwise touch B's own key")
         .isNotNull();
+  }
+
+  // SDE-III review, 2026-09-03 — real bug this test guards against: two concurrent rotate calls
+  // for the same Organization used to each read the same currently-active key, each retire it,
+  // and each independently activate a new one, leaving two rows with retired_at IS NULL for one
+  // Organization (which key new tokens sign under becoming nondeterministic). Real concurrent HTTP
+  // calls against the real running server, not a mocked port — see
+  // ActivateSigningKeyForOrganizationService's own Javadoc for the SELECT ... FOR UPDATE fix this
+  // proves closed.
+  @Test
+  void concurrentRotationsForTheSameOrganizationNeverLeaveTwoSimultaneouslyActiveKeys()
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Concurrent Rotation Co");
+
+    CompletableFuture<HttpResponse<String>> rotationA =
+        CompletableFuture.supplyAsync(
+            () -> rotateSigningKeyUnchecked(platformToken, organizationId));
+    CompletableFuture<HttpResponse<String>> rotationB =
+        CompletableFuture.supplyAsync(
+            () -> rotateSigningKeyUnchecked(platformToken, organizationId));
+    HttpResponse<String> responseA = rotationA.join();
+    HttpResponse<String> responseB = rotationB.join();
+
+    // Both requests must complete successfully — the fix serializes them (one blocks briefly on
+    // the other's row lock), it never rejects either outright.
+    assertThat(responseA.statusCode()).isEqualTo(200);
+    assertThat(responseB.statusCode()).isEqualTo(200);
+    Integer activeKeyCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from signing_keys where organization_id = ? and retired_at is null",
+            Integer.class,
+            organizationId);
+    assertThat(activeKeyCount)
+        .as("exactly one active signing key must survive two concurrent rotations")
+        .isEqualTo(1);
+  }
+
+  private HttpResponse<String> rotateSigningKeyUnchecked(
+      String platformToken, UUID organizationId) {
+    try {
+      return rotateSigningKey(platformToken, organizationId);
+    } catch (IOException | InterruptedException e) {
+      throw new IllegalStateException("Concurrent rotate call itself failed to complete", e);
+    }
   }
 
   @Test

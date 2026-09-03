@@ -1,6 +1,7 @@
 package com.clavaris.organization.application.usecase.changeworkspacememberrole;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.organization.application.usecase.addworkspacemember.LastAdminGuard;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -45,9 +46,14 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
     @SuppressWarnings("PMD.LongVariable")
     final boolean isDemotionFromAdmin =
         membership.role() == WorkspaceRole.ADMIN && command.newRole() != WorkspaceRole.ADMIN;
-    if (isDemotionFromAdmin
-        && memberships.countByWorkspaceIdAndRole(command.workspaceId(), WorkspaceRole.ADMIN) <= 1) {
-      throw new CannotDemoteLastAdminException(command.workspaceId());
+    // SDE-III review, 2026-09-03: LastAdminGuard both closes a real TOCTOU race and removes the
+    // duplicate-verbatim guard this class used to carry alongside RemoveWorkspaceMemberService's
+    // own copy — see LastAdminGuard's own Javadoc for the full reasoning.
+    if (isDemotionFromAdmin) {
+      LastAdminGuard.assertAtLeastOneAdminWouldRemain(
+          memberships,
+          command.workspaceId(),
+          () -> new CannotDemoteLastAdminException(command.workspaceId()));
     }
 
     final WorkspaceRole previousRole = membership.role();

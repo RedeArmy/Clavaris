@@ -42,7 +42,7 @@ public class RegisterAccountService implements RegisterAccountUseCase {
     // DIFFERENT Organization is not a conflict at all — command.organizationId() scopes this
     // check by design (BR-ORG-01).
     if (accounts.existsByOrganizationIdAndEmail(command.organizationId(), command.email())) {
-      throw new EmailAlreadyRegisteredException(command.organizationId(), command.email());
+      throw new EmailAlreadyRegisteredException(command.organizationId());
     }
 
     final Account account = Account.register(command.organizationId(), command.email());
@@ -56,8 +56,7 @@ public class RegisterAccountService implements RegisterAccountUseCase {
       // the caller (the web adapter) never needs to know a race occurred — but keep raceLost as
       // the cause, not discard it, so a production investigation still has the real JDBC-level
       // detail available.
-      throw new EmailAlreadyRegisteredException(
-          command.organizationId(), command.email(), raceLost);
+      throw new EmailAlreadyRegisteredException(command.organizationId(), raceLost);
     }
 
     // ADR-0007 §1: outbox row written in the SAME transaction as the account insert —

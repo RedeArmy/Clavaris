@@ -30,9 +30,10 @@ class ReplayWebhookDeliveryServiceTest {
 
   @Test
   void resetsAnExhaustedDeliveryBackToPendingAndAuditsIt() {
+    UUID endpointId = UUID.randomUUID();
     WebhookDelivery exhausted =
         WebhookDelivery.schedule(
-                UUID.randomUUID(),
+                endpointId,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "Account",
@@ -44,7 +45,7 @@ class ReplayWebhookDeliveryServiceTest {
     when(deliveries.findById(exhausted.id())).thenReturn(Optional.of(exhausted));
 
     WebhookDelivery result =
-        service.handle(new ReplayWebhookDeliveryCommand(exhausted.id(), ACTOR));
+        service.handle(new ReplayWebhookDeliveryCommand(endpointId, exhausted.id(), ACTOR));
 
     assertThat(result.status()).isEqualTo(WebhookDeliveryStatus.PENDING);
     verify(deliveries).save(result);
@@ -57,14 +58,19 @@ class ReplayWebhookDeliveryServiceTest {
   void rejectsReplayOfAnUnknownDelivery() {
     UUID unknownId = UUID.randomUUID();
     when(deliveries.findById(unknownId)).thenReturn(Optional.empty());
-    ReplayWebhookDeliveryCommand command = new ReplayWebhookDeliveryCommand(unknownId, ACTOR);
+    ReplayWebhookDeliveryCommand command =
+        new ReplayWebhookDeliveryCommand(UUID.randomUUID(), unknownId, ACTOR);
 
     assertThatExceptionOfType(WebhookDeliveryNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
   }
 
   @Test
-  void resetsASucceededDeliveryBackToPending() {
+  void rejectsReplayWhenTheDeliveryBelongsToADifferentEndpoint() {
+    // Real bug this test guards against (SDE-III review, 2026-09-03): the {endpointId} path
+    // segment was accepted but never checked against the delivery actually being replayed — a
+    // deliveryId belonging to a different endpoint (or a different Organization entirely) still
+    // replayed.
     WebhookDelivery succeeded =
         WebhookDelivery.schedule(
                 UUID.randomUUID(),
@@ -77,18 +83,45 @@ class ReplayWebhookDeliveryServiceTest {
                 null)
             .recordSuccess(200, Instant.now());
     when(deliveries.findById(succeeded.id())).thenReturn(Optional.of(succeeded));
+    UUID someOtherEndpointId = UUID.randomUUID();
+    ReplayWebhookDeliveryCommand command =
+        new ReplayWebhookDeliveryCommand(someOtherEndpointId, succeeded.id(), ACTOR);
+
+    assertThatExceptionOfType(WebhookDeliveryNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(deliveries, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void resetsASucceededDeliveryBackToPending() {
+    UUID endpointId = UUID.randomUUID();
+    WebhookDelivery succeeded =
+        WebhookDelivery.schedule(
+                endpointId,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Account",
+                UUID.randomUUID(),
+                "account.created",
+                "{}",
+                null)
+            .recordSuccess(200, Instant.now());
+    when(deliveries.findById(succeeded.id())).thenReturn(Optional.of(succeeded));
 
     WebhookDelivery result =
-        service.handle(new ReplayWebhookDeliveryCommand(succeeded.id(), ACTOR));
+        service.handle(new ReplayWebhookDeliveryCommand(endpointId, succeeded.id(), ACTOR));
 
     assertThat(result.status()).isEqualTo(WebhookDeliveryStatus.PENDING);
   }
 
   @Test
   void rejectsReplayOfAPendingDelivery_stillOwnedByTheOrdinaryRetryEngine() {
+    UUID endpointId = UUID.randomUUID();
     WebhookDelivery pending =
         WebhookDelivery.schedule(
-            UUID.randomUUID(),
+            endpointId,
             UUID.randomUUID(),
             UUID.randomUUID(),
             "Account",
@@ -97,7 +130,8 @@ class ReplayWebhookDeliveryServiceTest {
             "{}",
             null);
     when(deliveries.findById(pending.id())).thenReturn(Optional.of(pending));
-    ReplayWebhookDeliveryCommand command = new ReplayWebhookDeliveryCommand(pending.id(), ACTOR);
+    ReplayWebhookDeliveryCommand command =
+        new ReplayWebhookDeliveryCommand(endpointId, pending.id(), ACTOR);
 
     assertThatExceptionOfType(WebhookDeliveryNotReplayableException.class)
         .isThrownBy(() -> service.handle(command));
@@ -108,9 +142,10 @@ class ReplayWebhookDeliveryServiceTest {
 
   @Test
   void rejectsReplayOfAFailedDeliveryStillAwaitingItsOwnBackoff() {
+    UUID endpointId = UUID.randomUUID();
     WebhookDelivery failedNotYetDue =
         WebhookDelivery.schedule(
-                UUID.randomUUID(),
+                endpointId,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "Account",
@@ -121,7 +156,7 @@ class ReplayWebhookDeliveryServiceTest {
             .recordFailure(500, "boom", Instant.now(), Instant.now().plusSeconds(3600));
     when(deliveries.findById(failedNotYetDue.id())).thenReturn(Optional.of(failedNotYetDue));
     ReplayWebhookDeliveryCommand command =
-        new ReplayWebhookDeliveryCommand(failedNotYetDue.id(), ACTOR);
+        new ReplayWebhookDeliveryCommand(endpointId, failedNotYetDue.id(), ACTOR);
 
     assertThatExceptionOfType(WebhookDeliveryNotReplayableException.class)
         .isThrownBy(() -> service.handle(command));

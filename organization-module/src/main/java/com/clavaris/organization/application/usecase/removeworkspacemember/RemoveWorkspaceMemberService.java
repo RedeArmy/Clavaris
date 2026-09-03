@@ -1,6 +1,7 @@
 package com.clavaris.organization.application.usecase.removeworkspacemember;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.organization.application.usecase.addworkspacemember.LastAdminGuard;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -50,9 +51,16 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
                     new WorkspaceMembershipNotFoundException(
                         command.workspaceId(), command.accountId()));
 
-    if (membership.role() == WorkspaceRole.ADMIN
-        && memberships.countByWorkspaceIdAndRole(command.workspaceId(), WorkspaceRole.ADMIN) <= 1) {
-      throw new CannotRemoveLastAdminException(command.workspaceId());
+    // SDE-III review, 2026-09-03: LastAdminGuard both closes a real TOCTOU race (two concurrent
+    // requests against this Workspace could otherwise each pass this check and both commit) and
+    // removes the duplicate-verbatim guard this class used to carry alongside
+    // ChangeWorkspaceMemberRoleService's own copy — see that class's own Javadoc for the full
+    // reasoning.
+    if (membership.role() == WorkspaceRole.ADMIN) {
+      LastAdminGuard.assertAtLeastOneAdminWouldRemain(
+          memberships,
+          command.workspaceId(),
+          () -> new CannotRemoveLastAdminException(command.workspaceId()));
     }
 
     // webhook-module's own EventOutboxWriter needs organizationId — resolved before the delete

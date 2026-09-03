@@ -101,6 +101,8 @@ class AccountSuspensionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(countOauth2AuthorizationRowsForPrincipal(accountId))
         .as("a real, live authorization row must exist before suspension")
         .isGreaterThan(0);
+    String refreshToken =
+        objectMapper.readTree(tokenResponse.body()).get("refresh_token").asString();
 
     HttpResponse<String> suspendResponse = suspendAccount(platformToken, accountId);
     assertThat(suspendResponse.statusCode()).isEqualTo(204);
@@ -112,6 +114,17 @@ class AccountSuspensionIntegrationTest extends RedisBackedIntegrationTest {
             jdbcTemplate.queryForObject(
                 "select status from accounts where id = ?", String.class, accountId))
         .isEqualTo("SUSPENDED");
+
+    // SDE-III review, 2026-09-03 — real gap this section proves closed: a refresh token issued
+    // before suspension used to keep minting fresh access/refresh pairs forever, since neither
+    // this cascade nor RotateRefreshTokenService checked the account's own status. Real HTTP call
+    // against the real /oauth2/token refresh grant, not a mocked port.
+    HttpResponse<String> refreshAttemptAfterSuspension =
+        refreshAccessToken(organizationId, client, refreshToken);
+    assertThat(refreshAttemptAfterSuspension.statusCode())
+        .as("a suspended account's refresh token must never mint a fresh access token")
+        .isEqualTo(400);
+    assertThat(refreshAttemptAfterSuspension.body()).contains("invalid_grant");
 
     // Future logins must fail even with the exactly-correct password — anti-enumeration: a
     // generic re-rendered login form, never a distinguishing status code.
@@ -255,7 +268,7 @@ class AccountSuspensionIntegrationTest extends RedisBackedIntegrationTest {
         """
         {
           "redirectUris": ["%s"],
-          "allowedGrantTypes": ["authorization_code"],
+          "allowedGrantTypes": ["authorization_code", "refresh_token"],
           "allowedScopes": ["openid"],
           "requireConsent": false
         }
@@ -370,6 +383,22 @@ class AccountSuspensionIntegrationTest extends RedisBackedIntegrationTest {
             + urlEncode(REDIRECT_URI)
             + "&code_verifier="
             + codeVerifier;
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/token"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> refreshAccessToken(
+      UUID organizationId, ClientCredentials client, String refreshToken)
+      throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString((client.clientId() + ":" + client.clientSecret()).getBytes());
+    String body = "grant_type=refresh_token&refresh_token=" + refreshToken;
     HttpRequest request =
         HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/token"))
             .header("Authorization", "Basic " + basicAuth)

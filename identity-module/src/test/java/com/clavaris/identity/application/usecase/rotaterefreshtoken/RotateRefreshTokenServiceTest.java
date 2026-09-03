@@ -19,7 +19,10 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.RefreshTokenReuseDetectedEvent;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountStatus;
+import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
@@ -69,8 +72,28 @@ class RotateRefreshTokenServiceTest {
             outbox,
             metrics);
 
+    // Default: an ACTIVE account, matching this class's own accountId field — the SDE-III
+    // review (2026-09-03) status check every test below now passes through unless a test
+    // deliberately overrides this stub to prove the rejection path itself.
+    when(accounts.findById(accountId)).thenReturn(Optional.of(activeAccount()));
+
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
+  }
+
+  private Account activeAccount() {
+    return accountWithStatus(AccountStatus.ACTIVE);
+  }
+
+  private Account accountWithStatus(final AccountStatus status) {
+    return Account.reconstitute(
+        accountId,
+        organizationId,
+        new Email("rotate-me@example.com"),
+        Instant.now(),
+        null,
+        status,
+        null);
   }
 
   @AfterEach
@@ -124,6 +147,37 @@ class RotateRefreshTokenServiceTest {
     verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
     verify(outbox, never()).write(any(), any(), any(), any());
     verify(metrics).increment("clavaris.auth.refresh_token.rotated");
+  }
+
+  @Test
+  void rejectsRotationForASuspendedAccountWithoutTreatingItAsReuse() {
+    // Real gap this test guards against (SDE-III review, 2026-09-03): a refresh token issued
+    // before suspension kept rotating into fresh access/refresh pairs forever, since neither
+    // isRevoked() nor isActive() says anything about the account's own current status.
+    Session session = activeSession();
+    String rawValue = "a-valid-refresh-token-value";
+    RefreshToken active = activeTokenFor(session, rawValue);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+    when(accounts.findById(accountId))
+        .thenReturn(Optional.of(accountWithStatus(AccountStatus.SUSPENDED)));
+    RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(active.isRevoked())
+        .as("rejected before any mutation — the presented token itself is left untouched")
+        .isFalse();
+    verify(refreshTokens, never()).save(any());
+    // Not the reuse-detection cascade/alert — a suspended account rotating its own already-issued
+    // token is routine, not a security anomaly; see this class's own updated Javadoc.
+    verify(refreshTokens, never()).revokeAllActiveForAccount(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+    verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
+    verify(metrics, never()).increment("clavaris.auth.refresh_token.reuse_detected");
   }
 
   @Test
