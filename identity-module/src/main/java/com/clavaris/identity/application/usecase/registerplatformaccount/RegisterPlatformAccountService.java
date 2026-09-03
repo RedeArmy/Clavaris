@@ -40,7 +40,7 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
     }
 
     if (accounts.existsByEmail(command.email())) {
-      throw new PlatformAccountEmailAlreadyRegisteredException(command.email());
+      throw new PlatformAccountEmailAlreadyRegisteredException();
     }
 
     final PlatformAccount account = PlatformAccount.register(command.email());
@@ -49,7 +49,7 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
     try {
       accounts.save(account);
     } catch (final DataIntegrityViolationException raceLost) {
-      throw new PlatformAccountEmailAlreadyRegisteredException(command.email(), raceLost);
+      throw new PlatformAccountEmailAlreadyRegisteredException(raceLost);
     }
 
     LOG.info("event=platform_account_registered platformAccountId={}", account.id());

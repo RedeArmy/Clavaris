@@ -1,7 +1,6 @@
 package com.clavaris.organization.application.usecase.addworkspacemember;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -32,7 +31,7 @@ class LastAdminGuardTest {
 
     InOrder inOrder = Mockito.inOrder(memberships);
     inOrder.verify(memberships).lockForRoleChange(workspaceId);
-    inOrder.verify(memberships).countByWorkspaceIdAndRole(eq(workspaceId), eq(WorkspaceRole.ADMIN));
+    inOrder.verify(memberships).countByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN);
   }
 
   @Test

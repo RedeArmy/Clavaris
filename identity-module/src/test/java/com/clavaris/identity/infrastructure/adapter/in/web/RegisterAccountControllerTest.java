@@ -202,9 +202,7 @@ class RegisterAccountControllerTest {
   void alreadyRegisteredEmailRerendersTheFormWithAFieldError_neverALeakedStackTrace()
       throws Exception {
     when(useCase.handle(any()))
-        .thenThrow(
-            new EmailAlreadyRegisteredException(
-                new OrganizationId(ORGANIZATION_ID), new Email("taken@example.com")));
+        .thenThrow(new EmailAlreadyRegisteredException(new OrganizationId(ORGANIZATION_ID)));
 
     mockMvc
         .perform(

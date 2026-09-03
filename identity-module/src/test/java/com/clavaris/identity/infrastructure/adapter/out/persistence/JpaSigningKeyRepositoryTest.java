@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -84,10 +85,16 @@ class JpaSigningKeyRepositoryTest {
   void lockForRotationCompletesWithoutErrorAndDoesNotBlockASubsequentCallInTheSameTransaction() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
 
-    repository.lockForRotation(organizationId);
     // Postgres advisory locks are re-entrant within the same session/transaction — a second call
-    // here must not deadlock against the first.
-    repository.lockForRotation(organizationId);
+    // here must not deadlock against the first, and (SonarCloud finding) this is now a real
+    // assertion, not just two unchecked calls: a deadlock or a malformed query would surface as a
+    // thrown exception, which this explicitly asserts never happens.
+    assertThatCode(
+            () -> {
+              repository.lockForRotation(organizationId);
+              repository.lockForRotation(organizationId);
+            })
+        .doesNotThrowAnyException();
   }
 
   @Test

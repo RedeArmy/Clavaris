@@ -99,9 +99,7 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
   void translatesEmailAlreadyRegisteredIntoThisPortsOwnExceptionWithoutSendingAnyEmail() {
     UUID organizationId = UUID.randomUUID();
     when(registerAccount.handle(any()))
-        .thenThrow(
-            new EmailAlreadyRegisteredException(
-                new OrganizationId(organizationId), new Email("taken@example.com")));
+        .thenThrow(new EmailAlreadyRegisteredException(new OrganizationId(organizationId)));
 
     assertThatExceptionOfType(AccountProvisioner.AccountAlreadyExistsException.class)
         .isThrownBy(() -> bridge.provisionAndSendWelcome(organizationId, "taken@example.com"));

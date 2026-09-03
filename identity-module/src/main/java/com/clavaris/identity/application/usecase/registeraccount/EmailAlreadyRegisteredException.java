@@ -1,6 +1,5 @@
 package com.clavaris.identity.application.usecase.registeraccount;
 
-import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 
 /**
@@ -14,15 +13,16 @@ import com.clavaris.identity.domain.model.OrganizationId;
  * com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetCommand}'s own
  * {@code toString()} override) already does. A generic {@code catch (RuntimeException e) {
  * log.warn(..., e) }} anywhere in the call chain — or an APM error tracker capturing this
- * exception's own message — would have written the plaintext email to logs. The email itself is
- * never needed in the message: a caller that legitimately needs it already has the {@link Email}
- * value object it passed in.
+ * exception's own message — would have written the plaintext email to logs. Code-review follow-up
+ * to that same fix: {@code email} was left as an unused constructor parameter (a static-analysis
+ * finding, correctly) — dropped from the signature entirely, not just the message, since a
+ * parameter this constructor does nothing with is misleading API surface on its own.
  */
 public final class EmailAlreadyRegisteredException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;
 
-  public EmailAlreadyRegisteredException(final OrganizationId organizationId, final Email email) {
+  public EmailAlreadyRegisteredException(final OrganizationId organizationId) {
     super(message(organizationId));
   }
 
@@ -33,14 +33,11 @@ public final class EmailAlreadyRegisteredException extends RuntimeException {
    * without the actual JDBC-level cause.
    */
   public EmailAlreadyRegisteredException(
-      final OrganizationId organizationId, final Email email, final Throwable cause) {
+      final OrganizationId organizationId, final Throwable cause) {
     super(message(organizationId), cause);
   }
 
-  // BR-DATA-01: never the raw email — see this class's own Javadoc. email itself stays a
-  // constructor parameter (not removed) so a future caller reading this class's own signature
-  // still sees the exact BR-ORG-01 shape ((organizationId, email) uniqueness) this exception
-  // reports a violation of, even though the value is never interpolated into the message.
+  // BR-DATA-01: never the raw email — see this class's own Javadoc.
   private static String message(final OrganizationId organizationId) {
     return "An account with this email is already registered in organization "
         + organizationId.value();

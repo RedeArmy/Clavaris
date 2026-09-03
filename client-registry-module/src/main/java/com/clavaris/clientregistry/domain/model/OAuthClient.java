@@ -173,24 +173,27 @@ public final class OAuthClient {
         && !LOOPBACK_IP.equals(uri.getHost());
   }
 
-  // SDE-III review, 2026-09-03 — real bug found and closed: neither caller below used to
-  // restrict scheme at all, only "well-formed and absolute" — a client could register a
-  // plaintext http:// redirect URI against an arbitrary network-reachable host, exposing the
-  // authorization code (or, for postLogoutRedirectUris, the id_token_hint-bearing RP-initiated
-  // logout redirect) to interception by anything on the network path. Extracted as one shared
-  // per-entry validator, not duplicated per caller (PMD.CyclomaticComplexity was already at this
-  // codebase's own threshold on both callers before this fix even landed) — permits
-  // http://localhost / http://127.0.0.1 (RFC 8252 §7.3 — native-app loopback redirects are
-  // exempt everywhere else in the OAuth ecosystem for exactly this reason: loopback traffic
-  // never leaves the device, so there's nothing to intercept), and any non-http(s) scheme
-  // untouched (a native app's own custom scheme, e.g. {@code com.example.app://callback} — this
-  // class's own Javadoc already scopes "web + mobile" clients as in-scope, and a custom scheme
-  // was never interceptable over the network to begin with, unlike plaintext HTTP).
-  // PMD.CyclomaticComplexity: four genuinely distinct validation rules (blank, malformed,
-  // relative, insecure-scheme), each its own branch with its own distinct error message — already
-  // the extraction that brought both callers back under this threshold; splitting this single
-  // per-entry validator further would fragment one cohesive check into several without removing
-  // any real complexity, not reduce it.
+  /**
+   * SDE-III review, 2026-09-03 — real bug found and closed: neither caller below used to restrict
+   * scheme at all, only "well-formed and absolute" — a client could register a plaintext {@code
+   * http://} redirect URI against an arbitrary network-reachable host, exposing the authorization
+   * code (or, for {@code postLogoutRedirectUris}, the {@code id_token_hint}-bearing RP-initiated
+   * logout redirect) to interception by anything on the network path. Extracted as one shared
+   * per-entry validator, not duplicated per caller ({@code PMD.CyclomaticComplexity} was already at
+   * this codebase's own threshold on both callers before this fix even landed) — permits {@code
+   * http} against {@code localhost}/{@code 127.0.0.1} (RFC 8252 §7.3 — native-app loopback
+   * redirects are exempt everywhere else in the OAuth ecosystem for exactly this reason: loopback
+   * traffic never leaves the device, so there's nothing to intercept), and any non-http(s) scheme
+   * untouched (a native app's own custom scheme, e.g. {@code com.example.app://callback} — this
+   * class's own Javadoc already scopes "web + mobile" clients as in-scope, and a custom scheme was
+   * never interceptable over the network to begin with, unlike plaintext HTTP).
+   *
+   * <p>{@code PMD.CyclomaticComplexity}: four genuinely distinct validation rules (blank,
+   * malformed, relative, insecure-scheme), each its own branch with its own distinct error message
+   * — already the extraction that brought both callers back under this threshold; splitting this
+   * single per-entry validator further would fragment one cohesive check into several without
+   * removing any real complexity, not reduce it.
+   */
   @SuppressWarnings("PMD.CyclomaticComplexity")
   private static void requireWellFormedAbsoluteSecureUri(final String uri, final String fieldName) {
     if (uri == null || uri.isBlank()) {

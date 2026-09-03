@@ -61,23 +61,27 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
         credential);
   }
 
-  // Code review finding (SDE-III design, Phase 2 #8): same fix as JpaAccountRepository's own
-  // identical save() — that class's own Javadoc/comment has the full reasoning. This one was
-  // missed on the first pass (the exact class of divergence this whole session kept finding
-  // between the tenant and platform tiers), found live when migration V20260830110000's own
-  // deferred trigger rejected several integration tests' own test-fixture helpers that call this
-  // method directly, outside any @Transactional caller.
-  //
-  // SDE-III review, 2026-09-03 — real bug found and closed: this method still unconditionally
-  // required a PlatformPasswordCredential via orElseThrow, the exact same bug
-  // JpaAccountRepository's own sibling method was already fixed for (ADR-0020 Phase 6) — a brand
-  // new social signup (AuthenticatePlatformAccountWithSocialProviderService#linkBrandNewAccount)
-  // saves a PlatformAccount with no password credential at all, relying on the same transaction's
-  // own PlatformSocialIdentity insert to satisfy BR-ID-02 (migration V20260830110000's deferred
-  // trigger, platform-tier half). Every first-time "Sign in with Google/GitHub" against
-  // /platform/login/social/{provider} threw this IllegalStateException uncaught, a 500 on every
-  // attempt — this sibling repository never received the fix its tenant-tier twin got. Only
-  // persist a row here if the aggregate actually carries one, same as JpaAccountRepository.
+  /**
+   * Code review finding (SDE-III design, Phase 2 #8): same fix as {@code JpaAccountRepository}'s
+   * own identical {@code save()} — that class's own Javadoc/comment has the full reasoning. This
+   * one was missed on the first pass (the exact class of divergence this whole session kept finding
+   * between the tenant and platform tiers), found live when migration {@code V20260830110000}'s own
+   * deferred trigger rejected several integration tests' own test-fixture helpers that call this
+   * method directly, outside any {@code @Transactional} caller.
+   *
+   * <p>SDE-III review, 2026-09-03 — real bug found and closed: this method still unconditionally
+   * required a {@code PlatformPasswordCredential} via {@code orElseThrow}, the exact same bug
+   * {@code JpaAccountRepository}'s own sibling method was already fixed for (ADR-0020 Phase 6) — a
+   * brand new social signup ({@code
+   * AuthenticatePlatformAccountWithSocialProviderService#linkBrandNewAccount}) saves a {@code
+   * PlatformAccount} with no password credential at all, relying on the same transaction's own
+   * {@code PlatformSocialIdentity} insert to satisfy BR-ID-02 (migration {@code V20260830110000}'s
+   * deferred trigger, platform-tier half). Every first-time "Sign in with Google/GitHub" against
+   * {@code /platform/login/social/{provider}} threw this {@code IllegalStateException} uncaught, a
+   * 500 on every attempt — this sibling repository never received the fix its tenant-tier twin got.
+   * Only persist a row here if the aggregate actually carries one, same as {@code
+   * JpaAccountRepository}.
+   */
   @Override
   @Transactional
   public void save(final PlatformAccount account) {
