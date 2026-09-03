@@ -3,6 +3,8 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordCommand;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.InvalidPlatformCredentialsException;
+import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceCommand;
+import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceUseCase;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,12 +32,15 @@ public class PlatformLoginController {
 
   private final AuthenticatePlatformAccountWithPasswordUseCase useCase;
   private final PlatformAuthenticatedSessionEstablisher sessions;
+  private final RecordPlatformAccountLoginDeviceUseCase recordLoginDevice;
 
   public PlatformLoginController(
       final AuthenticatePlatformAccountWithPasswordUseCase useCase,
-      final PlatformAuthenticatedSessionEstablisher sessions) {
+      final PlatformAuthenticatedSessionEstablisher sessions,
+      final RecordPlatformAccountLoginDeviceUseCase recordLoginDevice) {
     this.useCase = useCase;
     this.sessions = sessions;
+    this.recordLoginDevice = recordLoginDevice;
   }
 
   @GetMapping
@@ -69,6 +74,19 @@ public class PlatformLoginController {
 
     final String redirectTarget =
         sessions.establish(request, response, accountId.value(), "/platform/dashboard");
+
+    // TD-FUT-026 (closed 2026-09-02): new-device login email notification, platform-tier mirror of
+    // LoginController's own identical call — see RecordPlatformAccountLoginDeviceService's own
+    // Javadoc for why this never throws.
+    recordLoginDevice
+        .handle(
+            new RecordPlatformAccountLoginDeviceCommand(
+                accountId,
+                request.getHeader("User-Agent"),
+                request.getRemoteAddr(),
+                PlatformDeviceCookie.read(request).orElse(null)))
+        .ifPresent(rawDeviceToken -> PlatformDeviceCookie.write(request, response, rawDeviceToken));
+
     return "redirect:" + redirectTarget;
   }
 }

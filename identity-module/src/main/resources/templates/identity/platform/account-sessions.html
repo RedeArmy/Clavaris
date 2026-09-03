@@ -7,8 +7,8 @@
 <body>
 <main>
     <h1>Your active sessions</h1>
-    <p>These are the devices/browsers currently signed in to your account. If you don't recognize
-        one, close it.</p>
+    <p>These are the devices/browsers currently signed in to your Clavaris operator account. If
+        you don't recognize one, close it.</p>
 
     <table>
         <thead>
@@ -32,7 +32,7 @@
             <td th:text="${userSession.lastAccessedAt()}">Last active</td>
             <td>
                 <form method="post"
-                      th:action="@{/o/{organizationId}/account/sessions/{sessionId}/revoke(organizationId=${organizationId},sessionId=${userSession.sessionId()})}">
+                      th:action="@{/platform/account/sessions/{sessionId}/revoke(sessionId=${userSession.sessionId()})}">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit">Cerrar sesión</button>
                 </form>

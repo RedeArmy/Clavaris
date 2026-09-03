@@ -18,8 +18,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordCommand;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.InvalidPlatformCredentialsException;
+import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceUseCase;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
@@ -34,12 +36,15 @@ class PlatformLoginControllerTest {
 
   private AuthenticatePlatformAccountWithPasswordUseCase useCase;
   private PlatformAuthenticatedSessionEstablisher sessionEstablisher;
+  private RecordPlatformAccountLoginDeviceUseCase recordLoginDevice;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     useCase = mock(AuthenticatePlatformAccountWithPasswordUseCase.class);
     sessionEstablisher = mock(PlatformAuthenticatedSessionEstablisher.class);
+    recordLoginDevice = mock(RecordPlatformAccountLoginDeviceUseCase.class);
+    when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -56,7 +61,8 @@ class PlatformLoginControllerTest {
     viewResolver.setTemplateEngine(templateEngine);
 
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new PlatformLoginController(useCase, sessionEstablisher))
+        MockMvcBuilders.standaloneSetup(
+                new PlatformLoginController(useCase, sessionEstablisher, recordLoginDevice))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -89,6 +95,23 @@ class PlatformLoginControllerTest {
         .handle(
             new AuthenticatePlatformAccountWithPasswordCommand(
                 new Email("founder@example.com"), "correct-password"));
+  }
+
+  // TD-FUT-026: proves the new-device notification wiring actually fires on a real successful
+  // login, not just that the constructor accepts the extra collaborator.
+  @Test
+  void validCredentialsAlsoRecordTheLoginDevice() throws Exception {
+    PlatformAccountId accountId = PlatformAccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+    when(sessionEstablisher.establish(any(), any(), eq(accountId.value()), anyString()))
+        .thenReturn("/platform/dashboard");
+
+    mockMvc.perform(
+        post("/platform/login")
+            .param("email", "founder@example.com")
+            .param("password", "correct-password"));
+
+    verify(recordLoginDevice).handle(any());
   }
 
   @Test

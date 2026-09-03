@@ -194,6 +194,29 @@ class ResendMailSender implements MailSender, PlatformMailSender {
             + " this, you can safely ignore it — your password will not be changed.</p>");
   }
 
+  @Override
+  public void sendNewPlatformDeviceLoginNotification(
+      final String toAddress,
+      final String userAgent,
+      final String sourceIp,
+      final Instant occurredAt) {
+    // Same HtmlUtils.htmlEscape rationale as sendNewDeviceLoginNotification above — userAgent/
+    // sourceIp are attacker-controlled raw request-header values, not something this server built.
+    httpClient.send(
+        toAddress,
+        "New sign-in to your Clavaris account",
+        "<p>Your Clavaris account was just signed in to from a new device or browser:</p>"
+            + "<ul><li>Device: "
+            + HtmlUtils.htmlEscape(userAgent)
+            + "</li><li>IP address: "
+            + HtmlUtils.htmlEscape(sourceIp)
+            + "</li><li>Time: "
+            + occurredAt
+            + "</li></ul>"
+            + "<p>If this was you, no action is needed. If you don't recognize this activity,"
+            + " change your password and review your active sessions.</p>");
+  }
+
   private String link(
       final OrganizationId organizationId, final String path, final String rawToken) {
     return baseUrl

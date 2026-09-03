@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithpassword.AuthenticatePlatformAccountWithPasswordUseCase;
@@ -15,6 +16,12 @@ import com.clavaris.identity.application.usecase.confirmplatformaccountemailveri
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetService;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.PlatformAccountSessionRevoker;
+import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.ListActiveSessionsForPlatformAccountService;
+import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.ListActiveSessionsForPlatformAccountUseCase;
+import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.PlatformAccountActiveSessionsRepository;
+import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.PlatformKnownDeviceRepository;
+import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceService;
+import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountService;
@@ -25,6 +32,10 @@ import com.clavaris.identity.application.usecase.requestplatformaccountemailveri
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.requestplatformaccountpasswordreset.RequestPlatformAccountPasswordResetService;
 import com.clavaris.identity.application.usecase.requestplatformaccountpasswordreset.RequestPlatformAccountPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionService;
+import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionUseCase;
+import java.time.Instant;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -33,14 +44,21 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * ADR-0012: wires {@code PlatformAccount}'s own use cases to Spring's context — split out from
  * {@link IdentityUseCaseConfig} (which carries its own {@code PMD.ExcessiveImports}/{@code
- * CouplingBetweenObjects} suppressions for the tenant-tier's own six use cases) purely to keep each
+ * CouplingBetweenObjects} suppressions for the tenant-tier's own use cases) purely to keep each
  * file a manageable size; both classes wire the same module's use cases, split by bounded concern
  * (tenant {@code Account} vs. platform {@code PlatformAccount}), not by anything architectural.
- * Smaller than that class — under PMD's ExcessiveImports/CouplingBetweenObjects thresholds, so no
- * class-level suppression needed here. AvoidDuplicateLiterals below: same "PMD.LongVariable" reused
- * across four parameters rationale as IdentityUseCaseConfig's own identical suppression.
+ * TD-FUT-026 (2026-09-02) added this class's own {@code ExcessiveImports}/{@code
+ * CouplingBetweenObjects}/{@code TooManyMethods} suppressions, same rationale as that class's own
+ * identical ones — one {@code @Bean} method per use case is what this class's entire job looks
+ * like. AvoidDuplicateLiterals below: same "PMD.LongVariable" reused across four parameters
+ * rationale as IdentityUseCaseConfig's own identical suppression.
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects",
+  "PMD.TooManyMethods"
+})
 @Configuration
 class PlatformAccountUseCaseConfig {
 
@@ -135,5 +153,39 @@ class PlatformAccountUseCaseConfig {
       final PlatformSocialIdentityRepository socialIdentities,
       final PlatformAccountRepository accounts) {
     return new ConfirmPendingPlatformSocialLinkService(pendingLinks, socialIdentities, accounts);
+  }
+
+  // TD-FUT-026 (closed 2026-09-02): self-service sessions/devices page for a PlatformAccount —
+  // platform-tier mirror of IdentityUseCaseConfig's own listActiveSessionsForAccountUseCase/
+  // revokeAccountSessionUseCase beans.
+  @Bean
+  /* package */ ListActiveSessionsForPlatformAccountUseCase
+      listActiveSessionsForPlatformAccountUseCase(
+          final PlatformAccountActiveSessionsRepository activeSessions) {
+    return new ListActiveSessionsForPlatformAccountService(activeSessions);
+  }
+
+  @Bean
+  /* package */ RevokePlatformAccountSessionUseCase revokePlatformAccountSessionUseCase(
+      final PlatformAccountActiveSessionsRepository activeSessions,
+      final AuditEventRecorder auditEvents) {
+    return new RevokePlatformAccountSessionService(activeSessions, auditEvents);
+  }
+
+  // New-device login email notification — platform-tier mirror of IdentityUseCaseConfig's own
+  // recordAccountLoginDeviceUseCase bean. Default cutover matches this feature's own migration,
+  // V20260902130000, same "the actual moment the mechanism went live" rationale that bean's own
+  // comment documents.
+  @Bean
+  @SuppressWarnings("PMD.LongVariable")
+  /* package */ RecordPlatformAccountLoginDeviceUseCase recordPlatformAccountLoginDeviceUseCase(
+      final PlatformKnownDeviceRepository knownDevices,
+      final PlatformAccountRepository accounts,
+      final PlatformMailSender mailSender,
+      final AuditEventRecorder auditEvents,
+      @Value("${clavaris.platform-known-device.migration-cutover-at:2026-09-02T13:00:00Z}")
+          final Instant platformKnownDeviceMigrationCutoverAt) {
+    return new RecordPlatformAccountLoginDeviceService(
+        knownDevices, accounts, mailSender, auditEvents, platformKnownDeviceMigrationCutoverAt);
   }
 }

@@ -1,6 +1,7 @@
 package com.clavaris.identity.application.usecase.requestplatformaccountemailverification;
 
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 
 /**
  * Outbound port — implemented by {@code infrastructure/adapter/out/mail/ResendMailSender} (the same
@@ -24,4 +25,15 @@ public interface PlatformMailSender {
    */
   void sendPlatformSocialLinkConfirmation(
       String toAddress, SocialProvider provider, String rawToken);
+
+  /**
+   * TD-FUT-026 (closed 2026-09-02): {@code recordplatformaccountlogindevice.
+   * RecordPlatformAccountLoginDeviceService}'s own notification — the platform-tier mirror of
+   * {@code requestemailverification.MailSender.sendNewDeviceLoginNotification}, generic
+   * "Clavaris"-branded like every other method here, since a {@code PlatformAccount} belongs to no
+   * Organization to brand with. Same "plain informational email, no action link" scope decision
+   * (TD-FUT-025 tracks the tenant-tier "wasn't me" gap; this inherits the exact same deferral).
+   */
+  void sendNewPlatformDeviceLoginNotification(
+      String toAddress, String userAgent, String sourceIp, Instant occurredAt);
 }
