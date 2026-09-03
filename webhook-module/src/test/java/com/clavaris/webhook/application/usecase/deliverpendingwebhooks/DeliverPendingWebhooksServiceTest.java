@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -168,6 +169,43 @@ class DeliverPendingWebhooksServiceTest {
 
     WebhookDelivery saved = captureSaved();
     assertThat(saved.status()).isEqualTo(WebhookDeliveryStatus.EXHAUSTED);
+  }
+
+  // SDE-III review, 2026-09-03 — real bug this test guards against: one delivery whose secret
+  // can't be decrypted used to throw uncaught out of the whole batch loop, silently skipping every
+  // other already-claimed, healthy delivery — a self-inflicted partial outage for unrelated
+  // consumers.
+  @Test
+  void oneDeliveryThrowingUnexpectedlyNeverPreventsTheRestOfTheBatchFromBeingAttempted() {
+    WebhookEndpoint brokenEndpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(),
+            "https://broken.example.com/hook",
+            null,
+            List.of("account.created"),
+            "undecryptable-secret");
+    WebhookEndpoint healthyEndpoint = registeredEndpoint();
+    WebhookDelivery brokenDelivery = scheduledDelivery(brokenEndpoint.id());
+    WebhookDelivery healthyDelivery = scheduledDelivery(healthyEndpoint.id());
+    when(deliveries.claimDueBatch(50)).thenReturn(List.of(brokenDelivery, healthyDelivery));
+    when(endpoints.findById(brokenEndpoint.id())).thenReturn(Optional.of(brokenEndpoint));
+    when(endpoints.findById(healthyEndpoint.id())).thenReturn(Optional.of(healthyEndpoint));
+    when(cipher.decrypt("undecryptable-secret"))
+        .thenThrow(new IllegalStateException("key rotated, old secret no longer decryptable"));
+    when(cipher.decrypt("encrypted-secret")).thenReturn("raw-secret");
+    when(sender.send(eq(healthyEndpoint.url()), anyMap(), anyString()))
+        .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
+
+    service.deliverDueDeliveries();
+
+    // The broken delivery is left exactly where claimDueBatch's own lease already put it — never
+    // saved by this tick at all, not force-failed — see this class's own Javadoc for why that's
+    // correct.
+    verify(deliveries, never()).save(brokenDelivery);
+    ArgumentCaptor<WebhookDelivery> savedCaptor = ArgumentCaptor.forClass(WebhookDelivery.class);
+    verify(deliveries).save(savedCaptor.capture());
+    assertThat(savedCaptor.getValue().id()).isEqualTo(healthyDelivery.id());
+    assertThat(savedCaptor.getValue().status()).isEqualTo(WebhookDeliveryStatus.SUCCEEDED);
   }
 
   private WebhookEndpoint registeredEndpoint() {

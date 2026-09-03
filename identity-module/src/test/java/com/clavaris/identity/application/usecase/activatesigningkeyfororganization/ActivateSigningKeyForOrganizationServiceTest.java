@@ -13,6 +13,8 @@ import com.clavaris.identity.domain.model.SigningKey;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.mockito.Mockito;
 
 class ActivateSigningKeyForOrganizationServiceTest {
 
@@ -61,6 +63,22 @@ class ActivateSigningKeyForOrganizationServiceTest {
     service.handle(organizationId, "new-kid", "RS256");
 
     verify(repository).findActive(organizationId);
+  }
+
+  // SDE-III review, 2026-09-03: the advisory lock must be acquired before the read it's meant to
+  // serialize against — see this service's own Javadoc for why acquiring it after (or not at all)
+  // reopens the exact race this fix exists to close.
+  @Test
+  void locksForRotationBeforeReadingTheCurrentlyActiveKey() {
+    SigningKeyRepository repository = mock(SigningKeyRepository.class);
+    ActivateSigningKeyForOrganizationService service =
+        new ActivateSigningKeyForOrganizationService(repository);
+
+    service.handle(organizationId, "new-kid", "RS256");
+
+    InOrder inOrder = Mockito.inOrder(repository);
+    inOrder.verify(repository).lockForRotation(organizationId);
+    inOrder.verify(repository).findActive(organizationId);
   }
 
   @Test

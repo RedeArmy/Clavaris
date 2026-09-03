@@ -15,6 +15,23 @@ public interface SigningKeyRepository {
   Optional<SigningKey> findActive(OrganizationId organizationId);
 
   /**
+   * Serializes concurrent rotate/purge/activation calls for one Organization via a transaction-
+   * scoped Postgres advisory lock ({@code pg_advisory_xact_lock}, auto-released at commit or
+   * rollback), keyed on {@code organizationId} — see {@link
+   * ActivateSigningKeyForOrganizationService}'s own Javadoc for the concurrent-rotation race this
+   * closes, and for why a row-level {@code SELECT ... FOR UPDATE} on the "active" row (this
+   * method's own first, reverted implementation) does not actually work here: Postgres re-qualifies
+   * a locked row against its {@code WHERE} clause once the blocking transaction commits, and
+   * retiring a key (setting {@code retired_at}) is exactly the kind of change that makes the row
+   * stop matching {@code retired_at IS NULL} — the second caller's lock wait resolves to "no row
+   * found," not "here is the winner's new row," so it still went on to activate a second one of its
+   * own. An advisory lock has no row to lose track of: keyed on {@code organizationId} itself, not
+   * on any row's current contents, it serializes every caller for the same Organization regardless
+   * of what {@code signing_keys} looks like before or after.
+   */
+  void lockForRotation(OrganizationId organizationId);
+
+  /**
    * TD-SEC-008: every key JWKS must still publish for {@code organizationId} — the currently active
    * one, plus any retired key whose {@code retiredAt} is after {@code retiredAfter} (still within
    * the rotation overlap window a still-valid, pre-rotation token might have been signed under).

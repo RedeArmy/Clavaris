@@ -67,6 +67,17 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
   // between the tenant and platform tiers), found live when migration V20260830110000's own
   // deferred trigger rejected several integration tests' own test-fixture helpers that call this
   // method directly, outside any @Transactional caller.
+  //
+  // SDE-III review, 2026-09-03 — real bug found and closed: this method still unconditionally
+  // required a PlatformPasswordCredential via orElseThrow, the exact same bug
+  // JpaAccountRepository's own sibling method was already fixed for (ADR-0020 Phase 6) — a brand
+  // new social signup (AuthenticatePlatformAccountWithSocialProviderService#linkBrandNewAccount)
+  // saves a PlatformAccount with no password credential at all, relying on the same transaction's
+  // own PlatformSocialIdentity insert to satisfy BR-ID-02 (migration V20260830110000's deferred
+  // trigger, platform-tier half). Every first-time "Sign in with Google/GitHub" against
+  // /platform/login/social/{provider} threw this IllegalStateException uncaught, a 500 on every
+  // attempt — this sibling repository never received the fix its tenant-tier twin got. Only
+  // persist a row here if the aggregate actually carries one, same as JpaAccountRepository.
   @Override
   @Transactional
   public void save(final PlatformAccount account) {
@@ -82,18 +93,15 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
     // own try/catch" rationale as JpaAccountRepository's own identical call.
     accounts.saveAndFlush(entity);
 
-    final PlatformPasswordCredential credential =
-        account
-            .passwordCredential()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "Attempted to save a PlatformAccount with no password credential attached"));
-    credentials.saveAndFlush(
-        new PlatformPasswordCredentialEntity(
-            credential.id(),
-            credential.platformAccountId().value(),
-            credential.passwordHash(),
-            credential.updatedAt()));
+    account
+        .passwordCredential()
+        .ifPresent(
+            credential ->
+                credentials.saveAndFlush(
+                    new PlatformPasswordCredentialEntity(
+                        credential.id(),
+                        credential.platformAccountId().value(),
+                        credential.passwordHash(),
+                        credential.updatedAt())));
   }
 }

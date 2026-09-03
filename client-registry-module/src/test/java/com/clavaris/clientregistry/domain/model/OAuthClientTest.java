@@ -140,6 +140,89 @@ class OAuthClientTest {
                     List.of()));
   }
 
+  // SDE-III review, 2026-09-03 — real bug this test guards against: a plaintext http:// redirect
+  // URI against an arbitrary network-reachable host used to be accepted, exposing the
+  // authorization code to interception on the network path.
+  @Test
+  void rejectsAPlaintextHttpRedirectUriAgainstANonLoopbackHost() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OAuthClient.register(
+                    organizationId,
+                    "a-client",
+                    "argon2id$hashed",
+                    List.of("http://example.com/callback"),
+                    List.of("authorization_code"),
+                    List.of(),
+                    true,
+                    List.of()));
+  }
+
+  // RFC 8252 §7.3: loopback HTTP is a native-app redirect, never network-interceptable — must
+  // stay accepted, not collateral damage from the fix above.
+  @Test
+  void acceptsHttpRedirectUrisAgainstLocalhostAndLoopback() {
+    OAuthClient localhostClient =
+        OAuthClient.register(
+            organizationId,
+            "a-native-client",
+            "argon2id$hashed",
+            List.of("http://localhost:8080/callback"),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+    OAuthClient loopbackIpClient =
+        OAuthClient.register(
+            organizationId,
+            "another-native-client",
+            "argon2id$hashed",
+            List.of("http://127.0.0.1:8080/callback"),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThat(localhostClient.redirectUris()).containsExactly("http://localhost:8080/callback");
+    assertThat(loopbackIpClient.redirectUris()).containsExactly("http://127.0.0.1:8080/callback");
+  }
+
+  // This class's own Javadoc already scopes "web + mobile" clients as in-scope — a native app's
+  // own custom scheme redirect is never network-interceptable to begin with, unlike plaintext
+  // HTTP, and must stay accepted.
+  @Test
+  void acceptsACustomSchemeRedirectUriForANativeClient() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-mobile-client",
+            "argon2id$hashed",
+            List.of("com.example.app://callback"),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThat(client.redirectUris()).containsExactly("com.example.app://callback");
+  }
+
+  @Test
+  void rejectsAPlaintextHttpPostLogoutRedirectUriAgainstANonLoopbackHost() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OAuthClient.register(
+                    organizationId,
+                    "a-client",
+                    "argon2id$hashed",
+                    List.of("https://example.com/callback"),
+                    List.of("authorization_code"),
+                    List.of(),
+                    true,
+                    List.of("http://example.com/logged-out")));
+  }
+
   @Test
   void rejectsAMalformedRedirectUri() {
     assertThatIllegalArgumentException()

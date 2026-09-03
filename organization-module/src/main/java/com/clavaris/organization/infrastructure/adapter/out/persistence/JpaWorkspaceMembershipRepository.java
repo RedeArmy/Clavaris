@@ -6,6 +6,7 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -16,10 +17,31 @@ import org.springframework.stereotype.Repository;
 class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository {
 
   private final SpringDataWorkspaceMembershipJpaRepository memberships;
+  private final JdbcTemplate jdbcTemplate;
 
   /* package */ JpaWorkspaceMembershipRepository(
-      final SpringDataWorkspaceMembershipJpaRepository memberships) {
+      final SpringDataWorkspaceMembershipJpaRepository memberships,
+      final JdbcTemplate jdbcTemplate) {
     this.memberships = memberships;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  // See WorkspaceMembershipRepository#lockForRoleChange's own Javadoc. Plain JdbcTemplate, not a
+  // Spring Data native @Query method — a void-returning native query without @Modifying is never
+  // actually sent to Postgres (nothing consumes its result), and @Modifying alone forces
+  // Hibernate through executeUpdate(), which PostgreSQL's own JDBC driver rejects for a
+  // SELECT-shaped statement ("A result was returned when none was expected") — both confirmed
+  // live while building this exact pattern for SigningKeyRepository#lockForRotation.
+  // query(sql, RowCallbackHandler, args) genuinely executes it as the SELECT it is and discards
+  // the single-column result — the lock's entire value is its side effect, not its return value.
+  @Override
+  public void lockForRoleChange(final UUID workspaceId) {
+    jdbcTemplate.query(
+        "SELECT pg_advisory_xact_lock(hashtext(?))",
+        resultSet -> {
+          /* side-effecting call — the lock itself is the point, not this row */
+        },
+        workspaceId.toString());
   }
 
   @Override

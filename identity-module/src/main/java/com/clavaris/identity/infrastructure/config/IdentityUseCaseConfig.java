@@ -255,12 +255,20 @@ class IdentityUseCaseConfig {
   @Bean
   /* package */ SuspendAccountUseCase suspendAccountUseCase(
       final AccountRepository accounts,
+      final SessionRepository sessions,
+      final RefreshTokenRepository refreshTokens,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new SuspendAccountService(
-        accounts, accountTokenRevoker, accountSessionRevoker, auditEvents, eventOutboxWriter);
+        accounts,
+        sessions,
+        refreshTokens,
+        accountTokenRevoker,
+        accountSessionRevoker,
+        auditEvents,
+        eventOutboxWriter);
   }
 
   @Bean

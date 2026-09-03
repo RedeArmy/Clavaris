@@ -6,7 +6,9 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.event.RefreshTokenReuseDetectedEvent;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
@@ -27,6 +29,21 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added to the reuse
  * cascade in {@link #handleReuse} — see that port's own Javadoc for why a token/session revocation
  * cascade is incomplete without it.
+ *
+ * <p><b>SDE-III review, 2026-09-03 — real gap found and closed:</b> this method never checked the
+ * presented token's own {@code Account} status at all — a refresh token issued before an account
+ * was suspended kept rotating into fresh access/refresh pairs forever, since {@link
+ * RefreshToken#isRevoked()}/{@link RefreshToken#isActive()} say nothing about the account's current
+ * standing. {@link #handle} now loads the {@code Account} and rejects any non-{@link
+ * AccountStatus#ACTIVE} status before even looking at the token's own revocation state —
+ * deliberately its own branch, not folded into the reuse-detection path below: an inactive-account
+ * rejection is a routine, expected outcome (the account owner suspended themselves, an admin banned
+ * them), not a security anomaly, and must never fire the same reuse-detected alert/metric a genuine
+ * stolen-token signal does. This is a backstop independent of {@code SuspendAccountService}'s own
+ * revocation cascade (identity-module's own {@code Session}/{@code RefreshToken} rows) — either one
+ * alone leaves a gap the other closes: a cascade that already ran leaves nothing here to reject
+ * against a still-{@code isActive()} token; a status check alone doesn't kill an already-issued SAS
+ * access token that hasn't expired yet.
  */
 // Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
 // parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
@@ -93,6 +110,12 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     final RefreshToken presented =
         refreshTokens.findByTokenHash(presentedHash).orElseThrow(InvalidRefreshTokenException::new);
 
+    // See this class's own Javadoc ("SDE-III review, 2026-09-03") — checked first, before the
+    // reuse/expiry branches below, and deliberately its own outcome, not folded into either.
+    // Extracted (PMD.CyclomaticComplexity — handle() was already at the default threshold),
+    // same "one branch, one private helper" precedent handleReuse below already establishes.
+    assertAccountActive(presented);
+
     if (presented.isRevoked()) {
       handleReuse(presented.accountId());
       throw new RefreshTokenReuseDetectedException();
@@ -152,6 +175,33 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         session.createdAt(),
         newRawValue,
         command.newExpiresAt());
+  }
+
+  // See this class's own Javadoc ("SDE-III review, 2026-09-03") for the full rationale — a
+  // dedicated, routine rejection, never the reuse-detection cascade/alert below.
+  // PMD.GuardLogStatement false positive — same rationale as handle()'s own identical
+  // suppression: every logged argument is a cheap in-memory accessor.
+  @SuppressWarnings("PMD.GuardLogStatement")
+  private void assertAccountActive(final RefreshToken presented) {
+    final Account account =
+        accounts
+            .findById(presented.accountId())
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "RefreshToken "
+                            + presented.id()
+                            + " references AccountId "
+                            + presented.accountId()
+                            + " that doesn't exist — data integrity violated before reaching this"
+                            + " use case"));
+    if (account.status() != AccountStatus.ACTIVE) {
+      LOG.info(
+          "event=refresh_token_rejected_inactive_account accountId={} accountStatus={}",
+          presented.accountId(),
+          account.status());
+      throw new InvalidRefreshTokenException();
+    }
   }
 
   // BR-ID-03: "revokes every active token for that account, not just the reused one" — completed

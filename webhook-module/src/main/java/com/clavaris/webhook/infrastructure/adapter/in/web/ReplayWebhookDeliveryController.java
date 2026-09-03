@@ -18,10 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * BR-WEBHOOK-03: {@code POST
  * /api/v1/admin/webhook-endpoints/{endpointId}/deliveries/{deliveryId}:replay}. {@code endpointId}
- * in the path names the resource being acted on for a consistent, discoverable URL shape — the
- * command itself only needs {@code deliveryId} ({@code WebhookDelivery} is already its own complete
- * primary key, same convention {@link ReplayWebhookDeliveryCommand}'s own Javadoc precedent
- * establishes elsewhere in this module).
+ * in the path names the resource being acted on for a consistent, discoverable URL shape — and, as
+ * of the SDE-III review that added the ownership guard in {@link ReplayWebhookDeliveryCommand}'s
+ * own Javadoc, is now actually enforced, not merely decorative.
  */
 @RestController
 class ReplayWebhookDeliveryController {
@@ -51,7 +50,7 @@ class ReplayWebhookDeliveryController {
       replayed =
           useCase.handle(
               new ReplayWebhookDeliveryCommand(
-                  deliveryId, AuditActor.platformClient(authentication.getName())));
+                  endpointId, deliveryId, AuditActor.platformClient(authentication.getName())));
     } catch (final WebhookDeliveryNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final WebhookDeliveryNotReplayableException _) {

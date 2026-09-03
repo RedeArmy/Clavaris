@@ -28,6 +28,19 @@ import org.slf4j.LoggerFactory;
  * this process crashes mid-delivery, the lease simply expires and the row becomes claimable again
  * on a later tick: an intentional consequence of ADR-0007 §2's own "at-least-once, never
  * at-most-once" delivery guarantee, not a bug in this design.
+ *
+ * <p><b>SDE-III review, 2026-09-03 — real bug found and closed:</b> {@link #deliverDueDeliveries}'s
+ * own loop had no per-item exception isolation — one delivery whose secret can't be decrypted (e.g.
+ * after a {@code WEBHOOK_SECRET_ENCRYPTION_KEY} rotation, {@code
+ * AesGcmWebhookSigningSecretCipher}'s own documented gap) threw uncaught out of {@link
+ * #attemptOneDelivery}, aborting the whole tick and silently skipping every other already-claimed,
+ * perfectly healthy delivery batched alongside it — a self-inflicted partial outage for unrelated
+ * consumers, not a bug in the failing delivery's own retry accounting. Now catches per item: a
+ * delivery whose attempt throws is logged and left exactly where {@link
+ * WebhookDeliveryRepository#claimDueBatch}'s own lease already put it (this class's own Javadoc
+ * above already establishes that a still-leased, not-yet-recorded row simply becomes claimable
+ * again once the lease expires — the same recovery path a mid-attempt process crash already relies
+ * on, not a new code path), and the loop moves on to the next delivery in the batch.
  */
 public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseCase {
 
@@ -57,10 +70,31 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     this.maxAttempts = maxAttempts;
   }
 
+  // PMD.AvoidCatchingGenericException: deliberate — see this class's own Javadoc ("SDE-III
+  // review, 2026-09-03") for why a single delivery's own failure (of any kind: a decrypt error, an
+  // unchecked exception from the HTTP client, anything) must never abort the rest of this batch.
+  // PMD.GuardLogStatement: same false-positive rationale as attemptOneDelivery's own identical
+  // suppression.
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.GuardLogStatement"})
   @Override
   public void deliverDueDeliveries() {
     for (final WebhookDelivery delivery : deliveries.claimDueBatch(batchSize)) {
-      attemptOneDelivery(delivery);
+      try {
+        attemptOneDelivery(delivery);
+      } catch (final RuntimeException e) {
+        // Left exactly where claimDueBatch's own lease already put it — see this class's own
+        // Javadoc for why that's the correct, already-established recovery path, not a gap this
+        // catch needs to paper over with its own ad hoc recordFailure call.
+        LOG.error(
+            "event=webhook_delivery_attempt_failed_unexpectedly deliveryId={} endpointId={}"
+                + " organizationId={} outboxEventId={} traceId={}",
+            delivery.id(),
+            delivery.endpointId(),
+            delivery.organizationId(),
+            delivery.outboxEventId(),
+            delivery.traceId(),
+            e);
+      }
     }
   }
 

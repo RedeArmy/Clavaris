@@ -76,6 +76,20 @@ class JpaSigningKeyRepositoryTest {
     assertThat(repository.findActive(second)).isEmpty();
   }
 
+  // SDE-III review, 2026-09-03: proves lockForRotation is a real, callable Postgres advisory-lock
+  // query (not a typo'd native SQL string that would only surface at first real use) — the actual
+  // serialization behavior is proven end-to-end, real concurrent HTTP calls, by
+  // SigningKeyRotationIntegrationTest; a single-threaded test here can't demonstrate blocking.
+  @Test
+  void lockForRotationCompletesWithoutErrorAndDoesNotBlockASubsequentCallInTheSameTransaction() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    repository.lockForRotation(organizationId);
+    // Postgres advisory locks are re-entrant within the same session/transaction — a second call
+    // here must not deadlock against the first.
+    repository.lockForRotation(organizationId);
+  }
+
   @Test
   void findActiveIgnoresARetiredKey() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());

@@ -40,6 +40,21 @@ public interface WorkspaceMembershipRepository {
    */
   long countByWorkspaceIdAndRole(UUID workspaceId, WorkspaceRole role);
 
+  /**
+   * SDE-III review, 2026-09-03 — real bug found and closed: without this, two concurrent requests
+   * against the same Workspace (one removing an ADMIN, one demoting a different ADMIN) could each
+   * read {@link #countByWorkspaceIdAndRole} as "2 remain," each pass {@code LastAdminGuard}'s own
+   * guard, and both commit — leaving zero ADMINs, exactly what that guard exists to make
+   * impossible. A transaction-scoped Postgres advisory lock ({@code pg_advisory_xact_lock}, keyed
+   * on {@code workspaceId}, auto-released at commit or rollback) serializes every caller for the
+   * same Workspace regardless of which specific membership rows exist before or after — same
+   * mechanism, same reasoning, as {@code SigningKeyRepository#lockForRotation}'s own identical fix
+   * for the signing-key rotation race (a row-level {@code SELECT ... FOR UPDATE} doesn't work for a
+   * {@code COUNT}-based check at all — there is no single row to lock). {@link LastAdminGuard} is
+   * the one caller; must be invoked before {@link #countByWorkspaceIdAndRole}, not after.
+   */
+  void lockForRoleChange(UUID workspaceId);
+
   void deleteById(UUID membershipId);
 
   /**
