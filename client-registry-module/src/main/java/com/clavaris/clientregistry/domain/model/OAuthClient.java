@@ -35,11 +35,14 @@ import java.util.UUID;
 })
 public final class OAuthClient {
 
-  // RFC 8252 §7.3: the only http scheme exception — loopback traffic never leaves the device, so
-  // there's nothing on the network path to intercept, unlike a plaintext http:// redirect to an
-  // arbitrary host. PMD.AvoidUsingHardCodedIP: this is a validation literal being compared
-  // against, never a real network endpoint this class connects to — the pattern that rule exists
-  // to catch (a hardcoded address baked into outbound connection logic) doesn't apply here.
+  /**
+   * RFC 8252 §7.3: the only {@code http} scheme exception — loopback traffic never leaves the
+   * device, so there's nothing on the network path to intercept, unlike a plaintext {@code http://}
+   * redirect to an arbitrary host. {@code PMD.AvoidUsingHardCodedIP}: this is a validation literal
+   * being compared against, never a real network endpoint this class connects to — the pattern that
+   * rule exists to catch (a hardcoded address baked into outbound connection logic) doesn't apply
+   * here.
+   */
   @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
   private static final String LOOPBACK_IP = "127.0.0.1";
 
