@@ -80,6 +80,15 @@ class SpringSecurityPlatformAuthenticatedSessionEstablisher
     final HttpSession currentSession = request.getSession();
     sessionRegistry.registerNewSession(currentSession.getId(), platformAccountId.toString());
 
+    // TD-FUT-026 (closed 2026-09-02): self-service sessions/devices page for a PlatformAccount —
+    // same two attributes, same SessionDeviceAttributes constants holder, same "populate once,
+    // right after the session is established" placement as
+    // SpringSecurityAuthenticatedSessionEstablisher's own identical write for the tenant tier.
+    // PlatformAccountActiveSessionsRepositoryBridge is the sole reader.
+    currentSession.setAttribute(
+        SessionDeviceAttributes.USER_AGENT, request.getHeader("User-Agent"));
+    currentSession.setAttribute(SessionDeviceAttributes.SOURCE_IP, request.getRemoteAddr());
+
     final SavedRequest savedRequest = requestCache.getRequest(request, response);
     return savedRequest != null ? savedRequest.getRedirectUrl() : fallbackUrl;
   }

@@ -27,10 +27,10 @@ import org.springframework.stereotype.Component;
  * uncached, not missed: the second of those exists specifically per ADR-0020 Decision 3/BR-ID-12 to
  * catch an operator disabling a provider mid-flow, "re-verified here, at the point of actual use,
  * not trusted from an earlier UI-level gate" (that service's own comment) — caching it would
- * reintroduce exactly the staleness window BR-ID-12 exists to close. Same "no premature caching"
- * precedent {@code RateLimitPolicyRepository}/TD-FUT-012 already accepts elsewhere in this codebase
- * for what remains: two reads on a login attempt (not a hot path) is a deliberate, accepted cost,
- * not an oversight.
+ * reintroduce exactly the staleness window BR-ID-12 exists to close — unlike {@link
+ * CachingRateLimitPolicyRepository}/TD-FUT-012 (closed 2026-09-02), whose own read has no such
+ * per-request-freshness requirement to protect. Two reads on a login attempt (not a hot path) is a
+ * deliberate, accepted cost here, not an oversight.
  */
 @Component
 class OrganizationSocialLoginPolicyProviderBridge implements OrganizationSocialLoginPolicyProvider {

@@ -14,17 +14,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
-import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
-import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionCommand;
-import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionUseCase;
-import com.clavaris.identity.application.usecase.revokeaccountsession.SessionNotFoundException;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.ActivePlatformAccountSession;
+import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.ListActiveSessionsForPlatformAccountUseCase;
+import com.clavaris.identity.application.usecase.revokeplatformaccountsession.PlatformAccountSessionNotFoundException;
+import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionCommand;
+import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionUseCase;
+import com.clavaris.identity.domain.model.PlatformAccountId;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
@@ -35,26 +34,24 @@ import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 
 /**
- * Same standalone MockMvc + real Thymeleaf setup as {@link LoginControllerTest} — see its Javadoc
- * for why.
+ * TD-FUT-026: platform-tier mirror of {@code AccountSessionsControllerTest} — same standalone
+ * MockMvc + real Thymeleaf setup rationale as {@code LoginControllerTest}.
  */
-class AccountSessionsControllerTest {
+class PlatformAccountSessionsControllerTest {
 
-  private static final UUID ORGANIZATION_ID = UUID.randomUUID();
-
-  private ListActiveSessionsForAccountUseCase listSessions;
-  private RevokeAccountSessionUseCase revokeSession;
-  private CurrentAccountResolver currentAccount;
-  private AccountId accountId;
+  private ListActiveSessionsForPlatformAccountUseCase listSessions;
+  private RevokePlatformAccountSessionUseCase revokeSession;
+  private CurrentPlatformAccountResolver currentPlatformAccount;
+  private PlatformAccountId platformAccountId;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
-    listSessions = mock(ListActiveSessionsForAccountUseCase.class);
-    revokeSession = mock(RevokeAccountSessionUseCase.class);
-    currentAccount = mock(CurrentAccountResolver.class);
-    accountId = AccountId.newId();
-    when(currentAccount.resolve(any())).thenReturn(Optional.of(accountId));
+    listSessions = mock(ListActiveSessionsForPlatformAccountUseCase.class);
+    revokeSession = mock(RevokePlatformAccountSessionUseCase.class);
+    currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
+    platformAccountId = PlatformAccountId.newId();
+    when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(platformAccountId));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -72,40 +69,38 @@ class AccountSessionsControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new AccountSessionsController(listSessions, revokeSession, currentAccount))
+                new PlatformAccountSessionsController(
+                    listSessions, revokeSession, currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
 
   @Test
-  void getRendersEveryLiveSessionForTheCurrentAccount() throws Exception {
-    ActiveAccountSession session =
-        new ActiveAccountSession(
+  void getRendersEveryLiveSessionForTheCurrentPlatformAccount() throws Exception {
+    ActivePlatformAccountSession session =
+        new ActivePlatformAccountSession(
             "session-1", "Mozilla/5.0", "1.2.3.4", Instant.now(), Instant.now());
     when(listSessions.handle(any())).thenReturn(List.of(session));
 
     mockMvc
-        .perform(get("/o/{organizationId}/account/sessions", ORGANIZATION_ID))
+        .perform(get("/platform/account/sessions"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/account/sessions"))
+        .andExpect(view().name("identity/platform/account-sessions"))
         .andExpect(model().attribute("sessions", List.of(session)));
   }
 
-  // TD-FUT-024: proves the friendly label actually reaches the rendered page, not just that
-  // UserAgentLabel's own unit tests pass in isolation — a real Thymeleaf render (see this class's
-  // own Javadoc), not a mocked view.
   @Test
   void getRendersAFriendlyDeviceLabelNotTheRawUserAgent() throws Exception {
     String chromeOnWindows =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
             + "Chrome/128.0.0.0 Safari/537.36";
-    ActiveAccountSession session =
-        new ActiveAccountSession(
+    ActivePlatformAccountSession session =
+        new ActivePlatformAccountSession(
             "session-1", chromeOnWindows, "1.2.3.4", Instant.now(), Instant.now());
     when(listSessions.handle(any())).thenReturn(List.of(session));
 
     mockMvc
-        .perform(get("/o/{organizationId}/account/sessions", ORGANIZATION_ID))
+        .perform(get("/platform/account/sessions"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Chrome on Windows")))
         .andExpect(
@@ -113,29 +108,24 @@ class AccountSessionsControllerTest {
   }
 
   @Test
-  void postRevokeDelegatesToTheUseCaseWithTheCurrentAccountAndRedirectsBackToTheList()
+  void postRevokeDelegatesToTheUseCaseWithTheCurrentPlatformAccountAndRedirectsBackToTheList()
       throws Exception {
     mockMvc
-        .perform(
-            post(
-                "/o/{organizationId}/account/sessions/{sessionId}/revoke",
-                ORGANIZATION_ID,
-                "session-1"))
+        .perform(post("/platform/account/sessions/{sessionId}/revoke", "session-1"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/sessions"));
+        .andExpect(redirectedUrl("/platform/account/sessions"));
 
-    verify(revokeSession).handle(new RevokeAccountSessionCommand(accountId, "session-1"));
+    verify(revokeSession)
+        .handle(new RevokePlatformAccountSessionCommand(platformAccountId, "session-1"));
   }
 
   @Test
   void postRevokeOnAnUnresolvableSessionStillRedirectsBackCleanly() throws Exception {
-    doThrow(new SessionNotFoundException("gone")).when(revokeSession).handle(any());
+    doThrow(new PlatformAccountSessionNotFoundException("gone")).when(revokeSession).handle(any());
 
     mockMvc
-        .perform(
-            post(
-                "/o/{organizationId}/account/sessions/{sessionId}/revoke", ORGANIZATION_ID, "gone"))
+        .perform(post("/platform/account/sessions/{sessionId}/revoke", "gone"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/sessions"));
+        .andExpect(redirectedUrl("/platform/account/sessions"));
   }
 }

@@ -16,6 +16,15 @@ import org.springframework.stereotype.Component;
  * PlatformAccountId}'s own string form) straight off the current {@link SecurityContext}, the same
  * source {@link PlatformAccountSessionRevokerBridge} keys its own {@code SessionRegistry} lookup
  * by.
+ *
+ * <p>TD-FUT-026 (closed 2026-09-02): identity-module's own same-shaped port, {@link
+ * IdentityCurrentPlatformAccountResolverBridge}, is a SEPARATE class, not this one implementing a
+ * second interface — {@code resolve(HttpServletRequest)} would then need two different return types
+ * on the exact same erasure ({@code Optional<UUID>} here vs. {@code Optional<PlatformAccountId>}
+ * there), which Java cannot express on one class. The auth-check logic itself is still duplicated
+ * across the two, deliberately — the alternative (one shared private helper returning {@code
+ * Optional<UUID>}, wrapped differently by each) was judged not worth the extra indirection for four
+ * lines of logic.
  */
 @Component
 class CurrentPlatformAccountResolverBridge implements CurrentPlatformAccountResolver {

@@ -157,6 +157,37 @@ class ResendMailSenderTest {
     assertThat(body.get("html").asString()).doesNotContain("<script>").contains("&lt;script&gt;");
   }
 
+  // TD-FUT-026: platform-tier mirror of sendsAWellFormedRequestForANewDeviceLoginNotification.
+  @Test
+  void sendsAWellFormedRequestForANewPlatformDeviceLoginNotification() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendNewPlatformDeviceLoginNotification(
+        "founder@example.com",
+        "Mozilla/5.0 Test Browser",
+        "203.0.113.5",
+        Instant.parse("2026-09-02T13:00:00Z"));
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("New sign-in to your Clavaris account");
+    assertThat(body.get("html").asString())
+        .contains("Mozilla/5.0 Test Browser")
+        .contains("203.0.113.5");
+  }
+
+  @Test
+  void escapesTheUserAgentAndIpBeforeInterpolatingThemIntoThePlatformNotificationHtml() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendNewPlatformDeviceLoginNotification(
+        "founder@example.com", "<script>alert(1)</script>", "1.2.3.4", Instant.now());
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("html").asString()).doesNotContain("<script>").contains("&lt;script&gt;");
+  }
+
   @Test
   void urlEncodesTheTokenInTheLinkItBuilds() {
     respondWith(200, "");

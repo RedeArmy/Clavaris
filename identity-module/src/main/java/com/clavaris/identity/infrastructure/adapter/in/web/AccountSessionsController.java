@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountQuery;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionCommand;
@@ -8,7 +9,9 @@ import com.clavaris.identity.application.usecase.revokeaccountsession.SessionNot
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,8 +59,21 @@ public class AccountSessionsController {
       final HttpServletRequest request,
       final Model model) {
     final AccountId accountId = requireCurrentAccount(request);
+    final List<ActiveAccountSession> sessions =
+        listSessions.handle(new ListActiveSessionsForAccountQuery(accountId));
+    model.addAttribute("sessions", sessions);
+    // TD-FUT-024: a parallel sessionId->label map, not a change to ActiveAccountSession itself —
+    // UserAgentLabel is a presentation concern (see its own Javadoc), and the application layer's
+    // query result stays exactly what it was, undecorated. Computed here, in Java, rather than via
+    // a template-side static-method call, for the same reason every other per-row computation on
+    // this page already happens here (see currentSessionId below) — plain, unit-testable Java.
     model.addAttribute(
-        "sessions", listSessions.handle(new ListActiveSessionsForAccountQuery(accountId)));
+        "friendlyDeviceLabels",
+        sessions.stream()
+            .collect(
+                Collectors.toMap(
+                    ActiveAccountSession::sessionId,
+                    session -> UserAgentLabel.friendly(session.userAgent()))));
     // Lets the template label/mark the row for the browser making this very request, without this
     // controller needing to duplicate any of ActiveAccountSession's own fields to identify it.
     final HttpSession currentSession = request.getSession(false);
