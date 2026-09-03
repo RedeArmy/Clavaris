@@ -4,6 +4,9 @@ import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDe
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -23,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SuppressWarnings("PMD.LongVariable")
 public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase {
 
+  private static final Logger LOG = LoggerFactory.getLogger(DispatchOutboxEventsService.class);
+
   private final OutboxEventReader outboxEvents;
   private final WebhookEndpointRepository endpoints;
   private final WebhookDeliveryRepository deliveries;
@@ -39,13 +44,24 @@ public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase 
     this.batchSizePerSource = batchSizePerSource;
   }
 
+  // PMD.GuardLogStatement false positives — the values logged are cheap in-memory accessors, same
+  // rationale as every other logging call site in this codebase (e.g.
+  // DeliverPendingWebhooksService's
+  // own identical suppression).
+  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public void dispatchPendingEvents() {
-    for (final OutboxEvent event : outboxEvents.claimUnpublishedBatch(batchSizePerSource)) {
-      for (final WebhookEndpoint endpoint :
+    final List<OutboxEvent> claimed = outboxEvents.claimUnpublishedBatch(batchSizePerSource);
+    if (claimed.isEmpty()) {
+      return;
+    }
+    LOG.info("event=webhook_dispatch_batch_claimed claimedCount={}", claimed.size());
+    for (final OutboxEvent event : claimed) {
+      final List<WebhookEndpoint> matchingEndpoints =
           endpoints.findActiveByOrganizationIdAndEventType(
-              event.organizationId(), event.eventType())) {
+              event.organizationId(), event.eventType());
+      for (final WebhookEndpoint endpoint : matchingEndpoints) {
         deliveries.save(
             WebhookDelivery.schedule(
                 endpoint.id(),
@@ -54,8 +70,22 @@ public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase 
                 event.aggregateType(),
                 event.aggregateId(),
                 event.eventType(),
-                event.payload()));
+                event.payload(),
+                event.traceId()));
       }
+      // Zero matches is the expected, common case for most events (no consumer has subscribed to
+      // this event type yet) — logged at debug, not warn, so it stays visible for tracing an
+      // individual event end to end without flooding production logs on every scheduler tick.
+      // traceId included so a request's own log lines (app tier) and this dispatch line can be
+      // correlated even when the dispatcher tick runs long after the original request returned.
+      LOG.debug(
+          "event=webhook_dispatch_fanned_out outboxEventId={} organizationId={} eventType={}"
+              + " matchedEndpointCount={} traceId={}",
+          event.id(),
+          event.organizationId(),
+          event.eventType(),
+          matchingEndpoints.size(),
+          event.traceId());
       outboxEvents.markPublished(event);
     }
   }

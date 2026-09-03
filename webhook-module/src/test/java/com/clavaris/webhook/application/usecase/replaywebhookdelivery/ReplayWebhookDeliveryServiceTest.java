@@ -2,8 +2,11 @@ package com.clavaris.webhook.application.usecase.replaywebhookdelivery;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
@@ -35,7 +38,8 @@ class ReplayWebhookDeliveryServiceTest {
                 "Account",
                 UUID.randomUUID(),
                 "account.created",
-                "{}")
+                "{}",
+                null)
             .recordFailure(500, "boom", Instant.now(), null);
     when(deliveries.findById(exhausted.id())).thenReturn(Optional.of(exhausted));
 
@@ -56,6 +60,70 @@ class ReplayWebhookDeliveryServiceTest {
     ReplayWebhookDeliveryCommand command = new ReplayWebhookDeliveryCommand(unknownId, ACTOR);
 
     assertThatExceptionOfType(WebhookDeliveryNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+  }
+
+  @Test
+  void resetsASucceededDeliveryBackToPending() {
+    WebhookDelivery succeeded =
+        WebhookDelivery.schedule(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Account",
+                UUID.randomUUID(),
+                "account.created",
+                "{}",
+                null)
+            .recordSuccess(200, Instant.now());
+    when(deliveries.findById(succeeded.id())).thenReturn(Optional.of(succeeded));
+
+    WebhookDelivery result =
+        service.handle(new ReplayWebhookDeliveryCommand(succeeded.id(), ACTOR));
+
+    assertThat(result.status()).isEqualTo(WebhookDeliveryStatus.PENDING);
+  }
+
+  @Test
+  void rejectsReplayOfAPendingDelivery_stillOwnedByTheOrdinaryRetryEngine() {
+    WebhookDelivery pending =
+        WebhookDelivery.schedule(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null);
+    when(deliveries.findById(pending.id())).thenReturn(Optional.of(pending));
+    ReplayWebhookDeliveryCommand command = new ReplayWebhookDeliveryCommand(pending.id(), ACTOR);
+
+    assertThatExceptionOfType(WebhookDeliveryNotReplayableException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(deliveries, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void rejectsReplayOfAFailedDeliveryStillAwaitingItsOwnBackoff() {
+    WebhookDelivery failedNotYetDue =
+        WebhookDelivery.schedule(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Account",
+                UUID.randomUUID(),
+                "account.created",
+                "{}",
+                null)
+            .recordFailure(500, "boom", Instant.now(), Instant.now().plusSeconds(3600));
+    when(deliveries.findById(failedNotYetDue.id())).thenReturn(Optional.of(failedNotYetDue));
+    ReplayWebhookDeliveryCommand command =
+        new ReplayWebhookDeliveryCommand(failedNotYetDue.id(), ACTOR);
+
+    assertThatExceptionOfType(WebhookDeliveryNotReplayableException.class)
         .isThrownBy(() -> service.handle(command));
   }
 }

@@ -40,7 +40,8 @@ class ListWebhookDeliveriesControllerTest {
             "Account",
             UUID.randomUUID(),
             "account.created",
-            "{}");
+            "{}",
+            null);
     when(useCase.handle(any())).thenReturn(List.of(delivery));
 
     mockMvc

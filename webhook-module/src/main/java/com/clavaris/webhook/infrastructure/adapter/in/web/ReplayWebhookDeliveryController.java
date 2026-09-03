@@ -4,6 +4,7 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryCommand;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryUseCase;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotFoundException;
+import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotReplayableException;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +36,11 @@ class ReplayWebhookDeliveryController {
   @Operation(summary = "Manually re-trigger one past WebhookDelivery (BR-WEBHOOK-03)")
   @ApiResponse(responseCode = "200", description = "Reset to PENDING, due immediately")
   @ApiResponse(responseCode = "404", description = "No WebhookDelivery exists with this id")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "The delivery is not in a terminal state (SUCCEEDED/EXHAUSTED) — it's still owned by"
+              + " the ordinary retry engine, replaying it now could double-deliver")
   @PostMapping("/api/v1/admin/webhook-endpoints/{endpointId}/deliveries/{deliveryId}:replay")
   /* package */ ResponseEntity<WebhookDeliveryResponse> replay(
       @PathVariable final UUID endpointId,
@@ -48,6 +54,8 @@ class ReplayWebhookDeliveryController {
                   deliveryId, AuditActor.platformClient(authentication.getName())));
     } catch (final WebhookDeliveryNotFoundException _) {
       return ResponseEntity.notFound().build();
+    } catch (final WebhookDeliveryNotReplayableException _) {
+      return ResponseEntity.status(409).build();
     }
     return ResponseEntity.ok(WebhookDeliveryResponse.from(replayed));
   }

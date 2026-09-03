@@ -7,6 +7,7 @@ import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import com.clavaris.webhook.domain.service.WebhookRetrySchedule;
 import com.clavaris.webhook.domain.service.WebhookSignature;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,7 +78,14 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
       // No hard-delete use case exists for WebhookEndpoint (deactivate/reactivate only) — this
       // should never happen in practice, but a delivery whose endpoint has vanished has nowhere
       // left to go; fail it terminally rather than retrying forever against nothing.
-      LOG.warn("event=webhook_delivery_endpoint_missing deliveryId={}", delivery.id());
+      LOG.warn(
+          "event=webhook_delivery_endpoint_missing deliveryId={} endpointId={} organizationId={}"
+              + " outboxEventId={} traceId={}",
+          delivery.id(),
+          delivery.endpointId(),
+          delivery.organizationId(),
+          delivery.outboxEventId(),
+          delivery.traceId());
       deliveries.save(
           delivery.recordFailure(null, "endpoint no longer exists", Instant.now(), null));
       return;
@@ -86,22 +94,43 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     final Instant now = Instant.now();
     final List<String> rawSecrets =
         endpoint.get().activeSecretsEncrypted(now).stream().map(cipher::decrypt).toList();
-    final Map<String, String> headers =
-        Map.of(
-            "Content-Type", "application/json",
-            "Clavaris-Signature", WebhookSignature.header(now, delivery.payload(), rawSecrets),
-            "Clavaris-Event-Type", delivery.eventType(),
-            "Clavaris-Event-Id", delivery.outboxEventId().toString());
+    // Clavaris-Delivery-Id: this row's own id, distinct from Clavaris-Event-Id (the outbox
+    // event's own stable id, unchanged across retries and shared by every endpoint one event fans
+    // out to). A consumer never needs it to dedupe — Clavaris-Event-Id already does that — but it
+    // lets a consumer's own support ticket ("delivery XYZ never arrived") be handed straight to
+    // GET .../webhook-endpoints/{id}/deliveries/{deliveryId} without first cross-referencing by
+    // event id and timestamp.
+    // Mutable map, not Map.of(...): Clavaris-Trace-Id is added conditionally below (traceId is
+    // legitimately null for any delivery whose source event predates this column or wasn't
+    // written on a traced thread), and Map.of(...) has no null-tolerant "put if present" form.
+    final Map<String, String> headers = new HashMap<>();
+    headers.put("Content-Type", "application/json");
+    headers.put("Clavaris-Signature", WebhookSignature.header(now, delivery.payload(), rawSecrets));
+    headers.put("Clavaris-Event-Type", delivery.eventType());
+    headers.put("Clavaris-Event-Id", delivery.outboxEventId().toString());
+    headers.put("Clavaris-Delivery-Id", delivery.id().toString());
+    // Clavaris-Trace-Id: lets a consumer's own support ticket be cross-referenced against
+    // Clavaris's own request logs for the original action that triggered this delivery, end to
+    // end — SDE-III traceability review; see WebhookDelivery's own Javadoc for why this can be
+    // absent.
+    if (delivery.traceId() != null) {
+      headers.put("Clavaris-Trace-Id", delivery.traceId());
+    }
 
     final WebhookDeliveryOutcome outcome =
         sender.send(endpoint.get().url(), headers, delivery.payload());
 
     if (outcome.success()) {
       LOG.info(
-          "event=webhook_delivery_succeeded deliveryId={} endpointId={} statusCode={}",
+          "event=webhook_delivery_succeeded deliveryId={} endpointId={} organizationId={}"
+              + " outboxEventId={} eventType={} statusCode={} traceId={}",
           delivery.id(),
           delivery.endpointId(),
-          outcome.statusCode());
+          delivery.organizationId(),
+          delivery.outboxEventId(),
+          delivery.eventType(),
+          outcome.statusCode(),
+          delivery.traceId());
       deliveries.save(delivery.recordSuccess(outcome.statusCode(), now));
       return;
     }
@@ -122,13 +151,19 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
             ? null
             : now.plus(WebhookRetrySchedule.nextDelay(attemptCountAfterThisFailure, jitterFactor));
     LOG.warn(
-        "event=webhook_delivery_failed deliveryId={} endpointId={} attemptCount={} exhausted={}"
-            + " statusCode={}",
+        "event=webhook_delivery_failed deliveryId={} endpointId={} organizationId={}"
+            + " outboxEventId={} eventType={} attemptCount={} exhausted={} statusCode={}"
+            + " errorMessage={} traceId={}",
         delivery.id(),
         delivery.endpointId(),
+        delivery.organizationId(),
+        delivery.outboxEventId(),
+        delivery.eventType(),
         attemptCountAfterThisFailure,
         exhausted,
-        outcome.statusCode());
+        outcome.statusCode(),
+        outcome.errorMessage(),
+        delivery.traceId());
     deliveries.save(
         delivery.recordFailure(outcome.statusCode(), outcome.errorMessage(), now, nextAttemptAt));
   }

@@ -29,7 +29,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * contract) via this module's independently-owned read-side entities, never a mocked port. This
  * module deliberately doesn't depend on either producer module, so {@code event_outbox}/{@code
  * organization_event_outbox} are created here by hand, matching their real migrations' final shape
- * (post {@code V20260902110000}/{@code V20260902110001}) exactly — not by pulling in those modules'
+ * (post {@code V20260902140000}/{@code V20260902140001}) exactly — not by pulling in those modules'
  * own Flyway migrations, which would reintroduce the very dependency ADR-0007 §1 forbids.
  */
 @SpringBootTest(classes = JpaOutboxEventReaderTest.TestConfig.class)
@@ -49,11 +49,13 @@ class JpaOutboxEventReaderTest {
         "create table if not exists event_outbox ("
             + "id uuid primary key, organization_id uuid not null, aggregate_type varchar(100) not"
             + " null, aggregate_id uuid not null, event_type varchar(100) not null, payload text,"
+            + " trace_id varchar(32),"
             + " occurred_at timestamptz not null default now(), published_at timestamptz)");
     jdbcTemplate.execute(
         "create table if not exists organization_event_outbox ("
             + "id uuid primary key, organization_id uuid not null, aggregate_type varchar(100) not"
             + " null, aggregate_id uuid not null, event_type varchar(100) not null, payload text,"
+            + " trace_id varchar(32),"
             + " occurred_at timestamptz not null default now(), published_at timestamptz)");
   }
 
@@ -114,6 +116,23 @@ class JpaOutboxEventReaderTest {
             "select published_at from organization_event_outbox where id = ?", Instant.class, id);
     assertThat(publishedAt).isNotNull();
     assertThat(reader.claimUnpublishedBatch(10)).isEmpty();
+  }
+
+  @Test
+  void claimUnpublishedBatchReadsTheTraceIdWhenTheSourceRowCarriesOne() {
+    UUID id = UUID.randomUUID();
+    jdbcTemplate.update(
+        "insert into event_outbox (id, organization_id, aggregate_type, aggregate_id, event_type,"
+            + " payload, trace_id, occurred_at) values (?, ?, 'Account', ?, ?, '{}', ?, now())",
+        id,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "account.created",
+        "trace-abc123");
+
+    OutboxEvent claimed = reader.claimUnpublishedBatch(10).get(0);
+
+    assertThat(claimed.traceId()).isEqualTo("trace-abc123");
   }
 
   private UUID insertIdentityOutboxRow(final UUID organizationId, final String eventType) {

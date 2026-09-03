@@ -24,6 +24,14 @@ import java.util.UUID;
  * rules are the same false positives {@code WebhookEndpoint}'s own identical suppression already
  * documents — the deliberate record-style accessor convention this codebase's value objects use
  * throughout, and every field name here is the exact term for what it holds, not arbitrarily long.
+ *
+ * <p>{@code traceId} (end-to-end traceability, SDE-III webhook review): the distributed-tracing id
+ * of the original inbound request that produced the source outbox row, captured once at {@code
+ * schedule}-time via {@code OutboxEvent#traceId()} and carried unchanged through every subsequent
+ * copy-on-write mutation ({@code lease}/{@code recordSuccess}/{@code recordFailure}/{@code
+ * resetForReplay} never change it) — never re-derived, since none of those later steps run on the
+ * original request's own thread. {@code null} for any row whose source event predates this column,
+ * or was written outside a traced request (e.g. a scheduled job) — always treat it as optional.
  */
 @SuppressWarnings({
   "PMD.DataClass",
@@ -43,6 +51,7 @@ public final class WebhookDelivery {
   private final UUID aggregateId;
   private final String eventType;
   private final String payload;
+  private final String traceId;
   private final WebhookDeliveryStatus status;
   private final int attemptCount;
   private final Instant nextAttemptAt;
@@ -61,6 +70,7 @@ public final class WebhookDelivery {
       final UUID aggregateId,
       final String eventType,
       final String payload,
+      final String traceId,
       final WebhookDeliveryStatus status,
       final int attemptCount,
       final Instant nextAttemptAt,
@@ -76,6 +86,7 @@ public final class WebhookDelivery {
     this.aggregateId = aggregateId;
     this.eventType = eventType;
     this.payload = payload;
+    this.traceId = traceId;
     this.status = Objects.requireNonNull(status, "status must not be null");
     this.attemptCount = attemptCount;
     this.nextAttemptAt = nextAttemptAt;
@@ -85,6 +96,7 @@ public final class WebhookDelivery {
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
   }
 
+  @SuppressWarnings("java:S107")
   public static WebhookDelivery schedule(
       final UUID endpointId,
       final UUID organizationId,
@@ -92,7 +104,8 @@ public final class WebhookDelivery {
       final String aggregateType,
       final UUID aggregateId,
       final String eventType,
-      final String payload) {
+      final String payload,
+      final String traceId) {
     final Instant now = Instant.now();
     return new WebhookDelivery(
         UUID.randomUUID(),
@@ -103,6 +116,7 @@ public final class WebhookDelivery {
         aggregateId,
         eventType,
         payload,
+        traceId,
         WebhookDeliveryStatus.PENDING,
         0,
         now,
@@ -123,6 +137,7 @@ public final class WebhookDelivery {
       final UUID aggregateId,
       final String eventType,
       final String payload,
+      final String traceId,
       final WebhookDeliveryStatus status,
       final int attemptCount,
       final Instant nextAttemptAt,
@@ -139,6 +154,7 @@ public final class WebhookDelivery {
         aggregateId,
         eventType,
         payload,
+        traceId,
         status,
         attemptCount,
         nextAttemptAt,
@@ -164,6 +180,7 @@ public final class WebhookDelivery {
         aggregateId,
         eventType,
         payload,
+        traceId,
         status,
         attemptCount,
         leaseUntil,
@@ -183,6 +200,7 @@ public final class WebhookDelivery {
         aggregateId,
         eventType,
         payload,
+        traceId,
         WebhookDeliveryStatus.SUCCEEDED,
         attemptCount + 1,
         null,
@@ -213,6 +231,7 @@ public final class WebhookDelivery {
         aggregateId,
         eventType,
         payload,
+        traceId,
         nextAttemptAt == null ? WebhookDeliveryStatus.EXHAUSTED : WebhookDeliveryStatus.FAILED,
         attemptCount + 1,
         nextAttemptAt,
@@ -238,6 +257,7 @@ public final class WebhookDelivery {
         aggregateId,
         eventType,
         payload,
+        traceId,
         WebhookDeliveryStatus.PENDING,
         attemptCount,
         now,
@@ -277,6 +297,10 @@ public final class WebhookDelivery {
 
   public String payload() {
     return payload;
+  }
+
+  public String traceId() {
+    return traceId;
   }
 
   public WebhookDeliveryStatus status() {

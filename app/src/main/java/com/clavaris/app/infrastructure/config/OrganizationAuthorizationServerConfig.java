@@ -130,6 +130,85 @@ class OrganizationAuthorizationServerConfig {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
+  // TD-NEW-1 (SDE-III complexity review, 2026-09-02): the three helpers below factor out
+  // organizationAuthorizationServerSecurityFilterChain's own pre-DSL object construction — each is
+  // a genuinely self-contained sub-assembly with a narrow, explicit input/output (JWKS/decoder,
+  // token-generation pipeline, authorization service), not a fragment of the surrounding wiring.
+  // Deliberately NOT extracted: the @Bean method's own parameter list, and the
+  // http.securityMatcher(...) fluent DSL chain itself — this class's own Javadoc above already
+  // explains why splitting either of those would be the wrong move (the parameter list IS the
+  // point: one bean, ~20 legitimately distinct SAS/Spring Security collaborators; the DSL chain IS
+  // the SecurityFilterChain assembly, the one thing this bean unavoidably exists to produce). This
+  // extraction only shortens the method body's own construction boilerplate, a different axis from
+  // the coupling/parameter-count concern that Javadoc defends.
+
+  /**
+   * The dynamic, per-request-resolved JWKS pair (TD-SEC-008) plus the {@code /userinfo} decoder
+   * built on top of the publishing one — see the call site's own Javadoc for why signing and
+   * publishing deliberately stay two different {@link JWKSource} instances.
+   */
+  private static JwtDecoderAndJwkSources buildJwksAndUserInfoDecoder(
+      final SigningKeyRepository signingKeys,
+      final OrganizationSigningKeyMaterialFactory keyMaterial,
+      final Duration jwksOverlapDuration) {
+    final JWKSource<SecurityContext> signingJwkSource =
+        new OrganizationScopedJwkSource(signingKeys, keyMaterial);
+    final JWKSource<SecurityContext> jwksPublishingSource =
+        new OrganizationJwksPublishingSource(signingKeys, keyMaterial, jwksOverlapDuration);
+    final NimbusJwtDecoder userInfoJwtDecoder =
+        NimbusJwtDecoder.withJwkSource(jwksPublishingSource).build();
+    userInfoJwtDecoder.setJwtValidator(
+        new DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefault(), new OrganizationJwtIssuerValidator()));
+    return new JwtDecoderAndJwkSources(signingJwkSource, jwksPublishingSource, userInfoJwtDecoder);
+  }
+
+  /** {@code signingJwkSource}, {@code jwksPublishingSource}, {@code userInfoJwtDecoder} bundled. */
+  private record JwtDecoderAndJwkSources(
+      JWKSource<SecurityContext> signingJwkSource,
+      JWKSource<SecurityContext> jwksPublishingSource,
+      NimbusJwtDecoder userInfoJwtDecoder) {}
+
+  /**
+   * ADR-0016/Workspace-feature/TD-SEC-016 token-issuance pipeline: one {@link JwtEncoder}, every
+   * ID-/access-token claims customizer composed into {@code JwtGenerator}'s single customizer slot
+   * (see the call site's own Javadoc for why they can't be set as separate calls), and BR-ID-03's
+   * refresh-token fallback wired via {@link DelegatingOAuth2TokenGenerator}.
+   */
+  private static OAuth2TokenGenerator<?> buildTokenGenerator(
+      final JWKSource<SecurityContext> signingJwkSource,
+      final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
+      final WorkspaceMembershipRepository workspaceMemberships,
+      final IssueRefreshTokenUseCase issueRefreshToken) {
+    final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
+    final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
+    final AuthenticationContextClaimsCustomizer authenticationContextClaims =
+        new AuthenticationContextClaimsCustomizer();
+    final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
+        new WorkspaceRoleClaimsCustomizer(workspaceMemberships);
+    jwtGenerator.setJwtCustomizer(
+        context -> {
+          tokenIssuanceLogger.customize(context);
+          authenticationContextClaims.customize(context);
+          workspaceRoleClaims.customize(context);
+        });
+    return new DelegatingOAuth2TokenGenerator(
+        jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
+  }
+
+  /**
+   * TD-SEC-003/TD-SEC-019: the JDBC-backed, HMAC-hashed {@link OAuth2AuthorizationService} shared
+   * by both this tier's {@code /authorize} and {@code /token} — see the call site's own Javadoc for
+   * why this tier (unlike the platform one) has BR-ID-03 refresh-token survivability at stake.
+   */
+  private static OAuth2AuthorizationService buildAuthorizationService(
+      final JdbcTemplate jdbcTemplate,
+      final RegisteredClientRepository registeredClients,
+      final BearerTokenHasher bearerTokenHasher) {
+    return new HashedTokenOAuth2AuthorizationService(
+        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
+  }
+
   // Explicit, named bean — not left to whatever HttpSecurity's own default resolution would pick —
   // so this chain's SecurityContextHolderFilter and SpringSecurityAuthenticatedSessionEstablisher
   // (which persists the context from plain controller code, not a filter) provably agree on the
@@ -227,13 +306,7 @@ class OrganizationAuthorizationServerConfig {
     // active key) feeds the encoder that signs new tokens; jwksPublishingSource (active + every
     // still-in-overlap-window retired key) is what setSharedObject registers, which is what the
     // JWKS endpoint filter itself actually resolves and serializes.
-    final JWKSource<SecurityContext> signingJwkSource =
-        new OrganizationScopedJwkSource(signingKeys, keyMaterial);
-    final JWKSource<SecurityContext> jwksPublishingSource =
-        new OrganizationJwksPublishingSource(
-            signingKeys, keyMaterial, Duration.ofHours(jwksOverlapHours));
-    http.setSharedObject(JWKSource.class, jwksPublishingSource);
-
+    //
     // TD-SEC-028: OidcUserInfoEndpointFilter (registered by .oidc(...) below) reads a
     // JwtAuthenticationToken from SecurityContextHolder, populated by resource-server Bearer-token
     // authentication — SAS's own OAuth2AuthorizationServerConfigurer.init() DOES wire
@@ -241,50 +314,27 @@ class OrganizationAuthorizationServerConfig {
     // is enabled (decompiled confirmation), but that default customizer expects a JwtDecoder bean
     // to already exist — none did anywhere in this app, so /userinfo requests never authenticated
     // and always fell through to a 401, unnoticed because nothing had ever called it with a real
-    // token. Reuses jwksPublishingSource, not signingJwkSource — a Bearer token presented here may
-    // have been signed under a since-rotated key still inside its overlap window (TD-SEC-008), the
-    // exact case jwksPublishingSource exists to keep verifiable. Explicitly re-set (not left at
-    // JwtValidators.createDefault(), the timestamp-only default) with a delegating validator adding
-    // OrganizationJwtIssuerValidator — defense in depth on top of the already-structural guarantee
-    // that a cross-tenant token's kid never resolves in a different Organization's own JWKS.
-    final NimbusJwtDecoder userInfoJwtDecoder =
-        NimbusJwtDecoder.withJwkSource(jwksPublishingSource).build();
-    userInfoJwtDecoder.setJwtValidator(
-        new DelegatingOAuth2TokenValidator<>(
-            JwtValidators.createDefault(), new OrganizationJwtIssuerValidator()));
+    // token. userInfoJwtDecoder reuses jwksPublishingSource, not signingJwkSource — a Bearer token
+    // presented here may have been signed under a since-rotated key still inside its overlap
+    // window (TD-SEC-008), the exact case jwksPublishingSource exists to keep verifiable.
+    // Explicitly re-set (not left at JwtValidators.createDefault(), the timestamp-only default)
+    // with a delegating validator adding OrganizationJwtIssuerValidator — defense in depth on top
+    // of the already-structural guarantee that a cross-tenant token's kid never resolves in a
+    // different Organization's own JWKS.
+    final JwtDecoderAndJwkSources jwksAndDecoder =
+        buildJwksAndUserInfoDecoder(signingKeys, keyMaterial, Duration.ofHours(jwksOverlapHours));
+    http.setSharedObject(JWKSource.class, jwksAndDecoder.jwksPublishingSource());
+    final NimbusJwtDecoder userInfoJwtDecoder = jwksAndDecoder.userInfoJwtDecoder();
 
-    final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
-    final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
-    // ADR-0016: ISO/IEC 29115 acr/amr claims on every ID token — see this customizer's own Javadoc
-    // for why it's constructed directly here rather than as a second Spring-managed
-    // OAuth2TokenCustomizer<JwtEncodingContext> bean.
-    final AuthenticationContextClaimsCustomizer authenticationContextClaims =
-        new AuthenticationContextClaimsCustomizer();
-    // Workspace feature follow-up: workspace_id/workspace_role claims, on both the ID token and
-    // the access token (so /userinfo carries them too) — see this customizer's own Javadoc for the
-    // full rationale. Same hand-constructed, not-a-second-@Component-bean pattern as
-    // authenticationContextClaims above, for the same reason.
-    final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
-        new WorkspaceRoleClaimsCustomizer(workspaceMemberships);
-    // TD-SEC-016: every token any Organization issues (client_credentials and, far more commonly,
-    // the interactive Authorization Code flow's access + ID tokens) gets a structured
-    // event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc. JwtGenerator has
-    // exactly one customizer slot, so every claims customizer above is composed into the same
-    // lambda rather than a second setJwtCustomizer(...) call, which would just silently overwrite
-    // the previous one.
-    jwtGenerator.setJwtCustomizer(
-        context -> {
-          tokenIssuanceLogger.customize(context);
-          authenticationContextClaims.customize(context);
-          workspaceRoleClaims.customize(context);
-        });
-    // BR-ID-03: the initial-issuance half of refresh-token support — JwtGenerator returns null
-    // for the non-JWT REFRESH_TOKEN token type, so DelegatingOAuth2TokenGenerator falls through
-    // to SessionBackedRefreshTokenGenerator for exactly that case, and only that case (see its
-    // own Javadoc for why AUTHORIZATION_CODE-only scoping matters here).
+    // ADR-0016 (acr/amr) + Workspace feature (workspace_id/workspace_role, ID and access tokens
+    // alike) + TD-SEC-016 (event=token_issued) + BR-ID-03 (refresh-token fallback) — see
+    // buildTokenGenerator's own Javadoc for the full per-claim rationale.
     final OAuth2TokenGenerator<?> tokenGenerator =
-        new DelegatingOAuth2TokenGenerator(
-            jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
+        buildTokenGenerator(
+            jwksAndDecoder.signingJwkSource(),
+            tokenIssuanceLogger,
+            workspaceMemberships,
+            issueRefreshToken);
 
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
@@ -297,10 +347,8 @@ class OrganizationAuthorizationServerConfig {
     // TD-SEC-019: wrapped, not passed to .authorizationService(...) directly — every bearer token
     // value this tier ever writes here is HMAC-hashed before it reaches Postgres. See
     // HashedTokenOAuth2AuthorizationService's own Javadoc for the full design.
-    @SuppressWarnings("PMD.LongVariable")
     final OAuth2AuthorizationService authorizationService =
-        new HashedTokenOAuth2AuthorizationService(
-            new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
+        buildAuthorizationService(jdbcTemplate, registeredClients, bearerTokenHasher);
 
     http.securityMatcher(
             "/o/*/oauth2/**",
