@@ -23,11 +23,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * no {@code organization_id} to aggregate by at all, so this layer structurally doesn't apply
  * there.
  *
- * <p>Reads {@link RateLimitPolicyRepository} on every matched request rather than caching — correct
- * and simple first, matching this codebase's own "don't build a caching layer before real traffic
- * justifies one" precedent ({@code common} module, TD-ARCH-001, is still deliberately empty for the
- * same reason). A short-TTL cache is a natural follow-up once Organization count/request volume
- * makes one DB read per request measurably expensive, not before.
+ * <p>TD-FUT-012 (closed 2026-09-02): reads {@link RateLimitPolicyRepository} on every matched
+ * request, same as before — but the bean actually injected here is now {@link
+ * CachingRateLimitPolicyRepository}, a short-TTL, write-through in-memory cache in front of the
+ * real Postgres read, not this filter's own concern. This filter's code is unchanged by that fix on
+ * purpose: it depends only on the port, exactly as hexagonal architecture intends, so the caching
+ * decision could be made entirely at the composition-root/adapter level with zero changes here.
  */
 @SuppressWarnings("PMD.LongVariable")
 final class OrganizationCapacityRateLimitingFilter extends OncePerRequestFilter {
