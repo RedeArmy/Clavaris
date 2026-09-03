@@ -12,6 +12,10 @@ interface SpringDataSigningKeyJpaRepository extends JpaRepository<SigningKeyEnti
 
   Optional<SigningKeyEntity> findFirstByOrganizationIdAndRetiredAtIsNull(UUID organizationId);
 
+  // TD-SEC-029: a plain AND, unlike findActiveAndRetiredSince below — no ambiguity for Spring
+  // Data's own derivation to get wrong.
+  Optional<SigningKeyEntity> findFirstByOrganizationIdAndKid(UUID organizationId, String kid);
+
   // TD-SEC-008: retiredAt IS NULL (the active key) OR retiredAt > retiredAfter (still within the
   // overlap window) — an explicit @Query, not a derived findByXAndYOrZ method name: Spring Data's
   // own derivation parses "AndYOrZ" as (X AND Y) OR Z, left to right, with no way to express the

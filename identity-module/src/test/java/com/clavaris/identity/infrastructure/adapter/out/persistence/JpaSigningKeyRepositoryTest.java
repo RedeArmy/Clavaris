@@ -173,6 +173,39 @@ class JpaSigningKeyRepositoryTest {
         .isEmpty();
   }
 
+  // TD-SEC-029: findByKid must find a key regardless of active/retired state — the emergency
+  // purge needs to be able to target an already-rotated-away key discovered compromised after
+  // the fact, not just the currently active one.
+  @Test
+  void findByKidFindsBothAnActiveAndAnAlreadyRetiredKey() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    SigningKey active = SigningKey.activate(organizationId, "active-kid", "RS256");
+    SigningKey retired = SigningKey.activate(organizationId, "retired-kid", "RS256");
+    retired.retire();
+    repository.save(active);
+    repository.save(retired);
+
+    assertThat(repository.findByKid(organizationId, "active-kid")).isPresent();
+    assertThat(repository.findByKid(organizationId, "retired-kid")).isPresent();
+  }
+
+  @Test
+  void findByKidIsScopedToOneOrganizationOnly() {
+    OrganizationId first = new OrganizationId(UUID.randomUUID());
+    OrganizationId second = new OrganizationId(UUID.randomUUID());
+    repository.save(SigningKey.activate(first, "shared-looking-kid", "RS256"));
+
+    assertThat(repository.findByKid(first, "shared-looking-kid")).isPresent();
+    assertThat(repository.findByKid(second, "shared-looking-kid")).isEmpty();
+  }
+
+  @Test
+  void findByKidIsEmptyForAnUnknownKid() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    assertThat(repository.findByKid(organizationId, "never-registered-kid")).isEmpty();
+  }
+
   // @Import, not @ComponentScan: this package also holds JpaPlatformSigningKeyRepositoryTest's
   // own nested TestConfig (same class shape, same package) — confirmed live that scanning the
   // whole package picks up that sibling test's @Configuration too and double-registers its

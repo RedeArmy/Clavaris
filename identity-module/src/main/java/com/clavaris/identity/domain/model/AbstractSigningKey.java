@@ -70,6 +70,24 @@ abstract class AbstractSigningKey {
     this.retiredAt = Instant.now();
   }
 
+  /**
+   * TD-SEC-029: emergency, zero-overlap purge for a <b>confirmed</b> compromise — unlike {@link
+   * #retire()} (which lets JWKS keep publishing this key for the normal overlap window), this
+   * backdates {@code retiredAt} far enough into the past that {@code
+   * SigningKeyRepository#findActiveAndRetiredSince}'s own overlap-window filter excludes it on the
+   * very next JWKS read, regardless of the configured overlap duration ({@code
+   * clavaris.signing-key.jwks-overlap-hours}). No new mechanism on the JWKS-serving side was needed
+   * — that filter already excludes any key retired before its own cutoff; this method only chooses
+   * a cutoff-proof timestamp. The accepted, deliberate cost: any legitimate, still-valid token
+   * signed under this key stops verifying immediately too — the trade this operation exists to make
+   * when the alternative (an attacker's own forged tokens continuing to verify for the rest of the
+   * overlap window) is worse. See {@code incident-response-signing-key-compromise.md} §3.6 for when
+   * to reach for this instead of plain {@link #retire()}.
+   */
+  public final void purgeImmediately() {
+    this.retiredAt = Instant.EPOCH;
+  }
+
   public final UUID id() {
     return id;
   }

@@ -24,6 +24,14 @@ public interface SigningKeyRepository {
    */
   List<SigningKey> findActiveAndRetiredSince(OrganizationId organizationId, Instant retiredAfter);
 
+  /**
+   * TD-SEC-029: the specific key by {@code kid}, active or already retired, regardless of any
+   * overlap window — unlike {@link #findActiveAndRetiredSince}, which is scoped to what JWKS should
+   * still publish, an emergency purge must be able to target a key that's already outside that
+   * window too (e.g. an old, already-rotated-away key discovered compromised after the fact).
+   */
+  Optional<SigningKey> findByKid(OrganizationId organizationId, String kid);
+
   void save(SigningKey signingKey);
 
   /**

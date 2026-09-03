@@ -34,6 +34,29 @@ class SigningKeyTest {
   }
 
   @Test
+  void purgeImmediatelyRetiresTheKeyToATimestampFarInThePast() {
+    // TD-SEC-029: unlike retire() (timestamped "now", giving the normal overlap window), an
+    // emergency purge must land outside any real overlap window immediately — asserting a fixed
+    // upper bound (not just "before now") is what actually proves that, since "before now" would
+    // also be true of a plain retire() called a moment ago.
+    SigningKey key = SigningKey.activate(organizationId, "a-kid", "RS256");
+
+    key.purgeImmediately();
+
+    assertThat(key.retiredAt()).contains(Instant.EPOCH);
+  }
+
+  @Test
+  void purgeImmediatelyOverridesAPriorNormalRetirement() {
+    SigningKey key = SigningKey.activate(organizationId, "a-kid", "RS256");
+    key.retire();
+
+    key.purgeImmediately();
+
+    assertThat(key.retiredAt()).contains(Instant.EPOCH);
+  }
+
+  @Test
   void reconstituteKeepsTheRealPersistedIdRatherThanMintingANewOne() {
     // Same bug class already caught once in JpaAccountRepository's own history.
     UUID persistedId = UUID.randomUUID();
