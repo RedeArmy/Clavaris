@@ -118,8 +118,8 @@ class PlatformAuthorizationServerConfig {
     // TD-SEC-016: every token this tier issues (platform-tier client_credentials only) gets a
     // structured event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc.
     // ADR-0023: composed with organizationClientClaimCustomizer, same "chain a second customizer"
-    // precedent ImpersonationTokenIssuer's own tokenIssuanceLogger.customize(context);
-    // addImpersonationClaims(...) composition already establishes.
+    // precedent ImpersonationTokenIssuer's own composition of tokenIssuanceLogger.customize(...)
+    // and addImpersonationClaims(...) already establishes.
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);

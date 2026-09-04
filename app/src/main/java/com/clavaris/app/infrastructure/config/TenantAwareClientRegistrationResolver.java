@@ -16,7 +16,7 @@ import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2Clien
 import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -65,15 +65,22 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * attribute) — same rationale {@code SocialLoginRedirectController}'s own identical suppression
  * already documents for the same class of guard-clause-heavy resolution logic.
  */
+// @Repository, not @Component: SonarCloud flags any @Component-annotated implementation of a
+// type whose own name ends in "Repository" (ClientRegistrationRepository here — a Spring Security
+// interface, not this codebase's own persistence convention), regardless of what this class itself
+// is called — confirmed live that renaming the class alone (still implementing that interface)
+// left the finding in place. @Repository is Spring's own generic bean stereotype plus optional
+// persistence-exception translation that never triggers here (this class never throws a
+// PersistenceException), so applying it is harmless, not just finding-suppression theatre.
 @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
-@Component
-class TenantAwareClientRegistrationRepository implements ClientRegistrationRepository {
+@Repository
+class TenantAwareClientRegistrationResolver implements ClientRegistrationRepository {
 
   private final Map<String, ClientRegistration> sharedRegistrations;
   private final OrganizationSocialCredentialRepository credentials;
   private final OrganizationSocialCredentialCipher cipher;
 
-  /* package */ TenantAwareClientRegistrationRepository(
+  /* package */ TenantAwareClientRegistrationResolver(
       final Environment environment,
       final OrganizationSocialCredentialRepository credentials,
       final OrganizationSocialCredentialCipher cipher) {

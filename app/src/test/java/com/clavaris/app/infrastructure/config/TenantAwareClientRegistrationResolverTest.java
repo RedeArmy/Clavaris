@@ -22,21 +22,21 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * ADR-0022: unit-level proof of {@code TenantAwareClientRegistrationRepository}'s own resolution
+ * ADR-0022: unit-level proof of {@code TenantAwareClientRegistrationResolver}'s own resolution
  * logic — tenant-own credential, fallback-to-shared, and the two "no organization context" cases
  * (no request at all; a request with no session attribute set) — without needing a real OAuth2
  * login round trip, which {@code SocialLoginIntegrationTest} already covers end to end.
  */
-class TenantAwareClientRegistrationRepositoryTest {
+class TenantAwareClientRegistrationResolverTest {
 
   private OrganizationSocialCredentialRepository credentials;
   private OrganizationSocialCredentialCipher cipher;
-  private TenantAwareClientRegistrationRepository repository;
+  private TenantAwareClientRegistrationResolver repository;
 
   @BeforeEach
   void setUp() {
     // Same relaxed-binding property keys application.yml itself uses — MockEnvironment +
-    // TenantAwareClientRegistrationRepository's own Binder-based construction reads these exactly
+    // TenantAwareClientRegistrationResolver's own Binder-based construction reads these exactly
     // the way the real running app does, no hand-built OAuth2ClientProperties object.
     MockEnvironment environment = new MockEnvironment();
     environment.setProperty(
@@ -54,7 +54,7 @@ class TenantAwareClientRegistrationRepositoryTest {
 
     credentials = mock(OrganizationSocialCredentialRepository.class);
     cipher = mock(OrganizationSocialCredentialCipher.class);
-    repository = new TenantAwareClientRegistrationRepository(environment, credentials, cipher);
+    repository = new TenantAwareClientRegistrationResolver(environment, credentials, cipher);
   }
 
   @AfterEach

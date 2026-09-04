@@ -142,6 +142,8 @@ public final class Organization {
             linkedDevelopmentOrganizationId, "linkedDevelopmentOrganizationId must not be null"));
   }
 
+  @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale the private
+  // constructor above already documents — rehydration from persistence, not a design smell.
   public static Organization reconstitute(
       final UUID id,
       final String name,

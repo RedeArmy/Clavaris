@@ -45,7 +45,7 @@ provider's login flow. Four scoping choices, each deliberate:
    gets an independently-rotatable key, never a reused one.
 
 Mechanically: `spring.security.oauth2.client.registration.*`'s existing shared registrations remain
-the fallback for every Organization that hasn't opted in (`app`'s `TenantAwareClientRegistrationRepository`,
+the fallback for every Organization that hasn't opted in (`app`'s `TenantAwareClientRegistrationResolver`,
 resolved per-request from the same `HttpSession` attribute `SocialLoginRedirectController` already
 sets to carry "which Organization initiated this login"). The registration-id scheme (`google`/
 `github`) is unchanged — no new URL shape, no new callback path.
