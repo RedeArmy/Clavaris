@@ -143,7 +143,8 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar
 
       # Identical invocation to ci.yml's own sonarcloud step — see that file's own comments for the
-      # full reasoning behind each property; not repeated here.
+      # full reasoning behind each property (including the 2026-09-04 sonar.sources/
+      # sonar.plsql.file.suffixes additions); not repeated here.
       - name: Build, test, and analyse
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -154,6 +155,8 @@ jobs:
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
+          -Dsonar.sources=src/main/java,src/main/resources
+          -Dsonar.plsql.file.suffixes=
 
   dependabot-security-gate:
     name: Dependabot Security Gate

@@ -309,12 +309,14 @@ jobs:
       # from any of their basedirs (including app's own — app/../app/...
       # normalises back to itself).
       #
-      # Setup (git-workflow.md §4a): project created at sonarcloud.io,
-      # projectKey/organization below are real values, and SONAR_TOKEN is
-      # confirmed added as a repo secret (2026-08-18). Branch protection on
-      # `master` requiring the `ci-passed` aggregator job below (not this
-      # job individually) is a GitHub repo setting only an admin can
-      # configure — nothing in this workflow file can set that from here.
+      # SDE-III review, 2026-09-04 — three SonarCloud analysis warnings investigated and closed,
+      # not just tolerated (the two that used to be explained away below now have an actual fix,
+      # not only a comment; the third's own explanation is corrected, not restated, now that the
+      # fact it was resting on has changed). Setup (git-workflow.md §4a): project created at
+      # sonarcloud.io, projectKey/organization below are real values, and SONAR_TOKEN is confirmed
+      # added as a repo secret (2026-08-18). Branch protection on `master` requiring the
+      # `ci-passed` aggregator job below (not this job individually) is a GitHub repo setting only
+      # an admin can configure — nothing in this workflow file can set that from here.
       - name: Build, test, and analyse
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -325,28 +327,47 @@ jobs:
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
+          -Dsonar.sources=src/main/java,src/main/resources
+          -Dsonar.plsql.file.suffixes=
 
-      # Expected, harmless log noise from the step above, not a real gap:
-      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...".
-      # Confirmed live (ls'd every module's target/site/jacoco/jacoco.xml after a real
-      # `mvn clean verify`): every module with actual classes produces one correctly;
-      # `common` is the sole exception, because it currently has zero classes and zero
-      # tests (still just placeholder folders) — there is no coverage data to report in
-      # the first place, not a broken report path. Revisit once `common` gains real code.
+      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...". Updated
+      # 2026-09-04, the fact this was resting on has changed: when this comment was first written,
+      # `common` genuinely had zero classes and zero tests (placeholder folders only), the one
+      # module producing no jacoco.xml for the paths above to find. `common` now has 11 real
+      # classes and a real test suite (identity-module's audit/outbox infrastructure moved there
+      # once a second module needed it) — confirmed live, every one of the six modules
+      # (common/identity-module/organization-module/client-registry-module/webhook-module/app) now
+      # produces its own real target/site/jacoco/jacoco.xml after `mvn clean verify`, `common`'s
+      # own included (27KB, real coverage data, not an empty shell). If this line still appears on
+      # a live SonarCloud run despite that, it is worth a fresh look then — not assumed away by
+      # this comment the way the now-stale original one was.
       #
-      # Also expected, also harmless: "The Data Dictionary is not configured for the
-      # PLSQL analyzer, which prevents rule(s) S3641, S3921, S3618, S3651 from raising
-      # issues." SonarCloud's PL/SQL (SonarPLSQL) analyzer runs against every `.sql` file
-      # it sees regardless of dialect, including Flyway's plain Postgres DDL migrations
-      # here — there is no per-dialect opt-out, only a full Data Dictionary connection.
-      # Confirmed against SonarSource's own docs: the Data Dictionary is a live JDBC
-      # connection to a real Oracle database (querying SYS.ALL_TAB_COLUMNS and similar
-      # views) that those four rules need to resolve table/column metadata — explicitly
-      # Oracle-only, with no PostgreSQL equivalent. This project has zero Oracle PL/SQL
-      # anywhere (ADR-0004: PostgreSQL) and never will, so there is no Data Dictionary to
-      # configure and nothing these four rules could ever check here — not a
-      # misconfiguration, a mismatch between a generic file-extension-triggered analyzer
-      # and a project that was never going to use the one database engine it targets.
+      # "Some thymeleaf templates are not indexed: you may want to add 'src/main/resources' in the
+      # scanned files of this project to detect java XSS vulnerabilities". Real gap, now fixed:
+      # sonar-maven-plugin's own default `sonar.sources` binds to each module's Maven
+      # compileSourceRoots (`src/main/java` only) — Thymeleaf templates
+      # (identity-module's/organization-module's own `src/main/resources/templates/*.html`) were
+      # never part of the scanned file set at all, so SAS's Java-side Thymeleaf/XSS taint analysis
+      # had no template content to cross-reference against controller output. Explicit
+      # `sonar.sources=src/main/java,src/main/resources` above adds them, resolved per module from
+      # each module's own basedir (same per-module resolution SonarSource's own docs already
+      # confirmed for `sonar.coverage.jacoco.xmlReportPaths` above) — harmless for a module with no
+      # `src/main/resources` of its own (e.g. `client-registry-module`), since Sonar tolerates a
+      # configured source directory that doesn't exist for a given module.
+      #
+      # "The Data Dictionary is not configured for the PLSQL analyzer, which prevents rule(s)
+      # S3641, S3921, S3618, S3651 from raising issues." Genuinely not fixable the way the other
+      # two were — confirmed against SonarSource's own docs, the Data Dictionary is a live JDBC
+      # connection to a real Oracle database (querying SYS.ALL_TAB_COLUMNS and similar views) those
+      # four rules need to resolve table/column metadata, explicitly Oracle-only with no PostgreSQL
+      # equivalent (ADR-0004: this project is PostgreSQL, has zero Oracle PL/SQL anywhere, and
+      # never will). What IS fixable, and now is: SonarCloud's PL/SQL analyzer previously claimed
+      # every `.sql` file it saw regardless of dialect (Flyway's plain Postgres DDL migrations
+      # included), which is what produced this warning in the first place — there is no
+      # per-dialect opt-out, but there is a per-suffix one.
+      # `sonar.plsql.file.suffixes=` (empty) above stops the PLSQL analyzer from claiming any file
+      # extension at all, so it never runs against this project's `.sql` files and this warning
+      # stops firing outright, instead of being merely explained away every time it appears.
 
   # Branch protection needs to require exactly one status check, not five —
   # requiring each job individually breaks silently the moment any one of
