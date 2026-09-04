@@ -81,12 +81,29 @@ clavaris:
   # ADR-0007: AesGcmWebhookSigningSecretCipher (webhook-module) — the one key every Organization's
   # every WebhookEndpoint signing secret is encrypted under at rest (WebhookSigningSecretCipher's
   # own Javadoc: this secret must be recoverable in cleartext at delivery time, so it can't be a
-  # one-way hash). Same "one trust root, dev-only literal below, real deployments must override"
-  # convention as signing-key-store.password/oauth2.token-hash-secret above — a compromise of this
-  # key exposes every Organization's every webhook signing secret at once, so treat it with the
-  # same care as those.
+  # one-way hash). A compromise of this key exposes every Organization's every webhook signing
+  # secret at once, so treat it with the same care as signing-key-store.password/oauth2.token-hash-
+  # secret above.
+  #
+  # SDE-III review, 2026-09-04 — GitGuardian flagged a real secret here, correctly: unlike every
+  # sibling dev-only literal in this file (all plain HMAC keys, which tolerate any string —
+  # "dev-only-...-change-in-real-deployments" is deliberately unusable-looking), AesGcmWebhookSigning
+  # SecretCipher needs a real, structurally-valid 256-bit AES key (base64, decodes to exactly 32
+  # bytes) just to construct its SecretKeySpec at startup — a human-readable placeholder string
+  # can't satisfy that. The previous default was a real, randomly-generated key, not a placeholder,
+  # checked into source control — the exact class of exposure GitGuardian exists to catch. No real
+  # deployment ever used it (this project hasn't launched, CLAUDE.md §11 — no Organization's real
+  # webhook secret was ever encrypted under it), so there is no live ciphertext to re-encrypt, but
+  # the value itself must never be trusted again. Replaced with a freshly generated key, used for
+  # nothing but satisfying local dev/test startup — same "structurally required, dev-only, never a
+  # real secret" status as every value below `dev-only-` in spirit, just base64-shaped instead of
+  # human-readable because AES itself demands that. WEBHOOK_SECRET_ENCRYPTION_KEY is now listed in
+  # .env.example (a real, separate gap — it was the one secret in this file missing from there),
+  # with the same "generate and rotate independently, never commit a real value" instruction every
+  # sibling secret already carries; any real deployment must set it explicitly regardless of what
+  # this default is.
   webhook:
-    secret-encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY:diTPilg0FPoKG/oUGVKSErBJYG5OYR+Y4TU1FQ2hqvo=}
+    secret-encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY:Ah1uNXa5LllyXt9HnJePrt1/3QLbDUG6SCRtFFwRSWc=}
   # TD-SEC-019: keys the HMAC-SHA256 digest HashedTokenOAuth2AuthorizationService computes for
   # every oauth2_authorization bearer token value before it reaches Postgres (BearerTokenHasher's
   # own Javadoc). The dev-only literal below is exactly that — never used in a real deployment,

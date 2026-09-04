@@ -73,7 +73,8 @@ class JpaPlatformClientRepositoryTest {
             PlatformScopes.ACCOUNTS_SUSPEND,
             PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE,
             PlatformScopes.WEBHOOK_ENDPOINTS_WRITE,
-            PlatformScopes.WEBHOOK_DELIVERIES_REPLAY);
+            PlatformScopes.WEBHOOK_DELIVERIES_REPLAY,
+            PlatformScopes.ACCOUNTS_IMPERSONATE);
   }
 
   @Test

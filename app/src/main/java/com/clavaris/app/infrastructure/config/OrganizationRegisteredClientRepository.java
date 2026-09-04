@@ -89,7 +89,13 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
         .orElse(null);
   }
 
-  private static RegisteredClient toRegisteredClient(final OAuthClient client) {
+  // Package-private, not private (SDE-III feature build, 2026-09-03): ImpersonationTokenIssuer
+  // reuses this exact OAuthClient→RegisteredClient mapping to build the same-shaped
+  // RegisteredClient
+  // an impersonation token is minted for — duplicating this ~35-line mapping there instead would be
+  // the real risk (the two silently drifting apart over time), not widening this method's own
+  // visibility within its own package.
+  /* package */ static RegisteredClient toRegisteredClient(final OAuthClient client) {
     final RegisteredClient.Builder builder =
         RegisteredClient.withId(client.id().toString())
             .clientId(client.clientId())
