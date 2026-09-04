@@ -77,7 +77,8 @@ class JpaPlatformClientRepositoryTest {
             PlatformScopes.ACCOUNTS_IMPERSONATE,
             PlatformScopes.SOCIAL_CREDENTIALS_WRITE,
             PlatformScopes.SECRET_KEYS_WRITE,
-            PlatformScopes.SECRET_KEYS_ROTATE);
+            PlatformScopes.SECRET_KEYS_ROTATE,
+            PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE);
   }
 
   @Test

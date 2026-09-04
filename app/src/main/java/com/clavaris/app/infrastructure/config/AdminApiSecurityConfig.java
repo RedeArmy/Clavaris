@@ -239,6 +239,14 @@ class AdminApiSecurityConfig {
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SECRET_KEYS_ROTATE)
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/organization-clients/*/revoke")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SECRET_KEYS_ROTATE)
+                    // ADR-0024 (sign-up/sign-in options, Clerk parity): tuning an Organization's
+                    // authentication-strategy policy — its own scope, same defence-in-depth
+                    // reasoning as every other admin-API rule above. Reading it back (GET) is
+                    // unscoped, same precedent every other GET on this surface already follows.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/authentication-policy")
+                    .hasAuthority(
+                        SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
