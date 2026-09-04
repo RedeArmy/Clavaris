@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.authenticatewithpassword;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -43,20 +44,28 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
   private final PasswordVerifier verifier;
   private final SecurityMetricsRecorder metrics;
 
+  private final AccountAuthenticationPolicyProvider policyProvider;
+
   public AuthenticateWithPasswordService(
       final AccountRepository accounts,
       final PasswordVerifier verifier,
-      final SecurityMetricsRecorder metrics) {
+      final SecurityMetricsRecorder metrics,
+      final AccountAuthenticationPolicyProvider policyProvider) {
     this.accounts = accounts;
     this.verifier = verifier;
     this.metrics = metrics;
+    this.policyProvider = policyProvider;
   }
 
   // PMD.GuardLogStatement false positive: every logged argument below is a direct value-object
   // accessor (organizationId()/id() on an already-in-memory record/UUID wrapper) — not an
   // expensive computation the INFO level should be checked before evaluating, the actual concern
   // the rule exists to catch. Guarding these with isInfoEnabled() would be noise, not safety.
-  @SuppressWarnings("PMD.GuardLogStatement")
+  // PMD.CyclomaticComplexity: ADR-0024 §2 added one more early-rejection branch
+  // (EmailNotVerifiedException) alongside the four this method already had — each branch is a
+  // genuinely distinct rejection reason this class's own Javadoc already explains are
+  // deliberately collapsed to one exception type at the boundary, not organic complexity.
+  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
   @Override
   public AccountId handle(final AuthenticateWithPasswordCommand command) {
     final Optional<Account> found =
@@ -102,6 +111,19 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
           account.id());
       recordFailure("invalid_password");
       throw new InvalidCredentialsException();
+    }
+
+    // ADR-0024 §2/BR-ID-16: only reached once the password is already confirmed correct — see
+    // EmailNotVerifiedException's own Javadoc for why this deliberately is a distinct, more
+    // specific rejection than InvalidCredentialsException above.
+    if (policyProvider.policyFor(account.organizationId()).emailVerificationRequiredAtSignIn()
+        && account.emailVerifiedAt().isEmpty()) {
+      LOG.info(
+          "event=login_failure organizationId={} accountId={} reason=email_not_verified",
+          command.organizationId(),
+          account.id());
+      recordFailure("email_not_verified");
+      throw new EmailNotVerifiedException();
     }
 
     LOG.info(

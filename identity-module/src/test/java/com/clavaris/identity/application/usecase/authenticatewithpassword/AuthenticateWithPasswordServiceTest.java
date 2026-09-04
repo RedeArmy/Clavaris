@@ -13,6 +13,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
@@ -37,6 +40,7 @@ class AuthenticateWithPasswordServiceTest {
   private AccountRepository accounts;
   private PasswordVerifier verifier;
   private SecurityMetricsRecorder metrics;
+  private AccountAuthenticationPolicyProvider policyProvider;
   private AuthenticateWithPasswordService service;
 
   // TD-SEC-014: captures what AuthenticateWithPasswordService actually logs, the same way a real
@@ -49,7 +53,12 @@ class AuthenticateWithPasswordServiceTest {
     accounts = mock(AccountRepository.class);
     verifier = mock(PasswordVerifier.class);
     metrics = mock(SecurityMetricsRecorder.class);
-    service = new AuthenticateWithPasswordService(accounts, verifier, metrics);
+    policyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    // Matches today's real default (ADR-0024) — every existing test in this class exercises
+    // behaviour that predates the policy gate, so it must stay a no-op unless a test overrides it.
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
+    service = new AuthenticateWithPasswordService(accounts, verifier, metrics, policyProvider);
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -140,6 +149,7 @@ class AuthenticateWithPasswordServiceTest {
             Instant.now(),
             null,
             AccountStatus.SUSPENDED,
+            null,
             null);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -170,6 +180,7 @@ class AuthenticateWithPasswordServiceTest {
             Instant.now(),
             null,
             AccountStatus.ACTIVE,
+            null,
             null);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -215,6 +226,73 @@ class AuthenticateWithPasswordServiceTest {
           .doesNotContain(RAW_PASSWORD)
           .doesNotContain(email.value());
     }
+  }
+
+  // ADR-0024 §2/BR-ID-16
+  @Test
+  void rejectsAnUnverifiedEmailWhenThePolicyRequiresVerificationAtSignIn() {
+    Account account =
+        Account.reconstitute(
+            new AccountId(UUID.randomUUID()),
+            organizationId,
+            email,
+            Instant.now(),
+            null,
+            AccountStatus.ACTIVE,
+            null,
+            null);
+    account.attachPasswordCredential("argon2id$stored-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true);
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                true,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false));
+    AuthenticateWithPasswordCommand command =
+        new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD);
+
+    assertThatExceptionOfType(EmailNotVerifiedException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(onlyLoggedMessage())
+        .contains("event=login_failure")
+        .contains("reason=email_not_verified");
+  }
+
+  @Test
+  void allowsAVerifiedAccountEvenWhenThePolicyRequiresVerificationAtSignIn() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("argon2id$stored-hash");
+    account.verifyEmail();
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true);
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                true,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false));
+
+    AccountId result =
+        service.handle(new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD));
+
+    assertThat(result).isEqualTo(account.id());
   }
 
   private String onlyLoggedMessage() {

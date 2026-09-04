@@ -31,6 +31,7 @@ class RequestEmailVerificationServiceTest {
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
   private OrganizationEnvironmentChecker environmentChecker;
+  private AccountAuthenticationPolicyProvider policyProvider;
   private RequestEmailVerificationService service;
 
   @BeforeEach
@@ -39,10 +40,15 @@ class RequestEmailVerificationServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
     environmentChecker = mock(OrganizationEnvironmentChecker.class);
-    // Mockito's own default (unstubbed boolean = false) already means "not DEVELOPMENT" — every
-    // existing test below relies on this real send path being taken by default, same as before
-    // this port existed.
-    service = new RequestEmailVerificationService(accounts, tokens, mailSender, environmentChecker);
+    policyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    // Matches today's real default (ADR-0024: LINK) — every existing test below relies on this
+    // exact send path being taken by default, same as before this port existed. Mockito's own
+    // default (unstubbed boolean = false) already means "not DEVELOPMENT".
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
+    service =
+        new RequestEmailVerificationService(
+            accounts, tokens, mailSender, environmentChecker, policyProvider);
   }
 
   @Test
@@ -93,6 +99,58 @@ class RequestEmailVerificationServiceTest {
 
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendEmailVerification(any(), any(), any());
+  }
+
+  // ADR-0024 §2
+  @Test
+  void issuesAShortCodeInsteadOfALinkWhenThePolicySaysCode() {
+    Account account = Account.register(organizationId, new Email("code-user@example.com"));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.CODE,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false));
+
+    service.handle(new RequestEmailVerificationCommand(account.id()));
+
+    verify(tokens, times(1)).save(any());
+    verify(mailSender, never()).sendEmailVerification(any(), any(), any());
+    verify(mailSender)
+        .sendEmailVerificationCode(eq("code-user@example.com"), eq(organizationId), any());
+  }
+
+  @Test
+  void issuesBothALinkAndACodeWhenThePolicySaysBoth() {
+    Account account = Account.register(organizationId, new Email("both-user@example.com"));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.BOTH,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false));
+
+    service.handle(new RequestEmailVerificationCommand(account.id()));
+
+    verify(tokens, times(2)).save(any());
+    verify(mailSender)
+        .sendEmailVerification(eq("both-user@example.com"), eq(organizationId), any());
+    verify(mailSender)
+        .sendEmailVerificationCode(eq("both-user@example.com"), eq(organizationId), any());
   }
 
   // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).

@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Duration;
 import java.time.Instant;
@@ -49,16 +50,20 @@ public class RequestEmailVerificationService implements RequestEmailVerification
   @SuppressWarnings("PMD.LongVariable")
   private final OrganizationEnvironmentChecker environmentChecker;
 
+  private final AccountAuthenticationPolicyProvider policyProvider;
+
+  @SuppressWarnings("java:S107")
   public RequestEmailVerificationService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
       final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
+      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
+      final AccountAuthenticationPolicyProvider policyProvider) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
     this.environmentChecker = environmentChecker;
+    this.policyProvider = policyProvider;
   }
 
   // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
@@ -81,14 +86,21 @@ public class RequestEmailVerificationService implements RequestEmailVerification
       return;
     }
 
-    final String rawToken = RefreshTokenSecret.generateRawValue();
-    final VerificationToken token =
-        VerificationToken.issue(
-            account.id(),
-            VerificationTokenType.EMAIL_VERIFICATION,
-            RefreshTokenSecret.hash(rawToken),
-            Instant.now().plus(TOKEN_TTL));
-    tokens.save(token);
+    // ADR-0024 §2: CODE/BOTH issue a second, independently-hashed token carrying the short raw
+    // value alongside (or instead of) the original link — same VerificationToken/EMAIL_VERIFICATION
+    // type either shape uses, only the raw value's format differs (EmailOneTimeCode vs
+    // RefreshTokenSecret). Two rows, not one token trying to satisfy two different raw-value
+    // shapes at once, since findByTokenHash's own lookup is by exact hash match.
+    final EmailVerificationMethod method =
+        policyProvider.policyFor(account.organizationId()).emailVerificationMethod();
+    final String rawLinkToken =
+        method == EmailVerificationMethod.CODE
+            ? null
+            : issueToken(account, RefreshTokenSecret.generateRawValue());
+    final String rawCode =
+        method == EmailVerificationMethod.LINK
+            ? null
+            : issueToken(account, EmailOneTimeCode.generate());
 
     if (environmentChecker.isDevelopment(account.organizationId())) {
       LOG.info(
@@ -99,6 +111,24 @@ public class RequestEmailVerificationService implements RequestEmailVerification
       return;
     }
 
-    mailSender.sendEmailVerification(account.email().value(), account.organizationId(), rawToken);
+    if (rawLinkToken != null) {
+      mailSender.sendEmailVerification(
+          account.email().value(), account.organizationId(), rawLinkToken);
+    }
+    if (rawCode != null) {
+      mailSender.sendEmailVerificationCode(
+          account.email().value(), account.organizationId(), rawCode);
+    }
+  }
+
+  private String issueToken(final Account account, final String rawValue) {
+    final VerificationToken token =
+        VerificationToken.issue(
+            account.id(),
+            VerificationTokenType.EMAIL_VERIFICATION,
+            RefreshTokenSecret.hash(rawValue),
+            Instant.now().plus(TOKEN_TTL));
+    tokens.save(token);
+    return rawValue;
   }
 }
