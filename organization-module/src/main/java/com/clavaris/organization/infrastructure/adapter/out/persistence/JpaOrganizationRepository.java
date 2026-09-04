@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationEnvironment;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +39,9 @@ class JpaOrganizationRepository implements OrganizationRepository {
             organization.createdAt(),
             organization.ownerPlatformAccountId(),
             organization.socialLoginEnabled(),
-            writeJsonArray(organization.allowedSocialProviders())));
+            writeJsonArray(organization.allowedSocialProviders()),
+            organization.environment().name(),
+            organization.linkedEnvironmentOrganizationId().orElse(null)));
   }
 
   @Override
@@ -76,7 +79,9 @@ class JpaOrganizationRepository implements OrganizationRepository {
         entity.getCreatedAt(),
         entity.getOwnerPlatformAccountId(),
         entity.isSocialLoginEnabled(),
-        readJsonArray(entity.getAllowedSocialProviders()));
+        readJsonArray(entity.getAllowedSocialProviders()),
+        OrganizationEnvironment.valueOf(entity.getEnvironment()),
+        entity.getLinkedEnvironmentOrganizationId());
   }
 
   private String writeJsonArray(final List<String> values) {

@@ -135,6 +135,31 @@ public final class PlatformScopes {
   public static final String ACCOUNTS_IMPERSONATE = "platform:accounts:impersonate";
 
   /**
+   * ADR-0022 (amending ADR-0020 Decision 4, SDE-III feature build, 2026-09-05): setting/deleting a
+   * PRODUCTION Organization's own Google/GitHub OAuth app credentials — its own scope, deliberately
+   * separate from {@link #SOCIAL_LOGIN_POLICY_WRITE} (a token that can flip the on/off policy
+   * switch doesn't automatically get to also set secret material), same defence-in-depth reasoning
+   * every other admin-API scope here already follows.
+   */
+  public static final String SOCIAL_CREDENTIALS_WRITE = "platform:social-credentials:write";
+
+  /**
+   * ADR-0023 (per-Organization admin credential, Clerk "Secret Key" parity): minting a new {@code
+   * OrganizationClient} for an Organization — its own scope, same defence-in-depth reasoning every
+   * other admin-API scope here already follows. Only ever granted to a {@code PlatformClient}
+   * token, never to an {@code OrganizationClient} token itself — a Secret Key cannot mint another
+   * Secret Key (no self-service credential issuance in v1, same deferral ADR-0010 already states).
+   */
+  public static final String SECRET_KEYS_WRITE = "platform:secret-keys:write";
+
+  /**
+   * ADR-0023: rotating/revoking an {@code OrganizationClient}'s own secret — its own scope,
+   * deliberately separate from {@link #SECRET_KEYS_WRITE}, same defence-in-depth reasoning {@link
+   * #WORKSPACE_MEMBERS_REMOVE} already establishes relative to {@link #WORKSPACE_MEMBERS_WRITE}.
+   */
+  public static final String SECRET_KEYS_ROTATE = "platform:secret-keys:rotate";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -155,7 +180,10 @@ public final class PlatformScopes {
           SOCIAL_LOGIN_POLICY_WRITE,
           WEBHOOK_ENDPOINTS_WRITE,
           WEBHOOK_DELIVERIES_REPLAY,
-          ACCOUNTS_IMPERSONATE);
+          ACCOUNTS_IMPERSONATE,
+          SOCIAL_CREDENTIALS_WRITE,
+          SECRET_KEYS_WRITE,
+          SECRET_KEYS_ROTATE);
 
   private PlatformScopes() {}
 }

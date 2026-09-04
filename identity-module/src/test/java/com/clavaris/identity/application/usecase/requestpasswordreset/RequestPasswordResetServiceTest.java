@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -32,6 +33,7 @@ class RequestPasswordResetServiceTest {
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
   private EventOutboxWriter outbox;
+  private OrganizationEnvironmentChecker environmentChecker;
   private RequestPasswordResetService service;
 
   @BeforeEach
@@ -40,7 +42,12 @@ class RequestPasswordResetServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new RequestPasswordResetService(accounts, tokens, mailSender, outbox);
+    environmentChecker = mock(OrganizationEnvironmentChecker.class);
+    // Mockito's own default (unstubbed boolean = false) already means "not DEVELOPMENT" — every
+    // existing test below relies on this real send path being taken by default, same as before
+    // this port existed.
+    service =
+        new RequestPasswordResetService(accounts, tokens, mailSender, outbox, environmentChecker);
   }
 
   @Test
@@ -71,5 +78,21 @@ class RequestPasswordResetServiceTest {
     verify(tokens, never()).save(any());
     verify(mailSender, never()).sendPasswordReset(any(), any(), any());
     verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  @Test
+  void stillIssuesATokenButNeverSendsARealEmailForADevelopmentEnvironmentAccount() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("existing-hash");
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
+
+    service.handle(new RequestPasswordResetCommand(organizationId, email));
+
+    verify(tokens).save(any());
+    verify(outbox).write(eq("password_reset.requested"), eq(account.id()), any(), any());
+    verify(mailSender, never()).sendPasswordReset(any(), any(), any());
   }
 }

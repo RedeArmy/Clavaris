@@ -90,7 +90,11 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
         requestPlatformAccessToken(
             "platform:organizations:write platform:workspaces:write"
                 + " platform:workspace-members:write");
-    UUID organizationId = createOrganization(platformToken, "Claim Test Co");
+    // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis): a
+    // fresh Organization now defaults to DEVELOPMENT (BR-ORG-08), which never sends real outbound
+    // email (BR-ID-15) — completePasswordSetup below needs a real welcome email, so promote first.
+    UUID organizationId =
+        promoteToProduction(platformToken, createOrganization(platformToken, "Claim Test Co"));
     ClientCredentials client = registerOAuthClient(platformToken, organizationId);
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
     String email = "workspace-admin@example.com";
@@ -125,7 +129,11 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
         requestPlatformAccessToken(
             "platform:organizations:write platform:workspaces:write"
                 + " platform:workspace-members:write");
-    UUID organizationId = createOrganization(platformToken, "Refresh Claim Co");
+    // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis): a fresh
+    // Organization now defaults to DEVELOPMENT (BR-ORG-08), which never sends real outbound email
+    // (BR-ID-15) — completePasswordSetup below needs a real welcome email, so promote first.
+    UUID organizationId =
+        promoteToProduction(platformToken, createOrganization(platformToken, "Refresh Claim Co"));
     ClientCredentials client = registerOAuthClientWithRefreshGrant(platformToken, organizationId);
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
     String email = "refresh-admin@example.com";
@@ -318,6 +326,22 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
                         + "\",\"ownerPlatformAccountId\":\""
                         + registerAPlatformAccount()
                         + "\"}"))
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
+  }
+
+  private UUID promoteToProduction(String platformToken, UUID developmentOrganizationId)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                baseUri(
+                    "/api/v1/admin/organizations/"
+                        + developmentOrganizationId
+                        + ":create-production-environment"))
+            .header("Authorization", "Bearer " + platformToken)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"Production\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());

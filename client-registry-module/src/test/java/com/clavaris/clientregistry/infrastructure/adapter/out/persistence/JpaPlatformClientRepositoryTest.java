@@ -74,7 +74,10 @@ class JpaPlatformClientRepositoryTest {
             PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE,
             PlatformScopes.WEBHOOK_ENDPOINTS_WRITE,
             PlatformScopes.WEBHOOK_DELIVERIES_REPLAY,
-            PlatformScopes.ACCOUNTS_IMPERSONATE);
+            PlatformScopes.ACCOUNTS_IMPERSONATE,
+            PlatformScopes.SOCIAL_CREDENTIALS_WRITE,
+            PlatformScopes.SECRET_KEYS_WRITE,
+            PlatformScopes.SECRET_KEYS_ROTATE);
   }
 
   @Test

@@ -254,7 +254,11 @@ class OrganizationAuthorizationServerConfig {
       final JdbcTemplate jdbcTemplate,
       final BearerTokenHasher bearerTokenHasher,
       final RateLimitKeyHasher rateLimitKeyHasher,
-      final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
+      // ADR-0023: typed as the concrete class, not the OAuth2TokenCustomizer<JwtEncodingContext>
+      // interface — OrganizationClientClaimCustomizer now also implements that same interface, so
+      // injecting by interface type alone became ambiguous (NoUniqueBeanDefinitionException,
+      // confirmed live) the moment a second implementation existed.
+      final TokenIssuanceEventLogger tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final WorkspaceMembershipRepository workspaceMemberships,
       final IssueRefreshTokenUseCase issueRefreshToken,

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.within;
 
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationEnvironment;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +17,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,6 +45,8 @@ class JpaOrganizationRepositoryTest {
 
   @Autowired private SpringDataOrganizationJpaRepository springDataRepository;
 
+  @Autowired private JdbcTemplate jdbcTemplate;
+
   @Test
   void savesAnOrganizationAndPersistsItsRealFields() {
     UUID ownerPlatformAccountId = UUID.randomUUID();
@@ -59,6 +63,51 @@ class JpaOrganizationRepositoryTest {
     // run, not a genuine assertion.
     assertThat(persisted.getCreatedAt())
         .isCloseTo(organization.createdAt(), within(1, ChronoUnit.MILLIS));
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  @Test
+  void savesAndReconstitutesTheEnvironmentAndLinkedEnvironmentOrganizationId() {
+    UUID ownerPlatformAccountId = UUID.randomUUID();
+    Organization developmentOrganization =
+        Organization.register("JobSeeker", ownerPlatformAccountId);
+    Organization productionOrganization =
+        Organization.registerProductionEnvironment(
+            "JobSeeker (production)", ownerPlatformAccountId, developmentOrganization.id());
+    repository.save(developmentOrganization);
+    repository.save(productionOrganization);
+    repository.save(
+        developmentOrganization.withLinkedEnvironmentOrganizationId(productionOrganization.id()));
+
+    Organization reloadedDevelopment =
+        repository.findById(developmentOrganization.id()).orElseThrow();
+    Organization reloadedProduction =
+        repository.findById(productionOrganization.id()).orElseThrow();
+
+    assertThat(reloadedDevelopment.environment()).isEqualTo(OrganizationEnvironment.DEVELOPMENT);
+    assertThat(reloadedDevelopment.linkedEnvironmentOrganizationId())
+        .contains(productionOrganization.id());
+    assertThat(reloadedProduction.environment()).isEqualTo(OrganizationEnvironment.PRODUCTION);
+    assertThat(reloadedProduction.linkedEnvironmentOrganizationId())
+        .contains(developmentOrganization.id());
+  }
+
+  // Every Organization that already existed before this concept shipped must default to
+  // PRODUCTION at the database level (migration V20260904090000) — a raw INSERT that never
+  // mentions the column at all, the only way to actually exercise the SQL DEFAULT clause itself
+  // rather than a value this entity's own constructor happened to pass through.
+  @Test
+  void anOrganizationInsertedWithoutAnExplicitEnvironmentDefaultsToProductionAtTheDatabaseLevel() {
+    UUID organizationId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "insert into organizations (id, name, owner_platform_account_id) values (?, ?, ?)",
+        organizationId,
+        "Pre-existing Co",
+        UUID.randomUUID());
+
+    Organization reloaded = repository.findById(organizationId).orElseThrow();
+
+    assertThat(reloaded.environment()).isEqualTo(OrganizationEnvironment.PRODUCTION);
   }
 
   @Test

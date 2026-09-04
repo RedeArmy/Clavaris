@@ -47,6 +47,7 @@ import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
@@ -193,8 +194,11 @@ class IdentityUseCaseConfig {
   /* package */ RequestEmailVerificationUseCase requestEmailVerificationUseCase(
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender) {
-    return new RequestEmailVerificationService(accounts, verificationTokens, mailSender);
+      final MailSender mailSender,
+      @SuppressWarnings("PMD.LongVariable")
+          final OrganizationEnvironmentChecker environmentChecker) {
+    return new RequestEmailVerificationService(
+        accounts, verificationTokens, mailSender, environmentChecker);
   }
 
   @Bean
@@ -210,9 +214,11 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      final EventOutboxWriter eventOutboxWriter) {
+      final EventOutboxWriter eventOutboxWriter,
+      @SuppressWarnings("PMD.LongVariable")
+          final OrganizationEnvironmentChecker environmentChecker) {
     return new RequestPasswordResetService(
-        accounts, verificationTokens, mailSender, eventOutboxWriter);
+        accounts, verificationTokens, mailSender, eventOutboxWriter, environmentChecker);
   }
 
   @Bean

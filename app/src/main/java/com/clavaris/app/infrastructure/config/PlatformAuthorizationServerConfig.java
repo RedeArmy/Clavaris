@@ -26,9 +26,7 @@ import org.springframework.security.oauth2.server.authorization.JdbcOAuth2Author
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -87,8 +85,15 @@ class PlatformAuthorizationServerConfig {
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
       @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
+      // ADR-0023: typed as the concrete class, not the OAuth2TokenCustomizer<JwtEncodingContext>
+      // interface — OrganizationClientClaimCustomizer now also implements that same interface, so
+      // injecting by interface type alone became ambiguous (NoUniqueBeanDefinitionException,
+      // confirmed live) the moment a second implementation existed.
+      @SuppressWarnings("PMD.LongVariable") final TokenIssuanceEventLogger tokenIssuanceLogger,
+      // ADR-0023: stamps organization_id onto an OrganizationClient's own minted token — absent
+      // entirely for a PlatformClient token, see this class's own Javadoc.
       @SuppressWarnings("PMD.LongVariable")
-          final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
+          final OrganizationClientClaimCustomizer organizationClientClaimCustomizer,
       @SuppressWarnings("PMD.LongVariable") final TokenRevocationEventLogger tokenRevocationLogger,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl,
       final RateLimiter rateLimiter,
@@ -112,7 +117,14 @@ class PlatformAuthorizationServerConfig {
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     // TD-SEC-016: every token this tier issues (platform-tier client_credentials only) gets a
     // structured event=token_issued log line — see TokenIssuanceEventLogger's own Javadoc.
-    jwtGenerator.setJwtCustomizer(tokenIssuanceLogger);
+    // ADR-0023: composed with organizationClientClaimCustomizer, same "chain a second customizer"
+    // precedent ImpersonationTokenIssuer's own composition of tokenIssuanceLogger.customize(...)
+    // and addImpersonationClaims(...) already establishes.
+    jwtGenerator.setJwtCustomizer(
+        context -> {
+          tokenIssuanceLogger.customize(context);
+          organizationClientClaimCustomizer.customize(context);
+        });
     final OAuth2TokenGenerator<?> tokenGenerator = jwtGenerator;
 
     // TD-SEC-003: SAS's own well-tested JDBC-backed implementation (ADR-0003 — build on the

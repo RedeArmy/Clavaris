@@ -2,6 +2,7 @@ package com.clavaris.organization.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.time.Instant;
 import java.util.List;
@@ -64,12 +65,63 @@ class OrganizationTest {
 
     final Organization organization =
         Organization.reconstitute(
-            persistedId, "JobSeeker", persistedCreatedAt, ownerPlatformAccountId, false, List.of());
+            persistedId,
+            "JobSeeker",
+            persistedCreatedAt,
+            ownerPlatformAccountId,
+            false,
+            List.of(),
+            OrganizationEnvironment.PRODUCTION,
+            null);
 
     assertThat(organization.id()).isEqualTo(persistedId);
     assertThat(organization.name()).isEqualTo("JobSeeker");
     assertThat(organization.createdAt()).isEqualTo(persistedCreatedAt);
     assertThat(organization.ownerPlatformAccountId()).isEqualTo(ownerPlatformAccountId);
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  @Test
+  void registerDefaultsToDevelopmentEnvironmentWithNoLinkedSibling() {
+    final Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
+
+    assertThat(organization.environment()).isEqualTo(OrganizationEnvironment.DEVELOPMENT);
+    assertThat(organization.linkedEnvironmentOrganizationId()).isEmpty();
+  }
+
+  @Test
+  void registerProductionEnvironmentCarriesProductionAndTheSourceDevelopmentOrganizationId() {
+    final UUID developmentOrganizationId = UUID.randomUUID();
+
+    final Organization organization =
+        Organization.registerProductionEnvironment(
+            "JobSeeker (production)", ownerPlatformAccountId, developmentOrganizationId);
+
+    assertThat(organization.environment()).isEqualTo(OrganizationEnvironment.PRODUCTION);
+    assertThat(organization.linkedEnvironmentOrganizationId()).contains(developmentOrganizationId);
+  }
+
+  @Test
+  void registerProductionEnvironmentRejectsANullLinkedDevelopmentOrganizationId() {
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                Organization.registerProductionEnvironment(
+                    "JobSeeker (production)", ownerPlatformAccountId, null));
+  }
+
+  @Test
+  void withLinkedEnvironmentOrganizationIdReturnsANewInstanceWithTheLink() {
+    final Organization original = Organization.register("JobSeeker", ownerPlatformAccountId);
+    final UUID productionOrganizationId = UUID.randomUUID();
+
+    final Organization updated =
+        original.withLinkedEnvironmentOrganizationId(productionOrganizationId);
+
+    assertThat(updated.linkedEnvironmentOrganizationId()).contains(productionOrganizationId);
+    // The original instance is untouched — same immutable-update shape withSocialLoginPolicy's
+    // own identical test already establishes.
+    assertThat(original.linkedEnvironmentOrganizationId()).isEmpty();
   }
 
   @Test

@@ -139,3 +139,15 @@ Evaluated as asked, not silently skipped:
 See Decisions 1–5 above — automatic email-based linking, full platform-tier password deprecation,
 per-`OAuthClient` policy, bring-your-own OAuth apps, and folding Microsoft/AD into this same
 implementation were each evaluated on their actual merits, not assumed away.
+
+## Addendum — Decision 4 narrowly amended for PRODUCTION Organizations (2026-09-05, ADR-0022)
+
+Decision 4's shared-app default is **still correct for the common case** and remains unchanged for
+`DEVELOPMENT` Organizations and the platform tier: zero-setup, two-database-field opt-in, no
+external registration step. What changed: a `PRODUCTION` Organization may now additionally bring its
+own Google/GitHub OAuth app credentials, opt-in and per-provider, on top of Decision 3's existing
+enabled/allowlist gate — see ADR-0022 for the full design. This is a narrow amendment, not a reversal
+of Decision 4's own reasoning; see ADR-0022 for why "eventually via ADR-0009" (this ADR's own
+original framing) turned out to be the wrong vehicle: ADR-0009's branding only ever re-skins
+Clavaris's own hosted login/consent page, it can never touch Google's/GitHub's own consent screen —
+only bringing your own OAuth app changes what those providers themselves display.
