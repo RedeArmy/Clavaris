@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
+import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.PlatformClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import java.util.Optional;
@@ -19,15 +20,19 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 /**
  * TD-SEC-010: same dedicated coverage as {@link OrganizationRegisteredClientRepositoryTest}, for
  * the platform tier's own adapter — {@code findById} was unreachable dead code until TD-SEC-003
- * wired {@code JdbcOAuth2AuthorizationService} in front of it.
+ * wired {@code JdbcOAuth2AuthorizationService} in front of it. ADR-0023: {@code
+ * organizationClients} is a real (unstubbed, Mockito's own default-empty-Optional) collaborator on
+ * every test here — none of these scenarios ever involve an {@code OrganizationClient}, only that
+ * the fallback lookup doesn't blow up when it's consulted.
  */
 class PlatformRegisteredClientRepositoryTest {
 
   @Test
   void findByIdReturnsNullForAMalformedId() {
     PlatformClientRepository platformClients = mock(PlatformClientRepository.class);
+    OrganizationClientRepository organizationClients = mock(OrganizationClientRepository.class);
     PlatformRegisteredClientRepository repository =
-        new PlatformRegisteredClientRepository(platformClients);
+        new PlatformRegisteredClientRepository(platformClients, organizationClients);
 
     RegisteredClient found = repository.findById("not-a-uuid");
 
@@ -38,10 +43,11 @@ class PlatformRegisteredClientRepositoryTest {
   @Test
   void findByIdReturnsNullWhenNoClientExistsForThatId() {
     PlatformClientRepository platformClients = mock(PlatformClientRepository.class);
+    OrganizationClientRepository organizationClients = mock(OrganizationClientRepository.class);
     UUID id = UUID.randomUUID();
     when(platformClients.findById(id)).thenReturn(Optional.empty());
     PlatformRegisteredClientRepository repository =
-        new PlatformRegisteredClientRepository(platformClients);
+        new PlatformRegisteredClientRepository(platformClients, organizationClients);
 
     RegisteredClient found = repository.findById(id.toString());
 
@@ -54,9 +60,10 @@ class PlatformRegisteredClientRepositoryTest {
         PlatformClient.register(
             "a-platform-client", "$argon2id$hashed", PlatformScopes.BOOTSTRAP_DEFAULT);
     PlatformClientRepository platformClients = mock(PlatformClientRepository.class);
+    OrganizationClientRepository organizationClients = mock(OrganizationClientRepository.class);
     when(platformClients.findById(client.id())).thenReturn(Optional.of(client));
     PlatformRegisteredClientRepository repository =
-        new PlatformRegisteredClientRepository(platformClients);
+        new PlatformRegisteredClientRepository(platformClients, organizationClients);
 
     RegisteredClient found = repository.findById(client.id().toString());
 

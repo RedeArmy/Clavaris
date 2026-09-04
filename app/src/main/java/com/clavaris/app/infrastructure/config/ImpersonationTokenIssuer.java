@@ -39,7 +39,6 @@ import org.springframework.security.oauth2.server.authorization.token.DefaultOAu
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.stereotype.Component;
 
 /**
@@ -124,7 +123,12 @@ class ImpersonationTokenIssuer {
   private final OrganizationSigningKeyMaterialFactory keyMaterial;
   private final JdbcTemplate jdbcTemplate;
   private final BearerTokenHasher bearerTokenHasher;
-  private final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger;
+  // ADR-0023: typed as the concrete class, not the OAuth2TokenCustomizer<JwtEncodingContext>
+  // interface — OrganizationClientClaimCustomizer now also implements that same interface, so
+  // injecting by interface type alone became ambiguous (NoUniqueBeanDefinitionException, confirmed
+  // live) the moment a second implementation existed. Same fix as
+  // PlatformAuthorizationServerConfig's own identical parameter.
+  private final TokenIssuanceEventLogger tokenIssuanceLogger;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port/bean — same rationale as
   // OrganizationAuthorizationServerConfig's own identical suppression for this same shape of
@@ -135,7 +139,7 @@ class ImpersonationTokenIssuer {
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final JdbcTemplate jdbcTemplate,
       final BearerTokenHasher bearerTokenHasher,
-      final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger) {
+      final TokenIssuanceEventLogger tokenIssuanceLogger) {
     this.oauthClients = oauthClients;
     this.signingKeys = signingKeys;
     this.keyMaterial = keyMaterial;

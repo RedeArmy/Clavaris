@@ -1,7 +1,9 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.infrastructure.adapter.out.security.PlatformSigningKeyMaterial;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.List;
@@ -43,7 +45,10 @@ import org.springframework.security.web.SecurityFilterChain;
 // Literals: the repeated string is "PMD.LongVariable" itself, used on several descriptively-named
 // fields/parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
 // suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
+// ExcessiveParameterList: ADR-0023 added two more collaborators (accounts/workspaces) to the one
+// SecurityFilterChain bean this class wires — same "wiring, not sprawl" reasoning
+// PlatformAuthorizationServerConfig's own identical suppression already documents.
+@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.ExcessiveParameterList"})
 @Configuration
 class AdminApiSecurityConfig {
 
@@ -94,7 +99,11 @@ class AdminApiSecurityConfig {
       // takeover risk, not just a wasted write.
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.admin-api.accounts-impersonate.per-client-limit:10}")
-          final int accountsImpersonatePerClientLimit) {
+          final int accountsImpersonatePerClientLimit,
+      // ADR-0023: resolves an accountId/workspaceId path variable to its owning Organization for
+      // OrganizationClientOwnershipFilter's own one-hop routes.
+      final AccountRepository accounts,
+      final WorkspaceRepository workspaces) {
     http.securityMatcher(ADMIN_API_PATH_PATTERN)
         .authorizeHttpRequests(
             authorize ->
@@ -182,6 +191,19 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/social-login-policy")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE)
+                    // ADR-0022 (amending ADR-0020 Decision 4): setting/deleting a PRODUCTION
+                    // Organization's own OAuth social credentials — its own scope, deliberately
+                    // separate from SOCIAL_LOGIN_POLICY_WRITE (see
+                    // PlatformScopes.SOCIAL_CREDENTIALS
+                    // _WRITE's own Javadoc). Listing is read-only, no dedicated scope needed — same
+                    // "only mutating actions get their own scope" precedent every GET endpoint on
+                    // this surface already follows.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/social-credentials/*")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SOCIAL_CREDENTIALS_WRITE)
+                    .requestMatchers(
+                        HttpMethod.DELETE, "/api/v1/admin/organizations/*/social-credentials/*")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SOCIAL_CREDENTIALS_WRITE)
                     // ADR-0007: registering an endpoint, rotating its secret, or (de)activating it
                     // — one shared scope, same "grouped under one scope for same-risk-tier actions"
                     // precedent WORKSPACE_MEMBERS_WRITE already establishes.
@@ -203,6 +225,20 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.POST, "/api/v1/admin/webhook-endpoints/*/deliveries/*:replay")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WEBHOOK_DELIVERIES_REPLAY)
+                    // ADR-0023: minting a new OrganizationClient / Secret Key — its own scope, same
+                    // defence-in-depth reasoning as every other admin-API rule above. Listing is
+                    // read-only, no dedicated scope needed, same precedent as every other GET here.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations/*/secret-keys")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SECRET_KEYS_WRITE)
+                    // ADR-0023: rotating/revoking a Secret Key — its own scope, deliberately
+                    // separate from SECRET_KEYS_WRITE, same defence-in-depth reasoning
+                    // WORKSPACE_MEMBERS_REMOVE already establishes relative to
+                    // WORKSPACE_MEMBERS_WRITE.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/organization-clients/*/rotate-secret")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SECRET_KEYS_ROTATE)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/organization-clients/*/revoke")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SECRET_KEYS_ROTATE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
@@ -280,6 +316,14 @@ class AdminApiSecurityConfig {
                         accountsImpersonatePerClientLimit,
                         Duration.ofMinutes(5)))),
             BearerTokenAuthenticationFilter.class)
+        // ADR-0023: enforces that an OrganizationClient token can only ever reach its own bound
+        // Organization — anchored after AntiAbuseRateLimitingFilter (same "needs the authenticated
+        // principal already populated" reason that filter is itself anchored after
+        // BearerTokenAuthenticationFilter), so it runs authenticate → rate-limit → org-ownership →
+        // business logic.
+        .addFilterAfter(
+            new OrganizationClientOwnershipFilter(accounts, workspaces),
+            AntiAbuseRateLimitingFilter.class)
         // Resource server, STATELESS session policy below, and securityMatcher already scopes
         // this whole chain to /api/v1/admin/** — every request reaching this point authenticates
         // via a Bearer token, never a cookie-based session, so there's no CSRF token to carry in

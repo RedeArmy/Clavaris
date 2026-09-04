@@ -23,14 +23,25 @@ import com.clavaris.organization.application.usecase.deleteorganization.EventOut
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationOAuthClientsEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationTokenRevoker;
+import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
+import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
+import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysService;
+import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysUseCase;
+import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsService;
+import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsUseCase;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersService;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationService;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialCipher;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialRepository;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SetOrganizationSocialCredentialService;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SetOrganizationSocialCredentialUseCase;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
@@ -52,15 +63,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 // Literals: the repeated string is "PMD.LongVariable" itself, reused across several @Bean
 // method parameters that legitimately share the same port name — same false positive
 // identity-module's own IdentityUseCaseConfig class-level suppression already documents.
-// ExcessiveImports/CouplingBetweenObjects: this class's whole job is wiring one @Bean method per
-// use case (this file's own doc comment) — the Workspace feature added 6 more use cases, tipping
-// import/collaborator counts over PMD's default thresholds. Same "wiring, not sprawl" reasoning
-// OrganizationAuthorizationServerConfig's own class-level Javadoc already documents for an
-// identical situation, not worth splitting a class whose entire job is Spring bean assembly.
+// ExcessiveImports/CouplingBetweenObjects/TooManyMethods: this class's whole job is wiring one
+// @Bean method per use case (this file's own doc comment) — the Workspace feature, then ADR-0022's
+// social-credential use cases, each added more, tipping method/import/collaborator counts over
+// PMD's default thresholds. Same "wiring, not sprawl" reasoning
+// OrganizationAuthorizationServerConfig's
+// own class-level Javadoc already documents for an identical situation, not worth splitting a class
+// whose entire job is Spring bean assembly.
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
   "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects"
+  "PMD.CouplingBetweenObjects",
+  "PMD.TooManyMethods"
 })
 @Configuration
 class OrganizationUseCaseConfig {
@@ -226,5 +240,40 @@ class OrganizationUseCaseConfig {
       setSocialLoginPolicyForOrganizationUseCase(
           final OrganizationRepository organizations, final AuditEventRecorder auditEvents) {
     return new SetSocialLoginPolicyForOrganizationService(organizations, auditEvents);
+  }
+
+  // PMD.LinguisticNaming: same false positive SetRateLimitPolicyForOrganizationUseCase's own
+  // @Bean method already documents above.
+  @SuppressWarnings("PMD.LinguisticNaming")
+  @Bean
+  /* package */ SetOrganizationSocialCredentialUseCase setOrganizationSocialCredentialUseCase(
+      final OrganizationRepository organizations,
+      final OrganizationSocialCredentialRepository credentials,
+      final OrganizationSocialCredentialCipher cipher,
+      final AuditEventRecorder auditEvents) {
+    return new SetOrganizationSocialCredentialService(
+        organizations, credentials, cipher, auditEvents);
+  }
+
+  @Bean
+  /* package */ ListOrganizationSocialCredentialsUseCase listOrganizationSocialCredentialsUseCase(
+      final OrganizationSocialCredentialRepository credentials) {
+    return new ListOrganizationSocialCredentialsService(credentials);
+  }
+
+  @Bean
+  /* package */ DeleteOrganizationSocialCredentialUseCase deleteOrganizationSocialCredentialUseCase(
+      final OrganizationSocialCredentialRepository credentials,
+      final AuditEventRecorder auditEvents) {
+    return new DeleteOrganizationSocialCredentialService(credentials, auditEvents);
+  }
+
+  // ADR-0023 / Clerk API-keys parity
+  @Bean
+  /* package */ GetOrganizationApiKeysUseCase getOrganizationApiKeysUseCase(
+      final OrganizationRepository organizations,
+      final OrganizationSigningKeyPublicKeyProvider publicKeyProvider,
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
+    return new GetOrganizationApiKeysService(organizations, publicKeyProvider, clavarisBaseUrl);
   }
 }
