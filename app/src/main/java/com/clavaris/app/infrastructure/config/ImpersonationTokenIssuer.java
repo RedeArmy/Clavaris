@@ -84,7 +84,23 @@ import org.springframework.stereotype.Component;
 // suppressions already establish) or a public constant whose exact name matters for readability at
 // its own call sites (TOKEN_EXCHANGE_GRANT_TYPE, ISSUER_PATH_PREFIX) — shortening any of them would
 // make this class harder to compare against the SAS source it mirrors, not easier to read.
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.LongVariable"})
+// java:S1075: ISSUER_PATH_PREFIX/TOKEN_ENDPOINT/JWK_SET_ENDPOINT are routes this deployment owns
+// and serves itself (ADR-0010 §5's own fixed issuer shape), not an external URI a deployment
+// should be able to independently repoint — same reasoning
+// SocialLoginAuthenticationSuccessHandler's
+// own identical suppression already documents for its TENANT_PATH_PREFIX. Making these configurable
+// would be actively dangerous here, not just unnecessary: ISSUER_PATH_PREFIX must stay
+// byte-for-byte
+// identical to CurrentOrganizationContext's own hardcoded "/o/" prefix (what a token minted here
+// must resolve back to on any future verification) and to OrganizationAuthorizationServerConfig's
+// own securityMatcher/tokenEndpoint/jwkSetEndpoint literals — two independently configurable copies
+// of the same structural constant could silently drift apart.
+@SuppressWarnings({
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects",
+  "PMD.LongVariable",
+  "java:S1075"
+})
 @Component
 class ImpersonationTokenIssuer {
 

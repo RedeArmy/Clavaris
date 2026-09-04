@@ -74,9 +74,10 @@ class ImpersonateAccountServiceTest {
   void rejectsAnUnknownAccountWithoutRecordingAnything() {
     AccountId unknownAccountId = AccountId.newId();
     when(accounts.findById(unknownAccountId)).thenReturn(Optional.empty());
+    ImpersonateAccountCommand command = new ImpersonateAccountCommand(unknownAccountId, ACTOR);
 
     assertThatExceptionOfType(AccountNotFoundException.class)
-        .isThrownBy(() -> service.handle(new ImpersonateAccountCommand(unknownAccountId, ACTOR)));
+        .isThrownBy(() -> service.handle(command));
 
     verifyNoInteractions(auditEvents);
   }
@@ -85,9 +86,10 @@ class ImpersonateAccountServiceTest {
   void rejectsASuspendedAccountWithoutRecordingAnything() {
     Account account = activeAccount();
     account.suspend();
+    ImpersonateAccountCommand command = new ImpersonateAccountCommand(account.id(), ACTOR);
 
     assertThatExceptionOfType(AccountNotActiveException.class)
-        .isThrownBy(() -> service.handle(new ImpersonateAccountCommand(account.id(), ACTOR)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(auditEvents, never()).write(any(), any(), any(), any(), any());
   }

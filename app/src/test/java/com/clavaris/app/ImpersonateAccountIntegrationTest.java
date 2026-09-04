@@ -109,8 +109,8 @@ class ImpersonateAccountIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(jwt.getJWTClaimsSet().getStringListClaim("amr")).containsExactly("imp");
     @SuppressWarnings("unchecked")
     Map<String, Object> act = (Map<String, Object>) jwt.getJWTClaimsSet().getClaim("act");
-    assertThat(act.get("sub")).isEqualTo("test-platform-client");
-    assertThat(act.get("type")).isEqualTo("PLATFORM_CLIENT");
+    assertThat(act).containsEntry("sub", "test-platform-client");
+    assertThat(act).containsEntry("type", "PLATFORM_CLIENT");
 
     // Cryptographic proof the token is real, not just well-formed — signed under a key this
     // Organization's own JWKS actually publishes, same "kid present + signature verifies" bar
