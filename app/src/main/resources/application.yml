@@ -104,6 +104,16 @@ clavaris:
   # this default is.
   webhook:
     secret-encryption-key: ${WEBHOOK_SECRET_ENCRYPTION_KEY:Ah1uNXa5LllyXt9HnJePrt1/3QLbDUG6SCRtFFwRSWc=}
+  # ADR-0022 (amending ADR-0020 Decision 4, SDE-III feature build, 2026-09-05): keys
+  # AesGcmOrganizationSocialCredentialCipher — a PRODUCTION Organization's own Google/GitHub OAuth
+  # app client_secret, encrypted at rest. Own dedicated key, deliberately not a reuse of
+  # WEBHOOK_SECRET_ENCRYPTION_KEY above — same "every at-rest secret gets its own independently-
+  # rotatable key" convention every sibling in this file already follows. The dev-only literal below
+  # is a freshly generated, structurally-valid-but-never-real key, and SOCIAL_CREDENTIAL_ENCRYPTION_
+  # KEY is listed in .env.example from day one — directly avoiding a repeat of the gap TD-SEC-047
+  # closed for WEBHOOK_SECRET_ENCRYPTION_KEY (that key shipped without a .env.example entry at all).
+  organization:
+    social-credential-encryption-key: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:2kqyn0bYhyCCadc20eH6ceXJS1z9DjwAhOjqQkDtYc8=}
   # TD-SEC-019: keys the HMAC-SHA256 digest HashedTokenOAuth2AuthorizationService computes for
   # every oauth2_authorization bearer token value before it reaches Postgres (BearerTokenHasher's
   # own Javadoc). The dev-only literal below is exactly that — never used in a real deployment,
