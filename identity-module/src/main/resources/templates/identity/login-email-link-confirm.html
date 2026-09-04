@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Confirm sign-in — Clavaris</title>
+</head>
+<body>
+<main>
+    <h1>Finish signing in</h1>
+    <!-- Deliberately not auto-submitted on page load — see EmailLinkSignInController's own
+         Javadoc for why this must be a genuine, human-initiated click, not a bare GET. -->
+    <p>Click the button below to complete your sign-in.</p>
+
+    <form th:action="@{''}" th:object="${form}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" th:field="*{token}"/>
+
+        <button type="submit">Sign in</button>
+    </form>
+</main>
+</body>
+</html>
