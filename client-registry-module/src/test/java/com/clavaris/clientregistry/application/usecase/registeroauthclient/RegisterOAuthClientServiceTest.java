@@ -20,6 +20,7 @@ class RegisterOAuthClientServiceTest {
   private final UUID organizationId = UUID.randomUUID();
   private OAuthClientRepository oauthClients;
   private OrganizationExistsChecker organizationExistsChecker;
+  private OrganizationEnvironmentChecker environmentChecker;
   private ClientSecretHasher hasher;
   private RegisterOAuthClientService service;
 
@@ -27,8 +28,11 @@ class RegisterOAuthClientServiceTest {
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
     organizationExistsChecker = mock(OrganizationExistsChecker.class);
+    environmentChecker = mock(OrganizationEnvironmentChecker.class);
     hasher = mock(ClientSecretHasher.class);
-    service = new RegisterOAuthClientService(oauthClients, organizationExistsChecker, hasher);
+    service =
+        new RegisterOAuthClientService(
+            oauthClients, organizationExistsChecker, environmentChecker, hasher);
 
     when(organizationExistsChecker.exists(organizationId)).thenReturn(true);
     when(hasher.hash(anyString())).thenReturn("argon2id$hashed");
@@ -127,5 +131,40 @@ class RegisterOAuthClientServiceTest {
 
     assertThat(result.client().postLogoutRedirectUris())
         .containsExactly("https://jobseeker.example.com/logged-out");
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  @Test
+  void prefixesTheClientIdWithLiveForAProductionOrganization() {
+    when(environmentChecker.isDevelopment(organizationId)).thenReturn(false);
+
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of()));
+
+    assertThat(result.client().clientId()).startsWith("live_");
+  }
+
+  @Test
+  void prefixesTheClientIdWithTestForADevelopmentOrganization() {
+    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
+
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of()));
+
+    assertThat(result.client().clientId()).startsWith("test_");
   }
 }

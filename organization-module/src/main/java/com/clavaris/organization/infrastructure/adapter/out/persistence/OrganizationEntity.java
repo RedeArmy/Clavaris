@@ -37,21 +37,33 @@ public class OrganizationEntity {
   @Column(name = "allowed_social_providers")
   private String allowedSocialProviders;
 
+  @Column(nullable = false)
+  private String environment;
+
+  @Column(name = "linked_environment_organization_id")
+  private UUID linkedEnvironmentOrganizationId;
+
   protected OrganizationEntity() {}
 
+  @SuppressWarnings("java:S107") // one parameter per persisted column — same rationale as the
+  // domain aggregate's own identical suppression.
   public OrganizationEntity(
       final UUID id,
       final String name,
       final Instant createdAt,
       final UUID ownerPlatformAccountId,
       final boolean socialLoginEnabled,
-      final String allowedSocialProviders) {
+      final String allowedSocialProviders,
+      final String environment,
+      final UUID linkedEnvironmentOrganizationId) {
     this.id = id;
     this.name = name;
     this.createdAt = createdAt;
     this.ownerPlatformAccountId = ownerPlatformAccountId;
     this.socialLoginEnabled = socialLoginEnabled;
     this.allowedSocialProviders = allowedSocialProviders;
+    this.environment = environment;
+    this.linkedEnvironmentOrganizationId = linkedEnvironmentOrganizationId;
   }
 
   public UUID getId() {
@@ -76,5 +88,13 @@ public class OrganizationEntity {
 
   public String getAllowedSocialProviders() {
     return allowedSocialProviders;
+  }
+
+  public String getEnvironment() {
+    return environment;
+  }
+
+  public UUID getLinkedEnvironmentOrganizationId() {
+    return linkedEnvironmentOrganizationId;
   }
 }

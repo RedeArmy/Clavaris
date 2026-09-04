@@ -105,6 +105,14 @@ class AdminApiSecurityConfig {
                     // PlatformScopes already reserves for this exact action.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/organizations")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ORGANIZATIONS_WRITE)
+                    // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances
+                    // analysis): promoting a DEVELOPMENT Organization by creating its PRODUCTION
+                    // sibling is structurally the same class of action as creating an Organization
+                    // in the first place — same scope, no new risk tier warranting its own.
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/v1/admin/organizations/*:create-production-environment")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ORGANIZATIONS_WRITE)
                     // ADR-0010 §6.2: tuning the capacity-layer ceiling is its own scope too, same
                     // defence-in-depth reasoning as Organization creation above — a platform
                     // token that can create Organizations doesn't automatically get to also

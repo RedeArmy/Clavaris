@@ -12,6 +12,8 @@ import com.clavaris.organization.application.usecase.createorganization.CreateOr
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createorganization.PlatformAccountExistsChecker;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
+import com.clavaris.organization.application.usecase.createproductionenvironment.CreateProductionEnvironmentService;
+import com.clavaris.organization.application.usecase.createproductionenvironment.CreateProductionEnvironmentUseCase;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceService;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
@@ -68,15 +70,44 @@ class OrganizationUseCaseConfig {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
 
+  // SDE-III feature build, 2026-09-04: developmentDefaultRequestsPerMinute is deliberately much
+  // lower than OrganizationCapacityRateLimitingFilter's own system default (600/min) — a brand-new
+  // sandbox Organization should never accidentally absorb production-scale traffic before an
+  // operator has deliberately promoted it (createProductionEnvironmentUseCase below). Reuses the
+  // exact same hardSystemWideCap value setRateLimitPolicyForOrganizationUseCase already injects
+  // below — one config source of truth for the one invariant RateLimitPolicy itself enforces.
   @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ CreateOrganizationUseCase createOrganizationUseCase(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
       final PlatformAccountExistsChecker platformAccountExistsChecker,
-      final AuditEventRecorder auditEvents) {
+      final AuditEventRecorder auditEvents,
+      final RateLimitPolicyRepository policies,
+      @Value("${clavaris.rate-limit.capacity.development-default-requests-per-minute:300}")
+          final int developmentDefaultRequestsPerMinute,
+      @Value("${clavaris.rate-limit.capacity.hard-cap-requests-per-minute:6000}")
+          final int hardSystemWideCap) {
     return new CreateOrganizationService(
-        organizations, keyProvisioner, platformAccountExistsChecker, auditEvents);
+        organizations,
+        keyProvisioner,
+        platformAccountExistsChecker,
+        auditEvents,
+        policies,
+        developmentDefaultRequestsPerMinute,
+        hardSystemWideCap);
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis): promotes
+  // a DEVELOPMENT Organization by creating its paired PRODUCTION sibling — see
+  // CreateProductionEnvironmentService's own Javadoc for why this deliberately doesn't wrap
+  // createOrganizationUseCase above rather than sharing its shape directly.
+  @Bean
+  /* package */ CreateProductionEnvironmentUseCase createProductionEnvironmentUseCase(
+      final OrganizationRepository organizations,
+      final SigningKeyProvisioner keyProvisioner,
+      final AuditEventRecorder auditEvents) {
+    return new CreateProductionEnvironmentService(organizations, keyProvisioner, auditEvents);
   }
 
   @Bean

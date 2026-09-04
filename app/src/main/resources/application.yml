@@ -185,6 +185,17 @@ clavaris:
       default-requests-per-minute: 600
       hard-cap-requests-per-minute: 6000
       policy-cache-ttl-seconds: 30
+      # SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis): the
+      # explicit RateLimitPolicy CreateOrganizationService provisions for every new (DEVELOPMENT-
+      # by-default, see Organization#register's own Javadoc) Organization — deliberately below
+      # default-requests-per-minute above, so a brand-new sandbox never accidentally absorbs
+      # production-scale traffic before an operator deliberately promotes it via
+      # :create-production-environment. 300, not 60: this capacity ceiling is cumulative across
+      # every endpoint hit against the Organization, so it must stay comfortably above any single
+      # per-account/IP anti-abuse rule's own limit (e.g. accountSessionsListPerAccountLimit, 60) or
+      # it silently pre-empts that more specific rule's own test/behaviour instead of the capacity
+      # layer actually being what's exercised.
+      development-default-requests-per-minute: 300
   # TD-TEST-002: EventOutboxRetentionJob (identity-module)/OrganizationEventOutboxRetentionJob
   # (organization-module) sweep event_outbox/organization_event_outbox rows older than this many
   # days, daily. webhook-module's own dispatcher now exists (ADR-0007) and polls every few seconds

@@ -17,6 +17,7 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.event.OrganizationDeletedEvent;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationEnvironment;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -59,7 +60,14 @@ class DeleteOrganizationServiceTest {
   private Organization registeredOrganization(final UUID organizationId) {
     Organization organization =
         Organization.reconstitute(
-            organizationId, "Acme", Instant.now(), UUID.randomUUID(), false, List.of());
+            organizationId,
+            "Acme",
+            Instant.now(),
+            UUID.randomUUID(),
+            false,
+            List.of(),
+            OrganizationEnvironment.PRODUCTION,
+            null);
     when(organizations.findById(organizationId)).thenReturn(Optional.of(organization));
     return organization;
   }

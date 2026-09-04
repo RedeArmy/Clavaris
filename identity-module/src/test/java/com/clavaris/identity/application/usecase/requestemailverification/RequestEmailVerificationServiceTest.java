@@ -30,6 +30,7 @@ class RequestEmailVerificationServiceTest {
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
+  private OrganizationEnvironmentChecker environmentChecker;
   private RequestEmailVerificationService service;
 
   @BeforeEach
@@ -37,7 +38,11 @@ class RequestEmailVerificationServiceTest {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
-    service = new RequestEmailVerificationService(accounts, tokens, mailSender);
+    environmentChecker = mock(OrganizationEnvironmentChecker.class);
+    // Mockito's own default (unstubbed boolean = false) already means "not DEVELOPMENT" — every
+    // existing test below relies on this real send path being taken by default, same as before
+    // this port existed.
+    service = new RequestEmailVerificationService(accounts, tokens, mailSender, environmentChecker);
   }
 
   @Test
@@ -87,6 +92,19 @@ class RequestEmailVerificationServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
+    verify(mailSender, never()).sendEmailVerification(any(), any(), any());
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  @Test
+  void stillIssuesATokenButNeverSendsARealEmailForADevelopmentEnvironmentAccount() {
+    Account account = Account.register(organizationId, new Email("sandbox-user@example.com"));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
+
+    service.handle(new RequestEmailVerificationCommand(account.id()));
+
+    verify(tokens, times(1)).save(any());
     verify(mailSender, never()).sendEmailVerification(any(), any(), any());
   }
 }

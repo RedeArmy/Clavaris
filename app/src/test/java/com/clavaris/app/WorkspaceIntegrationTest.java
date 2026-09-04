@@ -74,7 +74,13 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
   @Test
   void addingAMemberProvisionsARealAccountAndTriggersTheirOwnPasswordResetEmail() throws Exception {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
-    UUID organizationId = createOrganization(platformToken, "Workspace Flow Co");
+    // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis):
+    // every new Organization now defaults to DEVELOPMENT, which never sends a real outbound email
+    // (BR-ID-15) — this test's own point is proving a real welcome email fires, so it needs a real
+    // PRODUCTION Organization, not the sandbox default every other test in this file is indifferent
+    // to.
+    UUID organizationId =
+        promoteToProduction(platformToken, createOrganization(platformToken, "Workspace Flow Co"));
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
 
     JsonNode membership = addMember(platformToken, workspaceId, "new-member@example.com", null);
@@ -367,6 +373,25 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
                         + "\",\"ownerPlatformAccountId\":\""
                         + registerAPlatformAccount()
                         + "\"}"))
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis): a fresh
+  // Organization now defaults to DEVELOPMENT (BR-ORG-08), which never sends real outbound email
+  // (BR-ID-15) — a test proving a real email fires needs an actual PRODUCTION Organization.
+  private UUID promoteToProduction(String platformToken, UUID developmentOrganizationId)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                baseUri(
+                    "/api/v1/admin/organizations/"
+                        + developmentOrganizationId
+                        + ":create-production-environment"))
+            .header("Authorization", "Bearer " + platformToken)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"Production\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     return UUID.fromString(objectMapper.readTree(response.body()).get("id").asString());

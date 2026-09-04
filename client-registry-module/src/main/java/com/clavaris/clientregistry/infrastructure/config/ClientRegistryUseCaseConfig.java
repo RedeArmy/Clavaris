@@ -7,6 +7,7 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.P
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationEnvironmentChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientService;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
@@ -42,8 +43,10 @@ class ClientRegistryUseCaseConfig {
   /* package */ RegisterOAuthClientUseCase registerOAuthClientUseCase(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
+      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final ClientSecretHasher hasher) {
-    return new RegisterOAuthClientService(oauthClients, orgExistsChecker, hasher);
+    return new RegisterOAuthClientService(
+        oauthClients, orgExistsChecker, environmentChecker, hasher);
   }
 
   // TD-SEC-018

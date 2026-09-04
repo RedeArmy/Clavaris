@@ -13,18 +13,24 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
+import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
+import com.clavaris.organization.domain.model.RateLimitPolicy;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class CreateOrganizationServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
+  private static final int DEVELOPMENT_DEFAULT_REQUESTS_PER_MINUTE = 300;
+  private static final int HARD_SYSTEM_WIDE_CAP = 6000;
 
   private OrganizationRepository organizations;
   private SigningKeyProvisioner keyProvisioner;
   private PlatformAccountExistsChecker platformAccountExistsChecker;
   private AuditEventRecorder auditEvents;
+  private RateLimitPolicyRepository policies;
   private CreateOrganizationService service;
 
   @BeforeEach
@@ -33,10 +39,17 @@ class CreateOrganizationServiceTest {
     keyProvisioner = mock(SigningKeyProvisioner.class);
     platformAccountExistsChecker = mock(PlatformAccountExistsChecker.class);
     auditEvents = mock(AuditEventRecorder.class);
+    policies = mock(RateLimitPolicyRepository.class);
     when(platformAccountExistsChecker.exists(any())).thenReturn(true);
     service =
         new CreateOrganizationService(
-            organizations, keyProvisioner, platformAccountExistsChecker, auditEvents);
+            organizations,
+            keyProvisioner,
+            platformAccountExistsChecker,
+            auditEvents,
+            policies,
+            DEVELOPMENT_DEFAULT_REQUESTS_PER_MINUTE,
+            HARD_SYSTEM_WIDE_CAP);
   }
 
   @Test
@@ -101,5 +114,23 @@ class CreateOrganizationServiceTest {
     verify(organizations, never()).save(any());
     verifyNoInteractions(keyProvisioner);
     verifyNoInteractions(auditEvents);
+  }
+
+  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis):
+  // Organization.register() defaults every new Organization to DEVELOPMENT (Organization's own
+  // Javadoc) — this service must provision a real, explicit, low-default RateLimitPolicy for it.
+  @Test
+  void provisionsADevelopmentDefaultRateLimitPolicyForTheNewlyCreatedOrganization() {
+    when(keyProvisioner.provisionFor(any()))
+        .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
+
+    final CreateOrganizationResult result =
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
+
+    ArgumentCaptor<RateLimitPolicy> captor = ArgumentCaptor.forClass(RateLimitPolicy.class);
+    verify(policies).save(captor.capture());
+    assertThat(captor.getValue().organizationId()).isEqualTo(result.organization().id());
+    assertThat(captor.getValue().requestsPerMinute())
+        .isEqualTo(DEVELOPMENT_DEFAULT_REQUESTS_PER_MINUTE);
   }
 }
