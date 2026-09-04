@@ -121,6 +121,20 @@ public final class PlatformScopes {
   public static final String WEBHOOK_DELIVERIES_REPLAY = "platform:webhook-deliveries:replay";
 
   /**
+   * SDE-III feature build, 2026-09-03: mints a short-lived, real, revocable Bearer access token
+   * scoped to the target {@code Account} and one of its Organization's own {@code OAuthClient}s — a
+   * genuine support/operator "log in as this user" capability (RFC 8693 {@code act} claim marks the
+   * token as issued on-behalf-of the target while acting-as the calling {@code PlatformClient},
+   * same convention Clerk/Auth0's own equivalent feature uses). Its own dedicated scope,
+   * deliberately separate from every other admin-API scope here — the single highest-impact
+   * capability this management API exposes short of {@link #ACCOUNTS_DELETE}/{@link
+   * #ORGANIZATIONS_DELETE} themselves (it grants the bearer everything the impersonated Account
+   * itself can do, not just a mutation of it), so a platform token scoped for routine account
+   * administration must not get this by default.
+   */
+  public static final String ACCOUNTS_IMPERSONATE = "platform:accounts:impersonate";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -140,7 +154,8 @@ public final class PlatformScopes {
           ACCOUNTS_SUSPEND,
           SOCIAL_LOGIN_POLICY_WRITE,
           WEBHOOK_ENDPOINTS_WRITE,
-          WEBHOOK_DELIVERIES_REPLAY);
+          WEBHOOK_DELIVERIES_REPLAY,
+          ACCOUNTS_IMPERSONATE);
 
   private PlatformScopes() {}
 }

@@ -25,6 +25,8 @@ import com.clavaris.identity.application.usecase.confirmpendingsociallink.Confir
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
+import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountService;
+import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
@@ -269,6 +271,15 @@ class IdentityUseCaseConfig {
         accountSessionRevoker,
         auditEvents,
         eventOutboxWriter);
+  }
+
+  // SDE-III feature build, 2026-09-03: support/operator impersonation — see
+  // ImpersonateAccountCommand's own Javadoc for why this use case only validates+audits, never
+  // mints anything itself.
+  @Bean
+  /* package */ ImpersonateAccountUseCase impersonateAccountUseCase(
+      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
+    return new ImpersonateAccountService(accounts, auditEvents);
   }
 
   @Bean

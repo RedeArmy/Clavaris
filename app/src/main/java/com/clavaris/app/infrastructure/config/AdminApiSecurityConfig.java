@@ -87,7 +87,14 @@ class AdminApiSecurityConfig {
       // routine, non-destructive operation.
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.admin-api.workspace-members-write.per-client-limit:60}")
-          final int workspaceMembersWritePerClientLimit) {
+          final int workspaceMembersWritePerClientLimit,
+      // SDE-III feature build, 2026-09-03 (Impersonation): the tightest ceiling on this whole
+      // chain short of the two :delete endpoints — every call mints a real, usable Bearer token
+      // granting full access as the target Account, so a runaway loop here is a live account-
+      // takeover risk, not just a wasted write.
+      @SuppressWarnings("PMD.LongVariable")
+          @Value("${clavaris.rate-limit.admin-api.accounts-impersonate.per-client-limit:10}")
+          final int accountsImpersonatePerClientLimit) {
     http.securityMatcher(ADMIN_API_PATH_PATTERN)
         .authorizeHttpRequests(
             authorize ->
@@ -133,6 +140,13 @@ class AdminApiSecurityConfig {
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:reactivate")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
+                    // SDE-III feature build, 2026-09-03 (Impersonation) — its own scope,
+                    // deliberately separate from every other admin-API scope here: see
+                    // PlatformScopes.ACCOUNTS_IMPERSONATE's own Javadoc for why this is the
+                    // single highest-impact capability this surface exposes short of the two
+                    // :delete endpoints.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:impersonate")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_IMPERSONATE)
                     // BR-DATA-02/03: hard-deleting an entire Organization — its own scope too,
                     // deliberately separate from ACCOUNTS_DELETE (an entire tenant's whole
                     // account pool vs. one identity), arguably the single most irreversible
@@ -245,6 +259,17 @@ class AdminApiSecurityConfig {
                         RateLimitRule.always(),
                         RateLimitIdentifiers::authenticatedPlatformClientId,
                         workspaceMembersWritePerClientLimit,
+                        Duration.ofMinutes(5)),
+                    // SDE-III feature build, 2026-09-03 (Impersonation): tighter than every other
+                    // rule here bar the two :delete endpoints — see this method's own parameter
+                    // comment for why.
+                    new RateLimitRule(
+                        "admin-api-accounts-impersonate:client",
+                        HttpMethod.POST,
+                        "/api/v1/admin/accounts/*:impersonate",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        accountsImpersonatePerClientLimit,
                         Duration.ofMinutes(5)))),
             BearerTokenAuthenticationFilter.class)
         // Resource server, STATELESS session policy below, and securityMatcher already scopes
