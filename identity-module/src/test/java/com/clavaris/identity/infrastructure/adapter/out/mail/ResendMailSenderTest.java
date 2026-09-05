@@ -87,6 +87,63 @@ class ResendMailSenderTest {
   }
 
   @Test
+  void sendsAWellFormedRequestForAnEmailVerificationCode() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendEmailVerificationCode(
+        "user@example.com", new OrganizationId(UUID.randomUUID()), "482913");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("Verify your email address");
+    assertThat(body.get("html").asString())
+        .as("ADR-0024 §2: the CODE method sends a code, not a link")
+        .contains("482913");
+  }
+
+  @Test
+  void sendsAWellFormedRequestForAnEmailSignInCode() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendEmailSignInCode("user@example.com", new OrganizationId(UUID.randomUUID()), "111222");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("Your sign-in code");
+    assertThat(body.get("html").asString()).contains("111222");
+  }
+
+  @Test
+  void sendsAWellFormedRequestForAnEmailSignInLink() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+    UUID organizationId = UUID.randomUUID();
+
+    sender.sendEmailSignInLink(
+        "user@example.com", new OrganizationId(organizationId), "the-raw-sign-in-token");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("Your sign-in link");
+    assertThat(body.get("html").asString())
+        .as("ADR-0024 §3: the same tenant-scoped /o/{organizationId}/... link shape")
+        .contains(
+            BASE_URL + "/o/" + organizationId + "/login/email-link?token=the-raw-sign-in-token");
+  }
+
+  @Test
+  void sendsAWellFormedRequestForADeviceTrustChallengeCode() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendDeviceTrustChallengeCode(
+        "user@example.com", new OrganizationId(UUID.randomUUID()), "999888");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("Confirm this new device");
+    assertThat(body.get("html").asString()).contains("999888");
+  }
+
+  @Test
   void sendsAWellFormedRequestForAPlatformAccountWithThePlatformTierLinkShape() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();

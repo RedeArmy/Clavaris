@@ -15,11 +15,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
+import com.clavaris.identity.application.usecase.registeraccount.UsernameRequiredException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
+import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.AccountId;
@@ -253,6 +258,120 @@ class RegisterAccountControllerTest {
         .andExpect(view().name("identity/register"))
         .andExpect(model().attributeHasFieldErrors("form", "password"));
 
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void usernameRequiredExceptionRerendersTheFormWithAFieldError() throws Exception {
+    when(useCase.handle(any())).thenThrow(new UsernameRequiredException());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "username"));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void usernameAlreadyRegisteredExceptionRerendersTheFormWithAFieldError() throws Exception {
+    when(useCase.handle(any()))
+        .thenThrow(new UsernameAlreadyRegisteredException(new OrganizationId(ORGANIZATION_ID)));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password")
+                .param("username", "taken"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "username"));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void missingPasswordIsRejectedWhenThePolicyRequiresOne() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "password"));
+
+    verifyNoInteractions(useCase);
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void missingPasswordCompletesSignUpViaEmailCodeWhenThePolicyAllowsIt() throws Exception {
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false));
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/" + ORGANIZATION_ID + "/login/email-code/confirm?email=new-user@example.com"));
+
+    verify(requestEmailSignInCode)
+        .handle(
+            new RequestEmailSignInCodeCommand(
+                new OrganizationId(ORGANIZATION_ID), new Email("new-user@example.com")));
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void missingPasswordCompletesSignUpViaEmailLinkWhenCodeIsNotEnabled() throws Exception {
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false));
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login/email-link/pending"));
+
+    verify(requestEmailSignInLink)
+        .handle(
+            new RequestEmailSignInLinkCommand(
+                new OrganizationId(ORGANIZATION_ID), new Email("new-user@example.com")));
     verifyNoInteractions(requestEmailVerification);
   }
 

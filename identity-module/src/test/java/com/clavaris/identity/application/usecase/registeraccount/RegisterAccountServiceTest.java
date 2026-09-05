@@ -13,9 +13,11 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.Username;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,5 +124,87 @@ class RegisterAccountServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  @Test
+  void assignsTheSubmittedUsernameWhenTheOrganizationAllowsIt() {
+    when(policyProvider.policyFor(organizationId)).thenReturn(usernameOptionalPolicy());
+    when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
+    when(accounts.existsByOrganizationIdAndUsername(eq(organizationId), any())).thenReturn(false);
+
+    service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, "flowuser"));
+
+    org.mockito.ArgumentCaptor<com.clavaris.identity.domain.model.Account> accountCaptor =
+        org.mockito.ArgumentCaptor.forClass(com.clavaris.identity.domain.model.Account.class);
+    verify(accounts).save(accountCaptor.capture());
+    assertThat(accountCaptor.getValue().username()).contains(new Username("flowuser"));
+  }
+
+  @Test
+  void rejectsRegistrationWhenTheOrganizationRequiresAUsernameAndNoneWasSubmitted() {
+    when(policyProvider.policyFor(organizationId)).thenReturn(usernameRequiredPolicy());
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
+
+    assertThatExceptionOfType(UsernameRequiredException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).save(any());
+  }
+
+  @Test
+  void rejectsRegistrationWhenThePreCheckFindsTheUsernameAlreadyTaken() {
+    when(policyProvider.policyFor(organizationId)).thenReturn(usernameOptionalPolicy());
+    when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
+    when(accounts.existsByOrganizationIdAndUsername(eq(organizationId), any())).thenReturn(true);
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, "taken");
+
+    assertThatExceptionOfType(UsernameAlreadyRegisteredException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).save(any());
+  }
+
+  @Test
+  void attachesARandomGeneratedPasswordWhenPasswordAtSignUpIsDisabledAndNoneWasSubmitted() {
+    when(policyProvider.policyFor(organizationId)).thenReturn(passwordOptionalPolicy());
+    when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
+
+    service.handle(new RegisterAccountCommand(organizationId, email, null, null));
+
+    // ADR-0024 §5: never the raw submitted value (there wasn't one) — a real, hashed credential
+    // still gets attached, just never the literal null/blank the caller sent.
+    verify(hasher).hash(argThat(raw -> raw != null && raw.length() == 32));
+    verify(accounts).save(any());
+  }
+
+  @Test
+  void rejectsMissingPasswordWhenTheOrganizationStillRequiresOneAtSignUp() {
+    RegisterAccountCommand command = new RegisterAccountCommand(organizationId, email, null, null);
+
+    assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).save(any());
+  }
+
+  private static AccountAuthenticationPolicySnapshot usernameOptionalPolicy() {
+    return new AccountAuthenticationPolicySnapshot(
+        false, EmailVerificationMethod.LINK, false, false, true, false, false, true, false);
+  }
+
+  private static AccountAuthenticationPolicySnapshot usernameRequiredPolicy() {
+    return new AccountAuthenticationPolicySnapshot(
+        false, EmailVerificationMethod.LINK, false, false, true, true, false, true, false);
+  }
+
+  private static AccountAuthenticationPolicySnapshot passwordOptionalPolicy() {
+    return new AccountAuthenticationPolicySnapshot(
+        false, EmailVerificationMethod.LINK, true, false, false, false, false, false, false);
+  }
+
+  private static String argThat(final java.util.function.Predicate<String> predicate) {
+    return org.mockito.ArgumentMatchers.argThat(predicate::test);
   }
 }
