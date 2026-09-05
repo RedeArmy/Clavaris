@@ -19,7 +19,23 @@ public interface MailSender {
 
   void sendEmailVerification(String toAddress, OrganizationId organizationId, String rawToken);
 
+  /**
+   * ADR-0024 §2: the {@code CODE}/{@code BOTH} counterpart to {@link #sendEmailVerification} — a
+   * short, human-typeable one-time code ({@code EmailOneTimeCode}) rather than a clickable link.
+   */
+  void sendEmailVerificationCode(String toAddress, OrganizationId organizationId, String rawCode);
+
   void sendPasswordReset(String toAddress, OrganizationId organizationId, String rawToken);
+
+  /** ADR-0024 §3: passwordless email sign-in — a one-time code entered on the login page. */
+  void sendEmailSignInCode(String toAddress, OrganizationId organizationId, String rawCode);
+
+  /** ADR-0024 §3: passwordless email sign-in — a single-use confirmation link. */
+  void sendEmailSignInLink(String toAddress, OrganizationId organizationId, String rawToken);
+
+  /** ADR-0024 §6: Device Trust's step-up challenge for a sign-in from an unrecognized device. */
+  void sendDeviceTrustChallengeCode(
+      String toAddress, OrganizationId organizationId, String rawCode);
 
   /**
    * ADR-0020 Decision 1, BR-ID-09: {@code AuthenticateWithSocialProviderService}'s confirmation

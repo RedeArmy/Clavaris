@@ -19,7 +19,11 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Authen
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -48,6 +52,9 @@ class LoginControllerTest {
   private AuthenticatedSessionEstablisher sessionEstablisher;
   private OrganizationSocialLoginPolicyProvider policyProvider;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private KnownDeviceRepository knownDevices;
+  private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
+  private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -56,6 +63,12 @@ class LoginControllerTest {
     sessionEstablisher = mock(AuthenticatedSessionEstablisher.class);
     policyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
+    knownDevices = mock(KnownDeviceRepository.class);
+    authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
+    // Matches today's real default (ADR-0024) — every existing test below predates this policy.
+    when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -73,7 +86,14 @@ class LoginControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new LoginController(useCase, sessionEstablisher, policyProvider, recordLoginDevice))
+                new LoginController(
+                    useCase,
+                    sessionEstablisher,
+                    policyProvider,
+                    recordLoginDevice,
+                    knownDevices,
+                    authenticationPolicyProvider,
+                    requestDeviceTrustChallenge))
             .setViewResolvers(viewResolver)
             .build();
   }

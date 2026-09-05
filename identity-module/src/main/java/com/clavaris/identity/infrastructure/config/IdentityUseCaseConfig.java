@@ -8,6 +8,10 @@ import com.clavaris.identity.application.usecase.activateplatformsigningkey.Plat
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationService;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
+import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeService;
+import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkService;
+import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
@@ -16,6 +20,10 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
+import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameService;
+import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
+import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeService;
+import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
@@ -46,6 +54,13 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeService;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
+import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeService;
+import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
+import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkService;
+import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
@@ -112,8 +127,10 @@ class IdentityUseCaseConfig {
   /* package */ RegisterAccountUseCase registerAccountUseCase(
       final AccountRepository accountRepository,
       final PasswordHasher passwordHasher,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new RegisterAccountService(accountRepository, passwordHasher, eventOutboxWriter);
+      final EventOutboxWriter eventOutboxWriter,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    return new RegisterAccountService(
+        accountRepository, passwordHasher, eventOutboxWriter, policyProvider);
   }
 
   @Bean
@@ -158,9 +175,10 @@ class IdentityUseCaseConfig {
   /* package */ AuthenticateWithPasswordUseCase authenticateWithPasswordUseCase(
       final AccountRepository accountRepository,
       final PasswordVerifier passwordVerifier,
-      final SecurityMetricsRecorder securityMetrics) {
+      final SecurityMetricsRecorder securityMetrics,
+      final AccountAuthenticationPolicyProvider policyProvider) {
     return new AuthenticateWithPasswordService(
-        accountRepository, passwordVerifier, securityMetrics);
+        accountRepository, passwordVerifier, securityMetrics, policyProvider);
   }
 
   @Bean
@@ -190,15 +208,16 @@ class IdentityUseCaseConfig {
         securityMetrics);
   }
 
+  @SuppressWarnings("java:S107")
   @Bean
   /* package */ RequestEmailVerificationUseCase requestEmailVerificationUseCase(
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
+      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
+      final AccountAuthenticationPolicyProvider policyProvider) {
     return new RequestEmailVerificationService(
-        accounts, verificationTokens, mailSender, environmentChecker);
+        accounts, verificationTokens, mailSender, environmentChecker, policyProvider);
   }
 
   @Bean
@@ -240,6 +259,70 @@ class IdentityUseCaseConfig {
         accountSessionRevoker,
         passwordHasher,
         eventOutboxWriter);
+  }
+
+  // ADR-0024 §3 — passwordless email sign-in
+  @Bean
+  /* package */ RequestEmailSignInCodeUseCase requestEmailSignInCodeUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final MailSender mailSender,
+      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    return new RequestEmailSignInCodeService(
+        accounts, verificationTokens, mailSender, environmentChecker, policyProvider);
+  }
+
+  @Bean
+  /* package */ AuthenticateWithEmailCodeUseCase authenticateWithEmailCodeUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
+    return new AuthenticateWithEmailCodeService(accounts, verificationTokens);
+  }
+
+  @Bean
+  /* package */ RequestEmailSignInLinkUseCase requestEmailSignInLinkUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final MailSender mailSender,
+      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    return new RequestEmailSignInLinkService(
+        accounts, verificationTokens, mailSender, environmentChecker, policyProvider);
+  }
+
+  // ADR-0024 §4 — username sign-in
+  @Bean
+  /* package */ AuthenticateWithUsernameUseCase authenticateWithUsernameUseCase(
+      final AccountRepository accountRepository,
+      final PasswordVerifier passwordVerifier,
+      final AccountAuthenticationPolicyProvider policyProvider) {
+    return new AuthenticateWithUsernameService(accountRepository, passwordVerifier, policyProvider);
+  }
+
+  @Bean
+  /* package */ AuthenticateWithEmailLinkUseCase authenticateWithEmailLinkUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
+    return new AuthenticateWithEmailLinkService(accounts, verificationTokens);
+  }
+
+  // ADR-0024 §6 — device trust step-up challenge
+  @Bean
+  /* package */ RequestDeviceTrustChallengeUseCase requestDeviceTrustChallengeUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      final MailSender mailSender,
+      @SuppressWarnings("PMD.LongVariable")
+          final OrganizationEnvironmentChecker environmentChecker) {
+    return new RequestDeviceTrustChallengeService(
+        accounts, verificationTokens, mailSender, environmentChecker);
+  }
+
+  @Bean
+  /* package */ ConfirmDeviceTrustChallengeUseCase confirmDeviceTrustChallengeUseCase(
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
+    return new ConfirmDeviceTrustChallengeService(verificationTokens);
   }
 
   @Bean
