@@ -42,6 +42,10 @@ public class RedirectPolicyEntity {
   protected RedirectPolicyEntity() {}
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase.
+  // java:S107: PMD's own ExcessiveParameterList threshold isn't hit at 8 params (hence no PMD.*
+  // suppression needed), but SonarCloud's separate, lower-threshold (7) rule still fires — same
+  // precedent OAuthClientEntity's own constructor already establishes.
+  @SuppressWarnings("java:S107")
   public RedirectPolicyEntity(
       final UUID id,
       final UUID oauthClientId,
