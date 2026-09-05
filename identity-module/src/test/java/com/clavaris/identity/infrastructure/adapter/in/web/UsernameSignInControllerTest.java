@@ -20,10 +20,12 @@ import com.clavaris.identity.application.usecase.authenticatewithusername.Authen
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
@@ -49,6 +51,8 @@ class UsernameSignInControllerTest {
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private RedirectUrlResolver redirectUrlResolver;
+  private AccountRepository accounts;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -59,9 +63,13 @@ class UsernameSignInControllerTest {
     knownDevices = mock(KnownDeviceRepository.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
+    redirectUrlResolver = mock(RedirectUrlResolver.class);
+    accounts = mock(AccountRepository.class);
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
+    when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
+    when(accounts.findById(any())).thenReturn(Optional.empty());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -85,7 +93,9 @@ class UsernameSignInControllerTest {
                     recordLoginDevice,
                     knownDevices,
                     authenticationPolicyProvider,
-                    requestDeviceTrustChallenge))
+                    requestDeviceTrustChallenge,
+                    redirectUrlResolver,
+                    accounts))
             .setViewResolvers(viewResolver)
             .build();
   }

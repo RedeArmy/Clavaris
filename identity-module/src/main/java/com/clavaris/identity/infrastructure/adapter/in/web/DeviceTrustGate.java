@@ -43,8 +43,11 @@ final class DeviceTrustGate {
    *     DeviceCookie} matches a {@code KnownDevice} already on file for this exact account).
    */
   // Two genuinely distinct outcomes (must pause for a challenge / may proceed) — same "each
-  // outcome needs its own exit" rationale as DeviceCookie's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // outcome needs its own exit" rationale as DeviceCookie's own identical suppression. java:S107:
+  // one parameter per collaborating port/request value, same rationale as
+  // AuthenticatedSessionCompletion's own identical suppression — the two extra params
+  // (clientId/redirectUrl) are what pushed this over Sonar's own lower (7) threshold.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
   /* package */ static Optional<String> intercept(
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestChallenge,
@@ -52,7 +55,11 @@ final class DeviceTrustGate {
       final HttpServletRequest request,
       final UUID organizationId,
       final AccountId accountId,
-      final PendingAuthenticationFactor factor) {
+      final PendingAuthenticationFactor factor,
+      // Clerk "customize redirect URLs" parity — both nullable, see DeviceTrustPendingState's own
+      // Javadoc for why they're carried across this pause at all.
+      final String clientId,
+      final String redirectUrl) {
     if (!policy.deviceTrustEnabled()
         || isRecognized(knownDevices, request, organizationId, accountId)) {
       return Optional.empty();
@@ -64,6 +71,12 @@ final class DeviceTrustGate {
     session.setAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE, factor.name());
     session.setAttribute(
         DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE, organizationId.toString());
+    if (clientId != null) {
+      session.setAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE, clientId);
+    }
+    if (redirectUrl != null) {
+      session.setAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE, redirectUrl);
+    }
 
     requestChallenge.handle(new RequestDeviceTrustChallengeCommand(accountId));
     return Optional.of("/o/" + organizationId + "/login/device-trust");

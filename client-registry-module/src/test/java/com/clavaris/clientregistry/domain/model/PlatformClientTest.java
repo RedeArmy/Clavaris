@@ -37,7 +37,9 @@ class PlatformClientTest {
             PlatformScopes.SOCIAL_CREDENTIALS_WRITE,
             PlatformScopes.SECRET_KEYS_WRITE,
             PlatformScopes.SECRET_KEYS_ROTATE,
-            PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE);
+            PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE,
+            PlatformScopes.REDIRECT_POLICY_WRITE,
+            PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET);
     assertThat(client.createdAt()).isNotNull();
   }
 

@@ -1,9 +1,9 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeCommand;
-import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
-import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
+import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetCommand;
+import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,41 +22,38 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * ADR-0024 §6: the device-trust step-up challenge — reached only via a redirect from {@link
- * DeviceTrustGate#intercept}, never linked from {@code login.html} directly (unlike every other
- * controller in this package, there is no "sign in this way" entry point a user picks; landing here
- * with no matching pending session state means the flow was entered out of order, so both handlers
- * bounce back to the ordinary login page rather than erroring). Completes whichever primary-factor
- * {@link AuthenticatedSessionEstablisher} call the interrupted login had deferred — see {@link
- * PendingAuthenticationFactor}'s own Javadoc for why only those two factors are represented.
+ * Clerk "session tasks" parity: the forced-password-reset challenge — reached only via a redirect
+ * from {@link SessionTaskGate#intercept}, same "no direct entry point, landing here with no
+ * matching pending state bounces back to ordinary login" posture as {@link
+ * DeviceTrustChallengeController}, which this class otherwise mirrors closely.
  */
 // PMD.LongVariable: redirectUrlResolver matches its own port type name, not arbitrarily long —
-// same precedent RedirectUrlResolver's own suppression documents.
+// same precedent DeviceTrustChallengeController's own identical suppression documents.
 @SuppressWarnings("PMD.LongVariable")
 @Controller
-@RequestMapping("/o/{organizationId}/login/device-trust")
-public class DeviceTrustChallengeController {
+@RequestMapping("/o/{organizationId}/login/session-task/password-reset")
+public class SessionTaskChallengeController {
 
-  private static final String FORM_VIEW = "identity/device-trust-challenge";
+  private static final String FORM_VIEW = "identity/session-task-password-reset";
 
-  private final ConfirmDeviceTrustChallengeUseCase confirmUseCase;
+  private final CompleteForcedPasswordResetUseCase completeUseCase;
   private final AuthenticatedSessionEstablisher sessions;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
 
-  public DeviceTrustChallengeController(
-      final ConfirmDeviceTrustChallengeUseCase confirmUseCase,
+  public SessionTaskChallengeController(
+      final CompleteForcedPasswordResetUseCase completeUseCase,
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver) {
-    this.confirmUseCase = confirmUseCase;
+    this.completeUseCase = completeUseCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
   }
 
-  // Two genuinely distinct exits (no pending challenge / render the form) — same "each outcome
-  // needs its own exit" rationale as DeviceCookie's own identical suppression.
+  // Two genuinely distinct exits (no pending task / render the form) — same rationale as
+  // DeviceTrustChallengeController's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showForm(
@@ -66,18 +63,18 @@ public class DeviceTrustChallengeController {
     if (pendingAccountId(request, organizationId).isEmpty()) {
       return "redirect:/o/" + organizationId + "/login";
     }
-    model.addAttribute("form", new DeviceTrustChallengeForm());
+    model.addAttribute("form", new SessionTaskPasswordResetForm());
     return FORM_VIEW;
   }
 
-  // Three genuinely distinct exits (no pending challenge / validation error / invalid code) — same
-  // "each outcome needs its own exit" rationale as ResetPasswordController's own identical
+  // Four genuinely distinct exits (no pending task / validation error / mismatch / weak password)
+  // — same "each outcome needs its own exit" rationale as ResetPasswordController's own identical
   // suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String confirm(
       @PathVariable final UUID organizationId,
-      @Valid @ModelAttribute("form") final DeviceTrustChallengeForm form,
+      @Valid @ModelAttribute("form") final SessionTaskPasswordResetForm form,
       final BindingResult bindingResult,
       final HttpServletRequest request,
       final HttpServletResponse response,
@@ -89,28 +86,34 @@ public class DeviceTrustChallengeController {
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
     }
+    if (!form.getNewPassword().equals(form.getConfirmPassword())) {
+      bindingResult.rejectValue(
+          "confirmPassword", "confirmPassword.mismatch", "Passwords do not match");
+      return FORM_VIEW;
+    }
 
     final AccountId accountId = pending.get();
     try {
-      confirmUseCase.handle(new ConfirmDeviceTrustChallengeCommand(accountId, form.getCode()));
-    } catch (final InvalidDeviceTrustChallengeException _) {
-      model.addAttribute("codeError", true);
+      completeUseCase.handle(
+          new CompleteForcedPasswordResetCommand(accountId, form.getNewPassword()));
+    } catch (final WeakPasswordException _) {
+      bindingResult.rejectValue(
+          "newPassword", "newPassword.tooWeak", "Password does not meet the minimum requirements");
       return FORM_VIEW;
     }
 
     final HttpSession session = request.getSession(true);
     final PendingAuthenticationFactor factor =
         PendingAuthenticationFactor.valueOf(
-            (String) session.getAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE));
+            (String) session.getAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE));
     final String clientId =
-        (String) session.getAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
+        (String) session.getAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
     final String redirectUrl =
-        (String) session.getAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
+        (String) session.getAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
     clearPendingState(session);
 
-    // Device trust only ever gates a sign-in (never sign-up completion, ADR-0024 §6) — the device
-    // is recorded as known only now, after the challenge actually succeeded, never at the moment
-    // the challenge was merely issued (both handled inside AuthenticatedSessionCompletion).
+    // This task's own completion is the actual moment the session finally gets established —
+    // AuthenticatedSessionCompletion's own device-recording step reflects that.
     final String redirectTarget =
         AuthenticatedSessionCompletion.complete(
             sessions,
@@ -126,9 +129,8 @@ public class DeviceTrustChallengeController {
     return "redirect:" + redirectTarget;
   }
 
-  // Two genuinely distinct outcomes (a pending challenge for this exact Organization / none at
-  // all) — same "each outcome needs its own exit" rationale as DeviceCookie's own identical
-  // suppression.
+  // Two genuinely distinct outcomes (a pending task for this exact Organization / none at all) —
+  // same rationale as DeviceTrustChallengeController's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   private Optional<AccountId> pendingAccountId(
       final HttpServletRequest request, final UUID organizationId) {
@@ -136,14 +138,14 @@ public class DeviceTrustChallengeController {
     if (session == null) {
       return Optional.empty();
     }
-    // BR-ORG-02: a challenge started under a different Organization's own login is never
-    // resumable from this one's URL, even within the very same browser session.
+    // BR-ORG-02: same cross-tenant defence-in-depth as DeviceTrustChallengeController's own
+    // identical check.
     final Object pendingOrgId =
-        session.getAttribute(DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE);
+        session.getAttribute(SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE);
     if (!organizationId.toString().equals(pendingOrgId)) {
       return Optional.empty();
     }
-    final Object rawAccountId = session.getAttribute(DeviceTrustPendingState.ACCOUNT_ID_ATTRIBUTE);
+    final Object rawAccountId = session.getAttribute(SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE);
     if (rawAccountId == null) {
       return Optional.empty();
     }
@@ -151,10 +153,10 @@ public class DeviceTrustChallengeController {
   }
 
   private void clearPendingState(final HttpSession session) {
-    session.removeAttribute(DeviceTrustPendingState.ACCOUNT_ID_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
+    session.removeAttribute(SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE);
+    session.removeAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE);
+    session.removeAttribute(SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE);
+    session.removeAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
+    session.removeAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
   }
 }

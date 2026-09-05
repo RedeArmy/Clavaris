@@ -150,6 +150,7 @@ class AuthenticateWithPasswordServiceTest {
             null,
             AccountStatus.SUSPENDED,
             null,
+            null,
             null);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
@@ -180,6 +181,7 @@ class AuthenticateWithPasswordServiceTest {
             Instant.now(),
             null,
             AccountStatus.ACTIVE,
+            null,
             null,
             null);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
@@ -239,6 +241,7 @@ class AuthenticateWithPasswordServiceTest {
             Instant.now(),
             null,
             AccountStatus.ACTIVE,
+            null,
             null,
             null);
     account.attachPasswordCredential("argon2id$stored-hash");

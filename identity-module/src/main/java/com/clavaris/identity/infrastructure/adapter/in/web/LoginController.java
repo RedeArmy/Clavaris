@@ -6,11 +6,12 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailN
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * The hosted login page for the interactive Authorization Code flow (ADR-0010 §5) — this is what
@@ -63,6 +65,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class LoginController {
 
   private static final String FORM_VIEW = "identity/login";
+  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final AuthenticateWithPasswordUseCase useCase;
   private final AuthenticatedSessionEstablisher sessions;
@@ -71,6 +74,8 @@ public class LoginController {
   private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private final RedirectUrlResolver redirectUrlResolver;
+  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public LoginController(
@@ -80,7 +85,9 @@ public class LoginController {
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
+      final RedirectUrlResolver redirectUrlResolver,
+      final AccountRepository accounts) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.policyProvider = policyProvider;
@@ -88,12 +95,22 @@ public class LoginController {
     this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
+    this.redirectUrlResolver = redirectUrlResolver;
+    this.accounts = accounts;
   }
 
   @GetMapping
-  public String showForm(@PathVariable final UUID organizationId, final Model model) {
+  public String showForm(
+      @PathVariable final UUID organizationId,
+      final Model model,
+      // Clerk "customize redirect URLs" parity: needed here (unlike the POST handler below, which
+      // relies on the form's own th:action="@{''}" resubmit to carry these forward) purely so the
+      // social-login link — a plain <a href>, not a form resubmission — can append them to its own
+      // URL; see login.html's own comment.
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl) {
     model.addAttribute("form", new LoginForm());
-    addSignInOptions(organizationId, model);
+    addSignInOptions(organizationId, model, clientId, redirectUrl);
     return FORM_VIEW;
   }
 
@@ -107,9 +124,14 @@ public class LoginController {
       final BindingResult bindingResult,
       final HttpServletRequest request,
       final HttpServletResponse response,
-      final Model model) {
+      final Model model,
+      // Clerk "customize redirect URLs" parity: survive here purely because the form's own
+      // th:action="@{''}" resubmits to this exact same URL, query string included — no hidden
+      // field needed. Both optional: absent on every request that never opted into this feature.
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl) {
     if (bindingResult.hasErrors()) {
-      addSignInOptions(organizationId, model);
+      addSignInOptions(organizationId, model, clientId, redirectUrl);
       return FORM_VIEW;
     }
 
@@ -126,14 +148,14 @@ public class LoginController {
       // itself leak "the email field was fine, it was the password" or vice versa), matching
       // InvalidCredentialsException's own anti-enumeration design.
       model.addAttribute("loginError", true);
-      addSignInOptions(organizationId, model);
+      addSignInOptions(organizationId, model, clientId, redirectUrl);
       return FORM_VIEW;
     } catch (final EmailNotVerifiedException _) {
       // ADR-0024 §2: deliberately a distinct, more specific message than loginError above — see
       // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from
       // the anti-enumeration-generic rejection every other failure mode uses.
       model.addAttribute("emailNotVerifiedError", true);
-      addSignInOptions(organizationId, model);
+      addSignInOptions(organizationId, model, clientId, redirectUrl);
       return FORM_VIEW;
     }
 
@@ -145,31 +167,39 @@ public class LoginController {
             request,
             organizationId,
             accountId,
-            PendingAuthenticationFactor.PASSWORD);
+            PendingAuthenticationFactor.PASSWORD,
+            clientId,
+            redirectUrl);
     if (challenge.isPresent()) {
-      return "redirect:" + challenge.get();
+      return REDIRECT_PREFIX + challenge.get();
     }
 
-    final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
+    final Optional<String> sessionTask =
+        SessionTaskGate.intercept(
+            accounts,
+            request,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.PASSWORD,
+            clientId,
+            redirectUrl);
+    if (sessionTask.isPresent()) {
+      return REDIRECT_PREFIX + sessionTask.get();
+    }
+
     final String redirectTarget =
-        sessions.establish(request, response, accountId.value(), fallbackUrl);
-
-    // New-device login email notification — after establish(), same accountId/request already in
-    // scope; see RecordAccountLoginDeviceService's own Javadoc for why this never throws. A
-    // present return value means an unrecognized/absent DeviceCookie just got a fresh one minted
-    // for it — write it back onto the response so the browser actually keeps it.
-    recordLoginDevice
-        .handle(
-            new RecordAccountLoginDeviceCommand(
-                accountId,
-                request.getHeader("User-Agent"),
-                request.getRemoteAddr(),
-                DeviceCookie.read(request, organizationId).orElse(null)))
-        .ifPresent(
-            rawDeviceToken ->
-                DeviceCookie.write(request, response, organizationId, rawDeviceToken));
-
-    return "redirect:" + redirectTarget;
+        AuthenticatedSessionCompletion.complete(
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver,
+            request,
+            response,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.PASSWORD,
+            clientId,
+            redirectUrl);
+    return REDIRECT_PREFIX + redirectTarget;
   }
 
   // Code review finding (TD-SEC-032, closed): one allowedProviders() call per render, not one
@@ -181,7 +211,15 @@ public class LoginController {
   // ADR-0024 §3/§4: also surfaces which passwordless/username strategies this Organization has
   // enabled — same "computed fresh on every render, never cached, template only renders what's
   // actually allowed" posture as the social-provider list above.
-  private void addSignInOptions(final UUID organizationId, final Model model) {
+  private void addSignInOptions(
+      final UUID organizationId,
+      final Model model,
+      // Clerk "customize redirect URLs" parity: threaded through purely so the social-login link
+      // (a plain <a href>, not a form resubmission) can append them to its own URL — see
+      // login.html's own comment. Both nullable; Thymeleaf's link-expression syntax omits a param
+      // entirely when its value is null.
+      final String clientId,
+      final String redirectUrl) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final List<SocialProvider> enabled = new ArrayList<>(policyProvider.allowedProviders(orgId));
     model.addAttribute("socialProviders", enabled);
@@ -191,5 +229,7 @@ public class LoginController {
     model.addAttribute("emailCodeSignInEnabled", policy.emailCodeSignInEnabled());
     model.addAttribute("emailLinkSignInEnabled", policy.emailLinkSignInEnabled());
     model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
+    model.addAttribute("clientId", clientId);
+    model.addAttribute("redirectUrl", redirectUrl);
   }
 }

@@ -98,7 +98,8 @@ class JpaAccountRepository implements AccountRepository {
         entity.getEmailVerifiedAt(),
         AccountStatus.valueOf(entity.getStatus()),
         credential,
-        username);
+        username,
+        entity.getPasswordResetRequiredAt());
   }
 
   // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
@@ -129,7 +130,8 @@ class JpaAccountRepository implements AccountRepository {
             account.emailVerifiedAt().orElse(null),
             account.status().name(),
             account.createdAt(),
-            account.username().map(Username::value).orElse(null));
+            account.username().map(Username::value).orElse(null),
+            account.passwordResetRequiredAt().orElse(null));
 
     // saveAndFlush, not save: the unique constraint on accounts.(organization_id, email)
     // (data-model.md §3) must throw synchronously, right here, so RegisterAccountService's

@@ -49,6 +49,12 @@ public final class Account {
   // after the fact" convention attachPasswordCredential already establishes.
   private Username username;
 
+  // Clerk "session tasks" parity: an admin-forced "must change password before this account may
+  // finish signing in again" marker (null for the overwhelming common case — never forced). Not a
+  // boolean: the timestamp itself is useful audit context (when was this required), same reasoning
+  // emailVerifiedAt already establishes for "presence/absence plus a timestamp" over a bare flag.
+  private Instant passwordResetRequiredAt;
+
   private Account(
       final AccountId id,
       final OrganizationId organizationId,
@@ -80,12 +86,21 @@ public final class Account {
    * flow (a separate, future use case with its own invariants — e.g. requiring the current
    * password, per BR-ID-04's "assume prior sessions compromised" stance on reset).
    */
+  // PMD.NullAssignment: the null below deliberately CLEARS passwordResetRequiredAt (an
+  // already-satisfied requirement), not an accidental discard of a value worth keeping — see the
+  // comment on that line for why.
+  @SuppressWarnings("PMD.NullAssignment")
   public void attachPasswordCredential(final String passwordHash) {
     if (this.passwordCredential != null) {
       throw new IllegalStateException(
           "Account " + id.value() + " already has a password credential attached");
     }
     this.passwordCredential = PasswordCredential.issue(id, passwordHash);
+    // Clerk "session tasks" parity: same "any real password-setting call satisfies the
+    // requirement" reasoning as resetPasswordCredential's own identical statement — covers the
+    // edge case of a password-optional account (ADR-0024 §5) being forced to set its first
+    // password rather than rotate an existing one.
+    this.passwordResetRequiredAt = null;
   }
 
   /**
@@ -124,11 +139,13 @@ public final class Account {
       final Instant emailVerifiedAt,
       final AccountStatus status,
       final PasswordCredential passwordCredential,
-      final Username username) {
+      final Username username,
+      final Instant passwordResetRequiredAt) {
     final Account account = new Account(id, organizationId, email, createdAt, status);
     account.emailVerifiedAt = emailVerifiedAt;
     account.passwordCredential = passwordCredential;
     account.username = username;
+    account.passwordResetRequiredAt = passwordResetRequiredAt;
     return account;
   }
 
@@ -164,6 +181,10 @@ public final class Account {
     return Optional.ofNullable(username);
   }
 
+  public Optional<Instant> passwordResetRequiredAt() {
+    return Optional.ofNullable(passwordResetRequiredAt);
+  }
+
   /**
    * Confirms the email of record — {@code ConfirmEmailVerificationService} calls this only after
    * validating a single-use {@code VerificationToken} (BR-ID-05). Idempotent by design: a token is
@@ -194,6 +215,9 @@ public final class Account {
    * is an update to the one credential row an account may ever have, not a replacement of it with
    * an unrelated new one.
    */
+  // PMD.NullAssignment: same deliberate-clear rationale as attachPasswordCredential's own
+  // identical suppression.
+  @SuppressWarnings("PMD.NullAssignment")
   public void resetPasswordCredential(final String newPasswordHash) {
     if (this.passwordCredential == null) {
       throw new IllegalStateException(
@@ -202,6 +226,25 @@ public final class Account {
     this.passwordCredential =
         PasswordCredential.reconstitute(
             this.passwordCredential.id(), id, newPasswordHash, Instant.now());
+    // Clerk "session tasks" parity: a real password change (via any of this method's callers,
+    // self-service ConfirmPasswordResetService included) always satisfies an outstanding
+    // requirement — there is no separate "acknowledge the requirement without actually changing
+    // the password" path, so clearing it here (rather than in each individual caller) is the one
+    // place this can never be missed.
+    this.passwordResetRequiredAt = null;
+  }
+
+  /**
+   * Clerk "session tasks" parity: an operator-forced "must set a new password before this account
+   * may finish signing in again" — {@code ForcePasswordResetForAccountService}'s own state
+   * transition. Idempotent, same reasoning as {@link #suspend()}: re-forcing an already-pending
+   * requirement doesn't stamp a fresh timestamp — the original "since when" is the more useful
+   * audit fact to keep.
+   */
+  public void requirePasswordReset() {
+    if (this.passwordResetRequiredAt == null) {
+      this.passwordResetRequiredAt = Instant.now();
+    }
   }
 
   /**
