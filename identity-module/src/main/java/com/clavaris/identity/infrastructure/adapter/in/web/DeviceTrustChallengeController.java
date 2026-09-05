@@ -5,7 +5,10 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Con
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -30,6 +33,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * {@link AuthenticatedSessionEstablisher} call the interrupted login had deferred — see {@link
  * PendingAuthenticationFactor}'s own Javadoc for why only those two factors are represented.
  */
+// PMD.LongVariable: redirectUrlResolver matches its own port type name, not arbitrarily long —
+// same precedent RedirectUrlResolver's own suppression documents.
+@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/o/{organizationId}/login/device-trust")
 public class DeviceTrustChallengeController {
@@ -39,14 +45,17 @@ public class DeviceTrustChallengeController {
   private final ConfirmDeviceTrustChallengeUseCase confirmUseCase;
   private final AuthenticatedSessionEstablisher sessions;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private final RedirectUrlResolver redirectUrlResolver;
 
   public DeviceTrustChallengeController(
       final ConfirmDeviceTrustChallengeUseCase confirmUseCase,
       final AuthenticatedSessionEstablisher sessions,
-      final RecordAccountLoginDeviceUseCase recordLoginDevice) {
+      final RecordAccountLoginDeviceUseCase recordLoginDevice,
+      final RedirectUrlResolver redirectUrlResolver) {
     this.confirmUseCase = confirmUseCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
+    this.redirectUrlResolver = redirectUrlResolver;
   }
 
   // Two genuinely distinct exits (no pending challenge / render the form) — same "each outcome
@@ -96,9 +105,19 @@ public class DeviceTrustChallengeController {
     final PendingAuthenticationFactor factor =
         PendingAuthenticationFactor.valueOf(
             (String) session.getAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE));
+    final String clientId =
+        (String) session.getAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
+    final String redirectUrl =
+        (String) session.getAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
     clearPendingState(session);
 
-    final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
+    // Device trust only ever gates a sign-in (never sign-up completion, ADR-0024 §6) — always
+    // RedirectAction.SIGN_IN, same as every one of this challenge's four possible callers.
+    final String fallbackUrl =
+        redirectUrlResolver
+            .resolve(
+                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
+            .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
         factor == PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF
             ? sessions.establishViaOneTimeEmailProof(
@@ -151,5 +170,7 @@ public class DeviceTrustChallengeController {
     session.removeAttribute(DeviceTrustPendingState.ACCOUNT_ID_ATTRIBUTE);
     session.removeAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE);
     session.removeAttribute(DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE);
+    session.removeAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
+    session.removeAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
   }
 }

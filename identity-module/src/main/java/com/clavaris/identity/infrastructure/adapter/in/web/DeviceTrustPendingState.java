@@ -26,6 +26,18 @@ final class DeviceTrustPendingState {
   /* package */ static final String ORGANIZATION_ID_ATTRIBUTE =
       "clavaris.deviceTrust.pendingOrganizationId";
 
+  /**
+   * Clerk "customize redirect URLs" parity: the interrupted login's own {@code clientId}/{@code
+   * redirectUrl} (both nullable — absent whenever the interrupted request never carried them),
+   * carried across the pause so {@link DeviceTrustChallengeController#confirm} can resolve the
+   * exact same {@code RedirectPolicy} the original sign-in would have, instead of always falling
+   * back to the platform's own hardcoded literal the moment a device-trust challenge intervenes.
+   */
+  /* package */ static final String CLIENT_ID_ATTRIBUTE = "clavaris.deviceTrust.pendingClientId";
+
+  /* package */ static final String REDIRECT_URL_ATTRIBUTE =
+      "clavaris.deviceTrust.pendingRedirectUrl";
+
   private DeviceTrustPendingState() {
     // Constants only.
   }

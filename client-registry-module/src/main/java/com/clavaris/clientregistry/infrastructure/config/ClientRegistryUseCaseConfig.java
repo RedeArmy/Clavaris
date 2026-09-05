@@ -12,6 +12,8 @@ import com.clavaris.clientregistry.application.usecase.deactivateorganizationcli
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientUseCase;
+import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientService;
+import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsService;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
@@ -24,6 +26,9 @@ import com.clavaris.clientregistry.application.usecase.rotateorganizationclients
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.PlatformClientSecretGenerator;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretService;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.RedirectPolicyRepository;
+import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientService;
+import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientUseCase;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,7 +40,11 @@ import org.springframework.context.annotation.Configuration;
  * (Spring's own class-name-derived default) collides the moment both modules are on the same
  * classpath together, which they only started being once this class existed.
  */
-@SuppressWarnings("PMD.LongVariable")
+// PMD.ExcessiveImports: this class's whole job is wiring one @Bean method per use case (this
+// file's own doc comment) — the redirect-policy use cases tipped the import count over PMD's
+// default threshold. Same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own
+// class-level suppression already documents for an identical situation.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Configuration
 class ClientRegistryUseCaseConfig {
 
@@ -120,5 +129,25 @@ class ClientRegistryUseCaseConfig {
   /* package */ ListOrganizationClientsUseCase listOrganizationClientsUseCase(
       final OrganizationClientRepository organizationClients) {
     return new ListOrganizationClientsService(organizationClients);
+  }
+
+  // Clerk "customize redirect URLs" parity. PMD.LinguisticNaming: same false positive
+  // SetRateLimitPolicyForOrganizationUseCase's own bean method already documents — this bean's
+  // name matches SetRedirectPolicyForClientUseCase itself (lowercased first letter), not a
+  // JavaBean setter.
+  @SuppressWarnings("PMD.LinguisticNaming")
+  @Bean
+  /* package */ SetRedirectPolicyForClientUseCase setRedirectPolicyForClientUseCase(
+      final OAuthClientRepository oauthClients,
+      final RedirectPolicyRepository redirectPolicies,
+      final AuditEventRecorder auditEvents) {
+    return new SetRedirectPolicyForClientService(oauthClients, redirectPolicies, auditEvents);
+  }
+
+  // Clerk "customize redirect URLs" parity
+  @Bean
+  /* package */ GetRedirectPolicyForClientUseCase getRedirectPolicyForClientUseCase(
+      final RedirectPolicyRepository redirectPolicies) {
+    return new GetRedirectPolicyForClientService(redirectPolicies);
   }
 }

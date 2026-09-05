@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * The "Sign in with Google/GitHub" button's own target — both hosted login pages ({@link
@@ -55,6 +56,17 @@ public class SocialLoginRedirectController {
   public static final String ORGANIZATION_ID_SESSION_ATTRIBUTE =
       "clavaris.socialLogin.organizationId";
 
+  /**
+   * Clerk "customize redirect URLs" parity: same round-trip-through-the-session reasoning as {@link
+   * #ORGANIZATION_ID_SESSION_ATTRIBUTE}'s own Javadoc — the external provider's callback carries
+   * nothing of this codebase's own, so whatever {@code clientId}/{@code redirectUrl} this request
+   * arrived with must be stashed here before the redirect and read back by {@code app}'s own
+   * success handler. Both nullable — absent whenever the original request never carried them.
+   */
+  public static final String CLIENT_ID_SESSION_ATTRIBUTE = "clavaris.socialLogin.clientId";
+
+  public static final String REDIRECT_URL_SESSION_ATTRIBUTE = "clavaris.socialLogin.redirectUrl";
+
   private final OrganizationSocialLoginPolicyProvider policyProvider;
 
   public SocialLoginRedirectController(final OrganizationSocialLoginPolicyProvider policyProvider) {
@@ -66,7 +78,9 @@ public class SocialLoginRedirectController {
       @PathVariable final UUID organizationId,
       @PathVariable final String provider,
       final HttpServletRequest request,
-      final HttpServletResponse response)
+      final HttpServletResponse response,
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl)
       throws IOException {
     final SocialProvider socialProvider = parseProvider(provider);
     if (socialProvider == null
@@ -81,6 +95,12 @@ public class SocialLoginRedirectController {
     // configured session serializer handles an arbitrary class needed.
     final HttpSession session = request.getSession();
     session.setAttribute(ORGANIZATION_ID_SESSION_ATTRIBUTE, organizationId.toString());
+    if (clientId != null) {
+      session.setAttribute(CLIENT_ID_SESSION_ATTRIBUTE, clientId);
+    }
+    if (redirectUrl != null) {
+      session.setAttribute(REDIRECT_URL_SESSION_ATTRIBUTE, redirectUrl);
+    }
     response.sendRedirect(
         request.getContextPath()
             + "/oauth2/authorization/"
@@ -99,12 +119,14 @@ public class SocialLoginRedirectController {
     }
 
     // Single-use, same discipline as every other side-channel state this codebase stashes in a
-    // session (e.g. HttpSessionRequestCache) — a stale organizationId left over from an earlier,
-    // abandoned tenant social-login attempt on this same browser session must never leak into a
-    // platform-tier one.
+    // session (e.g. HttpSessionRequestCache) — a stale organizationId/clientId/redirectUrl left
+    // over from an earlier, abandoned tenant social-login attempt on this same browser session
+    // must never leak into a platform-tier one.
     final HttpSession existingSession = request.getSession(false);
     if (existingSession != null) {
       existingSession.removeAttribute(ORGANIZATION_ID_SESSION_ATTRIBUTE);
+      existingSession.removeAttribute(CLIENT_ID_SESSION_ATTRIBUTE);
+      existingSession.removeAttribute(REDIRECT_URL_SESSION_ATTRIBUTE);
     }
     response.sendRedirect(
         request.getContextPath() + "/oauth2/authorization/" + provider.toLowerCase(Locale.ROOT));

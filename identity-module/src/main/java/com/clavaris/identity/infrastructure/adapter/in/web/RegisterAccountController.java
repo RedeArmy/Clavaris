@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Thymeleaf form-POST controller (server-rendered hosted UI), not a JSON API: registration happens
@@ -97,7 +98,13 @@ public class RegisterAccountController {
       @PathVariable final UUID organizationId,
       @Valid @ModelAttribute("form") final RegisterAccountForm form,
       final BindingResult bindingResult,
-      final Model model) {
+      final Model model,
+      // Clerk "customize redirect URLs" parity — see LoginController's own identical parameters.
+      // Only ever consulted for the passwordless-completion redirect below: the password-submitted
+      // path lands on a purely informational "check your email" page with no follow-on redirect to
+      // carry them into, so there's nothing here for them to affect.
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final AccountAuthenticationPolicySnapshot policy = policyProvider.policyFor(orgId);
     if (bindingResult.hasErrors()) {
@@ -155,7 +162,7 @@ public class RegisterAccountController {
       // ADR-0024 §5: no password credential the account holder actually knows — completing sign-up
       // means completing whichever passwordless method the policy enabled, reusing §3's own
       // use cases entirely rather than a third, duplicated flow.
-      return completePasswordlessSignUp(organizationId, orgId, form, policy);
+      return completePasswordlessSignUp(organizationId, orgId, form, policy, clientId, redirectUrl);
     }
 
     // TD-SEC-004: this is the fix — a real send, triggered directly from the request that just
@@ -175,19 +182,34 @@ public class RegisterAccountController {
       final UUID organizationId,
       final OrganizationId orgId,
       final RegisterAccountForm form,
-      final AccountAuthenticationPolicySnapshot policy) {
+      final AccountAuthenticationPolicySnapshot policy,
+      final String clientId,
+      final String redirectUrl) {
     final Email email = new Email(form.getEmail());
     if (policy.emailCodeSignInEnabled()) {
       requestEmailSignInCode.handle(new RequestEmailSignInCodeCommand(orgId, email));
-      return REDIRECT_ORGANIZATION_PREFIX
-          + organizationId
-          + "/login/email-code/confirm?email="
-          + form.getEmail();
+      // Clerk "customize redirect URLs" parity: carried into EmailCodeSignInController's own
+      // confirm step, same cross-URL-redirect propagation as EmailCodeSignInController's own
+      // requestCode. Resolved there as RedirectAction.SIGN_IN (that endpoint's own only mode) —
+      // a client with only a SIGN_UP policy configured falls through to the platform default here,
+      // a deliberate, documented simplification rather than threading a separate action flag
+      // through this shared completion endpoint.
+      String target =
+          REDIRECT_ORGANIZATION_PREFIX
+              + organizationId
+              + "/login/email-code/confirm?email="
+              + form.getEmail();
+      target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
+      target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
+      return target;
     }
     // SetAccountAuthenticationPolicyForOrganizationService's own validation already guarantees at
     // least one of the two is enabled whenever passwordAtSignUpEnabled is off — this is the only
     // remaining possibility, not a silently-assumed one.
     requestEmailSignInLink.handle(new RequestEmailSignInLinkCommand(orgId, email));
+    // EmailLinkSignInController's own confirm step doesn't read clientId/redirectUrl at all yet
+    // (deliberately deferred — see that controller's own DeviceTrustGate.intercept call site), so
+    // there's nothing to carry into its "pending" page.
     return REDIRECT_ORGANIZATION_PREFIX + organizationId + "/login/email-link/pending";
   }
 
