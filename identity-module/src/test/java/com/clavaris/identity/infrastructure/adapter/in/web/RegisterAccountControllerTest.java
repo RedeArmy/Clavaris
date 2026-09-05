@@ -16,6 +16,10 @@ import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyReg
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
+import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.AccountId;
@@ -45,12 +49,21 @@ class RegisterAccountControllerTest {
 
   private RegisterAccountUseCase useCase;
   private RequestEmailVerificationUseCase requestEmailVerification;
+  private AccountAuthenticationPolicyProvider policyProvider;
+  private RequestEmailSignInCodeUseCase requestEmailSignInCode;
+  private RequestEmailSignInLinkUseCase requestEmailSignInLink;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     useCase = mock(RegisterAccountUseCase.class);
     requestEmailVerification = mock(RequestEmailVerificationUseCase.class);
+    policyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    requestEmailSignInCode = mock(RequestEmailSignInCodeUseCase.class);
+    requestEmailSignInLink = mock(RequestEmailSignInLinkUseCase.class);
+    // Matches today's real default (ADR-0024) — every existing test below predates this policy.
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
 
     // SpringResourceTemplateResolver needs a real ApplicationContext to resolve "classpath:"
     // resources (confirmed live — IllegalArgumentException: Application Context cannot be null
@@ -74,7 +87,12 @@ class RegisterAccountControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new RegisterAccountController(useCase, requestEmailVerification))
+                new RegisterAccountController(
+                    useCase,
+                    requestEmailVerification,
+                    policyProvider,
+                    requestEmailSignInCode,
+                    requestEmailSignInLink))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -108,7 +126,8 @@ class RegisterAccountControllerTest {
             new RegisterAccountCommand(
                 new OrganizationId(ORGANIZATION_ID),
                 new Email("new-user@example.com"),
-                "a-valid-password"));
+                "a-valid-password",
+                null));
     // TD-SEC-004: registration must actually trigger the verification email it promises on the
     // page it redirects to, not just claim to have.
     verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(accountId));

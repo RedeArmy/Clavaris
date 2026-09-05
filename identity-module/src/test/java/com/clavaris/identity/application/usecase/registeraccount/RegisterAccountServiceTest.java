@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -29,6 +31,7 @@ class RegisterAccountServiceTest {
   private AccountRepository accounts;
   private PasswordHasher hasher;
   private EventOutboxWriter outbox;
+  private AccountAuthenticationPolicyProvider policyProvider;
   private RegisterAccountService service;
 
   @BeforeEach
@@ -36,7 +39,11 @@ class RegisterAccountServiceTest {
     accounts = mock(AccountRepository.class);
     hasher = mock(PasswordHasher.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new RegisterAccountService(accounts, hasher, outbox);
+    policyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    // Matches today's real default (ADR-0024) — every existing test below predates this policy.
+    when(policyProvider.policyFor(organizationId))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
+    service = new RegisterAccountService(accounts, hasher, outbox, policyProvider);
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }
@@ -46,7 +53,7 @@ class RegisterAccountServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
     AccountId id =
-        service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD));
+        service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
 
     assertThat(id).isNotNull();
     verify(accounts).save(any());
@@ -57,7 +64,7 @@ class RegisterAccountServiceTest {
     // BR-ID-01
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
-    service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD));
+    service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
 
     verify(hasher).hash(VALID_PASSWORD);
   }
@@ -67,7 +74,7 @@ class RegisterAccountServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
     AccountId id =
-        service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD));
+        service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
 
     verify(outbox).write(eq("account.created"), eq(id), any(), any());
   }
@@ -78,7 +85,8 @@ class RegisterAccountServiceTest {
     // lambda has two invocations that could throw (the constructor and handle()), leaving it
     // ambiguous which one static analysis — and a future reader — should credit for the
     // exception. A single invocation in the lambda keeps the assertion unambiguous.
-    RegisterAccountCommand command = new RegisterAccountCommand(organizationId, email, "short");
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, "short", null);
 
     assertThatExceptionOfType(WeakPasswordException.class)
         .isThrownBy(() -> service.handle(command));
@@ -91,7 +99,7 @@ class RegisterAccountServiceTest {
   void rejectsRegistrationWhenThePreCheckFindsTheEmailAlreadyTaken() {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(true);
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD);
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
@@ -108,7 +116,7 @@ class RegisterAccountServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
     doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).save(any());
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD);
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));

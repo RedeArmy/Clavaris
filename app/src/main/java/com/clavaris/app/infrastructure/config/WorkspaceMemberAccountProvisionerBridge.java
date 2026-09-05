@@ -65,7 +65,7 @@ class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
     try {
       accountId =
           registerAccount.handle(
-              new RegisterAccountCommand(orgId, memberEmail, generateRandomPassword()));
+              new RegisterAccountCommand(orgId, memberEmail, generateRandomPassword(), null));
     } catch (final EmailAlreadyRegisteredException alreadyRegistered) {
       // Never let identity-module's own exception type cross the module boundary — see this
       // port's own Javadoc. Cause preserved, not discarded, same precedent
