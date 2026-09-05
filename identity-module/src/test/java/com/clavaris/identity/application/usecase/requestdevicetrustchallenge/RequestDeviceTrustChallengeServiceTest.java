@@ -84,9 +84,10 @@ class RequestDeviceTrustChallengeServiceTest {
   void failsDefensivelyWhenTheAccountIsUnresolvable() {
     AccountId accountId = AccountId.newId();
     when(accounts.findById(accountId)).thenReturn(Optional.empty());
+    RequestDeviceTrustChallengeCommand command = new RequestDeviceTrustChallengeCommand(accountId);
 
     assertThatExceptionOfType(IllegalStateException.class)
-        .isThrownBy(() -> service.handle(new RequestDeviceTrustChallengeCommand(accountId)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
   }

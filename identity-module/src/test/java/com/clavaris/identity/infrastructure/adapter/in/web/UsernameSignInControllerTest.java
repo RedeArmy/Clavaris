@@ -153,9 +153,9 @@ class UsernameSignInControllerTest {
 
   @Test
   void malformedUsernameRerendersTheFormWithTheSameGenericError() throws Exception {
-    // A shape @NotBlank/@Size alone wouldn't catch (uppercase, a space) but Username's own domain
-    // constructor rejects — same anti-enumeration-generic outcome as an actual
-    // InvalidCredentialsException, not a distinguishable field error.
+    // A shape the form's plain size/blank check wouldn't catch, such as uppercase letters or an
+    // embedded space, but Username's own domain constructor rejects — same anti-enumeration-generic
+    // outcome as an actual InvalidCredentialsException, not a distinguishable field error.
     mockMvc
         .perform(
             post("/o/{organizationId}/login/username", ORGANIZATION_ID)

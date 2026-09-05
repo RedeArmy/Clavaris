@@ -103,9 +103,11 @@ class RequestEmailSignInLinkServiceTest {
     when(policyProvider.policyFor(organizationId))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     Email email = new Email("someone@example.com");
+    RequestEmailSignInLinkCommand command =
+        new RequestEmailSignInLinkCommand(organizationId, email);
 
     assertThatExceptionOfType(EmailLinkSignInNotEnabledException.class)
-        .isThrownBy(() -> service.handle(new RequestEmailSignInLinkCommand(organizationId, email)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).findByOrganizationIdAndEmail(any(), any());
   }

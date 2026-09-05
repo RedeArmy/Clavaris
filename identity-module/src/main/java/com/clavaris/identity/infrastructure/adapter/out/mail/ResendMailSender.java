@@ -39,6 +39,12 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   @SuppressWarnings("PMD.LongVariable")
   private static final URI DEFAULT_RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
 
+  // Both the tenant-tier LINK and CODE email-verification methods (ADR-0024 §2) and the
+  // platform-tier equivalent share this exact subject line — one constant, not three repeated
+  // literals.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String VERIFY_EMAIL_SUBJECT = "Verify your email address";
+
   private final ResendHttpClient httpClient;
   private final String baseUrl;
 
@@ -85,7 +91,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     final String link = link(organizationId, "verify-email", rawToken);
     httpClient.send(
         toAddress,
-        "Verify your email address",
+        VERIFY_EMAIL_SUBJECT,
         "<p>Confirm your email address to finish setting up your account:</p>"
             + ResendHttpClient.htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
@@ -96,7 +102,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
     httpClient.send(
         toAddress,
-        "Verify your email address",
+        VERIFY_EMAIL_SUBJECT,
         "<p>Confirm your email address to finish setting up your account. Enter this code:</p>"
             + ResendHttpClient.htmlCode(rawCode)
             + "<p>This code expires in 24 hours. If you didn't request this, you can ignore it.</p>");
@@ -209,7 +215,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     final String link = platformLink("verify-email", rawToken);
     httpClient.send(
         toAddress,
-        "Verify your email address",
+        VERIFY_EMAIL_SUBJECT,
         "<p>Confirm your email address to finish setting up your Clavaris account:</p>"
             + ResendHttpClient.htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");

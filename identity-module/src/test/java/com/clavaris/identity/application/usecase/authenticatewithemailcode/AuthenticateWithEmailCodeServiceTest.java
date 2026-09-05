@@ -69,12 +69,11 @@ class AuthenticateWithEmailCodeServiceTest {
   @Test
   void rejectsAnUnknownAccount() {
     when(accounts.findByOrganizationIdAndEmail(organizationId, email)).thenReturn(Optional.empty());
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "000000");
 
     assertThatExceptionOfType(InvalidOneTimeCodeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithEmailCodeCommand(organizationId, email, "000000")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).findByTokenHash(any());
   }
@@ -85,12 +84,11 @@ class AuthenticateWithEmailCodeServiceTest {
     account.suspend();
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "000000");
 
     assertThatExceptionOfType(InvalidOneTimeCodeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithEmailCodeCommand(organizationId, email, "000000")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -101,12 +99,11 @@ class AuthenticateWithEmailCodeServiceTest {
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, "000000");
 
     assertThatExceptionOfType(InvalidOneTimeCodeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithEmailCodeCommand(organizationId, email, "000000")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -119,12 +116,11 @@ class AuthenticateWithEmailCodeServiceTest {
     String rawCode = "111222";
     VerificationToken token = issuedToken(AccountId.newId(), rawCode);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
 
     assertThatExceptionOfType(InvalidOneTimeCodeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -142,11 +138,10 @@ class AuthenticateWithEmailCodeServiceTest {
             RefreshTokenSecret.hash(rawCode),
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
 
     assertThatExceptionOfType(InvalidOneTimeCodeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode)));
+        .isThrownBy(() -> service.handle(command));
   }
 }

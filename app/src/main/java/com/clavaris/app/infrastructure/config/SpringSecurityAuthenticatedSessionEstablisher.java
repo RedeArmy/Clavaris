@@ -52,6 +52,11 @@ import org.springframework.stereotype.Component;
 @Component
 class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSessionEstablisher {
 
+  // Every establishVia* method below grants this same tenant-Account authority regardless of
+  // which factor authenticated the session — one constant, not three repeated literals.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String ROLE_ACCOUNT_AUTHORITY = "ROLE_ACCOUNT";
+
   private final SecurityContextRepository contextRepository;
 
   // Same instance shape SAS's own ExceptionTranslationFilter uses by default to remember "what was
@@ -85,7 +90,7 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
             FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
                 .issuedAt(Instant.now())
                 .build(),
-            new SimpleGrantedAuthority("ROLE_ACCOUNT")),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY)),
         fallbackUrl);
   }
 
@@ -111,7 +116,7 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
                     FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY)
                 .issuedAt(Instant.now())
                 .build(),
-            new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_" + provider.name())),
         fallbackUrl);
   }
@@ -137,7 +142,7 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
             FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.OTT_AUTHORITY)
                 .issuedAt(Instant.now())
                 .build(),
-            new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_OTP")),
         fallbackUrl);
   }

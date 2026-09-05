@@ -117,9 +117,11 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
   void rejectsANonExistentOrganizationWithoutPersistingAnything() {
     UUID nonExistentOrganizationId = UUID.randomUUID();
     when(organizations.existsById(nonExistentOrganizationId)).thenReturn(false);
+    SetAccountAuthenticationPolicyForOrganizationCommand command =
+        validCommand(nonExistentOrganizationId);
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
-        .isThrownBy(() -> service.handle(validCommand(nonExistentOrganizationId)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(policies, never()).save(any());
     verifyNoInteractions(auditEvents);

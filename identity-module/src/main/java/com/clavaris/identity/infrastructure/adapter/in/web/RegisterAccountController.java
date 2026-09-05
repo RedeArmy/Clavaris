@@ -56,6 +56,10 @@ public class RegisterAccountController {
 
   private static final String FORM_VIEW = "identity/register";
 
+  // Every redirect this controller issues targets this same Organization's own hosted UI — one
+  // constant, not three repeated literals.
+  private static final String REDIRECT_ORGANIZATION_PREFIX = "redirect:/o/";
+
   private final RegisterAccountUseCase useCase;
   private final RequestEmailVerificationUseCase requestEmailVerification;
   private final AccountAuthenticationPolicyProvider policyProvider;
@@ -160,7 +164,7 @@ public class RegisterAccountController {
     // language, for exactly that reason).
     requestEmailVerification.handle(new RequestEmailVerificationCommand(accountId));
 
-    return "redirect:/o/" + organizationId + "/register/pending-verification";
+    return REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
   }
 
   // Two genuinely distinct exits (email-code vs. email-link completion) — same "one exit per
@@ -175,13 +179,16 @@ public class RegisterAccountController {
     final Email email = new Email(form.getEmail());
     if (policy.emailCodeSignInEnabled()) {
       requestEmailSignInCode.handle(new RequestEmailSignInCodeCommand(orgId, email));
-      return "redirect:/o/" + organizationId + "/login/email-code/confirm?email=" + form.getEmail();
+      return REDIRECT_ORGANIZATION_PREFIX
+          + organizationId
+          + "/login/email-code/confirm?email="
+          + form.getEmail();
     }
     // SetAccountAuthenticationPolicyForOrganizationService's own validation already guarantees at
     // least one of the two is enabled whenever passwordAtSignUpEnabled is off — this is the only
     // remaining possibility, not a silently-assumed one.
     requestEmailSignInLink.handle(new RequestEmailSignInLinkCommand(orgId, email));
-    return "redirect:/o/" + organizationId + "/login/email-link/pending";
+    return REDIRECT_ORGANIZATION_PREFIX + organizationId + "/login/email-link/pending";
   }
 
   @GetMapping("/pending-verification")

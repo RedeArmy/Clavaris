@@ -94,8 +94,8 @@ public class UsernameSignInController {
                   new Username(form.getUsername()),
                   form.getPassword()));
     } catch (final IllegalArgumentException | InvalidCredentialsException _) {
-      // Username's own domain constructor rejects a shape UsernamePasswordForm's plain @Size
-      // check wouldn't catch (e.g. whitespace-only after trimming) — same anti-enumeration-generic
+      // Username's own domain constructor rejects a shape the form's plain size check wouldn't
+      // catch, such as whitespace-only input surviving trimming — same anti-enumeration-generic
       // outcome as an actual InvalidCredentialsException, not a distinguishable field error, so
       // both collapse to the same rendering.
       model.addAttribute("loginError", true);

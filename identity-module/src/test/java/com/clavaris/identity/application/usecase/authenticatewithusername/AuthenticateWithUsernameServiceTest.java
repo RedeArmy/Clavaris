@@ -70,12 +70,11 @@ class AuthenticateWithUsernameServiceTest {
   void rejectsAnUnknownUsername() {
     when(accounts.findByOrganizationIdAndUsername(organizationId, username))
         .thenReturn(Optional.empty());
+    AuthenticateWithUsernameCommand command =
+        new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -84,12 +83,11 @@ class AuthenticateWithUsernameServiceTest {
     when(accounts.findByOrganizationIdAndUsername(organizationId, username))
         .thenReturn(Optional.of(account));
     when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(false);
+    AuthenticateWithUsernameCommand command =
+        new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -106,12 +104,11 @@ class AuthenticateWithUsernameServiceTest {
             username);
     when(accounts.findByOrganizationIdAndUsername(organizationId, username))
         .thenReturn(Optional.of(account));
+    AuthenticateWithUsernameCommand command =
+        new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -132,11 +129,10 @@ class AuthenticateWithUsernameServiceTest {
                 false,
                 true,
                 false));
+    AuthenticateWithUsernameCommand command =
+        new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
 
     assertThatExceptionOfType(EmailNotVerifiedException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD)));
+        .isThrownBy(() -> service.handle(command));
   }
 }

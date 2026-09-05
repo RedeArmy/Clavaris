@@ -54,10 +54,11 @@ class ConfirmDeviceTrustChallengeServiceTest {
   @Test
   void rejectsAnUnknownCode() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    ConfirmDeviceTrustChallengeCommand command =
+        new ConfirmDeviceTrustChallengeCommand(accountId, "000000");
 
     assertThatExceptionOfType(InvalidDeviceTrustChallengeException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, "000000")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
   }
@@ -68,11 +69,11 @@ class ConfirmDeviceTrustChallengeServiceTest {
     VerificationToken token = issuedToken(rawCode);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
     AccountId anotherAccountId = AccountId.newId();
+    ConfirmDeviceTrustChallengeCommand command =
+        new ConfirmDeviceTrustChallengeCommand(anotherAccountId, rawCode);
 
     assertThatExceptionOfType(InvalidDeviceTrustChallengeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(new ConfirmDeviceTrustChallengeCommand(anotherAccountId, rawCode)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
   }
@@ -87,10 +88,11 @@ class ConfirmDeviceTrustChallengeServiceTest {
             RefreshTokenSecret.hash(rawCode),
             Instant.now().plusSeconds(600));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    ConfirmDeviceTrustChallengeCommand command =
+        new ConfirmDeviceTrustChallengeCommand(accountId, rawCode);
 
     assertThatExceptionOfType(InvalidDeviceTrustChallengeException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, rawCode)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).save(any());
   }
@@ -105,9 +107,10 @@ class ConfirmDeviceTrustChallengeServiceTest {
             RefreshTokenSecret.hash(rawCode),
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    ConfirmDeviceTrustChallengeCommand command =
+        new ConfirmDeviceTrustChallengeCommand(accountId, rawCode);
 
     assertThatExceptionOfType(InvalidDeviceTrustChallengeException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmDeviceTrustChallengeCommand(accountId, rawCode)));
+        .isThrownBy(() -> service.handle(command));
   }
 }

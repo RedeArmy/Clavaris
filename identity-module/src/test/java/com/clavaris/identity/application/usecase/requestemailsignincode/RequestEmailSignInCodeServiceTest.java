@@ -103,9 +103,11 @@ class RequestEmailSignInCodeServiceTest {
     when(policyProvider.policyFor(organizationId))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     Email email = new Email("someone@example.com");
+    RequestEmailSignInCodeCommand command =
+        new RequestEmailSignInCodeCommand(organizationId, email);
 
     assertThatExceptionOfType(EmailCodeSignInNotEnabledException.class)
-        .isThrownBy(() -> service.handle(new RequestEmailSignInCodeCommand(organizationId, email)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).findByOrganizationIdAndEmail(any(), any());
   }

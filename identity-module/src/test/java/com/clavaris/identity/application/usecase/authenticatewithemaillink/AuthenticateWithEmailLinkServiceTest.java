@@ -67,10 +67,11 @@ class AuthenticateWithEmailLinkServiceTest {
   @Test
   void rejectsAnUnknownToken() {
     when(tokens.findByTokenHash(any())).thenReturn(Optional.empty());
+    AuthenticateWithEmailLinkCommand command =
+        new AuthenticateWithEmailLinkCommand(organizationId, "garbage");
 
     assertThatExceptionOfType(InvalidSignInLinkException.class)
-        .isThrownBy(
-            () -> service.handle(new AuthenticateWithEmailLinkCommand(organizationId, "garbage")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -86,10 +87,11 @@ class AuthenticateWithEmailLinkServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().plusSeconds(600));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    AuthenticateWithEmailLinkCommand command =
+        new AuthenticateWithEmailLinkCommand(organizationId, rawToken);
 
     assertThatExceptionOfType(InvalidSignInLinkException.class)
-        .isThrownBy(
-            () -> service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -105,10 +107,11 @@ class AuthenticateWithEmailLinkServiceTest {
             RefreshTokenSecret.hash(rawToken),
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    AuthenticateWithEmailLinkCommand command =
+        new AuthenticateWithEmailLinkCommand(organizationId, rawToken);
 
     assertThatExceptionOfType(InvalidSignInLinkException.class)
-        .isThrownBy(
-            () -> service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken)));
+        .isThrownBy(() -> service.handle(command));
   }
 
   @Test
@@ -119,10 +122,11 @@ class AuthenticateWithEmailLinkServiceTest {
     String rawToken = "a-real-256-bit-token";
     VerificationToken token = issuedToken(account.id(), rawToken);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    AuthenticateWithEmailLinkCommand command =
+        new AuthenticateWithEmailLinkCommand(organizationId, rawToken);
 
     assertThatExceptionOfType(InvalidSignInLinkException.class)
-        .isThrownBy(
-            () -> service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
@@ -135,10 +139,11 @@ class AuthenticateWithEmailLinkServiceTest {
     String rawToken = "a-real-256-bit-token";
     VerificationToken token = issuedToken(account.id(), rawToken);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    AuthenticateWithEmailLinkCommand command =
+        new AuthenticateWithEmailLinkCommand(organizationId, rawToken);
 
     assertThatExceptionOfType(InvalidSignInLinkException.class)
-        .isThrownBy(
-            () -> service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken)));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
   }
