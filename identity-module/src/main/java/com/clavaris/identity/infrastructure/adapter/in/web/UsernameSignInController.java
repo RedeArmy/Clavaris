@@ -7,8 +7,11 @@ import com.clavaris.identity.application.usecase.authenticatewithusername.Authen
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * ADR-0024 §4: username sign-in — {@code organizationId} from the path, never a form field, same
@@ -48,6 +52,8 @@ public class UsernameSignInController {
   private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private final RedirectUrlResolver redirectUrlResolver;
+  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public UsernameSignInController(
@@ -56,13 +62,17 @@ public class UsernameSignInController {
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
+      final RedirectUrlResolver redirectUrlResolver,
+      final AccountRepository accounts) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
+    this.redirectUrlResolver = redirectUrlResolver;
+    this.accounts = accounts;
   }
 
   @GetMapping
@@ -80,7 +90,10 @@ public class UsernameSignInController {
       final BindingResult bindingResult,
       final HttpServletRequest request,
       final HttpServletResponse response,
-      final Model model) {
+      final Model model,
+      // Clerk "customize redirect URLs" parity — see LoginController's own identical parameters.
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl) {
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
     }
@@ -113,12 +126,31 @@ public class UsernameSignInController {
             request,
             organizationId,
             accountId,
-            PendingAuthenticationFactor.PASSWORD);
+            PendingAuthenticationFactor.PASSWORD,
+            clientId,
+            redirectUrl);
     if (challenge.isPresent()) {
       return "redirect:" + challenge.get();
     }
 
-    final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
+    final Optional<String> sessionTask =
+        SessionTaskGate.intercept(
+            accounts,
+            request,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.PASSWORD,
+            clientId,
+            redirectUrl);
+    if (sessionTask.isPresent()) {
+      return "redirect:" + sessionTask.get();
+    }
+
+    final String fallbackUrl =
+        redirectUrlResolver
+            .resolve(
+                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
+            .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
         sessions.establish(request, response, accountId.value(), fallbackUrl);
 

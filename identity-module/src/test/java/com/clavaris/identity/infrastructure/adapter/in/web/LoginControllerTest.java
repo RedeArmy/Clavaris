@@ -21,15 +21,20 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Invali
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +60,8 @@ class LoginControllerTest {
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private RedirectUrlResolver redirectUrlResolver;
+  private AccountRepository accounts;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -66,6 +73,15 @@ class LoginControllerTest {
     knownDevices = mock(KnownDeviceRepository.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
+    redirectUrlResolver = mock(RedirectUrlResolver.class);
+    accounts = mock(AccountRepository.class);
+    // Matches today's real default (no redirect policy configured) — every existing test below
+    // predates this feature and expects the controller's own hardcoded literal fallback.
+    when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
+    // Matches today's real default (no session task ever forced) — SessionTaskGate treats an
+    // absent account exactly like one with no outstanding requirement, same as a real empty
+    // Optional<Instant> would.
+    when(accounts.findById(any())).thenReturn(Optional.empty());
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
@@ -93,7 +109,9 @@ class LoginControllerTest {
                     recordLoginDevice,
                     knownDevices,
                     authenticationPolicyProvider,
-                    requestDeviceTrustChallenge))
+                    requestDeviceTrustChallenge,
+                    redirectUrlResolver,
+                    accounts))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -144,6 +162,58 @@ class LoginControllerTest {
                 "correct-password"));
     // New-device login email notification — fired after a successful login, same accountId.
     verify(recordLoginDevice).handle(any());
+  }
+
+  // Clerk "session tasks" parity.
+  @Test
+  void pausesForAForcedPasswordResetWhenTheAccountRequiresOne() throws Exception {
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+    Account accountRequiringReset =
+        Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
+    accountRequiringReset.attachPasswordCredential("argon2id$hashed");
+    accountRequiringReset.requirePasswordReset();
+    when(accounts.findById(accountId)).thenReturn(Optional.of(accountRequiringReset));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("email", "user@example.com")
+                .param("password", "correct-password"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login/session-task/password-reset"));
+
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), any());
+    verifyNoInteractions(recordLoginDevice);
+  }
+
+  // Clerk "customize redirect URLs" parity: when the resolver has an answer, it becomes the
+  // fallbackUrl argument passed to AuthenticatedSessionEstablisher — the establisher itself still
+  // decides whether a SavedRequest overrides it (not exercised here, sessionEstablisher is
+  // mocked), see RedirectUrlResolver's own Javadoc for the full precedence chain.
+  @Test
+  void aResolvedRedirectPolicyBecomesTheFallbackUrlPassedToTheSessionEstablisher()
+      throws Exception {
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+    when(redirectUrlResolver.resolve(
+            new OrganizationId(ORGANIZATION_ID), "test_client", null, RedirectAction.SIGN_IN))
+        .thenReturn(Optional.of("https://app.example.com/dashboard"));
+    when(sessionEstablisher.establish(
+            any(), any(), eq(accountId.value()), eq("https://app.example.com/dashboard")))
+        .thenReturn("https://app.example.com/dashboard");
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("email", "user@example.com")
+                .param("password", "correct-password")
+                .param("clientId", "test_client"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("https://app.example.com/dashboard"));
+
+    verify(sessionEstablisher)
+        .establish(any(), any(), eq(accountId.value()), eq("https://app.example.com/dashboard"));
   }
 
   @Test

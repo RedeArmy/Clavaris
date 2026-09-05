@@ -170,6 +170,23 @@ public final class PlatformScopes {
       "platform:account-authentication-policy:write";
 
   /**
+   * Clerk "customize redirect URLs" parity: tuning an {@code OAuthClient}'s post-authentication
+   * fallback/force landing pages — its own scope, same defence-in-depth reasoning as every other
+   * admin-API rule here. Reading the policy back is unscoped, same "only mutating actions get their
+   * own scope" precedent every other GET on this surface already follows.
+   */
+  public static final String REDIRECT_POLICY_WRITE = "platform:redirect-policy:write";
+
+  /**
+   * Clerk "session tasks" parity: forcing an Account to set a new password before its next login
+   * can complete — its own scope, same defence-in-depth reasoning as every other admin-API rule
+   * here. Deliberately separate from {@link #ACCOUNTS_SUSPEND} — this never blocks an existing
+   * session/token the way suspension does, a genuinely different risk tier.
+   */
+  public static final String ACCOUNTS_FORCE_PASSWORD_RESET =
+      "platform:accounts:force-password-reset";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -194,7 +211,9 @@ public final class PlatformScopes {
           SOCIAL_CREDENTIALS_WRITE,
           SECRET_KEYS_WRITE,
           SECRET_KEYS_ROTATE,
-          ACCOUNT_AUTHENTICATION_POLICY_WRITE);
+          ACCOUNT_AUTHENTICATION_POLICY_WRITE,
+          REDIRECT_POLICY_WRITE,
+          ACCOUNTS_FORCE_PASSWORD_RESET);
 
   private PlatformScopes() {}
 }

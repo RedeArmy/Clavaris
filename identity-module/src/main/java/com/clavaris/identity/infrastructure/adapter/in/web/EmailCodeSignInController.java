@@ -6,10 +6,13 @@ import com.clavaris.identity.application.usecase.authenticatewithemailcode.Inval
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -41,7 +44,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 // name would only make this class's two collaborating use cases harder to tell apart.
 // PMD.AvoidDuplicateLiterals: "form" is the Thymeleaf model attribute name every controller in
 // this package uses for its bound form object — a named constant here would only add indirection.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals"})
+// PMD.ExcessiveImports: this controller now collaborates with 9 ports (Clerk feature builds keep
+// adding one apiece) — same "one import per collaborating type is inherent to the design, not a
+// code smell" rationale as LoginController's own identical suppression.
+@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-code")
 public class EmailCodeSignInController {
@@ -56,6 +62,8 @@ public class EmailCodeSignInController {
   private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private final RedirectUrlResolver redirectUrlResolver;
+  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public EmailCodeSignInController(
@@ -65,7 +73,9 @@ public class EmailCodeSignInController {
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
+      final RedirectUrlResolver redirectUrlResolver,
+      final AccountRepository accounts) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -73,6 +83,8 @@ public class EmailCodeSignInController {
     this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
+    this.redirectUrlResolver = redirectUrlResolver;
+    this.accounts = accounts;
   }
 
   @GetMapping
@@ -86,7 +98,12 @@ public class EmailCodeSignInController {
   public String requestCode(
       @PathVariable final UUID organizationId,
       @Valid @ModelAttribute("form") final RequestEmailSignInCodeForm form,
-      final BindingResult bindingResult) {
+      final BindingResult bindingResult,
+      // Clerk "customize redirect URLs" parity: this hop is a genuine cross-URL redirect (unlike
+      // LoginController's own same-URL resubmit), so these are explicitly carried forward via
+      // RedirectQueryParams rather than relying on the browser's own query-string preservation.
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl) {
     if (bindingResult.hasErrors()) {
       return REQUEST_FORM_VIEW;
     }
@@ -99,7 +116,11 @@ public class EmailCodeSignInController {
         new RequestEmailSignInCodeCommand(
             new OrganizationId(organizationId), new Email(form.getEmail())));
 
-    return "redirect:/o/" + organizationId + "/login/email-code/confirm?email=" + form.getEmail();
+    String target =
+        "redirect:/o/" + organizationId + "/login/email-code/confirm?email=" + form.getEmail();
+    target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
+    target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
+    return target;
   }
 
   @GetMapping("/confirm")
@@ -123,7 +144,12 @@ public class EmailCodeSignInController {
       final BindingResult bindingResult,
       final HttpServletRequest request,
       final HttpServletResponse response,
-      final Model model) {
+      final Model model,
+      // Bound from the query string the redirect above appended — the confirm page's own
+      // th:action="@{''}" resubmit then carries them forward automatically, same as
+      // LoginController's own single-hop case.
+      @RequestParam(required = false) final String clientId,
+      @RequestParam(required = false) final String redirectUrl) {
     if (bindingResult.hasErrors()) {
       return CONFIRM_FORM_VIEW;
     }
@@ -147,12 +173,31 @@ public class EmailCodeSignInController {
             request,
             organizationId,
             accountId,
-            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF);
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            clientId,
+            redirectUrl);
     if (challenge.isPresent()) {
       return "redirect:" + challenge.get();
     }
 
-    final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
+    final Optional<String> sessionTask =
+        SessionTaskGate.intercept(
+            accounts,
+            request,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            clientId,
+            redirectUrl);
+    if (sessionTask.isPresent()) {
+      return "redirect:" + sessionTask.get();
+    }
+
+    final String fallbackUrl =
+        redirectUrlResolver
+            .resolve(
+                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
+            .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
         sessions.establishViaOneTimeEmailProof(request, response, accountId.value(), fallbackUrl);
 

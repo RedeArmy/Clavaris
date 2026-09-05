@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.authenticatewithemaillink.Inval
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
@@ -57,6 +58,7 @@ public class EmailLinkSignInController {
   private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public EmailLinkSignInController(
@@ -66,7 +68,8 @@ public class EmailLinkSignInController {
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
+      final AccountRepository accounts) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -74,6 +77,7 @@ public class EmailLinkSignInController {
     this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
+    this.accounts = accounts;
   }
 
   @GetMapping
@@ -147,9 +151,30 @@ public class EmailLinkSignInController {
             request,
             organizationId,
             accountId,
-            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF);
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            // Clerk "customize redirect URLs" parity: deliberately not wired for this controller
+            // yet — the confirm step here is reached via an emailed link, potentially on a
+            // different device/session than the original request, so clientId/redirectUrl can't
+            // simply ride the query string the way every same-session flow does; carrying them
+            // would require persisting them onto the VerificationToken itself. Scoped out of this
+            // pass, not silently dropped — see RequestEmailSignInLinkService's own package.
+            null,
+            null);
     if (challenge.isPresent()) {
       return "redirect:" + challenge.get();
+    }
+
+    final Optional<String> sessionTask =
+        SessionTaskGate.intercept(
+            accounts,
+            request,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            null,
+            null);
+    if (sessionTask.isPresent()) {
+      return "redirect:" + sessionTask.get();
     }
 
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";

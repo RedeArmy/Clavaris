@@ -157,6 +157,13 @@ class AdminApiSecurityConfig {
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:reactivate")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
+                    // Clerk "session tasks" parity: forcing a future password reset — its own
+                    // scope, deliberately separate from ACCOUNTS_SUSPEND (see
+                    // PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET's own Javadoc for why).
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/accounts/*:force-password-reset")
+                    .hasAuthority(
+                        SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET)
                     // SDE-III feature build, 2026-09-03 (Impersonation) — its own scope,
                     // deliberately separate from every other admin-API scope here: see
                     // PlatformScopes.ACCOUNTS_IMPERSONATE's own Javadoc for why this is the
@@ -247,6 +254,14 @@ class AdminApiSecurityConfig {
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/authentication-policy")
                     .hasAuthority(
                         SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE)
+                    // Clerk "customize redirect URLs" parity: tuning an OAuthClient's
+                    // fallback/force post-authentication redirect — its own scope, same
+                    // defence-in-depth reasoning as every other admin-API rule above. Reading it
+                    // back (GET) is unscoped, same precedent every other GET on this surface
+                    // already follows.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/clients/*/redirect-policy")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.REDIRECT_POLICY_WRITE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

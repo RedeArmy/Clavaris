@@ -52,7 +52,11 @@ final class DeviceTrustGate {
       final HttpServletRequest request,
       final UUID organizationId,
       final AccountId accountId,
-      final PendingAuthenticationFactor factor) {
+      final PendingAuthenticationFactor factor,
+      // Clerk "customize redirect URLs" parity — both nullable, see DeviceTrustPendingState's own
+      // Javadoc for why they're carried across this pause at all.
+      final String clientId,
+      final String redirectUrl) {
     if (!policy.deviceTrustEnabled()
         || isRecognized(knownDevices, request, organizationId, accountId)) {
       return Optional.empty();
@@ -64,6 +68,12 @@ final class DeviceTrustGate {
     session.setAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE, factor.name());
     session.setAttribute(
         DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE, organizationId.toString());
+    if (clientId != null) {
+      session.setAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE, clientId);
+    }
+    if (redirectUrl != null) {
+      session.setAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE, redirectUrl);
+    }
 
     requestChallenge.handle(new RequestDeviceTrustChallengeCommand(accountId));
     return Optional.of("/o/" + organizationId + "/login/device-trust");
