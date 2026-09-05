@@ -35,7 +35,11 @@
     <div th:if="${not #lists.isEmpty(socialProviders)}">
         <p>Or sign in with:</p>
         <p th:each="provider : ${socialProviders}">
-            <a th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}}"
+            <!-- Clerk "customize redirect URLs" parity: this is a plain link, not a form
+                 resubmission, so clientId/redirectUrl must be explicitly appended here —
+                 Thymeleaf's own link-expression syntax omits a param entirely when its value is
+                 null, so this renders no query string at all for the common case. -->
+            <a th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}"
                th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
         </p>
     </div>

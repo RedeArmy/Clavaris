@@ -10,6 +10,8 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.UnverifiedProviderEmailException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -89,6 +91,7 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
   private final AuthenticatedSessionEstablisher tenantSessions;
   private final PlatformAuthenticatedSessionEstablisher platformSessions;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private final RedirectUrlResolver redirectUrlResolver;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
@@ -99,12 +102,14 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
       final AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase,
       final AuthenticatedSessionEstablisher tenantSessions,
       final PlatformAuthenticatedSessionEstablisher platformSessions,
-      final RecordAccountLoginDeviceUseCase recordLoginDevice) {
+      final RecordAccountLoginDeviceUseCase recordLoginDevice,
+      final RedirectUrlResolver redirectUrlResolver) {
     this.tenantUseCase = tenantUseCase;
     this.platformUseCase = platformUseCase;
     this.tenantSessions = tenantSessions;
     this.platformSessions = platformSessions;
     this.recordLoginDevice = recordLoginDevice;
+    this.redirectUrlResolver = redirectUrlResolver;
   }
 
   @Override
@@ -122,8 +127,23 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
             : (String)
                 session.getAttribute(
                     SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE);
+    // Clerk "customize redirect URLs" parity: same single-use session round trip as
+    // organizationIdValue above — see SocialLoginRedirectController's own Javadoc for why an
+    // external provider round trip needs this at all.
+    final String clientId =
+        session == null
+            ? null
+            : (String)
+                session.getAttribute(SocialLoginRedirectController.CLIENT_ID_SESSION_ATTRIBUTE);
+    final String redirectUrl =
+        session == null
+            ? null
+            : (String)
+                session.getAttribute(SocialLoginRedirectController.REDIRECT_URL_SESSION_ATTRIBUTE);
     if (session != null) {
       session.removeAttribute(SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE);
+      session.removeAttribute(SocialLoginRedirectController.CLIENT_ID_SESSION_ATTRIBUTE);
+      session.removeAttribute(SocialLoginRedirectController.REDIRECT_URL_SESSION_ATTRIBUTE);
     }
 
     final SocialProvider provider = resolveProvider(oauthToken.getAuthorizedClientRegistrationId());
@@ -150,19 +170,25 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
           UUID.fromString(organizationIdValue),
           provider,
           providerUserId,
-          verifiedEmail);
+          verifiedEmail,
+          clientId,
+          redirectUrl);
     } else {
       onPlatformLogin(request, response, provider, providerUserId, verifiedEmail);
     }
   }
 
+  @SuppressWarnings("java:S107") // two more parameters for Clerk "customize redirect URLs"
+  // parity — same rationale as this class's own constructor suppression.
   private void onTenantLogin(
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID organizationId,
       final SocialProvider provider,
       final String providerUserId,
-      final String verifiedEmail)
+      final String verifiedEmail,
+      final String clientId,
+      final String redirectUrl)
       throws IOException {
     final AuthenticateWithSocialProviderResult result;
     try {
@@ -184,7 +210,11 @@ class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHa
     }
 
     if (result instanceof AuthenticateWithSocialProviderResult.LoggedIn(AccountId accountId)) {
-      final String fallbackUrl = TENANT_PATH_PREFIX + organizationId + "/login?authenticated";
+      final String fallbackUrl =
+          redirectUrlResolver
+              .resolve(
+                  new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
+              .orElse(TENANT_PATH_PREFIX + organizationId + "/login?authenticated");
       final String target =
           tenantSessions.establishViaSocialLogin(
               request, response, accountId.value(), provider, fallbackUrl);

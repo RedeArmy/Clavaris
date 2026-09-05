@@ -196,9 +196,14 @@ public final class OAuthClient {
    * — already the extraction that brought both callers back under this threshold; splitting this
    * single per-entry validator further would fragment one cohesive check into several without
    * removing any real complexity, not reduce it.
+   *
+   * <p>Package-private, not {@code private}: {@link RedirectPolicy} (same package) reuses this
+   * exact validator for its own configured URLs — a second, independently-drifting copy of these
+   * four rules would be a real duplication risk, not a reason to keep this class-private.
    */
   @SuppressWarnings("PMD.CyclomaticComplexity")
-  private static void requireWellFormedAbsoluteSecureUri(final String uri, final String fieldName) {
+  /* package */ static void requireWellFormedAbsoluteSecureUri(
+      final String uri, final String fieldName) {
     if (uri == null || uri.isBlank()) {
       throw new IllegalArgumentException(fieldName + " must not contain a blank entry");
     }

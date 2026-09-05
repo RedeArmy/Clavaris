@@ -15,6 +15,7 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
@@ -43,6 +44,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
   private AuthenticatedSessionEstablisher tenantSessions;
   private PlatformAuthenticatedSessionEstablisher platformSessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private RedirectUrlResolver redirectUrlResolver;
   private SocialLoginAuthenticationSuccessHandler handler;
 
   @BeforeEach
@@ -52,9 +54,17 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     tenantSessions = mock(AuthenticatedSessionEstablisher.class);
     platformSessions = mock(PlatformAuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
+    redirectUrlResolver = mock(RedirectUrlResolver.class);
+    when(redirectUrlResolver.resolve(any(), any(), any(), any()))
+        .thenReturn(java.util.Optional.empty());
     handler =
         new SocialLoginAuthenticationSuccessHandler(
-            tenantUseCase, platformUseCase, tenantSessions, platformSessions, recordLoginDevice);
+            tenantUseCase,
+            platformUseCase,
+            tenantSessions,
+            platformSessions,
+            recordLoginDevice,
+            redirectUrlResolver);
   }
 
   private OAuth2AuthenticationToken googleToken(final String email, final boolean verified) {

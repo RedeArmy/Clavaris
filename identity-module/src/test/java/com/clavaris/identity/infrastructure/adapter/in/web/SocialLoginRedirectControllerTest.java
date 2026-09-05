@@ -68,6 +68,34 @@ class SocialLoginRedirectControllerTest {
         .andExpect(redirectedUrl("/oauth2/authorization/google"));
   }
 
+  // Clerk "customize redirect URLs" parity: stashed in the session so app's own
+  // SocialLoginAuthenticationSuccessHandler can read them back once the provider redirects here —
+  // see SocialLoginRedirectController's own Javadoc for why a session round trip is needed at all.
+  @Test
+  void stashesClientIdAndRedirectUrlInTheSessionWhenPresent() throws Exception {
+    when(policyProvider.isProviderAllowed(
+            new OrganizationId(ORGANIZATION_ID), SocialProvider.GOOGLE))
+        .thenReturn(true);
+
+    org.springframework.mock.web.MockHttpSession session =
+        new org.springframework.mock.web.MockHttpSession();
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/login/social/google", ORGANIZATION_ID)
+                .session(session)
+                .param("clientId", "test_client")
+                .param("redirectUrl", "https://app.example.com/callback"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/oauth2/authorization/google"));
+
+    org.assertj.core.api.Assertions.assertThat(
+            session.getAttribute(SocialLoginRedirectController.CLIENT_ID_SESSION_ATTRIBUTE))
+        .isEqualTo("test_client");
+    org.assertj.core.api.Assertions.assertThat(
+            session.getAttribute(SocialLoginRedirectController.REDIRECT_URL_SESSION_ATTRIBUTE))
+        .isEqualTo("https://app.example.com/callback");
+  }
+
   @Test
   void redirectsBackToLoginWithAnErrorWhenTheOrganizationHasNotEnabledTheProvider()
       throws Exception {
