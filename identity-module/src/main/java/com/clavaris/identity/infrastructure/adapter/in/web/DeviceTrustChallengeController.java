@@ -3,12 +3,9 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeCommand;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
-import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -111,34 +108,21 @@ public class DeviceTrustChallengeController {
         (String) session.getAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
     clearPendingState(session);
 
-    // Device trust only ever gates a sign-in (never sign-up completion, ADR-0024 §6) — always
-    // RedirectAction.SIGN_IN, same as every one of this challenge's four possible callers.
-    final String fallbackUrl =
-        redirectUrlResolver
-            .resolve(
-                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
-            .orElse("/o/" + organizationId + "/login?authenticated");
+    // Device trust only ever gates a sign-in (never sign-up completion, ADR-0024 §6) — the device
+    // is recorded as known only now, after the challenge actually succeeded, never at the moment
+    // the challenge was merely issued (both handled inside AuthenticatedSessionCompletion).
     final String redirectTarget =
-        factor == PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF
-            ? sessions.establishViaOneTimeEmailProof(
-                request, response, accountId.value(), fallbackUrl)
-            : sessions.establish(request, response, accountId.value(), fallbackUrl);
-
-    // Same device-recording step every other sign-in controller's own POST handler performs — see
-    // RecordAccountLoginDeviceService's own Javadoc for why this never throws. The device is
-    // recorded as known only now, after the challenge actually succeeded — never at the moment the
-    // challenge was merely issued.
-    recordLoginDevice
-        .handle(
-            new RecordAccountLoginDeviceCommand(
-                accountId,
-                request.getHeader("User-Agent"),
-                request.getRemoteAddr(),
-                DeviceCookie.read(request, organizationId).orElse(null)))
-        .ifPresent(
-            rawDeviceToken ->
-                DeviceCookie.write(request, response, organizationId, rawDeviceToken));
-
+        AuthenticatedSessionCompletion.complete(
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver,
+            request,
+            response,
+            organizationId,
+            accountId,
+            factor,
+            clientId,
+            redirectUrl);
     return "redirect:" + redirectTarget;
   }
 

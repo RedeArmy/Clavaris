@@ -5,12 +5,10 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Invali
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameCommand;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
-import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -146,25 +144,18 @@ public class UsernameSignInController {
       return "redirect:" + sessionTask.get();
     }
 
-    final String fallbackUrl =
-        redirectUrlResolver
-            .resolve(
-                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
-            .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
-        sessions.establish(request, response, accountId.value(), fallbackUrl);
-
-    recordLoginDevice
-        .handle(
-            new RecordAccountLoginDeviceCommand(
-                accountId,
-                request.getHeader("User-Agent"),
-                request.getRemoteAddr(),
-                DeviceCookie.read(request, organizationId).orElse(null)))
-        .ifPresent(
-            rawDeviceToken ->
-                DeviceCookie.write(request, response, organizationId, rawDeviceToken));
-
+        AuthenticatedSessionCompletion.complete(
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver,
+            request,
+            response,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.PASSWORD,
+            clientId,
+            redirectUrl);
     return "redirect:" + redirectTarget;
   }
 }

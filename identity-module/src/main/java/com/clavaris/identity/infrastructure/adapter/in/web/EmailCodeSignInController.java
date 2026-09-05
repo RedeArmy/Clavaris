@@ -4,14 +4,12 @@ import com.clavaris.identity.application.usecase.authenticatewithemailcode.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.InvalidOneTimeCodeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
-import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -44,10 +42,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 // name would only make this class's two collaborating use cases harder to tell apart.
 // PMD.AvoidDuplicateLiterals: "form" is the Thymeleaf model attribute name every controller in
 // this package uses for its bound form object — a named constant here would only add indirection.
-// PMD.ExcessiveImports: this controller now collaborates with 9 ports (Clerk feature builds keep
-// adding one apiece) — same "one import per collaborating type is inherent to the design, not a
-// code smell" rationale as LoginController's own identical suppression.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals", "PMD.ExcessiveImports"})
+@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals"})
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-code")
 public class EmailCodeSignInController {
@@ -193,27 +188,18 @@ public class EmailCodeSignInController {
       return "redirect:" + sessionTask.get();
     }
 
-    final String fallbackUrl =
-        redirectUrlResolver
-            .resolve(
-                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
-            .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
-        sessions.establishViaOneTimeEmailProof(request, response, accountId.value(), fallbackUrl);
-
-    // Same device-recording step LoginController's own POST handler already performs — see that
-    // class's own Javadoc for why this never throws.
-    recordLoginDevice
-        .handle(
-            new RecordAccountLoginDeviceCommand(
-                accountId,
-                request.getHeader("User-Agent"),
-                request.getRemoteAddr(),
-                DeviceCookie.read(request, organizationId).orElse(null)))
-        .ifPresent(
-            rawDeviceToken ->
-                DeviceCookie.write(request, response, organizationId, rawDeviceToken));
-
+        AuthenticatedSessionCompletion.complete(
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver,
+            request,
+            response,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            clientId,
+            redirectUrl);
     return "redirect:" + redirectTarget;
   }
 }

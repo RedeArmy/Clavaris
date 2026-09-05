@@ -2,13 +2,10 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetCommand;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
-import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
-import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -115,30 +112,20 @@ public class SessionTaskChallengeController {
         (String) session.getAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
     clearPendingState(session);
 
-    final String fallbackUrl =
-        redirectUrlResolver
-            .resolve(
-                new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
-            .orElse("/o/" + organizationId + "/login?authenticated");
+    // This task's own completion is the actual moment the session finally gets established —
+    // AuthenticatedSessionCompletion's own device-recording step reflects that.
     final String redirectTarget =
-        factor == PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF
-            ? sessions.establishViaOneTimeEmailProof(
-                request, response, accountId.value(), fallbackUrl)
-            : sessions.establish(request, response, accountId.value(), fallbackUrl);
-
-    // Same device-recording step every primary-factor controller's own POST handler performs —
-    // this task's own completion is the actual moment the session finally gets established.
-    recordLoginDevice
-        .handle(
-            new RecordAccountLoginDeviceCommand(
-                accountId,
-                request.getHeader("User-Agent"),
-                request.getRemoteAddr(),
-                DeviceCookie.read(request, organizationId).orElse(null)))
-        .ifPresent(
-            rawDeviceToken ->
-                DeviceCookie.write(request, response, organizationId, rawDeviceToken));
-
+        AuthenticatedSessionCompletion.complete(
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver,
+            request,
+            response,
+            organizationId,
+            accountId,
+            factor,
+            clientId,
+            redirectUrl);
     return "redirect:" + redirectTarget;
   }
 
