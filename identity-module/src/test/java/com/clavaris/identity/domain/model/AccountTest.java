@@ -74,7 +74,8 @@ class AccountTest {
             createdAt,
             emailVerifiedAt,
             AccountStatus.SUSPENDED,
-            credential);
+            credential,
+            null);
 
     assertThat(account.id()).isEqualTo(id);
     assertThat(account.organizationId()).isEqualTo(organizationId);
@@ -139,6 +140,7 @@ class AccountTest {
             Instant.now(),
             null,
             AccountStatus.ACTIVE,
+            null,
             null);
 
     assertThat(account.passwordCredential()).isEmpty();
@@ -173,6 +175,7 @@ class AccountTest {
             Instant.now(),
             null,
             AccountStatus.DELETED,
+            null,
             null);
 
     account.suspend();
@@ -209,6 +212,7 @@ class AccountTest {
             Instant.now(),
             null,
             AccountStatus.DELETED,
+            null,
             null);
 
     account.reactivate();

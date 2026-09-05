@@ -43,6 +43,12 @@ public final class Account {
 
   private PasswordCredential passwordCredential;
 
+  // ADR-0024 §4: an optional, additional identifier — Account.email stays the mandatory, primary
+  // identity (see AccountAuthenticationPolicy's own Javadoc for why making email itself optional
+  // is out of scope) — never set at construction, only via assignUsername below, same "attach
+  // after the fact" convention attachPasswordCredential already establishes.
+  private Username username;
+
   private Account(
       final AccountId id,
       final OrganizationId organizationId,
@@ -83,6 +89,20 @@ public final class Account {
   }
 
   /**
+   * ADR-0024 §4: assigns this (freshly registered) account's username — same "attach after the
+   * fact, never at construction" convention {@link #attachPasswordCredential} already establishes.
+   * {@code RegisterAccountService} is the only caller in v1 (no separate "change username" use case
+   * exists yet) — throws if one is already assigned, same registration-time-only invariant {@link
+   * #attachPasswordCredential}'s own guard establishes for its own field.
+   */
+  public void assignUsername(final Username username) {
+    if (this.username != null) {
+      throw new IllegalStateException("Account " + id.value() + " already has a username assigned");
+    }
+    this.username = Objects.requireNonNull(username, "username must not be null");
+  }
+
+  /**
    * Rehydrates an existing row — preserves the real persisted {@code id}/{@code createdAt}/{@code
    * status}, same discipline as {@code SigningKey#reconstitute}/{@code OAuthClient#reconstitute}.
    * Unlike {@link #register}, this accepts an already-issued {@link PasswordCredential} directly
@@ -91,7 +111,11 @@ public final class Account {
    * registration-time invariant, not a rehydration-from-storage one. {@code passwordCredential} may
    * be {@code null} for an account whose only authentication method is a (not yet implemented)
    * social identity — BR-ID-02 still guarantees at least one exists, just not necessarily this one.
+   *
+   * @param username ADR-0024 §4: {@code null} for every account that never set one (the common
+   *     case) — see {@link #assignUsername} for why this is never set at construction time.
    */
+  @SuppressWarnings("java:S107")
   public static Account reconstitute(
       final AccountId id,
       final OrganizationId organizationId,
@@ -99,10 +123,12 @@ public final class Account {
       final Instant createdAt,
       final Instant emailVerifiedAt,
       final AccountStatus status,
-      final PasswordCredential passwordCredential) {
+      final PasswordCredential passwordCredential,
+      final Username username) {
     final Account account = new Account(id, organizationId, email, createdAt, status);
     account.emailVerifiedAt = emailVerifiedAt;
     account.passwordCredential = passwordCredential;
+    account.username = username;
     return account;
   }
 
@@ -132,6 +158,10 @@ public final class Account {
 
   public Optional<PasswordCredential> passwordCredential() {
     return Optional.ofNullable(passwordCredential);
+  }
+
+  public Optional<Username> username() {
+    return Optional.ofNullable(username);
   }
 
   /**

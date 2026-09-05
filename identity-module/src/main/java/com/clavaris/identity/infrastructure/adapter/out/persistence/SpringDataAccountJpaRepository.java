@@ -17,6 +17,11 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
 
   Optional<AccountEntity> findByOrganizationIdAndEmail(UUID organizationId, String email);
 
+  // ADR-0024 §4
+  boolean existsByOrganizationIdAndUsername(UUID organizationId, String username);
+
+  Optional<AccountEntity> findByOrganizationIdAndUsername(UUID organizationId, String username);
+
   // Code review finding (2026-09-01): a scalar projection, not the full entity + its own separate
   // password_credentials round trip findById()/toDomain() costs — for the several callers (e.g.
   // RevokeAccountSessionService, RotateRefreshTokenService) that only ever need organizationId,

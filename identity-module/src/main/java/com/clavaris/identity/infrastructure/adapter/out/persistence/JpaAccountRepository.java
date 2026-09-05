@@ -7,15 +7,20 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
+import com.clavaris.identity.domain.model.Username;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+// PMD.TooManyMethods: ADR-0024 §4 added two more methods (username lookup) to a repository
+// implementing the one AccountRepository port — same "wiring, not sprawl" reasoning every other
+// growing outbound-port implementation in this codebase already documents for an identical case.
 /**
  * Implements the outbound port; maps between {@code domain.model} (framework-free) and the
  * {@code @Entity} classes in this package.
  */
+@SuppressWarnings("PMD.TooManyMethods")
 @Repository
 class JpaAccountRepository implements AccountRepository {
 
@@ -47,6 +52,20 @@ class JpaAccountRepository implements AccountRepository {
   }
 
   @Override
+  public boolean existsByOrganizationIdAndUsername(
+      final OrganizationId organizationId, final Username username) {
+    return accounts.existsByOrganizationIdAndUsername(organizationId.value(), username.value());
+  }
+
+  @Override
+  public Optional<Account> findByOrganizationIdAndUsername(
+      final OrganizationId organizationId, final Username username) {
+    return accounts
+        .findByOrganizationIdAndUsername(organizationId.value(), username.value())
+        .map(this::toDomain);
+  }
+
+  @Override
   public Optional<Account> findById(final AccountId accountId) {
     return accounts.findById(accountId.value()).map(this::toDomain);
   }
@@ -69,6 +88,8 @@ class JpaAccountRepository implements AccountRepository {
                     PasswordCredential.reconstitute(
                         row.getId(), accountId, row.getPasswordHash(), row.getUpdatedAt()))
             .orElse(null);
+    final Username username =
+        entity.getUsername() == null ? null : new Username(entity.getUsername());
     return Account.reconstitute(
         accountId,
         new OrganizationId(entity.getOrganizationId()),
@@ -76,7 +97,8 @@ class JpaAccountRepository implements AccountRepository {
         entity.getCreatedAt(),
         entity.getEmailVerifiedAt(),
         AccountStatus.valueOf(entity.getStatus()),
-        credential);
+        credential,
+        username);
   }
 
   // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
@@ -106,7 +128,8 @@ class JpaAccountRepository implements AccountRepository {
             account.email().value(),
             account.emailVerifiedAt().orElse(null),
             account.status().name(),
-            account.createdAt());
+            account.createdAt(),
+            account.username().map(Username::value).orElse(null));
 
     // saveAndFlush, not save: the unique constraint on accounts.(organization_id, email)
     // (data-model.md §3) must throw synchronously, right here, so RegisterAccountService's

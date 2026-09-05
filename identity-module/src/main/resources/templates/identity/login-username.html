@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Sign in with username — Clavaris</title>
+</head>
+<body>
+<main>
+    <h1>Sign in with username</h1>
+
+    <p th:if="${loginError}">Invalid username or password.</p>
+    <p th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
+
+    <form th:action="@{''}" th:object="${form}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+        <div>
+            <label for="username">Username</label>
+            <input id="username" type="text" th:field="*{username}" autocomplete="username" required/>
+            <p th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
+        </div>
+
+        <div>
+            <label for="password">Password</label>
+            <input id="password" type="password" th:field="*{password}" autocomplete="current-password" required/>
+            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+        </div>
+
+        <button type="submit">Sign in</button>
+    </form>
+
+    <p><a th:href="@{../}">Back to sign in</a></p>
+</main>
+</body>
+</html>
