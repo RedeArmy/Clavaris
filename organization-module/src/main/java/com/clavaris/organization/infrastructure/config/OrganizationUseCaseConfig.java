@@ -25,6 +25,8 @@ import com.clavaris.organization.application.usecase.deleteorganization.Organiza
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationTokenRevoker;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
+import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysService;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysUseCase;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
@@ -38,6 +40,9 @@ import com.clavaris.organization.application.usecase.listworkspacesfororganizati
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialCipher;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialRepository;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SetOrganizationSocialCredentialService;
@@ -275,5 +280,25 @@ class OrganizationUseCaseConfig {
       final OrganizationSigningKeyPublicKeyProvider publicKeyProvider,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
     return new GetOrganizationApiKeysService(organizations, publicKeyProvider, clavarisBaseUrl);
+  }
+
+  // ADR-0024 / Clerk sign-up-sign-in-options parity. PMD.LinguisticNaming: same false positive
+  // SetRateLimitPolicyForOrganizationUseCase's own @Bean method already documents above.
+  @SuppressWarnings("PMD.LinguisticNaming")
+  @Bean
+  /* package */ SetAccountAuthenticationPolicyForOrganizationUseCase
+      setAccountAuthenticationPolicyForOrganizationUseCase(
+          final OrganizationRepository organizations,
+          final AccountAuthenticationPolicyRepository policies,
+          final AuditEventRecorder auditEvents) {
+    return new SetAccountAuthenticationPolicyForOrganizationService(
+        organizations, policies, auditEvents);
+  }
+
+  @Bean
+  /* package */ GetAccountAuthenticationPolicyForOrganizationUseCase
+      getAccountAuthenticationPolicyForOrganizationUseCase(
+          final AccountAuthenticationPolicyRepository policies) {
+    return new GetAccountAuthenticationPolicyForOrganizationService(policies);
   }
 }

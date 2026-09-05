@@ -4,6 +4,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.Username;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +32,16 @@ public interface AccountRepository {
    * against it.
    */
   Optional<Account> findByOrganizationIdAndEmail(OrganizationId organizationId, Email email);
+
+  /**
+   * ADR-0024 §4: same fast-path-pre-check-only caveat as {@link #existsByOrganizationIdAndEmail} —
+   * not the actual concurrency-safety guarantee.
+   */
+  boolean existsByOrganizationIdAndUsername(OrganizationId organizationId, Username username);
+
+  /** ADR-0024 §4: same BR-ORG-02 scoping rationale as {@link #findByOrganizationIdAndEmail}. */
+  Optional<Account> findByOrganizationIdAndUsername(
+      OrganizationId organizationId, Username username);
 
   /**
    * BR-ID-03: {@code RotateRefreshTokenService} uses this to resolve {@code organizationId} for

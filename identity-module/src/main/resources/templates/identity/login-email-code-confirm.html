@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Enter your code — Clavaris</title>
+</head>
+<body>
+<main>
+    <h1>Enter your code</h1>
+    <p>We sent a 6-digit code to your email address. It expires in 10 minutes.</p>
+
+    <p th:if="${codeError}">That code is invalid or has expired.</p>
+
+    <form th:action="@{''}" th:object="${form}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" th:field="*{email}"/>
+
+        <div>
+            <label for="code">Code</label>
+            <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" th:field="*{code}" required/>
+            <p th:if="${#fields.hasErrors('code')}" th:errors="*{code}">Code error</p>
+        </div>
+
+        <button type="submit">Sign in</button>
+    </form>
+</main>
+</body>
+</html>

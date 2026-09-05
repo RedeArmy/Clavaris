@@ -10,9 +10,11 @@ import com.clavaris.identity.domain.model.OrganizationId;
  *
  * @param rawPassword never logged, never persisted as-is — hashed by {@link PasswordHasher} before
  *     it touches {@link AccountRepository} (BR-ID-01).
+ * @param rawUsername ADR-0024 §4: {@code null}/blank when the submitter didn't provide one — legal
+ *     unless the Organization's own policy requires it ({@code UsernameRequiredException}).
  */
 public record RegisterAccountCommand(
-    OrganizationId organizationId, Email email, String rawPassword) {
+    OrganizationId organizationId, Email email, String rawPassword, String rawUsername) {
 
   /**
    * BR-ID-01 ("no PII, credential, or token value in logs, ever"): a record's auto-generated {@code
@@ -27,6 +29,8 @@ public record RegisterAccountCommand(
         + organizationId
         + ", email="
         + email
-        + ", rawPassword=[REDACTED]]";
+        + ", rawPassword=[REDACTED], rawUsername="
+        + rawUsername
+        + "]";
   }
 }

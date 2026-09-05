@@ -100,4 +100,13 @@ final class ResendHttpClient {
   /* package */ static String htmlButton(final String link, final String label) {
     return "<p><a href=\"" + link + "\">" + label + "</a></p>";
   }
+
+  // ADR-0024: the CODE-shaped counterpart to htmlButton above — every send*Code() method renders
+  // one large, easy-to-retype value the same way. code itself is always this server's own
+  // EmailOneTimeCode.generate() output (six ASCII digits), never attacker-controlled input, so no
+  // HTML-escaping is needed here the way sendNewDeviceLoginNotification's own userAgent/sourceIp
+  // interpolation requires.
+  /* package */ static String htmlCode(final String code) {
+    return "<p style=\"font-size:24px;font-weight:bold;letter-spacing:4px;\">" + code + "</p>";
+  }
 }

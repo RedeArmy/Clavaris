@@ -52,6 +52,11 @@ import org.springframework.stereotype.Component;
 @Component
 class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSessionEstablisher {
 
+  // Every establishVia* method below grants this same tenant-Account authority regardless of
+  // which factor authenticated the session — one constant, not three repeated literals.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String ROLE_ACCOUNT_AUTHORITY = "ROLE_ACCOUNT";
+
   private final SecurityContextRepository contextRepository;
 
   // Same instance shape SAS's own ExceptionTranslationFilter uses by default to remember "what was
@@ -85,7 +90,7 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
             FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
                 .issuedAt(Instant.now())
                 .build(),
-            new SimpleGrantedAuthority("ROLE_ACCOUNT")),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY)),
         fallbackUrl);
   }
 
@@ -111,8 +116,34 @@ class SpringSecurityAuthenticatedSessionEstablisher implements AuthenticatedSess
                     FactorGrantedAuthority.AUTHORIZATION_CODE_AUTHORITY)
                 .issuedAt(Instant.now())
                 .build(),
-            new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_" + provider.name())),
+        fallbackUrl);
+  }
+
+  @Override
+  public String establishViaOneTimeEmailProof(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID accountId,
+      final String fallbackUrl) {
+    // ADR-0024 §3: FACTOR_OTT (Spring Security's own standard authority for a one-time-token-style
+    // login, exactly what both the email code and email link mechanisms are structurally — a
+    // single-use value proven once, never a stored, reusable credential the way a password is) for
+    // auth_time, same role PASSWORD_AUTHORITY/AUTHORIZATION_CODE_AUTHORITY already play above. The
+    // AMR_OTP authority is RFC 8176's own registered "otp" amr value — a real registry value, not a
+    // minted one like the social-login provider names above (that registry has no per-provider
+    // entries, but it does have one for exactly this factor).
+    return establishWithAuthorities(
+        request,
+        response,
+        accountId,
+        List.of(
+            FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.OTT_AUTHORITY)
+                .issuedAt(Instant.now())
+                .build(),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
+            new SimpleGrantedAuthority("AMR_OTP")),
         fallbackUrl);
   }
 

@@ -40,22 +40,30 @@ public class AccountEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  // ADR-0024 §4: nullable — most accounts never set one. Own column, not a nullable-but-part-of-
+  // some-other-shape field, same "just add the scalar column" precedent email_verified_at already
+  // establishes for this same table.
+  @Column private String username;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
+  @SuppressWarnings("java:S107")
   public AccountEntity(
       final UUID id,
       final UUID organizationId,
       final String email,
       final Instant emailVerifiedAt,
       final String status,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final String username) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
     this.emailVerifiedAt = emailVerifiedAt;
     this.status = status;
     this.createdAt = createdAt;
+    this.username = username;
   }
 
   public UUID getId() {
@@ -80,5 +88,9 @@ public class AccountEntity {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public String getUsername() {
+    return username;
   }
 }

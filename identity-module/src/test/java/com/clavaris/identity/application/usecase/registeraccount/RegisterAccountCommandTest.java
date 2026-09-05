@@ -19,7 +19,10 @@ class RegisterAccountCommandTest {
     String rawPassword = "super-secret-value-must-not-leak";
     RegisterAccountCommand command =
         new RegisterAccountCommand(
-            new OrganizationId(UUID.randomUUID()), new Email("someone@example.com"), rawPassword);
+            new OrganizationId(UUID.randomUUID()),
+            new Email("someone@example.com"),
+            rawPassword,
+            null);
 
     assertThat(command.toString()).doesNotContain(rawPassword).contains("REDACTED");
   }

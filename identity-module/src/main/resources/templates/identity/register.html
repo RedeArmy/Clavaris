@@ -7,25 +7,35 @@
 <body>
 <main>
     <h1>Create an account</h1>
-
     <form th:action="@{''}" th:object="${form}" method="post">
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-
         <div>
             <label for="email">Email</label>
             <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
             <p th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
         </div>
 
-        <div>
-            <label for="password">Password</label>
-            <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
-            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+        <!-- ADR-0024 §4: only ever shown when this Organization's own policy offers it, same
+             "policy computed fresh on every render" posture as login.html's own conditionals. -->
+        <div th:if="${usernameSignUpEnabled}">
+            <label for="username">Username</label>
+            <input id="username" type="text" th:field="*{username}" autocomplete="username"
+                   th:required="${usernameRequired}"/>
+            <p th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
         </div>
 
-        <div>
+        <!-- ADR-0024 §5: only shown when password sign-up is enabled — when it's off, sign-up
+             completes through a passwordless email method instead (see RegisterAccountController). -->
+        <div th:if="${passwordAtSignUpEnabled}">
+            <label for="password">Password</label>
+            <input id="password" type="password" th:field="*{password}" autocomplete="new-password"
+                   required/>
+            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+        </div>
+        <div th:if="${passwordAtSignUpEnabled}">
             <label for="confirmPassword">Confirm password</label>
-            <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password" required/>
+            <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password"
+                   required/>
             <p th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}">Confirm password error</p>
         </div>
 

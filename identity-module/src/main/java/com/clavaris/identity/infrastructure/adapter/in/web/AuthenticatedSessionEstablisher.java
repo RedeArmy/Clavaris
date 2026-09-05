@@ -44,4 +44,14 @@ public interface AuthenticatedSessionEstablisher {
       UUID accountId,
       SocialProvider provider,
       String fallbackUrl);
+
+  /**
+   * ADR-0024 §3: same contract as {@link #establish}, for a session established via a passwordless
+   * email proof — {@code authenticatewithemailcode}/{@code authenticatewithemaillink} both call
+   * this same method, since both represent the identical OIDC {@code amr=["otp"]} factor (a
+   * single-use value proven once, never a stored, reusable credential) — see the implementation's
+   * own Javadoc for the exact {@code FactorGrantedAuthority}/AMR authorities this adds.
+   */
+  String establishViaOneTimeEmailProof(
+      HttpServletRequest request, HttpServletResponse response, UUID accountId, String fallbackUrl);
 }

@@ -93,6 +93,7 @@ class RotateRefreshTokenServiceTest {
         Instant.now(),
         null,
         status,
+        null,
         null);
   }
 

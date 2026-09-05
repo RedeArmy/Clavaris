@@ -2,10 +2,15 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordCommand;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -15,6 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -44,6 +50,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * provider (Microsoft, {@code TD-FUT-022}) needs no controller change to start appearing here the
  * day it's added to the enum.
  */
+// PMD.LongVariable: authenticationPolicyProvider/requestDeviceTrustChallenge (field + constructor
+// param each) are long by design, not accidentally — same class-level-suppression precedent as
+// RecordAccountLoginDeviceService's own identical rationale, chosen over 4 individual suppressions
+// once PMD.AvoidDuplicateLiterals started flagging that many repeats of the same string.
+// PMD.ExcessiveImports: this controller now collaborates with 7 ports (device trust, ADR-0024 §6,
+// added 2 more) — same "one import per collaborating type is inherent to the design, not a code
+// smell" rationale as OrganizationAuthorizationServerConfig's own identical suppression.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/login")
 public class LoginController {
@@ -54,22 +68,32 @@ public class LoginController {
   private final AuthenticatedSessionEstablisher sessions;
   private final OrganizationSocialLoginPolicyProvider policyProvider;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private final KnownDeviceRepository knownDevices;
+  private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
+  private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
 
+  @SuppressWarnings("java:S107")
   public LoginController(
       final AuthenticateWithPasswordUseCase useCase,
       final AuthenticatedSessionEstablisher sessions,
       final OrganizationSocialLoginPolicyProvider policyProvider,
-      final RecordAccountLoginDeviceUseCase recordLoginDevice) {
+      final RecordAccountLoginDeviceUseCase recordLoginDevice,
+      final KnownDeviceRepository knownDevices,
+      final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.policyProvider = policyProvider;
     this.recordLoginDevice = recordLoginDevice;
+    this.knownDevices = knownDevices;
+    this.authenticationPolicyProvider = authenticationPolicyProvider;
+    this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
   }
 
   @GetMapping
   public String showForm(@PathVariable final UUID organizationId, final Model model) {
     model.addAttribute("form", new LoginForm());
-    addEnabledSocialProviders(organizationId, model);
+    addSignInOptions(organizationId, model);
     return FORM_VIEW;
   }
 
@@ -85,7 +109,7 @@ public class LoginController {
       final HttpServletResponse response,
       final Model model) {
     if (bindingResult.hasErrors()) {
-      addEnabledSocialProviders(organizationId, model);
+      addSignInOptions(organizationId, model);
       return FORM_VIEW;
     }
 
@@ -102,8 +126,28 @@ public class LoginController {
       // itself leak "the email field was fine, it was the password" or vice versa), matching
       // InvalidCredentialsException's own anti-enumeration design.
       model.addAttribute("loginError", true);
-      addEnabledSocialProviders(organizationId, model);
+      addSignInOptions(organizationId, model);
       return FORM_VIEW;
+    } catch (final EmailNotVerifiedException _) {
+      // ADR-0024 §2: deliberately a distinct, more specific message than loginError above — see
+      // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from
+      // the anti-enumeration-generic rejection every other failure mode uses.
+      model.addAttribute("emailNotVerifiedError", true);
+      addSignInOptions(organizationId, model);
+      return FORM_VIEW;
+    }
+
+    final Optional<String> challenge =
+        DeviceTrustGate.intercept(
+            knownDevices,
+            requestDeviceTrustChallenge,
+            authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
+            request,
+            organizationId,
+            accountId,
+            PendingAuthenticationFactor.PASSWORD);
+    if (challenge.isPresent()) {
+      return "redirect:" + challenge.get();
     }
 
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
@@ -133,9 +177,19 @@ public class LoginController {
   // why this reduction doesn't weaken BR-ID-12 (the requirement that call re-verifies is
   // AuthenticateWithSocialProviderService's own single-provider check at the moment a login is
   // actually attempted, never how many times a page render reads the same enabled-providers set).
-  private void addEnabledSocialProviders(final UUID organizationId, final Model model) {
+  //
+  // ADR-0024 §3/§4: also surfaces which passwordless/username strategies this Organization has
+  // enabled — same "computed fresh on every render, never cached, template only renders what's
+  // actually allowed" posture as the social-provider list above.
+  private void addSignInOptions(final UUID organizationId, final Model model) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final List<SocialProvider> enabled = new ArrayList<>(policyProvider.allowedProviders(orgId));
     model.addAttribute("socialProviders", enabled);
+
+    final AccountAuthenticationPolicySnapshot policy =
+        authenticationPolicyProvider.policyFor(orgId);
+    model.addAttribute("emailCodeSignInEnabled", policy.emailCodeSignInEnabled());
+    model.addAttribute("emailLinkSignInEnabled", policy.emailLinkSignInEnabled());
+    model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
   }
 }

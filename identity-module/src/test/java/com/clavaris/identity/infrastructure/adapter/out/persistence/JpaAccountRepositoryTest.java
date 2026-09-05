@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.Username;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
@@ -206,6 +207,88 @@ class JpaAccountRepositoryTest {
     String column = "accounts".equals(table) ? "id" : "account_id";
     return jdbcTemplate.queryForObject(
         "select count(*) from " + table + " where " + column + " = ?", Integer.class, accountId);
+  }
+
+  // ADR-0024 §4
+  @Test
+  void roundTripsAnAssignedUsername() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account account = Account.register(organizationId, new Email("username-user@example.com"));
+    account.attachPasswordCredential("argon2id$stored-hash");
+    account.assignUsername(new Username("some_user"));
+
+    repository.save(account);
+    Account found = repository.findById(account.id()).orElseThrow();
+
+    assertThat(found.username()).contains(new Username("some_user"));
+  }
+
+  @Test
+  void findsAnAccountByOrganizationIdAndUsername() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account account = Account.register(organizationId, new Email("findme@example.com"));
+    account.attachPasswordCredential("argon2id$stored-hash");
+    Username username = new Username("findable_user");
+    account.assignUsername(username);
+    repository.save(account);
+
+    Optional<Account> found = repository.findByOrganizationIdAndUsername(organizationId, username);
+
+    assertThat(found).isPresent();
+    assertThat(found.orElseThrow().id()).isEqualTo(account.id());
+  }
+
+  @Test
+  void findByOrganizationIdAndUsernameIsEmptyWhenNoAccountHasThatUsername() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    Optional<Account> found =
+        repository.findByOrganizationIdAndUsername(organizationId, new Username("nobody_has_this"));
+
+    assertThat(found).isEmpty();
+  }
+
+  @Test
+  void existsByOrganizationIdAndUsernameReflectsWhatWasActuallyPersisted() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account account = Account.register(organizationId, new Email("exists-check@example.com"));
+    account.attachPasswordCredential("argon2id$stored-hash");
+    Username username = new Username("exists_check_user");
+
+    assertThat(repository.existsByOrganizationIdAndUsername(organizationId, username)).isFalse();
+
+    account.assignUsername(username);
+    repository.save(account);
+
+    assertThat(repository.existsByOrganizationIdAndUsername(organizationId, username)).isTrue();
+  }
+
+  @Test
+  void twoAccountsInDifferentOrganizationsCanShareTheSameUsername() {
+    // BR-ORG-02-style scoping: uniqueness is (organization_id, username), never global.
+    Username sharedUsername = new Username("shared_username");
+    OrganizationId firstOrg = new OrganizationId(UUID.randomUUID());
+    OrganizationId secondOrg = new OrganizationId(UUID.randomUUID());
+
+    Account first = Account.register(firstOrg, new Email("first@example.com"));
+    first.attachPasswordCredential("argon2id$stored-hash");
+    first.assignUsername(sharedUsername);
+    repository.save(first);
+
+    Account second = Account.register(secondOrg, new Email("second@example.com"));
+    second.attachPasswordCredential("argon2id$stored-hash");
+    second.assignUsername(sharedUsername);
+    repository.save(second);
+
+    assertThat(
+            repository.findByOrganizationIdAndUsername(firstOrg, sharedUsername).orElseThrow().id())
+        .isEqualTo(first.id());
+    assertThat(
+            repository
+                .findByOrganizationIdAndUsername(secondOrg, sharedUsername)
+                .orElseThrow()
+                .id())
+        .isEqualTo(second.id());
   }
 
   // Same @Import + narrowly-filtered @EnableJpaRepositories rationale as

@@ -11,5 +11,16 @@ package com.clavaris.identity.domain.model;
 // VerificationTokenType.EMAIL_VERIFICATION, ...)) harder to read, not easier.
 public enum VerificationTokenType {
   EMAIL_VERIFICATION,
-  PASSWORD_RESET
+  PASSWORD_RESET,
+
+  /** ADR-0024 §3: passwordless email sign-in via a short one-time code. */
+  EMAIL_SIGN_IN_CODE,
+
+  /** ADR-0024 §3: passwordless email sign-in via a single-use confirmation link. */
+  EMAIL_SIGN_IN_LINK,
+
+  /**
+   * ADR-0024 §6: the step-up challenge issued to an unrecognized device when Device Trust is on.
+   */
+  DEVICE_TRUST_CHALLENGE
 }

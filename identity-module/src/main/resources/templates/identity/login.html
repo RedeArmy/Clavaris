@@ -9,6 +9,7 @@
     <h1>Sign in</h1>
 
     <p th:if="${loginError}">Invalid email or password.</p>
+    <p th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
     <p th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
 
     <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
@@ -37,6 +38,18 @@
             <a th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}}"
                th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
         </p>
+    </div>
+
+    <!-- ADR-0024 §3: only ever the passwordless methods this Organization has actually enabled,
+         same "policy computed fresh on every render" posture as the social-provider block above. -->
+    <div th:if="${emailCodeSignInEnabled}">
+        <p><a th:href="@{login/email-code}">Sign in with an email code</a></p>
+    </div>
+    <div th:if="${emailLinkSignInEnabled}">
+        <p><a th:href="@{login/email-link}">Sign in with an email link</a></p>
+    </div>
+    <div th:if="${usernameSignInEnabled}">
+        <p><a th:href="@{login/username}">Sign in with a username</a></p>
     </div>
 
     <p><a th:href="@{forgot-password}">Forgot your password?</a></p>

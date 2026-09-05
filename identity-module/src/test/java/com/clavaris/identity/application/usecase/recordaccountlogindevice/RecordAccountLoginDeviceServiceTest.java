@@ -269,6 +269,7 @@ class RecordAccountLoginDeviceServiceTest {
             MIGRATION_CUTOVER_AT.minusSeconds(3600), // created an hour before the migration
             null,
             AccountStatus.ACTIVE,
+            null,
             null);
     when(accounts.findById(preExistingAccount.id())).thenReturn(Optional.of(preExistingAccount));
     when(knownDevices.existsByAccountId(preExistingAccount.id())).thenReturn(false);
@@ -304,6 +305,7 @@ class RecordAccountLoginDeviceServiceTest {
             MIGRATION_CUTOVER_AT.minusSeconds(3600),
             null,
             AccountStatus.ACTIVE,
+            null,
             null);
     when(accounts.findById(preExistingAccount.id())).thenReturn(Optional.of(preExistingAccount));
     // Already has a row from an earlier, already-suppressed migration-artifact login.
@@ -334,6 +336,7 @@ class RecordAccountLoginDeviceServiceTest {
             MIGRATION_CUTOVER_AT.plusSeconds(3600), // registered an hour after the migration
             null,
             AccountStatus.ACTIVE,
+            null,
             null);
     when(accounts.findById(brandNewAccount.id())).thenReturn(Optional.of(brandNewAccount));
     when(knownDevices.existsByAccountId(brandNewAccount.id())).thenReturn(false);

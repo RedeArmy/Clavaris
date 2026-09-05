@@ -29,16 +29,21 @@ import tools.jackson.databind.ObjectMapper;
  * branding instead of a per-Organization one, {@code {clavarisBaseUrl}/platform/...} links instead
  * of {@code /o/{organizationId}/...}.
  */
-// Implements both MailSender (4 send* methods) and PlatformMailSender (3 more) in one class —
-// deliberately, same "one class, same HTTP mechanics, two ports" design this class's own Javadoc
-// already explains. No PMD.TooManyMethods suppression needed any more: extracting the shared HTTP
-// mechanics to ResendHttpClient (code review finding, 2026-09-01) brought this class's own method
-// count back under PMD's default threshold.
+// Implements both MailSender (now 7 send* methods, ADR-0024 added 4 more passwordless/verification-
+// code ones) and PlatformMailSender (3 more) in one class — deliberately, same "one class, same
+// HTTP mechanics, two ports" design this class's own Javadoc already explains.
+@SuppressWarnings("PMD.TooManyMethods")
 @Component
 class ResendMailSender implements MailSender, PlatformMailSender {
 
   @SuppressWarnings("PMD.LongVariable")
   private static final URI DEFAULT_RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
+
+  // Both the tenant-tier LINK and CODE email-verification methods (ADR-0024 §2) and the
+  // platform-tier equivalent share this exact subject line — one constant, not three repeated
+  // literals.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String VERIFY_EMAIL_SUBJECT = "Verify your email address";
 
   private final ResendHttpClient httpClient;
   private final String baseUrl;
@@ -86,10 +91,21 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     final String link = link(organizationId, "verify-email", rawToken);
     httpClient.send(
         toAddress,
-        "Verify your email address",
+        VERIFY_EMAIL_SUBJECT,
         "<p>Confirm your email address to finish setting up your account:</p>"
             + ResendHttpClient.htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
+  }
+
+  @Override
+  public void sendEmailVerificationCode(
+      final String toAddress, final OrganizationId organizationId, final String rawCode) {
+    httpClient.send(
+        toAddress,
+        VERIFY_EMAIL_SUBJECT,
+        "<p>Confirm your email address to finish setting up your account. Enter this code:</p>"
+            + ResendHttpClient.htmlCode(rawCode)
+            + "<p>This code expires in 24 hours. If you didn't request this, you can ignore it.</p>");
   }
 
   @Override
@@ -121,6 +137,44 @@ class ResendMailSender implements MailSender, PlatformMailSender {
             + ResendHttpClient.htmlButton(link, "Confirm link")
             + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
             + " this, you can safely ignore it — no account changes will be made.</p>");
+  }
+
+  @Override
+  public void sendEmailSignInCode(
+      final String toAddress, final OrganizationId organizationId, final String rawCode) {
+    httpClient.send(
+        toAddress,
+        "Your sign-in code",
+        "<p>Enter this code to sign in:</p>"
+            + ResendHttpClient.htmlCode(rawCode)
+            + "<p>This code expires in 10 minutes. If you didn't request this, you can safely"
+            + " ignore it — no one can sign in without it.</p>");
+  }
+
+  @Override
+  public void sendEmailSignInLink(
+      final String toAddress, final OrganizationId organizationId, final String rawToken) {
+    final String link = link(organizationId, "login/email-link", rawToken);
+    httpClient.send(
+        toAddress,
+        "Your sign-in link",
+        "<p>Click the button below to sign in:</p>"
+            + ResendHttpClient.htmlButton(link, "Sign in")
+            + "<p>This link expires in 10 minutes and can only be used once. If you didn't request"
+            + " this, you can safely ignore it — no one can sign in without it.</p>");
+  }
+
+  @Override
+  public void sendDeviceTrustChallengeCode(
+      final String toAddress, final OrganizationId organizationId, final String rawCode) {
+    httpClient.send(
+        toAddress,
+        "Confirm this new device",
+        "<p>We don't recognize the device you're signing in from. Enter this code to confirm"
+            + " it's you:</p>"
+            + ResendHttpClient.htmlCode(rawCode)
+            + "<p>This code expires in 10 minutes. If you didn't try to sign in, you can safely"
+            + " ignore this — no one can complete the sign-in without it.</p>");
   }
 
   @Override
@@ -161,7 +215,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     final String link = platformLink("verify-email", rawToken);
     httpClient.send(
         toAddress,
-        "Verify your email address",
+        VERIFY_EMAIL_SUBJECT,
         "<p>Confirm your email address to finish setting up your Clavaris account:</p>"
             + ResendHttpClient.htmlButton(link, "Verify email")
             + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");

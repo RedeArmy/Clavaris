@@ -160,6 +160,16 @@ public final class PlatformScopes {
   public static final String SECRET_KEYS_ROTATE = "platform:secret-keys:rotate";
 
   /**
+   * ADR-0024 (sign-up/sign-in options, Clerk parity): tuning which identifiers/strategies an
+   * Organization's own Account population may use to sign up and sign in — its own scope, same
+   * defence-in-depth reasoning as every other admin-API rule here. Reading the policy back is
+   * unscoped, same "only mutating actions get their own scope" precedent every other GET on this
+   * surface already follows.
+   */
+  public static final String ACCOUNT_AUTHENTICATION_POLICY_WRITE =
+      "platform:account-authentication-policy:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -183,7 +193,8 @@ public final class PlatformScopes {
           ACCOUNTS_IMPERSONATE,
           SOCIAL_CREDENTIALS_WRITE,
           SECRET_KEYS_WRITE,
-          SECRET_KEYS_ROTATE);
+          SECRET_KEYS_ROTATE,
+          ACCOUNT_AUTHENTICATION_POLICY_WRITE);
 
   private PlatformScopes() {}
 }
