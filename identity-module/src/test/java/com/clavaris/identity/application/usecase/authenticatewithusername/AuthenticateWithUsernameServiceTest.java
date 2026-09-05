@@ -101,7 +101,8 @@ class AuthenticateWithUsernameServiceTest {
             null,
             AccountStatus.SUSPENDED,
             null,
-            username);
+            username,
+            null);
     when(accounts.findByOrganizationIdAndUsername(organizationId, username))
         .thenReturn(Optional.of(account));
     AuthenticateWithUsernameCommand command =

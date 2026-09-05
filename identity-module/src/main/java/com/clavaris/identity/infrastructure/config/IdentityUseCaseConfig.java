@@ -22,6 +22,8 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameService;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
+import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetService;
+import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeService;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
@@ -33,6 +35,8 @@ import com.clavaris.identity.application.usecase.confirmpendingsociallink.Confir
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
+import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountService;
+import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountService;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
@@ -360,6 +364,26 @@ class IdentityUseCaseConfig {
         accountSessionRevoker,
         auditEvents,
         eventOutboxWriter);
+  }
+
+  // Clerk "session tasks" parity
+  @Bean
+  /* package */ ForcePasswordResetForAccountUseCase forcePasswordResetForAccountUseCase(
+      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
+    return new ForcePasswordResetForAccountService(accounts, auditEvents);
+  }
+
+  // Clerk "session tasks" parity
+  @Bean
+  /* package */ CompleteForcedPasswordResetUseCase completeForcedPasswordResetUseCase(
+      final AccountRepository accounts,
+      final SessionRepository sessions,
+      final RefreshTokenRepository refreshTokens,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final PasswordHasher hasher) {
+    return new CompleteForcedPasswordResetService(
+        accounts, sessions, refreshTokens, accountTokenRevoker, accountSessionRevoker, hasher);
   }
 
   // SDE-III feature build, 2026-09-03: support/operator impersonation — see

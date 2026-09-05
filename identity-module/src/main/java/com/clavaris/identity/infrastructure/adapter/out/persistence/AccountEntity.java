@@ -18,7 +18,7 @@ import java.util.UUID;
  * to be a plain persistence-mapping data holder by hexagonal design — the real behaviour lives in
  * {@code domain.model.Account}, deliberately not here.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
+@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable"})
 @Entity
 @Table(name = "accounts")
 public class AccountEntity {
@@ -45,6 +45,11 @@ public class AccountEntity {
   // establishes for this same table.
   @Column private String username;
 
+  // Clerk "session tasks" parity: nullable — the overwhelming common case is never forced. Same
+  // "just add the scalar column" precedent as username/email_verified_at above.
+  @Column(name = "password_reset_required_at")
+  private Instant passwordResetRequiredAt;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
@@ -56,7 +61,8 @@ public class AccountEntity {
       final Instant emailVerifiedAt,
       final String status,
       final Instant createdAt,
-      final String username) {
+      final String username,
+      final Instant passwordResetRequiredAt) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
@@ -64,6 +70,7 @@ public class AccountEntity {
     this.status = status;
     this.createdAt = createdAt;
     this.username = username;
+    this.passwordResetRequiredAt = passwordResetRequiredAt;
   }
 
   public UUID getId() {
@@ -92,5 +99,9 @@ public class AccountEntity {
 
   public String getUsername() {
     return username;
+  }
+
+  public Instant getPasswordResetRequiredAt() {
+    return passwordResetRequiredAt;
   }
 }

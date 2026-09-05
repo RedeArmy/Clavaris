@@ -75,6 +75,7 @@ class AccountTest {
             emailVerifiedAt,
             AccountStatus.SUSPENDED,
             credential,
+            null,
             null);
 
     assertThat(account.id()).isEqualTo(id);
@@ -118,6 +119,57 @@ class AccountTest {
     assertThat(replaced.id()).isEqualTo(original.id());
   }
 
+  // Clerk "session tasks" parity.
+  @Test
+  void resetPasswordCredentialClearsAnOutstandingPasswordResetRequirement() {
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("old-hash");
+    account.requirePasswordReset();
+    assertThat(account.passwordResetRequiredAt()).isPresent();
+
+    account.resetPasswordCredential("new-hash");
+
+    assertThat(account.passwordResetRequiredAt()).isEmpty();
+  }
+
+  @Test
+  void attachPasswordCredentialClearsAnOutstandingPasswordResetRequirement() {
+    // Covers a password-optional account (ADR-0024 §5) forced to set its very first password
+    // rather than rotate an existing one.
+    Account account = Account.register(organizationId, email);
+    account.requirePasswordReset();
+    assertThat(account.passwordResetRequiredAt()).isPresent();
+
+    account.attachPasswordCredential("first-hash");
+
+    assertThat(account.passwordResetRequiredAt()).isEmpty();
+  }
+
+  @Test
+  void requirePasswordResetSetsATimestamp() {
+    Account account = Account.register(organizationId, email);
+
+    account.requirePasswordReset();
+
+    assertThat(account.passwordResetRequiredAt()).isPresent();
+  }
+
+  // java:S2925: Account has no injectable Clock, same Instant.now()-direct convention as every
+  // other domain entity in this codebase — see RateLimitPolicyTest's own identical rationale.
+  @SuppressWarnings("java:S2925")
+  @Test
+  void requirePasswordResetIsIdempotent_doesNotStampAFreshTimestampOnASecondCall()
+      throws InterruptedException {
+    Account account = Account.register(organizationId, email);
+    account.requirePasswordReset();
+    java.time.Instant original = account.passwordResetRequiredAt().orElseThrow();
+    Thread.sleep(5);
+
+    account.requirePasswordReset();
+
+    assertThat(account.passwordResetRequiredAt()).contains(original);
+  }
+
   @Test
   void resetPasswordCredentialRejectsAnAccountWithNoExistingCredential() {
     // BR-ID-04's reset flow presupposes something to reset — a social-only account (once
@@ -140,6 +192,7 @@ class AccountTest {
             Instant.now(),
             null,
             AccountStatus.ACTIVE,
+            null,
             null,
             null);
 
@@ -175,6 +228,7 @@ class AccountTest {
             Instant.now(),
             null,
             AccountStatus.DELETED,
+            null,
             null,
             null);
 
@@ -212,6 +266,7 @@ class AccountTest {
             Instant.now(),
             null,
             AccountStatus.DELETED,
+            null,
             null,
             null);
 

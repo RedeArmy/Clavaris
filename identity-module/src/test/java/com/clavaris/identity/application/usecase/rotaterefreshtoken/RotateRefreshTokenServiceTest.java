@@ -94,6 +94,7 @@ class RotateRefreshTokenServiceTest {
         null,
         status,
         null,
+        null,
         null);
   }
 
