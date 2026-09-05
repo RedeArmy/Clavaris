@@ -43,8 +43,11 @@ final class DeviceTrustGate {
    *     DeviceCookie} matches a {@code KnownDevice} already on file for this exact account).
    */
   // Two genuinely distinct outcomes (must pause for a challenge / may proceed) — same "each
-  // outcome needs its own exit" rationale as DeviceCookie's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // outcome needs its own exit" rationale as DeviceCookie's own identical suppression. java:S107:
+  // one parameter per collaborating port/request value, same rationale as
+  // AuthenticatedSessionCompletion's own identical suppression — the two extra params
+  // (clientId/redirectUrl) are what pushed this over Sonar's own lower (7) threshold.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
   /* package */ static Optional<String> intercept(
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestChallenge,

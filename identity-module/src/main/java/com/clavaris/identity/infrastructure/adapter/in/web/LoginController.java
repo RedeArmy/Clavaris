@@ -65,6 +65,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class LoginController {
 
   private static final String FORM_VIEW = "identity/login";
+  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final AuthenticateWithPasswordUseCase useCase;
   private final AuthenticatedSessionEstablisher sessions;
@@ -170,7 +171,7 @@ public class LoginController {
             clientId,
             redirectUrl);
     if (challenge.isPresent()) {
-      return "redirect:" + challenge.get();
+      return REDIRECT_PREFIX + challenge.get();
     }
 
     final Optional<String> sessionTask =
@@ -183,7 +184,7 @@ public class LoginController {
             clientId,
             redirectUrl);
     if (sessionTask.isPresent()) {
-      return "redirect:" + sessionTask.get();
+      return REDIRECT_PREFIX + sessionTask.get();
     }
 
     final String redirectTarget =
@@ -198,7 +199,7 @@ public class LoginController {
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
-    return "redirect:" + redirectTarget;
+    return REDIRECT_PREFIX + redirectTarget;
   }
 
   // Code review finding (TD-SEC-032, closed): one allowedProviders() call per render, not one

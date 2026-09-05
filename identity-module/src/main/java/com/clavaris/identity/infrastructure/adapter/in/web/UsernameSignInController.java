@@ -43,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class UsernameSignInController {
 
   private static final String FORM_VIEW = "identity/login-username";
+  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final AuthenticateWithUsernameUseCase useCase;
   private final AuthenticatedSessionEstablisher sessions;
@@ -128,7 +129,7 @@ public class UsernameSignInController {
             clientId,
             redirectUrl);
     if (challenge.isPresent()) {
-      return "redirect:" + challenge.get();
+      return REDIRECT_PREFIX + challenge.get();
     }
 
     final Optional<String> sessionTask =
@@ -141,7 +142,7 @@ public class UsernameSignInController {
             clientId,
             redirectUrl);
     if (sessionTask.isPresent()) {
-      return "redirect:" + sessionTask.get();
+      return REDIRECT_PREFIX + sessionTask.get();
     }
 
     final String redirectTarget =
@@ -156,6 +157,6 @@ public class UsernameSignInController {
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
-    return "redirect:" + redirectTarget;
+    return REDIRECT_PREFIX + redirectTarget;
   }
 }

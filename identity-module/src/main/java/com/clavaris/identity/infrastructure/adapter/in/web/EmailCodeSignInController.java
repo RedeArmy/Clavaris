@@ -49,6 +49,7 @@ public class EmailCodeSignInController {
 
   private static final String REQUEST_FORM_VIEW = "identity/login-email-code-request";
   private static final String CONFIRM_FORM_VIEW = "identity/login-email-code-confirm";
+  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final RequestEmailSignInCodeUseCase requestUseCase;
   private final AuthenticateWithEmailCodeUseCase authenticateUseCase;
@@ -172,7 +173,7 @@ public class EmailCodeSignInController {
             clientId,
             redirectUrl);
     if (challenge.isPresent()) {
-      return "redirect:" + challenge.get();
+      return REDIRECT_PREFIX + challenge.get();
     }
 
     final Optional<String> sessionTask =
@@ -185,7 +186,7 @@ public class EmailCodeSignInController {
             clientId,
             redirectUrl);
     if (sessionTask.isPresent()) {
-      return "redirect:" + sessionTask.get();
+      return REDIRECT_PREFIX + sessionTask.get();
     }
 
     final String redirectTarget =
@@ -200,6 +201,6 @@ public class EmailCodeSignInController {
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
             clientId,
             redirectUrl);
-    return "redirect:" + redirectTarget;
+    return REDIRECT_PREFIX + redirectTarget;
   }
 }

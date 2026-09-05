@@ -50,6 +50,7 @@ public class EmailLinkSignInController {
 
   private static final String REQUEST_FORM_VIEW = "identity/login-email-link-request";
   private static final String CONFIRM_FORM_VIEW = "identity/login-email-link-confirm";
+  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final RequestEmailSignInLinkUseCase requestUseCase;
   private final AuthenticateWithEmailLinkUseCase authenticateUseCase;
@@ -161,7 +162,7 @@ public class EmailLinkSignInController {
             null,
             null);
     if (challenge.isPresent()) {
-      return "redirect:" + challenge.get();
+      return REDIRECT_PREFIX + challenge.get();
     }
 
     final Optional<String> sessionTask =
@@ -174,7 +175,7 @@ public class EmailLinkSignInController {
             null,
             null);
     if (sessionTask.isPresent()) {
-      return "redirect:" + sessionTask.get();
+      return REDIRECT_PREFIX + sessionTask.get();
     }
 
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
@@ -192,6 +193,6 @@ public class EmailLinkSignInController {
             rawDeviceToken ->
                 DeviceCookie.write(request, response, organizationId, rawDeviceToken));
 
-    return "redirect:" + redirectTarget;
+    return REDIRECT_PREFIX + redirectTarget;
   }
 }
