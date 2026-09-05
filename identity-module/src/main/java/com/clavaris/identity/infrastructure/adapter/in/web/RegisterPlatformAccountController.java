@@ -8,10 +8,11 @@ import com.clavaris.identity.application.usecase.requestplatformaccountemailveri
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccountId;
-import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,10 +48,16 @@ public class RegisterPlatformAccountController {
     return FORM_VIEW;
   }
 
+  // PasswordRequired: this tier's own password is always mandatory, unlike RegisterAccountForm's
+  // policy-driven one (ADR-0024 §5) — see that group's own Javadoc for why the two forms share one
+  // field declaration instead of forking. Default.class must be listed explicitly alongside it:
+  // @Validated with any explicit group list replaces the implicit Default-only behavior @Valid
+  // gives, it doesn't add to it.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String register(
-      @Valid @ModelAttribute("form") final RegisterPlatformAccountForm form,
+      @Validated({Default.class, PasswordRequired.class}) @ModelAttribute("form")
+          final RegisterPlatformAccountForm form,
       final BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
