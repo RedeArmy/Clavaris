@@ -1,0 +1,12 @@
+{
+  "name": "clavaris-app-frontend-tests",
+  "private": true,
+  "description": "Tests for app/src/main/resources/static/js. Deliberately zero npm dependencies (no jsdom/Jest) — Node's own built-in test runner (node:test, stable since Node 20) plus hand-rolled DOM stubs are enough for the one small vanilla-JS file this repo ships; see embedded-login-popup.test.js's own header.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=lcov.info --test-reporter=spec --test-reporter-destination=stdout"
+  }
+}
