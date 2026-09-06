@@ -33,8 +33,21 @@ public interface WebhookEndpointRepository {
   List<WebhookEndpoint> findAllByOrganizationId(UUID organizationId);
 
   /**
-   * ADR-0007 §1: the dispatcher's own fan-out lookup — active endpoints subscribed to this event.
+   * ADR-0007 §1: active endpoints subscribed to this event, for a single (organization, event type)
+   * pair.
    */
   List<WebhookEndpoint> findActiveByOrganizationIdAndEventType(
       UUID organizationId, String eventType);
+
+  /**
+   * TD-PERF-005: every active endpoint for this Organization, regardless of which event types it
+   * subscribes to — {@link
+   * com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsService}'s
+   * own batch-by-organization fan-out calls this once per distinct Organization in a claimed outbox
+   * batch and filters by {@code eventType} in memory itself (via {@link
+   * WebhookEndpoint#subscribesTo}), instead of {@link #findActiveByOrganizationIdAndEventType} once
+   * per claimed event — the same list is reused across every event from the same Organization in
+   * one dispatch tick, rather than re-fetched from Postgres for each one.
+   */
+  List<WebhookEndpoint> findActiveByOrganizationId(UUID organizationId);
 }

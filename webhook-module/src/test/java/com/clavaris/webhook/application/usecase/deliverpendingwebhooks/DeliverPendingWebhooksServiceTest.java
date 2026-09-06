@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -31,8 +33,13 @@ class DeliverPendingWebhooksServiceTest {
   private final WebhookEndpointRepository endpoints = mock(WebhookEndpointRepository.class);
   private final WebhookSigningSecretCipher cipher = mock(WebhookSigningSecretCipher.class);
   private final WebhookHttpSender sender = mock(WebhookHttpSender.class);
+  // TD-PERF-004: a real, small bounded pool — deliverDueDeliveries() itself still blocks until
+  // every task finishes, so every assertion below (made after that call returns) is exactly as
+  // deterministic as when this class dispatched sequentially.
+  private final ExecutorService deliveryExecutor = Executors.newFixedThreadPool(2);
   private final DeliverPendingWebhooksService service =
-      new DeliverPendingWebhooksService(deliveries, endpoints, cipher, sender, 50, MAX_ATTEMPTS);
+      new DeliverPendingWebhooksService(
+          deliveries, endpoints, cipher, sender, deliveryExecutor, 50, MAX_ATTEMPTS);
 
   @Test
   void aSuccessfulDeliveryIsRecordedAsSucceededAndNeverRetried() {

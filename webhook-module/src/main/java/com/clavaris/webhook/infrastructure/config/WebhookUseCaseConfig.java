@@ -26,6 +26,10 @@ import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebh
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretService;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
 import java.time.Duration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,7 +38,14 @@ import org.springframework.context.annotation.Configuration;
  * Wires application-layer use cases to Spring's context — same rationale/shape as identity-module's
  * {@code IdentityUseCaseConfig}/organization-module's {@code OrganizationUseCaseConfig}: one
  * {@code @Bean} method per use case is this class's entire job, no business logic of its own.
+ *
+ * <p>PMD.ExcessiveImports: this class's whole job is wiring one {@code @Bean} method per use case
+ * (this file's own doc comment) — TD-PERF-004's own {@code webhookDeliveryExecutor} bean tipped
+ * this count over PMD's default threshold. Same "wiring, not sprawl" reasoning {@code
+ * ClientRegistryUseCaseConfig}'s own class-level suppression already documents for an identical
+ * situation.
  */
+@SuppressWarnings("PMD.ExcessiveImports")
 @Configuration
 class WebhookUseCaseConfig {
 
@@ -93,17 +104,46 @@ class WebhookUseCaseConfig {
     return new DispatchOutboxEventsService(outboxEvents, endpoints, deliveries, batchSizePerSource);
   }
 
+  // TD-PERF-004: a bounded pool of plain platform threads, not the @Scheduled trigger thread
+  // itself (TD-PERF-003's own spring.task.scheduling.pool.size is a separate concern) — this is
+  // what actually runs each delivery's own blocking HTTP call concurrently, so one slow consumer
+  // endpoint's own cost stays local to it instead of serializing the whole claimed batch behind
+  // it. destroyMethod="shutdown": a Spring-context-owned resource gets a Spring-managed lifecycle,
+  // same discipline this codebase already applies to every other closeable/stateful bean — without
+  // it, a repeatedly-started-and-stopped @SpringBootTest context (this module has several) would
+  // leak one thread pool's worth of non-daemon threads per test class.
+  @Bean(destroyMethod = "shutdown")
+  /* package */ ExecutorService webhookDeliveryExecutor(
+      @Value("${clavaris.webhook.delivery-concurrency:10}") final int concurrency) {
+    final AtomicInteger threadCount = new AtomicInteger();
+    final ThreadFactory namedThreads =
+        runnable -> {
+          final Thread thread =
+              new Thread(runnable, "webhook-delivery-" + threadCount.incrementAndGet());
+          // Never blocks JVM shutdown on an in-flight webhook HTTP call — same "don't let a
+          // background worker hold the process open" posture every other background thread in
+          // this codebase already follows implicitly via Spring's own scheduling infrastructure.
+          thread.setDaemon(true);
+          return thread;
+        };
+    return Executors.newFixedThreadPool(concurrency, namedThreads);
+  }
+
+  // PMD.LongVariable: webhookDeliveryExecutor names exactly what it is — the bean above, injected
+  // by type — a shortened identifier would only make this parameter list harder to read.
+  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ DeliverPendingWebhooksUseCase deliverPendingWebhooksUseCase(
       final WebhookDeliveryRepository deliveries,
       final WebhookEndpointRepository endpoints,
       final WebhookSigningSecretCipher cipher,
       final WebhookHttpSender sender,
+      final ExecutorService webhookDeliveryExecutor,
       @Value("${clavaris.webhook.delivery-batch-size:50}") final int batchSize,
       // ADR-0007 §2's own "e.g. 8 attempts over 24h" example schedule.
       @Value("${clavaris.webhook.delivery-max-attempts:8}") final int maxAttempts) {
     return new DeliverPendingWebhooksService(
-        deliveries, endpoints, cipher, sender, batchSize, maxAttempts);
+        deliveries, endpoints, cipher, sender, webhookDeliveryExecutor, batchSize, maxAttempts);
   }
 
   @Bean

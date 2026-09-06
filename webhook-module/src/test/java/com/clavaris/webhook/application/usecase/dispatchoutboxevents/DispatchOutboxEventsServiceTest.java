@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,7 +44,7 @@ class DispatchOutboxEventsServiceTest {
     WebhookEndpoint matchingEndpoint =
         WebhookEndpoint.register(
             organizationId, "https://example.com", null, List.of("account.created"), "secret");
-    when(endpoints.findActiveByOrganizationIdAndEventType(organizationId, "account.created"))
+    when(endpoints.findActiveByOrganizationId(organizationId))
         .thenReturn(List.of(matchingEndpoint));
 
     service.dispatchPendingEvents();
@@ -71,7 +72,7 @@ class DispatchOutboxEventsServiceTest {
             null,
             Instant.now());
     when(outboxEvents.claimUnpublishedBatch(200)).thenReturn(List.of(event));
-    when(endpoints.findActiveByOrganizationIdAndEventType(any(), any())).thenReturn(List.of());
+    when(endpoints.findActiveByOrganizationId(any())).thenReturn(List.of());
 
     service.dispatchPendingEvents();
 
@@ -87,5 +88,51 @@ class DispatchOutboxEventsServiceTest {
 
     verify(deliveries, never()).save(any());
     verify(outboxEvents, never()).markPublished(any());
+  }
+
+  // TD-PERF-005: the actual fix this row asked for — two events from the same Organization in one
+  // claimed batch must reuse one findActiveByOrganizationId call, not issue it once per event.
+  @Test
+  void reusesOneOrganizationsEndpointListAcrossEveryEventFromItInTheSameBatch() {
+    UUID organizationId = UUID.randomUUID();
+    OutboxEvent firstEvent =
+        new OutboxEvent(
+            OutboxSource.IDENTITY,
+            UUID.randomUUID(),
+            organizationId,
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null,
+            Instant.now());
+    OutboxEvent secondEvent =
+        new OutboxEvent(
+            OutboxSource.IDENTITY,
+            UUID.randomUUID(),
+            organizationId,
+            "Account",
+            UUID.randomUUID(),
+            "account.suspended",
+            "{}",
+            null,
+            Instant.now());
+    when(outboxEvents.claimUnpublishedBatch(200)).thenReturn(List.of(firstEvent, secondEvent));
+    WebhookEndpoint subscribedToBoth =
+        WebhookEndpoint.register(
+            organizationId,
+            "https://example.com",
+            null,
+            List.of("account.created", "account.suspended"),
+            "secret");
+    when(endpoints.findActiveByOrganizationId(organizationId))
+        .thenReturn(List.of(subscribedToBoth));
+
+    service.dispatchPendingEvents();
+
+    verify(endpoints, times(1)).findActiveByOrganizationId(organizationId);
+    verify(deliveries, times(2)).save(any());
+    verify(outboxEvents).markPublished(firstEvent);
+    verify(outboxEvents).markPublished(secondEvent);
   }
 }
