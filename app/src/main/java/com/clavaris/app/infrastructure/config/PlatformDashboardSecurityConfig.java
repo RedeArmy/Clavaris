@@ -72,7 +72,7 @@ class PlatformDashboardSecurityConfig {
   // already used throughout this codebase (e.g. PlatformAuthorizationServerConfig's own
   // tokenIssuanceLogger param) — a shortened identifier would only make this rule list harder to
   // read.
-  @SuppressWarnings("PMD.LongVariable")
+  @SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList"})
   @Bean
   @Order(5)
   /* package */ SecurityFilterChain platformDashboardSecurityFilterChain(
@@ -87,7 +87,8 @@ class PlatformDashboardSecurityConfig {
       @Value("${clavaris.rate-limit.platform-forgot-password.per-ip-limit:10}")
           final int forgotPasswordPerIpLimit,
       @Value("${clavaris.rate-limit.platform-create-organization.per-account-limit:10}")
-          final int createOrganizationPerAccountLimit) {
+          final int createOrganizationPerAccountLimit,
+      final EmbeddingEligibilityChecker embeddingChecker) {
     http.securityMatcher("/platform/**")
         .sessionManagement(
             session ->
@@ -210,7 +211,9 @@ class PlatformDashboardSecurityConfig {
         // the self-service dashboard (ADR-0012) all live on this chain — no interactive consent
         // here (client_credentials only, BR-PLATFORM-01), so every HTML response this chain ever
         // serves gets the strict policy (ContentSecurityPolicyHeaderWriter's own Javadoc).
-        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
+        .headers(
+            headers ->
+                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)));
     return http.build();
   }
 }

@@ -56,13 +56,16 @@ class DefaultSecurityConfig {
       @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.login-email-code-confirm.per-email-limit:10}")
-          final int emailCodeConfirmPerEmailLimit) {
+          final int emailCodeConfirmPerEmailLimit,
+      final EmbeddingEligibilityChecker embeddingChecker) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
         // TD-SEC-009: this chain is where RegisterAccountController's own hosted Thymeleaf form
         // (/o/{organizationId}/register) and every other non-SAS/non-dashboard hosted page lives —
         // see ContentSecurityPolicyHeaderWriter's own Javadoc for why this is safe to add
         // unconditionally even though this same chain also serves Actuator/non-HTML responses.
-        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()))
+        .headers(
+            headers ->
+                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)))
         .addFilterBefore(
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,

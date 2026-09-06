@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -56,10 +57,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 // param each) are long by design, not accidentally — same class-level-suppression precedent as
 // RecordAccountLoginDeviceService's own identical rationale, chosen over 4 individual suppressions
 // once PMD.AvoidDuplicateLiterals started flagging that many repeats of the same string.
-// PMD.ExcessiveImports: this controller now collaborates with 7 ports (device trust, ADR-0024 §6,
-// added 2 more) — same "one import per collaborating type is inherent to the design, not a code
-// smell" rationale as OrganizationAuthorizationServerConfig's own identical suppression.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// PMD.ExcessiveImports: this controller now collaborates with 8 ports (device trust, ADR-0024 §6,
+// ADR-0009 §3 added ClientBrandingProvider) — same "one import per collaborating type is inherent
+// to the design, not a code smell" rationale as OrganizationAuthorizationServerConfig's own
+// identical suppression. PMD.ExcessiveParameterList/CouplingBetweenObjects: same reasoning, tipped
+// over both thresholds by that same new collaborator.
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.ExcessiveImports",
+  "PMD.ExcessiveParameterList",
+  "PMD.CouplingBetweenObjects"
+})
 @Controller
 @RequestMapping("/o/{organizationId}/login")
 public class LoginController {
@@ -76,6 +84,7 @@ public class LoginController {
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
   private final AccountRepository accounts;
+  private final ClientBrandingProvider clientBrandingProvider;
 
   @SuppressWarnings("java:S107")
   public LoginController(
@@ -87,7 +96,8 @@ public class LoginController {
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
-      final AccountRepository accounts) {
+      final AccountRepository accounts,
+      final ClientBrandingProvider clientBrandingProvider) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.policyProvider = policyProvider;
@@ -97,6 +107,7 @@ public class LoginController {
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
     this.accounts = accounts;
+    this.clientBrandingProvider = clientBrandingProvider;
   }
 
   @GetMapping
@@ -108,9 +119,12 @@ public class LoginController {
       // social-login link — a plain <a href>, not a form resubmission — can append them to its own
       // URL; see login.html's own comment.
       @RequestParam(required = false) final String clientId,
-      @RequestParam(required = false) final String redirectUrl) {
+      @RequestParam(required = false) final String redirectUrl,
+      // ADR-0009 §1: the iframe-modal signal — new, additive, same nullable/optional shape as
+      // clientId/redirectUrl above.
+      @RequestParam(required = false) final String display) {
     model.addAttribute("form", new LoginForm());
-    addSignInOptions(organizationId, model, clientId, redirectUrl);
+    addSignInOptions(organizationId, model, clientId, redirectUrl, display);
     return FORM_VIEW;
   }
 
@@ -129,9 +143,13 @@ public class LoginController {
       // th:action="@{''}" resubmits to this exact same URL, query string included — no hidden
       // field needed. Both optional: absent on every request that never opted into this feature.
       @RequestParam(required = false) final String clientId,
-      @RequestParam(required = false) final String redirectUrl) {
+      @RequestParam(required = false) final String redirectUrl,
+      // ADR-0009 §1: survives here for the same reason clientId/redirectUrl do (the form's own
+      // th:action="@{''}" resubmit), only actually read again on the validation-failure re-render
+      // below — a successful login never re-renders this template at all.
+      @RequestParam(required = false) final String display) {
     if (bindingResult.hasErrors()) {
-      addSignInOptions(organizationId, model, clientId, redirectUrl);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
       return FORM_VIEW;
     }
 
@@ -148,14 +166,14 @@ public class LoginController {
       // itself leak "the email field was fine, it was the password" or vice versa), matching
       // InvalidCredentialsException's own anti-enumeration design.
       model.addAttribute("loginError", true);
-      addSignInOptions(organizationId, model, clientId, redirectUrl);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
       return FORM_VIEW;
     } catch (final EmailNotVerifiedException _) {
       // ADR-0024 §2: deliberately a distinct, more specific message than loginError above — see
       // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from
       // the anti-enumeration-generic rejection every other failure mode uses.
       model.addAttribute("emailNotVerifiedError", true);
-      addSignInOptions(organizationId, model, clientId, redirectUrl);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
       return FORM_VIEW;
     }
 
@@ -219,7 +237,12 @@ public class LoginController {
       // login.html's own comment. Both nullable; Thymeleaf's link-expression syntax omits a param
       // entirely when its value is null.
       final String clientId,
-      final String redirectUrl) {
+      final String redirectUrl,
+      // ADR-0009 §1: whether this render is happening inside a consumer's own iframe modal — the
+      // template uses this to theme itself and to open social-provider links via window.open()
+      // instead of a full top-level navigation (a provider's own consent screen refuses to render
+      // inside an iframe regardless, so a plain in-frame link would otherwise dead-end there).
+      final String display) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final List<SocialProvider> enabled = new ArrayList<>(policyProvider.allowedProviders(orgId));
     model.addAttribute("socialProviders", enabled);
@@ -231,5 +254,8 @@ public class LoginController {
     model.addAttribute("usernameSignInEnabled", policy.usernameSignInEnabled());
     model.addAttribute("clientId", clientId);
     model.addAttribute("redirectUrl", redirectUrl);
+    model.addAttribute("display", display);
+    model.addAttribute("modal", "modal".equals(display));
+    model.addAttribute("branding", clientBrandingProvider.brandingFor(orgId, clientId));
   }
 }

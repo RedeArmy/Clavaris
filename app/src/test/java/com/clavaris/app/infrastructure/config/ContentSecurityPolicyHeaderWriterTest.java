@@ -29,7 +29,8 @@ class ContentSecurityPolicyHeaderWriterTest {
   private static final String ORG_CONSENT_PATH =
       "/o/11111111-1111-1111-1111-111111111111/oauth2/authorize";
 
-  private final ContentSecurityPolicyHeaderWriter writer = new ContentSecurityPolicyHeaderWriter();
+  private final ContentSecurityPolicyHeaderWriter writer =
+      new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class));
 
   @Test
   void setsTheStrictPolicyOnAnHtmlResponseForAnOrdinaryHostedUiPath() {
@@ -176,6 +177,67 @@ class ContentSecurityPolicyHeaderWriterTest {
     assertThat(loginCaptor.getValue()).contains("script-src 'self'");
     assertThat(loginCaptor.getValue()).doesNotContain("unsafe-inline");
     assertThat(consentCaptor.getValue()).contains("unsafe-inline");
+  }
+
+  // ADR-0009 §1/§4: display=modal + an embedding-eligible clientId relaxes frame-ancestors on the
+  // login page — only there, only for that one request, only when the checker actually resolves an
+  // origin.
+  @Test
+  void relaxesFrameAncestorsOnTheLoginPageWhenDisplayModalAndClientIdAreEligible() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains("frame-ancestors https://jobseeker.example.com"));
+  }
+
+  @Test
+  void keepsFrameAncestorsNoneWhenDisplayModalButTheCheckerFindsNoEligibleOrigin() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("unverified-client"))
+        .thenReturn(java.util.Optional.empty());
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("unverified-client");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+  }
+
+  @Test
+  void neverRelaxesFrameAncestorsWithoutDisplayModalEvenForAnEligibleClient() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
   }
 
   private static HttpServletRequest requestWithUri(final String uri) {

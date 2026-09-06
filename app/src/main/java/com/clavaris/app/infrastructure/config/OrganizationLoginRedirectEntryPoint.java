@@ -3,7 +3,10 @@ package com.clavaris.app.infrastructure.config;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
 /**
@@ -23,11 +26,21 @@ import org.springframework.security.web.AuthenticationEntryPoint;
  * saved request is what lets {@link SpringSecurityAuthenticatedSessionEstablisher} send the browser
  * back to the real {@code /oauth2/authorize?...} URL once login succeeds, not something this class
  * needs to do itself.
+ *
+ * <p>ADR-0009 §1: forwards {@code client_id} (the OAuth2 spec's own param, translated onto the
+ * login page's existing {@code clientId} query-param name — Clerk "customize redirect URLs" parity
+ * already established that name, distinct from the spec's snake_case) and {@code display} (new,
+ * additive — the iframe-modal signal) onto the login redirect. Without this, an unauthenticated
+ * {@code /oauth2/authorize?...&display=modal} request would lose both by the time the browser ever
+ * reaches {@code /o/{organizationId}/login} — the login page needs {@code clientId} to resolve
+ * embedding eligibility and {@code display} to know it's being rendered inside an iframe at all.
  */
 final class OrganizationLoginRedirectEntryPoint implements AuthenticationEntryPoint {
 
   private static final String PREFIX = "/o/";
   private static final String LOGIN_SUFFIX = "/login";
+  private static final String DISPLAY_PARAM = "display";
+  private static final String CLIENT_ID_PARAM = "clientId";
 
   // Constructed directly (new OrganizationLoginRedirectEntryPoint()) by
   // OrganizationAuthorizationServerConfig, not Spring's own component scan — this class holds no
@@ -52,6 +65,25 @@ final class OrganizationLoginRedirectEntryPoint implements AuthenticationEntryPo
     final String afterPrefix = path.substring(prefixIndex + PREFIX.length());
     final int nextSlash = afterPrefix.indexOf('/');
     final String organizationId = nextSlash < 0 ? afterPrefix : afterPrefix.substring(0, nextSlash);
-    response.sendRedirect(request.getContextPath() + PREFIX + organizationId + LOGIN_SUFFIX);
+    final String loginUrl = request.getContextPath() + PREFIX + organizationId + LOGIN_SUFFIX;
+    response.sendRedirect(
+        appendIfPresent(
+            appendIfPresent(
+                loginUrl, CLIENT_ID_PARAM, request.getParameter(OAuth2ParameterNames.CLIENT_ID)),
+            DISPLAY_PARAM,
+            request.getParameter(DISPLAY_PARAM)));
+  }
+
+  // Two genuinely distinct outcomes (nothing to append / append one param) — same "each outcome
+  // needs its own exit" rationale as identity-module's own RedirectQueryParams#appendIfPresent,
+  // duplicated here rather than shared across the module boundary for a two-line helper.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private static String appendIfPresent(
+      final String baseUrl, final String paramName, final String value) {
+    if (value == null) {
+      return baseUrl;
+    }
+    final String separator = baseUrl.indexOf('?') >= 0 ? "&" : "?";
+    return baseUrl + separator + paramName + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8);
   }
 }

@@ -191,28 +191,30 @@ classDiagram
 
 - **`PlatformClient`** — structurally separate from `OAuthClient`, deliberately **not** a nullable-`organizationId` row on the same table. Authenticates the entire `/api/v1/admin/*` management-API surface in v1, including `POST /api/v1/admin/organizations` itself — the one call that, by definition, can't be authenticated by a token belonging to the `Organization` it's about to create. Issued against a **platform issuer** (`{clavarisBaseUrl}/oauth2/...`, no `/o/{organizationId}` prefix), signed by `PlatformSigningKey` (§2) — never reachable through, or confusable with, any tenant's own OIDC surface. Scopes are namespaced `platform:*`, reserved and distinct from any per-Organization management scope. The first `PlatformClient` row is seeded from environment variables (`PLATFORM_BOOTSTRAP_CLIENT_ID`/`PLATFORM_BOOTSTRAP_CLIENT_SECRET`) at startup, idempotently — never a "break glass" endpoint, never a credential shipped in code.
 
-### 4b. Embedded/branded login — 🟡 proposed, see ADR-0009
+### 4b. Embedded/branded login — 🟡 proposed, implemented 2026-09-05, see ADR-0009
 
 ```mermaid
 classDiagram
     class ClientDomainConfig {
         +UUID id
         +UUID oauthClientId
-        +DomainMode mode
-        +String customDomain
+        +ClientDomainMode mode
+        +String hostname
         +DomainVerificationStatus verificationStatus
+        +String dnsTxtChallengeToken
+        +String embeddingOrigin
         +Instant verifiedAt
     }
     class ClientBranding {
         +UUID id
         +UUID oauthClientId
         +String logoUrl
-        +String primaryColorHex
-        +String appDisplayName
+        +String primaryColor
+        +String applicationDisplayName
     }
 ```
 
-- **`ClientDomainConfig`** and **`ClientBranding`** are separate tables from `OAuthClient`, same "no nullable column bolted onto the core entity" convention as `PasswordCredential`/`SocialIdentity` on `Account` (`data-model.md` §2) — most clients never configure either, and BR-CLIENT-04 gates production use of the embedded experience on `verificationStatus = VERIFIED`.
+- **`ClientDomainConfig`** and **`ClientBranding`** are separate tables from `OAuthClient`, same "no nullable column bolted onto the core entity" convention as `PasswordCredential`/`SocialIdentity` on `Account` (`data-model.md` §2) — most clients never configure either, and BR-CLIENT-04 gates production use of the embedded experience on `verificationStatus = VERIFIED`. `embeddingOrigin` (the consumer's own frontend origin allowed to embed the hosted login in an iframe) is independent of the DNS ownership challenge the other fields exist for — changing it never resets `verificationStatus`, since it says who may embed an already-verified domain, not which domain is being claimed.
 - **`DomainMode`** — `CNAME | PROXY | SHARED` (ADR-0009 §2); `SHARED` (Clavaris's own domain, the only mode that exists today) is the default and the only mode valid outside production.
 
 ## 5. `webhook-module` — core entities — ✅ shipped 2026-09-02, see ADR-0007

@@ -2,11 +2,25 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8"/>
-    <title>Sign in — Clavaris</title>
+    <title th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ' — Sign in'">Sign in — Clavaris</title>
+    <!-- ADR-0009 §3: primaryColor becomes a CSS custom property, never inlined into an attribute a
+         script could read/write — the value itself is already validated (ClientBranding's own
+         #RGB/#RRGGBB check) before it ever reaches this template. -->
+    <style th:if="${branding.primaryColor.isPresent()}"
+           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see this block's own comment above */</style>
 </head>
-<body>
+<!-- ADR-0009 §1: data-modal marks this render as happening inside a consumer's own iframe
+     (display=modal) — login-submit-guard.js's own sibling script below reads this to decide
+     whether social-provider links open via window.open() instead of a normal same-frame
+     navigation (a provider's own consent screen refuses to render inside an iframe regardless of
+     this attribute, so a plain in-frame link would otherwise dead-end there). -->
+<body th:attr="data-modal=${modal}">
 <main>
-    <h1>Sign in</h1>
+    <h1 th:if="${branding.logoUrl.isEmpty()}" th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ': Sign in'">Sign in</h1>
+    <!-- Branding logo replaces the plain text heading, never both — an operator who configured a
+         logo already expects it to stand in for the wordmark, not sit above a duplicate. -->
+    <img th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
+         th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
 
     <p th:if="${loginError}">Invalid email or password.</p>
     <p th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
@@ -31,7 +45,9 @@
     </form>
 
     <!-- ADR-0020 Decision 3, BR-ID-12: only ever the providers this Organization has actually
-         enabled — email/password above is never gated by this, always shown regardless. -->
+         enabled — email/password above is never gated by this, always shown regardless.
+         ADR-0009 §1: data-social-login marks these links for login-submit-guard.js's own
+         window.open() treatment when data-modal is set on <body> above. -->
     <div th:if="${not #lists.isEmpty(socialProviders)}">
         <p>Or sign in with:</p>
         <p th:each="provider : ${socialProviders}">
@@ -39,7 +55,8 @@
                  resubmission, so clientId/redirectUrl must be explicitly appended here —
                  Thymeleaf's own link-expression syntax omits a param entirely when its value is
                  null, so this renders no query string at all for the common case. -->
-            <a th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}"
+            <a data-social-login
+               th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}"
                th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
         </p>
     </div>
@@ -62,5 +79,9 @@
      ContentSecurityPolicyHeaderWriter's own Javadoc and login-submit-guard.js's own header comment
      for the full rationale. -->
 <script th:src="@{/js/login-submit-guard.js}" defer></script>
+<!-- ADR-0009 §1: only actually does anything when data-modal is set on <body> above — see its own
+     header comment for why social-provider links need window.open() treatment inside an iframe,
+     and for the consumer-side postMessage snippet this page's own popup flow depends on. -->
+<script th:src="@{/js/embedded-login-popup.js}" defer></script>
 </body>
 </html>

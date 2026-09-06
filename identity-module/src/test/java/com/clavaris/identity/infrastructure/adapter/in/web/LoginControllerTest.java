@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordCommand;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
@@ -25,6 +26,8 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -62,6 +65,7 @@ class LoginControllerTest {
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private RedirectUrlResolver redirectUrlResolver;
   private AccountRepository accounts;
+  private ClientBrandingProvider clientBrandingProvider;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -75,9 +79,14 @@ class LoginControllerTest {
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
     accounts = mock(AccountRepository.class);
+    clientBrandingProvider = mock(ClientBrandingProvider.class);
     // Matches today's real default (no redirect policy configured) — every existing test below
     // predates this feature and expects the controller's own hardcoded literal fallback.
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
+    // Matches today's real default (no branding configured) — every existing test below predates
+    // ADR-0009 §3 and expects the template's own unbranded default look.
+    when(clientBrandingProvider.brandingFor(any(), any()))
+        .thenReturn(ClientBrandingSnapshot.unconfigured());
     // Matches today's real default (no session task ever forced) — SessionTaskGate treats an
     // absent account exactly like one with no outstanding requirement, same as a real empty
     // Optional<Instant> would.
@@ -111,7 +120,8 @@ class LoginControllerTest {
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
                     redirectUrlResolver,
-                    accounts))
+                    accounts,
+                    clientBrandingProvider))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -260,6 +270,27 @@ class LoginControllerTest {
         .andExpect(model().attribute("loginError", true))
         // Deliberately never a field-level error — see LoginController's own comment on why a
         // field-scoped error would itself leak which field was the actual problem.
+        .andExpect(model().attributeHasNoErrors("form"));
+
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verifyNoInteractions(recordLoginDevice);
+  }
+
+  @Test
+  void anUnverifiedEmailRerendersTheFormWithItsOwnDistinctError() throws Exception {
+    // ADR-0024 §2: a distinct, more specific message than the generic loginError above — see
+    // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from the
+    // anti-enumeration-generic rejection every other failure mode uses.
+    when(useCase.handle(any())).thenThrow(new EmailNotVerifiedException());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("email", "user@example.com")
+                .param("password", "correct-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/login"))
+        .andExpect(model().attribute("emailNotVerifiedError", true))
         .andExpect(model().attributeHasNoErrors("form"));
 
     verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());

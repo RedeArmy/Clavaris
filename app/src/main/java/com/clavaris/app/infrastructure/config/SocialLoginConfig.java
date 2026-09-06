@@ -77,7 +77,8 @@ class SocialLoginConfig {
       final RateLimitPolicyRepository rateLimitPolicies,
       @Value("${clavaris.rate-limit.social-login.per-ip-limit:30}") final int perIpLimit,
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
-          final int capacityDefaultRequestsPerMinute) {
+          final int capacityDefaultRequestsPerMinute,
+      final EmbeddingEligibilityChecker embeddingChecker) {
     http.securityMatcher(
             "/oauth2/authorization/**",
             "/login/oauth2/code/**",
@@ -123,7 +124,9 @@ class SocialLoginConfig {
             new OrganizationCapacityRateLimitingFilter(
                 rateLimiter, rateLimitPolicies, capacityDefaultRequestsPerMinute),
             AntiAbuseRateLimitingFilter.class)
-        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
+        .headers(
+            headers ->
+                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)));
     return http.build();
   }
 
