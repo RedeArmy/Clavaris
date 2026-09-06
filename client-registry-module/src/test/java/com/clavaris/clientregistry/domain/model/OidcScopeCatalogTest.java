@@ -33,7 +33,11 @@ class OidcScopeCatalogTest {
     // local-variable-first shape as the test above, same java:S3415 reasoning.
     final List<String> known = OidcScopeCatalog.KNOWN;
 
+    // isNotEmpty() first — a real gap SonarCloud correctly caught, not a stylistic one:
+    // allSatisfy(...) alone is vacuously true against an empty list, so this test would have kept
+    // passing, checking nothing, the moment KNOWN was ever emptied.
     assertThat(known)
+        .isNotEmpty()
         .allSatisfy(scope -> assertThat(scope).doesNotStartWith(PlatformScopes.NAMESPACE_PREFIX));
   }
 }
