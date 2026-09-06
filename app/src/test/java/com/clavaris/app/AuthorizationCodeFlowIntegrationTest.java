@@ -168,7 +168,11 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         getAuthorize(organizationId, client.clientId(), codeChallenge, state);
     assertThat(authorizeAttempt.statusCode()).isEqualTo(302);
     String loginRedirect = authorizeAttempt.headers().firstValue("Location").orElseThrow();
-    assertThat(loginRedirect).endsWith("/o/" + organizationId + "/login");
+    // ADR-0009 §1: the entry point now forwards client_id (translated onto the login page's own
+    // clientId query-param name) so the login page can resolve embedding eligibility — this
+    // assertion documents that forwarding, not just tolerates it.
+    assertThat(loginRedirect)
+        .endsWith("/o/" + organizationId + "/login?clientId=" + client.clientId());
     // TD-SEC-012 regression check: this is the pre-login session an attacker could have fixed
     // beforehand (RequestCache above just created it to remember this /authorize request).
     String sessionIdBeforeLogin = currentSessionId();
@@ -291,7 +295,11 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<Void> authorizeAttempt =
         getAuthorize(organizationId, client.clientId(), codeChallenge, "state");
     String loginRedirect = authorizeAttempt.headers().firstValue("Location").orElseThrow();
-    assertThat(loginRedirect).endsWith("/o/" + organizationId + "/login");
+    // ADR-0009 §1: the entry point now forwards client_id (translated onto the login page's own
+    // clientId query-param name) so the login page can resolve embedding eligibility — this
+    // assertion documents that forwarding, not just tolerates it.
+    assertThat(loginRedirect)
+        .endsWith("/o/" + organizationId + "/login?clientId=" + client.clientId());
     String loginCsrfToken = fetchLoginCsrfToken(organizationId);
     HttpResponse<Void> loginResponse =
         submitLogin(organizationId, loginCsrfToken, "pkce-user@example.com", "a-correct-password");

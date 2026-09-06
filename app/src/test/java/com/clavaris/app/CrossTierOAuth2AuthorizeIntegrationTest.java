@@ -104,7 +104,7 @@ class CrossTierOAuth2AuthorizeIntegrationTest extends RedisBackedIntegrationTest
         .as(
             "a PlatformAccount session must be treated as anonymous on this Organization's own "
                 + "/oauth2/authorize, sent to its login page — not accepted as the resource owner")
-        .endsWith("/o/" + organizationId + "/login")
+        .endsWith("/o/" + organizationId + "/login?clientId=" + client.clientId())
         .doesNotContain("code=")
         .doesNotStartWith(REDIRECT_URI);
   }
