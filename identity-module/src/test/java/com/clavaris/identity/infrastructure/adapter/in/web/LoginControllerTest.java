@@ -25,6 +25,8 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -62,6 +64,7 @@ class LoginControllerTest {
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private RedirectUrlResolver redirectUrlResolver;
   private AccountRepository accounts;
+  private ClientBrandingProvider clientBrandingProvider;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -75,9 +78,14 @@ class LoginControllerTest {
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
     accounts = mock(AccountRepository.class);
+    clientBrandingProvider = mock(ClientBrandingProvider.class);
     // Matches today's real default (no redirect policy configured) — every existing test below
     // predates this feature and expects the controller's own hardcoded literal fallback.
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
+    // Matches today's real default (no branding configured) — every existing test below predates
+    // ADR-0009 §3 and expects the template's own unbranded default look.
+    when(clientBrandingProvider.brandingFor(any(), any()))
+        .thenReturn(ClientBrandingSnapshot.unconfigured());
     // Matches today's real default (no session task ever forced) — SessionTaskGate treats an
     // absent account exactly like one with no outstanding requirement, same as a real empty
     // Optional<Instant> would.
@@ -111,7 +119,8 @@ class LoginControllerTest {
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
                     redirectUrlResolver,
-                    accounts))
+                    accounts,
+                    clientBrandingProvider))
             .setViewResolvers(viewResolver)
             .build();
   }
