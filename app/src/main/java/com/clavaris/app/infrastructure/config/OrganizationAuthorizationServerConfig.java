@@ -85,6 +85,14 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
  * DefaultSecurityConfig}'s catch-all chain; a broad matcher here would shadow that chain entirely
  * for every org-scoped path (this chain's {@code anyRequest().authenticated()} would apply to the
  * register form too) and break it.
+ *
+ * <p>TD-SEC-011 (2026-09-06): the one exception to "every path here is {@code /o/*&#47;...}-shaped"
+ * is {@code /oauth2/consent} — see {@code CONSENT_PATH_PATTERN}'s own comment for why Spring
+ * Authorization Server's own {@code consentPage(...)} setting cannot itself carry a
+ * per-Organization template, and {@code ConsentController}'s own Javadoc for the full replacement
+ * design (a project-owned, branded consent page resolving its Organization from {@code client_id}
+ * instead of the path, POSTing straight back to this chain's own real, tenant-scoped {@code
+ * /o/{organizationId}/oauth2/authorize}).
  */
 // This class's whole job is wiring together SAS's own protocol types (ADR-0003: build on the
 // framework, never reimplement it) — many distinct collaborators, long descriptive parameter
@@ -124,6 +132,15 @@ class OrganizationAuthorizationServerConfig {
   // could drift" reasoning as LOGIN_PATH_PATTERN/LOGOUT_PATH_PATTERN above.
   @SuppressWarnings("PMD.LongVariable")
   private static final String ACCOUNT_SELF_SERVICE_PATH_PATTERN = "/o/*/account/**";
+
+  // TD-SEC-011 (2026-09-06): deliberately flat, never "/o/*/oauth2/consent" — SAS's own
+  // consentPage(...) setting is one static literal shared by every Organization on this chain, with
+  // no per-request {organizationId} templating (confirmed by reading
+  // OAuth2AuthorizationEndpointConfigurer/OAuth2ConfigurerUtils#withMultipleIssuersPattern
+  // directly: that wrapping is applied to authorizationEndpointUri, never to consentPage). See
+  // ConsentController's own Javadoc for the full design this path is wired into below.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String CONSENT_PATH_PATTERN = "/oauth2/consent";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ OrganizationAuthorizationServerConfig() {
@@ -365,7 +382,17 @@ class OrganizationAuthorizationServerConfig {
             // specific, same as every other pattern already listed here; does not widen this
             // matcher to the broad /o/** this class's own Javadoc explains would shadow
             // DefaultSecurityConfig's register/forgot-/reset-password chain.
-            ACCOUNT_SELF_SERVICE_PATH_PATTERN)
+            ACCOUNT_SELF_SERVICE_PATH_PATTERN,
+            // TD-SEC-011: the one flat, non-"/o/*"-shaped pattern on this chain — see
+            // CONSENT_PATH_PATTERN's own comment for why. Confirmed not to collide with
+            // PlatformAuthorizationServerConfig's own @Order(1) chain: that chain's securityMatcher
+            // is authorizationServerConfigurer.getEndpointsMatcher(), a precise matcher built only
+            // from ITS OWN configured single-issuer endpoint literals (token/jwks/authorize/revoke/
+            // introspect/device/.well-known) — "/oauth2/consent" is not one of Spring Authorization
+            // Server's own named "-endpoint" settings, so it is never part of that matcher (read
+            // directly from OAuth2AuthorizationServerConfigurer#getEndpointsMatcher/#init, not
+            // assumed from this class's own historical "claims bare /oauth2/**" shorthand).
+            CONSENT_PATH_PATTERN)
         // TD-SEC-028: registered before .with(new OAuth2AuthorizationServerConfigurer(), ...)
         // below so this decoder is already set by the time that configurer's own init() applies
         // its internal .oauth2ResourceServer(jwt(Customizer.withDefaults())) call (decompiled
@@ -424,7 +451,18 @@ class OrganizationAuthorizationServerConfig {
                     .clientAuthentication(
                         clientAuth ->
                             clientAuth.authenticationProviders(
-                                Argon2ClientAuthenticationSupport::useArgon2PasswordEncoder)))
+                                Argon2ClientAuthenticationSupport::useArgon2PasswordEncoder))
+                    // TD-SEC-011 (2026-09-06): the project-owned, branded replacement for SAS's own
+                    // DefaultConsentPage — see ConsentController's own Javadoc for the full design
+                    // and CONSENT_PATH_PATTERN's own comment above for why this is one flat,
+                    // org-agnostic literal rather than a per-Organization path. Configuring this at
+                    // all switches every Organization's own consent render from SAS's previous
+                    // inline 200 response to a 302 redirect here — a deliberate protocol-shape
+                    // change, not a side effect (see AuthorizationCodeFlowIntegrationTest's own
+                    // updated consent tests, which now assert the redirect explicitly).
+                    .authorizationEndpoint(
+                        authorizationEndpoint ->
+                            authorizationEndpoint.consentPage(CONSENT_PATH_PATTERN)))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.
         // /o/*/connect/logout (TD-SEC-028) is permitAll for the same class of reason, not by
@@ -455,6 +493,15 @@ class OrganizationAuthorizationServerConfig {
                     // SDE-III review 2026-08-22) is reason enough for real defense-in-depth on a
                     // brand-new page that lists/revokes live sessions.
                     .requestMatchers(ACCOUNT_SELF_SERVICE_PATH_PATTERN)
+                    .hasAuthority("ROLE_ACCOUNT")
+                    // TD-SEC-011: same explicit hasAuthority (not left to the generic
+                    // .anyRequest().authenticated() below) as ACCOUNT_SELF_SERVICE_PATH_PATTERN's
+                    // own identical rationale — a plain @Controller path, unlike /oauth2/authorize
+                    // itself, so TenantAccountOnlySecurityContextFilter's own defense-in-depth
+                    // reasoning applies without that class's own caveat about SAS's filters
+                    // short-circuiting AuthorizationFilter first (no SAS filter matches this flat
+                    // path at all — confirmed via CONSENT_PATH_PATTERN's own comment above).
+                    .requestMatchers(CONSENT_PATH_PATTERN)
                     .hasAuthority("ROLE_ACCOUNT")
                     .anyRequest()
                     .authenticated())
