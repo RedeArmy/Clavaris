@@ -30,9 +30,17 @@
         <input type="hidden" name="client_id" th:value="${clientId}"/>
         <input type="hidden" name="state" th:value="${state}"/>
 
+        <!-- The checkbox is nested inside its own <label>, not paired via a separate id/for —
+             requestedScope is arbitrary OAuth2 scope text, not guaranteed to be a valid HTML id
+             token (e.g. a scope containing a space or colon), and Thymeleaf's th:id/th:for
+             attributes aren't visible to a static HTML/accessibility linter reading the raw
+             template source anyway (only the rendered output). Nesting is a normal, equally valid
+             WCAG label-association pattern that needs neither. -->
         <div th:each="requestedScope : ${scopes}">
-            <input type="checkbox" name="scope" th:id="${requestedScope}" th:value="${requestedScope}" checked/>
-            <label th:for="${requestedScope}" th:text="${requestedScope}">scope</label>
+            <label>
+                <input type="checkbox" name="scope" th:value="${requestedScope}" checked/>
+                <span th:text="${requestedScope}">scope</span>
+            </label>
         </div>
 
         <button type="submit">Approve</button>

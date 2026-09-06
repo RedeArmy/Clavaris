@@ -145,7 +145,7 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     for (final Future<?> task : tasks) {
       try {
         task.get();
-      } catch (final InterruptedException e) {
+      } catch (final InterruptedException _) {
         Thread.currentThread().interrupt();
         return;
       } catch (final ExecutionException e) {
