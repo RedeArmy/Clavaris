@@ -31,6 +31,20 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # app/package.json's own node:test suite for app/src/main/resources/static/js — the one
+      # piece of this repo's own frontend outside Thymeleaf's server-rendered templates
+      # (embedded-login-popup.js, ADR-0009 §1). Zero npm dependencies (node:test is a Node
+      # built-in, no node_modules, no lockfile to cache) — see that suite's own header for why a
+      # real DOM-emulation library was never justified for one ~15-line script.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Run JS tests (app/src/main/resources/static/js)
+        working-directory: app
+        run: npm test
+
       # Integration tests use Testcontainers (test-strategy.md §2), which
       # drives the Docker daemon directly rather than GitHub Actions'
       # `services:` block — ubuntu-latest runners ship Docker preinstalled,
@@ -265,6 +279,18 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      # Generates app/lcov.info, read by sonar.javascript.lcov.reportPaths below — same "produce
+      # the report file first, point Sonar at it in the same job" shape as JaCoCo's own XML report
+      # just below. lcov.info itself is gitignored, regenerated fresh on every run.
+      - name: Run JS tests with coverage (app/src/main/resources/static/js)
+        working-directory: app
+        run: npm run test:coverage
+
       - name: Cache SonarCloud analysis cache
         uses: actions/cache@v6
         with:
@@ -309,6 +335,14 @@ jobs:
       # from any of their basedirs (including app's own — app/../app/...
       # normalises back to itself).
       #
+      # sonar.javascript.lcov.reportPaths=lcov.info: same per-module-basedir resolution as
+      # sonar.coverage.jacoco.xmlReportPaths above, applied to app/lcov.info (the "Run JS tests
+      # with coverage" step just above generates it inside app/, so "lcov.info" alone is already
+      # correct from app's own basedir). Every other module resolves this same literal value to
+      # its own nonexistent <module>/lcov.info — harmless, same tolerance as a JaCoCo report
+      # pointing at a module with no coverage of that kind, since only app has any JS source
+      # under its own sonar.sources.
+      #
       # SDE-III review, 2026-09-04 — three SonarCloud analysis warnings investigated and closed,
       # not just tolerated (the two that used to be explained away below now have an actual fix,
       # not only a comment; the third's own explanation is corrected, not restated, now that the
@@ -328,6 +362,7 @@ jobs:
           -Dsonar.qualitygate.wait=true
           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
           -Dsonar.sources=src/main/java,src/main/resources
+          -Dsonar.javascript.lcov.reportPaths=lcov.info
           -Dsonar.plsql.file.suffixes=
 
       # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...". Updated

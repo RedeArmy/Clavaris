@@ -8,6 +8,12 @@ target/
 *.jar
 !.mvn/wrapper/maven-wrapper.jar
 
+# Node — app/package.json's own node:test suite for app/src/main/resources/static/js. No
+# dependencies (node:test is a Node built-in, no node_modules ever exists here), but the
+# coverage/test-run artifacts still shouldn't be committed.
+lcov.info
+node_modules/
+
 # IDE
 .idea/
 *.iml
