@@ -195,6 +195,14 @@ public final class PlatformScopes {
   public static final String CLIENT_BRANDING_WRITE = "platform:client-branding:write";
 
   /**
+   * ADR-0009 §2 (embedded/branded login): registering/verifying an {@code OAuthClient}'s custom
+   * domain (CNAME/Proxy mode) — its own scope, deliberately separate from {@link
+   * #CLIENT_BRANDING_WRITE} since a domain misconfiguration is a materially higher-risk mistake
+   * (routing/tenant-resolution impact) than a cosmetic branding change.
+   */
+  public static final String CLIENT_DOMAIN_WRITE = "platform:client-domain:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -222,7 +230,8 @@ public final class PlatformScopes {
           ACCOUNT_AUTHENTICATION_POLICY_WRITE,
           REDIRECT_POLICY_WRITE,
           ACCOUNTS_FORCE_PASSWORD_RESET,
-          CLIENT_BRANDING_WRITE);
+          CLIENT_BRANDING_WRITE,
+          CLIENT_DOMAIN_WRITE);
 
   private PlatformScopes() {}
 }

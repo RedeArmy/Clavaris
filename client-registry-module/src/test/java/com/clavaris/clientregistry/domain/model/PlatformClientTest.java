@@ -40,7 +40,8 @@ class PlatformClientTest {
             PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE,
             PlatformScopes.REDIRECT_POLICY_WRITE,
             PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET,
-            PlatformScopes.CLIENT_BRANDING_WRITE);
+            PlatformScopes.CLIENT_BRANDING_WRITE,
+            PlatformScopes.CLIENT_DOMAIN_WRITE);
     assertThat(client.createdAt()).isNotNull();
   }
 
