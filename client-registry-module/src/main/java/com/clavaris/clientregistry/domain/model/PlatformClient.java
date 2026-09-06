@@ -18,16 +18,15 @@ import java.util.UUID;
  * the same reason identity-module's {@code Account} suppresses them — the deliberate record-style
  * accessor convention used throughout this codebase's value objects, not an accidental data-holder
  * shape. DataClass itself is no longer flagged now that {@link #rotateSecret(String)}/{@link
- * #deactivate()} give this class real behavior beyond plain accessors. TooManyMethods: six one-line
- * accessors, two rehydration factories, and the TD-ARCH-004 scope validator is what a value object
- * with this many fields and one real invariant looks like, not organic growth — same reasoning
- * {@code OAuthClient}'s own identical suppression documents.
+ * #deactivate()} give this class real behavior beyond plain accessors. TooManyMethods no longer
+ * flagged either, now that TD-ARCH-004's own scope validation moved to {@link PlatformScopes}
+ * itself (shared with {@code OrganizationClient}, closing a real SonarCloud-flagged duplication)
+ * rather than staying a private method on this class.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods"
+  "PMD.ShortMethodName"
 })
 public final class PlatformClient {
 
@@ -49,7 +48,7 @@ public final class PlatformClient {
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
     this.clientSecretHash =
         Objects.requireNonNull(clientSecretHash, "clientSecretHash must not be null");
-    this.allowedScopes = requireValidScopes(allowedScopes);
+    this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     if (clientId.isBlank()) {
@@ -139,25 +138,5 @@ public final class PlatformClient {
 
   public boolean active() {
     return active;
-  }
-
-  // TD-ARCH-004: every entry must be a real, known platform:*-namespaced scope
-  // (PlatformScopes.BOOTSTRAP_DEFAULT — already the canonical "every scope that exists" list per
-  // its own Javadoc, so reused verbatim here rather than a second, driftable list). Before this,
-  // allowedScopes was free text nothing validated — a typo'd scope silently granted nothing (a
-  // client believing it holds a capability it doesn't), and nothing stopped this class's own
-  // instances from being handed a scope from an entirely different vocabulary. An empty list stays
-  // valid (a revoked-down-to-nothing or not-yet-provisioned client authenticates but can do
-  // nothing, same "existing, intentional empty state" this codebase's own
-  // DeactivatePlatformClientServiceTest/RotatePlatformClientSecretServiceTest already exercise) —
-  // only unknown scope *values* are rejected, not the absence of any.
-  private static List<String> requireValidScopes(final List<String> allowedScopes) {
-    Objects.requireNonNull(allowedScopes, "allowedScopes must not be null");
-    for (final String scope : allowedScopes) {
-      if (!PlatformScopes.BOOTSTRAP_DEFAULT.contains(scope)) {
-        throw new IllegalArgumentException("allowedScopes contains an unknown scope: " + scope);
-      }
-    }
-    return List.copyOf(allowedScopes);
   }
 }

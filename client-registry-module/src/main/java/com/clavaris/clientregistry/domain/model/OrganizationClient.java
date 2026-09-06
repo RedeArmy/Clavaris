@@ -55,7 +55,7 @@ public final class OrganizationClient {
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
     this.clientSecretHash =
         Objects.requireNonNull(clientSecretHash, "clientSecretHash must not be null");
-    this.allowedScopes = requireValidScopes(allowedScopes);
+    this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     if (clientId.isBlank()) {
@@ -140,22 +140,5 @@ public final class OrganizationClient {
 
   public boolean active() {
     return active;
-  }
-
-  // TD-ARCH-004: same vocabulary as PlatformClient's own identical validator, and deliberately so
-  // — this class's own Javadoc already commits to "the same allowedScopes vocabulary
-  // (PlatformScopes, reused verbatim, not a parallel scope namespace)". Unlike PlatformClient, an
-  // empty list stays valid here (existing, intentional behavior this codebase's own
-  // OrganizationClientTest already exercises via register(..., List.of())) — a Secret Key an
-  // operator hasn't yet granted any admin-API power to is a legitimate starting state, not a
-  // misconfiguration the way it would be for the platform-wide bootstrap credential.
-  private static List<String> requireValidScopes(final List<String> allowedScopes) {
-    Objects.requireNonNull(allowedScopes, "allowedScopes must not be null");
-    for (final String scope : allowedScopes) {
-      if (!PlatformScopes.BOOTSTRAP_DEFAULT.contains(scope)) {
-        throw new IllegalArgumentException("allowedScopes contains an unknown scope: " + scope);
-      }
-    }
-    return List.copyOf(allowedScopes);
   }
 }

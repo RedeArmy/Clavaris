@@ -22,7 +22,12 @@ class OidcScopeCatalogTest {
   @Test
   void noKnownScopeFallsInTheReservedPlatformNamespace() {
     // The two vocabularies must never collide — see OidcScopeCatalog's own Javadoc.
+    // AssertJ's own doesNotStartWith per element (via allSatisfy), not a raw noneMatch predicate —
+    // same assertion, a real failure message naming which scope collided instead of a generic
+    // "predicate failed", and the correct assertThat(actual).method(expected)-shaped call
+    // SonarCloud's
+    // own S3415 checks for, not a lambda check it can't see inside.
     assertThat(OidcScopeCatalog.KNOWN)
-        .noneMatch(scope -> scope.startsWith(PlatformScopes.NAMESPACE_PREFIX));
+        .allSatisfy(scope -> assertThat(scope).doesNotStartWith(PlatformScopes.NAMESPACE_PREFIX));
   }
 }
