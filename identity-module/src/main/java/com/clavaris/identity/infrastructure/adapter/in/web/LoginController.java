@@ -177,6 +177,15 @@ public class LoginController {
       return FORM_VIEW;
     }
 
+    // TD-ARCH-016: identical to UsernameSignInController's own equivalent block — CPD-flagged
+    // live by TD-PROC-009's own new local check, the very first time it ran. Deliberately not
+    // consolidated in this pass: unlike AuthenticatedSessionCompletion#complete (a single,
+    // self-contained tail), folding DeviceTrustGate+SessionTaskGate+that completion into one
+    // shared helper would need ~14 collaborating ports across both call sites — real design work
+    // (likely a small ports-record parameter, not a flat parameter list), not a same-day fix. See
+    // TD-ARCH-016 for the tracked follow-up. CPD-OFF/CPD-ON: a real, tracked, deliberately-deferred
+    // duplication, not silently ignored — everything outside this bracket still fails the build.
+    // CPD-OFF
     final Optional<String> challenge =
         DeviceTrustGate.intercept(
             knownDevices,
@@ -217,6 +226,7 @@ public class LoginController {
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
+    // CPD-ON
     return REDIRECT_PREFIX + redirectTarget;
   }
 

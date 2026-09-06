@@ -305,6 +305,34 @@
                             <goal>check</goal>
                         </goals>
                     </execution>
+                    <!-- TD-PROC-009: PMD's own bundled Copy-Paste-Detector, run locally in the same
+                         `mvn verify` every developer already runs — closes the "duplication has no
+                         local equivalent, only SonarCloud's own server-side check" half of this
+                         row's own gap. Per-module, not a cross-module/whole-reactor aggregate (PMD's
+                         own CPD supports that too, but wiring it here would mean a second,
+                         differently-scoped execution most local runs don't need) — this still
+                         catches the exact class of finding that motivated this row in the first
+                         place: TD-ARCH-004's own SonarCloud-flagged duplication (PlatformClient/
+                         OrganizationClient's identical requireValidScopes methods) was same-module,
+                         and this check would have caught it before the first `git push`, not after.
+                         Cross-module duplication (TD-ARCH-007's own historical finding) genuinely
+                         stays SonarCloud-only, same honest limit this row's own analysis already
+                         documents for "new-code coverage" — not silently claimed as closed here too.
+                         minimumTokens=75: PMD's own default (100) missed a real, SonarCloud-flagged
+                         duplicate this size in a live trial; 75 catches it without flagging this
+                         codebase's own routine repeated patterns (e.g. near-identical accessor
+                         blocks) as false positives. -->
+                    <execution>
+                        <id>cpd-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>cpd-check</goal>
+                        </goals>
+                        <configuration>
+                            <minimumTokens>75</minimumTokens>
+                            <printFailingErrors>true</printFailingErrors>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
 
