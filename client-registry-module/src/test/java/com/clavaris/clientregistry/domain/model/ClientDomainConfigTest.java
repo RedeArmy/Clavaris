@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -62,10 +63,51 @@ class ClientDomainConfigTest {
   }
 
   @Test
-  void rejectsAHostnameLongerThanRfc1035Allows() {
-    // java:S5852: an oversized input is rejected on length before HOSTNAME_PATTERN ever runs
-    // against it — this is the length guard's own behavior, not just the regex's.
-    final String oversizedHostname = "a".repeat(250) + ".example.com";
+  void rejectsALabelStartingWithAHyphen() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ClientDomainConfig.request(
+                    oauthClientId, ClientDomainMode.CNAME, "-login.example.com", null));
+  }
+
+  @Test
+  void rejectsALabelEndingWithAHyphen() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ClientDomainConfig.request(
+                    oauthClientId, ClientDomainMode.CNAME, "login-.example.com", null));
+  }
+
+  @Test
+  void acceptsAHyphenInTheMiddleOfALabel() {
+    ClientDomainConfig config =
+        ClientDomainConfig.request(
+            oauthClientId, ClientDomainMode.CNAME, "sign-in.example.com", null);
+
+    assertThat(config.hostname()).contains("sign-in.example.com");
+  }
+
+  @Test
+  void rejectsASingleLabelLongerThanRfc1035Allows() {
+    // Each label caps at 63 characters — isValidLabel's own MAX_LABEL_LENGTH ceiling, exercised
+    // directly rather than via the whole-hostname length guard below.
+    final String oversizedLabel = "a".repeat(64) + ".example.com";
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ClientDomainConfig.request(
+                    oauthClientId, ClientDomainMode.CNAME, oversizedLabel, null));
+  }
+
+  @Test
+  void rejectsAHostnameLongerThanRfc1035AllowsOverall() {
+    // Every individual label here ("ab") is well within isValidLabel's own 63-character limit —
+    // this exercises isValidHostname's separate, whole-hostname MAX_HOSTNAME_LENGTH guard, not
+    // the per-label one above.
+    final String oversizedHostname = String.join(".", Collections.nCopies(130, "ab"));
 
     assertThatIllegalArgumentException()
         .isThrownBy(
