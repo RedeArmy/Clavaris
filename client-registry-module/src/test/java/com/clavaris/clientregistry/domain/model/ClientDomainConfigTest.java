@@ -62,6 +62,19 @@ class ClientDomainConfigTest {
   }
 
   @Test
+  void rejectsAHostnameLongerThanRfc1035Allows() {
+    // java:S5852: an oversized input is rejected on length before HOSTNAME_PATTERN ever runs
+    // against it — this is the length guard's own behavior, not just the regex's.
+    final String oversizedHostname = "a".repeat(250) + ".example.com";
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                ClientDomainConfig.request(
+                    oauthClientId, ClientDomainMode.CNAME, oversizedHostname, null));
+  }
+
+  @Test
   void reRequestKeepsTheSameIdButMintsAFreshTokenAndResetsToPending() {
     ClientDomainConfig original =
         ClientDomainConfig.request(

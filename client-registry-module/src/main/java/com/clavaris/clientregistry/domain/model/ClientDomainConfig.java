@@ -46,9 +46,16 @@ public final class ClientDomainConfig {
   // hyphen), at least two labels — a scheme, path, port, or trailing dot is deliberately rejected,
   // since this value is compared verbatim against the inbound Host header (Phase 4's own
   // CustomDomainRequestRewriteFilter), not parsed as a URI.
+  //
+  // java:S5852: the repeated group's own optional inner quantifier gives this pattern
+  // superlinear worst-case backtracking on a long, non-matching input — MAX_HOSTNAME_LENGTH below
+  // bounds every input this is ever run against to RFC 1035's own 253-octet ceiling before the
+  // engine ever sees it, which bounds that worst case to a constant, not a refactor of the pattern
+  // itself (a hostname's own grammar is genuinely "one or more dot-separated labels").
   private static final Pattern HOSTNAME_PATTERN =
       Pattern.compile(
           "^([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$");
+  private static final int MAX_HOSTNAME_LENGTH = 253;
 
   private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
   private static final int TOKEN_BYTE_LENGTH = 24;
@@ -64,6 +71,13 @@ public final class ClientDomainConfig {
   private final Instant createdAt;
   private final Instant updatedAt;
 
+  // java:S107: ten persisted fields is what full rehydration of this row genuinely looks like,
+  // same reconstitute/ClientDomainConfigEntity/OAuthClientEntity precedent for a wide, flat
+  // aggregate — every other factory method funnels into this one canonical constructor rather
+  // than each duplicating field assignment/validation itself. No PMD.ExcessiveParameterList
+  // suppression here (unlike those siblings): PMD's own default threshold is 10, so it doesn't
+  // flag exactly 10 params — only SonarCloud's stricter default (7) does.
+  @SuppressWarnings("java:S107")
   private ClientDomainConfig(
       final UUID id,
       final UUID oauthClientId,
@@ -249,7 +263,9 @@ public final class ClientDomainConfig {
     if (hostname == null) {
       return null;
     }
-    if (!HOSTNAME_PATTERN.matcher(hostname).matches()) {
+    // java:S5852: reject an oversized input before it ever reaches HOSTNAME_PATTERN — see that
+    // field's own Javadoc for why this, not a pattern rewrite, is the fix.
+    if (hostname.length() > MAX_HOSTNAME_LENGTH || !HOSTNAME_PATTERN.matcher(hostname).matches()) {
       throw new IllegalArgumentException("hostname must be a valid DNS hostname: " + hostname);
     }
     return hostname;
