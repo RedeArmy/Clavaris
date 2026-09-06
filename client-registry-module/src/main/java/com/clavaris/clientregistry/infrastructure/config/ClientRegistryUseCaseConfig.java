@@ -12,6 +12,10 @@ import com.clavaris.clientregistry.application.usecase.deactivateorganizationcli
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientUseCase;
+import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingService;
+import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
+import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigService;
+import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigUseCase;
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsService;
@@ -21,14 +25,23 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Organ
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientService;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
+import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
+import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.RequestClientDomainConfigService;
+import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.RequestClientDomainConfigUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretService;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.PlatformClientSecretGenerator;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretService;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.setclientbranding.ClientBrandingRepository;
+import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingService;
+import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.RedirectPolicyRepository;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.DnsTxtRecordLookup;
+import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipService;
+import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipUseCase;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,11 +53,12 @@ import org.springframework.context.annotation.Configuration;
  * (Spring's own class-name-derived default) collides the moment both modules are on the same
  * classpath together, which they only started being once this class existed.
  */
-// PMD.ExcessiveImports: this class's whole job is wiring one @Bean method per use case (this
-// file's own doc comment) — the redirect-policy use cases tipped the import count over PMD's
-// default threshold. Same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own
-// class-level suppression already documents for an identical situation.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// PMD.ExcessiveImports/CouplingBetweenObjects: this class's whole job is wiring one @Bean method
+// per use case (this file's own doc comment) — the redirect-policy/client-branding use cases
+// tipped both counts over PMD's default thresholds. Same "wiring, not sprawl" reasoning
+// OrganizationUseCaseConfig's own class-level suppression already documents for an identical
+// situation.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class ClientRegistryUseCaseConfig {
 
@@ -149,5 +163,50 @@ class ClientRegistryUseCaseConfig {
   /* package */ GetRedirectPolicyForClientUseCase getRedirectPolicyForClientUseCase(
       final RedirectPolicyRepository redirectPolicies) {
     return new GetRedirectPolicyForClientService(redirectPolicies);
+  }
+
+  // ADR-0009 §3. PMD.LinguisticNaming: same false positive as setRedirectPolicyForClientUseCase's
+  // own identical suppression above.
+  @SuppressWarnings("PMD.LinguisticNaming")
+  @Bean
+  /* package */ SetClientBrandingUseCase setClientBrandingUseCase(
+      final OAuthClientRepository oauthClients,
+      final ClientBrandingRepository brandings,
+      final AuditEventRecorder auditEvents) {
+    return new SetClientBrandingService(oauthClients, brandings, auditEvents);
+  }
+
+  // ADR-0009 §3
+  @Bean
+  /* package */ GetClientBrandingUseCase getClientBrandingUseCase(
+      final ClientBrandingRepository brandings) {
+    return new GetClientBrandingService(brandings);
+  }
+
+  // ADR-0009 §2
+  @Bean
+  /* package */ RequestClientDomainConfigUseCase requestClientDomainConfigUseCase(
+      final OAuthClientRepository oauthClients,
+      final ClientDomainConfigRepository domainConfigs,
+      final AuditEventRecorder auditEvents) {
+    return new RequestClientDomainConfigService(oauthClients, domainConfigs, auditEvents);
+  }
+
+  // ADR-0009 §2
+  @Bean
+  /* package */ VerifyClientDomainOwnershipUseCase verifyClientDomainOwnershipUseCase(
+      final OAuthClientRepository oauthClients,
+      final ClientDomainConfigRepository domainConfigs,
+      final DnsTxtRecordLookup dnsLookup,
+      final AuditEventRecorder auditEvents) {
+    return new VerifyClientDomainOwnershipService(
+        oauthClients, domainConfigs, dnsLookup, auditEvents);
+  }
+
+  // ADR-0009 §2
+  @Bean
+  /* package */ GetClientDomainConfigUseCase getClientDomainConfigUseCase(
+      final ClientDomainConfigRepository domainConfigs) {
+    return new GetClientDomainConfigService(domainConfigs);
   }
 }

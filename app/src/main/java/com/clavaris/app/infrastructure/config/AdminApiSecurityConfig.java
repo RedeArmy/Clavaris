@@ -262,6 +262,28 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/clients/*/redirect-policy")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.REDIRECT_POLICY_WRITE)
+                    // ADR-0009 §3 (embedded/branded login, Clerk parity): tuning an OAuthClient's
+                    // hosted-login logo/color/display-name theming — its own scope, same
+                    // defence-in-depth reasoning as every other admin-API rule above. Reading it
+                    // back (GET) is unscoped, same precedent every other GET on this surface
+                    // already follows.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/clients/*/branding")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.CLIENT_BRANDING_WRITE)
+                    // ADR-0009 §2 (embedded/branded login, Clerk parity): requesting/re-requesting
+                    // an OAuthClient's custom domain, and triggering its DNS TXT-record ownership
+                    // verification — grouped under one scope, same "same risk tier" precedent
+                    // WORKSPACE_MEMBERS_WRITE already establishes (both mutate one client's own
+                    // domain configuration; neither reaches another Organization's data).
+                    // Reading it back (GET) is unscoped, same precedent every other GET on this
+                    // surface already follows.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/clients/*/domain-config")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.CLIENT_DOMAIN_WRITE)
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/v1/admin/organizations/*/clients/*/domain-config:verify-ownership")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.CLIENT_DOMAIN_WRITE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
