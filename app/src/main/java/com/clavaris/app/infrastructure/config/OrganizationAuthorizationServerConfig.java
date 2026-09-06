@@ -287,7 +287,8 @@ class OrganizationAuthorizationServerConfig {
       // incident-response-signing-key-compromise.md's own decompiled-jar finding) to cover
       // longer-lived ID tokens and real-world clock skew between this process and a verifier,
       // without holding a compromised key's material "live" in JWKS indefinitely.
-      @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours) {
+      @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours,
+      final EmbeddingEligibilityChecker embeddingChecker) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -529,7 +530,9 @@ class OrganizationAuthorizationServerConfig {
         // TD-SEC-009: the one chain serving both this project's own /o/*/login template AND SAS's
         // own default consent page — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
         // each gets a different policy and how it tells them apart.
-        .headers(headers -> headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter()));
+        .headers(
+            headers ->
+                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)));
 
     return http.build();
   }

@@ -3,6 +3,7 @@ package com.clavaris.app.infrastructure.config;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.springframework.security.web.header.HeaderWriter;
 
@@ -56,10 +57,30 @@ import org.springframework.security.web.header.HeaderWriter;
  * without {@code 'unsafe-inline'}, unlike the consent page above (that page's inline script is
  * SAS's own code this project doesn't control; this one is project-owned and has no reason to be
  * inline).
+ *
+ * <p>ADR-0009 §1/§4: on the login/consent pages only, {@code display=modal} + a {@code clientId}
+ * query param resolved as embedding-eligible by {@link EmbeddingEligibilityChecker} relaxes {@code
+ * frame-ancestors} from {@code 'none'} to that one client's own registered origin, for that one
+ * request only — every other request on every other path keeps {@code 'none'}, unconditionally.
+ * Deliberately does <b>not</b> also disable Spring Security's own zero-config {@code
+ * X-Frame-Options: DENY} default: every evergreen browser gives CSP {@code frame-ancestors}
+ * precedence over the legacy header when both are present (the CSP Level 2 spec's own documented
+ * behavior), so the relaxation above already works in practice; disabling the chain-wide default
+ * would have also stripped {@code X-Frame-Options} from this same chain's non-HTML JSON responses
+ * ({@code /oauth2/token}, {@code /userinfo}) — a real regression to an existing protection, for a
+ * benefit that only matters to browsers old enough to not understand CSP framing directives at all.
+ * Constructed with an {@link EmbeddingEligibilityChecker} at every {@code SecurityFilterChain}
+ * builder site (not just {@code OrganizationAuthorizationServerConfig}'s own) for a uniform
+ * constructor shape — the other three call sites simply never reach a request whose path matches
+ * {@link #LOGIN_PAGE_PATH}/{@link #CONSENT_PAGE_PATH}, so the checker there is never actually
+ * invoked.
  */
 final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   private static final String HEADER_NAME = "Content-Security-Policy";
+  private static final String DISPLAY_PARAM = "display";
+  private static final String DISPLAY_MODAL = "modal";
+  private static final String CLIENT_ID_PARAM = "clientId";
 
   private static final String STRICT_POLICY =
       "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
@@ -91,12 +112,15 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // platform tier's own login template (a different page, no such script).
   private static final Pattern LOGIN_PAGE_PATH = Pattern.compile("^/o/[^/]+/login$");
 
+  private final EmbeddingEligibilityChecker embeddingChecker;
+
   // Constructed only by each SecurityFilterChain builder's own `new
-  // ContentSecurityPolicyHeaderWriter()` call — no state to initialize, same convention as this
-  // package's other stateless writers/filters.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ ContentSecurityPolicyHeaderWriter() {
-    // Intentionally empty.
+  // ContentSecurityPolicyHeaderWriter(checker)` call — see this class's own Javadoc for why every
+  // site passes one even though only OrganizationAuthorizationServerConfig's own chain ever
+  // actually invokes it.
+  /* package */ ContentSecurityPolicyHeaderWriter(
+      final EmbeddingEligibilityChecker embeddingChecker) {
+    this.embeddingChecker = embeddingChecker;
   }
 
   @Override
@@ -104,20 +128,39 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     if (response.containsHeader(HEADER_NAME) || !isHtml(response)) {
       return;
     }
-    response.setHeader(HEADER_NAME, policyFor(request.getRequestURI()));
+    response.setHeader(HEADER_NAME, policyFor(request));
   }
 
   // Three-way, not a ternary any more — see this class's own Javadoc for why each path pattern
   // gets its own real policy rather than one being folded into "everything else".
   @SuppressWarnings("PMD.OnlyOneReturn")
-  private static String policyFor(final String requestUri) {
+  private String policyFor(final HttpServletRequest request) {
+    final String requestUri = request.getRequestURI();
     if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
-      return CONSENT_PAGE_POLICY;
+      return withRelaxedFrameAncestorsIfEligible(CONSENT_PAGE_POLICY, request);
     }
     if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
-      return LOGIN_PAGE_POLICY;
+      return withRelaxedFrameAncestorsIfEligible(LOGIN_PAGE_POLICY, request);
     }
     return STRICT_POLICY;
+  }
+
+  // ADR-0009 §1/§4: see this class's own Javadoc. Every policy this method is ever called with
+  // ends in the exact literal "frame-ancestors 'none'" — asserted by construction, not
+  // discovered by parsing, since both callers pass one of this class's own two constants.
+  // PMD.OnlyOneReturn: "not display=modal at all" / "resolved" are two independent, equally valid
+  // exits — same rationale as every other early-return chain in this codebase.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private String withRelaxedFrameAncestorsIfEligible(
+      final String basePolicy, final HttpServletRequest request) {
+    if (!DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
+      return basePolicy;
+    }
+    final Optional<String> allowedOrigin =
+        embeddingChecker.resolveAllowedFrameAncestor(request.getParameter(CLIENT_ID_PARAM));
+    return allowedOrigin
+        .map(origin -> basePolicy.replace("frame-ancestors 'none'", "frame-ancestors " + origin))
+        .orElse(basePolicy);
   }
 
   private static boolean isHtml(final HttpServletResponse response) {
