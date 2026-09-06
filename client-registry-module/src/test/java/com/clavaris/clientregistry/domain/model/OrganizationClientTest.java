@@ -44,6 +44,21 @@ class OrganizationClientTest {
   }
 
   @Test
+  void rejectsAnUnknownScope() {
+    // TD-ARCH-004: same vocabulary/rationale as PlatformClientTest's own identical test — this
+    // class's own Javadoc already commits to reusing PlatformScopes verbatim, not a parallel
+    // namespace.
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OrganizationClient.register(
+                    UUID.randomUUID(),
+                    "sk_test_abc",
+                    "argon2id$hashed",
+                    List.of("not-a-real-scope")));
+  }
+
+  @Test
   void rotateSecretReplacesTheHashKeepingEverythingElse() {
     OrganizationClient original =
         OrganizationClient.register(UUID.randomUUID(), "sk_test_abc", "old-hash", List.of());

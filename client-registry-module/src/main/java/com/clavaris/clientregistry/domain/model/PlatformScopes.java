@@ -19,6 +19,14 @@ import java.util.List;
 @SuppressWarnings({"PMD.LongVariable", "PMD.DataClass"})
 public final class PlatformScopes {
 
+  /**
+   * TD-ARCH-004: the reserved namespace itself, exposed as its own constant — {@link OAuthClient}'s
+   * own {@code requireValidScopes} checks a tenant-facing client's scopes against this prefix (not
+   * this class's own individual constants, which it must never be assignable one of) to keep the
+   * two vocabularies from colliding.
+   */
+  public static final String NAMESPACE_PREFIX = "platform:";
+
   public static final String ORGANIZATIONS_WRITE = "platform:organizations:write";
 
   /** ADR-0010 §6.2: tuning an Organization's rate-limit capacity ceiling — operator-only in v1. */

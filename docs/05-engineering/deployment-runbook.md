@@ -26,6 +26,8 @@ runbook (or replace it with a real orchestrator) the day that stops being true.
 ## 2. Prerequisites
 
 - A VM (any provider) with a public IP, Docker and the Docker Compose plugin installed.
+- **Minimum 3 vCPU / 4GB RAM** (TD-PERF-007) — see §2a below for why this specific floor, not a
+  round number picked without reasoning.
 - A DNS `A` record for the domain this instance will be reachable at, already pointing at that
   public IP before the first `docker compose up` — Let's Encrypt's own HTTP-01 challenge (Caddy
   runs this automatically) fails if the domain doesn't resolve yet.
@@ -34,6 +36,46 @@ runbook (or replace it with a real orchestrator) the day that stops being true.
 - A GitHub Container Registry image to pull: `ci.yml`'s own `docker-build` job pushes
   `ghcr.io/<owner>/clavaris:latest` (and `:<git-sha>`) automatically on every push to `master` — no
   separate publish step to run by hand.
+
+### 2a. Capacity tuning (TD-PERF-007)
+
+Three related numbers, sized together against the 3-vCPU reference machine TD-FUT-017's own real
+load test already measured this system's real bottleneck against (Argon2id verification on
+`/oauth2/token`, not Postgres or Redis) — none of them should be tuned in isolation from the
+others:
+
+| Setting | Env var | Default | Reasoning |
+|---|---|---|---|
+| Tomcat max threads | `TOMCAT_MAX_THREADS` | 50 | Bounds worst-case concurrent Argon2id memory (~19MiB/verification) to a number the JVM heap below is sized to survive, while still leaving room for fast, non-Argon2 endpoints (JWKS, health checks) to not queue behind it artificially. |
+| HikariCP pool size | `DB_HIKARI_MAX_POOL_SIZE` | 10 | HikariCP's own `((core_count * 2) + spindle_count)` sizing guidance for a 3-vCPU host. Raise roughly in step with real core count on a bigger VM, not independently of it. |
+| HikariCP connection timeout | `DB_HIKARI_CONNECTION_TIMEOUT_MS` | 10000 | Fails fast and loudly instead of Spring Boot's own 30s default silent queue — live-caught by this app's own full test suite that 5s (this row's own first attempt) was aggressive enough to convert genuine-but-transient contention into hard failures; 10s still fails an order of magnitude faster than the 30s default while giving that contention room to actually clear. |
+| JVM heap | `JAVA_OPTS` (`app/docker-entrypoint.sh`) | `-Xmx1536m -Xms512m` | Covers worst-case Argon2 memory (50 × ~19MiB ≈ 950MiB) plus normal heap/GC headroom. |
+| Container memory limit | `mem_limit` (`docker-compose.prod.yml`, `app` service) | `2g` | Headroom above the JVM heap ceiling for metaspace/thread stacks/native buffers — an unbounded container previously let a leak or genuine worst-case burst consume the whole host instead of failing this one container loudly (`restart: unless-stopped` brings it back). |
+
+On a bigger VM: raise Tomcat threads and the Hikari pool together (roughly in proportion to real
+core count), then raise the JVM heap/container memory to match the new worst-case Argon2 memory
+bill (`threads × ~19MiB`, plus headroom) — never just one of the five in isolation.
+
+**Under `docker-compose.prod.yml` specifically**, the three Spring-consumed env vars above
+(`TOMCAT_MAX_THREADS`, `DB_HIKARI_MAX_POOL_SIZE`, `DB_HIKARI_CONNECTION_TIMEOUT_MS`) are
+deliberately **not** wired into that file's own `app.environment` block — same as the pre-existing
+`EVENT_OUTBOX_RETENTION_DAYS`, setting one in `.env` alone has no effect through this specific
+deployment path today, and that's intentional, not an oversight: Spring's own YAML
+`${VAR:default}` placeholder only substitutes its default when the property is genuinely *absent*,
+not when it's present-but-empty — and Compose has no clean way to pass a host env var through only
+when it's actually set (the safe `${VAR:-}` pattern below, used for `JAVA_OPTS`, would instead pass
+an *empty string* into the container for any of these three, breaking Spring's own int/duration
+binding at startup the moment `.env` doesn't define it, which is the common case). To override one
+of these three, add its line to `docker-compose.prod.yml`'s own `environment:` list directly
+(`TOMCAT_MAX_THREADS: ${TOMCAT_MAX_THREADS:?...}` or a literal value) — a deliberate, visible file
+edit, not a blank-`.env`-value silently doing nothing or silently breaking startup.
+
+`JAVA_OPTS` doesn't share that risk and *is* wired through (`docker-compose.prod.yml`'s own
+`app.environment.JAVA_OPTS: ${JAVA_OPTS:-}`) — it's read by `docker-entrypoint.sh`'s own POSIX
+`"${JAVA_OPTS:-default}"`, which treats "unset" and "set to empty string" identically (confirmed
+live), so leaving it blank in `.env` correctly falls through to the real default instead of
+breaking anything. `mem_limit` is a `docker-compose.prod.yml` file value, not an env var at all —
+edited directly in that file.
 
 ## 3. First deploy
 
