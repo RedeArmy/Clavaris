@@ -262,6 +262,14 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/clients/*/redirect-policy")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.REDIRECT_POLICY_WRITE)
+                    // ADR-0009 §3 (embedded/branded login, Clerk parity): tuning an OAuthClient's
+                    // hosted-login logo/color/display-name theming — its own scope, same
+                    // defence-in-depth reasoning as every other admin-API rule above. Reading it
+                    // back (GET) is unscoped, same precedent every other GET on this surface
+                    // already follows.
+                    .requestMatchers(
+                        HttpMethod.PUT, "/api/v1/admin/organizations/*/clients/*/branding")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.CLIENT_BRANDING_WRITE)
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))

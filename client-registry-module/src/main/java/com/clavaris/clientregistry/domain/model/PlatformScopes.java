@@ -187,6 +187,14 @@ public final class PlatformScopes {
       "platform:accounts:force-password-reset";
 
   /**
+   * ADR-0009 §3 (embedded/branded login): tuning an {@code OAuthClient}'s hosted-login
+   * logo/color/display-name theming — its own scope, same defence-in-depth reasoning as every other
+   * admin-API rule here. Reading branding back is unscoped, same "only mutating actions get their
+   * own scope" precedent every other GET on this surface already follows.
+   */
+  public static final String CLIENT_BRANDING_WRITE = "platform:client-branding:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -213,7 +221,8 @@ public final class PlatformScopes {
           SECRET_KEYS_ROTATE,
           ACCOUNT_AUTHENTICATION_POLICY_WRITE,
           REDIRECT_POLICY_WRITE,
-          ACCOUNTS_FORCE_PASSWORD_RESET);
+          ACCOUNTS_FORCE_PASSWORD_RESET,
+          CLIENT_BRANDING_WRITE);
 
   private PlatformScopes() {}
 }
