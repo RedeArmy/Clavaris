@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 class CachingClientDomainConfigRepositoryTest {
 
   private static final long TTL_SECONDS = 30;
+  private static final long MAX_SIZE = 10_000;
 
   @Test
   void aSecondReadByHostnameWithinTheTtlNeverReachesTheDelegate() {
@@ -29,7 +30,7 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfig config = aVerifiedConfig("login.example.com");
     when(delegate.findByHostname("login.example.com")).thenReturn(Optional.of(config));
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS);
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByHostname("login.example.com");
     Optional<ClientDomainConfig> second = cache.findByHostname("login.example.com");
@@ -43,7 +44,7 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     when(delegate.findByHostname("unclaimed.example.com")).thenReturn(Optional.empty());
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS);
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByHostname("unclaimed.example.com");
     Optional<ClientDomainConfig> second = cache.findByHostname("unclaimed.example.com");
@@ -60,7 +61,7 @@ class CachingClientDomainConfigRepositoryTest {
     when(delegate.findByHostname("b.example.com"))
         .thenReturn(Optional.of(aVerifiedConfig("b.example.com")));
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS);
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByHostname("a.example.com");
     cache.findByHostname("b.example.com");
@@ -78,7 +79,7 @@ class CachingClientDomainConfigRepositoryTest {
             oauthClientId, ClientDomainMode.CNAME, "login.example.com", null);
     when(delegate.findByOAuthClientId(oauthClientId)).thenReturn(Optional.of(config));
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS);
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByOAuthClientId(oauthClientId);
     cache.findByOAuthClientId(oauthClientId);
@@ -95,7 +96,7 @@ class CachingClientDomainConfigRepositoryTest {
     // A zero-second TTL means every entry is already expired the instant it's written — the
     // simplest deterministic way to prove the fall-through path without sleeping in a test.
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, 0);
+        new CachingClientDomainConfigRepository(delegate, 0, MAX_SIZE);
 
     cache.findByHostname("login.example.com");
     cache.findByHostname("login.example.com");
@@ -112,7 +113,7 @@ class CachingClientDomainConfigRepositoryTest {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     ClientDomainConfig config = aVerifiedConfig("login.example.com");
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS);
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.save(config);
     Optional<ClientDomainConfig> byHostname = cache.findByHostname("login.example.com");
@@ -125,12 +126,28 @@ class CachingClientDomainConfigRepositoryTest {
     verify(delegate, never()).findByOAuthClientId(org.mockito.ArgumentMatchers.any());
   }
 
+  // TD-PERF-006: the actual fix this row asked for — a real, bounded cache, not an unbounded
+  // ConcurrentHashMap. A tiny maxSize (2) and more distinct OAuthClients than that fits proves
+  // Caffeine's own eviction genuinely runs, not just that the API compiles.
+  @Test
+  void cacheSizeStaysBoundedByMaxSizeNotUnbounded() {
+    ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
+    long smallMaxSize = 2;
+    CachingClientDomainConfigRepository cache =
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, smallMaxSize);
+    for (int i = 0; i < 10; i++) {
+      cache.save(aVerifiedConfig("host-" + i + ".example.com"));
+    }
+
+    assertThat(cache.byOauthClientIdEstimatedSizeAfterCleanup()).isLessThanOrEqualTo(smallMaxSize);
+  }
+
   @Test
   void saveAlwaysDelegatesTheRealWrite() {
     ClientDomainConfigRepository delegate = mock(ClientDomainConfigRepository.class);
     ClientDomainConfig config = aVerifiedConfig("login.example.com");
     CachingClientDomainConfigRepository cache =
-        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS);
+        new CachingClientDomainConfigRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.save(config);
 

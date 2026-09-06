@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 class CachingRateLimitPolicyRepositoryTest {
 
   private static final long TTL_SECONDS = 30;
+  private static final long MAX_SIZE = 10_000;
 
   @Test
   void aSecondReadWithinTheTtlNeverReachesTheDelegate() {
@@ -29,7 +30,7 @@ class CachingRateLimitPolicyRepositoryTest {
     RateLimitPolicy policy = aPolicyFor(organizationId, 100);
     when(delegate.findByOrganizationId(organizationId)).thenReturn(Optional.of(policy));
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS);
+        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByOrganizationId(organizationId);
     Optional<RateLimitPolicy> second = cache.findByOrganizationId(organizationId);
@@ -46,7 +47,7 @@ class CachingRateLimitPolicyRepositoryTest {
     UUID organizationId = UUID.randomUUID();
     when(delegate.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS);
+        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByOrganizationId(organizationId);
     Optional<RateLimitPolicy> second = cache.findByOrganizationId(organizationId);
@@ -63,7 +64,7 @@ class CachingRateLimitPolicyRepositoryTest {
     when(delegate.findByOrganizationId(first)).thenReturn(Optional.of(aPolicyFor(first, 100)));
     when(delegate.findByOrganizationId(second)).thenReturn(Optional.of(aPolicyFor(second, 200)));
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS);
+        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.findByOrganizationId(first);
     cache.findByOrganizationId(second);
@@ -80,7 +81,8 @@ class CachingRateLimitPolicyRepositoryTest {
         .thenReturn(Optional.of(aPolicyFor(organizationId, 100)));
     // A zero-second TTL means every entry is already expired the instant it's written — the
     // simplest deterministic way to prove the fall-through path without sleeping in a test.
-    CachingRateLimitPolicyRepository cache = new CachingRateLimitPolicyRepository(delegate, 0);
+    CachingRateLimitPolicyRepository cache =
+        new CachingRateLimitPolicyRepository(delegate, 0, MAX_SIZE);
 
     cache.findByOrganizationId(organizationId);
     cache.findByOrganizationId(organizationId);
@@ -97,7 +99,7 @@ class CachingRateLimitPolicyRepositoryTest {
     UUID organizationId = UUID.randomUUID();
     RateLimitPolicy policy = aPolicyFor(organizationId, 250);
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS);
+        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.save(policy);
     Optional<RateLimitPolicy> read = cache.findByOrganizationId(organizationId);
@@ -106,12 +108,29 @@ class CachingRateLimitPolicyRepositoryTest {
     verify(delegate, never()).findByOrganizationId(organizationId);
   }
 
+  // TD-PERF-006: the actual fix this row asked for — a real, bounded cache, not an unbounded
+  // ConcurrentHashMap. A tiny maxSize (2) and more distinct Organizations than that fits proves
+  // Caffeine's own eviction genuinely runs, not just that the API compiles.
+  @Test
+  void cacheSizeStaysBoundedByMaxSizeNotUnbounded() {
+    RateLimitPolicyRepository delegate = mock(RateLimitPolicyRepository.class);
+    long smallMaxSize = 2;
+    CachingRateLimitPolicyRepository cache =
+        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, smallMaxSize);
+    for (int i = 0; i < 10; i++) {
+      UUID organizationId = UUID.randomUUID();
+      cache.save(aPolicyFor(organizationId, 100));
+    }
+
+    assertThat(cache.estimatedSizeAfterCleanup()).isLessThanOrEqualTo(smallMaxSize);
+  }
+
   @Test
   void saveAlwaysDelegatesTheRealWrite() {
     RateLimitPolicyRepository delegate = mock(RateLimitPolicyRepository.class);
     RateLimitPolicy policy = aPolicyFor(UUID.randomUUID(), 100);
     CachingRateLimitPolicyRepository cache =
-        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS);
+        new CachingRateLimitPolicyRepository(delegate, TTL_SECONDS, MAX_SIZE);
 
     cache.save(policy);
 

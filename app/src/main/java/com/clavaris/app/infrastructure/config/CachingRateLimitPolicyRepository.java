@@ -2,12 +2,11 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
@@ -32,12 +31,16 @@ import org.springframework.stereotype.Repository;
  * bridge in this package respects), so a qualifier by bean name is the only way to disambiguate two
  * beans of the same interface type without one injecting itself.
  *
- * <p>Cache key is the raw {@code organizationId} — unbounded in principle (nothing evicts a deleted
- * Organization's own now-orphaned entry), but bounded in practice by real Organization count, which
- * is expected to stay small for the foreseeable future (same order-of-magnitude judgment call this
- * codebase already makes for TD-ARCH-001/{@code common}'s own deliberately-empty caching layer) — a
- * genuinely unbounded key space (per-request, per-user) would need a real eviction policy; a
- * per-tenant one does not, yet.
+ * <p>TD-PERF-006: previously a hand-rolled unbounded {@code ConcurrentHashMap} — a deleted
+ * Organization's own entry was never purged, only ever overwritten on its own next read (which
+ * never comes), so memory grew monotonically with total Organization churn over the process's
+ * lifetime, not current Organization count. Caffeine's own {@code maximumSize} (Window TinyLFU
+ * eviction) replaces that with a real, bounded cache that evicts the least-recently-used entries
+ * once full — a deleted Organization's entry simply stops being accessed and ages out on its own,
+ * with no explicit {@code evict(key)} call needed on every current and future Organization-deletion
+ * code path (a real Organization hard-delete flow already exists, {@code
+ * DeleteOrganizationService}, and every future one would otherwise need to remember this cache
+ * too).
  *
  * <p>Deliberately not {@code final}, unlike most classes in this codebase — {@code @Repository} (as
  * opposed to {@code @Component}) makes this bean eligible for {@code
@@ -52,40 +55,34 @@ import org.springframework.stereotype.Repository;
 class CachingRateLimitPolicyRepository implements RateLimitPolicyRepository {
 
   private final RateLimitPolicyRepository delegate;
-  private final Duration ttl;
-  // Declared as the Map interface (PMD.LooseCoupling), not the concrete ConcurrentHashMap type —
-  // nothing here uses any ConcurrentHashMap-specific method beyond plain get/put, both on Map
-  // itself; the concrete type is still what's actually constructed, for real thread-safe
-  // read/write access from concurrent requests.
-  private final Map<UUID, CacheEntry> cache = new ConcurrentHashMap<>();
+  private final Cache<UUID, Optional<RateLimitPolicy>> cache;
 
   /* package */ CachingRateLimitPolicyRepository(
       @Qualifier("jpaRateLimitPolicyRepository") final RateLimitPolicyRepository delegate,
-      @Value("${clavaris.rate-limit.capacity.policy-cache-ttl-seconds:30}") final long ttlSeconds) {
+      @Value("${clavaris.rate-limit.capacity.policy-cache-ttl-seconds:30}") final long ttlSeconds,
+      // TD-PERF-006: real Organization count is expected to stay small for the foreseeable future
+      // (same order-of-magnitude judgment TD-ARCH-001/common's own deliberately-empty caching
+      // layer already makes) — 10,000 is generous headroom over that, not a number this project
+      // expects to actually approach, while still being a real, finite bound instead of none.
+      @Value("${clavaris.rate-limit.capacity.policy-cache-max-size:10000}") final long maxSize) {
     this.delegate = delegate;
-    this.ttl = Duration.ofSeconds(ttlSeconds);
+    this.cache =
+        Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofSeconds(ttlSeconds))
+            .maximumSize(maxSize)
+            .build();
   }
 
-  // A live cache entry (including a genuinely absent policy, Optional.empty() — the common case
-  // for any Organization whose ceiling was never tuned, BR-ORG-05) is returned as-is; anything
-  // missing or expired falls through to a real read, which then populates/refreshes the entry.
-  // TD-FUT-012's own row explicitly accepted this simple "read-through, TTL-bounded staleness"
-  // shape over a fully-consistent invalidation scheme — SetRateLimitPolicyController writes are
-  // rare, operator-only actions, not a hot path this needs to optimize consistency for.
-  // PMD.OnlyOneReturn: the fresh-cache-hit early return and the fall-through-and-populate path are
-  // two independent, equally valid exits — same rationale as every other early-return chain in
-  // this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // TD-FUT-012's own row explicitly accepted a simple "read-through, TTL-bounded staleness" shape
+  // over a fully-consistent invalidation scheme — SetRateLimitPolicyController writes are rare,
+  // operator-only actions, not a hot path this needs to optimize consistency for. Cache#get with a
+  // mapping function (Caffeine's own atomic compute-if-absent) also closes a small pre-existing
+  // race the hand-rolled get-then-put version had: two concurrent misses for the same
+  // organizationId could previously both fall through to delegate.findByOrganizationId — harmless
+  // here (idempotent read), but no longer even possible.
   @Override
   public Optional<RateLimitPolicy> findByOrganizationId(final UUID organizationId) {
-    final Instant now = Instant.now();
-    final CacheEntry cached = cache.get(organizationId);
-    if (cached != null && cached.expiresAt().isAfter(now)) {
-      return cached.value();
-    }
-    final Optional<RateLimitPolicy> fresh = delegate.findByOrganizationId(organizationId);
-    cache.put(organizationId, new CacheEntry(fresh, now.plus(ttl)));
-    return fresh;
+    return cache.get(organizationId, delegate::findByOrganizationId);
   }
 
   // Write-through, not merely invalidate-and-let-the-next-read-repopulate: an operator changing a
@@ -96,9 +93,15 @@ class CachingRateLimitPolicyRepository implements RateLimitPolicyRepository {
   @Override
   public void save(final RateLimitPolicy policy) {
     delegate.save(policy);
-    cache.put(
-        policy.organizationId(), new CacheEntry(Optional.of(policy), Instant.now().plus(ttl)));
+    cache.put(policy.organizationId(), Optional.of(policy));
   }
 
-  private record CacheEntry(Optional<RateLimitPolicy> value, Instant expiresAt) {}
+  // Test-only observability, not used by any production code path — proves TD-PERF-006's own
+  // actual point (a real, bounded cache) directly, rather than only indirectly through delegate
+  // call counts. cleanUp() forces Caffeine's own otherwise-opportunistic eviction maintenance to
+  // run synchronously, so a size assertion taken right after this call is deterministic.
+  /* package */ long estimatedSizeAfterCleanup() {
+    cache.cleanUp();
+    return cache.estimatedSize();
+  }
 }
