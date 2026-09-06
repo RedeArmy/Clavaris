@@ -18,7 +18,10 @@ import java.util.UUID;
  * the same reason identity-module's {@code Account} suppresses them — the deliberate record-style
  * accessor convention used throughout this codebase's value objects, not an accidental data-holder
  * shape. DataClass itself is no longer flagged now that {@link #rotateSecret(String)}/{@link
- * #deactivate()} give this class real behavior beyond plain accessors.
+ * #deactivate()} give this class real behavior beyond plain accessors. TooManyMethods no longer
+ * flagged either, now that TD-ARCH-004's own scope validation moved to {@link PlatformScopes}
+ * itself (shared with {@code OrganizationClient}, closing a real SonarCloud-flagged duplication)
+ * rather than staying a private method on this class.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
@@ -45,8 +48,7 @@ public final class PlatformClient {
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
     this.clientSecretHash =
         Objects.requireNonNull(clientSecretHash, "clientSecretHash must not be null");
-    this.allowedScopes =
-        List.copyOf(Objects.requireNonNull(allowedScopes, "allowedScopes must not be null"));
+    this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     if (clientId.isBlank()) {

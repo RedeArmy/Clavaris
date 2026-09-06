@@ -59,4 +59,25 @@ class PlatformClientTest {
     assertThatIllegalArgumentException()
         .isThrownBy(() -> PlatformClient.register("bootstrap-client", " ", List.of()));
   }
+
+  @Test
+  void allowsAnEmptyScopeList() {
+    // Existing, intentional state — a revoked-down-to-nothing or not-yet-provisioned client
+    // authenticates but can do nothing, not itself a misconfiguration.
+    PlatformClient client =
+        PlatformClient.register("bootstrap-client", "argon2id$hashed", List.of());
+
+    assertThat(client.allowedScopes()).isEmpty();
+  }
+
+  @Test
+  void rejectsAnUnknownScope() {
+    // TD-ARCH-004: allowedScopes used to be free text nothing validated — a typo'd scope here
+    // must fail loudly, not silently grant nothing while looking configured.
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                PlatformClient.register(
+                    "bootstrap-client", "argon2id$hashed", List.of("platform:organzations:write")));
+  }
 }

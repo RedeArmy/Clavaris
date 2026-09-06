@@ -55,8 +55,7 @@ public final class OrganizationClient {
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
     this.clientSecretHash =
         Objects.requireNonNull(clientSecretHash, "clientSecretHash must not be null");
-    this.allowedScopes =
-        List.copyOf(Objects.requireNonNull(allowedScopes, "allowedScopes must not be null"));
+    this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     if (clientId.isBlank()) {

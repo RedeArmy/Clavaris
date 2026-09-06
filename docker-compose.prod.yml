@@ -78,6 +78,15 @@ services:
       DB_DEV_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # TD-PERF-007: safe to default-through-compose (unlike TOMCAT_MAX_THREADS/DB_HIKARI_* below,
+      # deliberately NOT wired the same way, see deployment-runbook.md §2a) — JAVA_OPTS is read by
+      # docker-entrypoint.sh's own POSIX "${JAVA_OPTS:-default}", which treats "unset" and "set to
+      # empty string" identically (confirmed live), so an unset .env value here resolves to the
+      # same real default the entrypoint script already documents, not a startup-breaking empty
+      # string. Spring's own YAML "${VAR:default}" placeholder does NOT share that safety (it only
+      # substitutes when the property is genuinely absent, not present-but-empty) — that's why this
+      # one variable is wired through here and the other three aren't.
+      JAVA_OPTS: ${JAVA_OPTS:-}
       TOKEN_SIGNING_KEY_STORE_PATH: /app/data/signing-keys.p12
       TOKEN_SIGNING_KEY_STORE_PASSWORD: ${TOKEN_SIGNING_KEY_STORE_PASSWORD:?TOKEN_SIGNING_KEY_STORE_PASSWORD must be set explicitly in .env}
       OAUTH2_TOKEN_HASH_SECRET: ${OAUTH2_TOKEN_HASH_SECRET:?OAUTH2_TOKEN_HASH_SECRET must be set explicitly in .env}
@@ -94,6 +103,15 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    # TD-PERF-007: previously unset — an unbounded container let a leak or a genuine worst-case
+    # burst (server.tomcat.threads.max Argon2id verifications all concurrent) consume the whole
+    # host's own memory instead of failing this one container loudly (OOM-killed, restart: unless-
+    # stopped brings it back) — same "fail one component visibly, not the whole host silently"
+    # reasoning app/docker-entrypoint.sh's own -Xmx=1536m comment documents. 2g leaves headroom
+    # above that heap ceiling for metaspace/thread stacks/native buffers, comfortably below what a
+    # typical small production VM (2-4GB) has free once Postgres/Redis/Caddy's own shares are
+    # accounted for.
+    mem_limit: 2g
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
       interval: 10s

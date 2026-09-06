@@ -81,8 +81,7 @@ public final class OAuthClient {
     this.clientSecretHash = requireNonBlank(clientSecretHash, "clientSecretHash");
     this.redirectUris = requireValidRedirectUris(redirectUris);
     this.allowedGrantTypes = List.copyOf(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
-    this.allowedScopes =
-        List.copyOf(Objects.requireNonNull(allowedScopes, "allowedScopes must not be null"));
+    this.allowedScopes = requireValidScopes(allowedScopes);
     this.requireConsent = requireConsent;
     // TD-FUT-018: genuinely optional, unlike redirectUris — a client with no post-logout redirect
     // configured simply gets SAS's own bare default (redirect to {clavarisBaseUrl}/), same
@@ -168,6 +167,31 @@ public final class OAuthClient {
       throw new IllegalArgumentException(fieldName + " must not be empty");
     }
     return values;
+  }
+
+  // TD-ARCH-004: rejects the one half of "allowedScopes is free text nothing validates" that's
+  // actually enforceable here — a scope from the reserved platform:* namespace (PlatformScopes)
+  // has no business on a tenant-facing OAuthClient at all, since it would be forwarded verbatim
+  // into SAS's own RegisteredClient.scope(...) (OrganizationRegisteredClientRepository) alongside
+  // this client's real ones. Deliberately does NOT restrict to OidcScopeCatalog.KNOWN the way
+  // PlatformClient/OrganizationClient restrict to PlatformScopes.BOOTSTRAP_DEFAULT: unlike those
+  // two (a small, fixed, Clavaris-owned admin-API vocabulary), an OAuthClient using the
+  // client_credentials grant legitimately needs arbitrary, consumer-defined API scopes Clavaris
+  // has no way to know in advance (confirmed live — SigningKeyRotationIntegrationTest/
+  // OrganizationOidcIssuerIntegrationTest both register a real OAuthClient with a custom
+  // "test.read" scope for exactly this reason) — OidcScopeCatalog.KNOWN documents which scopes
+  // this system's own login/consent/userinfo machinery actually understands, not an exhaustive
+  // allowlist of every scope an OAuthClient may ever hold. An empty list is valid (a client that
+  // only ever completes client_credentials-shaped flows genuinely needs none).
+  private static List<String> requireValidScopes(final List<String> allowedScopes) {
+    Objects.requireNonNull(allowedScopes, "allowedScopes must not be null");
+    for (final String scope : allowedScopes) {
+      if (scope.startsWith(PlatformScopes.NAMESPACE_PREFIX)) {
+        throw new IllegalArgumentException(
+            "allowedScopes must not contain a reserved platform:* scope: " + scope);
+      }
+    }
+    return List.copyOf(allowedScopes);
   }
 
   private static boolean isInsecureHttp(final URI uri) {

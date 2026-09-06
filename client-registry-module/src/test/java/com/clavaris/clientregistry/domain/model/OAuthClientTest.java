@@ -37,6 +37,42 @@ class OAuthClientTest {
   }
 
   @Test
+  void allowsACustomNonOidcScopeForClientCredentialsUsage() {
+    // TD-ARCH-004: confirmed live (SigningKeyRotationIntegrationTest/
+    // OrganizationOidcIssuerIntegrationTest) that a real OAuthClient legitimately needs
+    // consumer-defined API scopes outside OidcScopeCatalog.KNOWN for its own client_credentials
+    // grant — only a reserved platform:* scope is actually rejected, not "not a known OIDC scope".
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "service-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("client_credentials"),
+            List.of("test.read"),
+            true,
+            List.of());
+
+    assertThat(client.allowedScopes()).containsExactly("test.read");
+  }
+
+  @Test
+  void rejectsAReservedPlatformNamespacedScope() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OAuthClient.register(
+                    organizationId,
+                    "jobseeker-web",
+                    "argon2id$hashed",
+                    List.of("https://jobseeker.example.com/callback"),
+                    List.of("authorization_code"),
+                    List.of("platform:organizations:delete"),
+                    true,
+                    List.of()));
+  }
+
+  @Test
   void registerCarriesRequireConsentFalseWhenExplicitlyOptedOut() {
     // TD-SEC-026/ADR-0017: a trusted first-party client's opt-out is an explicit false, not an
     // absence — this is that explicit value actually reaching the domain model.

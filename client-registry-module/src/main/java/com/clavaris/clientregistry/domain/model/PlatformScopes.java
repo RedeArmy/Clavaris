@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.domain.model;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * ADR-0010: platform-tier scopes are namespaced {@code platform:*}, reserved and structurally
@@ -8,16 +9,25 @@ import java.util.List;
  * the two tiers. Scopes are added here as more platform-tier use cases are built, not pre-declared
  * ahead of them.
  *
- * <p>Class-wide suppressions, not per-field: {@code PMD.LongVariable} — these exact names are the
+ * <p>Class-wide suppression, not per-field: {@code PMD.LongVariable} — these exact names are the
  * public scope strings other tokens/config compare against (AdminApiSecurityConfig, .env-seeded
  * bootstrap scopes), where a shortened identifier would only make call sites harder to read; a
  * per-field suppression on every one of them tripped {@code PMD.AvoidDuplicateLiterals} on the
- * suppression string itself. {@code PMD.DataClass} — this class is deliberately nothing but a
- * namespaced constants holder plus the one derived list, not an organically grown class that should
- * gain behavior.
+ * suppression string itself. {@code PMD.DataClass} no longer flagged, now that {@link
+ * #requireValidScopes(List)} (TD-ARCH-004) gives this class real behavior beyond a constants holder
+ * — same "no longer just a data class" shift {@code PlatformClient}'s own identical suppression
+ * history documents.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.DataClass"})
+@SuppressWarnings("PMD.LongVariable")
 public final class PlatformScopes {
+
+  /**
+   * TD-ARCH-004: the reserved namespace itself, exposed as its own constant — {@link OAuthClient}'s
+   * own {@code requireValidScopes} checks a tenant-facing client's scopes against this prefix (not
+   * this class's own individual constants, which it must never be assignable one of) to keep the
+   * two vocabularies from colliding.
+   */
+  public static final String NAMESPACE_PREFIX = "platform:";
 
   public static final String ORGANIZATIONS_WRITE = "platform:organizations:write";
 
@@ -234,4 +244,25 @@ public final class PlatformScopes {
           CLIENT_DOMAIN_WRITE);
 
   private PlatformScopes() {}
+
+  /**
+   * TD-ARCH-004: the shared validator {@link PlatformClient}/{@code OrganizationClient} both call —
+   * extracted here (not left as one copy per caller) after SonarCloud flagged the two private
+   * methods as duplicated code, which they genuinely were: same body, same rationale (every entry
+   * must be a real, known {@code platform:*} scope — see either caller's own pre-existing Javadoc
+   * for why an empty list stays valid while an unknown value doesn't). Belongs on this class, not a
+   * third one: {@link #BOOTSTRAP_DEFAULT} is already the single source of truth for "every platform
+   * scope that exists," so the validation that reads it lives next to it.
+   *
+   * @throws IllegalArgumentException if any entry isn't a member of {@link #BOOTSTRAP_DEFAULT}
+   */
+  public static List<String> requireValidScopes(final List<String> allowedScopes) {
+    Objects.requireNonNull(allowedScopes, "allowedScopes must not be null");
+    for (final String scope : allowedScopes) {
+      if (!BOOTSTRAP_DEFAULT.contains(scope)) {
+        throw new IllegalArgumentException("allowedScopes contains an unknown scope: " + scope);
+      }
+    }
+    return List.copyOf(allowedScopes);
+  }
 }

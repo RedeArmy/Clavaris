@@ -10,6 +10,26 @@ spring:
     url: jdbc:postgresql://${DB_DEV_HOST:localhost}:${DB_DEV_PORT:5432}/${DB_DEV_NAME:clavaris}
     username: ${DB_DEV_USER:clavaris}
     password: ${DB_DEV_PASSWORD:clavaris}
+    hikari:
+      # TD-PERF-007: previously left at Spring Boot's own default (10) with no reasoning behind
+      # it either way — now an explicit number, sized off HikariCP's own "((core_count * 2) +
+      # effective_spindle_count)" pool-sizing guidance for the 3-vCPU reference machine TD-FUT-017's
+      # own real load test already measured this system against ((3*2)+1=7, rounded up for
+      # headroom) — not a guess, and deliberately still overridable per-deployment since the real
+      # production host's own core count isn't fixed yet (TD-FUT-013).
+      maximum-pool-size: ${DB_HIKARI_MAX_POOL_SIZE:10}
+      # Fails fast, loudly, instead of Spring Boot's own default 30s silent queue — a login/token
+      # request queuing behind an exhausted pool for 30s before erroring is a worse failure mode
+      # than a clear "the database connection pool is saturated" a few seconds later. 10000, not
+      # this row's own first attempt (5000): live-caught by this app's own full reactor test suite
+      # — two otherwise-unrelated integration tests failed under the full 332-test run (never in
+      # isolation) with a real `HikariPool ... timed out after 5001ms`, confirming 5s was
+      # aggressive enough to convert genuine-but-transient contention (many Testcontainers-backed
+      # Spring contexts competing for connections across one CI run, the same shape of load a real
+      # concurrent-request burst would produce) into hard failures rather than the brief queuing
+      # this timeout is meant to bound. 10s still fails an order of magnitude faster than Spring
+      # Boot's own default while giving transient contention enough room to actually clear.
+      connection-timeout: ${DB_HIKARI_CONNECTION_TIMEOUT_MS:10000}
   jpa:
     open-in-view: false # never leak a persistence session implicitly into the web layer
     hibernate:
@@ -22,6 +42,20 @@ spring:
     # Default locations (classpath:db/migration) already match every module's
     # scaffolded db/migration folder — nothing to override here.
     enabled: true
+  task:
+    scheduling:
+      # TD-PERF-003: Spring Boot's own default here is 1 (confirmed by decompiling the actual
+      # resolved spring-boot-autoconfigure jar's TaskSchedulingProperties$Pool constructor
+      # bytecode, not assumed) — every @Scheduled method anywhere in this app (ClavarisApplication's
+      # own @EnableScheduling is global) shares that single thread with no isolation between them.
+      # 11 real jobs exist today: 2 webhook-dispatch/delivery ticks every 5s
+      # (WebhookDispatchScheduler) plus 9 nightly retention/cleanup sweeps, staggered 03:30-04:15 to
+      # avoid starting at the identical instant but still serialized behind one thread if any one
+      # of them runs long. 5 gives the two frequent webhook ticks effective headroom to each get
+      # their own thread most of the time, plus 2-3 more for any nightly sweep overlap, without
+      # over-provisioning idle threads for a job set this small and mostly-quick.
+      pool:
+        size: ${TASK_SCHEDULING_POOL_SIZE:5}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -315,6 +349,23 @@ management:
 # of the codebase; this block is what backs the remaining Thymeleaf-rendered hosted-UI controllers,
 # which fall through to Spring Boot's own BasicErrorController, never this project's own code.
 server:
+  tomcat:
+    threads:
+      # TD-PERF-007: previously left at Spring Boot's own default (200), with no reasoning behind
+      # it against this system's own real, measured bottleneck — TD-FUT-017's own load test found
+      # /oauth2/token (Argon2id, ADR-0005, ~16-19MiB working memory per concurrent verification)
+      # collapses to a 14.2s p95 at concurrency 30 on the 3-vCPU reference machine that test used;
+      # 200 concurrent Argon2 attempts was never a real target to serve, only a worst-case memory
+      # bill (200 * ~19MiB ≈ 3.8GiB) nothing else in this config accounted for. 50 still comfortably
+      # serves every other fast, non-Argon2 endpoint (JWKS, health, static assets) without
+      # artificial queuing, while bounding worst-case Argon2 memory to a number the JVM heap below
+      # is deliberately sized to survive. Deliberately NOT lowered further to match the load test's
+      # own much-lower real safe concurrency (single digits) — that's a per-endpoint concurrency
+      # problem (TD-PERF-007's own resolution note in technical-debt-register.md §6 names a
+      # dedicated Argon2 admission-control gate as the finer-grained follow-up, out of scope for a
+      # config-only pass), not something one global thread-pool number can solve correctly for
+      # every endpoint at once.
+      max: ${TOMCAT_MAX_THREADS:50}
   error:
     include-message: never
     include-binding-errors: never
