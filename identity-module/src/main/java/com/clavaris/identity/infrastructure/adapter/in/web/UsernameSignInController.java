@@ -117,6 +117,9 @@ public class UsernameSignInController {
       return FORM_VIEW;
     }
 
+    // TD-ARCH-016: identical to LoginController's own equivalent block — see its own comment for
+    // the full CPD-OFF/CPD-ON rationale.
+    // CPD-OFF
     final Optional<String> challenge =
         DeviceTrustGate.intercept(
             knownDevices,
@@ -157,6 +160,7 @@ public class UsernameSignInController {
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
+    // CPD-ON
     return REDIRECT_PREFIX + redirectTarget;
   }
 }

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ' — Authorize access'">Authorize access</title>
+    <!-- ADR-0009 §3: same primaryColor-as-CSS-custom-property convention as login.html's own
+         identical block — see that template's own comment. -->
+    <style th:if="${branding.primaryColor.isPresent()}"
+           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time */</style>
+</head>
+<body>
+<main>
+    <h1 th:if="${branding.logoUrl.isEmpty()}"
+        th:text="${branding.applicationDisplayName.orElse('This application')} + ' wants to access your account'">
+        This application wants to access your account
+    </h1>
+    <img th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
+         th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
+
+    <!-- TD-SEC-011: openid is never listed here — see ConsentController's own Javadoc for why. -->
+    <p th:if="${not #lists.isEmpty(scopes)}">The following permissions are requested:</p>
+    <p th:if="${#lists.isEmpty(scopes)}">No additional permissions are requested.</p>
+
+    <!-- Posts directly to the real, tenant-scoped authorize endpoint SAS itself recognizes as a
+         consent decision — never back to this page. See ConsentController's own Javadoc for why
+         this URL is already correct without any {organizationId} templating on consentPage
+         itself. -->
+    <form th:action="${authorizeUri}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" name="client_id" th:value="${clientId}"/>
+        <input type="hidden" name="state" th:value="${state}"/>
+
+        <!-- The checkbox is nested inside its own <label>, not paired via a separate id/for —
+             requestedScope is arbitrary OAuth2 scope text, not guaranteed to be a valid HTML id
+             token (e.g. a scope containing a space or colon), and Thymeleaf's th:id/th:for
+             attributes aren't visible to a static HTML/accessibility linter reading the raw
+             template source anyway (only the rendered output). Nesting is a normal, equally valid
+             WCAG label-association pattern that needs neither. -->
+        <div th:each="requestedScope : ${scopes}">
+            <label>
+                <input type="checkbox" name="scope" th:value="${requestedScope}" checked/>
+                <span th:text="${requestedScope}">scope</span>
+            </label>
+        </div>
+
+        <button type="submit">Approve</button>
+    </form>
+
+    <!-- A second, independent, scope-free form — no scope="..." parameter at all is exactly what
+         OAuth2AuthorizationConsentAuthenticationProvider treats as a declined consent (decompiled
+         confirmation: an empty resulting authorities set removes the pending authorization and
+         redirects with error=access_denied). No client-side script needed to "uncheck everything
+         then submit," unlike SAS's own DefaultConsentPage Cancel button. -->
+    <form th:action="${authorizeUri}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" name="client_id" th:value="${clientId}"/>
+        <input type="hidden" name="state" th:value="${state}"/>
+        <button type="submit">Deny</button>
+    </form>
+</main>
+</body>
+</html>

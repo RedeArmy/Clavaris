@@ -197,6 +197,18 @@
             <artifactId>spring-session-data-redis</artifactId>
         </dependency>
 
+        <!-- TD-PERF-006: bounded/self-evicting in-process caches for CachingClientDomainConfigRepository/
+             CachingRateLimitPolicyRepository, replacing their own hand-rolled unbounded
+             ConcurrentHashMap-plus-manual-TTL shape — no version pinned, Spring Boot's own BOM
+             (imported in the root pom) already manages this at 3.2.4, so this stays whatever
+             version Spring Boot itself has already vetted, the same "ride the platform's own
+             tested pairing" posture every other unversioned dependency in this file already
+             follows. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

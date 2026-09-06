@@ -25,25 +25,24 @@ import org.springframework.security.web.header.HeaderWriter;
  * responses sharing the same chains, without needing to enumerate every hosted-UI path by hand and
  * keep that list in sync as pages are added.
  *
- * <p>Three policies, not one, because this project's own templates and Spring Authorization
- * Server's own default consent page have genuinely different real needs — confirmed by decompiling
- * SAS's {@code DefaultConsentPage} (spring-security-oauth2-authorization-server 7.1.0), not
- * assumed: every template this project owns other than the login page below (grep confirms zero
- * {@code <script>}, {@code <style>}, or external-host reference anywhere else under {@code
- * identity-module}'s/{@code organization-module}'s own {@code resources/templates}) gets the strict
- * policy; SAS's own unbranded consent page (TD-SEC-011, still open) loads Bootstrap from a CDN
- * (with Subresource Integrity already on that {@code <link>} tag) and uses one inline {@code
- * <script>} plus {@code onclick} handlers for its Cancel button — a real, external requirement of
- * code this project doesn't own the source of, scoped as narrowly as that specific page's own real
- * needs allow (one named CDN host, not wildcarded; {@code 'unsafe-inline'} only for scripts, the
- * one directive SAS's page can't function without). <b>Investigating this originally surfaced
+ * <p><b>TD-SEC-011 (2026-09-06): SAS's own unbranded {@code DefaultConsentPage} can no longer
+ * render at all.</b> {@code OrganizationAuthorizationServerConfig} now unconditionally configures a
+ * {@code consentPage(...)}, which switches {@code hasConsentUri()} permanently true for every
+ * request on this chain — SAS's own inline Bootstrap-CDN/{@code unsafe-inline} page (the reason a
+ * dedicated, weaker {@code CONSENT_PAGE_POLICY} used to exist here) is now structurally
+ * unreachable, not just deprecated. The project-owned replacement ({@code ConsentController},
+ * {@code identity/consent.html}) needs no script at all and only the same one conditional inline
+ * {@code <style>} block {@code identity/login.html} already uses for {@code primaryColor} — it gets
+ * the plain {@link #STRICT_POLICY}, the same as every other template this project owns other than
+ * the login page (grep confirms zero {@code <script>} anywhere under {@code
+ * identity-module}'s/{@code organization-module}'s own {@code resources/templates} besides {@code
+ * login.html}'s own two same-origin scripts). <b>Investigating this originally surfaced
  * TD-SEC-026</b> — {@code requireAuthorizationConsent} was never set to {@code true} anywhere, so
- * this page structurally never rendered for any client. That's now closed (ADR-0017, TD-SEC-026):
- * consent is a real, per-client {@code OAuthClient} attribute, defaulting to required, and this
- * branch is live-verified against an actually-rendered consent screen (see {@code
- * AuthorizationCodeFlowIntegrationTest}'s own consent-required test), not just unit-tested
- * path-matching. Stays correctly scoped for the day ADR-0009 replaces this page with a
- * project-owned, branded one (TD-SEC-011, still open).
+ * no consent page of any kind structurally ever rendered for any client. That's long closed
+ * (ADR-0017, TD-SEC-026): consent is a real, per-client {@code OAuthClient} attribute, defaulting
+ * to required, and this branch is live-verified against an actually-rendered consent screen (see
+ * {@code AuthorizationCodeFlowIntegrationTest}'s own consent-required test), not just unit-tested
+ * path-matching.
  *
  * <p><b>Code review finding (2026-09-01), the login page's own real script:</b> {@code
  * identity/login.html} ({@code LoginController}'s {@code /o/{organizationId}/login}) now loads one
@@ -58,8 +57,8 @@ import org.springframework.security.web.header.HeaderWriter;
  * SAS's own code this project doesn't control; this one is project-owned and has no reason to be
  * inline).
  *
- * <p>ADR-0009 §1/§4: on the login/consent pages only, {@code display=modal} + a {@code clientId}
- * query param resolved as embedding-eligible by {@link EmbeddingEligibilityChecker} relaxes {@code
+ * <p>ADR-0009 §1/§4: on the login page, {@code display=modal} + a {@code clientId} query param
+ * resolved as embedding-eligible by {@link EmbeddingEligibilityChecker} relaxes {@code
  * frame-ancestors} from {@code 'none'} to that one client's own registered origin, for that one
  * request only — every other request on every other path keeps {@code 'none'}, unconditionally.
  * Deliberately does <b>not</b> also disable Spring Security's own zero-config {@code
@@ -74,34 +73,52 @@ import org.springframework.security.web.header.HeaderWriter;
  * constructor shape — the other three call sites simply never reach a request whose path matches
  * {@link #LOGIN_PAGE_PATH}/{@link #CONSENT_PAGE_PATH}, so the checker there is never actually
  * invoked.
+ *
+ * <p><b>TD-SEC-011: the consent page's own relaxation reads {@code client_id}</b> (OAuth2's own
+ * snake_case parameter — confirmed by reading {@code
+ * OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent} directly), never this project's own
+ * camelCase {@code clientId} used on the login page — a real, previously-untested parameter-name
+ * mismatch this pass fixes, not something introduced by it. Still gated on {@code display=modal}
+ * like the login page, even though SAS's own internal redirect from {@code
+ * /o/{organizationId}/oauth2/authorize} to the configured {@code consentPage} only ever forwards
+ * {@code scope}/{@code client_id}/{@code state} — {@code display=modal} on the <em>original</em>
+ * authorize request is silently dropped across that redirect, so this gate is, in practice, never
+ * actually satisfied on the consent page today. Dropping the gate instead of documenting this was
+ * tried and reverted: {@code AuthorizationCodeFlowIntegrationTest} live-caught it relaxing {@code
+ * frame-ancestors} to {@code '*'} for every ordinary, non-modal consent render in a
+ * development-tier Organization, not just genuinely embedded ones. Tracked as its own follow-up in
+ * {@code technical-debt-register.md} (TD-SEC-011's own entry) rather than fixed here — it needs a
+ * real session-based carry-over of the modal signal across SAS's own redirect (the same {@code
+ * HttpSession}-attribute idiom {@code DeviceTrustGate}/{@code SessionTaskGate} already establish),
+ * a separate, moderate-sized addition, not a same-pass fix for a same-day filter-chain change.
  */
 final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   private static final String HEADER_NAME = "Content-Security-Policy";
   private static final String DISPLAY_PARAM = "display";
   private static final String DISPLAY_MODAL = "modal";
+
+  // This project's own login-page-only query param convention — never SAS's own client_id.
   private static final String CLIENT_ID_PARAM = "clientId";
+
+  // OAuth2's own spec parameter name (RFC 6749 §4.1.1) — what SAS's own consent redirect actually
+  // carries. See this class's own Javadoc for why the consent page can't reuse CLIENT_ID_PARAM.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String OAUTH2_CLIENT_ID_PARAM = "client_id";
 
   private static final String STRICT_POLICY =
       "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
           + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
-  // TD-SEC-011: see this class's own Javadoc for exactly why this is weaker, and why only here.
-  @SuppressWarnings("PMD.LongVariable")
-  private static final String CONSENT_PAGE_POLICY =
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-          + "style-src 'self' https://stackpath.bootstrapcdn.com; img-src 'self'; "
-          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-          + "form-action 'self'; frame-ancestors 'none'";
-
-  // Matches only SAS's own consent-rendering GET — /o/{organizationId}/oauth2/authorize — never
-  // the platform tier (client_credentials only, BR-PLATFORM-01, no interactive consent to render).
-  private static final Pattern CONSENT_PAGE_PATH = Pattern.compile("^/o/[^/]+/oauth2/authorize$");
+  // Matches only ConsentController's own flat, org-agnostic GET — see CONSENT_PATH_PATTERN's own
+  // comment in OrganizationAuthorizationServerConfig for why this is not "/o/*/oauth2/consent".
+  // Never the platform tier (client_credentials only, BR-PLATFORM-01, no interactive consent to
+  // render).
+  private static final Pattern CONSENT_PAGE_PATH = Pattern.compile("^/oauth2/consent$");
 
   // TD-SEC-009 addendum, see this class's own Javadoc: the one project-owned template that now
-  // loads a real, same-origin script. Unlike CONSENT_PAGE_POLICY above, this name is short enough
-  // that PMD's LongVariable rule never flags it — no suppression needed.
+  // loads a real, same-origin script.
   private static final String LOGIN_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
           + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
@@ -132,32 +149,44 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   }
 
   // Three-way, not a ternary any more — see this class's own Javadoc for why each path pattern
-  // gets its own real policy rather than one being folded into "everything else".
+  // gets its own real policy/relaxation rule rather than one being folded into "everything else".
   @SuppressWarnings("PMD.OnlyOneReturn")
   private String policyFor(final HttpServletRequest request) {
     final String requestUri = request.getRequestURI();
     if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
-      return withRelaxedFrameAncestorsIfEligible(CONSENT_PAGE_POLICY, request);
+      return withRelaxedFrameAncestorsIfDisplayModal(
+          STRICT_POLICY, request, OAUTH2_CLIENT_ID_PARAM);
     }
     if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
-      return withRelaxedFrameAncestorsIfEligible(LOGIN_PAGE_POLICY, request);
+      return withRelaxedFrameAncestorsIfDisplayModal(LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM);
     }
     return STRICT_POLICY;
   }
 
-  // ADR-0009 §1/§4: see this class's own Javadoc. Every policy this method is ever called with
-  // ends in the exact literal "frame-ancestors 'none'" — asserted by construction, not
-  // discovered by parsing, since both callers pass one of this class's own two constants.
+  // ADR-0009 §1/§4: see this class's own Javadoc. STRICT_POLICY/LOGIN_PAGE_POLICY both end in the
+  // exact literal "frame-ancestors 'none'" — asserted by construction, not discovered by parsing.
   // PMD.OnlyOneReturn: "not display=modal at all" / "resolved" are two independent, equally valid
   // exits — same rationale as every other early-return chain in this codebase.
+  //
+  // TD-SEC-011: still gated on display=modal for the consent page too, even though SAS's own
+  // internal redirect from /oauth2/authorize to this page never forwards that query param — see
+  // TD-SEC-011's own technical-debt-register.md entry, "consent page loses display=modal across
+  // SAS's own redirect" for why that is a real, separately-tracked follow-up rather than fixed by
+  // relaxing this gate. Keeping the gate here (rather than dropping it, which this class's own
+  // AuthorizationCodeFlowIntegrationTest live-caught relaxing frame-ancestors to '*' for every
+  // ordinary, non-modal consent render in a development-tier Organization) keeps today's default
+  // safe and correct; only the client_id parameter name below is genuinely fixed by this pass.
   @SuppressWarnings("PMD.OnlyOneReturn")
-  private String withRelaxedFrameAncestorsIfEligible(
-      final String basePolicy, final HttpServletRequest request) {
+  private String withRelaxedFrameAncestorsIfDisplayModal(
+      final String basePolicy, final HttpServletRequest request, final String clientIdParam) {
     if (!DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
       return basePolicy;
     }
-    final Optional<String> allowedOrigin =
-        embeddingChecker.resolveAllowedFrameAncestor(request.getParameter(CLIENT_ID_PARAM));
+    return relaxFrameAncestors(basePolicy, request.getParameter(clientIdParam));
+  }
+
+  private String relaxFrameAncestors(final String basePolicy, final String clientId) {
+    final Optional<String> allowedOrigin = embeddingChecker.resolveAllowedFrameAncestor(clientId);
     return allowedOrigin
         .map(origin -> basePolicy.replace("frame-ancestors 'none'", "frame-ancestors " + origin))
         .orElse(basePolicy);

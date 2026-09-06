@@ -11,6 +11,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +44,20 @@ import org.slf4j.LoggerFactory;
  * above already establishes that a still-leased, not-yet-recorded row simply becomes claimable
  * again once the lease expires — the same recovery path a mid-attempt process crash already relies
  * on, not a new code path), and the loop moves on to the next delivery in the batch.
+ *
+ * <p><b>TD-PERF-004, 2026-09-06 — bounded concurrent dispatch:</b> {@link #deliverDueDeliveries}
+ * used to make every claimed delivery's own HTTP call sequentially, one at a time — a handful of
+ * slow-but-not-yet-timed-out consumer endpoints (each up to {@link
+ * com.clavaris.webhook.infrastructure.adapter.out.http.JdkHttpWebhookSender}'s own 10s ceiling)
+ * could occupy the calling thread for minutes per tick, head-of-line-blocking every other
+ * Organization's deliveries batched alongside them, not just the slow endpoint's own. Each claimed
+ * delivery's own attempt now runs as an independent task on a bounded {@link ExecutorService}
+ * ({@code webhookDeliveryExecutor}, sized by {@code clavaris.webhook.delivery-concurrency}) — this
+ * method still blocks until every task in the batch finishes (same "one tick fully completes before
+ * {@code fixedDelay} schedules the next" semantics as before, {@link
+ * com.clavaris.webhook.infrastructure.config.WebhookDispatchScheduler} relies on nothing changing
+ * here), but a slow endpoint's own cost is now bounded by the pool size, not multiplied across the
+ * whole batch.
  */
 public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseCase {
 
@@ -50,6 +67,7 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   private final WebhookEndpointRepository endpoints;
   private final WebhookSigningSecretCipher cipher;
   private final WebhookHttpSender sender;
+  private final ExecutorService deliveryExecutor;
   private final int batchSize;
   private final int maxAttempts;
 
@@ -60,14 +78,37 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
       final WebhookEndpointRepository endpoints,
       final WebhookSigningSecretCipher cipher,
       final WebhookHttpSender sender,
+      final ExecutorService deliveryExecutor,
       final int batchSize,
       final int maxAttempts) {
     this.deliveries = deliveries;
     this.endpoints = endpoints;
     this.cipher = cipher;
     this.sender = sender;
+    this.deliveryExecutor = deliveryExecutor;
     this.batchSize = batchSize;
     this.maxAttempts = maxAttempts;
+  }
+
+  // TD-PERF-004: submits every claimed delivery's own attempt as an independent task, then blocks
+  // until all of them finish — same overall "this tick is done" contract as the sequential loop it
+  // replaces, just internally concurrent. Each task isolates its own failure via
+  // attemptOneDeliveryIsolated (below), the same per-item isolation the sequential loop's own
+  // try/catch used to provide directly — a Future.get() below is therefore not expected to ever
+  // throw ExecutionException in practice, only defensively handled.
+  @Override
+  public void deliverDueDeliveries() {
+    final List<Future<?>> tasks =
+        deliveries.claimDueBatch(batchSize).stream().map(this::submitDelivery).toList();
+    awaitAll(tasks);
+  }
+
+  // Explicit Future<?> return type, not inlined into deliverDueDeliveries' own stream pipeline —
+  // javac's own wildcard-capture inference otherwise narrows a lambda-returned
+  // ExecutorService#submit(Runnable) result to Future<capture-of-?>, incompatible with the
+  // List<Future<?>> this class's own field/method signatures use.
+  private Future<?> submitDelivery(final WebhookDelivery delivery) {
+    return deliveryExecutor.submit(() -> attemptOneDeliveryIsolated(delivery));
   }
 
   // PMD.AvoidCatchingGenericException: deliberate — see this class's own Javadoc ("SDE-III
@@ -76,24 +117,41 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   // PMD.GuardLogStatement: same false-positive rationale as attemptOneDelivery's own identical
   // suppression.
   @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.GuardLogStatement"})
-  @Override
-  public void deliverDueDeliveries() {
-    for (final WebhookDelivery delivery : deliveries.claimDueBatch(batchSize)) {
+  private void attemptOneDeliveryIsolated(final WebhookDelivery delivery) {
+    try {
+      attemptOneDelivery(delivery);
+    } catch (final RuntimeException e) {
+      // Left exactly where claimDueBatch's own lease already put it — see this class's own
+      // Javadoc for why that's the correct, already-established recovery path, not a gap this
+      // catch needs to paper over with its own ad hoc recordFailure call.
+      LOG.error(
+          "event=webhook_delivery_attempt_failed_unexpectedly deliveryId={} endpointId={}"
+              + " organizationId={} outboxEventId={} traceId={}",
+          delivery.id(),
+          delivery.endpointId(),
+          delivery.organizationId(),
+          delivery.outboxEventId(),
+          delivery.traceId(),
+          e);
+    }
+  }
+
+  // Restores the interrupt flag and stops waiting on the remaining futures rather than swallowing
+  // the interrupt — standard JDK convention; already-submitted tasks keep running to completion on
+  // the executor regardless (this method only stops *waiting* for them), the same "in-flight work
+  // isn't cancelled, just no longer awaited by this thread" trade-off a scheduled job being
+  // interrupted (e.g. application shutdown) should make.
+  private static void awaitAll(final List<Future<?>> tasks) {
+    for (final Future<?> task : tasks) {
       try {
-        attemptOneDelivery(delivery);
-      } catch (final RuntimeException e) {
-        // Left exactly where claimDueBatch's own lease already put it — see this class's own
-        // Javadoc for why that's the correct, already-established recovery path, not a gap this
-        // catch needs to paper over with its own ad hoc recordFailure call.
-        LOG.error(
-            "event=webhook_delivery_attempt_failed_unexpectedly deliveryId={} endpointId={}"
-                + " organizationId={} outboxEventId={} traceId={}",
-            delivery.id(),
-            delivery.endpointId(),
-            delivery.organizationId(),
-            delivery.outboxEventId(),
-            delivery.traceId(),
-            e);
+        task.get();
+      } catch (final InterruptedException _) {
+        Thread.currentThread().interrupt();
+        return;
+      } catch (final ExecutionException e) {
+        // Should be unreachable — attemptOneDeliveryIsolated already catches everything itself —
+        // logged defensively rather than silently swallowed if that invariant is ever violated.
+        LOG.error("event=webhook_delivery_task_failed_unexpectedly", e);
       }
     }
   }

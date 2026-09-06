@@ -26,8 +26,9 @@ class ContentSecurityPolicyHeaderWriterTest {
   private static final String ORG_LOGIN_PATH = "/o/11111111-1111-1111-1111-111111111111/login";
   private static final String ORG_LOGIN_SOCIAL_PATH =
       "/o/11111111-1111-1111-1111-111111111111/login/social/google";
-  private static final String ORG_CONSENT_PATH =
-      "/o/11111111-1111-1111-1111-111111111111/oauth2/authorize";
+  // TD-SEC-011: flat, org-agnostic — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
+  // this is no longer "/o/{organizationId}/oauth2/authorize".
+  private static final String ORG_CONSENT_PATH = "/oauth2/consent";
 
   private final ContentSecurityPolicyHeaderWriter writer =
       new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class));
@@ -83,8 +84,11 @@ class ContentSecurityPolicyHeaderWriterTest {
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 
+  // TD-SEC-011: SAS's own DefaultConsentPage can no longer render at all (consentPage(...) is now
+  // unconditionally configured) — the project-owned replacement needs no script/CDN, so this path
+  // gets the plain strict policy, same as any other ordinary hosted-UI path.
   @Test
-  void setsTheRelaxedPolicyOnlyForSasOwnConsentPagePath() {
+  void setsTheStrictPolicyForTheProjectOwnedConsentPagePath() {
     HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
 
@@ -93,9 +97,8 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                + "style-src 'self' https://stackpath.bootstrapcdn.com; img-src 'self'; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+                + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 
@@ -145,10 +148,12 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response, never()).setHeader(eq(HEADER_NAME), anyString());
   }
 
-  // Sanity: all three policies are genuinely different strings, or the "three policies" design
-  // claim this class's own Javadoc makes would be silently false.
+  // TD-SEC-011: the consent page now shares STRICT_POLICY's own text exactly (no script/CDN needed
+  // any more) — only the login page's own real script-src earns a distinct base policy. Renamed
+  // from "theThreePoliciesAreActuallyDifferent": that claim is no longer true by design, not a
+  // regression — see ContentSecurityPolicyHeaderWriter's own Javadoc.
   @Test
-  void theThreePoliciesAreActuallyDifferent() {
+  void theConsentPageSharesTheStrictPolicyButTheLoginPageDoesNot() {
     HttpServletRequest strictRequest = requestWithUri(ORG_REGISTER_PATH);
     HttpServletResponse strictResponse = responseWithContentType("text/html");
     HttpServletRequest loginRequest = requestWithUri(ORG_LOGIN_PATH);
@@ -167,16 +172,14 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(loginResponse).setHeader(eq(HEADER_NAME), loginCaptor.capture());
     verify(consentResponse).setHeader(eq(HEADER_NAME), consentCaptor.capture());
 
+    assertThat(strictCaptor.getValue()).isEqualTo(consentCaptor.getValue());
     assertThat(strictCaptor.getValue()).isNotEqualTo(loginCaptor.getValue());
-    assertThat(strictCaptor.getValue()).isNotEqualTo(consentCaptor.getValue());
-    assertThat(loginCaptor.getValue()).isNotEqualTo(consentCaptor.getValue());
 
     assertThat(strictCaptor.getValue()).doesNotContain("unsafe-inline");
-    // The login page gets a real script-src, but deliberately never 'unsafe-inline' — unlike the
-    // consent page, this one's script is project-owned and has no reason to be inline.
+    // The login page gets a real script-src, but deliberately never 'unsafe-inline'.
     assertThat(loginCaptor.getValue()).contains("script-src 'self'");
     assertThat(loginCaptor.getValue()).doesNotContain("unsafe-inline");
-    assertThat(consentCaptor.getValue()).contains("unsafe-inline");
+    assertThat(consentCaptor.getValue()).doesNotContain("unsafe-inline");
   }
 
   // ADR-0009 §1/§4: display=modal + an embedding-eligible clientId relaxes frame-ancestors on the
@@ -238,6 +241,101 @@ class ContentSecurityPolicyHeaderWriterTest {
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
     verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+  }
+
+  // TD-SEC-011: same display=modal gate as the login page, deliberately kept even though SAS's
+  // own internal redirect to this page never actually forwards that param in practice (see
+  // ContentSecurityPolicyHeaderWriter's own Javadoc — a separately tracked follow-up, not fixed
+  // here). Deliberately reads "client_id" (OAuth2's own parameter name), never this project's own
+  // "clientId" convention.
+  @Test
+  void relaxesFrameAncestorsOnTheConsentPageWhenDisplayModalAndClientIdAreEligible() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains("frame-ancestors https://jobseeker.example.com"));
+  }
+
+  @Test
+  void keepsFrameAncestorsNoneOnTheConsentPageWhenDisplayModalButTheCheckerFindsNoEligibleOrigin() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("unverified-client"))
+        .thenReturn(java.util.Optional.empty());
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("client_id")).thenReturn("unverified-client");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+  }
+
+  // TD-SEC-011: exactly the shape a real, non-embedded consent render has today (no display param
+  // at all, e.g. a development-tier Organization's ordinary sign-in) — live-caught via
+  // AuthorizationCodeFlowIntegrationTest before this gate was reinstated: dropping it relaxed
+  // frame-ancestors to the development wildcard for every such request, not just genuinely
+  // embedded ones.
+  @Test
+  void neverRelaxesFrameAncestorsOnTheConsentPageWithoutDisplayModalEvenForAnEligibleClient() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+  }
+
+  // The consent page's own camelCase "clientId" (this project's login-page-only convention) must
+  // never be read here — only OAuth2's own "client_id" — or the relaxation would silently key off
+  // the wrong parameter for every real consent request.
+  @Test
+  void neverReadsTheLoginPagesOwnCamelCaseClientIdParamOnTheConsentPage() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    // Stubbed only for the literal "jobseeker-web" — if the writer wrongly called this with
+    // null (the unstubbed request.getParameter("client_id") below), Mockito's own default
+    // Optional.empty() for an unstubbed argument is exactly what proves the bug this test guards
+    // against would otherwise go undetected.
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+    verify(checker).resolveAllowedFrameAncestor(null);
   }
 
   private static HttpServletRequest requestWithUri(final String uri) {

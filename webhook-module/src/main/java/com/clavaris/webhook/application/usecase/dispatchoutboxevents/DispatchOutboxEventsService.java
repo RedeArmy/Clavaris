@@ -4,7 +4,10 @@ import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDe
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,10 +60,20 @@ public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase 
       return;
     }
     LOG.info("event=webhook_dispatch_batch_claimed claimedCount={}", claimed.size());
+    // TD-PERF-005: one findActiveByOrganizationId query per DISTINCT Organization in this batch,
+    // not one findActiveByOrganizationIdAndEventType query per claimed event — a batch fanning out
+    // several events from the same handful of active Organizations (the common case) now reuses
+    // each Organization's own endpoint list instead of re-fetching it from Postgres per event,
+    // shortening how long this method's own @Transactional FOR UPDATE SKIP LOCKED claim stays held.
+    final Map<UUID, List<WebhookEndpoint>> endpointsByOrganization = new HashMap<>();
     for (final OutboxEvent event : claimed) {
+      final List<WebhookEndpoint> organizationEndpoints =
+          endpointsByOrganization.computeIfAbsent(
+              event.organizationId(), endpoints::findActiveByOrganizationId);
       final List<WebhookEndpoint> matchingEndpoints =
-          endpoints.findActiveByOrganizationIdAndEventType(
-              event.organizationId(), event.eventType());
+          organizationEndpoints.stream()
+              .filter(endpoint -> endpoint.subscribesTo(event.eventType()))
+              .toList();
       for (final WebhookEndpoint endpoint : matchingEndpoints) {
         deliveries.save(
             WebhookDelivery.schedule(

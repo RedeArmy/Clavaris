@@ -116,6 +116,39 @@ class JpaWebhookEndpointRepositoryTest {
   }
 
   @Test
+  void findActiveByOrganizationIdExcludesInactiveButNotByEventTypeSubscription() {
+    // TD-PERF-005: unlike findActiveByOrganizationIdAndEventType above, this one deliberately
+    // returns every active endpoint regardless of what it subscribes to —
+    // DispatchOutboxEventsService
+    // filters by event type itself, in memory, so it can reuse one call's own result across every
+    // event from the same Organization in a batch.
+    UUID organizationId = UUID.randomUUID();
+    WebhookEndpoint active =
+        WebhookEndpoint.register(
+            organizationId, "https://active.example.com", null, List.of("account.created"), "s");
+    WebhookEndpoint inactive =
+        WebhookEndpoint.register(
+                organizationId,
+                "https://inactive.example.com",
+                null,
+                List.of("account.created"),
+                "s")
+            .deactivate();
+    WebhookEndpoint activeSubscribedToSomethingElse =
+        WebhookEndpoint.register(
+            organizationId, "https://other.example.com", null, List.of("account.deleted"), "s");
+    repository.save(active);
+    repository.save(inactive);
+    repository.save(activeSubscribedToSomethingElse);
+
+    List<WebhookEndpoint> found = repository.findActiveByOrganizationId(organizationId);
+
+    assertThat(found)
+        .extracting(WebhookEndpoint::id)
+        .containsExactlyInAnyOrder(active.id(), activeSubscribedToSomethingElse.id());
+  }
+
+  @Test
   void findByIdReturnsEmptyForAnUnknownId() {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();
   }

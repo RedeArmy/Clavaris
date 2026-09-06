@@ -59,9 +59,15 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
     // a JSON-containment index as the real fix once volume justifies it; every Organization's own
     // endpoint count is small (a handful, not thousands), so this is "correct and simple first"
     // (same posture TD-SEC-031's own Javadoc already applies to a comparably-shaped lookup).
+    return findActiveByOrganizationId(organizationId).stream()
+        .filter(endpoint -> endpoint.subscribesTo(eventType))
+        .toList();
+  }
+
+  @Override
+  public List<WebhookEndpoint> findActiveByOrganizationId(final UUID organizationId) {
     return endpoints.findAllByOrganizationIdAndActiveTrue(organizationId).stream()
         .map(this::toDomain)
-        .filter(endpoint -> endpoint.subscribesTo(eventType))
         .toList();
   }
 

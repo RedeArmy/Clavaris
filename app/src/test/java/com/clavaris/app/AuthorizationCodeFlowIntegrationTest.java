@@ -315,12 +315,15 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   // TD-SEC-026/ADR-0017: the real, previously-dormant gap this closed — a client that doesn't opt
-  // out (the new default) must actually show SAS's own consent screen, and approving it must
-  // still complete a real, tokenizable authorization. Uses ["openid", "profile"] rather than
-  // ["openid"] alone: SAS's own DefaultConsentPage never renders a checkbox for "openid" itself
-  // (decompiled confirmation, DefaultConsentPage.generateConsentPage — treated as always-granted
-  // once anything else is approved), so a client requesting only "openid" would never present
-  // anything to actually consent to.
+  // out (the new default) must actually show a consent screen, and approving it must still
+  // complete a real, tokenizable authorization. Uses ["openid", "profile"] rather than ["openid"]
+  // alone: ConsentController never renders a checkbox for "openid" itself (TD-SEC-011, matching
+  // SAS's own former DefaultConsentPage — auto-granted once anything else is approved), so a
+  // client requesting only "openid" would never present anything to actually consent to.
+  //
+  // TD-SEC-011 (2026-09-06): the consent screen is now this project's own ConsentController at
+  // the flat /oauth2/consent path, reached via a real 302 from /o/{organizationId}/oauth2/authorize
+  // — a deliberate protocol-shape change from the previous inline 200 render, not a regression.
   @Test
   void completesARealPkceAuthorizationCodeFlowThroughARealConsentScreen() throws Exception {
     String platformToken = requestPlatformAccessToken();
@@ -339,18 +342,30 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
             organizationId, loginCsrfToken, "consent-user@example.com", "a-correct-password");
     String backToAuthorize = loginResponse.headers().firstValue("Location").orElseThrow();
 
-    // Re-requesting the saved /authorize URL now renders SAS's own consent page instead of
-    // redirecting straight to a code — the exact behavior TD-SEC-026 found missing.
-    HttpResponse<String> consentPage = getAbsoluteWithBody(backToAuthorize);
+    // Re-requesting the saved /authorize URL now 302s to this project's own consent page instead
+    // of rendering inline or redirecting straight to a code — the exact behavior TD-SEC-026 found
+    // missing, now reached through TD-SEC-011's own project-owned replacement.
+    HttpResponse<Void> authorizeRedirect = getAbsoluteDiscardingBody(backToAuthorize);
+    assertThat(authorizeRedirect.statusCode()).isEqualTo(302);
+    String consentUrl = authorizeRedirect.headers().firstValue("Location").orElseThrow();
+    assertThat(consentUrl).contains("/oauth2/consent");
+
+    HttpResponse<String> consentPage = getAbsoluteWithBody(consentUrl);
     assertThat(consentPage.statusCode()).isEqualTo(200);
     assertThat(consentPage.body())
-        .as("SAS's own DefaultConsentPage — see this class's own header comment")
-        .contains("Consent required")
-        .contains("name=\"scope\" value=\"profile\"");
-    // TD-SEC-009: the consent page's own relaxed CSP must actually be present on this exact
-    // response, not just configured — live proof, not a read of ContentSecurityPolicyHeaderWriter.
+        .as("ConsentController's own identity/consent.html — see this class's own header comment")
+        .contains("wants to access your account")
+        .contains("name=\"scope\"")
+        .contains("value=\"profile\"");
+    // TD-SEC-011: the project-owned consent page needs no script/CDN at all — the plain strict
+    // policy, not the weaker one SAS's own now-unreachable DefaultConsentPage used to need. Live
+    // proof, not a read of ContentSecurityPolicyHeaderWriter.
     assertThat(consentPage.headers().firstValue("Content-Security-Policy"))
-        .hasValueSatisfying(policy -> assertThat(policy).contains("stackpath.bootstrapcdn.com"));
+        .hasValueSatisfying(
+            policy ->
+                assertThat(policy)
+                    .contains("frame-ancestors 'none'")
+                    .doesNotContain("unsafe-inline"));
 
     HttpResponse<Void> approvedResponse =
         submitConsent(
@@ -406,9 +421,10 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   // TD-SEC-026/ADR-0017: the other real half of the invariant — a real user genuinely declining
-  // must NOT result in a code, matching DefaultConsentPage's own Cancel button (which resets the
-  // form, unchecking every scope, then submits — the same "no scope param at all" shape this test
-  // submits directly rather than driving the page's own JS).
+  // must NOT result in a code. TD-SEC-011: identity/consent.html's own second, scope-free form
+  // (see its own comment) produces this exact "no scope param at all" shape with no client-side
+  // script needed, unlike SAS's former DefaultConsentPage Cancel button — this test submits that
+  // same shape directly rather than driving the page's own form.
   @Test
   void decliningConsentRedirectsWithAccessDeniedAndIssuesNoCode() throws Exception {
     String platformToken = requestPlatformAccessToken();
@@ -424,7 +440,9 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         submitLogin(
             organizationId, loginCsrfToken, "decline-user@example.com", "a-correct-password");
     String backToAuthorize = loginResponse.headers().firstValue("Location").orElseThrow();
-    HttpResponse<String> consentPage = getAbsoluteWithBody(backToAuthorize);
+    HttpResponse<Void> authorizeRedirect = getAbsoluteDiscardingBody(backToAuthorize);
+    String consentUrl = authorizeRedirect.headers().firstValue("Location").orElseThrow();
+    HttpResponse<String> consentPage = getAbsoluteWithBody(consentUrl);
     String state = extractState(consentPage.body());
 
     // No "scope" parameter at all — an empty authorizedScopes set is exactly what SAS's own
