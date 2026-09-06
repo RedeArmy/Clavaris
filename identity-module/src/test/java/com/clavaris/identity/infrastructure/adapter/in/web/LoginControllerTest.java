@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordCommand;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
@@ -269,6 +270,27 @@ class LoginControllerTest {
         .andExpect(model().attribute("loginError", true))
         // Deliberately never a field-level error — see LoginController's own comment on why a
         // field-scoped error would itself leak which field was the actual problem.
+        .andExpect(model().attributeHasNoErrors("form"));
+
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verifyNoInteractions(recordLoginDevice);
+  }
+
+  @Test
+  void anUnverifiedEmailRerendersTheFormWithItsOwnDistinctError() throws Exception {
+    // ADR-0024 §2: a distinct, more specific message than the generic loginError above — see
+    // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from the
+    // anti-enumeration-generic rejection every other failure mode uses.
+    when(useCase.handle(any())).thenThrow(new EmailNotVerifiedException());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("email", "user@example.com")
+                .param("password", "correct-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/login"))
+        .andExpect(model().attribute("emailNotVerifiedError", true))
         .andExpect(model().attributeHasNoErrors("form"));
 
     verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());

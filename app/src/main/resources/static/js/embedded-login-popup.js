@@ -39,13 +39,13 @@
   "use strict";
 
   document.addEventListener("DOMContentLoaded", function () {
-    if (document.body.getAttribute("data-modal") !== "true") {
+    if (document.body.dataset.modal !== "true") {
       return;
     }
 
-    var socialLinks = document.querySelectorAll("a[data-social-login]");
-    for (var i = 0; i < socialLinks.length; i += 1) {
-      socialLinks[i].addEventListener("click", function (event) {
+    const socialLinks = document.querySelectorAll("a[data-social-login]");
+    for (const link of socialLinks) {
+      link.addEventListener("click", function (event) {
         event.preventDefault();
         // Deliberately no "noopener" in the features string below — the popup's own final
         // redirect_uri page needs window.opener to still be set so it can post the outcome back.

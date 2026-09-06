@@ -7,8 +7,7 @@
          script could read/write — the value itself is already validated (ClientBranding's own
          #RGB/#RRGGBB check) before it ever reaches this template. -->
     <style th:if="${branding.primaryColor.isPresent()}"
-           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">
-    </style>
+           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see this block's own comment above */</style>
 </head>
 <!-- ADR-0009 §1: data-modal marks this render as happening inside a consumer's own iframe
      (display=modal) — login-submit-guard.js's own sibling script below reads this to decide
