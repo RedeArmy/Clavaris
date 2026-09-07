@@ -3,7 +3,7 @@ package com.clavaris.app.infrastructure.config;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
-import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
@@ -26,8 +26,12 @@ import org.springframework.stereotype.Component;
  * DeleteOrganizationService}'s own {@code OrganizationTokenRevoker} step only reaches the
  * SAS-managed token/authorization rows, same gap {@code AccountSessionRevoker}'s own Javadoc
  * already documents for the single-account case. A bulk {@code deleteAllByOrganizationId} has no
- * per-row hook to revoke from, hence the read (({@link #accounts}{@code .findAllByOrganizationId})
- * immediately before it, purely to drive this loop.
+ * per-row hook to revoke from, hence the read (({@link #accounts}{@code
+ * .findAllAccountIdsByOrganizationId}) immediately before it, purely to drive this loop.
+ * TD-PERF-016: an id-only projection, not the full {@code Account} the original version of this
+ * read fetched — this loop only ever needed {@code account.id()}, so the full aggregate (and the
+ * separate password-credential query per row it forced) was pure waste on the single most
+ * destructive operation this system exposes.
  *
  * <p>TD-SEC-052 (SDE-III review, 2026-09-06): {@code signing_keys} rows and {@link SigningKeyStore}
  * entries are two independent stores of the same key material — deleting the DB rows alone (as this
@@ -66,8 +70,8 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
   public void eraseAllFor(final UUID organizationId) {
     final OrganizationId orgId = new OrganizationId(organizationId);
 
-    for (final Account account : accounts.findAllByOrganizationId(orgId)) {
-      accountSessionRevoker.revokeAllSessionsFor(account.id());
+    for (final AccountId accountId : accounts.findAllAccountIdsByOrganizationId(orgId)) {
+      accountSessionRevoker.revokeAllSessionsFor(accountId);
     }
 
     // TD-SEC-052: must be read before the deleteAllByOrganizationId call below — that's the only

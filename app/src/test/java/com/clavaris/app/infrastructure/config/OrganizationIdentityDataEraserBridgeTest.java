@@ -9,8 +9,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
-import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.Email;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import java.util.List;
@@ -33,17 +32,17 @@ class OrganizationIdentityDataEraserBridgeTest {
   void revokesEveryAccountsLiveSessionBeforeBulkDeletingAccountsAndSigningKeys() {
     UUID organizationId = UUID.randomUUID();
     OrganizationId orgId = new OrganizationId(organizationId);
-    Account first = Account.register(orgId, new Email("first@example.com"));
-    Account second = Account.register(orgId, new Email("second@example.com"));
-    when(accounts.findAllByOrganizationId(orgId)).thenReturn(List.of(first, second));
+    AccountId first = new AccountId(UUID.randomUUID());
+    AccountId second = new AccountId(UUID.randomUUID());
+    when(accounts.findAllAccountIdsByOrganizationId(orgId)).thenReturn(List.of(first, second));
 
     bridge.eraseAllFor(organizationId);
 
     // TD-SEC-031: each Account's own live HttpSession must be revoked before the bulk delete —
     // once the row is gone there is no per-account hook left to drive this loop from.
     InOrder order = inOrder(accountSessionRevoker, accounts);
-    order.verify(accountSessionRevoker).revokeAllSessionsFor(first.id());
-    order.verify(accountSessionRevoker).revokeAllSessionsFor(second.id());
+    order.verify(accountSessionRevoker).revokeAllSessionsFor(first);
+    order.verify(accountSessionRevoker).revokeAllSessionsFor(second);
     order.verify(accounts).deleteAllByOrganizationId(orgId);
     verify(signingKeys).deleteAllByOrganizationId(orgId);
   }
@@ -51,7 +50,7 @@ class OrganizationIdentityDataEraserBridgeTest {
   @Test
   void revokesNothingWhenTheOrganizationOwnsNoAccounts() {
     UUID organizationId = UUID.randomUUID();
-    when(accounts.findAllByOrganizationId(any())).thenReturn(List.of());
+    when(accounts.findAllAccountIdsByOrganizationId(any())).thenReturn(List.of());
 
     bridge.eraseAllFor(organizationId);
 
@@ -64,7 +63,7 @@ class OrganizationIdentityDataEraserBridgeTest {
     UUID organizationId = UUID.randomUUID();
     OrganizationId orgId = new OrganizationId(organizationId);
     List<String> kids = List.of("active-kid", "retired-kid-1", "retired-kid-2");
-    when(accounts.findAllByOrganizationId(orgId)).thenReturn(List.of());
+    when(accounts.findAllAccountIdsByOrganizationId(orgId)).thenReturn(List.of());
     when(signingKeys.findAllKidsByOrganizationId(orgId)).thenReturn(kids);
 
     bridge.eraseAllFor(organizationId);
@@ -81,7 +80,7 @@ class OrganizationIdentityDataEraserBridgeTest {
   void purgesWithAnEmptyKidListWhenTheOrganizationNeverHadAnySigningKey() {
     UUID organizationId = UUID.randomUUID();
     OrganizationId orgId = new OrganizationId(organizationId);
-    when(accounts.findAllByOrganizationId(orgId)).thenReturn(List.of());
+    when(accounts.findAllAccountIdsByOrganizationId(orgId)).thenReturn(List.of());
     when(signingKeys.findAllKidsByOrganizationId(orgId)).thenReturn(List.of());
 
     bridge.eraseAllFor(organizationId);
