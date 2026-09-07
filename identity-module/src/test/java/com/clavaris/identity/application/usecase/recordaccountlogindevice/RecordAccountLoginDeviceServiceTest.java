@@ -29,6 +29,9 @@ import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -36,6 +39,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 class RecordAccountLoginDeviceServiceTest {
 
   private static final Instant MIGRATION_CUTOVER_AT = Instant.parse("2026-08-31T10:00:00Z");
+
+  // TD-PERF-011: runs the submitted notification task immediately, on the calling (test) thread —
+  // every existing test below asserts on mailSender as if the send were still synchronous, which
+  // this executor choice keeps true for them; the executor-specific behavior itself (task really
+  // is decoupled, a rejection never propagates) gets its own dedicated tests further down.
+  private static final Executor DIRECT_EXECUTOR = Runnable::run;
 
   private KnownDeviceRepository knownDevices;
   private AccountRepository accounts;
@@ -54,7 +63,13 @@ class RecordAccountLoginDeviceServiceTest {
     outbox = mock(EventOutboxWriter.class);
     service =
         new RecordAccountLoginDeviceService(
-            knownDevices, accounts, mailSender, auditEvents, outbox, MIGRATION_CUTOVER_AT);
+            knownDevices,
+            accounts,
+            mailSender,
+            auditEvents,
+            outbox,
+            MIGRATION_CUTOVER_AT,
+            DIRECT_EXECUTOR);
 
     // Registered "now" (well after the cutover) — every existing test in this class exercises
     // ordinary, non-grandfathered behavior; the migration-suppression tests below build their own
@@ -370,5 +385,74 @@ class RecordAccountLoginDeviceServiceTest {
     verify(mailSender, never()).sendNewDeviceLoginNotification(any(), any(), any(), any(), any());
     verify(auditEvents).write(any(), eq("account.new_device_detected"), any(), any(), isNull());
     verifyNoInteractions(outbox);
+  }
+
+  // TD-PERF-011's own actual point: handle() must return without waiting for the notification
+  // send to actually run — a capturing executor (records the task, never runs it) is the only way
+  // to observe that from a synchronous unit test, since DIRECT_EXECUTOR above deliberately hides
+  // this distinction for every other test in this class.
+  @Test
+  void submitsTheNotificationToTheExecutorInsteadOfSendingItOnTheCallingThread() {
+    AtomicReference<Runnable> capturedTask = new AtomicReference<>();
+    RecordAccountLoginDeviceService serviceWithCapturingExecutor =
+        new RecordAccountLoginDeviceService(
+            knownDevices,
+            accounts,
+            mailSender,
+            auditEvents,
+            outbox,
+            MIGRATION_CUTOVER_AT,
+            capturedTask::set);
+
+    Optional<String> result =
+        serviceWithCapturingExecutor.handle(
+            new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(knownDevices).save(any(KnownDevice.class));
+    // The task was handed to the executor, not run inline — mailSender must not have been
+    // touched yet at the point handle() itself already returned.
+    verifyNoInteractions(mailSender);
+    assertThat(capturedTask.get()).isNotNull();
+
+    capturedTask.get().run();
+
+    verify(mailSender)
+        .sendNewDeviceLoginNotification(
+            eq(account.email().value()),
+            eq(account.organizationId()),
+            eq("Mozilla/5.0"),
+            eq("1.2.3.4"),
+            any());
+  }
+
+  // A rejection at the executor itself (realistically only reachable during process shutdown,
+  // once the pool has already been shut down) must follow this class's own "never lets a
+  // side-channel write fail an otherwise-successful login" guarantee just like every other
+  // failure mode above.
+  @Test
+  void aRejectedExecutionNeverPropagatesAndTheDeviceRowIsStillWritten() {
+    Executor rejectingExecutor =
+        runnable -> {
+          throw new RejectedExecutionException("executor already shut down");
+        };
+    RecordAccountLoginDeviceService serviceWithRejectingExecutor =
+        new RecordAccountLoginDeviceService(
+            knownDevices,
+            accounts,
+            mailSender,
+            auditEvents,
+            outbox,
+            MIGRATION_CUTOVER_AT,
+            rejectingExecutor);
+
+    Optional<String> result =
+        serviceWithRejectingExecutor.handle(
+            new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(knownDevices).save(any(KnownDevice.class));
+    verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
+    verifyNoInteractions(mailSender);
   }
 }

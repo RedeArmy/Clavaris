@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestOperations;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -44,6 +45,11 @@ import tools.jackson.databind.ObjectMapper;
  * {@link DefaultOAuth2UserService} unmodified — ADR-0020 Decision 5 names Microsoft as a future,
  * additive provider; a third non-OIDC registration sharing this same {@code userService()} slot one
  * day should fall through here untouched, not be silently mishandled by GitHub-specific logic.
+ *
+ * <p>TD-PERF-009 (closed): {@link #delegate}'s own default {@code RestOperations} (a bare {@code
+ * RestTemplate}) set no connect/read timeout — {@code SocialLoginConfig}'s own {@code
+ * socialLoginUserInfoRestOperations} bean now supplies one instead, injected here via constructor
+ * rather than left at {@code DefaultOAuth2UserService}'s own internal default.
  */
 // PMD.LongVariable: every flagged name here (VERIFIED_EMAIL_ATTRIBUTE, GITHUB_REGISTRATION_ID,
 // DEFAULT_GITHUB_EMAILS_ENDPOINT) names exactly what it is — see this class's own Javadoc.
@@ -125,17 +131,24 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   /* package */ GitHubVerifiedEmailUserService(
       final ObjectMapper objectMapper,
       @Value("${clavaris.oauth2.github.emails-uri:https://api.github.com/user/emails}")
-          final String emailsUri) {
-    this(HttpClient.newHttpClient(), objectMapper, URI.create(emailsUri));
+          final String emailsUri,
+      final RestOperations userInfoRestOperations) {
+    this(HttpClient.newHttpClient(), objectMapper, URI.create(emailsUri), userInfoRestOperations);
   }
 
   // Test-only, same rationale as ResendMailSender's own identical second constructor — lets a test
   // inject a fully-controlled HttpClient/endpoint without a real network call.
   /* package */ GitHubVerifiedEmailUserService(
-      final HttpClient httpClient, final ObjectMapper objectMapper, final URI emailsEndpoint) {
+      final HttpClient httpClient,
+      final ObjectMapper objectMapper,
+      final URI emailsEndpoint,
+      final RestOperations userInfoRestOperations) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.emailsEndpoint = emailsEndpoint;
+    // TD-PERF-009: see this class's own Javadoc — delegate's default RestOperations has no
+    // timeout at all otherwise.
+    this.delegate.setRestOperations(userInfoRestOperations);
   }
 
   @Override
