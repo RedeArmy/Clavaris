@@ -87,8 +87,8 @@ import org.springframework.stereotype.Component;
 // per-scope redesign needed (resolving a path, deriving a password), not accidental sprawl; the
 // class still does exactly one thing (persist/retrieve signing keys), same "more small methods,
 // not more responsibility" reasoning this codebase already applies elsewhere (e.g. OAuthClient's
-// own identical suppression). LongVariable: PASSWORD_DERIVATION_ALGORITHM/
-// PASSWORD_DERIVATION_CONTEXT_PREFIX name exactly what they hold, same precedent as every other
+// own identical suppression). LongVariable: DERIVATION_MAC_ALGORITHM/
+// DERIVATION_CONTEXT_PREFIX name exactly what they hold, same precedent as every other
 // long-but-precise constant name in this codebase.
 @SuppressWarnings({"PMD.TooManyMethods", "PMD.LongVariable"})
 @Component
@@ -98,12 +98,12 @@ class SigningKeyStore {
   // Used only as the SecretKeySpec's algorithm label — never passed to a Cipher, so any JCE
   // algorithm name would do; "RSA" documents intent at the point of storage/retrieval.
   private static final String KEY_ALGORITHM = "RSA";
-  private static final String PASSWORD_DERIVATION_ALGORITHM = "HmacSHA256";
+  private static final String DERIVATION_MAC_ALGORITHM = "HmacSHA256";
   // Versioned so a future change to the derivation itself (a different algorithm, a different
   // context string shape) can coexist with already-derived passwords during a transition, the same
   // "don't silently reinterpret an already-persisted secret" discipline this class's own file
   // format already follows.
-  private static final String PASSWORD_DERIVATION_CONTEXT_PREFIX = "clavaris:signing-key-store:v1:";
+  private static final String DERIVATION_CONTEXT_PREFIX = "clavaris:signing-key-store:v1:";
 
   private final Path baseDir;
   private final byte[] masterSecret;
@@ -264,11 +264,10 @@ class SigningKeyStore {
   // cache with its own invalidation story for a value this cheap to regenerate.
   private char[] derivePassword(final KeyStoreScope scope) {
     try {
-      final Mac mac = Mac.getInstance(PASSWORD_DERIVATION_ALGORITHM);
-      mac.init(new SecretKeySpec(masterSecret, PASSWORD_DERIVATION_ALGORITHM));
+      final Mac mac = Mac.getInstance(DERIVATION_MAC_ALGORITHM);
+      mac.init(new SecretKeySpec(masterSecret, DERIVATION_MAC_ALGORITHM));
       final byte[] derived =
-          mac.doFinal(
-              (PASSWORD_DERIVATION_CONTEXT_PREFIX + scope.id()).getBytes(StandardCharsets.UTF_8));
+          mac.doFinal((DERIVATION_CONTEXT_PREFIX + scope.id()).getBytes(StandardCharsets.UTF_8));
       return Base64.getUrlEncoder().withoutPadding().encodeToString(derived).toCharArray();
     } catch (final NoSuchAlgorithmException | InvalidKeyException e) {
       // HmacSHA256 is a JDK-mandatory algorithm and masterSecret is never empty (bound-checked at
