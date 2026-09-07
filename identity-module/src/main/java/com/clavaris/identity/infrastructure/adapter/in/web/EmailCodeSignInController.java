@@ -5,13 +5,12 @@ import com.clavaris.identity.application.usecase.authenticatewithemailcode.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.InvalidOneTimeCodeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -59,7 +58,6 @@ public class EmailCodeSignInController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
-  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public EmailCodeSignInController(
@@ -70,8 +68,7 @@ public class EmailCodeSignInController {
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final RedirectUrlResolver redirectUrlResolver,
-      final AccountRepository accounts) {
+      final RedirectUrlResolver redirectUrlResolver) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -80,7 +77,6 @@ public class EmailCodeSignInController {
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
-    this.accounts = accounts;
   }
 
   @GetMapping
@@ -150,9 +146,9 @@ public class EmailCodeSignInController {
       return CONFIRM_FORM_VIEW;
     }
 
-    final AccountId accountId;
+    final Account account;
     try {
-      accountId =
+      account =
           authenticateUseCase.handle(
               new AuthenticateWithEmailCodeCommand(
                   new OrganizationId(organizationId), new Email(form.getEmail()), form.getCode()));
@@ -168,7 +164,7 @@ public class EmailCodeSignInController {
             authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
             request,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
             clientId,
             redirectUrl);
@@ -178,10 +174,9 @@ public class EmailCodeSignInController {
 
     final Optional<String> sessionTask =
         SessionTaskGate.intercept(
-            accounts,
             request,
             organizationId,
-            accountId,
+            account,
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
             clientId,
             redirectUrl);
@@ -197,10 +192,11 @@ public class EmailCodeSignInController {
             request,
             response,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
             clientId,
-            redirectUrl);
+            redirectUrl,
+            account);
     return REDIRECT_PREFIX + redirectTarget;
   }
 }

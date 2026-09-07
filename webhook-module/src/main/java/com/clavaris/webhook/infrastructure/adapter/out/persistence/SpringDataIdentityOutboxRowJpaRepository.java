@@ -20,8 +20,10 @@ interface SpringDataIdentityOutboxRowJpaRepository
       nativeQuery = true)
   List<IdentityOutboxRowEntity> claimUnpublished(@Param("limit") int limit);
 
-  @SuppressWarnings("PMD.ShortVariable")
+  // TD-PERF-013: one round trip for the whole batch, not one UPDATE per claimed row — same
+  // WHERE id IN (...) bulk-update shape SpringDataWebhookDeliveryJpaRepository.leaseByIds already
+  // established for this same "batch the write, not just the read" gap.
   @Modifying
-  @Query("update IdentityOutboxRowEntity e set e.publishedAt = :publishedAt where e.id = :id")
-  void markPublished(@Param("id") UUID id, @Param("publishedAt") Instant publishedAt);
+  @Query("update IdentityOutboxRowEntity e set e.publishedAt = :publishedAt where e.id in :ids")
+  void markPublishedBatch(@Param("ids") List<UUID> ids, @Param("publishedAt") Instant publishedAt);
 }

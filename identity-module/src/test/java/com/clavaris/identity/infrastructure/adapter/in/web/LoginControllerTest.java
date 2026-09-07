@@ -22,7 +22,6 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Invali
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
@@ -31,7 +30,6 @@ import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBra
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
@@ -64,7 +62,6 @@ class LoginControllerTest {
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private RedirectUrlResolver redirectUrlResolver;
-  private AccountRepository accounts;
   private ClientBrandingProvider clientBrandingProvider;
   private MockMvc mockMvc;
 
@@ -78,7 +75,6 @@ class LoginControllerTest {
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
-    accounts = mock(AccountRepository.class);
     clientBrandingProvider = mock(ClientBrandingProvider.class);
     // Matches today's real default (no redirect policy configured) — every existing test below
     // predates this feature and expects the controller's own hardcoded literal fallback.
@@ -87,10 +83,6 @@ class LoginControllerTest {
     // ADR-0009 §3 and expects the template's own unbranded default look.
     when(clientBrandingProvider.brandingFor(any(), any()))
         .thenReturn(ClientBrandingSnapshot.unconfigured());
-    // Matches today's real default (no session task ever forced) — SessionTaskGate treats an
-    // absent account exactly like one with no outstanding requirement, same as a real empty
-    // Optional<Instant> would.
-    when(accounts.findById(any())).thenReturn(Optional.empty());
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
@@ -120,10 +112,21 @@ class LoginControllerTest {
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
                     redirectUrlResolver,
-                    accounts,
                     clientBrandingProvider))
             .setViewResolvers(viewResolver)
             .build();
+  }
+
+  // TD-PERF-015: the controller now gets the Account directly from useCase.handle() — this
+  // factory replaces the old "AccountId accountId = AccountId.newId()" pattern with a real,
+  // no-password-reset-required Account, matching what SessionTaskGate now reads directly (no
+  // separate AccountRepository mock needed to answer "nothing outstanding" — a fresh Account
+  // already has an empty passwordResetRequiredAt by construction).
+  private Account newAccount() {
+    Account account =
+        Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
+    account.attachPasswordCredential("argon2id$hashed");
+    return account;
   }
 
   @Test
@@ -151,9 +154,9 @@ class LoginControllerTest {
 
   @Test
   void validCredentialsEstablishASessionAndRedirectToWhatItReturns() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
-    when(sessionEstablisher.establish(any(), any(), eq(accountId.value()), anyString()))
+    Account account = newAccount();
+    when(useCase.handle(any())).thenReturn(account);
+    when(sessionEstablisher.establish(any(), any(), eq(account.id().value()), anyString()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -177,13 +180,9 @@ class LoginControllerTest {
   // Clerk "session tasks" parity.
   @Test
   void pausesForAForcedPasswordResetWhenTheAccountRequiresOne() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
-    Account accountRequiringReset =
-        Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
-    accountRequiringReset.attachPasswordCredential("argon2id$hashed");
+    Account accountRequiringReset = newAccount();
     accountRequiringReset.requirePasswordReset();
-    when(accounts.findById(accountId)).thenReturn(Optional.of(accountRequiringReset));
+    when(useCase.handle(any())).thenReturn(accountRequiringReset);
 
     mockMvc
         .perform(
@@ -204,13 +203,13 @@ class LoginControllerTest {
   @Test
   void aResolvedRedirectPolicyBecomesTheFallbackUrlPassedToTheSessionEstablisher()
       throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
+    Account account = newAccount();
+    when(useCase.handle(any())).thenReturn(account);
     when(redirectUrlResolver.resolve(
             new OrganizationId(ORGANIZATION_ID), "test_client", null, RedirectAction.SIGN_IN))
         .thenReturn(Optional.of("https://app.example.com/dashboard"));
     when(sessionEstablisher.establish(
-            any(), any(), eq(accountId.value()), eq("https://app.example.com/dashboard")))
+            any(), any(), eq(account.id().value()), eq("https://app.example.com/dashboard")))
         .thenReturn("https://app.example.com/dashboard");
 
     mockMvc
@@ -223,7 +222,7 @@ class LoginControllerTest {
         .andExpect(redirectedUrl("https://app.example.com/dashboard"));
 
     verify(sessionEstablisher)
-        .establish(any(), any(), eq(accountId.value()), eq("https://app.example.com/dashboard"));
+        .establish(any(), any(), eq(account.id().value()), eq("https://app.example.com/dashboard"));
   }
 
   @Test

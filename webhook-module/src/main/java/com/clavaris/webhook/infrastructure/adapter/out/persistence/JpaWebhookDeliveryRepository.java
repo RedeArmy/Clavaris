@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,10 +62,14 @@ class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
     return deliveries.findById(id).map(this::toDomain);
   }
 
+  // TD-PERF-012: PageRequest.of(0, limit) pushes the LIMIT itself into the generated SQL — see
+  // SpringDataWebhookDeliveryJpaRepository's own Javadoc for why this replaced an unbounded fetch
+  // truncated in Java.
   @Override
   public List<WebhookDelivery> findAllByEndpointId(final UUID endpointId, final int limit) {
-    return deliveries.findAllByEndpointIdOrderByCreatedAtDesc(endpointId).stream()
-        .limit(limit)
+    return deliveries
+        .findByEndpointIdOrderByCreatedAtDesc(endpointId, PageRequest.of(0, limit))
+        .stream()
         .map(this::toDomain)
         .toList();
   }

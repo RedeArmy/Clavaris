@@ -91,11 +91,11 @@ class JpaOutboxEventReaderTest {
   }
 
   @Test
-  void markPublishedStopsAnIdentityRowFromBeingClaimedAgain() {
+  void markPublishedBatchStopsAnIdentityRowFromBeingClaimedAgain() {
     UUID id = insertIdentityOutboxRow(UUID.randomUUID(), "account.created");
     OutboxEvent event = reader.claimUnpublishedBatch(10).get(0);
 
-    reader.markPublished(event);
+    reader.markPublishedBatch(List.of(event));
 
     Instant publishedAt =
         jdbcTemplate.queryForObject(
@@ -105,16 +105,42 @@ class JpaOutboxEventReaderTest {
   }
 
   @Test
-  void markPublishedStopsAnOrganizationRowFromBeingClaimedAgain() {
+  void markPublishedBatchStopsAnOrganizationRowFromBeingClaimedAgain() {
     UUID id = insertOrganizationOutboxRow(UUID.randomUUID(), "workspace_membership.removed");
     OutboxEvent event = reader.claimUnpublishedBatch(10).get(0);
 
-    reader.markPublished(event);
+    reader.markPublishedBatch(List.of(event));
 
     Instant publishedAt =
         jdbcTemplate.queryForObject(
             "select published_at from organization_event_outbox where id = ?", Instant.class, id);
     assertThat(publishedAt).isNotNull();
+    assertThat(reader.claimUnpublishedBatch(10)).isEmpty();
+  }
+
+  // TD-PERF-013: the actual fix this row asked for — a single markPublishedBatch call spanning
+  // BOTH physical source tables must mark every row in it, not just whichever source happened to
+  // be handled first (or only one of the two bulk UPDATEs actually firing).
+  @Test
+  void markPublishedBatchStopsRowsFromBothSourcesGivenInOneMixedCall() {
+    UUID identityId = insertIdentityOutboxRow(UUID.randomUUID(), "account.created");
+    UUID organizationId =
+        insertOrganizationOutboxRow(UUID.randomUUID(), "workspace_membership.removed");
+    List<OutboxEvent> claimed = reader.claimUnpublishedBatch(10);
+    assertThat(claimed).hasSize(2);
+
+    reader.markPublishedBatch(claimed);
+
+    Instant identityPublishedAt =
+        jdbcTemplate.queryForObject(
+            "select published_at from event_outbox where id = ?", Instant.class, identityId);
+    Instant organizationPublishedAt =
+        jdbcTemplate.queryForObject(
+            "select published_at from organization_event_outbox where id = ?",
+            Instant.class,
+            organizationId);
+    assertThat(identityPublishedAt).isNotNull();
+    assertThat(organizationPublishedAt).isNotNull();
     assertThat(reader.claimUnpublishedBatch(10)).isEmpty();
   }
 

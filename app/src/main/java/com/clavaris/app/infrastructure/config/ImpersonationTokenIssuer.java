@@ -3,7 +3,6 @@ package com.clavaris.app.infrastructure.config;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
@@ -119,7 +118,6 @@ class ImpersonationTokenIssuer {
   private static final String JWK_SET_ENDPOINT = "/oauth2/jwks";
 
   private final OAuthClientRepository oauthClients;
-  private final SigningKeyRepository signingKeys;
   private final OrganizationSigningKeyMaterialFactory keyMaterial;
   private final JdbcTemplate jdbcTemplate;
   private final BearerTokenHasher bearerTokenHasher;
@@ -135,13 +133,11 @@ class ImpersonationTokenIssuer {
   // token-issuance wiring.
   /* package */ ImpersonationTokenIssuer(
       final OAuthClientRepository oauthClients,
-      final SigningKeyRepository signingKeys,
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final JdbcTemplate jdbcTemplate,
       final BearerTokenHasher bearerTokenHasher,
       final TokenIssuanceEventLogger tokenIssuanceLogger) {
     this.oauthClients = oauthClients;
-    this.signingKeys = signingKeys;
     this.keyMaterial = keyMaterial;
     this.jdbcTemplate = jdbcTemplate;
     this.bearerTokenHasher = bearerTokenHasher;
@@ -236,7 +232,7 @@ class ImpersonationTokenIssuer {
       final Set<String> scopes,
       final AuditActor actor) {
     final JWKSource<SecurityContext> signingJwkSource =
-        new OrganizationScopedJwkSource(signingKeys, keyMaterial);
+        new OrganizationScopedJwkSource(keyMaterial);
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     jwtGenerator.setJwtCustomizer(

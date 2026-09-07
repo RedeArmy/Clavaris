@@ -54,10 +54,9 @@ class AuthenticateWithEmailLinkServiceTest {
     VerificationToken token = issuedToken(account.id(), rawToken);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
 
-    AccountId result =
-        service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken));
+    Account result = service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken));
 
-    assertThat(result).isEqualTo(account.id());
+    assertThat(result).isEqualTo(account);
     assertThat(token.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
     verify(tokens).save(token);

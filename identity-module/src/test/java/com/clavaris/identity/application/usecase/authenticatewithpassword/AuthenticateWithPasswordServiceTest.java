@@ -83,10 +83,10 @@ class AuthenticateWithPasswordServiceTest {
         .thenReturn(Optional.of(account));
     when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true);
 
-    AccountId result =
+    Account result =
         service.handle(new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD));
 
-    assertThat(result).isEqualTo(account.id());
+    assertThat(result).isEqualTo(account);
     assertThat(onlyLoggedMessage())
         .contains("event=login_success")
         .contains(organizationId.toString())
@@ -292,10 +292,10 @@ class AuthenticateWithPasswordServiceTest {
                 true,
                 false));
 
-    AccountId result =
+    Account result =
         service.handle(new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD));
 
-    assertThat(result).isEqualTo(account.id());
+    assertThat(result).isEqualTo(account);
   }
 
   private String onlyLoggedMessage() {

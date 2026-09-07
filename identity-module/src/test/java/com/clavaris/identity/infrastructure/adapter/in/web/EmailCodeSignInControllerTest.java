@@ -19,7 +19,6 @@ import com.clavaris.identity.application.usecase.authenticatewithemailcode.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.InvalidOneTimeCodeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
@@ -28,7 +27,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,7 +53,6 @@ class EmailCodeSignInControllerTest {
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private RedirectUrlResolver redirectUrlResolver;
-  private AccountRepository accounts;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -67,12 +65,10 @@ class EmailCodeSignInControllerTest {
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
-    accounts = mock(AccountRepository.class);
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
-    when(accounts.findById(any())).thenReturn(Optional.empty());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -98,10 +94,16 @@ class EmailCodeSignInControllerTest {
                     knownDevices,
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
-                    redirectUrlResolver,
-                    accounts))
+                    redirectUrlResolver))
             .setViewResolvers(viewResolver)
             .build();
+  }
+
+  // TD-PERF-015: same rationale as LoginControllerTest's own identical factory.
+  private Account newAccount() {
+    return Account.register(
+        new OrganizationId(ORGANIZATION_ID),
+        new com.clavaris.identity.domain.model.Email("someone@example.com"));
   }
 
   @Test
@@ -178,9 +180,9 @@ class EmailCodeSignInControllerTest {
 
   @Test
   void postConfirmWithAValidCodeEstablishesASessionAndRedirectsToWhatItReturns() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(authenticateUseCase.handle(any())).thenReturn(accountId);
-    when(sessions.establishViaOneTimeEmailProof(any(), any(), eq(accountId.value()), any()))
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
+    when(sessions.establishViaOneTimeEmailProof(any(), any(), eq(account.id().value()), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -204,13 +206,13 @@ class EmailCodeSignInControllerTest {
   // the establisher — same wiring LoginControllerTest's own identical test proves.
   @Test
   void aResolvedRedirectPolicyBecomesTheFallbackUrlOnConfirm() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(authenticateUseCase.handle(any())).thenReturn(accountId);
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
     when(redirectUrlResolver.resolve(
             new OrganizationId(ORGANIZATION_ID), "test_client", null, RedirectAction.SIGN_IN))
         .thenReturn(Optional.of("https://app.example.com/dashboard"));
     when(sessions.establishViaOneTimeEmailProof(
-            any(), any(), eq(accountId.value()), eq("https://app.example.com/dashboard")))
+            any(), any(), eq(account.id().value()), eq("https://app.example.com/dashboard")))
         .thenReturn("https://app.example.com/dashboard");
 
     mockMvc
@@ -241,8 +243,8 @@ class EmailCodeSignInControllerTest {
 
   @Test
   void postConfirmPausesForDeviceTrustWhenTheOrganizationRequiresIt() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(authenticateUseCase.handle(any())).thenReturn(accountId);
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(

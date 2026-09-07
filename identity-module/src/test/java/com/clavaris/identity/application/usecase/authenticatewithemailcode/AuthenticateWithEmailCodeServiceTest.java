@@ -56,10 +56,10 @@ class AuthenticateWithEmailCodeServiceTest {
     VerificationToken token = issuedToken(account.id(), rawCode);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
 
-    AccountId result =
+    Account result =
         service.handle(new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode));
 
-    assertThat(result).isEqualTo(account.id());
+    assertThat(result).isEqualTo(account);
     assertThat(token.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
     verify(tokens).save(token);

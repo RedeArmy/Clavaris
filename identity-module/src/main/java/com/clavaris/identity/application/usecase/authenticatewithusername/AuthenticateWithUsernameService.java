@@ -6,7 +6,6 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Passwo
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import java.util.Optional;
@@ -40,7 +39,7 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
 
   @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
   @Override
-  public AccountId handle(final AuthenticateWithUsernameCommand command) {
+  public Account handle(final AuthenticateWithUsernameCommand command) {
     final Optional<Account> found =
         accounts.findByOrganizationIdAndUsername(command.organizationId(), command.username());
     if (found.isEmpty()) {
@@ -82,6 +81,6 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
         "event=login_success organizationId={} accountId={}",
         command.organizationId(),
         account.id());
-    return account.id();
+    return account;
   }
 }

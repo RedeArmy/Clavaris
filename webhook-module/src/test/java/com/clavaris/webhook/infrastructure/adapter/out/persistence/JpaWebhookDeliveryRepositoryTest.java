@@ -7,6 +7,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -132,6 +133,50 @@ class JpaWebhookDeliveryRepositoryTest {
     List<WebhookDelivery> claimed = repository.claimDueBatch(3);
 
     assertThat(claimed).hasSize(3);
+  }
+
+  // TD-PERF-012: proves the LIMIT is real — pushed into the SQL itself, not applied afterward in
+  // Java on a fully-fetched result set. A pure unit test (mocked port) cannot distinguish the two;
+  // only a real database returning fewer rows than were actually saved proves it.
+  @Test
+  void findAllByEndpointIdReturnsAtMostTheRequestedLimitNewestFirst() {
+    UUID endpointId = newPersistedEndpointId();
+    // Truncated to microseconds: Postgres's timestamp column only keeps that much precision, so an
+    // untruncated Instant.now() (nanosecond-precision) would never round-trip back equal.
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    // Five rows, deliberately staggered createdAt values (oldest to newest) — reconstitute, not
+    // schedule(), since schedule() always stamps "now" and five back-to-back calls could collide
+    // at whatever precision this column actually persists at.
+    for (int i = 4; i >= 0; i--) {
+      repository.save(deliveryCreatedAt(endpointId, now.minusSeconds(i)));
+    }
+
+    List<WebhookDelivery> found = repository.findAllByEndpointId(endpointId, 3);
+
+    assertThat(found).hasSize(3);
+    assertThat(found)
+        .extracting(WebhookDelivery::createdAt)
+        .containsExactly(now, now.minusSeconds(1), now.minusSeconds(2));
+  }
+
+  private WebhookDelivery deliveryCreatedAt(final UUID endpointId, final Instant createdAt) {
+    return WebhookDelivery.reconstitute(
+        UUID.randomUUID(),
+        endpointId,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "Account",
+        UUID.randomUUID(),
+        "account.created",
+        "{}",
+        "trace-abc123",
+        com.clavaris.webhook.domain.model.WebhookDeliveryStatus.PENDING,
+        0,
+        createdAt,
+        null,
+        null,
+        null,
+        createdAt);
   }
 
   @Test
