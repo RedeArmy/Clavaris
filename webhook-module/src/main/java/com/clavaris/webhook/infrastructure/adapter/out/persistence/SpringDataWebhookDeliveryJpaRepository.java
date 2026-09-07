@@ -3,6 +3,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,7 +12,13 @@ import org.springframework.data.repository.query.Param;
 interface SpringDataWebhookDeliveryJpaRepository
     extends JpaRepository<WebhookDeliveryEntity, UUID> {
 
-  List<WebhookDeliveryEntity> findAllByEndpointIdOrderByCreatedAtDesc(UUID endpointId);
+  // TD-PERF-012: a Pageable-bearing derived query, not a plain findAllBy — Spring Data pushes
+  // Pageable#getPageSize()/getOffset() into the generated SQL's own LIMIT/OFFSET, so Postgres
+  // itself stops returning (and Hibernate stops hydrating, full payload column included) rows
+  // past the requested page — the caller's own .stream().limit(...) this replaces only ever
+  // truncated in Java, after every row this endpoint ever recorded had already made the trip.
+  List<WebhookDeliveryEntity> findByEndpointIdOrderByCreatedAtDesc(
+      UUID endpointId, Pageable pageable);
 
   // DeliverPendingWebhooksService's own claim step, part 1: lock and select the ids of every row
   // due right now — FOR UPDATE SKIP LOCKED, safe for more than one dispatcher instance polling

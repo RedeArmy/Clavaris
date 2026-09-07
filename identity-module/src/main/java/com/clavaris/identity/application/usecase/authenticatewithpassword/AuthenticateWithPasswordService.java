@@ -4,7 +4,6 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import java.util.Optional;
@@ -67,7 +66,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
   // deliberately collapsed to one exception type at the boundary, not organic complexity.
   @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
   @Override
-  public AccountId handle(final AuthenticateWithPasswordCommand command) {
+  public Account handle(final AuthenticateWithPasswordCommand command) {
     final Optional<Account> found =
         accounts.findByOrganizationIdAndEmail(command.organizationId(), command.email());
     if (found.isEmpty()) {
@@ -131,7 +130,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
         command.organizationId(),
         account.id());
     metrics.increment(LOGIN_METRIC, "tier", "organization", "outcome", "success");
-    return account.id();
+    return account;
   }
 
   private void recordFailure(final String reason) {

@@ -60,10 +60,10 @@ class AuthenticateWithUsernameServiceTest {
         .thenReturn(Optional.of(account));
     when(verifier.matches(RAW_PASSWORD, "argon2id$stored-hash")).thenReturn(true);
 
-    AccountId result =
+    Account result =
         service.handle(new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD));
 
-    assertThat(result).isEqualTo(account.id());
+    assertThat(result).isEqualTo(account);
   }
 
   @Test

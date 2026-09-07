@@ -1,8 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.Optional;
@@ -16,6 +14,14 @@ import java.util.UUID;
  * DeviceTrustGate#intercept} has already returned empty (a login can be paused for one, then the
  * other, but this one only ever runs once the device-trust gate has already let the login through,
  * same ordering every caller follows).
+ *
+ * <p>TD-PERF-015 (closed): {@link #intercept} used to take an {@code AccountId} and its own {@code
+ * AccountRepository}, re-fetching the exact {@link Account} row the caller's own {@code
+ * Authenticate*UseCase} had already loaded moments earlier — the caller's own comment already
+ * admitted as much ("the caller's own Authenticate*UseCase already proved this account exists
+ * moments ago"). Every real caller of this method is one of the four primary-factor controllers
+ * above, and every one of them now has that {@link Account} in hand (TD-PERF-015's own {@code
+ * Authenticate*UseCase} return-type change) — so this takes it directly instead.
  *
  * <p><b>Only one concrete task exists in this pass</b> — an operator-forced password reset ({@code
  * ForcePasswordResetForAccountUseCase}/{@code Account#requirePasswordReset}) — unlike Clerk's own
@@ -43,26 +49,21 @@ final class SessionTaskGate {
   // DeviceTrustGate's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ static Optional<String> intercept(
-      final AccountRepository accounts,
       final HttpServletRequest request,
       final UUID organizationId,
-      final AccountId accountId,
+      final Account account,
       final PendingAuthenticationFactor factor,
       // Clerk "customize redirect URLs" parity — both nullable, see DeviceTrustGate's own
       // identical parameters.
       final String clientId,
       final String redirectUrl) {
-    final Optional<Account> account = accounts.findById(accountId);
-    // Absent is treated as "nothing outstanding," not an error — the caller's own
-    // Authenticate*UseCase already proved this account exists moments ago; a genuinely missing
-    // account here would surface as a 500 further down this same request regardless.
-    if (account.isEmpty() || account.get().passwordResetRequiredAt().isEmpty()) {
+    if (account.passwordResetRequiredAt().isEmpty()) {
       return Optional.empty();
     }
 
     final HttpSession session = request.getSession(true);
     session.setAttribute(
-        SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE, accountId.value().toString());
+        SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE, account.id().value().toString());
     session.setAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE, factor.name());
     session.setAttribute(
         SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE, organizationId.toString());

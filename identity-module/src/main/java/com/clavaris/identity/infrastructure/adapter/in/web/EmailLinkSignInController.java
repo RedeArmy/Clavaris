@@ -6,12 +6,11 @@ import com.clavaris.identity.application.usecase.authenticatewithemaillink.Inval
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -59,7 +58,6 @@ public class EmailLinkSignInController {
   private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
-  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public EmailLinkSignInController(
@@ -69,8 +67,7 @@ public class EmailLinkSignInController {
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final AccountRepository accounts) {
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -78,7 +75,6 @@ public class EmailLinkSignInController {
     this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
-    this.accounts = accounts;
   }
 
   @GetMapping
@@ -134,9 +130,9 @@ public class EmailLinkSignInController {
       return "identity/verification-link-invalid";
     }
 
-    final AccountId accountId;
+    final Account account;
     try {
-      accountId =
+      account =
           authenticateUseCase.handle(
               new AuthenticateWithEmailLinkCommand(
                   new OrganizationId(organizationId), form.getToken()));
@@ -151,7 +147,7 @@ public class EmailLinkSignInController {
             authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
             request,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
             // Clerk "customize redirect URLs" parity: deliberately not wired for this controller
             // yet — the confirm step here is reached via an emailed link, potentially on a
@@ -167,10 +163,9 @@ public class EmailLinkSignInController {
 
     final Optional<String> sessionTask =
         SessionTaskGate.intercept(
-            accounts,
             request,
             organizationId,
-            accountId,
+            account,
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
             null,
             null);
@@ -180,15 +175,17 @@ public class EmailLinkSignInController {
 
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
     final String redirectTarget =
-        sessions.establishViaOneTimeEmailProof(request, response, accountId.value(), fallbackUrl);
+        sessions.establishViaOneTimeEmailProof(
+            request, response, account.id().value(), fallbackUrl);
 
     recordLoginDevice
         .handle(
             new RecordAccountLoginDeviceCommand(
-                accountId,
+                account.id(),
                 request.getHeader("User-Agent"),
                 request.getRemoteAddr(),
-                DeviceCookie.read(request, organizationId).orElse(null)))
+                DeviceCookie.read(request, organizationId).orElse(null),
+                account))
         .ifPresent(
             rawDeviceToken ->
                 DeviceCookie.write(request, response, organizationId, rawDeviceToken));

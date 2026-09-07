@@ -3,7 +3,6 @@ package com.clavaris.identity.application.usecase.authenticatewithemailcode;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
@@ -51,7 +50,7 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
   @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
   @Override
   @Transactional
-  public AccountId handle(final AuthenticateWithEmailCodeCommand command) {
+  public Account handle(final AuthenticateWithEmailCodeCommand command) {
     final Optional<Account> found =
         accounts.findByOrganizationIdAndEmail(command.organizationId(), command.email());
     if (found.isEmpty()) {
@@ -100,6 +99,6 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
         "event=email_code_sign_in_success organizationId={} accountId={}",
         command.organizationId(),
         account.id());
-    return account.id();
+    return account;
   }
 }

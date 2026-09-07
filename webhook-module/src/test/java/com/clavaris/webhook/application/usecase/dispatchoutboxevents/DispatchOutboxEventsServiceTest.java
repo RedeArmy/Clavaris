@@ -55,7 +55,7 @@ class DispatchOutboxEventsServiceTest {
     assertThat(captor.getValue().organizationId()).isEqualTo(organizationId);
     assertThat(captor.getValue().outboxEventId()).isEqualTo(event.id());
     assertThat(captor.getValue().traceId()).isEqualTo("trace-abc123");
-    verify(outboxEvents).markPublished(event);
+    verify(outboxEvents).markPublishedBatch(List.of(event));
   }
 
   @Test
@@ -77,7 +77,7 @@ class DispatchOutboxEventsServiceTest {
     service.dispatchPendingEvents();
 
     verify(deliveries, never()).save(any());
-    verify(outboxEvents).markPublished(event);
+    verify(outboxEvents).markPublishedBatch(List.of(event));
   }
 
   @Test
@@ -87,7 +87,7 @@ class DispatchOutboxEventsServiceTest {
     service.dispatchPendingEvents();
 
     verify(deliveries, never()).save(any());
-    verify(outboxEvents, never()).markPublished(any());
+    verify(outboxEvents, never()).markPublishedBatch(any());
   }
 
   // TD-PERF-005: the actual fix this row asked for — two events from the same Organization in one
@@ -132,7 +132,41 @@ class DispatchOutboxEventsServiceTest {
 
     verify(endpoints, times(1)).findActiveByOrganizationId(organizationId);
     verify(deliveries, times(2)).save(any());
-    verify(outboxEvents).markPublished(firstEvent);
-    verify(outboxEvents).markPublished(secondEvent);
+    verify(outboxEvents).markPublishedBatch(List.of(firstEvent, secondEvent));
+  }
+
+  // TD-PERF-013: the actual fix this row asked for — the whole claimed batch is marked published
+  // in one call, not one call per event, regardless of how many events were actually claimed.
+  @Test
+  void marksTheWholeClaimedBatchPublishedInOneCallRatherThanOnePerEvent() {
+    OutboxEvent first =
+        new OutboxEvent(
+            OutboxSource.IDENTITY,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null,
+            Instant.now());
+    OutboxEvent second =
+        new OutboxEvent(
+            OutboxSource.ORGANIZATION,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Workspace",
+            UUID.randomUUID(),
+            "workspace.created",
+            "{}",
+            null,
+            Instant.now());
+    when(outboxEvents.claimUnpublishedBatch(200)).thenReturn(List.of(first, second));
+    when(endpoints.findActiveByOrganizationId(any())).thenReturn(List.of());
+
+    service.dispatchPendingEvents();
+
+    verify(outboxEvents, times(1)).markPublishedBatch(any());
+    verify(outboxEvents).markPublishedBatch(List.of(first, second));
   }
 }

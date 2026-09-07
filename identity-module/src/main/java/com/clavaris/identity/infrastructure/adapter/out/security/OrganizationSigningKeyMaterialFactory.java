@@ -25,12 +25,12 @@ import org.springframework.stereotype.Component;
  * no longer invalidates every Organization's previously-issued tokens the moment their key is next
  * looked up.
  *
- * <p>TD-SEC-051 (closed): {@link #generateFor} used to write straight into {@link #keyPairs} — see
- * {@link SigningKeyMaterialGenerator}'s own Javadoc for the real, live-traced race that let two
- * concurrent rotations leave this cache holding a different key than the one the DB's own advisory
- * lock had just activated. {@link #generateFor} now only mints and persists key material; {@link
- * #cacheActive} is the only method that ever writes to {@link #keyPairs}, and every real caller
- * only invokes it after the DB-level activation it's racing against has already committed.
+ * <p>TD-SEC-051 (closed): {@link #generateFor} used to write straight into this cache — see {@link
+ * SigningKeyMaterialGenerator}'s own Javadoc for the real, live-traced race that let two concurrent
+ * rotations leave this cache holding a different key than the one the DB's own advisory lock had
+ * just activated. {@link #generateFor} now only mints and persists key material; {@link
+ * #cacheActive} is the only method that ever writes to this cache, and every real caller only
+ * invokes it after the DB-level activation it's racing against has already committed.
  *
  * <p><b>Known, deliberate limitations, not silent gaps:</b>
  *
@@ -58,11 +58,21 @@ import org.springframework.stereotype.Component;
  * {@code OrganizationIdentityDataEraserBridge} (app module) now calls it as the last step of
  * Organization hard-deletion, the same top-severity treatment TD-SEC-029's emergency purge already
  * gives a single compromised key, applied here to every key an entire deleted tenant ever had.
+ *
+ * <p>TD-PERF-014 (closed): the cache used to hold a bare {@link KeyPair}, forcing {@code
+ * OrganizationScopedJwkSource} to run its own separate {@code SigningKeyRepository.findActive}
+ * Postgres query on every single token issuance purely to learn the active {@code kid} — a real DB
+ * round trip this cache could already answer, since {@link #cacheActive}/{@link
+ * #reloadFromPersistentStore} both already know the {@code kid} at the exact moment they populate
+ * this map, and simply threw it away. The cache now holds {@link ActiveSigningKey} (kid + KeyPair
+ * together); {@link #activeSigningKeyFor} is the new method that serves both from one lookup,
+ * {@link #keyPairFor} stays for the one other caller ({@code
+ * OrganizationSigningKeyPublicKeyProviderBridge}) that only ever needed the {@link KeyPair}.
  */
 @Component
 public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterialGenerator {
 
-  private final Map<UUID, KeyPair> keyPairs = new ConcurrentHashMap<>();
+  private final Map<UUID, ActiveSigningKey> activeSigningKeys = new ConcurrentHashMap<>();
   private final SigningKeyRepository signingKeys;
   private final SigningKeyStore keyStore;
 
@@ -105,7 +115,7 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
                             + organizationId.value()
                             + " but has no matching key store entry — data integrity violated"
                             + " before reaching this call"));
-    keyPairs.put(organizationId.value(), keyPair);
+    activeSigningKeys.put(organizationId.value(), new ActiveSigningKey(kid, keyPair));
   }
 
   /**
@@ -121,7 +131,7 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
    * SigningKeyStore#delete} is a no-op for a {@code kid} it never had, or already removed.
    */
   public void purgeAllFor(final OrganizationId organizationId, final Collection<String> kids) {
-    keyPairs.remove(organizationId.value());
+    activeSigningKeys.remove(organizationId.value());
     for (final String kid : kids) {
       keyStore.delete(kid);
     }
@@ -139,9 +149,23 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
     return keyStore.find(kid);
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn") // early-return cache-hit path reads clearer than nesting
+  /**
+   * The one other caller of this cache ({@code OrganizationSigningKeyPublicKeyProviderBridge}) only
+   * ever needs the {@link KeyPair} itself, never the {@code kid} — this stays a thin projection of
+   * {@link #activeSigningKeyFor} rather than its own separate cache read.
+   */
   public Optional<KeyPair> keyPairFor(final OrganizationId organizationId) {
-    final KeyPair cached = keyPairs.get(organizationId.value());
+    return activeSigningKeyFor(organizationId).map(ActiveSigningKey::keyPair);
+  }
+
+  /**
+   * TD-PERF-014: the active {@code kid} and its {@link KeyPair} together, from one cache lookup —
+   * see this class's own Javadoc for why {@code OrganizationScopedJwkSource} needed this instead of
+   * its own separate {@code SigningKeyRepository.findActive} query on every token issuance.
+   */
+  @SuppressWarnings("PMD.OnlyOneReturn") // early-return cache-hit path reads clearer than nesting
+  public Optional<ActiveSigningKey> activeSigningKeyFor(final OrganizationId organizationId) {
+    final ActiveSigningKey cached = activeSigningKeys.get(organizationId.value());
     if (cached != null) {
       return Optional.of(cached);
     }
@@ -151,13 +175,18 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
   // TD-SEC-002: the durable-restart path — the metadata row and the keystore entry both outlive
   // this bean's own in-memory cache, so a cache miss reloads from them instead of assuming the key
   // was simply never generated.
-  private Optional<KeyPair> reloadFromPersistentStore(final OrganizationId organizationId) {
+  private Optional<ActiveSigningKey> reloadFromPersistentStore(
+      final OrganizationId organizationId) {
     return signingKeys
         .findActive(organizationId)
-        .flatMap(activeKey -> keyStore.find(activeKey.kid()))
+        .flatMap(
+            activeKey ->
+                keyStore
+                    .find(activeKey.kid())
+                    .map(pair -> new ActiveSigningKey(activeKey.kid(), pair)))
         .map(
             reloaded -> {
-              keyPairs.put(organizationId.value(), reloaded);
+              activeSigningKeys.put(organizationId.value(), reloaded);
               return reloaded;
             });
   }

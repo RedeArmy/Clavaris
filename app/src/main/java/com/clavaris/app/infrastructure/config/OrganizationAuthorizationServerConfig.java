@@ -169,7 +169,7 @@ class OrganizationAuthorizationServerConfig {
       final OrganizationSigningKeyMaterialFactory keyMaterial,
       final Duration jwksOverlapDuration) {
     final JWKSource<SecurityContext> signingJwkSource =
-        new OrganizationScopedJwkSource(signingKeys, keyMaterial);
+        new OrganizationScopedJwkSource(keyMaterial);
     final JWKSource<SecurityContext> jwksPublishingSource =
         new OrganizationJwksPublishingSource(signingKeys, keyMaterial, jwksOverlapDuration);
     final NimbusJwtDecoder userInfoJwtDecoder =

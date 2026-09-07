@@ -7,13 +7,12 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Invali
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
@@ -60,14 +59,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 // PMD.ExcessiveImports: this controller now collaborates with 8 ports (device trust, ADR-0024 §6,
 // ADR-0009 §3 added ClientBrandingProvider) — same "one import per collaborating type is inherent
 // to the design, not a code smell" rationale as OrganizationAuthorizationServerConfig's own
-// identical suppression. PMD.ExcessiveParameterList/CouplingBetweenObjects: same reasoning, tipped
-// over both thresholds by that same new collaborator.
-@SuppressWarnings({
-  "PMD.LongVariable",
-  "PMD.ExcessiveImports",
-  "PMD.ExcessiveParameterList",
-  "PMD.CouplingBetweenObjects"
-})
+// identical suppression. TD-PERF-015 dropped AccountRepository (SessionTaskGate now takes the
+// already-loaded Account directly), bringing parameter count/coupling back under PMD's own
+// threshold — ExcessiveParameterList/CouplingBetweenObjects removed accordingly.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/login")
 public class LoginController {
@@ -83,7 +78,6 @@ public class LoginController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
-  private final AccountRepository accounts;
   private final ClientBrandingProvider clientBrandingProvider;
 
   @SuppressWarnings("java:S107")
@@ -96,7 +90,6 @@ public class LoginController {
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
-      final AccountRepository accounts,
       final ClientBrandingProvider clientBrandingProvider) {
     this.useCase = useCase;
     this.sessions = sessions;
@@ -106,7 +99,6 @@ public class LoginController {
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
-    this.accounts = accounts;
     this.clientBrandingProvider = clientBrandingProvider;
   }
 
@@ -153,9 +145,9 @@ public class LoginController {
       return FORM_VIEW;
     }
 
-    final AccountId accountId;
+    final Account account;
     try {
-      accountId =
+      account =
           useCase.handle(
               new AuthenticateWithPasswordCommand(
                   new OrganizationId(organizationId),
@@ -193,7 +185,7 @@ public class LoginController {
             authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
             request,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
@@ -203,10 +195,9 @@ public class LoginController {
 
     final Optional<String> sessionTask =
         SessionTaskGate.intercept(
-            accounts,
             request,
             organizationId,
-            accountId,
+            account,
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
@@ -222,10 +213,11 @@ public class LoginController {
             request,
             response,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.PASSWORD,
             clientId,
-            redirectUrl);
+            redirectUrl,
+            account);
     // CPD-ON
     return REDIRECT_PREFIX + redirectTarget;
   }

@@ -25,6 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code WebhookDelivery} inserts and the final {@code markPublished} write, or a second concurrent
  * dispatcher tick could claim the same still-unpublished row before this one finishes fanning it
  * out.
+ *
+ * <p>TD-PERF-013: {@code markPublishedBatch} is called once, after the fan-out loop, not once per
+ * event inside it — one bulk {@code UPDATE ... WHERE id IN (...)} per physical source table instead
+ * of up to {@code claimed.size()} individual single-row updates, shortening how long the same
+ * lock-holding transaction stays open. No observable ordering change: every write here already
+ * shares one transaction, so a mid-loop failure rolls all of it back regardless of when within the
+ * method {@code markPublished} used to run.
  */
 @SuppressWarnings("PMD.LongVariable")
 public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase {
@@ -99,7 +106,8 @@ public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase 
           event.eventType(),
           matchingEndpoints.size(),
           event.traceId());
-      outboxEvents.markPublished(event);
     }
+    // TD-PERF-013: one bulk call for the whole claimed batch — see this class's own Javadoc.
+    outboxEvents.markPublishedBatch(claimed);
   }
 }

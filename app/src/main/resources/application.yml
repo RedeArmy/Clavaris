@@ -38,6 +38,20 @@ spring:
       # let dev/CI/prod schemas silently drift apart from each other; "validate"
       # fails loudly at startup instead.
       ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          # TD-PERF-013: lets Hibernate group same-entity-type INSERT/UPDATE statements from one
+          # flush into real multi-row JDBC batches instead of one round trip per row — safe across
+          # this entire codebase since every entity anywhere in it uses an application-assigned id
+          # (UUID, confirmed by grep: zero @GeneratedValue annotations exist), never the one id
+          # strategy batching can't work with (IDENTITY, which needs each row's own generated key
+          # back from the database before the next insert in the batch can even be built).
+          batch_size: 50
+        # Groups same-entity-type statements together within a flush so they actually land in the
+        # same batch instead of interleaving with a different entity type and silently breaking it
+        # (Hibernate only batches consecutive same-shape statements).
+        order_inserts: true
   flyway:
     # Default locations (classpath:db/migration) already match every module's
     # scaffolded db/migration folder — nothing to override here.

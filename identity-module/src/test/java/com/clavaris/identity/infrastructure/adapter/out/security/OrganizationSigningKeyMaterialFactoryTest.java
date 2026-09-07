@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
@@ -202,6 +204,69 @@ class OrganizationSigningKeyMaterialFactoryTest {
     assertThatCode(
             () -> factory.purgeAllFor(new OrganizationId(UUID.randomUUID()), java.util.List.of()))
         .doesNotThrowAnyException();
+  }
+
+  // TD-PERF-014: the actual fix this row asked for — activeSigningKeyFor serves both the kid and
+  // the KeyPair from one cache entry, matching what cacheActive was just called with.
+  @Test
+  void activeSigningKeyForReturnsTheCachedKidAlongsideTheKeyPair() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    String kid = factory.generateFor(organizationId);
+    factory.cacheActive(organizationId, kid);
+
+    Optional<ActiveSigningKey> active = factory.activeSigningKeyFor(organizationId);
+
+    assertThat(active).isPresent();
+    assertThat(active.orElseThrow().kid()).isEqualTo(kid);
+    assertThat(active.orElseThrow().keyPair().getPublic())
+        .isEqualTo(factory.keyPairFor(organizationId).orElseThrow().getPublic());
+  }
+
+  @Test
+  void isEmptyForActiveSigningKeyForAnOrganizationThatNeverHadAKeyGeneratedOrPersisted() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+
+    assertThat(factory.activeSigningKeyFor(new OrganizationId(UUID.randomUUID()))).isEmpty();
+  }
+
+  // TD-PERF-014's own actual point: a cache hit must never re-query the repository — that's the
+  // whole DB round trip this fix exists to remove from every token issuance.
+  @Test
+  void activeSigningKeyForNeverQueriesTheRepositoryOnACacheHit() {
+    SigningKeyRepository repository = emptyRepository();
+    OrganizationSigningKeyMaterialFactory factory =
+        new OrganizationSigningKeyMaterialFactory(repository, newKeyStore());
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    factory.cacheActive(organizationId, factory.generateFor(organizationId));
+
+    factory.activeSigningKeyFor(organizationId);
+
+    verify(repository, never()).findActive(organizationId);
+  }
+
+  @Test
+  void activeSigningKeyForReloadsTheKidAlongsideTheKeyPairAfterTheInMemoryCacheIsLost() {
+    // TD-SEC-002's own durable-restart path, TD-PERF-014's own extra requirement: the reload path
+    // must populate the kid in the cache too, not just the KeyPair, or the very next call would
+    // still be forced back to the repository.
+    SigningKeyStore keyStore = newKeyStore();
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    keyStore.generate("persisted-org-kid");
+
+    SigningKeyRepository repository = mock(SigningKeyRepository.class);
+    when(repository.findActive(organizationId))
+        .thenReturn(Optional.of(SigningKey.activate(organizationId, "persisted-org-kid", "RS256")));
+    OrganizationSigningKeyMaterialFactory afterRestart =
+        new OrganizationSigningKeyMaterialFactory(repository, keyStore);
+
+    Optional<ActiveSigningKey> firstLookup = afterRestart.activeSigningKeyFor(organizationId);
+    afterRestart.activeSigningKeyFor(organizationId);
+
+    assertThat(firstLookup).isPresent();
+    assertThat(firstLookup.orElseThrow().kid()).isEqualTo("persisted-org-kid");
+    // Exactly once — the second lookup above must have been served from the now-populated cache.
+    verify(repository, org.mockito.Mockito.times(1)).findActive(organizationId);
   }
 
   @Test

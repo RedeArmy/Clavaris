@@ -150,9 +150,15 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
 
     recordAudit(command.accountId(), device.id());
 
-    // Defensive only — a real Account is guaranteed to exist right after it just authenticated;
-    // a thrown or genuinely unresolved lookup both degrade to null, skipping outbox and mail.
-    final Account account = findAccountOrNull(command.accountId());
+    // TD-PERF-015: uses the caller's own already-loaded Account when it supplied one — see
+    // RecordAccountLoginDeviceCommand's own Javadoc — falling back to this class's original
+    // lookup, unchanged, for a caller with none in hand. Defensive either way: a real Account is
+    // guaranteed to exist right after it just authenticated; a thrown or genuinely unresolved
+    // lookup both degrade to null, skipping outbox and mail.
+    final Account account =
+        command.preloadedAccount() != null
+            ? command.preloadedAccount()
+            : findAccountOrNull(command.accountId());
     if (account != null) {
       // Migration grandfather (see class Javadoc): this Account predates the cookie mechanism
       // itself, so its very first row here is an artifact of the migration, not a real new

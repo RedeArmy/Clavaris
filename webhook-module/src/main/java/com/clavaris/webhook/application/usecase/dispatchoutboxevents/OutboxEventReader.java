@@ -13,5 +13,12 @@ public interface OutboxEventReader {
 
   List<OutboxEvent> claimUnpublishedBatch(int limitPerSource);
 
-  void markPublished(OutboxEvent event);
+  /**
+   * TD-PERF-013: one bulk {@code UPDATE ... WHERE id IN (...)} per physical source table
+   * represented in {@code events}, not one single-row {@code UPDATE} per event — {@code events} may
+   * span both {@link OutboxSource#IDENTITY} and {@link OutboxSource#ORGANIZATION} rows in the same
+   * call, since a single claimed batch routinely does; the implementation groups by source and
+   * issues at most two statements total regardless of batch size.
+   */
+  void markPublishedBatch(List<OutboxEvent> events);
 }

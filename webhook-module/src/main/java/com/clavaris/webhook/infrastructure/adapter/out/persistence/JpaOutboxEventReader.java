@@ -6,6 +6,7 @@ import com.clavaris.webhook.application.usecase.dispatchoutboxevents.OutboxSourc
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,14 +69,28 @@ class JpaOutboxEventReader implements OutboxEventReader {
     return claimed;
   }
 
+  // TD-PERF-013: groups by source and issues at most two bulk UPDATEs total, not one per event —
+  // see OutboxEventReader's own Javadoc for why a mixed-source batch is the normal case, not an
+  // edge case to special-case away.
   @Override
   @Transactional
-  public void markPublished(final OutboxEvent event) {
+  public void markPublishedBatch(final List<OutboxEvent> events) {
     final Instant now = Instant.now();
-    if (event.source() == OutboxSource.IDENTITY) {
-      identityOutbox.markPublished(event.id(), now);
-    } else {
-      organizationOutbox.markPublished(event.id(), now);
+    final List<UUID> identityIds =
+        events.stream()
+            .filter(event -> event.source() == OutboxSource.IDENTITY)
+            .map(OutboxEvent::id)
+            .toList();
+    final List<UUID> organizationIds =
+        events.stream()
+            .filter(event -> event.source() == OutboxSource.ORGANIZATION)
+            .map(OutboxEvent::id)
+            .toList();
+    if (!identityIds.isEmpty()) {
+      identityOutbox.markPublishedBatch(identityIds, now);
+    }
+    if (!organizationIds.isEmpty()) {
+      organizationOutbox.markPublishedBatch(organizationIds, now);
     }
   }
 }

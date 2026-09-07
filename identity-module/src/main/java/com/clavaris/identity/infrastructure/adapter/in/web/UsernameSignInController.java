@@ -6,11 +6,10 @@ import com.clavaris.identity.application.usecase.authenticatewithusername.Authen
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,7 +51,6 @@ public class UsernameSignInController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
-  private final AccountRepository accounts;
 
   @SuppressWarnings("java:S107")
   public UsernameSignInController(
@@ -62,8 +60,7 @@ public class UsernameSignInController {
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final RedirectUrlResolver redirectUrlResolver,
-      final AccountRepository accounts) {
+      final RedirectUrlResolver redirectUrlResolver) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
@@ -71,7 +68,6 @@ public class UsernameSignInController {
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
-    this.accounts = accounts;
   }
 
   @GetMapping
@@ -97,9 +93,9 @@ public class UsernameSignInController {
       return FORM_VIEW;
     }
 
-    final AccountId accountId;
+    final Account account;
     try {
-      accountId =
+      account =
           useCase.handle(
               new AuthenticateWithUsernameCommand(
                   new OrganizationId(organizationId),
@@ -127,7 +123,7 @@ public class UsernameSignInController {
             authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
             request,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
@@ -137,10 +133,9 @@ public class UsernameSignInController {
 
     final Optional<String> sessionTask =
         SessionTaskGate.intercept(
-            accounts,
             request,
             organizationId,
-            accountId,
+            account,
             PendingAuthenticationFactor.PASSWORD,
             clientId,
             redirectUrl);
@@ -156,10 +151,11 @@ public class UsernameSignInController {
             request,
             response,
             organizationId,
-            accountId,
+            account.id(),
             PendingAuthenticationFactor.PASSWORD,
             clientId,
-            redirectUrl);
+            redirectUrl,
+            account);
     // CPD-ON
     return REDIRECT_PREFIX + redirectTarget;
   }

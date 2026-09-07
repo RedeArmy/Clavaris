@@ -18,14 +18,13 @@ import com.clavaris.identity.application.usecase.authenticatewithemaillink.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemaillink.InvalidSignInLinkException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +48,6 @@ class EmailLinkSignInControllerTest {
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
-  private AccountRepository accounts;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -61,11 +59,9 @@ class EmailLinkSignInControllerTest {
     knownDevices = mock(KnownDeviceRepository.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
-    accounts = mock(AccountRepository.class);
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
-    when(accounts.findById(any())).thenReturn(Optional.empty());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -90,10 +86,16 @@ class EmailLinkSignInControllerTest {
                     recordLoginDevice,
                     knownDevices,
                     authenticationPolicyProvider,
-                    requestDeviceTrustChallenge,
-                    accounts))
+                    requestDeviceTrustChallenge))
             .setViewResolvers(viewResolver)
             .build();
+  }
+
+  // TD-PERF-015: same rationale as LoginControllerTest's own identical factory.
+  private Account newAccount() {
+    return Account.register(
+        new com.clavaris.identity.domain.model.OrganizationId(ORGANIZATION_ID),
+        new com.clavaris.identity.domain.model.Email("someone@example.com"));
   }
 
   @Test
@@ -156,10 +158,10 @@ class EmailLinkSignInControllerTest {
 
   @Test
   void postConfirmWithAValidTokenEstablishesASessionAndRedirectsToWhatItReturns() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(authenticateUseCase.handle(any())).thenReturn(accountId);
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
     when(sessions.establishViaOneTimeEmailProof(
-            any(), any(), org.mockito.ArgumentMatchers.eq(accountId.value()), any()))
+            any(), any(), org.mockito.ArgumentMatchers.eq(account.id().value()), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -206,8 +208,8 @@ class EmailLinkSignInControllerTest {
 
   @Test
   void postConfirmPausesForDeviceTrustWhenTheOrganizationRequiresIt() throws Exception {
-    AccountId accountId = AccountId.newId();
-    when(authenticateUseCase.handle(any())).thenReturn(accountId);
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(

@@ -3,7 +3,6 @@ package com.clavaris.identity.application.usecase.authenticatewithemaillink;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
@@ -36,7 +35,7 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
   @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
-  public AccountId handle(final AuthenticateWithEmailLinkCommand command) {
+  public Account handle(final AuthenticateWithEmailLinkCommand command) {
     final String presentedHash = RefreshTokenSecret.hash(command.presentedRawToken());
     final Optional<VerificationToken> found = tokens.findByTokenHash(presentedHash);
     if (found.isEmpty()
@@ -80,6 +79,6 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
         "event=email_link_sign_in_success organizationId={} accountId={}",
         command.organizationId(),
         account.id());
-    return account.id();
+    return account;
   }
 }

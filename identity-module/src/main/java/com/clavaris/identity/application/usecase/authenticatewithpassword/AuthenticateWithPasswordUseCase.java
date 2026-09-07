@@ -1,6 +1,6 @@
 package com.clavaris.identity.application.usecase.authenticatewithpassword;
 
-import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Account;
 
 /**
  * BR-ORG-02: the hosted login screen for a given {@code OAuthClient} authenticates only against
@@ -11,9 +11,13 @@ import com.clavaris.identity.domain.model.AccountId;
 public interface AuthenticateWithPasswordUseCase {
 
   /**
-   * @return the authenticated {@link AccountId} on success.
+   * TD-PERF-015: returns the full {@link Account}, not just its id — the caller ({@code
+   * LoginController}) already needs it for {@code SessionTaskGate}/{@code
+   * AuthenticatedSessionCompletion} moments later in the same request; returning the id alone
+   * forced both to redundantly re-fetch the exact row this method had already loaded.
+   *
    * @throws InvalidCredentialsException on any failure — see its own Javadoc for why every failure
    *     mode is indistinguishable from the caller's point of view.
    */
-  AccountId handle(AuthenticateWithPasswordCommand command);
+  Account handle(AuthenticateWithPasswordCommand command);
 }

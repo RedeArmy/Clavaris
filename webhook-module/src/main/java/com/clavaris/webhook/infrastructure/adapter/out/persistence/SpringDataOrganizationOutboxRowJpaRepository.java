@@ -18,8 +18,9 @@ interface SpringDataOrganizationOutboxRowJpaRepository
       nativeQuery = true)
   List<OrganizationOutboxRowEntity> claimUnpublished(@Param("limit") int limit);
 
-  @SuppressWarnings("PMD.ShortVariable")
+  // TD-PERF-013: same bulk-update shape as SpringDataIdentityOutboxRowJpaRepository's own
+  // identical fix — see that interface's own comment.
   @Modifying
-  @Query("update OrganizationOutboxRowEntity e set e.publishedAt = :publishedAt where e.id = :id")
-  void markPublished(@Param("id") UUID id, @Param("publishedAt") Instant publishedAt);
+  @Query("update OrganizationOutboxRowEntity e set e.publishedAt = :publishedAt where e.id in :ids")
+  void markPublishedBatch(@Param("ids") List<UUID> ids, @Param("publishedAt") Instant publishedAt);
 }
