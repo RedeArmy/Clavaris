@@ -199,10 +199,10 @@ class SocialLoginConfig {
         .oauth2Login(
             oauth2 ->
                 oauth2
-                    // GitHub (non-OIDC) needs its own verified-email-fetching customization;
-                    // Google (OIDC) only needs socialLoginOidcUserService's own timeout fix, not
-                    // GitHub-shaped logic — Spring's own OidcUserService already exposes
-                    // email/email_verified correctly from the ID token.
+                    // GitHub, the non-OIDC provider, needs its own verified-email-fetching
+                    // customization. Google, the OIDC one, only needs socialLoginOidcUserService's
+                    // own timeout fix, not GitHub-shaped logic — Spring's own OidcUserService
+                    // already exposes email/email_verified correctly from the ID token.
                     .userInfoEndpoint(
                         userInfo ->
                             userInfo
