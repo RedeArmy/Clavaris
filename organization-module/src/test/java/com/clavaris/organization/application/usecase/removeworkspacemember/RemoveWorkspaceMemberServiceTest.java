@@ -29,6 +29,7 @@ class RemoveWorkspaceMemberServiceTest {
   private WorkspaceRepository workspaces;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
+  private WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
   private RemoveWorkspaceMemberService service;
 
   @BeforeEach
@@ -38,7 +39,10 @@ class RemoveWorkspaceMemberServiceTest {
     when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(UUID.randomUUID()));
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new RemoveWorkspaceMemberService(memberships, workspaces, auditEvents, outbox);
+    refreshTokenRevoker = mock(WorkspaceMemberRefreshTokenRevoker.class);
+    service =
+        new RemoveWorkspaceMemberService(
+            memberships, workspaces, auditEvents, outbox, refreshTokenRevoker);
   }
 
   private WorkspaceMembership existingMembership(
@@ -90,6 +94,20 @@ class RemoveWorkspaceMemberServiceTest {
     verify(memberships, never()).deleteById(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+    verifyNoInteractions(refreshTokenRevoker);
+  }
+
+  // TD-WS-002 mitigation: the actual fix this pass adds — see WorkspaceMemberRefreshTokenRevoker's
+  // own Javadoc for why this is deliberately narrower than a full session/access-token revocation.
+  @Test
+  void revokesEveryRefreshTokenForTheRemovedMembersAccountOnSuccess() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+
+    service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
+
+    verify(refreshTokenRevoker).revokeAllRefreshTokensFor(accountId);
   }
 
   @Test
@@ -132,6 +150,7 @@ class RemoveWorkspaceMemberServiceTest {
     verify(memberships, never()).deleteById(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+    verifyNoInteractions(refreshTokenRevoker);
   }
 
   @Test
@@ -149,5 +168,6 @@ class RemoveWorkspaceMemberServiceTest {
     verify(memberships, never()).deleteById(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+    verifyNoInteractions(refreshTokenRevoker);
   }
 }

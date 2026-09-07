@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -150,6 +151,43 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
                 workspaceId,
                 secondAccountId))
         .isEqualTo(1);
+  }
+
+  // TD-WS-002 mitigation (2026-09-06): the real fix this pass adds, end to end against a real
+  // Postgres row — not just the mocked-repository proof in RemoveWorkspaceMemberServiceTest. A
+  // refresh_tokens row is inserted directly (no need to drive a full interactive login just to
+  // mint one) since RemoveWorkspaceMemberService's own new revocation call only needs a real
+  // accountId to act on, exactly like BR-ID-03's own reuse-detection cascade this reuses.
+  @Test
+  void removingAMemberRevokesTheirActiveRefreshTokens() throws Exception {
+    String platformToken = requestPlatformAccessToken(FULL_SCOPE);
+    UUID organizationId = createOrganization(platformToken, "Refresh Token Revocation Co");
+    UUID workspaceId = createWorkspace(platformToken, organizationId, "Support");
+    JsonNode member = addMember(platformToken, workspaceId, "removed-member@example.com", null);
+    UUID accountId = UUID.fromString(member.get("accountId").asString());
+
+    UUID sessionId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "insert into sessions (id, account_id, scopes) values (?, ?, ?)",
+        sessionId,
+        accountId,
+        "openid");
+    UUID refreshTokenId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "insert into refresh_tokens (id, session_id, account_id, token_hash, expires_at) values"
+            + " (?, ?, ?, ?, now() + interval '30 days')",
+        refreshTokenId,
+        sessionId,
+        accountId,
+        "a".repeat(64));
+
+    HttpResponse<String> removeResponse = removeMember(platformToken, workspaceId, accountId);
+    assertThat(removeResponse.statusCode()).isEqualTo(204);
+
+    Timestamp revokedAt =
+        jdbcTemplate.queryForObject(
+            "select revoked_at from refresh_tokens where id = ?", Timestamp.class, refreshTokenId);
+    assertThat(revokedAt).as("the removed member's refresh token must be revoked").isNotNull();
   }
 
   @Test
