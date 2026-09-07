@@ -1,6 +1,6 @@
 # ADR-0018: Production deployment tooling — reverse proxy, secrets posture, and IaC timing
 
-**Status:** ✅ Aprobado (2026-08-28)
+**Status:** ✅ Approved (2026-08-28)
 
 ## Context
 

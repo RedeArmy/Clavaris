@@ -143,8 +143,23 @@ services:
         condition: service_healthy
 
 volumes:
+  # TD-FUT-006: explicit `name:` on every volume — found live, while building
+  # scripts/host/backup-postgres.sh/restore-postgres.sh, that Compose otherwise prefixes each
+  # volume with its own project name (derived from the deploy directory's own basename by default,
+  # e.g. "clavaris_clavaris-signing-keys-data"), which those scripts' hardcoded volume name would
+  # silently miss — confirmed via a real `docker compose up` and `docker volume ls`, not assumed.
+  # Pinning the literal name here removes that project-name dependency entirely, for these scripts
+  # and for any future host/CI environment that might compute a different default project name.
+  # Safe to do now, before any real production instance holds real data (no consumer has real
+  # traffic here yet) — the same "zero real traffic" justification TD-SEC-054 already used for its
+  # own no-migration-path decision.
   clavaris-postgres-data:
+    name: clavaris-postgres-data
   clavaris-redis-data:
+    name: clavaris-redis-data
   clavaris-signing-keys-data:
+    name: clavaris-signing-keys-data
   clavaris-caddy-data:
+    name: clavaris-caddy-data
   clavaris-caddy-config:
+    name: clavaris-caddy-config

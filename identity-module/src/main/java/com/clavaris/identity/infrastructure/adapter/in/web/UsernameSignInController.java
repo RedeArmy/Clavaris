@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameCommand;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
@@ -15,7 +16,6 @@ import com.clavaris.identity.domain.model.Username;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -42,15 +42,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class UsernameSignInController {
 
   private static final String FORM_VIEW = "identity/login-username";
-  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final AuthenticateWithUsernameUseCase useCase;
-  private final AuthenticatedSessionEstablisher sessions;
-  private final RecordAccountLoginDeviceUseCase recordLoginDevice;
-  private final KnownDeviceRepository knownDevices;
-  private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
-  private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
-  private final RedirectUrlResolver redirectUrlResolver;
+
+  // TD-ARCH-016: sessions/recordLoginDevice/knownDevices/authenticationPolicyProvider/
+  // requestDeviceTrustChallenge/redirectUrlResolver are never read as bare fields anywhere in this
+  // class — they exist solely to build this one record, once, here, not per-request. Kept as
+  // constructor parameters (not folded away) so Spring still autowires each of them individually,
+  // the same as before this extraction.
+  private final PrimaryFactorLoginPorts loginPorts;
 
   @SuppressWarnings("java:S107")
   public UsernameSignInController(
@@ -62,12 +62,14 @@ public class UsernameSignInController {
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver) {
     this.useCase = useCase;
-    this.sessions = sessions;
-    this.recordLoginDevice = recordLoginDevice;
-    this.knownDevices = knownDevices;
-    this.authenticationPolicyProvider = authenticationPolicyProvider;
-    this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
-    this.redirectUrlResolver = redirectUrlResolver;
+    this.loginPorts =
+        new PrimaryFactorLoginPorts(
+            knownDevices,
+            requestDeviceTrustChallenge,
+            authenticationPolicyProvider,
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver);
   }
 
   @GetMapping
@@ -111,52 +113,25 @@ public class UsernameSignInController {
     } catch (final EmailNotVerifiedException _) {
       model.addAttribute("emailNotVerifiedError", true);
       return FORM_VIEW;
+    } catch (final VerificationOverloadedException _) {
+      // TD-FUT-017: same rationale as LoginController's own identical catch block — the password
+      // was never actually checked, so this must never be rendered as loginError's generic
+      // "invalid credentials" message.
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("serviceOverloadedError", true);
+      return FORM_VIEW;
     }
 
-    // TD-ARCH-016: identical to LoginController's own equivalent block — see its own comment for
-    // the full CPD-OFF/CPD-ON rationale.
-    // CPD-OFF
-    final Optional<String> challenge =
-        DeviceTrustGate.intercept(
-            knownDevices,
-            requestDeviceTrustChallenge,
-            authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
-            request,
-            organizationId,
-            account.id(),
-            PendingAuthenticationFactor.PASSWORD,
-            clientId,
-            redirectUrl);
-    if (challenge.isPresent()) {
-      return REDIRECT_PREFIX + challenge.get();
-    }
-
-    final Optional<String> sessionTask =
-        SessionTaskGate.intercept(
-            request,
-            organizationId,
-            account,
-            PendingAuthenticationFactor.PASSWORD,
-            clientId,
-            redirectUrl);
-    if (sessionTask.isPresent()) {
-      return REDIRECT_PREFIX + sessionTask.get();
-    }
-
-    final String redirectTarget =
-        AuthenticatedSessionCompletion.complete(
-            sessions,
-            recordLoginDevice,
-            redirectUrlResolver,
-            request,
-            response,
-            organizationId,
-            account.id(),
-            PendingAuthenticationFactor.PASSWORD,
-            clientId,
-            redirectUrl,
-            account);
-    // CPD-ON
-    return REDIRECT_PREFIX + redirectTarget;
+    // TD-ARCH-016 (closed): used to be an identical, byte-for-byte-duplicated block against
+    // LoginController's own equivalent — see PrimaryFactorLoginCompletion's own Javadoc.
+    return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
+        loginPorts,
+        request,
+        response,
+        organizationId,
+        account,
+        PendingAuthenticationFactor.PASSWORD,
+        clientId,
+        redirectUrl);
   }
 }

@@ -1,6 +1,6 @@
 # ADR-0010: Organization-scoped tenant isolation (Account belongs to exactly one Organization)
 
-**Status:** ✅ Aprobado (2026-08-22 — see "Ratification" addendum below)
+**Status:** ✅ Approved (2026-08-22 — see "Ratification" addendum below)
 
 ## Context
 

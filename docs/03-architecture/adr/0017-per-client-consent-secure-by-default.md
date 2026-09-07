@@ -1,6 +1,6 @@
 # ADR-0017: Per-client, secure-by-default authorization consent
 
-**Status:** ✅ Aprobado (2026-08-25)
+**Status:** ✅ Approved (2026-08-25)
 
 ## Context
 

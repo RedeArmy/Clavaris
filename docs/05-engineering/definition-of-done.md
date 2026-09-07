@@ -1,6 +1,6 @@
 # Definition of Done — Clavaris
 
-🟡 En revisión
+✅ Approved (2026-09-07) — SDE-III review confirmed no substantive blocker remained (TD-PROC-002): every cross-referenced file/tool this checklist names (`coding-standards.md`, `git-workflow.md` §4/4a's SonarCloud Quality Gate, `pmd-ruleset.xml`, `check-doc-consistency.sh`, `MigrationDataPreservationTest.java`) exists and is live, not aspirational. §4's project-level gates (OpenID conformance, external security review, JobSeeker integration) are correctly described as still-pending, not falsely claimed done — no change needed there. Every future edit should re-open review status only on a real, unresolved gap, same posture as `security-architecture.md`'s own promotion note.
 
 A change is done when **all** of the following hold — not merely "compiles and passes the tests I thought to write":
 

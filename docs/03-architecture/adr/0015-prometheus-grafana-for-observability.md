@@ -1,6 +1,6 @@
 # ADR-0015: Self-hosted Prometheus + Alertmanager + Grafana for observability, not a SaaS or a unified all-in-one
 
-**Status:** ✅ Aprobado (2026-08-24) — **implemented and live-verified 2026-08-24** (scope expanded same day to include full per-request tracing — see the addendum at the end of Decision and Consequences below; this is no longer decision-only).
+**Status:** ✅ Approved (2026-08-24) — **implemented and live-verified 2026-08-24** (scope expanded same day to include full per-request tracing — see the addendum at the end of Decision and Consequences below; this is no longer decision-only).
 
 ## Context
 

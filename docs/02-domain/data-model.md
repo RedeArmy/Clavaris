@@ -1,6 +1,6 @@
 # Data Model — Clavaris
 
-🟡 En revisión
+✅ Approved (2026-09-07) — SDE-III review confirmed no substantive blocker remained (TD-PROC-002). Three real staleness bugs found and fixed, all in the ERD/index sketch, none in §2's own table notes (which stayed in sync with the real schema throughout): `CLIENT_DOMAIN_CONFIGS`'s ERD block still named pre-implementation placeholder columns (`custom_domain`, `verification_token`) instead of the real, shipped ones (`hostname`, `dns_txt_challenge_token`) and was missing `embedding_origin` entirely; `CLIENT_BRANDINGS`'s ERD block likewise named placeholder column names (`primary_color_hex`, `app_display_name`) instead of the real ones (`primary_color`, `application_display_name`) — verified against both tables' own real migrations (`V20260910100000`, `V20260909100000`), not assumed. §3's index table also still listed a `unique (code_hash)` index on `authorization_codes`, a table §2's own text already says was retired in favor of `oauth2_authorization` (TD-SEC-003) — confirmed no such table/migration exists anywhere in the repo, and the dead row is removed. Every future edit should re-open review status only on a real, unresolved gap.
 
 Companion to `domain-model.md` — this document is the persistence-level translation (tables, columns, indexes), not a restatement of the domain reasoning.
 
@@ -227,17 +227,18 @@ erDiagram
         uuid id PK
         uuid oauth_client_id FK UK
         varchar mode
-        varchar custom_domain UK
+        varchar hostname UK
         varchar verification_status
-        varchar verification_token
+        varchar dns_txt_challenge_token
+        varchar embedding_origin
         timestamptz verified_at
     }
     CLIENT_BRANDINGS {
         uuid id PK
         uuid oauth_client_id FK UK
-        varchar logo_url
-        varchar primary_color_hex
-        varchar app_display_name
+        text logo_url
+        varchar primary_color
+        varchar application_display_name
     }
 ```
 
@@ -290,7 +291,6 @@ erDiagram
 | `oauth_clients` | `(organization_id)` | list a tenant's registered clients |
 | `platform_clients` | unique `(client_id)` | client lookup at the platform issuer's `/oauth2/token` (ADR-0010, Organization provisioning) |
 | `platform_signing_keys` | unique `(kid)` | JWKS lookup for the platform issuer — globally unique since there is only ever one platform tier |
-| `authorization_codes` | unique `(code_hash)` | code exchange lookup |
 | `event_outbox` / `organization_event_outbox` | `(published_at)` where `published_at IS NULL` | dispatcher poll query — partial index keeps it small regardless of total outbox history |
 | `event_outbox` / `organization_event_outbox` | `(occurred_at)` | each producer module's own retention-sweep query (`EventOutboxRetentionJob`/`OrganizationEventOutboxRetentionJob`) |
 | `event_outbox` / `organization_event_outbox` | `(organization_id)` | dispatcher's own per-organization fan-out lookup |

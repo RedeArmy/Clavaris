@@ -1,6 +1,6 @@
 # ADR-0003: Spring Authorization Server as the OIDC/OAuth2 protocol foundation
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

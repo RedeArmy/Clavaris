@@ -1,6 +1,6 @@
 # ADR-0019: Remove Infisical — supersedes ADR-0014's own Phase 2
 
-**Status:** ✅ Aprobado (2026-08-28)
+**Status:** ✅ Approved (2026-08-28)
 
 ## Context
 

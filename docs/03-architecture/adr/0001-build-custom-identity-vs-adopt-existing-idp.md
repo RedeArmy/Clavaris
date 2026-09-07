@@ -1,6 +1,6 @@
 # ADR-0001: Build a custom identity engine vs. adopt an existing IdP
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

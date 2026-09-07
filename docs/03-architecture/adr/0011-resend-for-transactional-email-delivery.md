@@ -1,6 +1,6 @@
 # ADR-0011: Resend for transactional email delivery
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

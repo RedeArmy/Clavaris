@@ -25,6 +25,9 @@
     <p th:if="${loginError}">Invalid email or password.</p>
     <p th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
     <p th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
+    <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
+         alongside loginError above, since the password was never actually checked either way. -->
+    <p th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
 
     <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

@@ -1,6 +1,6 @@
 # ADR-0006: Standard OIDC/OAuth2 as the primary interface (not a bespoke API)
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

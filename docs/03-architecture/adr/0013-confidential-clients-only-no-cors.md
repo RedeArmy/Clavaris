@@ -1,6 +1,6 @@
 # ADR-0013: Confidential OAuth clients only in v1 — no public/SPA client type, no CORS policy
 
-**Status:** ✅ Aprobado (2026-08-24)
+**Status:** ✅ Approved (2026-08-24)
 
 ## Context
 

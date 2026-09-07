@@ -1,6 +1,6 @@
 # Test Strategy — Clavaris
 
-🟡 En revisión
+✅ Approved (2026-09-07) — SDE-III review confirmed no substantive blocker remained (TD-PROC-002). Two stale spots fixed as part of this promotion: §2's tooling column no longer reads "expected, to be confirmed at implementation time" — every row it names (JUnit 5/Testcontainers, `HexagonalArchitectureTest`, the `node:test` JS suite) is live, not aspirational; §5's "not tested" claim was corrected — a real, targeted concurrency benchmark (`load-testing/`, TD-TEST-004) has in fact run and found a genuine finding (TD-FUT-017), distinct from the broad load/performance testing this section still correctly scopes out of v1. Every future edit should re-open review status only on a real, unresolved gap — not reflexively on a routine update, same posture as `security-architecture.md`'s own promotion note.
 
 ## 1. Why this system's testing bar is higher than a typical feature module
 
@@ -8,7 +8,7 @@ Clavaris is the credential store and token issuer for every consuming applicatio
 
 ## 2. Test pyramid
 
-| Level | Focus | Tooling (expected, to be confirmed at implementation time) |
+| Level | Focus | Tooling |
 |---|---|---|
 | Unit | Domain logic in isolation — password policy validation, refresh token rotation-chain logic, workspace membership role invariants (BR-WS-01) | JUnit 5, no Spring context |
 | Integration | Persistence adapters against a real Postgres (Testcontainers) — every repository implementation, migration correctness | JUnit 5 + Testcontainers |
@@ -31,4 +31,4 @@ Before the v1 exit criterion (`roadmap-and-release-plan.md` §2) is considered m
 
 ## 5. What's deliberately not tested exhaustively in v1
 
-Load/performance testing beyond the generous targets in `nfr-quality-attributes.md` §3 — not meaningful at this project's expected v1 traffic (single-digit consumers). Revisit once real usage data exists, consistent with the same "don't over-engineer for a load level we don't have" stance taken in the NFR document itself.
+Broad load/performance testing beyond the generous targets in `nfr-quality-attributes.md` §3 — not meaningful at this project's expected v1 traffic (single-digit consumers). This is narrower than it used to read: a real, targeted concurrency benchmark against `/oauth2/token`'s Argon2id verification path did run (`load-testing/README.md`, TD-TEST-004, 2026-08-24) and surfaced a genuine capacity-planning finding (TD-FUT-017) — what's still deliberately out of scope for v1 is exhaustive, broad-surface load testing, not "no load testing at all." Revisit the broader scope once real usage data exists, consistent with the same "don't over-engineer for a load level we don't have" stance taken in the NFR document itself.

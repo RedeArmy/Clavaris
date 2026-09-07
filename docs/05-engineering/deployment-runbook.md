@@ -148,10 +148,88 @@ CLAVARIS_IMAGE_TAG=<the git sha of the last known-good commit>
 Set `CLAVARIS_IMAGE_TAG` back to blank (or `latest`) once the underlying issue is fixed and a new
 commit is merged — pinning is a deliberate, temporary override, not the normal operating mode.
 
-## 6. What this runbook does not cover, on purpose
+## 6. Backup and disaster recovery (TD-FUT-006)
 
-- **Database backup/restore** — a real, distinct gap, tracked separately as `TD-FUT-006`. Do not
-  treat this deployment as having a tested recovery path until that row closes.
+`nfr-quality-attributes.md` §7 named "how do we recover if the primary database is lost" as a real,
+unaddressed gap for a ≥99.5%-availability credential store — this section, plus
+`scripts/host/backup-postgres.sh`/`restore-postgres.sh`, is that answer.
+
+### 6a. What gets backed up, and why both halves matter together
+
+Every backup captures **two** things, not just Postgres:
+
+1. **The Postgres database** (`pg_dump -F c`, custom format — supports `pg_restore --clean
+   --if-exists` and parallel restore, safer and faster than a plain `.sql` dump piped through
+   `psql`).
+2. **The `clavaris-signing-keys-data` volume** — the actual PKCS12 signing-key material
+   `data-model.md` §2 confirms is never in the database, only referenced by `kid`/metadata from the
+   `signing_keys`/`platform_signing_keys` tables. Restoring Postgres alone would bring back
+   `SigningKey` rows pointing at key material that no longer exists on disk — a worse, harder-to-
+   diagnose failure than no backup at all, since the app starts and looks healthy right up until the
+   first token needs signing under a `kid` the restored keystore doesn't have.
+
+### 6b. Scheduling backups
+
+As the `clavaris` user, on the production host:
+
+```bash
+crontab -e
+# Daily at 02:00 (this host's own low-traffic window, same convention as routine deploys):
+0 2 * * * cd /opt/clavaris && ./backup-postgres.sh >> backups/backup.log 2>&1
+```
+
+Backups land in `/opt/clavaris/backups/`, retained `CLAVARIS_BACKUP_RETENTION_DAYS` days (default
+14, set in `.env` to override) — old backups are pruned automatically on every run, not left to
+grow unbounded. Copying `backups/` to storage off this VM (a second host, object storage) is a
+real, separate, not-yet-automated step — a backup that lives only on the same disk as what it's
+backing up doesn't survive that disk failing, which is worth naming plainly rather than implying
+this alone is a complete off-site DR story.
+
+### 6c. Restoring
+
+```bash
+cd /opt/clavaris
+./restore-postgres.sh backups/clavaris-postgres-<timestamp>.dump backups/clavaris-signing-keys-<timestamp>.tar.gz
+```
+
+Destructive and confirmed interactively by default (`-y` skips the prompt, for scripted/rehearsed
+use only) — stops `app`, replaces the signing-keys volume's contents and the database's contents
+from the given backup pair, then restarts `app`. Confirm recovery with the same health check
+`deploy.sh` itself uses: `docker compose -f docker-compose.prod.yml exec -T app curl -fsS
+http://localhost:8080/actuator/health/readiness`.
+
+### 6d. Live-verified RPO/RTO — what was actually measured, and its honest scope
+
+Run end to end against a real `postgres:16` container and a real named Docker volume (this
+runbook's own compose service names, not a mock) — seeded with representative rows (an
+`organizations`/`accounts` pair with a real foreign key, and a real file written into the
+signing-keys volume), then genuinely destroyed (`DROP TABLE`, the signing-key file deleted) before
+restoring, not restored-onto-itself:
+
+- **Backup**: ~1.7s for the seeded dataset.
+- **Restore**: ~14s end to end (stop `app`, restore both volumes, restart `app`).
+- **Data integrity**: the restored database returned the exact seeded row via a real join query;
+  the restored signing-keys volume's file content was byte-identical to what was seeded.
+
+**Honest scope note, not overclaimed**: this proves the backup/restore *mechanism* is correct
+(dump format, `--clean --if-exists` restore semantics, the volume tar/untar round trip, the
+stop-app/restore/restart-app sequence) against a real Postgres 16 engine — it does not itself prove
+the numbers above at real production data volume, which this project has none of yet (zero real
+consumer traffic, per `roadmap-and-release-plan.md` §14). `pg_restore`'s own runtime scales with
+data size, so RTO at real scale should be re-measured once real data volume exists, not assumed to
+stay at ~14s — this is the same "found live, not assumed" discipline this project applies
+everywhere else, applied here to itself. **A real bug was caught during this exact verification
+run, not hypothesized**: Docker Compose prefixes every named volume with its own project name
+(derived from the deploy directory's basename) unless a volume declares an explicit `name:` —
+`docker-compose.prod.yml` didn't, which would have made `backup-postgres.sh`'s hardcoded volume
+name silently miss the real one in production. Fixed by adding explicit `name:` to every volume in
+that file, confirmed safe to do now (before any real production instance holds real data) rather
+than a live migration hazard.
+
+## 7. What this runbook does not cover, on purpose
+
+- **Off-site/geo-redundant backup copies** — §6b above is honest that this is not yet automated;
+  backups currently live on the same disk as the data they back up.
 - **Rotating a compromised credential on this host** — see the two existing incident-response
   runbooks (`incident-response-signing-key-compromise.md`,
   `incident-response-platform-client-compromise.md`) for the containment procedure itself; this

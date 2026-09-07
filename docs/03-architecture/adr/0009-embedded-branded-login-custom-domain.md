@@ -1,6 +1,6 @@
 # ADR-0009: Embedded, branded login via per-client custom domain (CNAME) + iframe-modal presentation
 
-**Status:** 🟡 Propuesta, implementada — código real y probado (2026-09-05: `ClientBranding`, `ClientDomainConfig` con verificación DNS TXT real vía JNDI, `CustomDomainRequestRewriteFilter`, relajación de `frame-ancestors` vía CSP para `display=modal`), pendiente de revisión formal antes de considerarse ✅ Aprobado y añadirse a la lista de ADRs vigentes del proyecto — mismo patrón que ADR-0010 (implementado, formal review pendiente, no bloqueante para seguir construyendo encima)
+**Status:** 🟡 Propuesta, implementada — código real y probado (2026-09-05: `ClientBranding`, `ClientDomainConfig` con verificación DNS TXT real vía JNDI, `CustomDomainRequestRewriteFilter`, relajación de `frame-ancestors` vía CSP para `display=modal`), pendiente de revisión formal antes de considerarse ✅ Approved y añadirse a la lista de ADRs vigentes del proyecto — mismo patrón que ADR-0010 (implementado, formal review pendiente, no bloqueante para seguir construyendo encima)
 
 ## Context
 
