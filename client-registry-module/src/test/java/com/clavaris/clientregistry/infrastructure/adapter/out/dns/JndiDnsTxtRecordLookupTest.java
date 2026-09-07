@@ -25,8 +25,7 @@ class JndiDnsTxtRecordLookupTest {
   void returnsRealTxtValuesForARealStableRecord() {
     List<String> values = lookup.lookupTxtRecords("_dmarc.google.com");
 
-    assertThat(values).isNotEmpty();
-    assertThat(values).anyMatch(value -> value.startsWith("v=DMARC1"));
+    assertThat(values).isNotEmpty().anyMatch(value -> value.startsWith("v=DMARC1"));
   }
 
   // RFC 2606 §2: ".invalid" is reserved specifically for this — guaranteed to never resolve,
