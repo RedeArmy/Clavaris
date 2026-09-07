@@ -365,17 +365,21 @@ jobs:
           -Dsonar.javascript.lcov.reportPaths=lcov.info
           -Dsonar.plsql.file.suffixes=
 
-      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...". Updated
-      # 2026-09-04, the fact this was resting on has changed: when this comment was first written,
-      # `common` genuinely had zero classes and zero tests (placeholder folders only), the one
-      # module producing no jacoco.xml for the paths above to find. `common` now has 11 real
-      # classes and a real test suite (identity-module's audit/outbox infrastructure moved there
-      # once a second module needed it) — confirmed live, every one of the six modules
-      # (common/identity-module/organization-module/client-registry-module/webhook-module/app) now
-      # produces its own real target/site/jacoco/jacoco.xml after `mvn clean verify`, `common`'s
-      # own included (27KB, real coverage data, not an empty shell). If this line still appears on
-      # a live SonarCloud run despite that, it is worth a fresh look then — not assumed away by
-      # this comment the way the now-stale original one was.
+      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...". Root
+      # cause corrected 2026-09-06, not just restated — this comment's own 2026-09-04 predecessor
+      # (blaming `common` having zero tests) was confirmed live to no longer be the explanation
+      # (every one of the six real modules produces its own jacoco.xml after `mvn clean verify`),
+      # yet the warning kept appearing in SonarCloud's "Analysis warnings" panel. Real, permanent
+      # cause: `clavaris-parent` (root pom.xml, packaging=pom) has no src/main/java of its own —
+      # this property resolves per module relative to THAT module's own basedir, and from the
+      # repo root, "../app/target/site/jacoco-aggregate/jacoco.xml" resolves OUTSIDE the
+      # repository entirely (confirmed: realpath -m from the repo root), never to a real file
+      # regardless of build order or completeness. Genuinely inert either way (zero source lines
+      # in that module means coverage has nothing to attach to even if the paths did resolve), but
+      # a real, reproducible warning, not a timing artifact — silenced at the source via
+      # sonar.skip=true on the root pom's own <properties>, explicitly overridden back to false in
+      # each of the six real modules' own pom.xml (Maven property inheritance means the root's
+      # value would otherwise silence analysis everywhere, not just there).
       #
       # "Some thymeleaf templates are not indexed: you may want to add 'src/main/resources' in the
       # scanned files of this project to detect java XSS vulnerabilities". Real gap, now fixed:

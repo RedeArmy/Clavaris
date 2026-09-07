@@ -89,6 +89,20 @@
              (11.0.26 is not, as of this writing) — this is the latest
              available patch release, not an arbitrary bump. -->
         <tomcat.version>11.0.25</tomcat.version>
+        <!-- SonarCloud analysis warning, confirmed live: "No coverage report can be found with
+             sonar.coverage.jacoco.xmlReportPaths=...". This module (clavaris-parent, packaging=pom)
+             has no src/main/java of its own — sonar.coverage.jacoco.xmlReportPaths is resolved per
+             module relative to THAT module's own basedir (ci.yml's own comment on this exact
+             property, confirmed against SonarSource's docs), and from the repo root "../app/..."
+             resolves outside the repository entirely, never to a real file, regardless of build
+             order or completeness. Genuinely inert either way — zero source lines here means
+             coverage has nothing to attach to even if the paths did resolve — but the warning is
+             real and permanent, not a timing artifact, so it's silenced at the source rather than
+             left to reappear on every analysis. sonar.skip inherits to every child module by
+             default (Maven property inheritance) — each of the 6 real modules explicitly overrides
+             this back to false in its own pom.xml, or this would silently disable analysis
+             everywhere, not just here. -->
+        <sonar.skip>true</sonar.skip>
     </properties>
 
     <!--

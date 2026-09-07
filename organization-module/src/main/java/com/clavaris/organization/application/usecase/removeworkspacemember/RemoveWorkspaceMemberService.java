@@ -17,10 +17,18 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>BR-WS-03, stated honestly: v1 has no workspace-scoped token/authorization concept — tokens are
  * Account/OAuthClient-scoped per Organization, not per-Workspace (`domain-model.md`). "Immediate
  * access revocation" in v1 means the admin-API listing and this method's own outbox event fire
- * synchronously with the delete below, not that a live token is invalidated (there is no such token
- * to invalidate yet). A consuming application that gates its own authorization by workspace
- * membership must re-check membership itself (or subscribe to this event once webhook-module
- * exists) — documented as a forward-looking limitation, not silently glossed over.
+ * synchronously with the delete below, not that a live token is invalidated in the full sense this
+ * rule's own title implies. A consuming application that gates its own authorization by workspace
+ * membership must still re-check membership itself (or subscribe to this event) — documented as a
+ * forward-looking limitation, not silently glossed over.
+ *
+ * <p><b>TD-WS-002 mitigation (2026-09-06):</b> this method now also revokes every active {@code
+ * RefreshToken} for the removed member's Account — see {@link WorkspaceMemberRefreshTokenRevoker}'s
+ * own Javadoc for exactly why this is a real, measurable exposure-window reduction (bounds it to
+ * one access-token TTL instead of the token's full refresh lifetime) and deliberately not the full
+ * workspace-scoped-token architecture BR-WS-03's own text still correctly names as out of v1 scope.
+ * A currently-live access token is deliberately left to expire naturally, not force-revoked
+ * alongside it — same reasoning that port's own Javadoc documents in full.
  */
 public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCase {
 
@@ -29,15 +37,24 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
+  // PMD.LongVariable: refreshTokenRevoker names exactly what it is — same convention every other
+  // descriptively-named port in this codebase follows (e.g. RotateRefreshTokenService's own
+  // identical accountTokenRevoker/accountSessionRevoker fields).
+  @SuppressWarnings("PMD.LongVariable")
+  private final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
+
   public RemoveWorkspaceMemberService(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,
       final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      @SuppressWarnings("PMD.LongVariable")
+          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker) {
     this.memberships = memberships;
     this.workspaces = workspaces;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
+    this.refreshTokenRevoker = refreshTokenRevoker;
   }
 
   @Override
@@ -78,6 +95,14 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
                             + " use case"));
 
     memberships.deleteById(membership.id());
+
+    // TD-WS-002 mitigation: same transaction as the membership delete above — both RefreshToken
+    // (identity-module) and WorkspaceMembership (organization-module) rows live in this one
+    // deployable's own single persistence unit, so there is no cross-database atomicity concern
+    // here, unlike AccountProvisioner's own deliberately-outside-the-transaction network call. A
+    // crash between the two writes is not a real risk this way — either both commit or neither
+    // does.
+    refreshTokenRevoker.revokeAllRefreshTokensFor(command.accountId());
 
     auditEvents.write(
         command.actor(),
