@@ -1,6 +1,6 @@
 package com.clavaris.clientregistry.domain.model;
 
-import java.net.URI;
+import com.clavaris.common.domain.model.AbsoluteHttpsUrlValidator;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -117,19 +117,11 @@ public final class ClientBranding {
     if (logoUrl == null) {
       return null;
     }
-    // Well-formedness/absoluteness/https-only only — unlike RedirectPolicy's own URLs, a logo is
-    // never matched against redirectUris (it's not a place the browser is ever redirected to), so
-    // only OAuthClient's shared validator's first three checks are the relevant ones here.
-    final URI parsed;
-    try {
-      parsed = URI.create(logoUrl);
-    } catch (final IllegalArgumentException e) {
-      throw new IllegalArgumentException("logoUrl must be a well-formed URI: " + logoUrl, e);
-    }
-    if (!parsed.isAbsolute() || !"https".equalsIgnoreCase(parsed.getScheme())) {
-      throw new IllegalArgumentException("logoUrl must be an absolute https URL: " + logoUrl);
-    }
-    return logoUrl;
+    // TD-ARCH-019: well-formedness/absoluteness/https-only, delegated to the shared common/
+    // validator — unlike RedirectPolicy's own URLs, a logo is never matched against redirectUris
+    // (it's not a place the browser is ever redirected to), so no loopback-http exception applies
+    // here the way it does for OAuthClient's own redirect-URI validator.
+    return AbsoluteHttpsUrlValidator.requireAbsoluteHttps(logoUrl, "logoUrl");
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")

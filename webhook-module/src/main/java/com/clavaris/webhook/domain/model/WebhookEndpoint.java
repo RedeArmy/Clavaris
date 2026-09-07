@@ -1,6 +1,6 @@
 package com.clavaris.webhook.domain.model;
 
-import java.net.URI;
+import com.clavaris.common.domain.model.AbsoluteHttpsUrlValidator;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -223,21 +223,15 @@ public final class WebhookEndpoint {
   // in the payload, but the payload itself can carry ids/roles worth keeping off the wire in the
   // clear) to any network observer. Same "meaningless without TLS" reasoning redirect_uris would
   // have if BR-CLIENT-01 allowed a bare http:// entry.
+  //
+  // TD-ARCH-019: the well-formedness/absoluteness/https-only check itself is delegated to the
+  // shared common/ validator — this SSRF-adjacent (private/loopback/cloud-metadata) address check
+  // is a separate, deliberately later concern, done at registration and delivery time by
+  // WebhookUrlSsrfChecker (TD-SEC-053), not here: this constructor-time check only proves the URL
+  // is well-shaped, not that it's safe to actually connect to.
   private static String requireValidUrl(final String url) {
     requireNonBlank(url, "url");
-    final URI parsed;
-    try {
-      parsed = URI.create(url);
-    } catch (final IllegalArgumentException e) {
-      throw new IllegalArgumentException("url must be a well-formed URI: " + url, e);
-    }
-    if (!parsed.isAbsolute()) {
-      throw new IllegalArgumentException("url must be an absolute URI: " + url);
-    }
-    if (!"https".equalsIgnoreCase(parsed.getScheme())) {
-      throw new IllegalArgumentException("url must use https: " + url);
-    }
-    return url;
+    return AbsoluteHttpsUrlValidator.requireAbsoluteHttps(url, "url");
   }
 
   private static List<String> requireNonEmptyEventTypes(final List<String> eventTypes) {

@@ -12,9 +12,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Orchestration for {@link RegisterAccountUseCase}. {@code @Transactional} is the one place Spring
- * leaks into this class — every type it depends on otherwise (the domain model, the ports) has zero
- * Spring imports.
+ * Orchestration for {@link RegisterAccountUseCase}. TD-ARCH-018: {@code @Transactional} and one
+ * caught exception-translation type ({@link DataIntegrityViolationException}, in {@link #handle}
+ * below) are the only two places Spring leaks into this class — every type it depends on otherwise
+ * (the domain model, the ports) has zero Spring imports.
  *
  * <p>ADR-0024 §4/§5: also validates the optional {@code username} (required/uniqueness per policy)
  * and, when the Organization's own {@code passwordAtSignUpEnabled} policy is off and the caller

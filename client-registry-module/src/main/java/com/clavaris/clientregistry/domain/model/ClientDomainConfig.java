@@ -1,5 +1,6 @@
 package com.clavaris.clientregistry.domain.model;
 
+import com.clavaris.common.domain.model.AbsoluteHttpsUrlValidator;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -263,21 +264,15 @@ public final class ClientDomainConfig {
     if (embeddingOrigin == null) {
       return null;
     }
-    // Origin only — scheme+host+port, no path/query/fragment (RFC 6454): this value becomes a CSP
-    // frame-ancestors source, where anything beyond an origin is meaningless and, for a path
+    // TD-ARCH-019: well-formedness/absoluteness/https-only, delegated to the shared common/
+    // validator — the origin-only check below (scheme+host+port, no path/query/fragment, RFC 6454)
+    // is specific to this field's own CSP frame-ancestors use and stays here: this value becomes a
+    // CSP frame-ancestors source, where anything beyond an origin is meaningless and, for a path
     // component in particular, silently ignored by browsers rather than rejected — validating it
     // away here is cheaper than an operator discovering that the hard way.
-    final URI parsed;
-    try {
-      parsed = URI.create(embeddingOrigin);
-    } catch (final IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "embeddingOrigin must be a well-formed URI: " + embeddingOrigin, e);
-    }
-    if (!parsed.isAbsolute() || !"https".equalsIgnoreCase(parsed.getScheme())) {
-      throw new IllegalArgumentException(
-          "embeddingOrigin must be an absolute https origin: " + embeddingOrigin);
-    }
+    final String validated =
+        AbsoluteHttpsUrlValidator.requireAbsoluteHttps(embeddingOrigin, "embeddingOrigin");
+    final URI parsed = URI.create(validated); // already proven well-formed above
     if (hasPathQueryOrFragment(parsed)) {
       throw new IllegalArgumentException(
           "embeddingOrigin must be an origin only, no path/query/fragment: " + embeddingOrigin);
