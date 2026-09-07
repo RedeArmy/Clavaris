@@ -47,6 +47,12 @@ class CreateOrganizationSigningKeyBridge implements SigningKeyProvisioner {
     // order would leave a metadata row claiming an active key that doesn't actually exist yet.
     final String kid = materialFactory.generateFor(orgId);
     final SigningKey activated = keyActivator.handle(orgId, kid, ALGORITHM);
+    // TD-SEC-051: generateFor no longer caches by itself — see SigningKeyMaterialGenerator's own
+    // Javadoc. No real race exists at this specific call site (a brand-new Organization's own id
+    // is never shared by a concurrent caller), but every caller follows the same two-step contract
+    // for consistency, and this org's first token issuance would otherwise pay one avoidable
+    // cache-miss reload for no reason.
+    materialFactory.cacheActive(orgId, kid);
     return new ProvisionedSigningKey(activated.id(), activated.kid(), activated.algorithm());
   }
 }

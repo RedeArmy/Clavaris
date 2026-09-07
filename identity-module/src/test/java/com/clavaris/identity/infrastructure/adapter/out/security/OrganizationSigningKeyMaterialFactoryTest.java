@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +41,7 @@ class OrganizationSigningKeyMaterialFactoryTest {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
 
     String kid = factory.generateFor(organizationId);
+    factory.cacheActive(organizationId, kid);
 
     assertThat(kid).isNotBlank();
     Optional<KeyPair> keyPair = factory.keyPairFor(organizationId);
@@ -64,8 +66,8 @@ class OrganizationSigningKeyMaterialFactoryTest {
     OrganizationId first = new OrganizationId(UUID.randomUUID());
     OrganizationId second = new OrganizationId(UUID.randomUUID());
 
-    factory.generateFor(first);
-    factory.generateFor(second);
+    factory.cacheActive(first, factory.generateFor(first));
+    factory.cacheActive(second, factory.generateFor(second));
 
     assertThat(factory.keyPairFor(first).orElseThrow().getPublic())
         .isNotEqualTo(factory.keyPairFor(second).orElseThrow().getPublic());
@@ -78,13 +80,58 @@ class OrganizationSigningKeyMaterialFactoryTest {
     // doesn't silently change this behaviour without a test noticing.
     OrganizationSigningKeyMaterialFactory factory = newFactory();
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    factory.generateFor(organizationId);
+    factory.cacheActive(organizationId, factory.generateFor(organizationId));
     KeyPair first = factory.keyPairFor(organizationId).orElseThrow();
 
-    factory.generateFor(organizationId);
+    factory.cacheActive(organizationId, factory.generateFor(organizationId));
     KeyPair second = factory.keyPairFor(organizationId).orElseThrow();
 
     assertThat(second.getPublic()).isNotEqualTo(first.getPublic());
+  }
+
+  @Test
+  void cacheActiveThrowsWhenTheKidHasNoMatchingKeyStoreEntry() {
+    // TD-SEC-051: every real caller only ever passes a kid this same factory's own generateFor
+    // just minted — a missing key store entry at this point is a real data-integrity violation,
+    // never an expected outcome, so this must surface loudly rather than silently no-op.
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    assertThatExceptionOfType(IllegalStateException.class)
+        .isThrownBy(() -> factory.cacheActive(organizationId, "never-generated-kid"));
+  }
+
+  // TD-SEC-051: the actual regression this row exists to prevent — see
+  // SigningKeyMaterialGenerator's own Javadoc for the full traced race. Models the exact
+  // interleaving that used to break this cache: two concurrent "rotations" mint their own key
+  // material in one order (generateFor(A) then generateFor(B)), but the DB-level advisory lock
+  // — simulated here simply by which cacheActive call happens last — resolves the other way
+  // (kid A ends up "active" last). Before this fix, the cache's own final state was determined by
+  // generateFor's own call order (would have ended up holding B, the wrong key); after this fix,
+  // it's determined entirely by cacheActive's own call order, matching whichever kid a real
+  // Postgres advisory lock would have serialized as the true winner.
+  @Test
+  void cacheReflectsWhicheverKidCacheActiveWasCalledWithLastRegardlessOfGenerateForOrder() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    String kidA = factory.generateFor(organizationId);
+    String kidB = factory.generateFor(organizationId);
+    // The DB-level winner (kid A) is the one activated — and therefore cached — LAST, even though
+    // its own generateFor call happened FIRST in wall-clock time.
+    factory.cacheActive(organizationId, kidB);
+    factory.cacheActive(organizationId, kidA);
+
+    // KeyPair itself has no equals() override (reference equality) — comparing the wrapped
+    // RSAPublicKey instead is what every other identity-comparison in this test class already
+    // does (see e.g. differentOrganizationsGetGenuinelyDifferentKeyPairs above), since RSA key
+    // implementations do compare by their actual modulus/exponent.
+    Optional<KeyPair> cached = factory.keyPairFor(organizationId);
+    assertThat(cached).isPresent();
+    assertThat(cached.orElseThrow().getPublic())
+        .isEqualTo(factory.keyPairForKid(kidA).orElseThrow().getPublic());
+    assertThat(cached.orElseThrow().getPublic())
+        .isNotEqualTo(factory.keyPairForKid(kidB).orElseThrow().getPublic());
   }
 
   @Test

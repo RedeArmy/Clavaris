@@ -66,6 +66,11 @@ public class RotateSigningKeyForOrganizationService
         command.organizationId().value().toString(),
         "newKid=" + newKid + " previousKid=" + currentlyActive.kid());
 
+    // TD-SEC-051: deliberately the last statement in this @Transactional method, not placed right
+    // after activate.handle() above — see SigningKeyMaterialGenerator#cacheActive's own Javadoc for
+    // why the ordering here is what actually closes the race, not just moving it earlier.
+    keyMaterial.cacheActive(command.organizationId(), newKid);
+
     return new RotateSigningKeyForOrganizationResult(rotated, currentlyActive.kid());
   }
 }

@@ -24,6 +24,13 @@ import org.springframework.stereotype.Component;
  * no longer invalidates every Organization's previously-issued tokens the moment their key is next
  * looked up.
  *
+ * <p>TD-SEC-051 (closed): {@link #generateFor} used to write straight into {@link #keyPairs} — see
+ * {@link SigningKeyMaterialGenerator}'s own Javadoc for the real, live-traced race that let two
+ * concurrent rotations leave this cache holding a different key than the one the DB's own advisory
+ * lock had just activated. {@link #generateFor} now only mints and persists key material; {@link
+ * #cacheActive} is the only method that ever writes to {@link #keyPairs}, and every real caller
+ * only invokes it after the DB-level activation it's racing against has already committed.
+ *
  * <p><b>Known, deliberate limitations, not silent gaps:</b>
  *
  * <ul>
@@ -57,15 +64,39 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
   }
 
   /**
-   * Generates and stores a brand-new key pair for {@code organizationId}, returning its {@code
-   * kid}.
+   * Generates and persists a brand-new key pair for {@code organizationId} to the key store,
+   * returning its {@code kid} — see {@link SigningKeyMaterialGenerator#generateFor}'s own Javadoc
+   * (TD-SEC-051) for why this deliberately does NOT also cache it as the active key.
    */
   @Override
   public String generateFor(final OrganizationId organizationId) {
     final String kid = UUID.randomUUID().toString();
-    final KeyPair keyPair = keyStore.generate(kid);
-    keyPairs.put(organizationId.value(), keyPair);
+    keyStore.generate(kid);
     return kid;
+  }
+
+  /**
+   * TD-SEC-051: see {@link SigningKeyMaterialGenerator#cacheActive}'s own Javadoc for the full
+   * ordering contract every caller must follow. Reloads from {@link SigningKeyStore} rather than
+   * threading the {@link KeyPair} {@link #generateFor} already computed through as a return value —
+   * a deliberately simple, already-synchronized read path (the same one {@link #keyPairForKid}
+   * already uses), not a second cache/holder structure with its own cleanup-on-failure concerns.
+   */
+  @Override
+  public void cacheActive(final OrganizationId organizationId, final String kid) {
+    final KeyPair keyPair =
+        keyStore
+            .find(kid)
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "Signing key '"
+                            + kid
+                            + "' was just generated/activated for Organization "
+                            + organizationId.value()
+                            + " but has no matching key store entry — data integrity violated"
+                            + " before reaching this call"));
+    keyPairs.put(organizationId.value(), keyPair);
   }
 
   /**

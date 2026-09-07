@@ -57,5 +57,8 @@ class CreateOrganizationSigningKeyBridgeTest {
 
     verify(materialFactory).generateFor(expected);
     verify(keyActivator).handle(expected, "a-kid", "RS256");
+    // TD-SEC-051: generateFor no longer caches by itself — this bridge must call cacheActive
+    // itself, with the exact kid that was just activated.
+    verify(materialFactory).cacheActive(expected, "a-kid");
   }
 }

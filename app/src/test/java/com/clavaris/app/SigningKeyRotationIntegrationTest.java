@@ -140,11 +140,24 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
   // calls against the real running server, not a mocked port — see
   // ActivateSigningKeyForOrganizationService's own Javadoc for the SELECT ... FOR UPDATE fix this
   // proves closed.
+  //
+  // TD-SEC-051 (2026-09-06): the DB-level invariant this test already proved (exactly one active
+  // row survives) was never the whole story — OrganizationSigningKeyMaterialFactory's own
+  // in-memory KeyPair cache raced independently of the advisory lock above, so the DB's own
+  // winning kid could still end up paired with the WRONG process-local KeyPair. The only way to
+  // actually catch that class of bug is to issue a real token right after both concurrent
+  // rotations settle and cryptographically verify it against the real JWKS response — a purely
+  // DB-side assertion (row counts, kid columns) cannot see a cache/DB mismatch, since the mismatch
+  // lives entirely in process memory, never in a column. This is the live, full-stack proof the
+  // unit-level tests on SigningKeyMaterialGenerator/OrganizationSigningKeyMaterialFactory can only
+  // model, not actually exercise under a real Postgres advisory lock and a real Spring
+  // transaction boundary.
   @Test
   void concurrentRotationsForTheSameOrganizationNeverLeaveTwoSimultaneouslyActiveKeys()
       throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Concurrent Rotation Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
 
     CompletableFuture<HttpResponse<String>> rotationA =
         CompletableFuture.supplyAsync(
@@ -167,6 +180,23 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(activeKeyCount)
         .as("exactly one active signing key must survive two concurrent rotations")
         .isEqualTo(1);
+
+    // TD-SEC-051: a token issued right after both rotations settle must be signed with a private
+    // key that actually matches the public key JWKS publishes under the same kid — the exact
+    // property the race let silently break (a token signed with a stale cached KeyPair, labeled
+    // with whichever kid happened to win the DB race).
+    SignedJWT postRotationJwt =
+        parse(accessTokenOf(requestOrganizationToken(organizationId, client)));
+    JWKSet jwks = parseJwkSet(get("/o/" + organizationId + "/oauth2/jwks").body());
+    JWK activeJwk = jwks.getKeyByKeyId(postRotationJwt.getHeader().getKeyID());
+    assertThat(activeJwk)
+        .as("JWKS must publish the exact kid this token was signed under")
+        .isNotNull();
+    assertThat(verify(postRotationJwt, (RSAKey) activeJwk))
+        .as(
+            "TD-SEC-051: the token must cryptographically verify against JWKS — a cache/DB kid"
+                + " mismatch from the race this row fixes would fail exactly this assertion")
+        .isTrue();
   }
 
   private HttpResponse<String> rotateSigningKeyUnchecked(

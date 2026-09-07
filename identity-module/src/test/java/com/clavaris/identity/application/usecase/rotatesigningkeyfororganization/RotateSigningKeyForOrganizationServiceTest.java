@@ -57,6 +57,26 @@ class RotateSigningKeyForOrganizationServiceTest {
     verify(activate).handle(organizationId, "new-kid", "RS256");
   }
 
+  // TD-SEC-051: the actual fix this row adds — cacheActive must be called with the exact kid that
+  // won activation, after activate.handle() has already returned (Mockito's own InOrder proves the
+  // real statement ordering this fix's whole correctness argument depends on, not just that both
+  // calls eventually happen).
+  @Test
+  void cachesTheNewKeyAsActiveOnlyAfterItHasAlreadyBeenActivated() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    when(signingKeys.findActive(organizationId))
+        .thenReturn(Optional.of(SigningKey.activate(organizationId, "old-kid", "RS256")));
+    when(keyMaterial.generateFor(organizationId)).thenReturn("new-kid");
+    when(activate.handle(organizationId, "new-kid", "RS256"))
+        .thenReturn(SigningKey.activate(organizationId, "new-kid", "RS256"));
+
+    service.handle(new RotateSigningKeyForOrganizationCommand(organizationId, ACTOR));
+
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(activate, keyMaterial);
+    order.verify(activate).handle(organizationId, "new-kid", "RS256");
+    order.verify(keyMaterial).cacheActive(organizationId, "new-kid");
+  }
+
   // TD-SEC-007: this is exactly the action the technical-debt register named as needing to be
   // audited before the rotation endpoint could go live at all.
   @Test
@@ -90,6 +110,7 @@ class RotateSigningKeyForOrganizationServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(keyMaterial, never()).generateFor(any());
+    verify(keyMaterial, never()).cacheActive(any(), any());
     verifyNoInteractions(activate);
     verifyNoInteractions(auditEvents);
   }

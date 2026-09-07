@@ -60,6 +60,40 @@ class PurgeSigningKeyForOrganizationServiceTest {
     assertThat(result.replacementKid()).isEqualTo("replacement-kid");
   }
 
+  // TD-SEC-051: same fix, same rationale as RotateSigningKeyForOrganizationService's own identical
+  // test — cacheActive must be called with the replacement kid, after everything else in this
+  // transaction (activation, the backdated retire-save, the audit write) has already succeeded.
+  @Test
+  void cachesTheReplacementAsActiveOnlyAfterEverythingElseInTheTransactionSucceeded() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    SigningKey compromisedActive = SigningKey.activate(organizationId, "compromised-kid", "RS256");
+    when(signingKeys.findByKid(organizationId, "compromised-kid"))
+        .thenReturn(Optional.of(compromisedActive));
+    when(keyMaterial.generateFor(organizationId)).thenReturn("replacement-kid");
+
+    service.handle(
+        new PurgeSigningKeyForOrganizationCommand(organizationId, "compromised-kid", ACTOR));
+
+    org.mockito.InOrder order =
+        org.mockito.Mockito.inOrder(activate, signingKeys, auditEvents, keyMaterial);
+    order.verify(activate).handle(organizationId, "replacement-kid", "RS256");
+    order.verify(signingKeys).save(any());
+    order.verify(auditEvents).write(any(), any(), any(), any(), any());
+    order.verify(keyMaterial).cacheActive(organizationId, "replacement-kid");
+  }
+
+  @Test
+  void purgingAnAlreadyRetiredKeyNeverCachesAnything() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    SigningKey oldRetiredKey = SigningKey.activate(organizationId, "old-kid", "RS256");
+    oldRetiredKey.retire();
+    when(signingKeys.findByKid(organizationId, "old-kid")).thenReturn(Optional.of(oldRetiredKey));
+
+    service.handle(new PurgeSigningKeyForOrganizationCommand(organizationId, "old-kid", ACTOR));
+
+    verify(keyMaterial, never()).cacheActive(any(), any());
+  }
+
   @Test
   void purgingTheActiveKeySavesItBackdatedToEpochAfterActivatingTheReplacement() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
@@ -139,6 +173,7 @@ class PurgeSigningKeyForOrganizationServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(keyMaterial, never()).generateFor(any());
+    verify(keyMaterial, never()).cacheActive(any(), any());
     verifyNoInteractions(activate);
     verifyNoInteractions(auditEvents);
     verify(signingKeys, never()).save(any());
