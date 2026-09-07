@@ -78,6 +78,13 @@ public class PurgeSigningKeyForOrganizationService
         command.organizationId().value().toString(),
         "purgedKid=" + command.kid() + " replacementKid=" + replacementKid);
 
+    // TD-SEC-051: same "cache only as the very last statement in this @Transactional method"
+    // placement as RotateSigningKeyForOrganizationService's own identical fix — see
+    // SigningKeyMaterialGenerator#cacheActive's own Javadoc for why.
+    if (wasActive) {
+      keyMaterial.cacheActive(command.organizationId(), replacementKid);
+    }
+
     return new PurgeSigningKeyForOrganizationResult(
         command.organizationId(), command.kid(), replacementKid);
   }
