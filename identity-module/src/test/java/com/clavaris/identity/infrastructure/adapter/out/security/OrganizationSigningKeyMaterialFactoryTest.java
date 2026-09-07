@@ -133,9 +133,9 @@ class OrganizationSigningKeyMaterialFactoryTest {
     Optional<KeyPair> cached = factory.keyPairFor(organizationId);
     assertThat(cached).isPresent();
     assertThat(cached.orElseThrow().getPublic())
-        .isEqualTo(factory.keyPairForKid(kidA).orElseThrow().getPublic());
+        .isEqualTo(factory.keyPairForKid(organizationId, kidA).orElseThrow().getPublic());
     assertThat(cached.orElseThrow().getPublic())
-        .isNotEqualTo(factory.keyPairForKid(kidB).orElseThrow().getPublic());
+        .isNotEqualTo(factory.keyPairForKid(organizationId, kidB).orElseThrow().getPublic());
   }
 
   @Test
@@ -145,7 +145,8 @@ class OrganizationSigningKeyMaterialFactoryTest {
     // from the repository's active row plus the key store — not just from its own cache.
     SigningKeyStore keyStore = newKeyStore();
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    KeyPair generatedBeforeRestart = keyStore.generate("persisted-org-kid");
+    KeyPair generatedBeforeRestart =
+        keyStore.generate(KeyStoreScope.organization(organizationId.value()), "persisted-org-kid");
 
     SigningKeyRepository repository = mock(SigningKeyRepository.class);
     when(repository.findActive(organizationId))
@@ -168,7 +169,8 @@ class OrganizationSigningKeyMaterialFactoryTest {
     String activeKid = factory.generateFor(organizationId);
     factory.cacheActive(organizationId, activeKid);
     String retiredKid = factory.generateFor(organizationId);
-    factory.keyPairForKid(retiredKid); // sanity: the retired kid's own entry exists beforehand
+    // sanity: the retired kid's own entry exists beforehand
+    factory.keyPairForKid(organizationId, retiredKid);
     assertThat(factory.keyPairFor(organizationId)).isPresent();
 
     factory.purgeAllFor(organizationId, java.util.List.of(activeKid, retiredKid));
@@ -176,8 +178,8 @@ class OrganizationSigningKeyMaterialFactoryTest {
     // TD-SEC-052: both the in-memory cache entry and every key-store entry for this
     // Organization's full kid history must be gone — not just the currently-cached one.
     assertThat(factory.keyPairFor(organizationId)).isEmpty();
-    assertThat(factory.keyPairForKid(activeKid)).isEmpty();
-    assertThat(factory.keyPairForKid(retiredKid)).isEmpty();
+    assertThat(factory.keyPairForKid(organizationId, activeKid)).isEmpty();
+    assertThat(factory.keyPairForKid(organizationId, retiredKid)).isEmpty();
   }
 
   @Test
@@ -193,7 +195,7 @@ class OrganizationSigningKeyMaterialFactoryTest {
     factory.purgeAllFor(purged, java.util.List.of(purgedKid));
 
     assertThat(factory.keyPairFor(untouched)).isPresent();
-    assertThat(factory.keyPairForKid(untouchedKid)).isPresent();
+    assertThat(factory.keyPairForKid(untouched, untouchedKid)).isPresent();
   }
 
   @Test
@@ -253,7 +255,7 @@ class OrganizationSigningKeyMaterialFactoryTest {
     // still be forced back to the repository.
     SigningKeyStore keyStore = newKeyStore();
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
-    keyStore.generate("persisted-org-kid");
+    keyStore.generate(KeyStoreScope.organization(organizationId.value()), "persisted-org-kid");
 
     SigningKeyRepository repository = mock(SigningKeyRepository.class);
     when(repository.findActive(organizationId))
