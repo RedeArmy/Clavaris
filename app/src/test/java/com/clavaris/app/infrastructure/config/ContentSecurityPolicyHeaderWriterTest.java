@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -124,14 +125,20 @@ class ContentSecurityPolicyHeaderWriterTest {
 
   @Test
   void neverOverridesAHeaderAlreadySetByAnEarlierWriter() {
-    HttpServletRequest request = mock(HttpServletRequest.class);
+    // TD-SEC-050: getRequestURI() is stubbed (never null on a real HttpServletRequest, per the
+    // Servlet spec) because captureModalStateIfPresent now reads it unconditionally, before this
+    // test's own early-return path — a deliberately separate concern from the header decision
+    // below, not something the early return should short-circuit.
+    HttpServletRequest request = requestWithUri(ORG_REGISTER_PATH);
     HttpServletResponse response = mock(HttpServletResponse.class);
     when(response.containsHeader(HEADER_NAME)).thenReturn(true);
 
     writer.writeHeaders(request, response);
 
     verify(response, never()).setHeader(eq(HEADER_NAME), anyString());
-    // Confirms the early-return path doesn't even bother reading the content type/URI first.
+    // Confirms the early-return path doesn't bother reading the content type once containsHeader
+    // is true — captureModalStateIfPresent's own independent read of getRequestURI() above is not
+    // part of this assertion any more (see this test's own header comment).
     verify(response, never()).getContentType();
   }
 
@@ -336,6 +343,111 @@ class ContentSecurityPolicyHeaderWriterTest {
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
     verify(checker).resolveAllowedFrameAncestor(null);
+  }
+
+  // TD-SEC-050: SAS's own sendAuthorizationConsent redirect never forwards display=modal — these
+  // prove the session-based fallback that closes this row, keyed by "state" so a later, unrelated,
+  // non-modal consent render sharing the same HttpSession can never inherit a stale relaxation
+  // (the exact regression AuthorizationCodeFlowIntegrationTest caught before this class's own
+  // display=modal gate existed at all).
+  private static final String ORG_AUTHORIZE_PATH =
+      "/o/11111111-1111-1111-1111-111111111111/oauth2/authorize";
+
+  @Test
+  void capturesTheModalStateOnTheAuthorizeRequestWhenDisplayModalIsPresent() {
+    HttpServletRequest authorizeRequest = requestWithUri(ORG_AUTHORIZE_PATH);
+    when(authorizeRequest.getParameter("display")).thenReturn("modal");
+    when(authorizeRequest.getParameter("state")).thenReturn("real-state-value");
+    HttpSession session = mock(HttpSession.class);
+    when(authorizeRequest.getSession(true)).thenReturn(session);
+    HttpServletResponse authorizeResponse = responseWithContentType(null); // a real 302, no body
+
+    writer.writeHeaders(authorizeRequest, authorizeResponse);
+
+    verify(session)
+        .setAttribute("clavaris.security.display-modal.pending-state", "real-state-value");
+  }
+
+  @Test
+  void neverCapturesAnythingOnTheAuthorizeRequestWithoutDisplayModal() {
+    HttpServletRequest authorizeRequest = requestWithUri(ORG_AUTHORIZE_PATH);
+    when(authorizeRequest.getParameter("state")).thenReturn("real-state-value");
+    HttpServletResponse authorizeResponse = responseWithContentType(null);
+
+    writer.writeHeaders(authorizeRequest, authorizeResponse);
+
+    verify(authorizeRequest, never()).getSession(org.mockito.ArgumentMatchers.anyBoolean());
+  }
+
+  @Test
+  void relaxesFrameAncestorsOnTheConsentPageViaTheSessionFallbackWhenStateMatches() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpSession session = mock(HttpSession.class);
+    when(session.getAttribute("clavaris.security.display-modal.pending-state"))
+        .thenReturn("shared-state-value");
+    HttpServletRequest consentRequest = requestWithUri(ORG_CONSENT_PATH);
+    when(consentRequest.getSession(false)).thenReturn(session);
+    when(consentRequest.getParameter("state")).thenReturn("shared-state-value");
+    when(consentRequest.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse consentResponse = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(consentRequest, consentResponse);
+
+    verify(consentResponse)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains("frame-ancestors https://jobseeker.example.com"));
+  }
+
+  @Test
+  void neverRelaxesOnTheConsentPageWhenTheSessionsPendingStateDoesNotMatchThisRequest() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpSession session = mock(HttpSession.class);
+    // A different, unrelated authorization attempt's own leftover state — same HttpSession, a
+    // genuinely different "state" value, exactly the staleness this design avoids.
+    when(session.getAttribute("clavaris.security.display-modal.pending-state"))
+        .thenReturn("some-other-flows-state");
+    HttpServletRequest consentRequest = requestWithUri(ORG_CONSENT_PATH);
+    when(consentRequest.getSession(false)).thenReturn(session);
+    when(consentRequest.getParameter("state")).thenReturn("this-flows-own-state");
+    when(consentRequest.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse consentResponse = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(consentRequest, consentResponse);
+
+    verify(consentResponse)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void neverRelaxesOnTheConsentPageWhenNoSessionExistsAtAll() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest consentRequest = requestWithUri(ORG_CONSENT_PATH);
+    when(consentRequest.getSession(false)).thenReturn(null);
+    when(consentRequest.getParameter("state")).thenReturn("this-flows-own-state");
+    when(consentRequest.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse consentResponse = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(consentRequest, consentResponse);
+
+    verify(consentResponse)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
   }
 
   private static HttpServletRequest requestWithUri(final String uri) {
