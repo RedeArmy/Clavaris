@@ -61,6 +61,18 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      # TD-PERF-010: previously unset, so Lettuce's own implicit 60s command timeout applied
+      # everywhere (confirmed by decompiling LettuceConnectionConfiguration: commandTimeout is
+      # only ever overridden when this property is non-null) — distinct from TD-SEC-022 (Redis
+      # *unreachable*, an immediate RedisConnectionFailureException the existing fail-open catch
+      # already handles): this is Redis reachable but slow/overloaded, in which case
+      # RedisFixedWindowRateLimiter (every request, all three rate-limiting filters) would block
+      # the calling Tomcat thread for up to 60s before that same fail-open catch finally fired —
+      # with Tomcat capped at 50 threads (TD-PERF-007), a degraded (not dead) Redis could exhaust
+      # the whole pool in well under a minute. 2000ms: generous headroom over this system's own
+      # p95 < 300ms NFR target (TD-FUT-017) for the request as a whole, while still an order of
+      # magnitude below the 60s default this replaces.
+      timeout: ${REDIS_COMMAND_TIMEOUT_MS:2000}
   # ADR-0020 Decision 4: one Clavaris-owned shared OAuth app per provider, not bring-your-own —
   # SocialLoginConfig (app) is what actually wires oauth2Login() against these registrations.
   # Dev-only placeholder defaults, same convention as signing-key-store.password/oauth2.token-hash-

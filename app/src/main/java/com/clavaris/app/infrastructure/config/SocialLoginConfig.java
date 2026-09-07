@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
+import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,10 +9,23 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * ADR-0020: the OAuth2 <em>client</em> half of social login — Clavaris authenticating an end-user
@@ -39,13 +53,107 @@ import org.springframework.security.web.context.SecurityContextRepository;
  * {@code HttpSession} attribute regardless of which repository instance wrote it), but consistent
  * with how every other chain in this codebase wires it, rather than a silent exception to that
  * rule.
+ *
+ * <p>PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on four
+ * different TD-PERF-009 methods below — every one of connectTimeoutSeconds/readTimeoutSeconds/
+ * socialLoginUserInfoRestOperations names exactly what it is, not accidentally long, same precedent
+ * IdentityUseCaseConfig's own identical class-level suppression already documents for the same
+ * shape of false positive.
  */
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Configuration
 class SocialLoginConfig {
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ SocialLoginConfig() {
-    // Intentionally empty — this class holds no state, only the @Bean method below.
+    // Intentionally empty — this class holds no state, only the @Bean methods below.
+  }
+
+  // TD-PERF-009: shared by both new beans below — Google's token exchange and both providers'
+  // userinfo calls all need the same connect/read ceiling, not two independently-tuned numbers.
+  @SuppressWarnings("PMD.LongVariable")
+  private static ClientHttpRequestFactory timeoutConfiguredRequestFactory(
+      final long connectTimeoutSeconds, final long readTimeoutSeconds) {
+    final JdkClientHttpRequestFactory factory =
+        new JdkClientHttpRequestFactory(
+            HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(connectTimeoutSeconds))
+                .build());
+    factory.setReadTimeout(Duration.ofSeconds(readTimeoutSeconds));
+    return factory;
+  }
+
+  // TD-PERF-009: Spring Security's own default token-response client sets no connect/read
+  // timeout at all — confirmed by reading AbstractRestClientOAuth2AccessTokenResponseClient's
+  // real source (7.1.1), not assumed. With Tomcat capped at 50 threads (TD-PERF-007), a hung
+  // Google/GitHub token endpoint could exhaust the whole pool from this one call alone.
+  // Deliberately replicates that same class's own default RestClient construction byte-for-byte
+  // (same FormHttpMessageConverter/OAuth2AccessTokenResponseHttpMessageConverter/
+  // OAuth2ErrorResponseErrorHandler combination) rather than building a bare RestClient — calling
+  // setRestClient(...) fully replaces the default, so anything less than this exact
+  // configuration would silently break real token-response parsing and OAuth2 error handling,
+  // not just fix a timeout.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+      socialLoginAccessTokenResponseClient(
+          @Value("${clavaris.oauth2.social-login.connect-timeout-seconds:5}")
+              final long connectTimeoutSeconds,
+          @Value("${clavaris.oauth2.social-login.read-timeout-seconds:10}")
+              final long readTimeoutSeconds) {
+    final RestClient restClient =
+        RestClient.builder()
+            .requestFactory(
+                timeoutConfiguredRequestFactory(connectTimeoutSeconds, readTimeoutSeconds))
+            .configureMessageConverters(
+                messageConverters -> {
+                  messageConverters.addCustomConverter(new FormHttpMessageConverter());
+                  messageConverters.addCustomConverter(
+                      new OAuth2AccessTokenResponseHttpMessageConverter());
+                })
+            .defaultStatusHandler(new OAuth2ErrorResponseErrorHandler())
+            .build();
+    final RestClientAuthorizationCodeTokenResponseClient client =
+        new RestClientAuthorizationCodeTokenResponseClient();
+    client.setRestClient(restClient);
+    return client;
+  }
+
+  // TD-PERF-009: same gap, same fix shape, for the userinfo call — DefaultOAuth2UserService's
+  // own default RestTemplate (confirmed from its real source) also sets no timeout. Shared by
+  // both userinfo call sites this codebase has: GitHubVerifiedEmailUserService's own delegate
+  // (the non-OIDC userService slot) below, and socialLoginOidcUserService (the OIDC slot Google
+  // actually uses) just below that. Replicates DefaultOAuth2UserService's own default
+  // OAuth2ErrorResponseErrorHandler — a bare RestTemplate would silently revert userinfo error
+  // handling to RestTemplate's own generic exception type instead of OAuth2AuthenticationException.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ RestOperations socialLoginUserInfoRestOperations(
+      @Value("${clavaris.oauth2.social-login.connect-timeout-seconds:5}")
+          final long connectTimeoutSeconds,
+      @Value("${clavaris.oauth2.social-login.read-timeout-seconds:10}")
+          final long readTimeoutSeconds) {
+    final RestTemplate restTemplate =
+        new RestTemplate(
+            timeoutConfiguredRequestFactory(connectTimeoutSeconds, readTimeoutSeconds));
+    restTemplate.setErrorHandler(new OAuth2ErrorResponseErrorHandler());
+    return restTemplate;
+  }
+
+  // TD-PERF-009: Google is OIDC, so its own userinfo call goes through OidcUserService, not
+  // GitHubVerifiedEmailUserService's own DefaultOAuth2UserService delegate — this class's own
+  // Javadoc already establishes why Google needs no GitHub-shaped customization otherwise.
+  // oauth2UserService is the one delegate slot where OidcUserService actually performs the HTTP
+  // call, so that's where the shared timeout-configured RestOperations plugs in.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ OidcUserService socialLoginOidcUserService(
+      final RestOperations socialLoginUserInfoRestOperations) {
+    final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
+    delegate.setRestOperations(socialLoginUserInfoRestOperations);
+    final OidcUserService oidcUserService = new OidcUserService();
+    oidcUserService.setOauth2UserService(delegate);
+    return oidcUserService;
   }
 
   // CLAUDE.md §6 (code review finding): this chain was originally wired with no
@@ -70,6 +178,9 @@ class SocialLoginConfig {
       final HttpSecurity http,
       final SecurityContextRepository contextRepository,
       final GitHubVerifiedEmailUserService gitHubUserService,
+      final OidcUserService socialLoginOidcUserService,
+      final OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+          socialLoginAccessTokenResponseClient,
       final SocialLoginAuthenticationSuccessHandler successHandler,
       final SocialLoginAuthenticationFailureHandler failureHandler,
       final RateLimiter rateLimiter,
@@ -88,10 +199,20 @@ class SocialLoginConfig {
         .oauth2Login(
             oauth2 ->
                 oauth2
-                    // Only the non-OIDC (GitHub) delegate needs overriding — Google is OIDC and
-                    // Spring's own default OidcUserService already exposes email/email_verified
-                    // correctly, no customization needed there.
-                    .userInfoEndpoint(userInfo -> userInfo.userService(gitHubUserService))
+                    // GitHub (non-OIDC) needs its own verified-email-fetching customization;
+                    // Google (OIDC) only needs socialLoginOidcUserService's own timeout fix, not
+                    // GitHub-shaped logic — Spring's own OidcUserService already exposes
+                    // email/email_verified correctly from the ID token.
+                    .userInfoEndpoint(
+                        userInfo ->
+                            userInfo
+                                .userService(gitHubUserService)
+                                .oidcUserService(socialLoginOidcUserService))
+                    // TD-PERF-009: without this, Spring Security silently falls back to its own
+                    // default, unbounded-timeout token-response client.
+                    .tokenEndpoint(
+                        token ->
+                            token.accessTokenResponseClient(socialLoginAccessTokenResponseClient))
                     .successHandler(successHandler)
                     .failureHandler(failureHandler))
         .securityContext(context -> context.securityContextRepository(contextRepository))

@@ -84,6 +84,10 @@ import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountService;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import java.time.Instant;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -455,6 +459,31 @@ class IdentityUseCaseConfig {
     return new RevokeAccountSessionService(activeSessions, accounts, auditEvents, outbox);
   }
 
+  // TD-PERF-011: a small, bounded pool of daemon threads dedicated to the new-device-login
+  // notification email — decouples RecordAccountLoginDeviceService's own outbound Resend call
+  // from the request thread completing every unrecognized-device login, the same "don't block
+  // the calling thread on a third-party HTTP call" pattern TD-PERF-004 already established for
+  // webhook delivery (webhookDeliveryExecutor, WebhookUseCaseConfig). Small on purpose: this
+  // fires only on unrecognized-device logins, not every login, nowhere near the concurrency a
+  // batch webhook dispatch tick needs. destroyMethod="shutdown": same Spring-managed-lifecycle
+  // discipline as that bean, so a repeatedly-started-and-stopped @SpringBootTest context doesn't
+  // leak thread pools.
+  @Bean(destroyMethod = "shutdown")
+  /* package */ ExecutorService newDeviceNotificationExecutor(
+      @Value("${clavaris.known-device.notification-concurrency:4}") final int concurrency) {
+    final AtomicInteger threadCount = new AtomicInteger();
+    final ThreadFactory namedThreads =
+        runnable -> {
+          final Thread thread =
+              new Thread(runnable, "new-device-notification-" + threadCount.incrementAndGet());
+          // Never blocks JVM shutdown on an in-flight notification send — same posture
+          // webhookDeliveryExecutor's own identical thread factory already establishes.
+          thread.setDaemon(true);
+          return thread;
+        };
+    return Executors.newFixedThreadPool(concurrency, namedThreads);
+  }
+
   // New-device login email notification.
   @Bean
   // Code review finding (2026-09-01): the migration grandfather cutoff — see
@@ -469,8 +498,15 @@ class IdentityUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
       @Value("${clavaris.known-device.migration-cutover-at:2026-08-31T10:00:00Z}")
-          final Instant deviceCookieMigrationCutoverAt) {
+          final Instant deviceCookieMigrationCutoverAt,
+      final ExecutorService newDeviceNotificationExecutor) {
     return new RecordAccountLoginDeviceService(
-        knownDevices, accounts, mailSender, auditEvents, outbox, deviceCookieMigrationCutoverAt);
+        knownDevices,
+        accounts,
+        mailSender,
+        auditEvents,
+        outbox,
+        deviceCookieMigrationCutoverAt,
+        newDeviceNotificationExecutor);
   }
 }

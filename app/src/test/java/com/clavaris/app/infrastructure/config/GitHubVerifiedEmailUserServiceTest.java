@@ -23,6 +23,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -38,6 +39,10 @@ import tools.jackson.databind.ObjectMapper;
 class GitHubVerifiedEmailUserServiceTest {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+  // TD-PERF-009: a plain, un-timeout-configured RestTemplate is fine here — this test's own
+  // delegate call always targets stubServer on localhost, never a real third party; the timeout
+  // configuration itself is SocialLoginConfig's own concern, covered there instead.
+  private final RestTemplate userInfoRestOperations = new RestTemplate();
   private HttpServer stubServer;
 
   @BeforeEach
@@ -150,7 +155,8 @@ class GitHubVerifiedEmailUserServiceTest {
         new GitHubVerifiedEmailUserService(
             HttpClient.newHttpClient(),
             objectMapper,
-            URI.create(stubServerUri() + "/user/emails-malformed"));
+            URI.create(stubServerUri() + "/user/emails-malformed"),
+            userInfoRestOperations);
     OAuth2UserRequest request = userRequest();
 
     assertThatExceptionOfType(OAuth2AuthenticationException.class)
@@ -189,7 +195,8 @@ class GitHubVerifiedEmailUserServiceTest {
         new GitHubVerifiedEmailUserService(
             HttpClient.newHttpClient(),
             objectMapper,
-            URI.create(stubServerUri() + "/emails-forbidden"));
+            URI.create(stubServerUri() + "/emails-forbidden"),
+            userInfoRestOperations);
     OAuth2UserRequest request = userRequest();
 
     assertThatExceptionOfType(OAuth2AuthenticationException.class)
@@ -229,7 +236,10 @@ class GitHubVerifiedEmailUserServiceTest {
 
   private GitHubVerifiedEmailUserService serviceWith(final HttpClient httpClient) {
     return new GitHubVerifiedEmailUserService(
-        httpClient, objectMapper, URI.create(stubServerUri() + "/user/emails"));
+        httpClient,
+        objectMapper,
+        URI.create(stubServerUri() + "/user/emails"),
+        userInfoRestOperations);
   }
 
   private OAuth2UserRequest userRequest() {
