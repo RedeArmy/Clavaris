@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,10 +24,14 @@ class RegisterWebhookEndpointServiceTest {
 
   private final WebhookEndpointRepository endpoints = mock(WebhookEndpointRepository.class);
   private final OrganizationExistsChecker orgExistsChecker = mock(OrganizationExistsChecker.class);
+  // Defaults every URL to safe — TD-SEC-053's own rejection behaviour is exercised by the
+  // dedicated tests below, keeping the rest of this class focused on registration itself.
+  private final WebhookUrlSsrfGuard ssrfGuard = mock(WebhookUrlSsrfGuard.class);
   private final WebhookSigningSecretCipher cipher = mock(WebhookSigningSecretCipher.class);
   private final AuditEventRecorder auditEvents = mock(AuditEventRecorder.class);
   private final RegisterWebhookEndpointService service =
-      new RegisterWebhookEndpointService(endpoints, orgExistsChecker, cipher, auditEvents);
+      new RegisterWebhookEndpointService(
+          endpoints, orgExistsChecker, ssrfGuard, cipher, auditEvents);
 
   @Test
   void registersAnEndpointWithAnEncryptedRandomSecretAndReturnsTheRawOneExactlyOnce() {
@@ -87,6 +92,42 @@ class RegisterWebhookEndpointServiceTest {
 
     verify(endpoints, never()).save(any());
     verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void rejectsAUrlTheSsrfGuardFlagsWithoutSavingAnything() {
+    // TD-SEC-053: WebhookEndpoint.requireValidUrl (domain layer) only checks the scheme — the
+    // service itself must still consult the SSRF guard before persisting anything.
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    doThrow(new UnsafeWebhookUrlException("host resolves to a private address"))
+        .when(ssrfGuard)
+        .requireSafeToRegister("https://internal.example.com/hooks");
+    RegisterWebhookEndpointCommand command =
+        new RegisterWebhookEndpointCommand(
+            organizationId, "https://internal.example.com/hooks", null, List.of("x"), ACTOR);
+
+    assertThatExceptionOfType(UnsafeWebhookUrlException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(endpoints, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void checksTheSsrfGuardOnlyAfterConfirmingTheOrganizationExists() {
+    // Cheapest check first — no point resolving DNS for a command that's going to be rejected on
+    // the Organization check alone.
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(false);
+    RegisterWebhookEndpointCommand command =
+        new RegisterWebhookEndpointCommand(
+            organizationId, "https://example.com", null, List.of("x"), ACTOR);
+
+    assertThatExceptionOfType(OrganizationNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(ssrfGuard);
   }
 
   @Test

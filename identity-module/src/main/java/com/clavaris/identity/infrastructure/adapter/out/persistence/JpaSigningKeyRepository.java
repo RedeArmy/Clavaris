@@ -93,6 +93,13 @@ class JpaSigningKeyRepository implements SigningKeyRepository {
     signingKeys.flush();
   }
 
+  @Override
+  public List<String> findAllKidsByOrganizationId(final OrganizationId organizationId) {
+    return signingKeys.findAllByOrganizationId(organizationId.value()).stream()
+        .map(SigningKeyEntity::getKid)
+        .toList();
+  }
+
   private SigningKey toDomain(final SigningKeyEntity entity) {
     return SigningKey.reconstitute(
         entity.getId(),

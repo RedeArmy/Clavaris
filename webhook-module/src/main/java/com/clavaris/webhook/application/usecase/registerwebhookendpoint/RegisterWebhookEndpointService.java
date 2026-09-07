@@ -19,6 +19,7 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
 
   private final WebhookEndpointRepository endpoints;
   private final OrganizationExistsChecker orgExistsChecker;
+  private final WebhookUrlSsrfGuard ssrfGuard;
   private final WebhookSigningSecretCipher cipher;
   private final AuditEventRecorder auditEvents;
   private final SecureRandom secureRandom = new SecureRandom();
@@ -26,10 +27,12 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
   public RegisterWebhookEndpointService(
       final WebhookEndpointRepository endpoints,
       final OrganizationExistsChecker orgExistsChecker,
+      final WebhookUrlSsrfGuard ssrfGuard,
       final WebhookSigningSecretCipher cipher,
       final AuditEventRecorder auditEvents) {
     this.endpoints = endpoints;
     this.orgExistsChecker = orgExistsChecker;
+    this.ssrfGuard = ssrfGuard;
     this.cipher = cipher;
     this.auditEvents = auditEvents;
   }
@@ -43,6 +46,9 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
     if (!orgExistsChecker.exists(command.organizationId())) {
       throw new OrganizationNotFoundException(command.organizationId());
     }
+    // TD-SEC-053: before anything is persisted — WebhookEndpoint.requireValidUrl only ever checks
+    // the scheme (BR-WEBHOOK-07), never where the host actually resolves to.
+    ssrfGuard.requireSafeToRegister(command.url());
 
     final String rawSecret = generateRawSecret();
     final WebhookEndpoint endpoint =

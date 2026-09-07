@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -155,6 +156,52 @@ class OrganizationSigningKeyMaterialFactoryTest {
     assertThat(reloaded).isPresent();
     assertThat(reloaded.get().getPublic()).isEqualTo(generatedBeforeRestart.getPublic());
     assertThat(reloaded.get().getPrivate()).isEqualTo(generatedBeforeRestart.getPrivate());
+  }
+
+  @Test
+  void purgeAllForEvictsTheCachedActiveKeyAndDeletesEveryHistoricalKidFromTheKeyStore() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    String activeKid = factory.generateFor(organizationId);
+    factory.cacheActive(organizationId, activeKid);
+    String retiredKid = factory.generateFor(organizationId);
+    factory.keyPairForKid(retiredKid); // sanity: the retired kid's own entry exists beforehand
+    assertThat(factory.keyPairFor(organizationId)).isPresent();
+
+    factory.purgeAllFor(organizationId, java.util.List.of(activeKid, retiredKid));
+
+    // TD-SEC-052: both the in-memory cache entry and every key-store entry for this
+    // Organization's full kid history must be gone — not just the currently-cached one.
+    assertThat(factory.keyPairFor(organizationId)).isEmpty();
+    assertThat(factory.keyPairForKid(activeKid)).isEmpty();
+    assertThat(factory.keyPairForKid(retiredKid)).isEmpty();
+  }
+
+  @Test
+  void purgeAllForLeavesOtherOrganizationsCacheAndKeysUntouched() {
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+    OrganizationId purged = new OrganizationId(UUID.randomUUID());
+    OrganizationId untouched = new OrganizationId(UUID.randomUUID());
+    String purgedKid = factory.generateFor(purged);
+    factory.cacheActive(purged, purgedKid);
+    String untouchedKid = factory.generateFor(untouched);
+    factory.cacheActive(untouched, untouchedKid);
+
+    factory.purgeAllFor(purged, java.util.List.of(purgedKid));
+
+    assertThat(factory.keyPairFor(untouched)).isPresent();
+    assertThat(factory.keyPairForKid(untouchedKid)).isPresent();
+  }
+
+  @Test
+  void purgeAllForToleratesAnEmptyKidListAndAnOrganizationNeverCached() {
+    // TD-SEC-052: OrganizationIdentityDataEraserBridge always calls this, even for an
+    // Organization that never had a signing key at all — must not throw.
+    OrganizationSigningKeyMaterialFactory factory = newFactory();
+
+    assertThatCode(
+            () -> factory.purgeAllFor(new OrganizationId(UUID.randomUUID()), java.util.List.of()))
+        .doesNotThrowAnyException();
   }
 
   @Test

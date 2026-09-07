@@ -56,4 +56,14 @@ public interface SigningKeyRepository {
    * through, active or long-retired alike.
    */
   void deleteAllByOrganizationId(OrganizationId organizationId);
+
+  /**
+   * TD-SEC-052: every {@code kid} this Organization ever had, active or retired, with no
+   * window/cutoff at all — unlike {@link #findActiveAndRetiredSince} (scoped to what JWKS should
+   * currently still publish) or {@link #findByKid} (a single targeted key), a real security purge
+   * on Organization deletion must reach every key this Organization's own rows still reference,
+   * including ones long outside any overlap window. Callers must read this <em>before</em> calling
+   * {@link #deleteAllByOrganizationId} — nothing is left to enumerate afterward.
+   */
+  List<String> findAllKidsByOrganizationId(OrganizationId organizationId);
 }

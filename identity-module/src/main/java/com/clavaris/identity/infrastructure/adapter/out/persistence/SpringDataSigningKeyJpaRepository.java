@@ -32,4 +32,8 @@ interface SpringDataSigningKeyJpaRepository extends JpaRepository<SigningKeyEnti
   // rotated through, active or long-retired alike, not just what findActiveAndRetiredSince
   // itself cares about for JWKS publishing.
   void deleteAllByOrganizationId(UUID organizationId);
+
+  // TD-SEC-052: every row this Organization ever had, active or retired, no cutoff — must be read
+  // before deleteAllByOrganizationId above, which leaves nothing left to enumerate.
+  List<SigningKeyEntity> findAllByOrganizationId(UUID organizationId);
 }
