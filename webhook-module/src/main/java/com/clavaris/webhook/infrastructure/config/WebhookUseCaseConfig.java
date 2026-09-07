@@ -21,6 +21,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Register
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookSigningSecretCipher;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookUrlSsrfGuard;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryService;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryUseCase;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretService;
@@ -44,8 +45,13 @@ import org.springframework.context.annotation.Configuration;
  * this count over PMD's default threshold. Same "wiring, not sprawl" reasoning {@code
  * ClientRegistryUseCaseConfig}'s own class-level suppression already documents for an identical
  * situation.
+ *
+ * <p>PMD.CouplingBetweenObjects: same reasoning, same shape of false positive — TD-SEC-053's own
+ * {@code WebhookUrlSsrfGuard} parameter on {@code registerWebhookEndpointUseCase} tipped this count
+ * from 20 to 21. Every one of these types is a port/use-case/operational-value parameter to one
+ * wiring method or another, not a sign of any one method doing too much.
  */
-@SuppressWarnings("PMD.ExcessiveImports")
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Configuration
 class WebhookUseCaseConfig {
 
@@ -58,9 +64,11 @@ class WebhookUseCaseConfig {
   /* package */ RegisterWebhookEndpointUseCase registerWebhookEndpointUseCase(
       final WebhookEndpointRepository endpoints,
       final OrganizationExistsChecker orgExistsChecker,
+      final WebhookUrlSsrfGuard ssrfGuard,
       final WebhookSigningSecretCipher cipher,
       final AuditEventRecorder auditEvents) {
-    return new RegisterWebhookEndpointService(endpoints, orgExistsChecker, cipher, auditEvents);
+    return new RegisterWebhookEndpointService(
+        endpoints, orgExistsChecker, ssrfGuard, cipher, auditEvents);
   }
 
   @Bean

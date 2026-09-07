@@ -74,6 +74,60 @@ class SigningKeyStoreTest {
   }
 
   @Test
+  void deleteRemovesAKeyPairSoItCanNoLongerBeFound() {
+    SigningKeyStore store = newStore();
+    String kid = UUID.randomUUID().toString();
+    store.generate(kid);
+
+    store.delete(kid);
+
+    assertThat(store.find(kid)).isEmpty();
+  }
+
+  @Test
+  void deleteIsANoOpForAKidNeverWritten() {
+    SigningKeyStore store = newStore();
+
+    // TD-SEC-052: OrganizationSigningKeyMaterialFactory#purgeAllFor may call this for a kid it
+    // read from signing_keys but which never actually got a key store entry — must not throw.
+    store.delete(UUID.randomUUID().toString());
+
+    assertThat(store.find(UUID.randomUUID().toString())).isEmpty();
+  }
+
+  @Test
+  void deletingOneKidLeavesEveryOtherKidUntouched() {
+    SigningKeyStore store = newStore();
+    String kept = UUID.randomUUID().toString();
+    String removed = UUID.randomUUID().toString();
+    KeyPair keptPair = store.generate(kept);
+    store.generate(removed);
+
+    store.delete(removed);
+
+    assertThat(store.find(removed)).isEmpty();
+    assertThat(store.find(kept)).isPresent();
+    assertThat(store.find(kept).orElseThrow().getPublic()).isEqualTo(keptPair.getPublic());
+  }
+
+  @Test
+  void deletedKeyMaterialStaysGoneAcrossANewStoreInstance() {
+    // TD-SEC-052's actual point, same empirical standard as TD-SEC-002's own restart-survival
+    // test above: the deletion must be durable on disk, not just absent from this instance's own
+    // in-memory KeyStore object.
+    java.nio.file.Path path = tempDir.resolve("signing-keys.p12");
+    SigningKeyStore store = new SigningKeyStore(path.toString(), "a-test-key-store-password");
+    String kid = UUID.randomUUID().toString();
+    store.generate(kid);
+    store.delete(kid);
+
+    SigningKeyStore reloadedAfterRestart =
+        new SigningKeyStore(path.toString(), "a-test-key-store-password");
+
+    assertThat(reloadedAfterRestart.find(kid)).isEmpty();
+  }
+
+  @Test
   void aWrongPasswordCannotReadAnExistingStore() {
     String kid = UUID.randomUUID().toString();
     java.nio.file.Path path = tempDir.resolve("signing-keys.p12");

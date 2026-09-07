@@ -5,6 +5,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Organiza
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -38,6 +39,9 @@ class RegisterWebhookEndpointController {
       responseCode = "201",
       description = "WebhookEndpoint created — signingSecret is shown here exactly once")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
+  @ApiResponse(
+      responseCode = "400",
+      description = "url resolves to a private/loopback/link-local network address (TD-SEC-053)")
   @PostMapping("/api/v1/admin/organizations/{organizationId}/webhook-endpoints")
   /* package */ ResponseEntity<RegisterWebhookEndpointResponse> register(
       @PathVariable final UUID organizationId,
@@ -55,6 +59,10 @@ class RegisterWebhookEndpointController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
+    } catch (final UnsafeWebhookUrlException _) {
+      // TD-SEC-053: same "surface a validation failure as 400, not a generic 500" precedent as
+      // SetClientBrandingController's own identical IllegalArgumentException catch.
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(RegisterWebhookEndpointResponse.from(result));

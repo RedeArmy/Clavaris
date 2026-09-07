@@ -13,6 +13,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Organiza
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.security.Principal;
 import java.util.List;
@@ -114,6 +115,21 @@ class RegisterWebhookEndpointControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"url\":\"https://example.com\",\"subscribedEventTypes\":[\"x\"]}"))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void returns400WhenTheUrlIsFlaggedAsUnsafeByTheSsrfGuard() throws Exception {
+    when(useCase.handle(any()))
+        .thenThrow(new UnsafeWebhookUrlException("host resolves to a private address"));
+
+    mockMvc
+        .perform(
+            post(path())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"url\":\"https://internal.example.com\",\"subscribedEventTypes\":[\"x\"]}"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

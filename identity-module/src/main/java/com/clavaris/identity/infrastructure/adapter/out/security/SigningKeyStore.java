@@ -83,6 +83,29 @@ class SigningKeyStore {
     return keyPair;
   }
 
+  /**
+   * TD-SEC-052: permanently removes {@code kid}'s own entries from the key store, if present — a
+   * no-op if this store never had one, since a real hard-delete cascade may legitimately try to
+   * purge a {@code kid} that was already retired/purged some other way. Same
+   * write-to-temp-then-atomic-rename durability as {@link #store}: a crash mid-write must never
+   * leave a half-deleted PKCS12 file behind.
+   */
+  /* package */ synchronized void delete(final String kid) {
+    final KeyStore keyStore = load();
+    try {
+      if (keyStore.containsAlias(privateAlias(kid))) {
+        keyStore.deleteEntry(privateAlias(kid));
+      }
+      if (keyStore.containsAlias(publicAlias(kid))) {
+        keyStore.deleteEntry(publicAlias(kid));
+      }
+      persist(keyStore);
+    } catch (final GeneralSecurityException e) {
+      throw new IllegalStateException(
+          "Failed to delete signing key '" + kid + "' from the key store at " + filePath, e);
+    }
+  }
+
   /** Reloads the key pair previously persisted under {@code kid}, if this store has one. */
   @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ synchronized Optional<KeyPair> find(final String kid) {

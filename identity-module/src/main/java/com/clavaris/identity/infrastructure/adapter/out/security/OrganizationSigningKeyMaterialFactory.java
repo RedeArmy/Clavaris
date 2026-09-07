@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.security.KeyPair;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +50,14 @@ import org.springframework.stereotype.Component;
  *       retrievable by {@link OrganizationId}; wiring it into a real per-tenant OIDC issuer is the
  *       next slice after {@code CreateOrganization}, not part of it.
  * </ul>
+ *
+ * <p>TD-SEC-052 (closed): {@link #purgeAllFor} exists specifically because everything above this
+ * paragraph used to be a one-way door — every key ever generated stayed in {@link SigningKeyStore}
+ * forever, and a deleted Organization's own cache entry (and every historical PKCS12 entry {@code
+ * keyStore} still held for it) simply outlived the Organization, with no eviction path at all.
+ * {@code OrganizationIdentityDataEraserBridge} (app module) now calls it as the last step of
+ * Organization hard-deletion, the same top-severity treatment TD-SEC-029's emergency purge already
+ * gives a single compromised key, applied here to every key an entire deleted tenant ever had.
  */
 @Component
 public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterialGenerator {
@@ -97,6 +106,25 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
                             + " but has no matching key store entry — data integrity violated"
                             + " before reaching this call"));
     keyPairs.put(organizationId.value(), keyPair);
+  }
+
+  /**
+   * TD-SEC-052: irreversibly removes every trace of {@code organizationId}'s own signing-key
+   * material this process can reach — the in-memory cache entry (if any is currently held for this
+   * Organization) plus every one of {@code kids}'s own key-store entries. Deliberately takes the
+   * full {@code kid} list as a parameter rather than looking it up itself: by the time an
+   * Organization is actually being purged, its own {@code signing_keys} rows are typically already
+   * gone (the caller must read the full history <em>before</em> deleting those rows, the same "read
+   * before you can no longer look it up" ordering {@code OrganizationIdentityDataEraserBridge}'s
+   * own class Javadoc already documents for revoking every live session before the account rows are
+   * bulk-deleted). Safe to call with an empty or already-purged {@code kids} collection — {@link
+   * SigningKeyStore#delete} is a no-op for a {@code kid} it never had, or already removed.
+   */
+  public void purgeAllFor(final OrganizationId organizationId, final Collection<String> kids) {
+    keyPairs.remove(organizationId.value());
+    for (final String kid : kids) {
+      keyStore.delete(kid);
+    }
   }
 
   /**
