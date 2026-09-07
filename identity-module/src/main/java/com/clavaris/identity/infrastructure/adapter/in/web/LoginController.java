@@ -68,7 +68,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class LoginController {
 
   private static final String FORM_VIEW = "identity/login";
-  private static final String REDIRECT_PREFIX = "redirect:";
 
   private final AuthenticateWithPasswordUseCase useCase;
   private final OrganizationSocialLoginPolicyProvider policyProvider;

@@ -79,7 +79,7 @@ class SemaphoreCpuBoundVerificationGateTest {
   private static void await(final CountDownLatch latch) {
     try {
       latch.await(5, TimeUnit.SECONDS);
-    } catch (final InterruptedException interrupted) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }

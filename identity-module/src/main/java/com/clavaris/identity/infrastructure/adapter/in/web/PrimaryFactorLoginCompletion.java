@@ -35,9 +35,16 @@ import java.util.UUID;
    *     should return directly — a device-trust challenge, a session-task pause, or the final
    *     post-login redirect, in that same priority order the original duplicated block established.
    */
-  @SuppressWarnings("PMD.OnlyOneReturn") // three genuinely distinct exits (device-trust challenge,
-  // session-task pause, final redirect) — same "one exit per distinct outcome" rationale the
-  // two controllers this replaces already documented for their own identical block.
+  // java:S107: 8 parameters is exactly what replacing a 46-line duplicated block with one shared
+  // method costs — ports (6 collaborators, already bundled into one record) plus request/response
+  // (both gates and the final establish step need them) plus the 4 call-specific values (account,
+  // factor, clientId, redirectUrl) that vary per invocation. Same "flat parameter list over a
+  // synthetic wrapper that would only hide the real count" precedent OAuthClient's own rehydration
+  // factories already establish for this codebase.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"}) // three genuinely distinct exits
+  // (device-trust challenge, session-task pause, final redirect) — same "one exit per distinct
+  // outcome" rationale the two controllers this replaces already documented for their own
+  // identical block.
   /* package */ static String completeAfterPrimaryFactor(
       final PrimaryFactorLoginPorts ports,
       final HttpServletRequest request,

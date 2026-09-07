@@ -36,6 +36,7 @@ class SemaphoreCpuBoundVerificationGate implements CpuBoundVerificationGate {
   private static final Logger LOG =
       LoggerFactory.getLogger(SemaphoreCpuBoundVerificationGate.class);
   private static final String METRIC_NAME = "clavaris.auth.argon2_bulkhead";
+  private static final String OUTCOME_TAG_KEY = "outcome";
 
   private final Semaphore permits;
   private final Duration maxWait;
@@ -66,12 +67,12 @@ class SemaphoreCpuBoundVerificationGate implements CpuBoundVerificationGate {
     final boolean acquired;
     try {
       acquired = permits.tryAcquire(maxWait.toMillis(), TimeUnit.MILLISECONDS);
-    } catch (final InterruptedException interrupted) {
+    } catch (final InterruptedException _) {
       // Restore the interrupt flag rather than swallow it (standard practice) — but still report
       // this the same way as an ordinary rejection to the caller, since the verification
       // genuinely never ran either way.
       Thread.currentThread().interrupt();
-      metrics.increment(METRIC_NAME, "outcome", "interrupted");
+      metrics.increment(METRIC_NAME, OUTCOME_TAG_KEY, "interrupted");
       return Optional.empty();
     }
     if (!acquired) {
@@ -79,12 +80,12 @@ class SemaphoreCpuBoundVerificationGate implements CpuBoundVerificationGate {
       // gate itself is saturated — a real operational signal (TokenIssuanceLatencyHigh-style
       // alerting, TD-FUT-011, can watch this metric the same way it already watches p95 latency).
       LOG.warn("event=argon2_bulkhead_rejected");
-      metrics.increment(METRIC_NAME, "outcome", "rejected");
+      metrics.increment(METRIC_NAME, OUTCOME_TAG_KEY, "rejected");
       return Optional.empty();
     }
     try {
       final boolean result = verification.getAsBoolean();
-      metrics.increment(METRIC_NAME, "outcome", "admitted");
+      metrics.increment(METRIC_NAME, OUTCOME_TAG_KEY, "admitted");
       return Optional.of(result);
     } finally {
       permits.release();
