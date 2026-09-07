@@ -198,9 +198,9 @@ class JpaAccountRepository implements AccountRepository {
   }
 
   @Override
-  public List<Account> findAllByOrganizationId(final OrganizationId organizationId) {
-    return accounts.findByOrganizationId(organizationId.value()).stream()
-        .map(this::toDomain)
+  public List<AccountId> findAllAccountIdsByOrganizationId(final OrganizationId organizationId) {
+    return accounts.findIdsByOrganizationId(organizationId.value()).stream()
+        .map(AccountId::new)
         .toList();
   }
 }

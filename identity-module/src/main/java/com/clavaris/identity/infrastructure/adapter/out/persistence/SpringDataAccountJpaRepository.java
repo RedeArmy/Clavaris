@@ -29,11 +29,17 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   @Query("select a.organizationId from AccountEntity a where a.id = :accountId")
   Optional<UUID> findOrganizationIdById(@Param("accountId") UUID accountId);
 
-  // TD-SEC-031: full entities, not an id-only projection — "correct and simple first," same
-  // precedent as OrganizationCapacityRateLimitingFilter's own Javadoc for reading a whole row over
-  // a real DB read where the caller (JpaAccountRepository) already has a toDomain(...) mapper to
-  // reuse. This is a bounded, delete-time-only read, not a hot path.
-  List<AccountEntity> findByOrganizationId(UUID organizationId);
+  // TD-PERF-016: revisits TD-SEC-031's own original "full entities, not an id-only projection —
+  // correct and simple first... this is a bounded, delete-time-only read, not a hot path" call.
+  // Still true that it's not a hot path; not true that the cost is bounded — the caller
+  // (OrganizationIdentityDataEraserBridge) only ever reads AccountId, but the prior version
+  // (findByOrganizationId, returning full entities) forced JpaAccountRepository#toDomain to run a
+  // second, separate password_credentials query per row, an N+1 that scales with the Organization's
+  // own total account count on the single most destructive operation this system exposes. Same
+  // scalar-projection fix findOrganizationIdById already established above for the identical shape
+  // of over-fetch.
+  @Query("select a.id from AccountEntity a where a.organizationId = :organizationId")
+  List<UUID> findIdsByOrganizationId(@Param("organizationId") UUID organizationId);
 
   // BR-DATA-02/03's own organization-level equivalent: Spring Data's own deleteBy/deleteAllBy
   // query derivation, natively a real DELETE, no @Modifying needed. Cascades at the database

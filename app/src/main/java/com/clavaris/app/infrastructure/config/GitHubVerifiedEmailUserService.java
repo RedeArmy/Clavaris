@@ -1,15 +1,14 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,8 +92,15 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   // bounded, in-process cache (not Redis — this is a per-instance latency optimization, not state
   // that needs cross-instance consistency the way rate limits or sessions do) absorbs the common
   // case of the same person logging in more than once within a few minutes; a cold/expired entry
-  // still makes the real call, same as before. Bounded via LinkedHashMap's own access-order LRU
-  // eviction so this can never grow unbounded over a long-lived instance's uptime.
+  // still makes the real call, same as before.
+  //
+  // TD-PERF-016: Caffeine, not a hand-rolled Collections.synchronizedMap(LinkedHashMap) with an
+  // access-order-eviction override — same "less code, not more" migration TD-PERF-006 already made
+  // for CachingRateLimitPolicyRepository/CachingClientDomainConfigRepository. The prior version's
+  // single coarse-grained lock (synchronizedMap wraps every read AND write in one mutex) serialized
+  // every concurrent GitHub login through it; Caffeine's own striped internals don't. maximumSize
+  // and expireAfterWrite together replace both the LRU-eviction override and the manual
+  // CachedVerifiedEmail/expiresAt bookkeeping the old version needed to implement TTL by hand.
   private static final int MAX_CACHED_VERIFIED_EMAILS = 1000;
   private static final Duration VERIFIED_EMAIL_CACHE_TTL = Duration.ofMinutes(5);
 
@@ -102,17 +108,11 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final URI emailsEndpoint;
-  private final Map<String, CachedVerifiedEmail> verifiedEmailCache =
-      Collections.synchronizedMap(
-          new LinkedHashMap<>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(
-                final Map.Entry<String, CachedVerifiedEmail> eldest) {
-              return size() > MAX_CACHED_VERIFIED_EMAILS;
-            }
-          });
-
-  private record CachedVerifiedEmail(String email, Instant expiresAt) {}
+  private final Cache<String, String> verifiedEmailCache =
+      Caffeine.newBuilder()
+          .maximumSize(MAX_CACHED_VERIFIED_EMAILS)
+          .expireAfterWrite(VERIFIED_EMAIL_CACHE_TTL)
+          .build();
 
   // @Autowired required now that a second constructor exists (below) — same fix ResendMailSender's
   // own identical situation already established: without it, Spring has no way to pick between the
@@ -173,10 +173,9 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   }
 
   private String resolveVerifiedEmail(final String githubUserId, final String accessToken) {
-    final Instant now = Instant.now();
-    final CachedVerifiedEmail cached = verifiedEmailCache.get(githubUserId);
-    if (cached != null && cached.expiresAt().isAfter(now)) {
-      return cached.email();
+    final String cached = verifiedEmailCache.getIfPresent(githubUserId);
+    if (cached != null) {
+      return cached;
     }
     final String verifiedEmail = fetchPrimaryVerifiedEmail(accessToken);
     // Code review finding: only cache a real, positive result. Caching a null (no primary
@@ -186,8 +185,7 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
     // whole point of this cache (absorbing a *returning* user's repeat login) only ever applies
     // to the positive case in the first place.
     if (verifiedEmail != null) {
-      verifiedEmailCache.put(
-          githubUserId, new CachedVerifiedEmail(verifiedEmail, now.plus(VERIFIED_EMAIL_CACHE_TTL)));
+      verifiedEmailCache.put(githubUserId, verifiedEmail);
     }
     return verifiedEmail;
   }

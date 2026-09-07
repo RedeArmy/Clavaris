@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -120,6 +121,45 @@ class JpaAccountRepositoryTest {
   @Test
   void findOrganizationIdByIdReturnsEmptyForAnUnknownAccount() {
     assertThat(repository.findOrganizationIdById(AccountId.newId())).isEmpty();
+  }
+
+  // TD-PERF-016: findAllAccountIdsByOrganizationId exists specifically so
+  // OrganizationIdentityDataEraserBridge's own pre-bulk-delete session-revocation loop never pays
+  // for the full findByOrganizationId()/toDomain() round trip, including its own separate
+  // password_credentials query per row — proven against real Postgres, not just inspected, same
+  // discipline findOrganizationIdById's own sibling tests already established above.
+  @Test
+  void findsAllAccountIdsForAnOrganizationWithoutHydratingFullAccounts() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account first = Account.register(organizationId, new Email("scalar-id-one@example.com"));
+    Account second = Account.register(organizationId, new Email("scalar-id-two@example.com"));
+    repository.save(first);
+    repository.save(second);
+
+    List<AccountId> found = repository.findAllAccountIdsByOrganizationId(organizationId);
+
+    assertThat(found).containsExactlyInAnyOrder(first.id(), second.id());
+  }
+
+  @Test
+  void findAllAccountIdsByOrganizationIdIsScopedToOneOrganizationOnly() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
+    Account inScope = Account.register(organizationId, new Email("in-scope@example.com"));
+    Account outOfScope =
+        Account.register(otherOrganizationId, new Email("out-of-scope@example.com"));
+    repository.save(inScope);
+    repository.save(outOfScope);
+
+    List<AccountId> found = repository.findAllAccountIdsByOrganizationId(organizationId);
+
+    assertThat(found).containsExactly(inScope.id()).doesNotContain(outOfScope.id());
+  }
+
+  @Test
+  void findAllAccountIdsByOrganizationIdReturnsEmptyForAnOrganizationWithNoAccounts() {
+    assertThat(repository.findAllAccountIdsByOrganizationId(new OrganizationId(UUID.randomUUID())))
+        .isEmpty();
   }
 
   @Test

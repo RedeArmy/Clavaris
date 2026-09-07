@@ -77,10 +77,15 @@ public interface AccountRepository {
   void deleteAllByOrganizationId(OrganizationId organizationId);
 
   /**
-   * TD-SEC-031: {@code OrganizationIdentityDataEraserBridge}'s own read before it calls {@link
+   * TD-PERF-016: {@code OrganizationIdentityDataEraserBridge}'s own read before it calls {@link
    * #deleteAllByOrganizationId} — the ids are needed to revoke each Account's own live {@code
    * HttpSession} (via {@code AccountSessionRevoker}) before the row it belongs to disappears, since
-   * a bulk delete alone has no per-account hook to do that from.
+   * a bulk delete alone has no per-account hook to do that from. A scalar {@code id} projection,
+   * not the full {@link Account} the original version of this method returned — this Javadoc's own
+   * prior wording already said only the ids were needed, but the implementation fetched every
+   * Account aggregate anyway, including a separate {@code password_credentials} query per row via
+   * {@code JpaAccountRepository#toDomain} — a real N+1 in the one call site that ever used it, an
+   * Organization's own hard-delete cascade, scaling with that Organization's total account count.
    */
-  List<Account> findAllByOrganizationId(OrganizationId organizationId);
+  List<AccountId> findAllAccountIdsByOrganizationId(OrganizationId organizationId);
 }
