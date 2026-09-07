@@ -22,6 +22,13 @@
         thing").
     </description>
 
+    <properties>
+        <!-- Root pom.xml's own sonar.skip=true (silences a real, permanent warning on that
+             zero-source aggregator module) inherits to every child by default — this override is
+             what actually keeps this module analyzed. -->
+        <sonar.skip>false</sonar.skip>
+    </properties>
+
     <dependencies>
         <!-- AuditEventEntity (infrastructure/adapter/out/persistence) — @Entity, Spring Data
              repository. No web/security starter: this module has no inbound adapter of its own,
