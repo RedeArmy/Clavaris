@@ -3,6 +3,8 @@ package com.clavaris.webhook.infrastructure.adapter.out.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class WebhookUrlSsrfCheckerTest {
 
@@ -18,65 +20,30 @@ class WebhookUrlSsrfCheckerTest {
     assertThat(result.reason()).isNull();
   }
 
-  @Test
-  void blocksLoopbackAddresses() {
-    SsrfCheckResult result = checker.check("https://127.0.0.1/webhooks");
+  // Every disallowed address category this class rejects — loopback (IPv4/IPv6), link-local
+  // (169.254.169.254, the single most concrete real-world consequence of this finding, TD-SEC-053's
+  // own register wording), RFC 1918 private, IPv6 unique-local (fc00::/7, RFC 4193 — the modern
+  // range isSiteLocalAddress() alone does not recognise, only the deprecated fec0::/10, this
+  // class's own documented gap fix), multicast, and the wildcard address — collapsed into one
+  // parameterized test rather than a near-identical `@Test` per category.
+  @ParameterizedTest(name = "{0} is blocked as unsafe ({1})")
+  @CsvSource({
+    "https://127.0.0.1/webhooks, loopback",
+    "https://[::1]/webhooks, loopback",
+    "https://169.254.169.254/latest/meta-data/, link-local",
+    "https://10.0.0.5/hooks, private",
+    "https://172.16.0.5/hooks, private",
+    "https://192.168.1.5/hooks, private",
+    "https://[fc00::1]/hooks, unique local",
+    "https://[fd12:3456:789a::1]/hooks, unique local",
+    "https://224.0.0.1/hooks, multicast",
+    "https://0.0.0.0/hooks, wildcard"
+  })
+  void blocksAddressesInDisallowedRanges(final String url, final String expectedReasonSubstring) {
+    SsrfCheckResult result = checker.check(url);
 
     assertThat(result.safe()).isFalse();
-    assertThat(result.reason()).contains("loopback");
-  }
-
-  @Test
-  void blocksTheIpv6LoopbackAddress() {
-    SsrfCheckResult result = checker.check("https://[::1]/webhooks");
-
-    assertThat(result.safe()).isFalse();
-    assertThat(result.reason()).contains("loopback");
-  }
-
-  @Test
-  void blocksTheCloudMetadataAddress() {
-    // 169.254.169.254 — the single most concrete real-world consequence of this finding
-    // (TD-SEC-053's own register wording): AWS/GCP/Azure all serve instance credentials here.
-    SsrfCheckResult result = checker.check("https://169.254.169.254/latest/meta-data/");
-
-    assertThat(result.safe()).isFalse();
-    assertThat(result.reason()).contains("link-local");
-  }
-
-  @Test
-  void blocksRfc1918PrivateAddresses() {
-    assertThat(checker.check("https://10.0.0.5/hooks").safe()).isFalse();
-    assertThat(checker.check("https://172.16.0.5/hooks").safe()).isFalse();
-    assertThat(checker.check("https://192.168.1.5/hooks").safe()).isFalse();
-  }
-
-  @Test
-  void blocksIpv6UniqueLocalAddresses() {
-    // fc00::/7 (RFC 4193) — the modern IPv6 private range isSiteLocalAddress() alone does not
-    // recognise (it only knows the deprecated fec0::/10) — this class's own documented gap fix.
-    SsrfCheckResult fc00 = checker.check("https://[fc00::1]/hooks");
-    SsrfCheckResult fd12 = checker.check("https://[fd12:3456:789a::1]/hooks");
-
-    assertThat(fc00.safe()).isFalse();
-    assertThat(fc00.reason()).contains("unique local");
-    assertThat(fd12.safe()).isFalse();
-  }
-
-  @Test
-  void blocksMulticastAddresses() {
-    SsrfCheckResult result = checker.check("https://224.0.0.1/hooks");
-
-    assertThat(result.safe()).isFalse();
-    assertThat(result.reason()).contains("multicast");
-  }
-
-  @Test
-  void blocksTheWildcardAddress() {
-    SsrfCheckResult result = checker.check("https://0.0.0.0/hooks");
-
-    assertThat(result.safe()).isFalse();
-    assertThat(result.reason()).contains("wildcard");
+    assertThat(result.reason()).contains(expectedReasonSubstring);
   }
 
   @Test

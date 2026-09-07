@@ -16,7 +16,7 @@ class DnsResolvingWebhookUrlSsrfGuardTest {
 
   @Test
   void doesNothingWhenTheCheckerReportsTheUrlIsSafe() {
-    when(checker.check("https://example.com/hooks")).thenReturn(SsrfCheckResult.SAFE);
+    when(checker.check("https://example.com/hooks")).thenReturn(SsrfCheckResult.SAFE_RESULT);
 
     assertThatCode(() -> guard.requireSafeToRegister("https://example.com/hooks"))
         .doesNotThrowAnyException();

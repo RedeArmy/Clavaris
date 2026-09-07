@@ -68,7 +68,7 @@ public class WebhookUrlSsrfChecker {
     final InetAddress[] addresses;
     try {
       addresses = InetAddress.getAllByName(host);
-    } catch (final UnknownHostException e) {
+    } catch (final UnknownHostException _) {
       // Fail-safe: an unresolvable host cannot be proven safe, so it is treated as unsafe rather
       // than let through — the posture a security boundary must take when it cannot verify a
       // claim, not an incidental side effect of the exception type.
@@ -82,7 +82,7 @@ public class WebhookUrlSsrfChecker {
             "host '" + host + "' resolves to " + address.getHostAddress() + " (" + reason + ")");
       }
     }
-    return SsrfCheckResult.SAFE;
+    return SsrfCheckResult.SAFE_RESULT;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn") // a malformed URL (caught) vs. a well-formed one is two
@@ -90,7 +90,7 @@ public class WebhookUrlSsrfChecker {
   private String extractHost(final String url) {
     try {
       return URI.create(url).getHost();
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
   }

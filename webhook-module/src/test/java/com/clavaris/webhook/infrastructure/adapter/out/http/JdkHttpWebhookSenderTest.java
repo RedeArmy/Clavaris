@@ -30,7 +30,7 @@ class JdkHttpWebhookSenderTest {
       new WebhookUrlSsrfChecker() {
         @Override
         public SsrfCheckResult check(final String url) {
-          return SsrfCheckResult.SAFE;
+          return SsrfCheckResult.SAFE_RESULT;
         }
       };
 

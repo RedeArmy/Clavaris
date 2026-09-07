@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -198,7 +199,9 @@ class OrganizationSigningKeyMaterialFactoryTest {
     // Organization that never had a signing key at all — must not throw.
     OrganizationSigningKeyMaterialFactory factory = newFactory();
 
-    factory.purgeAllFor(new OrganizationId(UUID.randomUUID()), java.util.List.of());
+    assertThatCode(
+            () -> factory.purgeAllFor(new OrganizationId(UUID.randomUUID()), java.util.List.of()))
+        .doesNotThrowAnyException();
   }
 
   @Test
