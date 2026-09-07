@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameCommand;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
@@ -111,6 +112,13 @@ public class UsernameSignInController {
       return FORM_VIEW;
     } catch (final EmailNotVerifiedException _) {
       model.addAttribute("emailNotVerifiedError", true);
+      return FORM_VIEW;
+    } catch (final VerificationOverloadedException _) {
+      // TD-FUT-017: same rationale as LoginController's own identical catch block — the password
+      // was never actually checked, so this must never be rendered as loginError's generic
+      // "invalid credentials" message.
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("serviceOverloadedError", true);
       return FORM_VIEW;
     }
 

@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.infrastructure.adapter.out.security.PlatformSigningKeyMaterial;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -99,7 +100,10 @@ class PlatformAuthorizationServerConfig {
       final RateLimiter rateLimiter,
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.token.per-client-limit:20}")
-          final int tokenPerClientLimit) {
+          final int tokenPerClientLimit,
+      // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
+      // bulkheads its own password checks through — both compete for the same limited CPU budget.
+      @SuppressWarnings("PMD.LongVariable") final CpuBoundVerificationGate argon2BulkheadGate) {
     final AuthorizationServerSettings settings =
         AuthorizationServerSettings.builder()
             .issuer(baseUrl)
@@ -175,7 +179,9 @@ class PlatformAuthorizationServerConfig {
                     .clientAuthentication(
                         clientAuth ->
                             clientAuth.authenticationProviders(
-                                Argon2ClientAuthenticationSupport::useArgon2PasswordEncoder)))
+                                providers ->
+                                    Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                        providers, argon2BulkheadGate))))
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         // ADR-0010 §6.1/BR-ID-06: this tier's own client_credentials-only anti-abuse layer — no
         // refresh_token grant exists here at all (BR-PLATFORM-04: PlatformAccount never issues an

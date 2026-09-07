@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Authen
 import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
+import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
@@ -169,6 +170,14 @@ public class LoginController {
       // EmailNotVerifiedException's own Javadoc for why this one case is allowed to differ from
       // the anti-enumeration-generic rejection every other failure mode uses.
       model.addAttribute("emailNotVerifiedError", true);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      return FORM_VIEW;
+    } catch (final VerificationOverloadedException _) {
+      // TD-FUT-017: the password was never actually checked (see that exception's own Javadoc) —
+      // a distinct 503, never loginError's generic "invalid credentials" message, which would
+      // mislead the caller and could wrongly consume BR-ID-06's own failed-attempt lockout budget.
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("serviceOverloadedError", true);
       addSignInOptions(organizationId, model, clientId, redirectUrl, display);
       return FORM_VIEW;
     }

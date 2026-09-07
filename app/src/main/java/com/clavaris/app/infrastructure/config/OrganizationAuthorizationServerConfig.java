@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
@@ -305,7 +306,10 @@ class OrganizationAuthorizationServerConfig {
       // longer-lived ID tokens and real-world clock skew between this process and a verifier,
       // without holding a compromised key's material "live" in JWKS indefinitely.
       @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours,
-      final EmbeddingEligibilityChecker embeddingChecker) {
+      final EmbeddingEligibilityChecker embeddingChecker,
+      // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
+      // bulkheads its own password checks through — both compete for the same limited CPU budget.
+      final CpuBoundVerificationGate argon2BulkheadGate) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -451,7 +455,9 @@ class OrganizationAuthorizationServerConfig {
                     .clientAuthentication(
                         clientAuth ->
                             clientAuth.authenticationProviders(
-                                Argon2ClientAuthenticationSupport::useArgon2PasswordEncoder))
+                                providers ->
+                                    Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                        providers, argon2BulkheadGate)))
                     // TD-SEC-011 (2026-09-06): the project-owned, branded replacement for SAS's own
                     // DefaultConsentPage — see ConsentController's own Javadoc for the full design
                     // and CONSENT_PATH_PATTERN's own comment above for why this is one flat,
