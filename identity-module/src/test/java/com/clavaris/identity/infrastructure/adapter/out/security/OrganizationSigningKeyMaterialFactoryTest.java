@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -266,7 +267,7 @@ class OrganizationSigningKeyMaterialFactoryTest {
     assertThat(firstLookup).isPresent();
     assertThat(firstLookup.orElseThrow().kid()).isEqualTo("persisted-org-kid");
     // Exactly once — the second lookup above must have been served from the now-populated cache.
-    verify(repository, org.mockito.Mockito.times(1)).findActive(organizationId);
+    verify(repository, times(1)).findActive(organizationId);
   }
 
   @Test
