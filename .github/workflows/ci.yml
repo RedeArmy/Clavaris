@@ -366,20 +366,30 @@ jobs:
           -Dsonar.plsql.file.suffixes=
 
       # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...". Root
-      # cause corrected 2026-09-06, not just restated — this comment's own 2026-09-04 predecessor
-      # (blaming `common` having zero tests) was confirmed live to no longer be the explanation
-      # (every one of the six real modules produces its own jacoco.xml after `mvn clean verify`),
-      # yet the warning kept appearing in SonarCloud's "Analysis warnings" panel. Real, permanent
-      # cause: `clavaris-parent` (root pom.xml, packaging=pom) has no src/main/java of its own —
-      # this property resolves per module relative to THAT module's own basedir, and from the
-      # repo root, "../app/target/site/jacoco-aggregate/jacoco.xml" resolves OUTSIDE the
-      # repository entirely (confirmed: realpath -m from the repo root), never to a real file
-      # regardless of build order or completeness. Genuinely inert either way (zero source lines
-      # in that module means coverage has nothing to attach to even if the paths did resolve), but
-      # a real, reproducible warning, not a timing artifact — silenced at the source via
-      # sonar.skip=true on the root pom's own <properties>, explicitly overridden back to false in
-      # each of the six real modules' own pom.xml (Maven property inheritance means the root's
-      # value would otherwise silence analysis everywhere, not just there).
+      # cause confirmed 2026-09-06 (this comment's own 2026-09-04 predecessor, blaming `common`
+      # having zero tests, was confirmed live to no longer be the explanation — every one of the
+      # six real modules produces its own jacoco.xml after `mvn clean verify`): `clavaris-parent`
+      # (root pom.xml, packaging=pom) has no src/main/java of its own — this property resolves per
+      # module relative to THAT module's own basedir, and from the repo root,
+      # "../app/target/site/jacoco-aggregate/jacoco.xml" resolves OUTSIDE the repository entirely
+      # (confirmed: realpath -m from the repo root), never to a real file regardless of build order
+      # or completeness. Genuinely inert either way (zero source lines in that module means coverage
+      # has nothing to attach to even if the paths did resolve).
+      #
+      # A `sonar.skip=true` fix on the root pom (explicitly overridden back to `false` in each of
+      # the six real modules' own pom.xml) was tried the same week and reverted days later — real
+      # regression, caught live: `sonar:sonar` is an aggregator mojo, executed exactly ONCE against
+      # this root project regardless of the reactor's own module count, and it reads `sonar.skip`
+      # from THIS project's own resolved properties for that one invocation. A child module's own
+      # override is never consulted for "should the aggregate submission happen at all" — only
+      # per-sensor properties like `sonar.coverage.jacoco.xmlReportPaths` above get resolved per
+      # module. Setting `sonar.skip=true` here silently skipped the ENTIRE analysis submission for
+      # every module in the reactor, on every PR, not just this one module's own irrelevant
+      # coverage warning — confirmed live: "sonar.skip = true: Skipping analysis" was the very last
+      # line of every affected run, no analysis ever reached SonarCloud. **Do not reintroduce
+      # `sonar.skip` anywhere in this repo's pom.xml tree to silence this warning** — it is
+      # genuinely not fixable that way. Tolerated as harmless, cosmetic noise instead, same class of
+      # accepted gap as the PL/SQL Data Dictionary warning below.
       #
       # "Some thymeleaf templates are not indexed: you may want to add 'src/main/resources' in the
       # scanned files of this project to detect java XSS vulnerabilities". Real gap, now fixed:
