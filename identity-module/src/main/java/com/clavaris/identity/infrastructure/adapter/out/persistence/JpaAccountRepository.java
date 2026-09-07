@@ -78,8 +78,8 @@ class JpaAccountRepository implements AccountRepository {
   private Account toDomain(final AccountEntity entity) {
     final AccountId accountId = new AccountId(entity.getId());
     // A password-only login attempt against an account that only has a social identity attached
-    // (not yet implemented) is exactly the case reconstitute's own Javadoc calls out — absent here
-    // is not a bug, AuthenticateWithPasswordService treats it as "no password credential to check".
+    // (ADR-0020) is exactly the case reconstitute's own Javadoc calls out — absent here is not a
+    // bug, AuthenticateWithPasswordService treats it as "no password credential to check".
     final PasswordCredential credential =
         credentials
             .findByAccountId(entity.getId())

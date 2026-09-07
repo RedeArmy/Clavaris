@@ -8,9 +8,8 @@ import com.clavaris.identity.domain.model.OrganizationId;
  * the domain state change it records, which is why {@link RegisterAccountService} calls this (not a
  * direct event bus publish) from inside its own {@code @Transactional} method. Write-only in this
  * slice: the dispatcher that drains {@code event_outbox} and actually delivers webhooks belongs to
- * {@code webhook-module} (ADR-0007, 🟡 proposed), not yet built — a row written here simply waits
- * until that module exists to drain it, same as any other outbox consumer coming online later
- * would.
+ * {@code webhook-module} (ADR-0007, ✅ Approved, shipped 2026-09-02) — this port stays write-only
+ * here regardless, this module has no reason to depend on that dispatcher directly.
  *
  * <p><b>Named exception (TD-SEC-036):</b> a caller whose own state change isn't itself a database
  * write (e.g. {@code RevokeAccountSessionService}'s real action is a Redis call) has no transaction

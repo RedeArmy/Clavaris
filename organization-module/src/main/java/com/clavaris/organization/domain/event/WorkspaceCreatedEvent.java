@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * Written to this module's own {@code organization_event_outbox} table (same table {@code
  * OrganizationDeletedEvent} already uses — {@code aggregateType} discriminates), aggregate type
- * {@code "Workspace"}. Functionally inert today, same "write-only until a dispatcher exists"
- * posture as every other outbox write in this codebase (webhook-module doesn't exist yet).
+ * {@code "Workspace"}. {@code webhook-module} (ADR-0007) shipped 2026-09-02 and drains this write
+ * for real now — no longer the write-only-with-no-consumer state this comment used to describe.
  */
 public record WorkspaceCreatedEvent(
     UUID workspaceId, UUID organizationId, String name, Instant occurredAt) {
