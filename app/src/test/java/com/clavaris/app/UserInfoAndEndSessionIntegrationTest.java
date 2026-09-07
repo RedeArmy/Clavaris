@@ -154,12 +154,65 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
                 + urlEncode(tokens.tokenResponse().idToken()));
 
     // SAS's own default: redirects to "/" (this application's own base URL) when no
-    // post_logout_redirect_uri was presented — OrganizationRegisteredClientRepository never wires
-    // RegisteredClient.postLogoutRedirectUri(...) today (TD-FUT-018, tracked, not this row's own
-    // scope — post_logout_redirect_uri is genuinely optional per the RP-Initiated Logout spec, so
-    // its absence doesn't stop this endpoint from being real and working).
+    // post_logout_redirect_uri was presented — this client's own registration (below) never sets
+    // one, the genuinely valid "not configured" state (post_logout_redirect_uri is optional per
+    // the RP-Initiated Logout spec itself). The configured case is
+    // endSessionRedirectsToARealConfiguredPostLogoutRedirectUri below, not this test.
     assertThat(response.statusCode()).isEqualTo(302);
     assertThat(response.headers().firstValue("Location")).isPresent();
+  }
+
+  // TD-FUT-018 (closed): OrganizationRegisteredClientRepository does wire
+  // RegisteredClient.postLogoutRedirectUri(...) from a real, registered, non-empty
+  // postLogoutRedirectUris entry — confirmed by code review, not by this test alone — but nothing
+  // had ever exercised the actual redirect behavior end to end when one is genuinely configured.
+  // This is that missing proof: a real client registered with a real post-logout URI, a real
+  // authorization code exchange, and a real /connect/logout call presenting both id_token_hint and
+  // a matching post_logout_redirect_uri — asserting SAS actually redirects there, not to its own
+  // bare default.
+  @Test
+  void endSessionRedirectsToARealConfiguredPostLogoutRedirectUri() throws Exception {
+    String postLogoutRedirectUri = "https://client.example.test/logged-out";
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Configured Post-Logout Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, postLogoutRedirectUri);
+    String email = "logout-configured@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+
+    String codeVerifier = generateCodeVerifier();
+    String codeChallenge = deriveCodeChallenge(codeVerifier);
+    getAuthorize(organizationId, client.clientId(), codeChallenge, "state-value");
+    String loginCsrfToken = fetchLoginCsrfToken(organizationId);
+    HttpResponse<Void> loginResponse =
+        submitLogin(organizationId, loginCsrfToken, email, "a-correct-password");
+    String backToAuthorize = loginResponse.headers().firstValue("Location").orElseThrow();
+    HttpResponse<Void> authorizedResponse = getDiscardingBodyAbsolute(backToAuthorize);
+    String redirectWithCode = authorizedResponse.headers().firstValue("Location").orElseThrow();
+    String code = queryParam(redirectWithCode, "code");
+    HttpResponse<String> tokenResponse = exchangeCode(organizationId, client, code, codeVerifier);
+    assertThat(tokenResponse.statusCode())
+        .as("test setup itself must succeed before the logout redirect can be exercised")
+        .isEqualTo(200);
+    String idToken = objectMapper.readTree(tokenResponse.body()).get("id_token").asString();
+
+    HttpResponse<Void> logoutResponse =
+        getDiscardingBody(
+            "/o/"
+                + organizationId
+                + "/connect/logout?id_token_hint="
+                + urlEncode(idToken)
+                + "&post_logout_redirect_uri="
+                + urlEncode(postLogoutRedirectUri)
+                + "&client_id="
+                + client.clientId());
+
+    assertThat(logoutResponse.statusCode()).isEqualTo(302);
+    assertThat(logoutResponse.headers().firstValue("Location"))
+        .as(
+            "SAS must redirect to this client's own registered post-logout URI, not its bare"
+                + " default \"/\"")
+        .contains(postLogoutRedirectUri);
   }
 
   @Test
@@ -288,16 +341,30 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
 
   private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)
       throws IOException, InterruptedException {
+    return registerOAuthClient(platformToken, organizationId, null);
+  }
+
+  // TD-FUT-018: the overload every other test above uses omits postLogoutRedirectUris entirely
+  // (SAS's own bare "/" default, the case already covered) — this one is the real registration
+  // path for endSessionRedirectsToARealConfiguredPostLogoutRedirectUri below, the one scenario
+  // that row's own feature was actually built for but had never been exercised end to end.
+  private ClientCredentials registerOAuthClient(
+      String platformToken, UUID organizationId, String postLogoutRedirectUri)
+      throws IOException, InterruptedException {
+    String postLogoutClause =
+        postLogoutRedirectUri == null
+            ? ""
+            : ",\n          \"postLogoutRedirectUris\": [\"" + postLogoutRedirectUri + "\"]";
     String requestBody =
         """
         {
           "redirectUris": ["%s"],
           "allowedGrantTypes": ["authorization_code"],
           "allowedScopes": ["openid"],
-          "requireConsent": false
+          "requireConsent": false%s
         }
         """
-            .formatted(REDIRECT_URI);
+            .formatted(REDIRECT_URI, postLogoutClause);
     HttpRequest request =
         HttpRequest.newBuilder(
                 baseUri("/api/v1/admin/organizations/" + organizationId + "/clients"))
