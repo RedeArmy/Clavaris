@@ -9,10 +9,9 @@ import java.util.UUID;
  * ADR-0010 (Organization provisioning), BR-PLATFORM-01/02/03: authenticates the entire {@code
  * /api/v1/admin/*} management-API surface, including {@code POST /api/v1/admin/organizations}
  * itself — the one call that, by definition, can't be authenticated by a token belonging to the
- * Organization it's about to create. Deliberately a separate class from {@code OAuthClient}
- * (client-registry-module's tenant-scoped registrations, not yet implemented) — belongs to no
- * Organization at all, not a nullable-{@code organizationId} row on the same table (data-model.md
- * §2).
+ * Organization it's about to create. Deliberately a separate class from {@link OAuthClient} (this
+ * same module's tenant-scoped registrations) — belongs to no Organization at all, not a
+ * nullable-{@code organizationId} row on the same table (data-model.md §2).
  *
  * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
  * the same reason identity-module's {@code Account} suppresses them — the deliberate record-style

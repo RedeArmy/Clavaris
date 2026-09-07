@@ -70,9 +70,9 @@ public final class Account {
 
   /**
    * Registers a new account. Deliberately does not attach a credential — a caller must call {@link
-   * #attachPasswordCredential(String)} (or, once social login exists, link a {@code
-   * SocialIdentity}) in the same use case, before the aggregate is persisted, so that "an Account
-   * with no credential yet" is never a state observable outside this package (BR-ID-02).
+   * #attachPasswordCredential(String)} (or link a {@code SocialIdentity}, ADR-0020) in the same use
+   * case, before the aggregate is persisted, so that "an Account with no credential yet" is never a
+   * state observable outside this package (BR-ID-02).
    */
   public static Account register(final OrganizationId organizationId, final Email email) {
     return new Account(
@@ -124,8 +124,8 @@ public final class Account {
    * (via {@link PasswordCredential#reconstitute}) rather than going through {@link
    * #attachPasswordCredential(String)} — that method's "must not already have one" guard models a
    * registration-time invariant, not a rehydration-from-storage one. {@code passwordCredential} may
-   * be {@code null} for an account whose only authentication method is a (not yet implemented)
-   * social identity — BR-ID-02 still guarantees at least one exists, just not necessarily this one.
+   * be {@code null} for an account whose only authentication method is a social identity (ADR-0020)
+   * — BR-ID-02 still guarantees at least one exists, just not necessarily this one.
    *
    * @param username ADR-0024 §4: {@code null} for every account that never set one (the common
    *     case) — see {@link #assignUsername} for why this is never set at construction time.

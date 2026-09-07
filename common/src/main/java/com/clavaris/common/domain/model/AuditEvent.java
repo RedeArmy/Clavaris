@@ -11,8 +11,9 @@ import java.util.UUID;
  * and every future action this register or a business rule names as requiring one. Distinct from
  * the {@code event=} structured log lines TD-SEC-014/016/017 already established for the
  * login/token surface: those are grep-able signal in a log stream that can rotate away, this is a
- * durable, queryable Postgres row — BR-ADMIN-01 (impersonation, not yet built) and any future "who
- * did this and when" investigation both need the latter, not the former.
+ * durable, queryable Postgres row — BR-ADMIN-01 (impersonation, shipped, its own {@code
+ * ImpersonateAccountService} writes here too) and any future "who did this and when" investigation
+ * both need the latter, not the former.
  *
  * <p>Never carries PII or a secret in {@code detail} — same BR-DATA-01 discipline as every other
  * logged/persisted event in this codebase (TD-SEC-014's own login-event logging, TD-SEC-016/017's

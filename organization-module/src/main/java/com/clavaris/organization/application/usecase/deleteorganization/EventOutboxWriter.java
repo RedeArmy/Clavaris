@@ -12,7 +12,8 @@ import java.util.UUID;
  * the domain state change it records, which is why {@link DeleteOrganizationService} calls this
  * (not a direct event bus publish) from inside its own {@code @Transactional} method. Write-only in
  * this slice: the dispatcher that drains {@code event_outbox} and actually delivers webhooks
- * belongs to {@code webhook-module} (ADR-0007, 🟡 proposed), not yet built.
+ * belongs to {@code webhook-module} (ADR-0007, ✅ Approved, shipped 2026-09-02) — this port stays
+ * write-only here regardless, this module has no reason to depend on that dispatcher directly.
  *
  * <p>{@code aggregateType} added (Workspace feature, 2026-08-27): this port used to hardcode {@code
  * "Organization"} internally since {@code Organization} was this module's only aggregate — {@code

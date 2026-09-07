@@ -37,16 +37,20 @@ import org.springframework.transaction.annotation.Transactional;
  * AccountTokenRevoker} already established) — those rows must still exist when it runs. The two
  * erasers have no ordering dependency on each other.
  *
- * <p><b>No `Workspace`/`WorkspaceMembership` step exists here either</b>, same reason {@code
- * DeleteAccountService} doesn't have one — zero code exists for that feature yet
- * (`roadmap-and-release-plan.md` §2). Revisit the day it ships.
+ * <p><b>No explicit `Workspace`/`WorkspaceMembership` erasure step here</b> — deliberately, not a
+ * gap: unlike the two erasers above (needed because identity-module/client-registry-module are
+ * separate modules with no shared migration folder, see this Javadoc's own reasoning), {@code
+ * workspaces}/{@code workspace_memberships} are this same module's own tables, both {@code ON
+ * DELETE CASCADE} from {@code organizations}/{@code workspaces} respectively (migrations {@code
+ * V20260827130000}/{@code V20260827130001}) — the plain {@code organizations.deleteById} call below
+ * already erases every Workspace and WorkspaceMembership row for this Organization, no
+ * application-layer code needed.
  *
  * <p>TD-ARCH-007 (SDE-III review, 2026-08-26): {@link EventOutboxWriter}/{@link
  * OrganizationDeletedEvent} added — this class's identity-module sibling, {@code
  * DeleteAccountService}, already wrote an outbox event on delete; this one never did, a real
- * inconsistency between two structurally parallel services now closed. Functionally inert today
- * (webhook-module doesn't exist yet), same "write-only until a dispatcher exists" posture as every
- * other outbox write in this codebase. The read this needs ({@link
+ * inconsistency between two structurally parallel services now closed. {@code webhook-module}
+ * (ADR-0007) shipped 2026-09-02 and now drains this write for real. The read this needs ({@link
  * OrganizationRepository#findById}) replaces the plain {@code existsById} check this class used
  * before — the full {@code Organization} (specifically its {@code name}) is needed to build the
  * event payload.

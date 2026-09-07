@@ -5,10 +5,11 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 
 /**
- * Input to {@link AuthenticateWithSocialProviderUseCase}. Built by the (Phase 4, not yet built)
- * OAuth2 client adapter after it has already exchanged the provider's authorization code and
- * decoded the returned identity — this use case never talks to Google/GitHub itself (§7.2's
- * dependency rule: no HTTP concepts in {@code application/}).
+ * Input to {@link AuthenticateWithSocialProviderUseCase}. Built by {@code
+ * SocialLoginAuthenticationSuccessHandler} (ADR-0020, {@code app} module) after it has already
+ * exchanged the provider's authorization code and decoded the returned identity — this use case
+ * never talks to Google/GitHub itself (§7.2's dependency rule: no HTTP concepts in {@code
+ * application/}).
  *
  * @param providerUserId the provider's own opaque, stable subject identifier — never the email (see
  *     {@code SocialIdentity}'s own Javadoc for why).
