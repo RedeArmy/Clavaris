@@ -21,7 +21,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -71,14 +70,16 @@ public class LoginController {
   private static final String REDIRECT_PREFIX = "redirect:";
 
   private final AuthenticateWithPasswordUseCase useCase;
-  private final AuthenticatedSessionEstablisher sessions;
   private final OrganizationSocialLoginPolicyProvider policyProvider;
-  private final RecordAccountLoginDeviceUseCase recordLoginDevice;
-  private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
-  private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
-  private final RedirectUrlResolver redirectUrlResolver;
   private final ClientBrandingProvider clientBrandingProvider;
+
+  // TD-ARCH-016: the other 5 constructor params below (knownDevices, requestDeviceTrustChallenge,
+  // sessions, recordLoginDevice, redirectUrlResolver) are never read as bare fields anywhere in
+  // this class — they exist solely to build this one record, once, here, not per-request. Kept as
+  // constructor parameters (not folded away) so Spring still autowires each of them individually,
+  // the same as before this extraction.
+  private final PrimaryFactorLoginPorts loginPorts;
 
   @SuppressWarnings("java:S107")
   public LoginController(
@@ -92,14 +93,17 @@ public class LoginController {
       final RedirectUrlResolver redirectUrlResolver,
       final ClientBrandingProvider clientBrandingProvider) {
     this.useCase = useCase;
-    this.sessions = sessions;
     this.policyProvider = policyProvider;
-    this.recordLoginDevice = recordLoginDevice;
-    this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
-    this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
-    this.redirectUrlResolver = redirectUrlResolver;
     this.clientBrandingProvider = clientBrandingProvider;
+    this.loginPorts =
+        new PrimaryFactorLoginPorts(
+            knownDevices,
+            requestDeviceTrustChallenge,
+            authenticationPolicyProvider,
+            sessions,
+            recordLoginDevice,
+            redirectUrlResolver);
   }
 
   @GetMapping
@@ -169,57 +173,17 @@ public class LoginController {
       return FORM_VIEW;
     }
 
-    // TD-ARCH-016: identical to UsernameSignInController's own equivalent block — CPD-flagged
-    // live by TD-PROC-009's own new local check, the very first time it ran. Deliberately not
-    // consolidated in this pass: unlike AuthenticatedSessionCompletion#complete (a single,
-    // self-contained tail), folding DeviceTrustGate+SessionTaskGate+that completion into one
-    // shared helper would need ~14 collaborating ports across both call sites — real design work
-    // (likely a small ports-record parameter, not a flat parameter list), not a same-day fix. See
-    // TD-ARCH-016 for the tracked follow-up. CPD-OFF/CPD-ON: a real, tracked, deliberately-deferred
-    // duplication, not silently ignored — everything outside this bracket still fails the build.
-    // CPD-OFF
-    final Optional<String> challenge =
-        DeviceTrustGate.intercept(
-            knownDevices,
-            requestDeviceTrustChallenge,
-            authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
-            request,
-            organizationId,
-            account.id(),
-            PendingAuthenticationFactor.PASSWORD,
-            clientId,
-            redirectUrl);
-    if (challenge.isPresent()) {
-      return REDIRECT_PREFIX + challenge.get();
-    }
-
-    final Optional<String> sessionTask =
-        SessionTaskGate.intercept(
-            request,
-            organizationId,
-            account,
-            PendingAuthenticationFactor.PASSWORD,
-            clientId,
-            redirectUrl);
-    if (sessionTask.isPresent()) {
-      return REDIRECT_PREFIX + sessionTask.get();
-    }
-
-    final String redirectTarget =
-        AuthenticatedSessionCompletion.complete(
-            sessions,
-            recordLoginDevice,
-            redirectUrlResolver,
-            request,
-            response,
-            organizationId,
-            account.id(),
-            PendingAuthenticationFactor.PASSWORD,
-            clientId,
-            redirectUrl,
-            account);
-    // CPD-ON
-    return REDIRECT_PREFIX + redirectTarget;
+    // TD-ARCH-016 (closed): used to be an identical, byte-for-byte-duplicated block against
+    // UsernameSignInController's own equivalent — see PrimaryFactorLoginCompletion's own Javadoc.
+    return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
+        loginPorts,
+        request,
+        response,
+        organizationId,
+        account,
+        PendingAuthenticationFactor.PASSWORD,
+        clientId,
+        redirectUrl);
   }
 
   // Code review finding (TD-SEC-032, closed): one allowedProviders() call per render, not one
