@@ -1,6 +1,6 @@
 # ADR-0004: PostgreSQL + Redis for storage
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

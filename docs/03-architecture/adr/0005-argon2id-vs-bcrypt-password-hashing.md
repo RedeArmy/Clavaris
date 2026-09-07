@@ -1,6 +1,6 @@
 # ADR-0005: Argon2id vs. BCrypt for password hashing
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

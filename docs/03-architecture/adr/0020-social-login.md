@@ -1,6 +1,6 @@
 # ADR-0020: Social login (Google/GitHub) — account linking, platform-tier scope, per-tenant policy
 
-**Status:** ✅ Aprobado (2026-08-28)
+**Status:** ✅ Approved (2026-08-28)
 
 ## Context
 

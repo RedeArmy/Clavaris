@@ -1,6 +1,6 @@
 # ADR-0012: PlatformAccount — self-service human ownership of Organizations
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

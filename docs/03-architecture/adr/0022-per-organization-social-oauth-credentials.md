@@ -1,6 +1,6 @@
 # ADR-0022: Per-Organization social OAuth credentials (PRODUCTION only)
 
-**Status:** ✅ Aprobado (2026-09-05)
+**Status:** ✅ Approved (2026-09-05)
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR-0008: API versioning strategy and OpenAPI/Swagger as the contract source of truth
 
-**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Aprobado y añadirse a la lista de ADRs vigentes del proyecto
+**Status:** 🟡 Propuesta — pendiente de revisión antes de considerarse ✅ Approved y añadirse a la lista de ADRs vigentes del proyecto
 
 ## Context
 

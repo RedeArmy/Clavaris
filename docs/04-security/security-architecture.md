@@ -1,6 +1,6 @@
 # Security Architecture — Clavaris
 
-✅ Aprobado (2026-08-28) — SDE-III review confirmed no substantive blocker remained: `threat-model-stride.md` §6's own gap list is clean except MFA, explicitly risk-accepted for v1. First document promoted out of `🟡 En revisión` in this project's history (TD-PROC-002), on the recommendation named across four prior reviews. Every future edit to this document should re-open review status only if it introduces a real, unresolved gap — not reset to `🟡` reflexively on every routine update.
+✅ Approved (2026-08-28) — SDE-III review confirmed no substantive blocker remained: `threat-model-stride.md` §6's own gap list is clean except MFA, explicitly risk-accepted for v1. First document promoted out of `🟡 En revisión` in this project's history (TD-PROC-002), on the recommendation named across four prior reviews. Every future edit to this document should re-open review status only if it introduces a real, unresolved gap — not reset to `🟡` reflexively on every routine update.
 
 ## 1. Scope
 

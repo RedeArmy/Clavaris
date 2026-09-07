@@ -1,6 +1,6 @@
 # ADR-0002: RS256 vs. HS256 for token signing
 
-**Status:** ✅ Aprobado
+**Status:** ✅ Approved
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR-0016: Build toward ISO/IEC 27001 + SOC 2 Type II readiness now; defer the paid, formal certification audit; adopt ISO/IEC 29115 immediately
 
-**Status:** ✅ Aprobado (2026-08-24)
+**Status:** ✅ Approved (2026-08-24)
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR-0023: Organization-scoped admin credential (`OrganizationClient`) + API keys info endpoint
 
-**Status:** ✅ Aprobado (2026-09-05)
+**Status:** ✅ Approved (2026-09-05)
 
 ## Context
 
