@@ -71,18 +71,18 @@ final class OrganizationJwksPublishingSource implements JWKSource<SecurityContex
   private List<JWK> jwksFor(final OrganizationId organizationId) {
     final Instant retiredAfter = Instant.now().minus(overlapWindow);
     return signingKeys.findActiveAndRetiredSince(organizationId, retiredAfter).stream()
-        .map(this::toRsaKey)
+        .map(key -> toRsaKey(organizationId, key))
         .flatMap(Optional::stream)
         .toList();
   }
 
-  private Optional<JWK> toRsaKey(final SigningKey key) {
+  private Optional<JWK> toRsaKey(final OrganizationId organizationId, final SigningKey key) {
     // A metadata row with no matching keystore entry should never happen (SigningKeyStore never
     // deletes anything this process ever wrote) — skip it rather than fail the whole JWKS response
     // over one anomalous row, same defensive posture OrganizationScopedJwkSource's own equivalent
     // lookup already takes.
     return keyMaterial
-        .keyPairForKid(key.kid())
+        .keyPairForKid(organizationId, key.kid())
         .map(
             pair ->
                 new RSAKey.Builder((RSAPublicKey) pair.getPublic())

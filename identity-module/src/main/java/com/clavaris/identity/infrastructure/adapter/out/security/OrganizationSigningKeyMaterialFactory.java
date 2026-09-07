@@ -40,10 +40,10 @@ import org.springframework.stereotype.Component;
  *       immediately. That's fine for signing new tokens (which must always use the current key,
  *       never a retired one), but JWKS <em>publishing</em> needs the overlap this cache alone can't
  *       give it — closed (TD-SEC-008) not by changing this cache's shape, but by {@link
- *       #keyPairForKid(String)} bypassing it entirely: {@link SigningKeyStore} already retains
- *       every key it ever wrote, so a retired kid's material is still reachable directly, and
- *       {@code OrganizationJwksPublishingSource} (app module) is what actually looks up every
- *       still-in-window kid this way for the JWKS response.
+ *       #keyPairForKid(OrganizationId, String)} bypassing it entirely: {@link SigningKeyStore}
+ *       already retains every key it ever wrote, so a retired kid's material is still reachable
+ *       directly, and {@code OrganizationJwksPublishingSource} (app module) is what actually looks
+ *       up every still-in-window kid this way for the JWKS response.
  *   <li>Deliberately does NOT wire a per-Organization {@code SecurityFilterChain}/JWKS endpoint —
  *       that's the spike's Appendix A discovery-filter pattern, a separate slice ("don't build
  *       ahead of the use case that needs it"). This class only makes the key material exist and be
@@ -68,6 +68,11 @@ import org.springframework.stereotype.Component;
  * together); {@link #activeSigningKeyFor} is the new method that serves both from one lookup,
  * {@link #keyPairFor} stays for the one other caller ({@code
  * OrganizationSigningKeyPublicKeyProviderBridge}) that only ever needed the {@link KeyPair}.
+ *
+ * <p>TD-SEC-054 (closed): every call into {@link SigningKeyStore} now passes a {@link
+ * KeyStoreScope} derived from {@code organizationId} — see that class's own Javadoc for why the
+ * previous single-shared-file design meant a signing-key compromise at the storage layer was never
+ * actually single-tenant, only the application-layer routing was.
  */
 @Component
 public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterialGenerator {
@@ -90,7 +95,7 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
   @Override
   public String generateFor(final OrganizationId organizationId) {
     final String kid = UUID.randomUUID().toString();
-    keyStore.generate(kid);
+    keyStore.generate(KeyStoreScope.organization(organizationId.value()), kid);
     return kid;
   }
 
@@ -105,7 +110,7 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
   public void cacheActive(final OrganizationId organizationId, final String kid) {
     final KeyPair keyPair =
         keyStore
-            .find(kid)
+            .find(KeyStoreScope.organization(organizationId.value()), kid)
             .orElseThrow(
                 () ->
                     new IllegalStateException(
@@ -132,8 +137,9 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
    */
   public void purgeAllFor(final OrganizationId organizationId, final Collection<String> kids) {
     activeSigningKeys.remove(organizationId.value());
+    final KeyStoreScope scope = KeyStoreScope.organization(organizationId.value());
     for (final String kid : kids) {
-      keyStore.delete(kid);
+      keyStore.delete(scope, kid);
     }
   }
 
@@ -143,10 +149,12 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
    * overlap-window key's material, since {@link #keyPairFor(OrganizationId)}'s cache holds at most
    * one entry per Organization (the currently active one) by design. {@link SigningKeyStore} never
    * deletes a key once written, so this works for any {@code kid} this process ever generated,
-   * active or retired alike.
+   * active or retired alike. TD-SEC-054: {@code organizationId} is now required — {@link
+   * SigningKeyStore} is scoped per Organization, not one shared store, so knowing which
+   * Organization's file to look in is no longer optional.
    */
-  public Optional<KeyPair> keyPairForKid(final String kid) {
-    return keyStore.find(kid);
+  public Optional<KeyPair> keyPairForKid(final OrganizationId organizationId, final String kid) {
+    return keyStore.find(KeyStoreScope.organization(organizationId.value()), kid);
   }
 
   /**
@@ -177,12 +185,13 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
   // was simply never generated.
   private Optional<ActiveSigningKey> reloadFromPersistentStore(
       final OrganizationId organizationId) {
+    final KeyStoreScope scope = KeyStoreScope.organization(organizationId.value());
     return signingKeys
         .findActive(organizationId)
         .flatMap(
             activeKey ->
                 keyStore
-                    .find(activeKey.kid())
+                    .find(scope, activeKey.kid())
                     .map(pair -> new ActiveSigningKey(activeKey.kid(), pair)))
         .map(
             reloaded -> {

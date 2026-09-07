@@ -29,6 +29,11 @@ import org.springframework.stereotype.Component;
  * <p>PMD's AvoidFieldNameMatchingMethodName rule flags {@code keyPair}/{@code kid} for the same
  * reason {@code Account} suppresses it — the deliberate record-style accessor convention used
  * throughout this codebase's value objects.
+ *
+ * <p>TD-SEC-054 (closed): this tier's key material now lives in its own {@link
+ * KeyStoreScope#platform} file, separate from every Organization's own — see {@link
+ * SigningKeyStore}'s own Javadoc for why the platform tier sharing one file with every tenant used
+ * to mean a storage-layer compromise was never actually scoped to one tenant at all.
  */
 @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 @Component
@@ -39,15 +44,16 @@ public class PlatformSigningKeyMaterial {
 
   /* package */ PlatformSigningKeyMaterial(
       final PlatformSigningKeyRepository repository, final SigningKeyStore keyStore) {
+    final KeyStoreScope scope = KeyStoreScope.platform();
     final Optional<PlatformSigningKey> active = repository.findActive();
-    final Optional<KeyPair> persisted = active.flatMap(key -> keyStore.find(key.kid()));
+    final Optional<KeyPair> persisted = active.flatMap(key -> keyStore.find(scope, key.kid()));
 
     if (active.isPresent() && persisted.isPresent()) {
       this.kid = active.get().kid();
       this.keyPair = persisted.get();
     } else {
       this.kid = UUID.randomUUID().toString();
-      this.keyPair = keyStore.generate(this.kid);
+      this.keyPair = keyStore.generate(scope, this.kid);
     }
   }
 

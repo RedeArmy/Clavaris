@@ -65,7 +65,8 @@ class PlatformSigningKeyMaterialTest {
     // kid a previous process would have persisted to Postgres — the new bean instance must
     // reload that exact key material, not generate a fresh one.
     SigningKeyStore beforeRestart = newKeyStore();
-    KeyPair generatedBeforeRestart = beforeRestart.generate("persisted-kid");
+    KeyPair generatedBeforeRestart =
+        beforeRestart.generate(KeyStoreScope.platform(), "persisted-kid");
 
     PlatformSigningKeyRepository repository = mock(PlatformSigningKeyRepository.class);
     when(repository.findActive())
