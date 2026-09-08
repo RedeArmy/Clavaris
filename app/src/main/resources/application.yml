@@ -279,6 +279,18 @@ clavaris:
   known-device:
     retention-days: ${KNOWN_DEVICE_RETENTION_DAYS:400}
     migration-cutover-at: ${KNOWN_DEVICE_MIGRATION_CUTOVER_AT:2026-08-31T10:00:00Z}
+  # SDE III optimization pass, P1: optional Idempotency-Key support for /api/v1/admin/**'s own
+  # mutating POST endpoints — see IdempotencyKeyFilter's own Javadoc for the full mechanism. A
+  # dedicated hash secret, same "never reuse a secret across purposes" discipline as
+  # rate-limit.key-hash-secret/oauth2.token-hash-secret above.
+  idempotency:
+    key-hash-secret: ${IDEMPOTENCY_KEY_HASH_SECRET:dev-only-idempotency-key-hash-secret-change-in-real-deployments}
+    # How long a just-claimed-but-not-yet-completed key stays claimed before it's considered
+    # abandoned (e.g. the process crashed mid-request) and a retry is treated as a fresh attempt.
+    claim-ttl-seconds: 30
+    # How long a completed response stays cached and replayable — Stripe's own documented
+    # convention for this exact mechanism.
+    completed-ttl-seconds: 86400
 
 # TD-SEC-017 / nfr-quality-attributes.md §5: real structured (JSON) logs, not just grep-able
 # key=value text — Spring Boot's own native structured-logging support (no extra dependency;

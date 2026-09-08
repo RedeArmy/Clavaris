@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.infrastructure.adapter.out.security.PlatformSigningKeyMaterial;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
@@ -19,6 +20,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * BR-PLATFORM-02: the entire {@code /api/v1/admin/*} surface accepts platform-tier tokens only — no
@@ -70,6 +72,17 @@ class AdminApiSecurityConfig {
     return NimbusJwtDecoder.withPublicKey((RSAPublicKey) platformKey.keyPair().getPublic()).build();
   }
 
+  // Optional Idempotency-Key support (see IdempotencyKeyFilter's own Javadoc) — this surface's own
+  // sole consumer, unlike RateLimitKeyHasher/BearerTokenHasher which several security chains share;
+  // no other chain needs idempotency semantics, so this hasher/its dedicated secret live here, not
+  // promoted to a shared config class.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ IdempotencyKeyHasher idempotencyKeyHasher(
+      @Value("${clavaris.idempotency.key-hash-secret}") final String idempotencyKeyHashSecret) {
+    return new IdempotencyKeyHasher(idempotencyKeyHashSecret);
+  }
+
   @Bean
   @Order(2)
   /* package */ SecurityFilterChain adminApiSecurityFilterChain(
@@ -103,7 +116,12 @@ class AdminApiSecurityConfig {
       // ADR-0023: resolves an accountId/workspaceId path variable to its owning Organization for
       // OrganizationClientOwnershipFilter's own one-hop routes.
       final AccountRepository accounts,
-      final WorkspaceRepository workspaces) {
+      final WorkspaceRepository workspaces,
+      // Optional Idempotency-Key support — see IdempotencyKeyFilter's own Javadoc.
+      @SuppressWarnings("PMD.LongVariable") final IdempotencyKeyStore idempotencyKeyStore,
+      @SuppressWarnings("PMD.LongVariable") final IdempotencyKeyHasher idempotencyKeyHasher,
+      final ObjectMapper objectMapper,
+      final SecurityMetricsRecorder securityMetrics) {
     http.securityMatcher(ADMIN_API_PATH_PATTERN)
         .authorizeHttpRequests(
             authorize ->
@@ -369,6 +387,15 @@ class AdminApiSecurityConfig {
         .addFilterAfter(
             new OrganizationClientOwnershipFilter(accounts, workspaces),
             AntiAbuseRateLimitingFilter.class)
+        // Optional Idempotency-Key support (see IdempotencyKeyFilter's own Javadoc) — anchored
+        // after OrganizationClientOwnershipFilter, last in this chain's own filter sequence: only
+        // a request that already authenticated, cleared rate limiting, and is scoped to its own
+        // Organization ever reaches real business logic, so idempotency bookkeeping is never spent
+        // on a request that was going to be rejected anyway.
+        .addFilterAfter(
+            new IdempotencyKeyFilter(
+                idempotencyKeyStore, idempotencyKeyHasher, objectMapper, securityMetrics),
+            OrganizationClientOwnershipFilter.class)
         // Resource server, STATELESS session policy below, and securityMatcher already scopes
         // this whole chain to /api/v1/admin/** — every request reaching this point authenticates
         // via a Bearer token, never a cookie-based session, so there's no CSRF token to carry in
