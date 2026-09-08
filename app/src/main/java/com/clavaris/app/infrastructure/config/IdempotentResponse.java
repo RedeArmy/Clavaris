@@ -27,12 +27,13 @@ record IdempotentResponse(int status, String contentType, byte[] body) {
     if (this == other) {
       return true;
     }
-    if (!(other instanceof final IdempotentResponse that)) {
+    if (!(other
+        instanceof IdempotentResponse(int thatStatus, String thatContentType, byte[] thatBody))) {
       return false;
     }
-    return status == that.status
-        && Objects.equals(contentType, that.contentType)
-        && Arrays.equals(body, that.body);
+    return status == thatStatus
+        && Objects.equals(contentType, thatContentType)
+        && Arrays.equals(body, thatBody);
   }
 
   @Override

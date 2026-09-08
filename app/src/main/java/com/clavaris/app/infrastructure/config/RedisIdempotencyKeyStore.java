@@ -179,19 +179,30 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
           false, requestBodyHash, response.status(), response.contentType(), response.body());
     }
 
+    // PMD.LongVariable: thatRequestBodyHash names exactly what it is — same "deliberate,
+    // descriptive name over an arbitrary shortening" convention this codebase applies everywhere
+    // else this rule fires (e.g. RedisFixedWindowRateLimiter's own identical suppression).
+    @SuppressWarnings("PMD.LongVariable")
     @Override
     public boolean equals(final Object other) {
       if (this == other) {
         return true;
       }
-      if (!(other instanceof final StoredEntry that)) {
+      if (!(other
+          instanceof
+          StoredEntry(
+              boolean thatInProgress,
+              String thatRequestBodyHash,
+              Integer thatStatus,
+              String thatContentType,
+              byte[] thatBody))) {
         return false;
       }
-      return inProgress == that.inProgress
-          && Objects.equals(requestBodyHash, that.requestBodyHash)
-          && Objects.equals(status, that.status)
-          && Objects.equals(contentType, that.contentType)
-          && Arrays.equals(body, that.body);
+      return inProgress == thatInProgress
+          && Objects.equals(requestBodyHash, thatRequestBodyHash)
+          && Objects.equals(status, thatStatus)
+          && Objects.equals(contentType, thatContentType)
+          && Arrays.equals(body, thatBody);
     }
 
     @Override
