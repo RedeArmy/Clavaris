@@ -25,19 +25,21 @@ import org.springframework.session.data.redis.config.annotation.web.http.EnableR
  * SpringSessionBackedSessionRegistry} needs the find-by-principal-name index only the indexed
  * repository provides — see that class's own Javadoc for why.
  *
- * <p><b>Known test-suite-only log noise, not a production bug:</b> a full {@code mvn -pl app test}
- * run logs occasional {@code ERROR ... LettuceConnectionFactory has been STOPPED} lines from a
- * {@code spring-session-1} thread — this class's own {@code cleanupCron} background job
- * (fixed-rate, every minute, {@code RedisIndexedSessionRepository.cleanUpExpiredSessions}) firing
- * against a connection factory Spring's own {@code DefaultContextCache} paused ({@code
+ * <p><b>Test-suite-only log noise, previously left as-is, now closed:</b> a full {@code mvn -pl app
+ * test} run used to log occasional {@code ERROR ... LettuceConnectionFactory has been STOPPED}
+ * lines from a {@code spring-session-1} thread — this class's own {@code cleanupCron} background
+ * job (fixed-rate, every minute, {@code RedisIndexedSessionRepository.cleanUpExpiredSessions})
+ * firing against a connection factory Spring's own {@code DefaultContextCache} paused ({@code
  * SmartLifecycle.stop()}) while evicting/switching between two different {@code @SpringBootTest}
- * configurations cached in the same JVM — confirmed by reading the logged stack trace's own {@code
- * DefaultContextCache.pauseOnContextSwitchIfNecessary} frame. The cron thread isn't itself part of
- * that pause, so it keeps firing against an already-stopped factory until that context is evicted
- * outright or the JVM exits. Harmless (caught by Spring's own {@code LoggingErrorHandler}, no test
- * ever fails from it) and specific to running many distinct context configurations back-to-back in
- * one test JVM — a real deployment has exactly one {@code ApplicationContext}, never paused this
- * way.
+ * configurations cached in the same JVM. Harmless (caught by Spring's own {@code
+ * LoggingErrorHandler}, no test ever failed from it) but revisited on explicit request rather than
+ * left as accepted noise — {@code RedisBackedIntegrationTest} now imports {@code
+ * SessionCleanupCronDisabledForTestsConfig}, which disables this job outright for every test that
+ * extends it (Spring Session's own documented {@code "-"} sentinel, applied via a {@code
+ * BeanPostProcessor} before this class's own {@code RedisIndexedSessionRepository} ever schedules
+ * its cron — see that test config's own Javadoc for why a property override couldn't do it). Real
+ * deployments are unaffected: this class's own annotation attribute, and therefore production's
+ * real minute-by-minute cleanup, is untouched.
  */
 @Configuration
 @EnableRedisIndexedHttpSession(
