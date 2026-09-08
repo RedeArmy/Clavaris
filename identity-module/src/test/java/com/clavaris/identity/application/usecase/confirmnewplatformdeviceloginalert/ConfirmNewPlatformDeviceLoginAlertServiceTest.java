@@ -3,7 +3,6 @@ package com.clavaris.identity.application.usecase.confirmnewplatformdevicelogina
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,19 +55,19 @@ class ConfirmNewPlatformDeviceLoginAlertServiceTest {
     verify(tokens).save(token);
     verify(suspendPlatformAccount)
         .handle(
-            eq(
-                new SuspendPlatformAccountCommand(
-                    platformAccountId, AuditActor.platformAccount(platformAccountId.value()))));
+            new SuspendPlatformAccountCommand(
+                platformAccountId, AuditActor.platformAccount(platformAccountId.value())));
   }
 
   @Test
   void anUnknownTokenIsRejectedWithoutSuspendingAnything() {
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("unknown-token")))
         .thenReturn(Optional.empty());
+    ConfirmNewPlatformDeviceLoginAlertCommand command =
+        new ConfirmNewPlatformDeviceLoginAlertCommand("unknown-token");
 
     assertThatExceptionOfType(InvalidNewPlatformDeviceLoginAlertException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmNewPlatformDeviceLoginAlertCommand("unknown-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendPlatformAccount, never()).handle(any());
   }
@@ -84,10 +83,11 @@ class ConfirmNewPlatformDeviceLoginAlertServiceTest {
             Instant.now().plusSeconds(3600));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("the-raw-token")))
         .thenReturn(Optional.of(wrongTypeToken));
+    ConfirmNewPlatformDeviceLoginAlertCommand command =
+        new ConfirmNewPlatformDeviceLoginAlertCommand("the-raw-token");
 
     assertThatExceptionOfType(InvalidNewPlatformDeviceLoginAlertException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmNewPlatformDeviceLoginAlertCommand("the-raw-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendPlatformAccount, never()).handle(any());
   }
@@ -104,10 +104,11 @@ class ConfirmNewPlatformDeviceLoginAlertServiceTest {
     consumedToken.consume();
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("the-raw-token")))
         .thenReturn(Optional.of(consumedToken));
+    ConfirmNewPlatformDeviceLoginAlertCommand command =
+        new ConfirmNewPlatformDeviceLoginAlertCommand("the-raw-token");
 
     assertThatExceptionOfType(InvalidNewPlatformDeviceLoginAlertException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmNewPlatformDeviceLoginAlertCommand("the-raw-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendPlatformAccount, never()).handle(any());
   }
@@ -123,10 +124,11 @@ class ConfirmNewPlatformDeviceLoginAlertServiceTest {
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("the-raw-token")))
         .thenReturn(Optional.of(expiredToken));
+    ConfirmNewPlatformDeviceLoginAlertCommand command =
+        new ConfirmNewPlatformDeviceLoginAlertCommand("the-raw-token");
 
     assertThatExceptionOfType(InvalidNewPlatformDeviceLoginAlertException.class)
-        .isThrownBy(
-            () -> service.handle(new ConfirmNewPlatformDeviceLoginAlertCommand("the-raw-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendPlatformAccount, never()).handle(any());
   }

@@ -3,7 +3,6 @@ package com.clavaris.identity.application.usecase.confirmnewdeviceloginalert;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,16 +55,18 @@ class ConfirmNewDeviceLoginAlertServiceTest {
     // BR-ID-08's own reversible-ban cascade, but as the account holder themselves — never
     // AuditActor#platformClient, the tier every other SuspendAccountCommand caller uses.
     verify(suspendAccount)
-        .handle(eq(new SuspendAccountCommand(accountId, AuditActor.account(accountId.value()))));
+        .handle(new SuspendAccountCommand(accountId, AuditActor.account(accountId.value())));
   }
 
   @Test
   void anUnknownTokenIsRejectedWithoutSuspendingAnything() {
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("unknown-token")))
         .thenReturn(Optional.empty());
+    ConfirmNewDeviceLoginAlertCommand command =
+        new ConfirmNewDeviceLoginAlertCommand("unknown-token");
 
     assertThatExceptionOfType(InvalidNewDeviceLoginAlertException.class)
-        .isThrownBy(() -> service.handle(new ConfirmNewDeviceLoginAlertCommand("unknown-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendAccount, never()).handle(any());
   }
@@ -84,9 +85,11 @@ class ConfirmNewDeviceLoginAlertServiceTest {
             Instant.now().plusSeconds(3600));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("the-raw-token")))
         .thenReturn(Optional.of(wrongTypeToken));
+    ConfirmNewDeviceLoginAlertCommand command =
+        new ConfirmNewDeviceLoginAlertCommand("the-raw-token");
 
     assertThatExceptionOfType(InvalidNewDeviceLoginAlertException.class)
-        .isThrownBy(() -> service.handle(new ConfirmNewDeviceLoginAlertCommand("the-raw-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendAccount, never()).handle(any());
   }
@@ -103,9 +106,11 @@ class ConfirmNewDeviceLoginAlertServiceTest {
     consumedToken.consume();
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("the-raw-token")))
         .thenReturn(Optional.of(consumedToken));
+    ConfirmNewDeviceLoginAlertCommand command =
+        new ConfirmNewDeviceLoginAlertCommand("the-raw-token");
 
     assertThatExceptionOfType(InvalidNewDeviceLoginAlertException.class)
-        .isThrownBy(() -> service.handle(new ConfirmNewDeviceLoginAlertCommand("the-raw-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendAccount, never()).handle(any());
   }
@@ -121,9 +126,11 @@ class ConfirmNewDeviceLoginAlertServiceTest {
             Instant.now().minusSeconds(1));
     when(tokens.findByTokenHash(RefreshTokenSecret.hash("the-raw-token")))
         .thenReturn(Optional.of(expiredToken));
+    ConfirmNewDeviceLoginAlertCommand command =
+        new ConfirmNewDeviceLoginAlertCommand("the-raw-token");
 
     assertThatExceptionOfType(InvalidNewDeviceLoginAlertException.class)
-        .isThrownBy(() -> service.handle(new ConfirmNewDeviceLoginAlertCommand("the-raw-token")));
+        .isThrownBy(() -> service.handle(command));
 
     verify(suspendAccount, never()).handle(any());
   }

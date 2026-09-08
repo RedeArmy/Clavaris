@@ -60,13 +60,11 @@ class SuspendPlatformAccountServiceTest {
   void aMissingAccountThrowsAndRevokesNothing() {
     PlatformAccountId unknownId = PlatformAccountId.newId();
     when(accounts.findById(unknownId)).thenReturn(Optional.empty());
+    SuspendPlatformAccountCommand command =
+        new SuspendPlatformAccountCommand(unknownId, AuditActor.platformAccount(unknownId.value()));
 
     assertThatExceptionOfType(PlatformAccountNotFoundException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new SuspendPlatformAccountCommand(
-                        unknownId, AuditActor.platformAccount(unknownId.value()))));
+        .isThrownBy(() -> service.handle(command));
 
     verify(sessionRevoker, never()).revokeAllSessionsFor(unknownId);
   }
