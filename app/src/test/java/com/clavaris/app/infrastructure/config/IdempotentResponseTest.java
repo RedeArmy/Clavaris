@@ -25,8 +25,7 @@ class IdempotentResponseTest {
     IdempotentResponse second =
         new IdempotentResponse(201, "application/json", "{\"a\":1}".getBytes());
 
-    assertThat(first).isEqualTo(second);
-    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
   }
 
   @Test
@@ -60,16 +59,14 @@ class IdempotentResponseTest {
     IdempotentResponse first = new IdempotentResponse(204, null, null);
     IdempotentResponse second = new IdempotentResponse(204, null, null);
 
-    assertThat(first).isEqualTo(second);
-    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
   }
 
   @Test
   void isNeverEqualToAnUnrelatedType() {
     IdempotentResponse response = new IdempotentResponse(200, "application/json", "{}".getBytes());
 
-    assertThat(response).isNotEqualTo("not an IdempotentResponse");
-    assertThat(response).isNotEqualTo(null);
+    assertThat(response).isNotEqualTo("not an IdempotentResponse").isNotEqualTo(null);
   }
 
   @Test

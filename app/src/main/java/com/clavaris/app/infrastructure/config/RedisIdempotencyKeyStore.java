@@ -159,13 +159,17 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
    * The JSON envelope actually stored in Redis — {@code status}/{@code contentType}/{@code body}
    * are {@code null} while {@link #inProgress()}, populated once {@link #done}.
    *
-   * <p>Deliberately no {@code equals}/{@code hashCode}/{@code toString} override, unlike {@link
-   * IdempotentResponse}'s own identical-shaped array field — nothing in this codebase ever compares
-   * or prints two {@code StoredEntry} instances; every real read here goes through {@link
-   * #inProgress()}/{@link #requestBodyHash()}/{@link #status()}/{@link #contentType()}/{@link
-   * #body()}, the plain accessors. Overriding the array-comparison behavior speculatively, with no
-   * real call site to exercise it, would just be untested dead code.
+   * <p>java:S6218 (a record's generated {@code equals}/{@code hashCode}/{@code toString} compare an
+   * array field by reference, not content, same footgun {@link IdempotentResponse}'s own override
+   * fixes) suppressed deliberately here rather than fixed the same way: unlike {@code
+   * IdempotentResponse}, this type is {@code private} and never leaves this class — nothing in this
+   * codebase ever compares or prints two {@code StoredEntry} instances, every real read goes
+   * through {@link #inProgress()}/{@link #requestBodyHash()}/{@link #status()}/{@link
+   * #contentType()}/{@link #body()}, the plain accessors. Adding the override here would just be
+   * untested dead code, the exact thing this codebase's own "honest dead-code removal over
+   * speculative test coverage" precedent (TD-ARCH-017's own sibling findings) argues against.
    */
+  @SuppressWarnings("java:S6218")
   private record StoredEntry(
       boolean inProgress, String requestBodyHash, Integer status, String contentType, byte[] body) {
 
