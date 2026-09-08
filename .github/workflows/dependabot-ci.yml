@@ -106,6 +106,7 @@ jobs:
           -DdataDirectory=$HOME/.dependency-check-data
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
           -DnvdApiDelay=2000
+          -DsuppressionFiles=owasp-suppressions.xml
 
       - name: Upload dependency-check report
         if: always()

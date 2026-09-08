@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  security-architecture.md §8 / git-workflow.md §4: dependency-check is a required CI gate, not a
+  nice-to-have — a suppression here is a deliberate, documented exception to that gate, never a
+  blanket "make the red go away." Each <suppress> must name the exact CVE, the exact package, and a
+  real justification checked against the CVE's own advisory text, matching this codebase's own
+  "genuine false positive gets a targeted suppression, never a ruleset-wide exclusion" convention
+  (pull_request_template.md's own PMD checklist line states the same rule for PMD findings).
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <suppress>
+    <notes><![CDATA[
+      False positive, not a real exposure here. CVE-2026-53914 ("Code execution was possible via
+      unsafe deserialization in the build cache metadata") is a JetBrains Kotlin *compiler*/build-tool
+      vulnerability (CWE-502, deserializing untrusted Gradle/Kotlin build-cache metadata) — confirmed
+      against the CVE's own NVD description and JetBrains' own security bulletin
+      (https://www.jetbrains.com/privacy-security/issues-fixed/) before suppressing, not assumed.
+
+      dependency-check's CPE analyzer matches the broad `cpe:2.3:a:jetbrains:kotlin:*` product
+      identifier against `kotlin-stdlib`, but this project never compiles Kotlin code and never
+      invokes a Kotlin/Gradle build cache — kotlin-stdlib.jar ships none of the vulnerable compiler
+      code, only runtime helper classes. The actual dependency path is transitive and purely
+      runtime: resilience4j-circuitbreaker (added for P2.4's external-HTTP-dependency circuit
+      breakers) -> resilience4j-core -> kotlin-stdlib-jdk8 -> kotlin-stdlib, consumed only as an
+      already-compiled runtime jar.
+
+      Not fixed by excluding kotlin-stdlib outright: resilience4j-core 2.3.0's own implementation is
+      partially written in Kotlin and genuinely calls into kotlin-stdlib at runtime — removing it
+      risks a real NoClassDefFoundError on that code path, trading a false-positive CVE for an
+      actual production defect. Not fixed by a version bump either: the vulnerability lives in the
+      Kotlin compiler tooling, not in any kotlin-stdlib runtime API surface, so no kotlin-stdlib
+      version pin changes the real exposure here.
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin\-stdlib.*@.*$</packageUrl>
+    <cve>CVE-2026-53914</cve>
+  </suppress>
+</suppressions>
