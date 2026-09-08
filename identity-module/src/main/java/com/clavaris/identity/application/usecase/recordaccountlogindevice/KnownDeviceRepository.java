@@ -33,4 +33,15 @@ public interface KnownDeviceRepository {
    *     catches it.
    */
   void save(KnownDevice device);
+
+  /**
+   * TD-PERF-019: same write as {@link #save}, for the one call site that knows for a fact this
+   * {@code KnownDevice} has never been persisted before — {@link RecordAccountLoginDeviceService}'s
+   * "unrecognized or absent cookie" branch, which always constructs via {@code
+   * KnownDevice.recognize(...)}. The "recognized" branch (loads via {@link
+   * #findByAccountIdAndDeviceTokenHash}, calls {@code device.touch()}) is a genuine update and must
+   * keep calling {@link #save}. Same synchronous-flush contract as {@link #save} — the collision
+   * catch this same call site wraps around it depends on that.
+   */
+  void insert(KnownDevice device);
 }

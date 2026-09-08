@@ -3,10 +3,12 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -19,22 +21,34 @@ import tools.jackson.databind.ObjectMapper;
  * than accepting it as a caller parameter — every one of this port's existing call sites
  * (RegisterAccountService and every use case after it) would otherwise need to learn about tracing,
  * a cross-cutting concern this write-side adapter can absorb on its own without widening the port.
+ *
+ * <p>TD-PERF-019: calls {@link EntityManager#persist} directly, not {@code
+ * SpringDataEventOutboxJpaRepository#save} — {@link #write} is this class's only method, mints a
+ * brand-new random id every call, and nothing anywhere ever re-saves an already-written row (the
+ * dispatcher-side {@code markPublishedBatch} in webhook-module updates rows via its own bulk {@code
+ * UPDATE}, never through this class), so this table is genuinely insert-only from here.
+ * {@code @Transactional} on {@code write} itself, same "a raw {@code persist} call needs one
+ * already open on the current thread" reasoning {@code JpaWorkspaceRepository#save}'s own identical
+ * annotation documents — every real caller already has one (this method's own class Javadoc above),
+ * but this guards a bare test-fixture caller too, same precedent {@code
+ * JpaAccountRepository#save}'s own {@code @Transactional} already established.
  */
 @Repository
 class JpaEventOutboxWriter implements EventOutboxWriter {
 
-  private final SpringDataEventOutboxJpaRepository outbox;
   private final ObjectMapper objectMapper;
+  private final EntityManager entityManager;
 
   // Constructed only by Spring's own component scan (via @Repository above) — EventOutboxWriter
   // (the port) is the only type callers outside this package should depend on.
   /* package */ JpaEventOutboxWriter(
-      final SpringDataEventOutboxJpaRepository outbox, final ObjectMapper objectMapper) {
-    this.outbox = outbox;
+      final ObjectMapper objectMapper, final EntityManager entityManager) {
     this.objectMapper = objectMapper;
+    this.entityManager = entityManager;
   }
 
   @Override
+  @Transactional
   public void write(
       final String eventType,
       final AccountId aggregateId,
@@ -59,7 +73,7 @@ class JpaEventOutboxWriter implements EventOutboxWriter {
     // throw synchronously — it participates in the same @Transactional as the account insert
     // (ADR-0007 §1: same transaction, not same statement), so it's fine for Hibernate to flush it
     // whenever the transaction commits.
-    outbox.save(
+    entityManager.persist(
         new EventOutboxEntity(
             UUID.randomUUID(),
             organizationId.value(),

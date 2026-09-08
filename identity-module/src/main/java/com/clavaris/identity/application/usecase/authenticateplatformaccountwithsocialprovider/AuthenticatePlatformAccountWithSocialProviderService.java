@@ -127,7 +127,9 @@ public class AuthenticatePlatformAccountWithSocialProviderService
             // cryptographically random, never-surfaced password credential, so this account is
             // never left with zero authentication methods other than the one linked provider.
             account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
-            accounts.save(account);
+            // TD-PERF-019: insert, not save — PlatformAccount.register a few lines above guarantees
+            // this is a brand-new aggregate. See PlatformAccountRepository#insert's own Javadoc.
+            accounts.insert(account);
 
             final PlatformSocialIdentity identity =
                 PlatformSocialIdentity.link(

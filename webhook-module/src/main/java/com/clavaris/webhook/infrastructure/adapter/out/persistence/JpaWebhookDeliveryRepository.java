@@ -3,6 +3,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDeliveryRepository;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
+import jakarta.persistence.EntityManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -16,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Implements the outbound port; maps between {@code domain.model.WebhookDelivery} and {@link
  * WebhookDeliveryEntity}.
+ *
+ * <p>TD-PERF-019: {@code insert} calls {@link EntityManager#persist} directly, not {@code
+ * SpringDataWebhookDeliveryJpaRepository#save} — see {@code WebhookDeliveryRepository#insert}'s own
+ * Javadoc for which call site that's safe for and why {@code save} itself is unchanged.
  */
 @SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
 @Repository
@@ -23,6 +28,7 @@ class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
 
   private final SpringDataWebhookDeliveryJpaRepository deliveries;
   private final Duration claimLeaseDuration;
+  private final EntityManager entityManager;
 
   // claimLeaseDuration: how long a claimed-but-not-yet-attempted row stays ineligible for a second
   // claim — see WebhookDelivery.lease's own Javadoc. Comfortably wider than
@@ -30,31 +36,42 @@ class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
   // claimed by a concurrent tick.
   /* package */ JpaWebhookDeliveryRepository(
       final SpringDataWebhookDeliveryJpaRepository deliveries,
-      @Value("${clavaris.webhook.delivery-claim-lease:PT5M}") final Duration claimLeaseDuration) {
+      @Value("${clavaris.webhook.delivery-claim-lease:PT5M}") final Duration claimLeaseDuration,
+      final EntityManager entityManager) {
     this.deliveries = deliveries;
     this.claimLeaseDuration = claimLeaseDuration;
+    this.entityManager = entityManager;
   }
 
   @Override
   public void save(final WebhookDelivery delivery) {
-    deliveries.save(
-        new WebhookDeliveryEntity(
-            delivery.id(),
-            delivery.endpointId(),
-            delivery.organizationId(),
-            delivery.outboxEventId(),
-            delivery.aggregateType(),
-            delivery.aggregateId(),
-            delivery.eventType(),
-            delivery.payload(),
-            delivery.traceId(),
-            delivery.status().name(),
-            delivery.attemptCount(),
-            delivery.nextAttemptAt(),
-            delivery.lastAttemptAt(),
-            delivery.lastResponseStatus(),
-            delivery.lastError(),
-            delivery.createdAt()));
+    deliveries.save(toEntity(delivery));
+  }
+
+  @Override
+  @Transactional
+  public void insert(final WebhookDelivery delivery) {
+    entityManager.persist(toEntity(delivery));
+  }
+
+  private WebhookDeliveryEntity toEntity(final WebhookDelivery delivery) {
+    return new WebhookDeliveryEntity(
+        delivery.id(),
+        delivery.endpointId(),
+        delivery.organizationId(),
+        delivery.outboxEventId(),
+        delivery.aggregateType(),
+        delivery.aggregateId(),
+        delivery.eventType(),
+        delivery.payload(),
+        delivery.traceId(),
+        delivery.status().name(),
+        delivery.attemptCount(),
+        delivery.nextAttemptAt(),
+        delivery.lastAttemptAt(),
+        delivery.lastResponseStatus(),
+        delivery.lastError(),
+        delivery.createdAt());
   }
 
   @Override

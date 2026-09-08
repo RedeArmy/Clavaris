@@ -104,7 +104,9 @@ public class RecordPlatformAccountLoginDeviceService
             normalizedUserAgent(command.userAgent()),
             RefreshTokenSecret.hash(rawDeviceToken));
     try {
-      knownDevices.save(device);
+      // TD-PERF-019: insert, not save — PlatformKnownDevice.recognize always mints a brand-new
+      // row. See PlatformKnownDeviceRepository#insert's own Javadoc.
+      knownDevices.insert(device);
     } catch (final DataIntegrityViolationException e) {
       LOG.warn("event=platform_known_device_token_collision", e);
       return Optional.empty();

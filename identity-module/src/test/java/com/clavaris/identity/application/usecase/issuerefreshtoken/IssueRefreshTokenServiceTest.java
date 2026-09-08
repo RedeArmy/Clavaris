@@ -63,8 +63,8 @@ class IssueRefreshTokenServiceTest {
     assertThat(result.rawToken()).isNotBlank();
     assertThat(result.expiresAt()).isEqualTo(expiresAt);
     assertThat(result.sessionId()).isNotNull();
-    verify(sessions).save(any());
-    verify(refreshTokens).save(any());
+    verify(sessions).insert(any());
+    verify(refreshTokens).insert(any());
     verify(metrics).increment("clavaris.auth.token.issued", "tokenType", "refresh_token");
   }
 

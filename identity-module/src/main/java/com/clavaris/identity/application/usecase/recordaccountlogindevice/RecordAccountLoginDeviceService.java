@@ -158,7 +158,9 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
             normalizedUserAgent(command.userAgent()),
             RefreshTokenSecret.hash(rawDeviceToken));
     try {
-      knownDevices.save(device);
+      // TD-PERF-019: insert, not save — KnownDevice.recognize always mints a brand-new row, one
+      // per never-before-seen device. See KnownDeviceRepository#insert's own Javadoc.
+      knownDevices.insert(device);
     } catch (final DataIntegrityViolationException e) {
       // Statistically negligible under this design (two independent 256-bit random values
       // colliding) — degrades to "no notification this time" rather than an unhandled 500.

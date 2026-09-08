@@ -6,25 +6,30 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccount;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformPasswordCredential;
+import jakarta.persistence.EntityManager;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implements the outbound port; mirrors {@link JpaAccountRepository} exactly, minus {@code
- * organizationId} scoping.
+ * organizationId} scoping — including its TD-PERF-019 {@code insert}/{@code save} split.
  */
 @Repository
 class JpaPlatformAccountRepository implements PlatformAccountRepository {
 
   private final SpringDataPlatformAccountJpaRepository accounts;
   private final SpringDataPlatformPasswordCredentialJpaRepository credentials;
+  private final EntityManager entityManager;
 
   /* package */ JpaPlatformAccountRepository(
       final SpringDataPlatformAccountJpaRepository accounts,
-      final SpringDataPlatformPasswordCredentialJpaRepository credentials) {
+      final SpringDataPlatformPasswordCredentialJpaRepository credentials,
+      final EntityManager entityManager) {
     this.accounts = accounts;
     this.credentials = credentials;
+    this.entityManager = entityManager;
   }
 
   @Override
@@ -85,23 +90,39 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
   @Override
   @Transactional
   public void save(final PlatformAccount account) {
-    final PlatformAccountEntity entity =
-        new PlatformAccountEntity(
-            account.id().value(),
-            account.email().value(),
-            account.emailVerifiedAt().orElse(null),
-            account.status().name(),
-            account.createdAt());
-
     // saveAndFlush — same "the unique constraint must throw synchronously, inside the caller's
     // own try/catch" rationale as JpaAccountRepository's own identical call.
-    accounts.saveAndFlush(entity);
+    accounts.saveAndFlush(toEntity(account));
+    saveCredentialIfPresent(account, credentials::saveAndFlush);
+  }
 
+  // TD-PERF-019: same insert()/save() split as JpaAccountRepository, same two call sites
+  // (RegisterPlatformAccountService, AuthenticatePlatformAccountWithSocialProviderService#
+  // linkBrandNewAccount) that already know this PlatformAccount is genuinely new.
+  @Override
+  @Transactional
+  public void insert(final PlatformAccount account) {
+    entityManager.persist(toEntity(account));
+    saveCredentialIfPresent(account, entityManager::persist);
+    entityManager.flush();
+  }
+
+  private PlatformAccountEntity toEntity(final PlatformAccount account) {
+    return new PlatformAccountEntity(
+        account.id().value(),
+        account.email().value(),
+        account.emailVerifiedAt().orElse(null),
+        account.status().name(),
+        account.createdAt());
+  }
+
+  private void saveCredentialIfPresent(
+      final PlatformAccount account, final Consumer<PlatformPasswordCredentialEntity> saver) {
     account
         .passwordCredential()
         .ifPresent(
             credential ->
-                credentials.saveAndFlush(
+                saver.accept(
                     new PlatformPasswordCredentialEntity(
                         credential.id(),
                         credential.platformAccountId().value(),

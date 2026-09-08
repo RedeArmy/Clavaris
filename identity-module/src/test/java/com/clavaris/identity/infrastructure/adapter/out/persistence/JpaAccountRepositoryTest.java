@@ -1,10 +1,12 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
@@ -22,6 +24,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +71,52 @@ class JpaAccountRepositoryTest {
     assertThat(found.get().passwordCredential()).isPresent();
     assertThat(found.get().passwordCredential().orElseThrow().passwordHash())
         .isEqualTo("argon2id$stored-hash");
+  }
+
+  // TD-PERF-019: RegisterAccountService/AuthenticateWithSocialProviderService#linkBrandNewAccount
+  // now call insert(), not save(), for the one case both already know is genuinely new.
+  @Test
+  void insertPersistsANewAccountFindableAfterward() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Email email = new Email("inserted-user@example.com");
+    Account account = Account.register(organizationId, email);
+    account.attachPasswordCredential("argon2id$inserted-hash");
+
+    repository.insert(account);
+
+    Optional<Account> found = repository.findById(account.id());
+    assertThat(found).isPresent();
+    assertThat(found.get().email()).isEqualTo(email);
+    assertThat(found.get().passwordCredential()).isPresent();
+  }
+
+  // TD-PERF-019's own real risk, proven directly: insert() must call EntityManager#persist, not
+  // save()'s own merge()-based path — the whole reason a naive codebase-wide Persistable-based fix
+  // was reverted (technical-debt-register.md TD-PERF-019's own closure note) is that merge()
+  // silently treats an already-existing id as an update, while persist() correctly refuses to. A
+  // second insert() reusing an id this test already inserted must fail loudly with a real
+  // primary-key violation, exactly like any other duplicate INSERT would — not silently succeed as
+  // an UPDATE the way calling save() twice legitimately does elsewhere in this same test class.
+  @Test
+  void insertOnAnAlreadyPersistedIdFailsLoudlyInsteadOfSilentlyUpdating() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account original = Account.register(organizationId, new Email("first-owner@example.com"));
+    repository.insert(original);
+
+    Account reusesTheSameId =
+        Account.reconstitute(
+            original.id(),
+            organizationId,
+            new Email("second-owner@example.com"),
+            Instant.now(),
+            null,
+            AccountStatus.ACTIVE,
+            null,
+            null,
+            null);
+
+    assertThatExceptionOfType(DataIntegrityViolationException.class)
+        .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
   // ADR-0020 (Phase 6, live-verified): AuthenticateWithSocialProviderService#linkBrandNewAccount

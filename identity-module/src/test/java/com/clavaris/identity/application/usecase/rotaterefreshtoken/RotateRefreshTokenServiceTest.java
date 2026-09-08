@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -144,7 +143,8 @@ class RotateRefreshTokenServiceTest {
     assertThat(result.newRawToken()).isNotBlank().isNotEqualTo(rawValue);
     assertThat(result.newExpiresAt()).isEqualTo(newExpiresAt);
     assertThat(active.isRevoked()).isTrue();
-    verify(refreshTokens, times(2)).save(any()); // once for the revoked old, once for the new
+    verify(refreshTokens).save(any()); // the revoked old
+    verify(refreshTokens).insert(any()); // the new
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
     verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
     verify(outbox, never()).write(any(), any(), any(), any());
@@ -172,6 +172,7 @@ class RotateRefreshTokenServiceTest {
         .as("rejected before any mutation — the presented token itself is left untouched")
         .isFalse();
     verify(refreshTokens, never()).save(any());
+    verify(refreshTokens, never()).insert(any());
     // Not the reuse-detection cascade/alert — a suspended account rotating its own already-issued
     // token is routine, not a security anomaly; see this class's own updated Javadoc.
     verify(refreshTokens, never()).revokeAllActiveForAccount(any());
@@ -278,7 +279,9 @@ class RotateRefreshTokenServiceTest {
         .as("a rejected over-scoped request must leave the presented token fully usable")
         .isFalse();
     verify(refreshTokens, never()).save(any());
+    verify(refreshTokens, never()).insert(any());
     verify(sessions, never()).save(any());
+    verify(sessions, never()).insert(any());
   }
 
   @Test

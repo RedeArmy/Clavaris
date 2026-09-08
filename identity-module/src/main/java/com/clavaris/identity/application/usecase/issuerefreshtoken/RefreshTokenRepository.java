@@ -21,6 +21,16 @@ public interface RefreshTokenRepository {
   void save(RefreshToken refreshToken);
 
   /**
+   * TD-PERF-019: same write as {@link #save}, for the call sites that know for a fact this {@code
+   * RefreshToken} has never been persisted before — {@code IssueRefreshTokenService} (a fresh
+   * login) and {@code RotateRefreshTokenService}'s own newly-{@code rotatedFrom} token. That same
+   * service's {@code presented.revoke()} + {@link #save} call (marking the OLD token consumed) is a
+   * genuine update and must keep calling {@link #save}. Same rationale {@code
+   * AccountRepository#insert}'s own identical addition documents.
+   */
+  void insert(RefreshToken refreshToken);
+
+  /**
    * BR-ID-03: the reuse-detection cascade — every refresh token for the account, not just the one
    * that was presented for reuse.
    */

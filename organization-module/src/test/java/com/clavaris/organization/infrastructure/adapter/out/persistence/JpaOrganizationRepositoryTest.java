@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.within;
 
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -126,6 +128,39 @@ class JpaOrganizationRepositoryTest {
     assertThat(found)
         .extracting(Organization::id)
         .containsExactlyInAnyOrder(ownedByA1.id(), ownedByA2.id());
+  }
+
+  // TD-PERF-019: proves insert() genuinely uses persist() semantics (fails loudly on a duplicate
+  // id), not merge()'s silent-update behavior — same load-bearing regression proof
+  // JpaAccountRepositoryTest's own identical pair of tests already established for Account.
+  @Test
+  void insertPersistsANewOrganizationFindableAfterward() {
+    Organization organization = Organization.register("Inserted Co", UUID.randomUUID());
+
+    repository.insert(organization);
+
+    Organization found = repository.findById(organization.id()).orElseThrow();
+    assertThat(found.id()).isEqualTo(organization.id());
+    assertThat(found.name()).isEqualTo("Inserted Co");
+  }
+
+  @Test
+  void insertOnAnAlreadyPersistedIdFailsLoudlyInsteadOfSilentlyUpdating() {
+    Organization original = Organization.register("Original Co", UUID.randomUUID());
+    repository.insert(original);
+    Organization reusesTheSameId =
+        Organization.reconstitute(
+            original.id(),
+            "A Different Name",
+            original.createdAt(),
+            original.ownerPlatformAccountId(),
+            original.socialLoginEnabled(),
+            original.allowedSocialProviders(),
+            original.environment(),
+            original.linkedEnvironmentOrganizationId().orElse(null));
+
+    assertThatExceptionOfType(DataIntegrityViolationException.class)
+        .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
   @Configuration

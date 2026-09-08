@@ -8,8 +8,10 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import com.clavaris.identity.domain.model.Username;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,15 +28,18 @@ class JpaAccountRepository implements AccountRepository {
 
   private final SpringDataAccountJpaRepository accounts;
   private final SpringDataPasswordCredentialJpaRepository credentials;
+  private final EntityManager entityManager;
 
   // Constructed only by Spring's own component scan (via @Repository above), never directly by
   // other code — AccountRepository (the port) is the only type callers outside this package
   // should depend on.
   /* package */ JpaAccountRepository(
       final SpringDataAccountJpaRepository accounts,
-      final SpringDataPasswordCredentialJpaRepository credentials) {
+      final SpringDataPasswordCredentialJpaRepository credentials,
+      final EntityManager entityManager) {
     this.accounts = accounts;
     this.credentials = credentials;
+    this.entityManager = entityManager;
   }
 
   @Override
@@ -122,51 +127,71 @@ class JpaAccountRepository implements AccountRepository {
   @Override
   @Transactional
   public void save(final Account account) {
-    final AccountEntity entity =
-        new AccountEntity(
-            account.id().value(),
-            account.organizationId().value(),
-            account.email().value(),
-            account.emailVerifiedAt().orElse(null),
-            account.status().name(),
-            account.createdAt(),
-            account.username().map(Username::value).orElse(null),
-            account.passwordResetRequiredAt().orElse(null));
-
     // saveAndFlush, not save: the unique constraint on accounts.(organization_id, email)
     // (data-model.md §3) must throw synchronously, right here, so RegisterAccountService's
     // try/catch actually catches it. Plain save() only stages the insert in the persistence
     // context — Hibernate would defer executing it until the surrounding @Transactional method
     // returns and the transaction commits, by which point the try/catch block has already
     // exited and the exception would surface somewhere the service never expects it.
-    accounts.saveAndFlush(entity);
+    accounts.saveAndFlush(toEntity(account));
+    saveCredentialIfPresent(account, credentials::saveAndFlush);
+  }
 
-    // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider
-    // Service#linkBrandNewAccount) saves an Account with no PasswordCredential at all — BR-ID-02's
-    // real "never zero auth methods" invariant is upheld one level up, by that same transaction
-    // also saving a SocialIdentity for the same account, not by this repository unconditionally
-    // requiring a password specifically. Account.reconstitute's own Javadoc already documented a
-    // null credential as a legitimate social-only state; this method previously still threw on it —
-    // a real, previously-undetected gap this phase's own integration test caught live (a 500 on the
-    // very first real social signup), not a hypothetical one. Only persist a row here if the
-    // aggregate actually carries one.
-    //
-    // Code review finding: this removes the persistence layer's own fail-fast enforcement of
-    // BR-ID-02 for every caller, not just the social-login ones — every current caller happens to
-    // also save a SocialIdentity/PasswordCredential in the same transaction, so nothing breaks
-    // today, but nothing here would catch a future regression that doesn't. An application-layer
-    // synchronous guard can't work at this exact call site regardless — a genuinely synchronous
-    // guard now does exist, just not here: migration V20260830110000's own DEFERRABLE INITIALLY
-    // DEFERRED constraint trigger fires at transaction commit (after this same transaction's own
-    // SocialIdentity/PasswordCredential insert has already run, whichever order they happened in)
-    // and rejects the whole insert. AccountAuthMethodIntegrityCheckJob remains a second,
-    // independent daily sweep on top of that trigger, not the primary control anymore — see
-    // either one's own Javadoc for the full reasoning.
+  // TD-PERF-019: same write as save() above, for the two call sites (RegisterAccountService,
+  // AuthenticateWithSocialProviderService#linkBrandNewAccount) that know for a fact this Account
+  // has never been persisted before — entityManager.persist() skips the pre-existence SELECT
+  // save()'s own merge()-based path always issues, correct for an update but pure waste on a row
+  // both caller and callee already know is new. Explicit flush() for the exact same synchronous-
+  // exception-surfacing reason save()'s own saveAndFlush comment already documents — persist()
+  // alone only stages the insert, same as a bare save() would.
+  @Override
+  @Transactional
+  public void insert(final Account account) {
+    entityManager.persist(toEntity(account));
+    saveCredentialIfPresent(account, entityManager::persist);
+    entityManager.flush();
+  }
+
+  private AccountEntity toEntity(final Account account) {
+    return new AccountEntity(
+        account.id().value(),
+        account.organizationId().value(),
+        account.email().value(),
+        account.emailVerifiedAt().orElse(null),
+        account.status().name(),
+        account.createdAt(),
+        account.username().map(Username::value).orElse(null),
+        account.passwordResetRequiredAt().orElse(null));
+  }
+
+  // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider
+  // Service#linkBrandNewAccount) saves an Account with no PasswordCredential at all — BR-ID-02's
+  // real "never zero auth methods" invariant is upheld one level up, by that same transaction
+  // also saving a SocialIdentity for the same account, not by this repository unconditionally
+  // requiring a password specifically. Account.reconstitute's own Javadoc already documented a
+  // null credential as a legitimate social-only state; this method previously still threw on it —
+  // a real, previously-undetected gap this phase's own integration test caught live (a 500 on the
+  // very first real social signup), not a hypothetical one. Only persist a row here if the
+  // aggregate actually carries one.
+  //
+  // Code review finding: this removes the persistence layer's own fail-fast enforcement of
+  // BR-ID-02 for every caller, not just the social-login ones — every current caller happens to
+  // also save a SocialIdentity/PasswordCredential in the same transaction, so nothing breaks
+  // today, but nothing here would catch a future regression that doesn't. An application-layer
+  // synchronous guard can't work at this exact call site regardless — a genuinely synchronous
+  // guard now does exist, just not here: migration V20260830110000's own DEFERRABLE INITIALLY
+  // DEFERRED constraint trigger fires at transaction commit (after this same transaction's own
+  // SocialIdentity/PasswordCredential insert has already run, whichever order they happened in)
+  // and rejects the whole insert. AccountAuthMethodIntegrityCheckJob remains a second,
+  // independent daily sweep on top of that trigger, not the primary control anymore — see
+  // either one's own Javadoc for the full reasoning.
+  private void saveCredentialIfPresent(
+      final Account account, final Consumer<PasswordCredentialEntity> saver) {
     account
         .passwordCredential()
         .ifPresent(
             credential ->
-                credentials.saveAndFlush(
+                saver.accept(
                     new PasswordCredentialEntity(
                         credential.id(),
                         credential.accountId().value(),

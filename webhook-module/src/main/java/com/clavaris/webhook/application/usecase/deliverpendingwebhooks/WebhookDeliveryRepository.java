@@ -19,6 +19,17 @@ public interface WebhookDeliveryRepository {
   void save(WebhookDelivery delivery);
 
   /**
+   * TD-PERF-019: same write as {@link #save}, for the one call site that knows for a fact this
+   * {@code WebhookDelivery} has never been persisted before — {@code DispatchOutboxEventsService}'s
+   * own fan-out loop, which always constructs via {@code WebhookDelivery.schedule(...)}. Every
+   * other call site ({@code DeliverPendingWebhooksService}'s {@code recordSuccess}/{@code
+   * recordFailure}, {@code ReplayWebhookDeliveryService}'s {@code resetForReplay}) first loads an
+   * existing row (via {@link #claimDueBatch} or {@link #findById}) and must keep calling {@link
+   * #save}. Same rationale {@code AccountRepository#insert}'s own identical addition documents.
+   */
+  void insert(WebhookDelivery delivery);
+
+  /**
    * Addressed by this id alone — see {@code WebhookEndpointRepository#findById}'s own Javadoc for
    * why no additional Organization-scoping check applies on this admin API surface.
    */

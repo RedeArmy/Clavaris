@@ -41,14 +41,17 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
   @Override
   @Transactional
   public IssueRefreshTokenResult handle(final IssueRefreshTokenCommand command) {
+    // TD-PERF-019: insert, not save — Session.open/RefreshToken.issue guarantee both are
+    // brand-new aggregates, one per login. See SessionRepository#insert/RefreshTokenRepository
+    // #insert's own Javadoc.
     final Session session = Session.open(command.accountId(), command.authorizedScopes());
-    sessions.save(session);
+    sessions.insert(session);
 
     final String rawValue = RefreshTokenSecret.generateRawValue();
     final String hash = RefreshTokenSecret.hash(rawValue);
     final RefreshToken token =
         RefreshToken.issue(session.id(), command.accountId(), hash, command.expiresAt());
-    refreshTokens.save(token);
+    refreshTokens.insert(token);
 
     LOG.info(
         "event=token_issued tokenType=refresh_token accountId={} sessionId={}",

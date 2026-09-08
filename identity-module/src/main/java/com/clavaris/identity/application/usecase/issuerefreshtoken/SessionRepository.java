@@ -21,6 +21,15 @@ public interface SessionRepository {
   void save(Session session);
 
   /**
+   * TD-PERF-019: same write as {@link #save}, for the one call site ({@code
+   * IssueRefreshTokenService}, a fresh login) that knows for a fact this {@code Session} has never
+   * been persisted before — {@code RotateRefreshTokenService}'s own {@code session.touch()} +
+   * {@link #save} path is a genuine update and must keep calling {@link #save}. Same rationale
+   * {@code AccountRepository#insert}'s own identical addition documents.
+   */
+  void insert(Session session);
+
+  /**
    * BR-ID-03: the reuse-detection cascade — every session for the account, not just the one the
    * reused token belonged to.
    */

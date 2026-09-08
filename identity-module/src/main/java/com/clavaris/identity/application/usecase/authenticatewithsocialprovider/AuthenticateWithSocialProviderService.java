@@ -184,7 +184,10 @@ public class AuthenticateWithSocialProviderService
             // all, so a password-reset attempt would have failed outright (Account.
             // resetPasswordCredential requires one to already exist).
             account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
-            accounts.save(account);
+            // TD-PERF-019: insert, not save — Account.register two lines above guarantees this is
+            // a brand-new aggregate, never persisted before. See AccountRepository#insert's own
+            // Javadoc for why that matters.
+            accounts.insert(account);
 
             final SocialIdentity identity =
                 SocialIdentity.link(

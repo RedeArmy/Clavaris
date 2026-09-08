@@ -110,7 +110,7 @@ class AuthenticateWithSocialProviderServiceTest {
     assertThat(result).isInstanceOf(AuthenticateWithSocialProviderResult.LoggedIn.class);
     assertThat(((AuthenticateWithSocialProviderResult.LoggedIn) result).accountId())
         .isEqualTo(accountId);
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   @Test
@@ -125,7 +125,7 @@ class AuthenticateWithSocialProviderServiceTest {
     assertThat(result).isInstanceOf(AuthenticateWithSocialProviderResult.LoggedIn.class);
     org.mockito.ArgumentCaptor<Account> savedAccount =
         org.mockito.ArgumentCaptor.forClass(Account.class);
-    verify(accounts).save(savedAccount.capture());
+    verify(accounts).insert(savedAccount.capture());
     verify(socialIdentities).save(any(SocialIdentity.class));
     verify(outbox).write(eq("account.created"), any(), any(), any());
     verify(outbox).write(eq("social_identity.linked"), any(), any(), any());
@@ -154,7 +154,7 @@ class AuthenticateWithSocialProviderServiceTest {
         .thenReturn(Optional.of(winningAccount)); // re-fetch after losing the race
     doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
         .when(accounts)
-        .save(any());
+        .insert(any());
 
     AuthenticateWithSocialProviderResult result = service.handle(command());
 
@@ -183,7 +183,7 @@ class AuthenticateWithSocialProviderServiceTest {
     verify(mailSender)
         .sendSocialLinkConfirmation(
             eq(EMAIL.value()), eq(ORGANIZATION_ID), eq(SocialProvider.GOOGLE), any());
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
     verify(socialIdentities, never()).save(any());
   }
 

@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -75,15 +74,15 @@ class CreateProductionEnvironmentServiceTest {
             new CreateProductionEnvironmentCommand(
                 developmentOrganization.id(), "JobSeeker (production)", ACTOR));
 
-    verify(organizations, times(2)).save(any());
-    verify(organizations).save(result.organization());
+    // TD-PERF-019: the new PRODUCTION Organization is a genuine insert (never persisted before);
+    // the source DEVELOPMENT Organization's updated linkedEnvironmentOrganizationId is a genuine
+    // update to a row already loaded via findById — see CreateProductionEnvironmentService's own
+    // call-site comments.
+    verify(organizations).insert(result.organization());
     ArgumentCaptor<Organization> captor = ArgumentCaptor.forClass(Organization.class);
-    verify(organizations, times(2)).save(captor.capture());
-    Organization savedSource =
-        captor.getAllValues().stream()
-            .filter(candidate -> candidate.id().equals(developmentOrganization.id()))
-            .findFirst()
-            .orElseThrow();
+    verify(organizations).save(captor.capture());
+    Organization savedSource = captor.getValue();
+    assertThat(savedSource.id()).isEqualTo(developmentOrganization.id());
     assertThat(savedSource.linkedEnvironmentOrganizationId()).contains(result.organization().id());
   }
 
@@ -113,6 +112,7 @@ class CreateProductionEnvironmentServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(organizations, never()).save(any());
+    verify(organizations, never()).insert(any());
     verifyNoInteractions(keyProvisioner);
     verifyNoInteractions(auditEvents);
   }
@@ -131,6 +131,7 @@ class CreateProductionEnvironmentServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(organizations, never()).save(any());
+    verify(organizations, never()).insert(any());
     verifyNoInteractions(keyProvisioner);
   }
 
@@ -147,6 +148,7 @@ class CreateProductionEnvironmentServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(organizations, never()).save(any());
+    verify(organizations, never()).insert(any());
     verifyNoInteractions(keyProvisioner);
   }
 

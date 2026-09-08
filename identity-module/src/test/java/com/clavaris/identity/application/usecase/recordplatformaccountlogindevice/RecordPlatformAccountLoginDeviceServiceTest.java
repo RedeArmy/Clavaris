@@ -98,7 +98,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(PlatformKnownDevice.class));
+    verify(knownDevices).insert(any(PlatformKnownDevice.class));
     verify(mailSender)
         .sendNewPlatformDeviceLoginNotification(
             eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any(), any());
@@ -180,7 +180,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
 
     assertThat(blankResult).isPresent();
     assertThat(nullResult).isPresent();
-    verify(knownDevices, times(2)).save(any(PlatformKnownDevice.class));
+    verify(knownDevices, times(2)).insert(any(PlatformKnownDevice.class));
   }
 
   @Test
@@ -195,7 +195,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(PlatformKnownDevice.class));
+    verify(knownDevices).insert(any(PlatformKnownDevice.class));
   }
 
   @Test
@@ -210,7 +210,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(PlatformKnownDevice.class));
+    verify(knownDevices).insert(any(PlatformKnownDevice.class));
     verify(mailSender)
         .sendNewPlatformDeviceLoginNotification(
             eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any(), any());
@@ -227,7 +227,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(PlatformKnownDevice.class));
+    verify(knownDevices).insert(any(PlatformKnownDevice.class));
     verify(mailSender, never())
         .sendNewPlatformDeviceLoginNotification(any(), any(), any(), any(), any());
     verify(auditEvents)
@@ -238,7 +238,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
   void aTokenCollisionOnSaveDegradesToNoNotificationInsteadOfPropagating() {
     doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
         .when(knownDevices)
-        .save(any(PlatformKnownDevice.class));
+        .insert(any(PlatformKnownDevice.class));
 
     Optional<String> result =
         service.handle(
@@ -272,7 +272,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
                 preExisting.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(PlatformKnownDevice.class));
+    verify(knownDevices).insert(any(PlatformKnownDevice.class));
     verify(auditEvents)
         .write(
             eq(AuditActor.platformAccount(preExisting.id().value())),
@@ -341,7 +341,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
             new RecordPlatformAccountLoginDeviceCommand(unknownId, "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(PlatformKnownDevice.class));
+    verify(knownDevices).insert(any(PlatformKnownDevice.class));
     verify(mailSender, never())
         .sendNewPlatformDeviceLoginNotification(any(), any(), any(), any(), any());
     verify(auditEvents)

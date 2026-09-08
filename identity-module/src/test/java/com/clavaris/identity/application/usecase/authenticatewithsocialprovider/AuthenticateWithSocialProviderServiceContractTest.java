@@ -125,7 +125,7 @@ class AuthenticateWithSocialProviderServiceContractTest
         .thenReturn(Optional.of(winningAccount));
     doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
         .when(accounts)
-        .save(any());
+        .insert(any());
   }
 
   @Override

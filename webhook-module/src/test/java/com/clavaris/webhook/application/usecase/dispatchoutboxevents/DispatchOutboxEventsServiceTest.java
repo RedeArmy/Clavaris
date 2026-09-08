@@ -50,7 +50,7 @@ class DispatchOutboxEventsServiceTest {
     service.dispatchPendingEvents();
 
     ArgumentCaptor<WebhookDelivery> captor = ArgumentCaptor.forClass(WebhookDelivery.class);
-    verify(deliveries).save(captor.capture());
+    verify(deliveries).insert(captor.capture());
     assertThat(captor.getValue().endpointId()).isEqualTo(matchingEndpoint.id());
     assertThat(captor.getValue().organizationId()).isEqualTo(organizationId);
     assertThat(captor.getValue().outboxEventId()).isEqualTo(event.id());
@@ -76,7 +76,7 @@ class DispatchOutboxEventsServiceTest {
 
     service.dispatchPendingEvents();
 
-    verify(deliveries, never()).save(any());
+    verify(deliveries, never()).insert(any());
     verify(outboxEvents).markPublishedBatch(List.of(event));
   }
 
@@ -86,7 +86,7 @@ class DispatchOutboxEventsServiceTest {
 
     service.dispatchPendingEvents();
 
-    verify(deliveries, never()).save(any());
+    verify(deliveries, never()).insert(any());
     verify(outboxEvents, never()).markPublishedBatch(any());
   }
 
@@ -131,7 +131,7 @@ class DispatchOutboxEventsServiceTest {
     service.dispatchPendingEvents();
 
     verify(endpoints, times(1)).findActiveByOrganizationId(organizationId);
-    verify(deliveries, times(2)).save(any());
+    verify(deliveries, times(2)).insert(any());
     verify(outboxEvents).markPublishedBatch(List.of(firstEvent, secondEvent));
   }
 

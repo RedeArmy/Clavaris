@@ -98,7 +98,7 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
             ((AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn) result)
                 .platformAccountId())
         .isEqualTo(platformAccountId);
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   @Test
@@ -113,7 +113,7 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
         .isInstanceOf(AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn.class);
     org.mockito.ArgumentCaptor<PlatformAccount> savedAccount =
         org.mockito.ArgumentCaptor.forClass(PlatformAccount.class);
-    verify(accounts).save(savedAccount.capture());
+    verify(accounts).insert(savedAccount.capture());
     verify(socialIdentities).save(any(PlatformSocialIdentity.class));
     verifyNoInteractions(mailSender);
 
@@ -139,7 +139,7 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
         .thenReturn(Optional.of(winningAccount)); // re-fetch after losing the race
     doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
         .when(accounts)
-        .save(any());
+        .insert(any());
 
     AuthenticatePlatformAccountWithSocialProviderResult result = service.handle(command());
 
@@ -167,7 +167,7 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
     verify(pendingLinks).save(any());
     verify(mailSender)
         .sendPlatformSocialLinkConfirmation(eq(EMAIL.value()), eq(SocialProvider.GOOGLE), any());
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
     verify(socialIdentities, never()).save(any());
   }
 

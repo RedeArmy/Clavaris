@@ -82,7 +82,10 @@ public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase 
               .filter(endpoint -> endpoint.subscribesTo(event.eventType()))
               .toList();
       for (final WebhookEndpoint endpoint : matchingEndpoints) {
-        deliveries.save(
+        // TD-PERF-019: insert, not save — WebhookDelivery.schedule always mints a brand-new row,
+        // one per (endpoint, event) fan-out pair. See WebhookDeliveryRepository#insert's own
+        // Javadoc.
+        deliveries.insert(
             WebhookDelivery.schedule(
                 endpoint.id(),
                 event.organizationId(),
