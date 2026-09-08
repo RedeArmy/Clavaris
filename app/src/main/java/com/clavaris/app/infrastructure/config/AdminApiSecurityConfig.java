@@ -72,10 +72,10 @@ class AdminApiSecurityConfig {
     return NimbusJwtDecoder.withPublicKey((RSAPublicKey) platformKey.keyPair().getPublic()).build();
   }
 
-  // Optional Idempotency-Key support (see IdempotencyKeyFilter's own Javadoc) — this surface's own
-  // sole consumer, unlike RateLimitKeyHasher/BearerTokenHasher which several security chains share;
-  // no other chain needs idempotency semantics, so this hasher/its dedicated secret live here, not
-  // promoted to a shared config class.
+  // Optional Idempotency-Key support (see IdempotencyKeyFilter's own Javadoc). Several other
+  // security chains share RateLimitKeyHasher and BearerTokenHasher, but this admin-API chain is
+  // the sole consumer of idempotency semantics in the whole app, so this hasher and its own
+  // dedicated secret live here rather than being promoted to a shared config class.
   @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ IdempotencyKeyHasher idempotencyKeyHasher(

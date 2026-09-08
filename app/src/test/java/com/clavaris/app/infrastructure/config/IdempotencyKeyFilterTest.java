@@ -3,17 +3,26 @@ package com.clavaris.app.infrastructure.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -112,13 +121,11 @@ class IdempotencyKeyFilterTest {
         new MockFilterChain() {
           @Override
           public void doFilter(
-              final jakarta.servlet.ServletRequest servletRequest,
-              final jakarta.servlet.ServletResponse servletResponse)
-              throws java.io.IOException, jakarta.servlet.ServletException {
+              final ServletRequest servletRequest, final ServletResponse servletResponse)
+              throws IOException, ServletException {
             super.doFilter(servletRequest, servletResponse);
-            ((jakarta.servlet.http.HttpServletResponse) servletResponse).setStatus(201);
-            ((jakarta.servlet.http.HttpServletResponse) servletResponse)
-                .setContentType("application/json");
+            ((HttpServletResponse) servletResponse).setStatus(201);
+            ((HttpServletResponse) servletResponse).setContentType("application/json");
             servletResponse
                 .getOutputStream()
                 .write("{\"id\":\"org-1\"}".getBytes(StandardCharsets.UTF_8));
@@ -130,15 +137,14 @@ class IdempotencyKeyFilterTest {
     assertThat(chain.getRequest()).as("a claimed request must reach the real chain").isNotNull();
     assertThat(response.getStatus()).isEqualTo(201);
     assertThat(response.getContentAsString()).isEqualTo("{\"id\":\"org-1\"}");
-    // A record's auto-generated equals() compares a byte[] field by reference, not content — an
-    // ArgumentCaptor plus per-field assertions (AssertJ's own isEqualTo on a byte[] does compare
-    // content) proves the real thing, not a false negative eq(...) would produce here.
-    org.mockito.ArgumentCaptor<IdempotentResponse> cached =
-        org.mockito.ArgumentCaptor.forClass(IdempotentResponse.class);
-    verify(store).complete(anyString(), anyString(), cached.capture());
-    assertThat(cached.getValue().status()).isEqualTo(201);
-    assertThat(cached.getValue().contentType()).isEqualTo("application/json");
-    assertThat(cached.getValue().body()).isEqualTo("{\"id\":\"org-1\"}".getBytes());
+    // IdempotentResponse overrides equals() to compare its own byte[] body by content, not
+    // reference — see its own Javadoc — so eq(...) here genuinely proves the cached entry, not a
+    // false negative a record's default array-by-reference equals() would otherwise produce.
+    verify(store)
+        .complete(
+            anyString(),
+            anyString(),
+            eq(new IdempotentResponse(201, "application/json", "{\"id\":\"org-1\"}".getBytes())));
   }
 
   @Test
@@ -156,9 +162,8 @@ class IdempotencyKeyFilterTest {
         new MockFilterChain() {
           @Override
           public void doFilter(
-              final jakarta.servlet.ServletRequest servletRequest,
-              final jakarta.servlet.ServletResponse servletResponse) {
-            ((jakarta.servlet.http.HttpServletResponse) servletResponse).setStatus(500);
+              final ServletRequest servletRequest, final ServletResponse servletResponse) {
+            ((HttpServletResponse) servletResponse).setStatus(500);
           }
         };
 
@@ -254,8 +259,8 @@ class IdempotencyKeyFilterTest {
     requestB.addHeader("Idempotency-Key", "retry-1");
     filter.doFilter(requestB, new MockHttpServletResponse(), new MockFilterChain());
 
-    org.mockito.ArgumentCaptor<String> keys = org.mockito.ArgumentCaptor.forClass(String.class);
-    verify(store, org.mockito.Mockito.times(2)).claim(keys.capture(), anyString());
+    ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+    verify(store, times(2)).claim(keys.capture(), anyString());
     assertThat(keys.getAllValues().get(0)).isNotEqualTo(keys.getAllValues().get(1));
   }
 
@@ -272,6 +277,6 @@ class IdempotencyKeyFilterTest {
     // 's own source — the 1-arg constructor never calls setAuthenticated(true) at all, which
     // RateLimitIdentifiers.authenticatedPlatformClientId's own null-check depends on.
     SecurityContextHolder.getContext()
-        .setAuthentication(new JwtAuthenticationToken(jwt, java.util.List.of()));
+        .setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
   }
 }

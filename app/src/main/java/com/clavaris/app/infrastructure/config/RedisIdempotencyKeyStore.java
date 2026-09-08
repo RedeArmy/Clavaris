@@ -2,7 +2,9 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -158,6 +160,11 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
   /**
    * The JSON envelope actually stored in Redis — {@code status}/{@code contentType}/{@code body}
    * are {@code null} while {@link #inProgress()}, populated once {@link #done}.
+   *
+   * <p>{@link #equals}/{@link #hashCode}/{@link #toString} overridden explicitly — same "a record's
+   * own generated versions compare/print an array field by reference, not content" reasoning {@link
+   * IdempotentResponse}'s own identical override documents, for {@link #body}, the one array
+   * component here.
    */
   private record StoredEntry(
       boolean inProgress, String requestBodyHash, Integer status, String contentType, byte[] body) {
@@ -170,6 +177,41 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
         final String requestBodyHash, final IdempotentResponse response) {
       return new StoredEntry(
           false, requestBodyHash, response.status(), response.contentType(), response.body());
+    }
+
+    @Override
+    public boolean equals(final Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof final StoredEntry that)) {
+        return false;
+      }
+      return inProgress == that.inProgress
+          && Objects.equals(requestBodyHash, that.requestBodyHash)
+          && Objects.equals(status, that.status)
+          && Objects.equals(contentType, that.contentType)
+          && Arrays.equals(body, that.body);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(inProgress, requestBodyHash, status, contentType, Arrays.hashCode(body));
+    }
+
+    @Override
+    public String toString() {
+      return "StoredEntry[inProgress="
+          + inProgress
+          + ", requestBodyHash="
+          + requestBodyHash
+          + ", status="
+          + status
+          + ", contentType="
+          + contentType
+          + ", body="
+          + Arrays.toString(body)
+          + ']';
     }
   }
 }
