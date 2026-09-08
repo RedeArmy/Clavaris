@@ -60,7 +60,7 @@
              compatible" resolves to over time without any pom edit) —
              consistent with every other plugin version in this file already
              being explicit, not left to Maven's own discretion. -->
-        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
         <!-- Pinned explicitly (TD-TEST-005), same "every other plugin version in this file is
              explicit" rationale as maven-compiler-plugin above — this is the version Maven was
              already resolving unpinned before this row existed, confirmed via a real build's own
