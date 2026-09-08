@@ -17,6 +17,18 @@ public interface OrganizationRepository {
 
   void save(Organization organization);
 
+  /**
+   * TD-PERF-019: same write as {@link #save}, for the call sites that know for a fact this {@code
+   * Organization} has never been persisted before — {@code CreateOrganizationService} and {@code
+   * CreateProductionEnvironmentService}'s own new {@code PRODUCTION} row (constructed via {@code
+   * Organization.register}/{@code Organization.registerProductionEnvironment}). That same service's
+   * other write — the source {@code DEVELOPMENT} Organization's updated {@code
+   * linkedEnvironmentOrganizationId}, loaded via {@link #findById} — is a genuine update and must
+   * keep calling {@link #save}, same for {@code SetSocialLoginPolicyForOrganizationService}. Same
+   * rationale {@code AccountRepository#insert}'s own identical addition documents.
+   */
+  void insert(Organization organization);
+
   boolean existsById(UUID organizationId);
 
   /**

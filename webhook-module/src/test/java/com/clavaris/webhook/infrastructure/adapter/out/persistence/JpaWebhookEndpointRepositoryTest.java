@@ -1,6 +1,7 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -151,6 +153,44 @@ class JpaWebhookEndpointRepositoryTest {
   @Test
   void findByIdReturnsEmptyForAnUnknownId() {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();
+  }
+
+  // TD-PERF-019: proves insert() genuinely uses persist() semantics (fails loudly on a duplicate
+  // id), not merge()'s silent-update behavior — same load-bearing regression proof
+  // JpaAccountRepositoryTest's own identical pair of tests already established for Account.
+  @Test
+  void insertPersistsANewEndpointFindableAfterward() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://inserted.example.com", null, List.of("x"), "s");
+
+    repository.insert(endpoint);
+
+    WebhookEndpoint found = repository.findById(endpoint.id()).orElseThrow();
+    assertThat(found.id()).isEqualTo(endpoint.id());
+  }
+
+  @Test
+  void insertOnAnAlreadyPersistedIdFailsLoudlyInsteadOfSilentlyUpdating() {
+    WebhookEndpoint original =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://original.example.com", null, List.of("x"), "s");
+    repository.insert(original);
+    WebhookEndpoint reusesTheSameId =
+        WebhookEndpoint.reconstitute(
+            original.id(),
+            original.organizationId(),
+            "https://different.example.com",
+            "A different description",
+            original.subscribedEventTypes(),
+            original.currentSecretEncrypted(),
+            original.previousSecretEncrypted(),
+            original.previousSecretExpiresAt(),
+            original.active(),
+            original.createdAt());
+
+    assertThatExceptionOfType(DataIntegrityViolationException.class)
+        .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
   @Configuration

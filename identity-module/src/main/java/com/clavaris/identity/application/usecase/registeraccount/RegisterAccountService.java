@@ -74,7 +74,12 @@ public class RegisterAccountService implements RegisterAccountUseCase {
     }
 
     try {
-      accounts.save(account);
+      // TD-PERF-019: insert, not save — this Account has definitely never been persisted before
+      // (the pre-check above already confirmed no row for it exists, and this is the one place
+      // that ever constructs one fresh via Account.register), so there's no ambiguity for
+      // AccountRepository#insert's own persist()-based path to get wrong, unlike save()'s own
+      // merge()-based one — see that method's own Javadoc.
+      accounts.insert(account);
     } catch (DataIntegrityViolationException raceLost) {
       // The pre-check above lost the race — another request committed first. Translate the
       // low-level DB exception into the same domain exception the pre-check would have thrown, so

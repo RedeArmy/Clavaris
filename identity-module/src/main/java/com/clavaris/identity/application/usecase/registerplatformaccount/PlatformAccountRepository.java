@@ -21,4 +21,13 @@ public interface PlatformAccountRepository {
   Optional<PlatformAccount> findById(PlatformAccountId platformAccountId);
 
   void save(PlatformAccount account);
+
+  /**
+   * TD-PERF-019: same write as {@link #save}, for the two call sites that know for a fact this
+   * {@code PlatformAccount} has never been persisted before ({@code
+   * RegisterPlatformAccountService}, {@code
+   * AuthenticatePlatformAccountWithSocialProviderService#linkBrandNewAccount}) — same rationale
+   * {@code AccountRepository#insert}'s own identical addition documents.
+   */
+  void insert(PlatformAccount account);
 }

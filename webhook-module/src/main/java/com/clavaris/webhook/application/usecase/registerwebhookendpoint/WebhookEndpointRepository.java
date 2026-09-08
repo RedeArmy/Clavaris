@@ -19,6 +19,17 @@ public interface WebhookEndpointRepository {
   void save(WebhookEndpoint endpoint);
 
   /**
+   * TD-PERF-019: same write as {@link #save}, for the one call site that knows for a fact this
+   * {@code WebhookEndpoint} has never been persisted before — {@code
+   * RegisterWebhookEndpointService}, which always constructs via {@code
+   * WebhookEndpoint.register(...)}. Every mutating call site below registration ({@code
+   * rotatewebhookendpointsecret}, {@code (de)activatewebhookendpoint}) first loads via {@link
+   * #findById} and must keep calling {@link #save}. Same rationale {@code
+   * AccountRepository#insert}'s own identical addition documents.
+   */
+  void insert(WebhookEndpoint endpoint);
+
+  /**
    * Every mutating use case below registration ({@code rotatewebhookendpointsecret}, {@code
    * (de)activatewebhookendpoint}) addresses an endpoint by this id alone — the platform-tier caller
    * that reaches this whole admin API surface is already trusted across every Organization

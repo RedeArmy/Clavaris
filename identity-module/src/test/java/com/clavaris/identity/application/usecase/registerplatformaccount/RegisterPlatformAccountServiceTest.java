@@ -45,7 +45,7 @@ class RegisterPlatformAccountServiceTest {
         service.handle(new RegisterPlatformAccountCommand(email, VALID_PASSWORD));
 
     assertThat(id).isNotNull();
-    verify(accounts).save(any());
+    verify(accounts).insert(any());
   }
 
   @Test
@@ -64,7 +64,7 @@ class RegisterPlatformAccountServiceTest {
     assertThatExceptionOfType(WeakPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   @Test
@@ -76,13 +76,13 @@ class RegisterPlatformAccountServiceTest {
     assertThatExceptionOfType(PlatformAccountEmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   @Test
   void translatesALostRaceIntoTheSameDomainExceptionAsThePreCheck() {
     when(accounts.existsByEmail(email)).thenReturn(false);
-    doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).save(any());
+    doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).insert(any());
     RegisterPlatformAccountCommand command =
         new RegisterPlatformAccountCommand(email, VALID_PASSWORD);
 

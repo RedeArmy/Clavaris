@@ -58,7 +58,7 @@ class RegisterAccountServiceTest {
         service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
 
     assertThat(id).isNotNull();
-    verify(accounts).save(any());
+    verify(accounts).insert(any());
   }
 
   @Test
@@ -93,7 +93,7 @@ class RegisterAccountServiceTest {
     assertThatExceptionOfType(WeakPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
     verify(outbox, never()).write(any(), any(), any(), any());
   }
 
@@ -106,7 +106,7 @@ class RegisterAccountServiceTest {
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
     verify(outbox, never()).write(any(), any(), any(), any());
   }
 
@@ -116,7 +116,7 @@ class RegisterAccountServiceTest {
     // insert first — the unique constraint on accounts.(organization_id, email) is what's really
     // load-bearing here, not this pre-check (data-model.md §3).
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
-    doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).save(any());
+    doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).insert(any());
     RegisterAccountCommand command =
         new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
 
@@ -136,7 +136,7 @@ class RegisterAccountServiceTest {
 
     org.mockito.ArgumentCaptor<com.clavaris.identity.domain.model.Account> accountCaptor =
         org.mockito.ArgumentCaptor.forClass(com.clavaris.identity.domain.model.Account.class);
-    verify(accounts).save(accountCaptor.capture());
+    verify(accounts).insert(accountCaptor.capture());
     assertThat(accountCaptor.getValue().username()).contains(new Username("flowuser"));
   }
 
@@ -149,7 +149,7 @@ class RegisterAccountServiceTest {
     assertThatExceptionOfType(UsernameRequiredException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   @Test
@@ -163,7 +163,7 @@ class RegisterAccountServiceTest {
     assertThatExceptionOfType(UsernameAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   @Test
@@ -176,7 +176,7 @@ class RegisterAccountServiceTest {
     // ADR-0024 §5: never the raw submitted value (there wasn't one) — a real, hashed credential
     // still gets attached, just never the literal null/blank the caller sent.
     verify(hasher).hash(argThat(raw -> raw != null && raw.length() == 32));
-    verify(accounts).save(any());
+    verify(accounts).insert(any());
   }
 
   @Test
@@ -186,7 +186,7 @@ class RegisterAccountServiceTest {
     assertThatExceptionOfType(WeakPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(accounts, never()).save(any());
+    verify(accounts, never()).insert(any());
   }
 
   private static AccountAuthenticationPolicySnapshot usernameOptionalPolicy() {

@@ -22,4 +22,11 @@ public interface PlatformKnownDeviceRepository {
    *     "implementations must flush immediately" contract as {@code KnownDeviceRepository.save}.
    */
   void save(PlatformKnownDevice device);
+
+  /**
+   * TD-PERF-019: platform-tier mirror of {@code KnownDeviceRepository#insert} — same "the
+   * 'unrecognized or absent cookie' branch always constructs a brand-new row" rationale, same
+   * synchronous-flush contract {@link #save} documents above.
+   */
+  void insert(PlatformKnownDevice device);
 }

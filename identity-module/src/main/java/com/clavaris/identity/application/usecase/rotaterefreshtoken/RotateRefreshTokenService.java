@@ -155,7 +155,10 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     final RefreshToken rotated =
         RefreshToken.rotatedFrom(
             presented, RefreshTokenSecret.hash(newRawValue), command.newExpiresAt());
-    refreshTokens.save(rotated);
+    // TD-PERF-019: insert, not save — RefreshToken.rotatedFrom always mints a brand-new token
+    // (its own id, never previously persisted), unlike presented/session above which are both
+    // genuine updates to rows already loaded earlier in this same method.
+    refreshTokens.insert(rotated);
 
     LOG.info(
         "event=refresh_token_rotated accountId={} sessionId={}",

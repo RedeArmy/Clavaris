@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.PlatformKnownDeviceRepository;
 import com.clavaris.identity.domain.model.PlatformAccountId;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -133,6 +135,40 @@ class JpaPlatformKnownDeviceRepositoryTest {
         PlatformKnownDevice.recognize(otherPlatformAccountId, "Mozilla/5.0 Test Browser", "hash"));
 
     assertThat(repository.existsByPlatformAccountId(platformAccountId)).isFalse();
+  }
+
+  // TD-PERF-019: same load-bearing regression proof as JpaKnownDeviceRepositoryTest's own
+  // identical pair — insert() must fail loudly on a duplicate id, not silently update.
+  @Test
+  void insertPersistsANewDeviceFindableAfterward() {
+    PlatformKnownDevice device =
+        PlatformKnownDevice.recognize(
+            platformAccountId, "Mozilla/5.0 Test Browser", "inserted-hash");
+
+    repository.insert(device);
+
+    Optional<PlatformKnownDevice> found =
+        repository.findByPlatformAccountIdAndDeviceTokenHash(platformAccountId, "inserted-hash");
+    assertThat(found).isPresent();
+    assertThat(found.get().id()).isEqualTo(device.id());
+  }
+
+  @Test
+  void insertOnAnAlreadyPersistedIdFailsLoudlyInsteadOfSilentlyUpdating() {
+    PlatformKnownDevice original =
+        PlatformKnownDevice.recognize(platformAccountId, "Mozilla/5.0 Test Browser", "hash-one");
+    repository.insert(original);
+    PlatformKnownDevice reusesTheSameId =
+        PlatformKnownDevice.reconstitute(
+            original.id(),
+            platformAccountId,
+            "A different browser entirely",
+            "hash-two",
+            original.firstSeenAt(),
+            original.lastSeenAt());
+
+    assertThatExceptionOfType(DataIntegrityViolationException.class)
+        .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
   @Configuration

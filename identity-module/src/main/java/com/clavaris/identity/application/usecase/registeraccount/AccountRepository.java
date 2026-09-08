@@ -15,7 +15,13 @@ import java.util.Optional;
  * findByOrganizationIdAndEmail} is scoped to it — {@code
  * application.usecase.authenticatewithpassword.AuthenticateWithPasswordService} is the second
  * consumer, same precedent as organization-module's own {@code OrganizationRepository.existsById}.
+ *
+ * <p>PMD.TooManyMethods (TD-PERF-019's own {@link #insert} pushed this past the default threshold):
+ * every method here is a genuinely distinct, cohesive read/write this port's several consumers
+ * actually need — same "one port, several use cases" shape {@code WebhookEndpoint}'s own identical
+ * suppression documents, not a design smell to split up.
  */
+@SuppressWarnings("PMD.TooManyMethods")
 public interface AccountRepository {
 
   /**
@@ -60,6 +66,18 @@ public interface AccountRepository {
 
   /** Persists the account and its attached credential in one write. */
   void save(Account account);
+
+  /**
+   * TD-PERF-019: same write as {@link #save}, for the two call sites that know for a fact this
+   * {@code Account} has never been persisted before ({@code RegisterAccountService}, {@code
+   * AuthenticateWithSocialProviderService#linkBrandNewAccount}) — every other caller loads an
+   * existing {@code Account} first and must keep calling {@link #save}. Letting the one genuinely
+   * new-row case skip {@code save}'s own {@code merge()}-based path (a real, necessary
+   * pre-existence check for an update, but pure waste for a row both caller and callee already know
+   * doesn't exist) is the entire point of this method existing separately — see {@code
+   * JpaAccountRepository}'s own Javadoc for the mechanism.
+   */
+  void insert(Account account);
 
   /**
    * BR-DATA-02/03: a real, permanent hard delete — the only delete this port (or any repository in

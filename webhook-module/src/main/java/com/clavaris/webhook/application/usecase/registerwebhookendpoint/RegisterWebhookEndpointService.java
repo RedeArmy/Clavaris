@@ -59,7 +59,9 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
             command.subscribedEventTypes(),
             cipher.encrypt(rawSecret));
 
-    endpoints.save(endpoint);
+    // TD-PERF-019: insert, not save — WebhookEndpoint.register always mints a brand-new
+    // aggregate. See WebhookEndpointRepository#insert's own Javadoc.
+    endpoints.insert(endpoint);
     auditEvents.write(
         command.actor(),
         "webhook_endpoint.registered",

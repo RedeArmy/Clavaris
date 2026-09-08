@@ -47,7 +47,10 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
     account.attachPasswordCredential(hasher.hash(command.rawPassword()));
 
     try {
-      accounts.save(account);
+      // TD-PERF-019: insert, not save — the pre-check above already confirmed no row exists, and
+      // this is the one place that ever constructs a PlatformAccount fresh. See
+      // PlatformAccountRepository#insert's own Javadoc.
+      accounts.insert(account);
     } catch (final DataIntegrityViolationException raceLost) {
       throw new PlatformAccountEmailAlreadyRegisteredException(raceLost);
     }

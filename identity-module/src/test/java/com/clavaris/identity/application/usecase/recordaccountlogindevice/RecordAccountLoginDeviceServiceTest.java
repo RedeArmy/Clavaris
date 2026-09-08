@@ -112,7 +112,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(mailSender)
         .sendNewDeviceLoginNotification(
             eq(account.email().value()),
@@ -215,7 +215,7 @@ class RecordAccountLoginDeviceServiceTest {
 
     assertThat(blankResult).isPresent();
     assertThat(nullResult).isPresent();
-    verify(knownDevices, times(2)).save(any(KnownDevice.class));
+    verify(knownDevices, times(2)).insert(any(KnownDevice.class));
     verify(outbox, times(2))
         .write(eq("account.new_device_detected"), eq(account.id()), any(), any());
   }
@@ -234,7 +234,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
   }
 
@@ -252,7 +252,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(mailSender)
         .sendNewDeviceLoginNotification(
             eq(account.email().value()),
@@ -277,7 +277,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
     verify(mailSender)
         .sendNewDeviceLoginNotification(
@@ -301,7 +301,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(mailSender, never())
         .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
     verify(auditEvents).write(any(), eq("account.new_device_detected"), any(), any(), isNull());
@@ -318,7 +318,7 @@ class RecordAccountLoginDeviceServiceTest {
   void aTokenCollisionOnSaveDegradesToNoNotificationInsteadOfPropagating() {
     doThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"))
         .when(knownDevices)
-        .save(any(KnownDevice.class));
+        .insert(any(KnownDevice.class));
 
     Optional<String> result =
         service.handle(
@@ -358,7 +358,7 @@ class RecordAccountLoginDeviceServiceTest {
                 preExistingAccount.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(auditEvents)
         .write(
             eq(AuditActor.account(preExistingAccount.id().value())),
@@ -443,7 +443,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(unknownAccountId, "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(mailSender, never())
         .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
     verify(auditEvents).write(any(), eq("account.new_device_detected"), any(), any(), isNull());
@@ -473,7 +473,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     // The task was handed to the executor, not run inline — mailSender must not have been
     // touched yet at the point handle() itself already returned.
     verifyNoInteractions(mailSender);
@@ -517,7 +517,7 @@ class RecordAccountLoginDeviceServiceTest {
             new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
 
     assertThat(result).isPresent();
-    verify(knownDevices).save(any(KnownDevice.class));
+    verify(knownDevices).insert(any(KnownDevice.class));
     verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
     verifyNoInteractions(mailSender);
   }

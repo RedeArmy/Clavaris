@@ -61,7 +61,7 @@ class CreateOrganizationServiceTest {
         service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
 
     assertThat(result.organization().name()).isEqualTo("JobSeeker");
-    verify(organizations).save(result.organization());
+    verify(organizations).insert(result.organization());
   }
 
   @Test
@@ -112,6 +112,7 @@ class CreateOrganizationServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(organizations, never()).save(any());
+    verify(organizations, never()).insert(any());
     verifyNoInteractions(keyProvisioner);
     verifyNoInteractions(auditEvents);
   }

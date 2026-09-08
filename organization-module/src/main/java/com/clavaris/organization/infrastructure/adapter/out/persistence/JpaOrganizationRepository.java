@@ -3,11 +3,13 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
+import jakarta.persistence.EntityManager;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -17,31 +19,48 @@ import tools.jackson.databind.ObjectMapper;
  * allowedScopes} column already establishes — null-safe, unlike that class's own helper, since an
  * Organization that has never configured social login has a genuinely {@code NULL} column, not
  * merely an empty JSON array.
+ *
+ * <p>TD-PERF-019: {@code insert} calls {@link EntityManager#persist} directly — see {@code
+ * OrganizationRepository#insert}'s own Javadoc for which call sites that's safe for and why {@code
+ * save} itself is unchanged.
  */
 @Repository
 class JpaOrganizationRepository implements OrganizationRepository {
 
   private final SpringDataOrganizationJpaRepository organizations;
   private final ObjectMapper objectMapper;
+  private final EntityManager entityManager;
 
   /* package */ JpaOrganizationRepository(
-      final SpringDataOrganizationJpaRepository organizations, final ObjectMapper objectMapper) {
+      final SpringDataOrganizationJpaRepository organizations,
+      final ObjectMapper objectMapper,
+      final EntityManager entityManager) {
     this.organizations = organizations;
     this.objectMapper = objectMapper;
+    this.entityManager = entityManager;
   }
 
   @Override
   public void save(final Organization organization) {
-    organizations.save(
-        new OrganizationEntity(
-            organization.id(),
-            organization.name(),
-            organization.createdAt(),
-            organization.ownerPlatformAccountId(),
-            organization.socialLoginEnabled(),
-            writeJsonArray(organization.allowedSocialProviders()),
-            organization.environment().name(),
-            organization.linkedEnvironmentOrganizationId().orElse(null)));
+    organizations.save(toEntity(organization));
+  }
+
+  @Override
+  @Transactional
+  public void insert(final Organization organization) {
+    entityManager.persist(toEntity(organization));
+  }
+
+  private OrganizationEntity toEntity(final Organization organization) {
+    return new OrganizationEntity(
+        organization.id(),
+        organization.name(),
+        organization.createdAt(),
+        organization.ownerPlatformAccountId(),
+        organization.socialLoginEnabled(),
+        writeJsonArray(organization.allowedSocialProviders()),
+        organization.environment().name(),
+        organization.linkedEnvironmentOrganizationId().orElse(null));
   }
 
   @Override

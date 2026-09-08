@@ -51,7 +51,7 @@ class RegisterWebhookEndpointServiceTest {
     assertThat(result.endpoint().organizationId()).isEqualTo(organizationId);
     assertThat(result.endpoint().currentSecretEncrypted()).isEqualTo("encrypted-secret");
     assertThat(result.rawSigningSecret()).isNotBlank();
-    verify(endpoints).save(result.endpoint());
+    verify(endpoints).insert(result.endpoint());
     verify(auditEvents)
         .write(
             eq(ACTOR),
@@ -91,6 +91,7 @@ class RegisterWebhookEndpointServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(endpoints, never()).save(any());
+    verify(endpoints, never()).insert(any());
     verifyNoInteractions(auditEvents);
   }
 
@@ -111,6 +112,7 @@ class RegisterWebhookEndpointServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(endpoints, never()).save(any());
+    verify(endpoints, never()).insert(any());
     verifyNoInteractions(auditEvents);
   }
 
@@ -147,7 +149,7 @@ class RegisterWebhookEndpointServiceTest {
   private WebhookEndpoint captureSavedEndpoint() {
     org.mockito.ArgumentCaptor<WebhookEndpoint> captor =
         org.mockito.ArgumentCaptor.forClass(WebhookEndpoint.class);
-    verify(endpoints).save(captor.capture());
+    verify(endpoints).insert(captor.capture());
     return captor.getValue();
   }
 }

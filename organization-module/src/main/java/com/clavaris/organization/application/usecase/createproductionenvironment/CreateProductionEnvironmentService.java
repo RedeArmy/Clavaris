@@ -68,8 +68,12 @@ public class CreateProductionEnvironmentService implements CreateProductionEnvir
             command.name(),
             developmentOrganization.ownerPlatformAccountId(),
             developmentOrganization.id());
-    organizations.save(productionOrganization);
+    // TD-PERF-019: insert, not save — a brand-new PRODUCTION Organization row. See
+    // OrganizationRepository#insert's own Javadoc.
+    organizations.insert(productionOrganization);
 
+    // Genuine update — developmentOrganization was loaded via findById above, unchanged from
+    // save() semantics.
     organizations.save(
         developmentOrganization.withLinkedEnvironmentOrganizationId(productionOrganization.id()));
 

@@ -2,16 +2,22 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import jakarta.persistence.EntityManager;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Implements the outbound port; maps between {@code domain.model.WebhookEndpoint} and {@link
  * WebhookEndpointEntity}.
+ *
+ * <p>TD-PERF-019: {@code insert} calls {@link EntityManager#persist} directly — see {@code
+ * WebhookEndpointRepository#insert}'s own Javadoc for which call site that's safe for and why
+ * {@code save} itself is unchanged.
  */
 @SuppressWarnings("PMD.ShortVariable")
 @Repository
@@ -19,27 +25,40 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
 
   private final SpringDataWebhookEndpointJpaRepository endpoints;
   private final ObjectMapper objectMapper;
+  private final EntityManager entityManager;
 
   /* package */ JpaWebhookEndpointRepository(
-      final SpringDataWebhookEndpointJpaRepository endpoints, final ObjectMapper objectMapper) {
+      final SpringDataWebhookEndpointJpaRepository endpoints,
+      final ObjectMapper objectMapper,
+      final EntityManager entityManager) {
     this.endpoints = endpoints;
     this.objectMapper = objectMapper;
+    this.entityManager = entityManager;
   }
 
   @Override
   public void save(final WebhookEndpoint endpoint) {
-    endpoints.save(
-        new WebhookEndpointEntity(
-            endpoint.id(),
-            endpoint.organizationId(),
-            endpoint.url(),
-            endpoint.description(),
-            objectMapper.writeValueAsString(endpoint.subscribedEventTypes()),
-            endpoint.currentSecretEncrypted(),
-            endpoint.previousSecretEncrypted(),
-            endpoint.previousSecretExpiresAt(),
-            endpoint.active(),
-            endpoint.createdAt()));
+    endpoints.save(toEntity(endpoint));
+  }
+
+  @Override
+  @Transactional
+  public void insert(final WebhookEndpoint endpoint) {
+    entityManager.persist(toEntity(endpoint));
+  }
+
+  private WebhookEndpointEntity toEntity(final WebhookEndpoint endpoint) {
+    return new WebhookEndpointEntity(
+        endpoint.id(),
+        endpoint.organizationId(),
+        endpoint.url(),
+        endpoint.description(),
+        objectMapper.writeValueAsString(endpoint.subscribedEventTypes()),
+        endpoint.currentSecretEncrypted(),
+        endpoint.previousSecretEncrypted(),
+        endpoint.previousSecretExpiresAt(),
+        endpoint.active(),
+        endpoint.createdAt());
   }
 
   @Override

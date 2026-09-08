@@ -1,10 +1,12 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDeliveryRepository;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
+import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -18,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -207,6 +210,47 @@ class JpaWebhookDeliveryRepositoryTest {
     // doesNotContainAnyElementsOf without proving SKIP LOCKED ever actually split the work.
     assertThat(idsFromA.size() + idsFromB.size()).isGreaterThan(0);
     assertThat(idsFromA).doesNotContainAnyElementsOf(idsFromB);
+  }
+
+  // TD-PERF-019: proves insert() genuinely uses persist() semantics (fails loudly on a duplicate
+  // id), not merge()'s silent-update behavior — same load-bearing regression proof
+  // JpaAccountRepositoryTest's own identical pair of tests already established for Account.
+  @Test
+  void insertPersistsANewDeliveryFindableAfterward() {
+    WebhookDelivery delivery = scheduledDelivery();
+
+    repository.insert(delivery);
+
+    WebhookDelivery found = repository.findById(delivery.id()).orElseThrow();
+    assertThat(found.id()).isEqualTo(delivery.id());
+    assertThat(found.status()).isEqualTo(WebhookDeliveryStatus.PENDING);
+  }
+
+  @Test
+  void insertOnAnAlreadyPersistedIdFailsLoudlyInsteadOfSilentlyUpdating() {
+    WebhookDelivery original = scheduledDelivery();
+    repository.insert(original);
+    WebhookDelivery reusesTheSameId =
+        WebhookDelivery.reconstitute(
+            original.id(),
+            original.endpointId(),
+            original.organizationId(),
+            original.outboxEventId(),
+            original.aggregateType(),
+            original.aggregateId(),
+            original.eventType(),
+            original.payload(),
+            original.traceId(),
+            WebhookDeliveryStatus.SUCCEEDED,
+            1,
+            null,
+            Instant.now(),
+            200,
+            null,
+            original.createdAt());
+
+    assertThatExceptionOfType(DataIntegrityViolationException.class)
+        .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
   private WebhookDelivery scheduledDelivery() {

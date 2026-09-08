@@ -77,7 +77,9 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
 
     final Organization organization =
         Organization.register(command.name(), command.ownerPlatformAccountId());
-    organizations.save(organization);
+    // TD-PERF-019: insert, not save — Organization.register always mints a brand-new aggregate.
+    // See OrganizationRepository#insert's own Javadoc.
+    organizations.insert(organization);
 
     // See this class's own Javadoc: every new Organization is DEVELOPMENT by construction, so this
     // branch is unconditional today — written as a real check anyway (not asserted/assumed) since
