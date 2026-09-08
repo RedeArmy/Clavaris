@@ -65,7 +65,7 @@
              explicit" rationale as maven-compiler-plugin above — this is the version Maven was
              already resolving unpinned before this row existed, confirmed via a real build's own
              "maven-surefire-plugin:3.5.4:test" log line, not guessed. -->
-        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
+        <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
         <!-- CVE overrides (security-architecture.md §8 — zero critical/high
              findings open, non-negotiable): spring-boot-
              dependencies 4.1.0 manages versions with real, live CVSS ≥ 7
