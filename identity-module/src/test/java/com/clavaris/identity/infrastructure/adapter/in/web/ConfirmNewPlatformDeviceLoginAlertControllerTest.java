@@ -60,7 +60,7 @@ class ConfirmNewPlatformDeviceLoginAlertControllerTest {
     mockMvc
         .perform(get("/platform/account-alert/lock").param("token", "a-token"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/platform/account-alert-lock-confirm"))
+        .andExpect(view().name("identity/account-alert-lock-confirm"))
         .andExpect(model().attributeExists("form"));
   }
 

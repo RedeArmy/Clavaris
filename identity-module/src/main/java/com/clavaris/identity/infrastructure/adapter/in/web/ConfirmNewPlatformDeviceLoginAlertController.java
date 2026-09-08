@@ -19,12 +19,19 @@ import org.springframework.web.bind.annotation.RequestParam;
  * ResetPlatformAccountPasswordController}. Reuses {@link ConfirmNewDeviceLoginAlertForm} as-is (no
  * tenant-specific field on it, same precedent {@link ResetPlatformAccountPasswordController}'s own
  * Javadoc documents for {@link ConfirmPasswordResetForm}).
+ *
+ * <p>{@code CONFIRM_VIEW} also reuses the tenant-tier's own {@code
+ * identity/account-alert-lock-confirm} template directly, not a second {@code
+ * identity/platform/...} copy — SonarCloud duplication finding (2026-09-09): the two were
+ * byte-identical except for one comment, since neither the form nor the CSRF handling differs by
+ * tier. {@code identity/platform/account-alert-lock-success} stays a separate file, unaffected by
+ * this finding.
  */
 @Controller
 @RequestMapping("/platform/account-alert/lock")
 public class ConfirmNewPlatformDeviceLoginAlertController {
 
-  private static final String CONFIRM_VIEW = "identity/platform/account-alert-lock-confirm";
+  private static final String CONFIRM_VIEW = "identity/account-alert-lock-confirm";
   private static final String INVALID_VIEW = "identity/platform/verification-link-invalid";
 
   private final ConfirmNewPlatformDeviceLoginAlertUseCase useCase;

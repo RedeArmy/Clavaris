@@ -7,9 +7,13 @@
 <body>
 <main>
     <h1>Lock this account</h1>
-    <!-- Deliberately not auto-submitted on page load — see
-         ConfirmNewDeviceLoginAlertController's own Javadoc for why this must be a genuine,
-         human-initiated click, not a bare GET. -->
+    <!-- Deliberately not auto-submitted on page load — see ConfirmNewDeviceLoginAlertController/
+         ConfirmNewPlatformDeviceLoginAlertController's own Javadoc for why this must be a genuine,
+         human-initiated click, not a bare GET. Shared by both controllers (SonarCloud duplication
+         finding, 2026-09-09): the platform-tier confirm page was byte-identical to this one save
+         for that comment — deleted rather than kept as a second copy, same "reuse
+         ConfirmNewDeviceLoginAlertForm as-is" precedent ConfirmNewPlatformDeviceLoginAlertController
+         already establishes for the form object. -->
     <p>
         We'll lock this account and sign it out of every active session immediately. If this was
         actually you signing in, close this page — no action is needed.
