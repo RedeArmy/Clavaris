@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.Email;
@@ -38,6 +39,7 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
   private PendingPlatformSocialLinkRepository pendingLinks;
   private PlatformMailSender mailSender;
   private SecurityMetricsRecorder metrics;
+  private PasswordHasher hasher;
   private AuthenticatePlatformAccountWithSocialProviderService service;
 
   @BeforeEach
@@ -47,6 +49,10 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
     pendingLinks = mock(PendingPlatformSocialLinkRepository.class);
     mailSender = mock(PlatformMailSender.class);
     metrics = mock(SecurityMetricsRecorder.class);
+    hasher = mock(PasswordHasher.class);
+    // TD-FUT-030: any non-null value stands in for a real Argon2id hash — this test suite is
+    // about the linking decision, not password hashing itself.
+    when(hasher.hash(org.mockito.ArgumentMatchers.anyString())).thenReturn("$argon2id$fake-hash");
 
     // Same fake-immediate-execution TransactionTemplate as the tenant-tier sibling test's setup.
     PlatformTransactionManager fakeTransactionManager = mock(PlatformTransactionManager.class);
@@ -61,7 +67,13 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
 
     service =
         new AuthenticatePlatformAccountWithSocialProviderService(
-            accounts, socialIdentities, pendingLinks, mailSender, metrics, fakeTransactionTemplate);
+            accounts,
+            socialIdentities,
+            pendingLinks,
+            mailSender,
+            metrics,
+            fakeTransactionTemplate,
+            hasher);
   }
 
   private AuthenticatePlatformAccountWithSocialProviderCommand command() {
@@ -99,9 +111,16 @@ class AuthenticatePlatformAccountWithSocialProviderServiceTest {
 
     assertThat(result)
         .isInstanceOf(AuthenticatePlatformAccountWithSocialProviderResult.LoggedIn.class);
-    verify(accounts).save(any(PlatformAccount.class));
+    org.mockito.ArgumentCaptor<PlatformAccount> savedAccount =
+        org.mockito.ArgumentCaptor.forClass(PlatformAccount.class);
+    verify(accounts).save(savedAccount.capture());
     verify(socialIdentities).save(any(PlatformSocialIdentity.class));
     verifyNoInteractions(mailSender);
+
+    // TD-FUT-030: same fix as the tenant-tier sibling — a brand-new social-only PlatformAccount
+    // must never be left with zero authentication methods other than the linked provider.
+    verify(hasher).hash(any());
+    assertThat(savedAccount.getValue().passwordCredential()).isPresent();
   }
 
   @Test

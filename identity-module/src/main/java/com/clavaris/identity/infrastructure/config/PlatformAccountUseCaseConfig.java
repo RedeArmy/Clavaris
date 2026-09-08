@@ -136,15 +136,16 @@ class PlatformAccountUseCaseConfig {
           final PendingPlatformSocialLinkRepository pendingLinks,
           final PlatformMailSender mailSender,
           final SecurityMetricsRecorder securityMetrics,
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformTransactionManager transactionManager) {
+          @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
+          final PasswordHasher hasher) {
     return new AuthenticatePlatformAccountWithSocialProviderService(
         accounts,
         socialIdentities,
         pendingLinks,
         mailSender,
         securityMetrics,
-        new TransactionTemplate(transactionManager));
+        new TransactionTemplate(transactionManager),
+        hasher);
   }
 
   @Bean

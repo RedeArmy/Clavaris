@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -44,6 +45,7 @@ class AuthenticateWithSocialProviderServiceTest {
   private MailSender mailSender;
   private EventOutboxWriter outbox;
   private SecurityMetricsRecorder metrics;
+  private PasswordHasher hasher;
   private AuthenticateWithSocialProviderService service;
 
   @BeforeEach
@@ -55,6 +57,11 @@ class AuthenticateWithSocialProviderServiceTest {
     mailSender = mock(MailSender.class);
     outbox = mock(EventOutboxWriter.class);
     metrics = mock(SecurityMetricsRecorder.class);
+    hasher = mock(PasswordHasher.class);
+    // TD-FUT-030: any non-null value stands in for a real Argon2id hash — this test suite is
+    // about the linking decision, not password hashing itself (Argon2PasswordHasherTest already
+    // covers the real implementation).
+    when(hasher.hash(org.mockito.ArgumentMatchers.anyString())).thenReturn("$argon2id$fake-hash");
 
     when(policyProvider.isProviderAllowed(ORGANIZATION_ID, SocialProvider.GOOGLE)).thenReturn(true);
 
@@ -79,7 +86,8 @@ class AuthenticateWithSocialProviderServiceTest {
             mailSender,
             outbox,
             metrics,
-            fakeTransactionTemplate);
+            fakeTransactionTemplate,
+            hasher);
   }
 
   private AuthenticateWithSocialProviderCommand command() {
@@ -115,11 +123,19 @@ class AuthenticateWithSocialProviderServiceTest {
     AuthenticateWithSocialProviderResult result = service.handle(command());
 
     assertThat(result).isInstanceOf(AuthenticateWithSocialProviderResult.LoggedIn.class);
-    verify(accounts).save(any(Account.class));
+    org.mockito.ArgumentCaptor<Account> savedAccount =
+        org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).save(savedAccount.capture());
     verify(socialIdentities).save(any(SocialIdentity.class));
     verify(outbox).write(eq("account.created"), any(), any(), any());
     verify(outbox).write(eq("social_identity.linked"), any(), any(), any());
     verifyNoInteractions(mailSender);
+
+    // TD-FUT-030: a brand-new social-only signup must never be left with zero authentication
+    // methods other than the linked provider — a real, hashed password credential is attached,
+    // even though the account's actual sign-in method stays the social identity.
+    verify(hasher).hash(any());
+    assertThat(savedAccount.getValue().passwordCredential()).isPresent();
   }
 
   @Test

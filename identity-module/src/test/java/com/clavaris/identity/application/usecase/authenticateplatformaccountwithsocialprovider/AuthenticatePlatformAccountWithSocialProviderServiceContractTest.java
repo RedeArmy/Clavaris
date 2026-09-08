@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.SocialLoginLinkingContractTest;
+import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.Email;
@@ -44,6 +45,8 @@ class AuthenticatePlatformAccountWithSocialProviderServiceContractTest
     pendingLinks = mock(PendingPlatformSocialLinkRepository.class);
     PlatformMailSender mailSender = mock(PlatformMailSender.class);
     SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
+    PasswordHasher hasher = mock(PasswordHasher.class);
+    when(hasher.hash(any())).thenReturn("$argon2id$fake-hash");
 
     // Same fake-immediate-execution TransactionTemplate as this service's own dedicated unit
     // test — this contract test never touches a real database either.
@@ -59,7 +62,13 @@ class AuthenticatePlatformAccountWithSocialProviderServiceContractTest
 
     service =
         new AuthenticatePlatformAccountWithSocialProviderService(
-            accounts, socialIdentities, pendingLinks, mailSender, metrics, fakeTransactionTemplate);
+            accounts,
+            socialIdentities,
+            pendingLinks,
+            mailSender,
+            metrics,
+            fakeTransactionTemplate,
+            hasher);
   }
 
   private AuthenticatePlatformAccountWithSocialProviderCommand command(

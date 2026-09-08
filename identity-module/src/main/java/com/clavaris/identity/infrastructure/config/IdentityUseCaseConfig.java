@@ -420,7 +420,8 @@ class IdentityUseCaseConfig {
       final MailSender mailSender,
       final EventOutboxWriter eventOutboxWriter,
       final SecurityMetricsRecorder securityMetrics,
-      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
+      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
+      final PasswordHasher hasher) {
     return new AuthenticateWithSocialProviderService(
         accounts,
         socialIdentities,
@@ -429,7 +430,8 @@ class IdentityUseCaseConfig {
         mailSender,
         eventOutboxWriter,
         securityMetrics,
-        new TransactionTemplate(transactionManager));
+        new TransactionTemplate(transactionManager),
+        hasher);
   }
 
   @Bean
