@@ -67,9 +67,9 @@ final class ResendHttpClient {
   // PMD.CyclomaticComplexity: the circuit breaker added one more genuinely distinct failure mode
   // (CallNotPermittedException) on top of the pre-existing IOException/InterruptedException split
   // — same "each real outcome needs its own branch" shape AuthenticateWithPasswordService's own
-  // identical suppression already documents. PMD.AvoidCatchingGenericException: the final
-  // catch (Exception e) is defensive-only, matching Callable#call's own broad `throws Exception`
-  // signature executeCallable propagates — see that catch block's own comment.
+  // identical suppression already documents. PMD.AvoidCatchingGenericException: the trailing
+  // broad-Exception catch clause is defensive-only, matching Callable#call's own broad `throws
+  // Exception` signature executeCallable propagates — see that catch block's own comment.
   @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
   /* package */ void send(final String toAddress, final String subject, final String html) {
     final Map<String, Object> requestBody =

@@ -286,8 +286,8 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   // PMD.CyclomaticComplexity: the circuit breaker added one more genuinely distinct failure mode
   // (CallNotPermittedException) on top of the pre-existing IOException/InterruptedException split
   // — same shape ResendHttpClient#send's own identical suppression documents.
-  // PMD.AvoidCatchingGenericException: the final catch (Exception e) is defensive-only, matching
-  // Callable#call's own broad `throws Exception` signature executeCallable propagates.
+  // PMD.AvoidCatchingGenericException: the trailing broad-Exception catch clause is defensive-only,
+  // matching Callable#call's own broad `throws Exception` signature executeCallable propagates.
   @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
   private String sendEmailsRequest(final String accessToken) {
     final HttpRequest request =

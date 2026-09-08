@@ -49,8 +49,8 @@ final class CircuitBreakerClientHttpRequestInterceptor implements ClientHttpRequ
     this.metrics = metrics;
   }
 
-  // PMD.AvoidCatchingGenericException: the final catch (Exception e) is defensive-only, matching
-  // ClientHttpRequestExecution#execute's own broad Callable#call signature executeCallable
+  // PMD.AvoidCatchingGenericException: the trailing broad-Exception catch clause is defensive-only,
+  // matching ClientHttpRequestExecution#execute's own broad Callable#call signature executeCallable
   // propagates — same rationale ResendHttpClient#send's own identical catch documents.
   // PMD.LawOfDemeter: request.getURI() is the standard ClientHttpRequestInterceptor API shape for
   // reading the target host — there is no other way to reach it, same rationale
