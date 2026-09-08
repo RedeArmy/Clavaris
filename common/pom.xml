@@ -45,6 +45,22 @@
             <artifactId>micrometer-core</artifactId>
         </dependency>
 
+        <!-- SDE-III optimization pass, P2 point 4: CircuitBreakerMetricsBinder
+             (infrastructure/adapter/out/resilience) — the shared "bind a
+             CircuitBreaker's state-transition/call-not-permitted events to a real
+             SecurityMetricsRecorder metric" wiring identity-module (Resend) and app
+             (GitHub API, Google/GitHub OAuth2 endpoints) both need. Core artifact
+             only, no Spring Boot starter — each consumer builds and tunes its own
+             CircuitBreaker instance directly; this module only supplies the shared
+             metrics-binding piece, same "port lives here, wiring stays with the
+             actual caller" shape MicrometerSecurityMetricsRecorder just above already
+             establishes. -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

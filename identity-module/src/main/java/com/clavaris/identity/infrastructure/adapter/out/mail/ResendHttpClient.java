@@ -1,6 +1,8 @@
 package com.clavaris.identity.infrastructure.adapter.out.mail;
 
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,6 +23,15 @@ import tools.jackson.databind.ObjectMapper;
  * needs to know Clavaris's own email content — same separation this codebase already applies
  * elsewhere between "how" and "what". No behavior change: same timeout, same status threshold, same
  * error messages, same BR-DATA-01 no-body-in-logs discipline.
+ *
+ * <p><b>SDE-III optimization pass, P2 point 4:</b> every real HTTP attempt now runs through a
+ * {@link CircuitBreaker} — a real Resend outage today means every affected request still pays this
+ * class's own {@link #REQUEST_TIMEOUT} (10s) before failing, on the single highest-traffic mail
+ * path in the system (email verification, password reset, new-device alerts). Once the breaker
+ * trips open, a request fails fast with {@link CallNotPermittedException} (translated to the same
+ * {@link MailDeliveryException} every other failure mode here already produces — this class's own
+ * callers already treat mail delivery as best-effort, see {@code RecordAccountLoginDeviceService}'s
+ * own Javadoc) instead of waiting out the full timeout on a dependency already known to be down.
  */
 final class ResendHttpClient {
 
@@ -36,20 +47,30 @@ final class ResendHttpClient {
   private final String apiKey;
   private final String fromAddress;
   private final URI resendEndpoint;
+  private final CircuitBreaker circuitBreaker;
 
   /* package */ ResendHttpClient(
       final HttpClient httpClient,
       final ObjectMapper objectMapper,
       final String apiKey,
       final String fromAddress,
-      final URI resendEndpoint) {
+      final URI resendEndpoint,
+      final CircuitBreaker circuitBreaker) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.apiKey = apiKey;
     this.fromAddress = fromAddress;
     this.resendEndpoint = resendEndpoint;
+    this.circuitBreaker = circuitBreaker;
   }
 
+  // PMD.CyclomaticComplexity: the circuit breaker added one more genuinely distinct failure mode
+  // (CallNotPermittedException) on top of the pre-existing IOException/InterruptedException split
+  // — same "each real outcome needs its own branch" shape AuthenticateWithPasswordService's own
+  // identical suppression already documents. PMD.AvoidCatchingGenericException: the final
+  // catch (Exception e) is defensive-only, matching Callable#call's own broad `throws Exception`
+  // signature executeCallable propagates — see that catch block's own comment.
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
   /* package */ void send(final String toAddress, final String subject, final String html) {
     final Map<String, Object> requestBody =
         Map.of("from", fromAddress, "to", List.of(toAddress), "subject", subject, "html", html);
@@ -73,7 +94,14 @@ final class ResendHttpClient {
 
     final HttpResponse<String> response;
     try {
-      response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      // SDE-III optimization pass, P2 point 4: same "fail fast on a dependency already known to
+      // be down, don't pay the full timeout again" reasoning this class's own Javadoc documents.
+      response =
+          circuitBreaker.executeCallable(
+              () -> httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+    } catch (final CallNotPermittedException e) {
+      throw new MailDeliveryException(
+          "Resend circuit breaker is open — Resend appears to be down", e);
     } catch (final IOException e) {
       throw new MailDeliveryException("Resend request failed (network/IO)", e);
     } catch (final InterruptedException e) {
@@ -82,6 +110,11 @@ final class ResendHttpClient {
       // whatever code is further up the call stack.
       Thread.currentThread().interrupt();
       throw new MailDeliveryException("Resend request interrupted", e);
+    } catch (final Exception e) {
+      // Unreachable in practice — the wrapped Callable only ever throws IOException/
+      // InterruptedException itself; defensive only, matching Callable#call's own broad `throws
+      // Exception` signature that executeCallable propagates.
+      throw new MailDeliveryException("Resend request failed unexpectedly", e);
     }
 
     if (response.statusCode() >= FIRST_ERROR_STATUS) {

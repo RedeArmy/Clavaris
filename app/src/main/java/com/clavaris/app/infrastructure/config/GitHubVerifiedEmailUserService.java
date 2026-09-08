@@ -1,7 +1,12 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.common.infrastructure.adapter.out.resilience.CircuitBreakerMetricsBinder;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -49,6 +54,13 @@ import tools.jackson.databind.ObjectMapper;
  * RestTemplate}) set no connect/read timeout — {@code SocialLoginConfig}'s own {@code
  * socialLoginUserInfoRestOperations} bean now supplies one instead, injected here via constructor
  * rather than left at {@code DefaultOAuth2UserService}'s own internal default.
+ *
+ * <p><b>SDE-III optimization pass, P2 point 4:</b> the {@code GET /user/emails} call this class
+ * owns directly (not {@link #delegate}'s own base {@code /user} fetch — see {@code
+ * SocialLoginConfig}'s own circuit breaker for that one) now runs through a {@link CircuitBreaker},
+ * same "fail fast on a dependency already known to be down" reasoning {@code ResendHttpClient}'s
+ * own identical addition documents — a GitHub outage today means every affected login still pays
+ * this class's own {@link #REQUEST_TIMEOUT} (10s) before failing.
  */
 // PMD.LongVariable: every flagged name here (VERIFIED_EMAIL_ATTRIBUTE, GITHUB_REGISTRATION_ID,
 // DEFAULT_GITHUB_EMAILS_ENDPOINT) names exactly what it is — see this class's own Javadoc.
@@ -108,6 +120,7 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final URI emailsEndpoint;
+  private final CircuitBreaker circuitBreaker;
   private final Cache<String, String> verifiedEmailCache =
       Caffeine.newBuilder()
           .maximumSize(MAX_CACHED_VERIFIED_EMAILS)
@@ -127,28 +140,83 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
   // access token — a real, previously-undetected gap, not a hypothetical one. Configurable the same
   // way the OAuth2 provider's own authorization-uri/token-uri/user-info-uri already are, so a test
   // can point it at a local stub exactly like it already does for those.
+  // SDE-III optimization pass, P2 point 4: the three new @Value params tune this dependency's own
+  // CircuitBreaker — same defaults/rationale as ResendMailSender's own identical addition.
+  @SuppressWarnings("java:S107") // one parameter per collaborating value — same rationale as
+  // every other multi-collaborator constructor in this codebase.
   @Autowired
   /* package */ GitHubVerifiedEmailUserService(
       final ObjectMapper objectMapper,
       @Value("${clavaris.oauth2.github.emails-uri:https://api.github.com/user/emails}")
           final String emailsUri,
-      final RestOperations userInfoRestOperations) {
-    this(HttpClient.newHttpClient(), objectMapper, URI.create(emailsUri), userInfoRestOperations);
+      final RestOperations userInfoRestOperations,
+      @Value("${clavaris.resilience.github.failure-rate-threshold:50}")
+          final float failureRateThreshold,
+      @Value("${clavaris.resilience.github.sliding-window-size:10}") final int slidingWindowSize,
+      @Value("${clavaris.resilience.github.wait-duration-in-open-state-seconds:30}")
+          final long waitDurationInOpenStateSeconds,
+      final SecurityMetricsRecorder metrics) {
+    this(
+        HttpClient.newHttpClient(),
+        objectMapper,
+        URI.create(emailsUri),
+        userInfoRestOperations,
+        buildCircuitBreaker(
+            failureRateThreshold, slidingWindowSize, waitDurationInOpenStateSeconds, metrics));
   }
 
   // Test-only, same rationale as ResendMailSender's own identical second constructor — lets a test
-  // inject a fully-controlled HttpClient/endpoint without a real network call.
+  // inject a fully-controlled HttpClient/endpoint without a real network call. Same parameter
+  // shape as before this pass — every existing GitHubVerifiedEmailUserServiceTest call site must
+  // keep working unmodified. Delegates to the full constructor below with a bare-default
+  // CircuitBreaker (metrics binding only matters in production).
   /* package */ GitHubVerifiedEmailUserService(
       final HttpClient httpClient,
       final ObjectMapper objectMapper,
       final URI emailsEndpoint,
       final RestOperations userInfoRestOperations) {
+    this(
+        httpClient,
+        objectMapper,
+        emailsEndpoint,
+        userInfoRestOperations,
+        CircuitBreaker.ofDefaults("github-emails"));
+  }
+
+  // Package-private, not private: GitHubVerifiedEmailUserServiceCircuitBreakerTest constructs
+  // this directly with a small, test-friendly CircuitBreaker window — same rationale
+  // ResendHttpClient's own package-private (not private) constructor already establishes.
+  @SuppressWarnings("java:S107")
+  /* package */ GitHubVerifiedEmailUserService(
+      final HttpClient httpClient,
+      final ObjectMapper objectMapper,
+      final URI emailsEndpoint,
+      final RestOperations userInfoRestOperations,
+      final CircuitBreaker circuitBreaker) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.emailsEndpoint = emailsEndpoint;
+    this.circuitBreaker = circuitBreaker;
     // TD-PERF-009: see this class's own Javadoc — delegate's default RestOperations has no
     // timeout at all otherwise.
     this.delegate.setRestOperations(userInfoRestOperations);
+  }
+
+  private static CircuitBreaker buildCircuitBreaker(
+      final float failureRateThreshold,
+      final int slidingWindowSize,
+      final long waitDurationInOpenStateSeconds,
+      final SecurityMetricsRecorder metrics) {
+    final CircuitBreaker circuitBreaker =
+        CircuitBreaker.of(
+            "github-emails",
+            CircuitBreakerConfig.custom()
+                .failureRateThreshold(failureRateThreshold)
+                .slidingWindowSize(slidingWindowSize)
+                .waitDurationInOpenState(Duration.ofSeconds(waitDurationInOpenStateSeconds))
+                .build());
+    CircuitBreakerMetricsBinder.bind(circuitBreaker, metrics);
+    return circuitBreaker;
   }
 
   @Override
@@ -215,6 +283,12 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
     return findPrimaryVerifiedEmail(emails);
   }
 
+  // PMD.CyclomaticComplexity: the circuit breaker added one more genuinely distinct failure mode
+  // (CallNotPermittedException) on top of the pre-existing IOException/InterruptedException split
+  // — same shape ResendHttpClient#send's own identical suppression documents.
+  // PMD.AvoidCatchingGenericException: the final catch (Exception e) is defensive-only, matching
+  // Callable#call's own broad `throws Exception` signature executeCallable propagates.
+  @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
   private String sendEmailsRequest(final String accessToken) {
     final HttpRequest request =
         HttpRequest.newBuilder(emailsEndpoint)
@@ -226,7 +300,16 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
 
     final HttpResponse<String> response;
     try {
-      response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      // SDE-III optimization pass, P2 point 4: same "fail fast on a dependency already known to
+      // be down" reasoning this class's own Javadoc documents.
+      response =
+          circuitBreaker.executeCallable(
+              () -> httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+    } catch (final CallNotPermittedException e) {
+      throw new OAuth2AuthenticationException(
+          new OAuth2Error(EMAILS_UNAVAILABLE_ERROR_CODE),
+          "GitHub /user/emails circuit breaker is open — GitHub appears to be down",
+          e);
     } catch (final IOException e) {
       throw new OAuth2AuthenticationException(
           new OAuth2Error(EMAILS_UNAVAILABLE_ERROR_CODE), "GitHub /user/emails request failed", e);
@@ -237,6 +320,12 @@ class GitHubVerifiedEmailUserService implements OAuth2UserService<OAuth2UserRequ
       throw new OAuth2AuthenticationException(
           new OAuth2Error(EMAILS_UNAVAILABLE_ERROR_CODE),
           "GitHub /user/emails request interrupted",
+          e);
+    } catch (final Exception e) {
+      // Unreachable in practice — see ResendHttpClient#send's own identical catch block.
+      throw new OAuth2AuthenticationException(
+          new OAuth2Error(EMAILS_UNAVAILABLE_ERROR_CODE),
+          "GitHub /user/emails request failed unexpectedly",
           e);
     }
 
