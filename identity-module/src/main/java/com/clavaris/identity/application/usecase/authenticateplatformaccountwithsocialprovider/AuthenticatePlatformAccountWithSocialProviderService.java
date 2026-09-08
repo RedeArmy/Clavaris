@@ -1,11 +1,13 @@
 package com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
+import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.domain.model.PendingPlatformSocialLink;
 import com.clavaris.identity.domain.model.PlatformAccount;
 import com.clavaris.identity.domain.model.PlatformSocialIdentity;
+import com.clavaris.identity.domain.service.RandomPasswordGenerator;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.SocialLinkingPolicy;
 import java.time.Instant;
@@ -30,6 +32,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Account}/{@code OrganizationId}, a deeper unification is a separately-tracked refactor, not
  * something to rush into security-critical auth code without matching test coverage). If you change
  * the linking decision here, check the tenant-tier sibling too.
+ *
+ * <p>TD-FUT-030 (closed): same fix as the tenant-tier sibling, same day — branch 2's brand-new
+ * {@code PlatformAccount} now also gets a real, cryptographically random, never-surfaced password
+ * credential attached, so a social-only signup is never left with zero authentication methods other
+ * than that one linked provider.
  */
 // PMD.LongVariable/GuardLogStatement/OnlyOneReturn: same rationale as the tenant-tier sibling's
 // own identical class-level suppression.
@@ -55,6 +62,7 @@ public class AuthenticatePlatformAccountWithSocialProviderService
   private final PlatformMailSender mailSender;
   private final SecurityMetricsRecorder metrics;
   private final TransactionTemplate transactionTemplate;
+  private final PasswordHasher hasher;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as the
   // tenant-tier sibling's own identical suppression.
@@ -64,13 +72,15 @@ public class AuthenticatePlatformAccountWithSocialProviderService
       final PendingPlatformSocialLinkRepository pendingLinks,
       final PlatformMailSender mailSender,
       final SecurityMetricsRecorder metrics,
-      final TransactionTemplate transactionTemplate) {
+      final TransactionTemplate transactionTemplate,
+      final PasswordHasher hasher) {
     this.accounts = accounts;
     this.socialIdentities = socialIdentities;
     this.pendingLinks = pendingLinks;
     this.mailSender = mailSender;
     this.metrics = metrics;
     this.transactionTemplate = transactionTemplate;
+    this.hasher = hasher;
   }
 
   @Override
@@ -113,6 +123,10 @@ public class AuthenticatePlatformAccountWithSocialProviderService
             // The provider already proved control of this email (guarded above) — no reason to
             // make a brand-new social signup go through email verification a second time.
             account.verifyEmail();
+            // TD-FUT-030: same fix, same day, as the tenant-tier sibling above — a real,
+            // cryptographically random, never-surfaced password credential, so this account is
+            // never left with zero authentication methods other than the one linked provider.
+            account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
             accounts.save(account);
 
             final PlatformSocialIdentity identity =

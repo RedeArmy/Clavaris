@@ -9,6 +9,8 @@ import com.clavaris.identity.application.usecase.authenticateplatformaccountwith
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.PendingPlatformSocialLinkRepository;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.PlatformSocialIdentityRepository;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
+import com.clavaris.identity.application.usecase.confirmnewplatformdeviceloginalert.ConfirmNewPlatformDeviceLoginAlertService;
+import com.clavaris.identity.application.usecase.confirmnewplatformdeviceloginalert.ConfirmNewPlatformDeviceLoginAlertUseCase;
 import com.clavaris.identity.application.usecase.confirmpendingplatformsociallink.ConfirmPendingPlatformSocialLinkService;
 import com.clavaris.identity.application.usecase.confirmpendingplatformsociallink.ConfirmPendingPlatformSocialLinkUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountemailverification.ConfirmPlatformAccountEmailVerificationService;
@@ -34,6 +36,8 @@ import com.clavaris.identity.application.usecase.requestplatformaccountpasswordr
 import com.clavaris.identity.application.usecase.requestplatformaccountpasswordreset.RequestPlatformAccountPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionService;
 import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionUseCase;
+import com.clavaris.identity.application.usecase.suspendplatformaccount.SuspendPlatformAccountService;
+import com.clavaris.identity.application.usecase.suspendplatformaccount.SuspendPlatformAccountUseCase;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -136,15 +140,16 @@ class PlatformAccountUseCaseConfig {
           final PendingPlatformSocialLinkRepository pendingLinks,
           final PlatformMailSender mailSender,
           final SecurityMetricsRecorder securityMetrics,
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformTransactionManager transactionManager) {
+          @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
+          final PasswordHasher hasher) {
     return new AuthenticatePlatformAccountWithSocialProviderService(
         accounts,
         socialIdentities,
         pendingLinks,
         mailSender,
         securityMetrics,
-        new TransactionTemplate(transactionManager));
+        new TransactionTemplate(transactionManager),
+        hasher);
   }
 
   @Bean
@@ -184,8 +189,38 @@ class PlatformAccountUseCaseConfig {
       final PlatformMailSender mailSender,
       final AuditEventRecorder auditEvents,
       @Value("${clavaris.platform-known-device.migration-cutover-at:2026-09-02T13:00:00Z}")
-          final Instant platformKnownDeviceMigrationCutoverAt) {
+          final Instant platformKnownDeviceMigrationCutoverAt,
+      @SuppressWarnings("PMD.LongVariable")
+          final PlatformVerificationTokenRepository verificationTokens) {
     return new RecordPlatformAccountLoginDeviceService(
-        knownDevices, accounts, mailSender, auditEvents, platformKnownDeviceMigrationCutoverAt);
+        knownDevices,
+        accounts,
+        mailSender,
+        auditEvents,
+        platformKnownDeviceMigrationCutoverAt,
+        verificationTokens);
+  }
+
+  // TD-FUT-031: platform-tier mirror of IdentityUseCaseConfig's own suspendAccountUseCase bean —
+  // see SuspendPlatformAccountUseCase's own Javadoc for why it's a deliberately simpler cascade.
+  @Bean
+  /* package */ SuspendPlatformAccountUseCase suspendPlatformAccountUseCase(
+      final PlatformAccountRepository accounts,
+      final PlatformAccountSessionRevoker sessionRevoker,
+      final AuditEventRecorder auditEvents) {
+    return new SuspendPlatformAccountService(accounts, sessionRevoker, auditEvents);
+  }
+
+  // TD-FUT-031: the "this wasn't me" half of the new-platform-device login alert — see
+  // ConfirmNewPlatformDeviceLoginAlertService's own Javadoc for why this delegates straight to
+  // the suspendPlatformAccountUseCase bean above rather than duplicating its cascade.
+  @Bean
+  /* package */ ConfirmNewPlatformDeviceLoginAlertUseCase confirmNewPlatformDeviceLoginAlertUseCase(
+      @SuppressWarnings("PMD.LongVariable")
+          final PlatformVerificationTokenRepository verificationTokens,
+      @SuppressWarnings("PMD.LongVariable")
+          final SuspendPlatformAccountUseCase suspendPlatformAccountUseCase) {
+    return new ConfirmNewPlatformDeviceLoginAlertService(
+        verificationTokens, suspendPlatformAccountUseCase);
   }
 }

@@ -22,5 +22,12 @@ public enum VerificationTokenType {
   /**
    * ADR-0024 §6: the step-up challenge issued to an unrecognized device when Device Trust is on.
    */
-  DEVICE_TRUST_CHALLENGE
+  DEVICE_TRUST_CHALLENGE,
+
+  /**
+   * TD-FUT-025: the "this wasn't me" action link on a new-device login notification (BR-ID-14) —
+   * consuming it locks the account and revokes every live session/token, reusing {@code
+   * SuspendAccountUseCase}'s own already-tested cascade rather than a second copy of it.
+   */
+  NEW_DEVICE_LOGIN_ALERT
 }

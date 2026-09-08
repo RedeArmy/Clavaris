@@ -18,6 +18,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.event.AccountNewDeviceDetectedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -25,6 +26,8 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.KnownDevice;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.VerificationToken;
+import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.util.Optional;
@@ -34,6 +37,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 
 class RecordAccountLoginDeviceServiceTest {
@@ -51,6 +55,7 @@ class RecordAccountLoginDeviceServiceTest {
   private MailSender mailSender;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
+  private VerificationTokenRepository verificationTokens;
   private RecordAccountLoginDeviceService service;
   private Account account;
 
@@ -61,6 +66,7 @@ class RecordAccountLoginDeviceServiceTest {
     mailSender = mock(MailSender.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
+    verificationTokens = mock(VerificationTokenRepository.class);
     service =
         new RecordAccountLoginDeviceService(
             knownDevices,
@@ -69,7 +75,8 @@ class RecordAccountLoginDeviceServiceTest {
             auditEvents,
             outbox,
             MIGRATION_CUTOVER_AT,
-            DIRECT_EXECUTOR);
+            DIRECT_EXECUTOR,
+            verificationTokens);
 
     // Registered "now" (well after the cutover) — every existing test in this class exercises
     // ordinary, non-grandfathered behavior; the migration-suppression tests below build their own
@@ -112,6 +119,7 @@ class RecordAccountLoginDeviceServiceTest {
             eq(account.organizationId()),
             eq("Mozilla/5.0"),
             eq("1.2.3.4"),
+            any(),
             any());
     verify(auditEvents)
         .write(
@@ -128,6 +136,57 @@ class RecordAccountLoginDeviceServiceTest {
             any(AccountNewDeviceDetectedEvent.class));
   }
 
+  // TD-FUT-025: the "this wasn't me" token is minted and persisted on the calling thread, before
+  // the notification is even handed to the executor — see mintNewDeviceAlertTokenOrNull's own
+  // Javadoc for why it must never happen inside the background task itself.
+  @Test
+  void mintsAndPersistsANewDeviceAlertTokenAndPassesItToTheNotification() {
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+
+    ArgumentCaptor<VerificationToken> savedToken = ArgumentCaptor.forClass(VerificationToken.class);
+    verify(verificationTokens).save(savedToken.capture());
+    assertThat(savedToken.getValue().accountId()).isEqualTo(account.id());
+    assertThat(savedToken.getValue().type())
+        .isEqualTo(VerificationTokenType.NEW_DEVICE_LOGIN_ALERT);
+
+    ArgumentCaptor<String> rawAlertToken = ArgumentCaptor.forClass(String.class);
+    verify(mailSender)
+        .sendNewDeviceLoginNotification(
+            eq(account.email().value()),
+            eq(account.organizationId()),
+            eq("Mozilla/5.0"),
+            eq("1.2.3.4"),
+            any(),
+            rawAlertToken.capture());
+    assertThat(rawAlertToken.getValue()).isNotBlank();
+  }
+
+  // Same "never lets a side-channel write fail an otherwise-successful login" guarantee as every
+  // other degrade-gracefully path in this class — a failed mint must still send the (now
+  // action-link-less) notification, not skip it or fail the login.
+  @Test
+  void aFailedTokenMintDegradesToANotificationWithNoActionLinkInsteadOfPropagating() {
+    doThrow(new RuntimeException("Postgres hiccup")).when(verificationTokens).save(any());
+
+    Optional<String> result =
+        service.handle(
+            new RecordAccountLoginDeviceCommand(account.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(mailSender)
+        .sendNewDeviceLoginNotification(
+            eq(account.email().value()),
+            eq(account.organizationId()),
+            eq("Mozilla/5.0"),
+            eq("1.2.3.4"),
+            any(),
+            isNull());
+  }
+
   @Test
   void anUnrecognizedPresentedCookieFallsThroughToTheNewDevicePath() {
     // Stale, tampered, foreign, or an already-purged row — same outcome as no cookie at all.
@@ -140,7 +199,7 @@ class RecordAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", "an-unrecognized-cookie-value"));
 
     assertThat(result).isPresent();
-    verify(mailSender).sendNewDeviceLoginNotification(any(), any(), any(), any(), any());
+    verify(mailSender).sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
     verify(outbox).write(eq("account.new_device_detected"), eq(account.id()), any(), any());
   }
 
@@ -168,7 +227,7 @@ class RecordAccountLoginDeviceServiceTest {
   void aFailedNotificationEmailNeverPropagatesAndTheDeviceRowAndOutboxEventAreStillWritten() {
     doThrow(new MailDeliveryException("Resend is down"))
         .when(mailSender)
-        .sendNewDeviceLoginNotification(any(), any(), any(), any(), any());
+        .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
 
     Optional<String> result =
         service.handle(
@@ -200,6 +259,7 @@ class RecordAccountLoginDeviceServiceTest {
             eq(account.organizationId()),
             eq("Mozilla/5.0"),
             eq("1.2.3.4"),
+            any(),
             any());
   }
 
@@ -225,6 +285,7 @@ class RecordAccountLoginDeviceServiceTest {
             eq(account.organizationId()),
             eq("Mozilla/5.0"),
             eq("1.2.3.4"),
+            any(),
             any());
   }
 
@@ -241,7 +302,8 @@ class RecordAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(knownDevices).save(any(KnownDevice.class));
-    verify(mailSender, never()).sendNewDeviceLoginNotification(any(), any(), any(), any(), any());
+    verify(mailSender, never())
+        .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
     verify(auditEvents).write(any(), eq("account.new_device_detected"), any(), any(), isNull());
     verifyNoInteractions(outbox);
   }
@@ -336,7 +398,7 @@ class RecordAccountLoginDeviceServiceTest {
     assertThat(result).isPresent();
     verify(mailSender)
         .sendNewDeviceLoginNotification(
-            eq(preExistingAccount.email().value()), any(), any(), any(), any());
+            eq(preExistingAccount.email().value()), any(), any(), any(), any(), any());
     verify(outbox)
         .write(eq("account.new_device_detected"), eq(preExistingAccount.id()), any(), any());
   }
@@ -367,7 +429,7 @@ class RecordAccountLoginDeviceServiceTest {
     assertThat(result).isPresent();
     verify(mailSender)
         .sendNewDeviceLoginNotification(
-            eq(brandNewAccount.email().value()), any(), any(), any(), any());
+            eq(brandNewAccount.email().value()), any(), any(), any(), any(), any());
     verify(outbox).write(eq("account.new_device_detected"), eq(brandNewAccount.id()), any(), any());
   }
 
@@ -382,7 +444,8 @@ class RecordAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(knownDevices).save(any(KnownDevice.class));
-    verify(mailSender, never()).sendNewDeviceLoginNotification(any(), any(), any(), any(), any());
+    verify(mailSender, never())
+        .sendNewDeviceLoginNotification(any(), any(), any(), any(), any(), any());
     verify(auditEvents).write(any(), eq("account.new_device_detected"), any(), any(), isNull());
     verifyNoInteractions(outbox);
   }
@@ -402,7 +465,8 @@ class RecordAccountLoginDeviceServiceTest {
             auditEvents,
             outbox,
             MIGRATION_CUTOVER_AT,
-            capturedTask::set);
+            capturedTask::set,
+            verificationTokens);
 
     Optional<String> result =
         serviceWithCapturingExecutor.handle(
@@ -423,6 +487,7 @@ class RecordAccountLoginDeviceServiceTest {
             eq(account.organizationId()),
             eq("Mozilla/5.0"),
             eq("1.2.3.4"),
+            any(),
             any());
   }
 
@@ -444,7 +509,8 @@ class RecordAccountLoginDeviceServiceTest {
             auditEvents,
             outbox,
             MIGRATION_CUTOVER_AT,
-            rejectingExecutor);
+            rejectingExecutor,
+            verificationTokens);
 
     Optional<String> result =
         serviceWithRejectingExecutor.handle(

@@ -6,11 +6,15 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.registeraccount.BestEffortEventPublisher;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
+import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.event.AccountNewDeviceDetectedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.KnownDevice;
+import com.clavaris.identity.domain.model.VerificationToken;
+import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,7 +73,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 // LongVariable: deviceCookieMigrationCutoverAt (field/param/bean-method-param) and the two local
 // booleans in handle() below are all long by design, not accidentally — same "deliberate
 // record-style naming" precedent as KnownDevice's own class-level suppression.
-@SuppressWarnings("PMD.LongVariable")
+// AvoidDuplicateLiterals: "PMD.AvoidCatchingGenericException" repeats across this class's several
+// defensive catch sites, same rationale as EmailLinkSignInController's own class-level suppression
+// of this exact rule — extracting a constant for a suppression string would be needless
+// indirection.
+@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals"})
 public class RecordAccountLoginDeviceService implements RecordAccountLoginDeviceUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RecordAccountLoginDeviceService.class);
@@ -80,6 +88,13 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   @SuppressWarnings("PMD.LongVariable")
   private static final String UNKNOWN_USER_AGENT = "Unknown";
 
+  // TD-FUT-025: a week is deliberately generous compared to VerificationToken's other, more
+  // time-sensitive uses (password reset's own 30 minutes) — this link's whole premise is that the
+  // account holder may not check this specific email right away, unlike a reset they just
+  // requested themselves. Still finite: past a week, the normal remedy (log in, review/revoke
+  // sessions from the account's own sessions page, BR-ID-13) is the expected path instead.
+  private static final Duration NEW_DEVICE_ALERT_TOKEN_TTL = Duration.ofDays(7);
+
   private final KnownDeviceRepository knownDevices;
   private final AccountRepository accounts;
   private final MailSender mailSender;
@@ -87,6 +102,7 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   private final EventOutboxWriter outbox;
   private final Instant deviceCookieMigrationCutoverAt;
   private final Executor newDeviceNotificationExecutor;
+  private final VerificationTokenRepository verificationTokens;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // DeleteAccountService's own identical suppression.
@@ -97,7 +113,8 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
       final Instant deviceCookieMigrationCutoverAt,
-      final Executor newDeviceNotificationExecutor) {
+      final Executor newDeviceNotificationExecutor,
+      final VerificationTokenRepository verificationTokens) {
     this.knownDevices = knownDevices;
     this.accounts = accounts;
     this.mailSender = mailSender;
@@ -105,6 +122,7 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
     this.outbox = outbox;
     this.deviceCookieMigrationCutoverAt = deviceCookieMigrationCutoverAt;
     this.newDeviceNotificationExecutor = newDeviceNotificationExecutor;
+    this.verificationTokens = verificationTokens;
   }
 
   // Three genuinely distinct outcomes (recognized via cookie / lost the negligible token-
@@ -178,11 +196,18 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
             account.organizationId(),
             AccountNewDeviceDetectedEvent.from(device, account.organizationId()),
             "event=account_new_device_detected_outbox_write_failed");
+        // TD-FUT-025: minted and persisted here, on the calling thread, same as the outbox write
+        // immediately above — never inside the background executor below, so a rejected/never-run
+        // notification task still leaves a real, usable token behind rather than silently minting
+        // one that's never actually sent. A failure here degrades to no action link in the email
+        // (rawAlertToken null, same "never lets a side-channel write fail an otherwise-successful
+        // login" guarantee this class's own Javadoc establishes) rather than losing the login.
+        final String rawAlertToken = mintNewDeviceAlertTokenOrNull(command.accountId());
         // TD-PERF-011: fire-and-forget — this method returns as soon as the task is enqueued,
         // not once Resend actually responds. See this class's own Javadoc for why.
         try {
           newDeviceNotificationExecutor.execute(
-              () -> sendNewDeviceNotification(account, device, command.sourceIp()));
+              () -> sendNewDeviceNotification(account, device, command.sourceIp(), rawAlertToken));
         } catch (final RejectedExecutionException e) {
           // Same "never lets a side-channel write fail an otherwise-successful login" guarantee
           // this class's own Javadoc establishes — only realistically reachable during process
@@ -226,6 +251,30 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
     }
   }
 
+  // TD-FUT-025: same "never lets a side-channel write fail an otherwise-successful login"
+  // guarantee as recordAudit/findAccountOrNull above — a failure here degrades to an
+  // informational-only email (null raw token, see sendNewDeviceNotification below), not a lost
+  // login.
+  // Two genuinely distinct exits (minted / mint failed), same "each outcome needs its own exit"
+  // rationale as findAccountOrNull's own identical suppression above.
+  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.OnlyOneReturn"})
+  private String mintNewDeviceAlertTokenOrNull(final AccountId accountId) {
+    try {
+      final String rawToken = RefreshTokenSecret.generateRawValue();
+      final VerificationToken token =
+          VerificationToken.issue(
+              accountId,
+              VerificationTokenType.NEW_DEVICE_LOGIN_ALERT,
+              RefreshTokenSecret.hash(rawToken),
+              Instant.now().plus(NEW_DEVICE_ALERT_TOKEN_TTL));
+      verificationTokens.save(token);
+      return rawToken;
+    } catch (final RuntimeException e) {
+      LOG.warn("event=new_device_alert_token_mint_failed", e);
+      return null;
+    }
+  }
+
   // TD-PERF-011: runs on newDeviceNotificationExecutor's own background thread, never the request
   // thread — no caller left up there to catch anything, so any RuntimeException MailSender's own
   // contract doesn't explicitly document (not just the documented MailDeliveryException) must be
@@ -234,14 +283,18 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   // recordAudit/findAccountOrNull above, just relocated off the request thread.
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
   private void sendNewDeviceNotification(
-      final Account account, final KnownDevice device, final String sourceIp) {
+      final Account account,
+      final KnownDevice device,
+      final String sourceIp,
+      final String rawAlertToken) {
     try {
       mailSender.sendNewDeviceLoginNotification(
           account.email().value(),
           account.organizationId(),
           device.userAgent(),
           sourceIp,
-          device.firstSeenAt());
+          device.firstSeenAt(),
+          rawAlertToken);
     } catch (final RuntimeException e) {
       // BR-DATA-01: status/event only, never the recipient address or any other PII.
       LOG.warn("event=new_device_notification_failed", e);

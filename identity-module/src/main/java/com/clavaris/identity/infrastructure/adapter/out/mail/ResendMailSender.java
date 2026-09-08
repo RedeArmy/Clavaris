@@ -183,18 +183,27 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final OrganizationId organizationId,
       final String userAgent,
       final String sourceIp,
-      final Instant occurredAt) {
-    // Plain informational email, no action link — see MailSender's own Javadoc for why a "this
-    // wasn't me" flow is deliberately out of scope for now. organizationId is accepted (matches
-    // every other tenant-tier method's own signature here) but unused in the body itself: the
-    // recipient already knows which product they're logging into, this notification doesn't need
-    // to brand itself per-Organization the way a confirmation link's own redirect target does.
+      final Instant occurredAt,
+      final String rawAlertToken) {
+    // TD-FUT-025: renders a real "this wasn't me" action link when a token was minted
+    // (rawAlertToken != null), and degrades to the old plain-informational body when it wasn't —
+    // MailSender's own Javadoc documents that minting failure must never fail the whole send.
     //
     // userAgent/sourceIp are the first values this class has ever interpolated into an email body
     // that this server itself did NOT generate — a raw HTTP request header, fully attacker-
     // controlled. HtmlUtils.htmlEscape guards against HTML injection into the sent email; every
     // other send* method here only ever interpolates a link/token this server built itself, so
     // this is the first method that needs it.
+    final String actionParagraph =
+        rawAlertToken == null
+            ? "<p>If this was you, no action is needed. If you don't recognize this activity,"
+                + " change your password and review your active sessions.</p>"
+            : "<p>If this was you, no action is needed.</p>"
+                + "<p>If you don't recognize this activity, lock your account and sign out every"
+                + " active session immediately:</p>"
+                + ResendHttpClient.htmlButton(
+                    link(organizationId, "account-alert/lock", rawAlertToken), "This wasn't me")
+                + "<p>This link expires in 7 days and can only be used once.</p>";
     httpClient.send(
         toAddress,
         "New sign-in to your account",
@@ -206,8 +215,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
             + "</li><li>Time: "
             + occurredAt
             + "</li></ul>"
-            + "<p>If this was you, no action is needed. If you don't recognize this activity,"
-            + " change your password and review your active sessions.</p>");
+            + actionParagraph);
   }
 
   @Override
@@ -253,9 +261,21 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String toAddress,
       final String userAgent,
       final String sourceIp,
-      final Instant occurredAt) {
+      final Instant occurredAt,
+      final String rawAlertToken) {
     // Same HtmlUtils.htmlEscape rationale as sendNewDeviceLoginNotification above — userAgent/
     // sourceIp are attacker-controlled raw request-header values, not something this server built.
+    // TD-FUT-031: same real-link-when-minted/degrade-when-not shape as that tenant-tier sibling.
+    final String actionParagraph =
+        rawAlertToken == null
+            ? "<p>If this was you, no action is needed. If you don't recognize this activity,"
+                + " change your password and review your active sessions.</p>"
+            : "<p>If this was you, no action is needed.</p>"
+                + "<p>If you don't recognize this activity, lock your account and sign out every"
+                + " active session immediately:</p>"
+                + ResendHttpClient.htmlButton(
+                    platformLink("account-alert/lock", rawAlertToken), "This wasn't me")
+                + "<p>This link expires in 7 days and can only be used once.</p>";
     httpClient.send(
         toAddress,
         "New sign-in to your Clavaris account",
@@ -267,8 +287,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
             + "</li><li>Time: "
             + occurredAt
             + "</li></ul>"
-            + "<p>If this was you, no action is needed. If you don't recognize this activity,"
-            + " change your password and review your active sessions.</p>");
+            + actionParagraph);
   }
 
   private String link(

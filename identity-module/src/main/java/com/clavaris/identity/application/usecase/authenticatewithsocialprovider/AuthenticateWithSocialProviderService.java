@@ -3,12 +3,14 @@ package com.clavaris.identity.application.usecase.authenticatewithsocialprovider
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.event.AccountRegisteredEvent;
 import com.clavaris.identity.domain.event.SocialIdentityLinkedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
+import com.clavaris.identity.domain.service.RandomPasswordGenerator;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.SocialLinkingPolicy;
 import java.time.Instant;
@@ -45,6 +47,16 @@ import org.springframework.transaction.support.TransactionTemplate;
  * exists (distinct aggregate types, {@code Account}/{@code OrganizationId} vs. {@code
  * PlatformAccount}, a deeper unification is a separately-tracked refactor). If you change the
  * linking decision here, check that class too.
+ *
+ * <p>TD-FUT-030 (closed): branch 2's brand-new {@code Account} now also gets a real,
+ * cryptographically random, never-surfaced password credential attached ({@link
+ * com.clavaris.identity.domain.service.RandomPasswordGenerator}, the same pattern {@code
+ * RegisterAccountService}'s own password-optional path already establishes for ADR-0024). Before
+ * this, a social-only signup had zero authentication methods other than that one provider — not
+ * just "degraded" if the provider went down, genuinely locked out, and {@code
+ * Account#resetPasswordCredential} requires an existing credential to replace, so "forgot password"
+ * couldn't even rescue such an account. The platform-tier sibling above had the identical gap and
+ * got the identical fix, same day.
  */
 // PMD.LongVariable: policyProvider/socialIdentities/pendingLinks/transactionTemplate match their
 // own collaborator type names, same convention AddWorkspaceMemberService's own class-level
@@ -81,6 +93,7 @@ public class AuthenticateWithSocialProviderService
   private final EventOutboxWriter outbox;
   private final SecurityMetricsRecorder metrics;
   private final TransactionTemplate transactionTemplate;
+  private final PasswordHasher hasher;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // AddWorkspaceMemberService's own identical suppression: this flow genuinely needs every one.
@@ -92,7 +105,8 @@ public class AuthenticateWithSocialProviderService
       final MailSender mailSender,
       final EventOutboxWriter outbox,
       final SecurityMetricsRecorder metrics,
-      final TransactionTemplate transactionTemplate) {
+      final TransactionTemplate transactionTemplate,
+      final PasswordHasher hasher) {
     this.accounts = accounts;
     this.socialIdentities = socialIdentities;
     this.pendingLinks = pendingLinks;
@@ -101,6 +115,7 @@ public class AuthenticateWithSocialProviderService
     this.outbox = outbox;
     this.metrics = metrics;
     this.transactionTemplate = transactionTemplate;
+    this.hasher = hasher;
   }
 
   @Override
@@ -160,6 +175,15 @@ public class AuthenticateWithSocialProviderService
             // The provider already proved control of this email (guarded above) — no reason to
             // make a brand-new social signup go through email verification a second time.
             account.verifyEmail();
+            // TD-FUT-030: a real, cryptographically random, never-surfaced password credential —
+            // same RandomPasswordGenerator/BR-ID-02 pattern RegisterAccountService's own
+            // password-optional path already establishes. Never this account's actual sign-in
+            // method (that stays the linked social identity), but its presence is what lets
+            // "forgot password" issue a real, usable credential later if this provider is ever
+            // down — before this fix, a social-only account had no password_credential row at
+            // all, so a password-reset attempt would have failed outright (Account.
+            // resetPasswordCredential requires one to already exist).
+            account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
             accounts.save(account);
 
             final SocialIdentity identity =

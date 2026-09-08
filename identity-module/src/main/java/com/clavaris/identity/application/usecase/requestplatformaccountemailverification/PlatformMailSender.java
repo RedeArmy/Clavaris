@@ -31,9 +31,18 @@ public interface PlatformMailSender {
    * RecordPlatformAccountLoginDeviceService}'s own notification — the platform-tier mirror of
    * {@code requestemailverification.MailSender.sendNewDeviceLoginNotification}, generic
    * "Clavaris"-branded like every other method here, since a {@code PlatformAccount} belongs to no
-   * Organization to brand with. Same "plain informational email, no action link" scope decision
-   * (TD-FUT-025 tracks the tenant-tier "wasn't me" gap; this inherits the exact same deferral).
+   * Organization to brand with.
+   *
+   * <p><b>TD-FUT-031 (closed):</b> {@code rawAlertToken} carries the same "this wasn't me" contract
+   * as that tenant-tier sibling's own now-added parameter — the raw {@code VerificationToken} value
+   * for {@code VerificationTokenType#NEW_DEVICE_LOGIN_ALERT}, or {@code null} when minting it
+   * failed, in which case implementations must render the old plain-informational body with no
+   * action link rather than fail the whole send.
    */
   void sendNewPlatformDeviceLoginNotification(
-      String toAddress, String userAgent, String sourceIp, Instant occurredAt);
+      String toAddress,
+      String userAgent,
+      String sourceIp,
+      Instant occurredAt,
+      String rawAlertToken);
 }

@@ -11,6 +11,7 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.SocialLoginLinkingContractTest;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -51,6 +52,8 @@ class AuthenticateWithSocialProviderServiceContractTest
     MailSender mailSender = mock(MailSender.class);
     EventOutboxWriter outbox = mock(EventOutboxWriter.class);
     SecurityMetricsRecorder metrics = mock(SecurityMetricsRecorder.class);
+    PasswordHasher hasher = mock(PasswordHasher.class);
+    when(hasher.hash(any())).thenReturn("$argon2id$fake-hash");
 
     when(policyProvider.isProviderAllowed(ORGANIZATION_ID, SocialProvider.GOOGLE)).thenReturn(true);
 
@@ -75,7 +78,8 @@ class AuthenticateWithSocialProviderServiceContractTest
             mailSender,
             outbox,
             metrics,
-            fakeTransactionTemplate);
+            fakeTransactionTemplate,
+            hasher);
   }
 
   private AuthenticateWithSocialProviderCommand command(final boolean emailVerified) {

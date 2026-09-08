@@ -47,18 +47,22 @@ public interface MailSender {
       String toAddress, OrganizationId organizationId, SocialProvider provider, String rawToken);
 
   /**
-   * {@code recordaccountlogindevice.RecordAccountLoginDeviceService}'s own notification — a plain
-   * informational email, no action link/token (a "this wasn't me" flow is real additional scope,
-   * deliberately deferred, not built speculatively ahead of a real need — see
-   * technical-debt-register.md). Callers must be prepared for {@link MailDeliveryException} to
-   * propagate exactly like every other method here — {@code RecordAccountLoginDeviceService} is the
-   * one caller that deliberately catches it instead of letting it propagate; see that class's own
-   * Javadoc for why.
+   * {@code recordaccountlogindevice.RecordAccountLoginDeviceService}'s own notification.
+   * TD-FUT-025: now carries an optional "this wasn't me" action link — {@code rawAlertToken} is the
+   * raw {@code VerificationToken} value for {@code VerificationTokenType#NEW_DEVICE_LOGIN_ALERT},
+   * or {@code null} when minting it failed ({@code
+   * RecordAccountLoginDeviceService#mintNewDeviceAlertTokenOrNull}'s own degrade-gracefully
+   * contract) — implementations must render a plain informational email with no action link in that
+   * case, never fail the whole send over a missing token. Callers must be prepared for {@link
+   * MailDeliveryException} to propagate exactly like every other method here — {@code
+   * RecordAccountLoginDeviceService} is the one caller that deliberately catches it instead of
+   * letting it propagate; see that class's own Javadoc for why.
    */
   void sendNewDeviceLoginNotification(
       String toAddress,
       OrganizationId organizationId,
       String userAgent,
       String sourceIp,
-      Instant occurredAt);
+      Instant occurredAt,
+      String rawAlertToken);
 }

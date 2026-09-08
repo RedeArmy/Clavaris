@@ -32,7 +32,9 @@ public final class PlatformAccount {
   private final Instant createdAt;
   private Instant emailVerifiedAt;
 
-  @SuppressWarnings("PMD.ImmutableField") // same rationale as Account.status
+  // No longer needs PMD.ImmutableField's own suppression once suspend()/reactivate() below
+  // actually mutate this field outside the constructor (TD-FUT-031) — PMD only flags a field that
+  // truly never changes after construction, which this one no longer is.
   private AccountStatus status;
 
   private PlatformPasswordCredential passwordCredential;
@@ -98,6 +100,28 @@ public final class PlatformAccount {
     this.passwordCredential =
         PlatformPasswordCredential.reconstitute(
             this.passwordCredential.id(), id, newPasswordHash, Instant.now());
+  }
+
+  /**
+   * TD-FUT-031: reversible ban, same state transition and same idempotency/DELETED-terminal
+   * reasoning as {@link Account#suspend()} — {@code suspendplatformaccount.
+   * SuspendPlatformAccountService}'s own job is only the transition itself, same "domain mutates
+   * state, use case orchestrates side effects" split. {@code
+   * AuthenticatePlatformAccountWithPasswordService} already rejects any non-{@link
+   * AccountStatus#ACTIVE} account, so future logins are already blocked the moment this returns;
+   * killing an already-live session is the calling service's own responsibility.
+   */
+  public void suspend() {
+    if (this.status == AccountStatus.ACTIVE) {
+      this.status = AccountStatus.SUSPENDED;
+    }
+  }
+
+  /** Reverses {@link #suspend()} — same idempotency/DELETED-terminal reasoning. */
+  public void reactivate() {
+    if (this.status == AccountStatus.SUSPENDED) {
+      this.status = AccountStatus.ACTIVE;
+    }
   }
 
   public PlatformAccountId id() {
