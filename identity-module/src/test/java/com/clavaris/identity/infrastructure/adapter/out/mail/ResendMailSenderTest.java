@@ -177,7 +177,34 @@ class ResendMailSenderTest {
   }
 
   @Test
-  void sendsAWellFormedRequestForANewDeviceLoginNotification() {
+  void sendsAWellFormedRequestForANewDeviceLoginNotificationWithAnActionLink() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+    UUID organizationId = UUID.randomUUID();
+
+    sender.sendNewDeviceLoginNotification(
+        "user@example.com",
+        new OrganizationId(organizationId),
+        "Mozilla/5.0 Test Browser",
+        "203.0.113.5",
+        Instant.parse("2026-08-31T10:00:00Z"),
+        "the-alert-token");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("subject").asString()).isEqualTo("New sign-in to your account");
+    assertThat(body.get("html").asString())
+        .contains("Mozilla/5.0 Test Browser")
+        .contains("203.0.113.5")
+        .as(
+            "TD-FUT-025: the 'this wasn't me' action link, same tenant-scoped shape as every"
+                + " other /o/{organizationId}/... link")
+        .contains(BASE_URL + "/o/" + organizationId + "/account-alert/lock?token=the-alert-token");
+  }
+
+  // TD-FUT-025: MailSender's own Javadoc contract — a null token (minting failed) must degrade to
+  // the old plain-informational body, never fail the whole send.
+  @Test
+  void degradesToAPlainInformationalBodyWithNoActionLinkWhenNoAlertTokenWasMinted() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
 
@@ -186,13 +213,14 @@ class ResendMailSenderTest {
         new OrganizationId(UUID.randomUUID()),
         "Mozilla/5.0 Test Browser",
         "203.0.113.5",
-        Instant.parse("2026-08-31T10:00:00Z"));
+        Instant.parse("2026-08-31T10:00:00Z"),
+        null);
 
     JsonNode body = objectMapper.readTree(capturedRequest.body);
-    assertThat(body.get("subject").asString()).isEqualTo("New sign-in to your account");
     assertThat(body.get("html").asString())
         .contains("Mozilla/5.0 Test Browser")
-        .contains("203.0.113.5");
+        .doesNotContain("account-alert/lock")
+        .doesNotContain("This wasn't me");
   }
 
   @Test
@@ -208,7 +236,8 @@ class ResendMailSenderTest {
         new OrganizationId(UUID.randomUUID()),
         "<script>alert(1)</script>",
         "1.2.3.4",
-        Instant.now());
+        Instant.now(),
+        "the-alert-token");
 
     JsonNode body = objectMapper.readTree(capturedRequest.body);
     assertThat(body.get("html").asString()).doesNotContain("<script>").contains("&lt;script&gt;");

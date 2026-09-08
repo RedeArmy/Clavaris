@@ -85,7 +85,7 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(sessionsPage).contains("device-A");
     verify(mailSender, times(1))
-        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
+        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
   }
 
   @Test
@@ -103,7 +103,7 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     login(client, organizationId, email, "a-correct-password", "device-A");
 
     verify(mailSender, times(1))
-        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
+        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
   }
 
   @Test
@@ -116,9 +116,9 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-B");
 
     verify(mailSender)
-        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
+        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
     verify(mailSender)
-        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-B"), any(), any());
+        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-B"), any(), any(), any());
   }
 
   // TD-SEC-033's own reason for existing: proves the actual security property, not just the
@@ -140,7 +140,7 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     login(newSessionBackedClient(), organizationId, email, "a-correct-password", "device-A");
 
     verify(mailSender, times(2))
-        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any());
+        .sendNewDeviceLoginNotification(eq(email), any(), eq("device-A"), any(), any(), any());
   }
 
   @Test

@@ -28,6 +28,8 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Con
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
 import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
+import com.clavaris.identity.application.usecase.confirmnewdeviceloginalert.ConfirmNewDeviceLoginAlertService;
+import com.clavaris.identity.application.usecase.confirmnewdeviceloginalert.ConfirmNewDeviceLoginAlertUseCase;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkService;
@@ -501,7 +503,8 @@ class IdentityUseCaseConfig {
       final EventOutboxWriter outbox,
       @Value("${clavaris.known-device.migration-cutover-at:2026-08-31T10:00:00Z}")
           final Instant deviceCookieMigrationCutoverAt,
-      final ExecutorService newDeviceNotificationExecutor) {
+      final ExecutorService newDeviceNotificationExecutor,
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
     return new RecordAccountLoginDeviceService(
         knownDevices,
         accounts,
@@ -509,6 +512,17 @@ class IdentityUseCaseConfig {
         auditEvents,
         outbox,
         deviceCookieMigrationCutoverAt,
-        newDeviceNotificationExecutor);
+        newDeviceNotificationExecutor,
+        verificationTokens);
+  }
+
+  // TD-FUT-025: the "this wasn't me" half of the new-device login alert — see
+  // ConfirmNewDeviceLoginAlertService's own Javadoc for why this delegates straight to the
+  // already-tested suspendAccountUseCase bean above rather than duplicating its cascade.
+  @Bean
+  /* package */ ConfirmNewDeviceLoginAlertUseCase confirmNewDeviceLoginAlertUseCase(
+      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
+      @SuppressWarnings("PMD.LongVariable") final SuspendAccountUseCase suspendAccountUseCase) {
+    return new ConfirmNewDeviceLoginAlertService(verificationTokens, suspendAccountUseCase);
   }
 }
