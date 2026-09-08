@@ -2,7 +2,6 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -10,31 +9,25 @@ import java.util.UUID;
 /**
  * JPA row mapping for {@code known_devices} (data-model.md, new-device-login notification,
  * TD-SEC-033).
+ *
+ * <p>Shared columns live on {@link AbstractKnownDeviceEntity} — only {@code account_id} is declared
+ * here (TD-ARCH-009), same split {@link VerificationTokenEntity} already establishes against its
+ * own {@link AbstractVerificationTokenEntity}.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
+@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "known_devices")
-public class KnownDeviceEntity {
-
-  @Id private UUID id;
+public class KnownDeviceEntity extends AbstractKnownDeviceEntity {
 
   @Column(name = "account_id", nullable = false)
   private UUID accountId;
 
-  @Column(name = "user_agent", nullable = false, length = 512)
-  private String userAgent;
+  protected KnownDeviceEntity() {
+    super();
+  }
 
-  @Column(name = "device_token_hash")
-  private String deviceTokenHash;
-
-  @Column(name = "first_seen_at", nullable = false)
-  private Instant firstSeenAt;
-
-  @Column(name = "last_seen_at", nullable = false)
-  private Instant lastSeenAt;
-
-  protected KnownDeviceEntity() {}
-
+  // One parameter per persisted column — same convention as every other *Entity in this codebase
+  // (RefreshTokenEntity, SigningKeyEntity, OAuthClientEntity, ...) that crosses 7 columns.
   @SuppressWarnings("java:S107")
   public KnownDeviceEntity(
       final UUID id,
@@ -43,35 +36,11 @@ public class KnownDeviceEntity {
       final String deviceTokenHash,
       final Instant firstSeenAt,
       final Instant lastSeenAt) {
-    this.id = id;
+    super(id, userAgent, deviceTokenHash, firstSeenAt, lastSeenAt);
     this.accountId = accountId;
-    this.userAgent = userAgent;
-    this.deviceTokenHash = deviceTokenHash;
-    this.firstSeenAt = firstSeenAt;
-    this.lastSeenAt = lastSeenAt;
-  }
-
-  public UUID getId() {
-    return id;
   }
 
   public UUID getAccountId() {
     return accountId;
-  }
-
-  public String getUserAgent() {
-    return userAgent;
-  }
-
-  public String getDeviceTokenHash() {
-    return deviceTokenHash;
-  }
-
-  public Instant getFirstSeenAt() {
-    return firstSeenAt;
-  }
-
-  public Instant getLastSeenAt() {
-    return lastSeenAt;
   }
 }

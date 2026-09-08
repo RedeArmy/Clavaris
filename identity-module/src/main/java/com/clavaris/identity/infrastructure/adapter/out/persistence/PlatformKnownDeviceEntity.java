@@ -2,7 +2,6 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -10,30 +9,21 @@ import java.util.UUID;
 /**
  * JPA row mapping for {@code platform_known_devices} (TD-FUT-026, platform-tier mirror of {@link
  * KnownDeviceEntity}).
+ *
+ * <p>Shared columns live on {@link AbstractKnownDeviceEntity} (TD-ARCH-009) — only {@code
+ * platform_account_id} is declared here.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
+@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "platform_known_devices")
-public class PlatformKnownDeviceEntity {
-
-  @Id private UUID id;
+public class PlatformKnownDeviceEntity extends AbstractKnownDeviceEntity {
 
   @Column(name = "platform_account_id", nullable = false)
   private UUID platformAccountId;
 
-  @Column(name = "user_agent", nullable = false, length = 512)
-  private String userAgent;
-
-  @Column(name = "device_token_hash")
-  private String deviceTokenHash;
-
-  @Column(name = "first_seen_at", nullable = false)
-  private Instant firstSeenAt;
-
-  @Column(name = "last_seen_at", nullable = false)
-  private Instant lastSeenAt;
-
-  protected PlatformKnownDeviceEntity() {}
+  protected PlatformKnownDeviceEntity() {
+    super();
+  }
 
   @SuppressWarnings("java:S107")
   public PlatformKnownDeviceEntity(
@@ -43,35 +33,11 @@ public class PlatformKnownDeviceEntity {
       final String deviceTokenHash,
       final Instant firstSeenAt,
       final Instant lastSeenAt) {
-    this.id = id;
+    super(id, userAgent, deviceTokenHash, firstSeenAt, lastSeenAt);
     this.platformAccountId = platformAccountId;
-    this.userAgent = userAgent;
-    this.deviceTokenHash = deviceTokenHash;
-    this.firstSeenAt = firstSeenAt;
-    this.lastSeenAt = lastSeenAt;
-  }
-
-  public UUID getId() {
-    return id;
   }
 
   public UUID getPlatformAccountId() {
     return platformAccountId;
-  }
-
-  public String getUserAgent() {
-    return userAgent;
-  }
-
-  public String getDeviceTokenHash() {
-    return deviceTokenHash;
-  }
-
-  public Instant getFirstSeenAt() {
-    return firstSeenAt;
-  }
-
-  public Instant getLastSeenAt() {
-    return lastSeenAt;
   }
 }

@@ -1,7 +1,6 @@
 package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -13,21 +12,15 @@ import java.util.UUID;
  * {@code Organization} to further scope this by, same "platform tier is not multi-tenant" shape
  * {@link PlatformAccountId} itself already establishes.
  *
- * <p>Same PMD suppressions and the same reason as {@link KnownDevice}'s own class-level Javadoc.
+ * <p>Shared state/lifecycle lives on {@link AbstractKnownDevice} — see its own Javadoc for why this
+ * pair shares a base (TD-ARCH-009).
+ *
+ * <p>PMD.ShortVariable: {@code id} names exactly what it is — same convention {@link
+ * AbstractKnownDevice}'s own identical suppression already documents for this same constructor
+ * parameter.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
-public final class PlatformKnownDevice {
-
-  private final UUID id;
-  private final PlatformAccountId platformAccountId;
-  private final String userAgent;
-  private final String deviceTokenHash;
-  private final Instant firstSeenAt;
-  private Instant lastSeenAt;
+@SuppressWarnings("PMD.ShortVariable")
+public final class PlatformKnownDevice extends AbstractKnownDevice<PlatformAccountId> {
 
   private PlatformKnownDevice(
       final UUID id,
@@ -36,14 +29,7 @@ public final class PlatformKnownDevice {
       final String deviceTokenHash,
       final Instant firstSeenAt,
       final Instant lastSeenAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    this.platformAccountId =
-        Objects.requireNonNull(platformAccountId, "platformAccountId must not be null");
-    this.userAgent = Objects.requireNonNull(userAgent, "userAgent must not be null");
-    this.deviceTokenHash =
-        Objects.requireNonNull(deviceTokenHash, "deviceTokenHash must not be null");
-    this.firstSeenAt = Objects.requireNonNull(firstSeenAt, "firstSeenAt must not be null");
-    this.lastSeenAt = Objects.requireNonNull(lastSeenAt, "lastSeenAt must not be null");
+    super(id, platformAccountId, userAgent, deviceTokenHash, firstSeenAt, lastSeenAt);
   }
 
   /**
@@ -71,32 +57,7 @@ public final class PlatformKnownDevice {
         id, platformAccountId, userAgent, deviceTokenHash, firstSeenAt, lastSeenAt);
   }
 
-  /** Called on every subsequent login from an already-known device — no notification, just this. */
-  public void touch() {
-    this.lastSeenAt = Instant.now();
-  }
-
-  public UUID id() {
-    return id;
-  }
-
   public PlatformAccountId platformAccountId() {
-    return platformAccountId;
-  }
-
-  public String userAgent() {
-    return userAgent;
-  }
-
-  public String deviceTokenHash() {
-    return deviceTokenHash;
-  }
-
-  public Instant firstSeenAt() {
-    return firstSeenAt;
-  }
-
-  public Instant lastSeenAt() {
-    return lastSeenAt;
+    return owningId();
   }
 }

@@ -1,7 +1,6 @@
 package com.clavaris.identity.domain.model;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -43,23 +42,15 @@ import java.util.UUID;
  * be. It narrows the practical frequency of this race without touching the server-side invariant
  * above at all — two genuinely different devices still notify independently, correctly.
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason {@code Session}/{@code Account} suppress them — the deliberate record-style
- * accessor convention used throughout this codebase's value objects.
+ * <p>Shared state/lifecycle ({@link #touch()} and every field except {@link #accountId()}) lives on
+ * {@link AbstractKnownDevice} — see its own Javadoc for why this pair shares a base (TD-ARCH-009).
+ *
+ * <p>PMD.ShortVariable: {@code id} names exactly what it is — same convention {@link
+ * AbstractKnownDevice}'s own identical suppression already documents for this same constructor
+ * parameter.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
-public final class KnownDevice {
-
-  private final UUID id;
-  private final AccountId accountId;
-  private final String userAgent;
-  private final String deviceTokenHash;
-  private final Instant firstSeenAt;
-  private Instant lastSeenAt;
+@SuppressWarnings("PMD.ShortVariable")
+public final class KnownDevice extends AbstractKnownDevice<AccountId> {
 
   private KnownDevice(
       final UUID id,
@@ -68,13 +59,7 @@ public final class KnownDevice {
       final String deviceTokenHash,
       final Instant firstSeenAt,
       final Instant lastSeenAt) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
-    this.userAgent = Objects.requireNonNull(userAgent, "userAgent must not be null");
-    this.deviceTokenHash =
-        Objects.requireNonNull(deviceTokenHash, "deviceTokenHash must not be null");
-    this.firstSeenAt = Objects.requireNonNull(firstSeenAt, "firstSeenAt must not be null");
-    this.lastSeenAt = Objects.requireNonNull(lastSeenAt, "lastSeenAt must not be null");
+    super(id, accountId, userAgent, deviceTokenHash, firstSeenAt, lastSeenAt);
   }
 
   /**
@@ -100,32 +85,7 @@ public final class KnownDevice {
     return new KnownDevice(id, accountId, userAgent, deviceTokenHash, firstSeenAt, lastSeenAt);
   }
 
-  /** Called on every subsequent login from an already-known device — no notification, just this. */
-  public void touch() {
-    this.lastSeenAt = Instant.now();
-  }
-
-  public UUID id() {
-    return id;
-  }
-
   public AccountId accountId() {
-    return accountId;
-  }
-
-  public String userAgent() {
-    return userAgent;
-  }
-
-  public String deviceTokenHash() {
-    return deviceTokenHash;
-  }
-
-  public Instant firstSeenAt() {
-    return firstSeenAt;
-  }
-
-  public Instant lastSeenAt() {
-    return lastSeenAt;
+    return owningId();
   }
 }
