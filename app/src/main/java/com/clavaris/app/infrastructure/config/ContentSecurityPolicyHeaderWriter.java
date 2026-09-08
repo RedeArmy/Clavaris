@@ -2,9 +2,12 @@ package com.clavaris.app.infrastructure.config;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.header.HeaderWriter;
 
 /**
@@ -78,19 +81,25 @@ import org.springframework.security.web.header.HeaderWriter;
  * snake_case parameter — confirmed by reading {@code
  * OAuth2AuthorizationEndpointFilter#sendAuthorizationConsent} directly), never this project's own
  * camelCase {@code clientId} used on the login page — a real, previously-untested parameter-name
- * mismatch this pass fixes, not something introduced by it. Still gated on {@code display=modal}
- * like the login page, even though SAS's own internal redirect from {@code
- * /o/{organizationId}/oauth2/authorize} to the configured {@code consentPage} only ever forwards
- * {@code scope}/{@code client_id}/{@code state} — {@code display=modal} on the <em>original</em>
- * authorize request is silently dropped across that redirect, so this gate is, in practice, never
- * actually satisfied on the consent page today. Dropping the gate instead of documenting this was
- * tried and reverted: {@code AuthorizationCodeFlowIntegrationTest} live-caught it relaxing {@code
- * frame-ancestors} to {@code '*'} for every ordinary, non-modal consent render in a
- * development-tier Organization, not just genuinely embedded ones. Tracked as its own follow-up in
- * {@code technical-debt-register.md} (TD-SEC-011's own entry) rather than fixed here — it needs a
- * real session-based carry-over of the modal signal across SAS's own redirect (the same {@code
- * HttpSession}-attribute idiom {@code DeviceTrustGate}/{@code SessionTaskGate} already establish),
- * a separate, moderate-sized addition, not a same-pass fix for a same-day filter-chain change.
+ * mismatch this pass fixes, not something introduced by it.
+ *
+ * <p><b>TD-SEC-050 (closed): {@code display=modal} on the consent page.</b> SAS's own internal
+ * redirect from {@code /o/{organizationId}/oauth2/authorize} to the configured {@code consentPage}
+ * only ever forwards {@code scope}/{@code client_id}/{@code state} — {@code display=modal} on the
+ * <em>original</em> authorize request is silently dropped across that redirect, so a direct query
+ * check alone (what the login page relies on) is never satisfied on the consent page in practice.
+ * Dropping the gate instead was tried once and reverted: {@code
+ * AuthorizationCodeFlowIntegrationTest} live-caught it relaxing {@code frame-ancestors} to {@code
+ * '*'} for every ordinary, non-modal consent render in a development-tier Organization, not just
+ * genuinely embedded ones. Real fix: {@link #captureModalStateIfPresent} stashes the original
+ * authorize request's own {@code state} value into the {@code HttpSession} the moment {@code
+ * display=modal} is seen on {@link #AUTHORIZE_PATH} — the same {@code HttpSession}-attribute idiom
+ * {@code DeviceTrustGate}/{@code SessionTaskGate} already establish — and {@link
+ * #withRelaxedFrameAncestorsOnConsentPage} matches it back against the consent render's own {@code
+ * state} before relaxing. Keyed by {@code state}, not a bare boolean, specifically so a second,
+ * unrelated, non-modal consent render later in the same browser session can never inherit a stale
+ * "was modal once" flag — the exact shape of regression the reverted blanket-drop attempt above
+ * hit.
  */
 final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
@@ -117,6 +126,22 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // render).
   private static final Pattern CONSENT_PAGE_PATH = Pattern.compile("^/oauth2/consent$");
 
+  // TD-SEC-050: the one point in the whole flow that reliably sees display=modal on an
+  // authenticated (or about-to-authenticate) request before SAS's own sendAuthorizationConsent
+  // drops it on its internal redirect to CONSENT_PAGE_PATH above — see this class's own Javadoc
+  // addendum for the full flow this closes.
+  private static final Pattern AUTHORIZE_PATH = Pattern.compile("^/o/[^/]+/oauth2/authorize$");
+
+  // Keyed by this specific authorization attempt's own OAuth2 "state" value (a fresh, single-use
+  // nonce per RFC 6749 §10.12) rather than a bare boolean — see
+  // withRelaxedFrameAncestorsOnConsentPage for why a boolean would risk relaxing a later,
+  // unrelated, non-modal consent render sharing the same HttpSession (exactly the
+  // AuthorizationCodeFlowIntegrationTest-caught regression this class's own Javadoc documents for
+  // a blanket relaxation).
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String MODAL_STATE_SESSION_ATTRIBUTE =
+      "clavaris.security.display-modal.pending-state";
+
   // TD-SEC-009 addendum, see this class's own Javadoc: the one project-owned template that now
   // loads a real, same-origin script.
   private static final String LOGIN_PAGE_POLICY =
@@ -142,10 +167,31 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   @Override
   public void writeHeaders(final HttpServletRequest request, final HttpServletResponse response) {
+    // TD-SEC-050: runs unconditionally, before the isHtml/already-set early return below — the
+    // authorize request's own response is SAS's own 302 redirect (never text/html), so gating this
+    // capture behind the same check the header-writing logic uses would mean it never fires at all.
+    captureModalStateIfPresent(request);
     if (response.containsHeader(HEADER_NAME) || !isHtml(response)) {
       return;
     }
     response.setHeader(HEADER_NAME, policyFor(request));
+  }
+
+  // TD-SEC-050: fires on every request to AUTHORIZE_PATH, authenticated or not — an unauthenticated
+  // first hit still passes through HeaderWriterFilter before ExceptionTranslationFilter redirects
+  // it to login, and Spring Security's own default changeSessionId() (session-fixation protection
+  // at login) preserves this same session object's attributes across the ID rotation, so capturing
+  // this early survives login intact. Capturing again on the post-login, RequestCache-replayed hit
+  // to this same path is harmless (same value, or nothing to capture if display=modal is genuinely
+  // absent this time).
+  private static void captureModalStateIfPresent(final HttpServletRequest request) {
+    if (!AUTHORIZE_PATH.matcher(request.getRequestURI()).matches()) {
+      return;
+    }
+    final String state = request.getParameter(OAuth2ParameterNames.STATE);
+    if (DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM)) && state != null) {
+      request.getSession(true).setAttribute(MODAL_STATE_SESSION_ATTRIBUTE, state);
+    }
   }
 
   // Three-way, not a ternary any more — see this class's own Javadoc for why each path pattern
@@ -154,8 +200,7 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private String policyFor(final HttpServletRequest request) {
     final String requestUri = request.getRequestURI();
     if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
-      return withRelaxedFrameAncestorsIfDisplayModal(
-          STRICT_POLICY, request, OAUTH2_CLIENT_ID_PARAM);
+      return withRelaxedFrameAncestorsOnConsentPage(request);
     }
     if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
       return withRelaxedFrameAncestorsIfDisplayModal(LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM);
@@ -167,15 +212,6 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // exact literal "frame-ancestors 'none'" — asserted by construction, not discovered by parsing.
   // PMD.OnlyOneReturn: "not display=modal at all" / "resolved" are two independent, equally valid
   // exits — same rationale as every other early-return chain in this codebase.
-  //
-  // TD-SEC-011: still gated on display=modal for the consent page too, even though SAS's own
-  // internal redirect from /oauth2/authorize to this page never forwards that query param — see
-  // TD-SEC-011's own technical-debt-register.md entry, "consent page loses display=modal across
-  // SAS's own redirect" for why that is a real, separately-tracked follow-up rather than fixed by
-  // relaxing this gate. Keeping the gate here (rather than dropping it, which this class's own
-  // AuthorizationCodeFlowIntegrationTest live-caught relaxing frame-ancestors to '*' for every
-  // ordinary, non-modal consent render in a development-tier Organization) keeps today's default
-  // safe and correct; only the client_id parameter name below is genuinely fixed by this pass.
   @SuppressWarnings("PMD.OnlyOneReturn")
   private String withRelaxedFrameAncestorsIfDisplayModal(
       final String basePolicy, final HttpServletRequest request, final String clientIdParam) {
@@ -183,6 +219,29 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
       return basePolicy;
     }
     return relaxFrameAncestors(basePolicy, request.getParameter(clientIdParam));
+  }
+
+  // TD-SEC-050 (closed): the consent page needs its own variant, not the shared method above —
+  // SAS's own sendAuthorizationConsent redirect never forwards display=modal, so a direct query
+  // check alone (what the login page relies on) is never satisfied here in practice. Falls back to
+  // the session state captureModalStateIfPresent stashed on the original /oauth2/authorize request,
+  // matched against this exact consent render's own "state" value — never a bare "was modal ever
+  // seen this session" flag, which would risk relaxing a later, unrelated, non-modal consent render
+  // sharing the same HttpSession (the precise regression AuthorizationCodeFlowIntegrationTest
+  // caught before this gate existed at all — see this class's own Javadoc).
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private String withRelaxedFrameAncestorsOnConsentPage(final HttpServletRequest request) {
+    if (DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
+      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM));
+    }
+    final HttpSession session = request.getSession(false);
+    final String pendingState =
+        session == null ? null : (String) session.getAttribute(MODAL_STATE_SESSION_ATTRIBUTE);
+    if (pendingState != null
+        && Objects.equals(pendingState, request.getParameter(OAuth2ParameterNames.STATE))) {
+      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM));
+    }
+    return STRICT_POLICY;
   }
 
   private String relaxFrameAncestors(final String basePolicy, final String clientId) {
