@@ -115,7 +115,13 @@ class PlatformDashboardSecurityConfig {
                         "/platform/forgot-password",
                         "/platform/forgot-password/pending",
                         "/platform/reset-password",
-                        "/platform/reset-password/success")
+                        "/platform/reset-password/success",
+                        // TD-FUT-031: the "this wasn't me" link a new-device-login email sends —
+                        // reached by whoever clicks it, not necessarily a browser already holding
+                        // a ROLE_PLATFORM_ACCOUNT session for this same account (the whole point is
+                        // locking a session/device this browser may never have authenticated as).
+                        "/platform/account-alert/lock",
+                        "/platform/account-alert/lock/success")
                     .permitAll()
                     .anyRequest()
                     // Security finding (SDE-III review, 2026-08-22): this was `.authenticated()`,

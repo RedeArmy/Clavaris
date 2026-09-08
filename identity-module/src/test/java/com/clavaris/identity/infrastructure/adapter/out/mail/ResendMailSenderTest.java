@@ -244,8 +244,9 @@ class ResendMailSenderTest {
   }
 
   // TD-FUT-026: platform-tier mirror of sendsAWellFormedRequestForANewDeviceLoginNotification.
+  // TD-FUT-031: now with a real action link, same mirror shape as that update.
   @Test
-  void sendsAWellFormedRequestForANewPlatformDeviceLoginNotification() {
+  void sendsAWellFormedRequestForANewPlatformDeviceLoginNotificationWithAnActionLink() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
 
@@ -253,13 +254,36 @@ class ResendMailSenderTest {
         "founder@example.com",
         "Mozilla/5.0 Test Browser",
         "203.0.113.5",
-        Instant.parse("2026-09-02T13:00:00Z"));
+        Instant.parse("2026-09-02T13:00:00Z"),
+        "the-alert-token");
 
     JsonNode body = objectMapper.readTree(capturedRequest.body);
     assertThat(body.get("subject").asString()).isEqualTo("New sign-in to your Clavaris account");
     assertThat(body.get("html").asString())
         .contains("Mozilla/5.0 Test Browser")
-        .contains("203.0.113.5");
+        .contains("203.0.113.5")
+        .contains(BASE_URL + "/platform/account-alert/lock?token=the-alert-token");
+  }
+
+  // TD-FUT-031: platform-tier mirror of
+  // degradesToAPlainInformationalBodyWithNoActionLinkWhenNoAlertTokenWasMinted.
+  @Test
+  void degradesToAPlainInformationalPlatformBodyWithNoActionLinkWhenNoAlertTokenWasMinted() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendNewPlatformDeviceLoginNotification(
+        "founder@example.com",
+        "Mozilla/5.0 Test Browser",
+        "203.0.113.5",
+        Instant.parse("2026-09-02T13:00:00Z"),
+        null);
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("html").asString())
+        .contains("Mozilla/5.0 Test Browser")
+        .doesNotContain("account-alert/lock")
+        .doesNotContain("This wasn't me");
   }
 
   @Test
@@ -268,7 +292,11 @@ class ResendMailSenderTest {
     ResendMailSender sender = senderPointedAtTheStubServer();
 
     sender.sendNewPlatformDeviceLoginNotification(
-        "founder@example.com", "<script>alert(1)</script>", "1.2.3.4", Instant.now());
+        "founder@example.com",
+        "<script>alert(1)</script>",
+        "1.2.3.4",
+        Instant.now(),
+        "the-alert-token");
 
     JsonNode body = objectMapper.readTree(capturedRequest.body);
     assertThat(body.get("html").asString()).doesNotContain("<script>").contains("&lt;script&gt;");

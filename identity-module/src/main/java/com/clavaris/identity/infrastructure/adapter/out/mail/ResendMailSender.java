@@ -261,9 +261,21 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String toAddress,
       final String userAgent,
       final String sourceIp,
-      final Instant occurredAt) {
+      final Instant occurredAt,
+      final String rawAlertToken) {
     // Same HtmlUtils.htmlEscape rationale as sendNewDeviceLoginNotification above — userAgent/
     // sourceIp are attacker-controlled raw request-header values, not something this server built.
+    // TD-FUT-031: same real-link-when-minted/degrade-when-not shape as that tenant-tier sibling.
+    final String actionParagraph =
+        rawAlertToken == null
+            ? "<p>If this was you, no action is needed. If you don't recognize this activity,"
+                + " change your password and review your active sessions.</p>"
+            : "<p>If this was you, no action is needed.</p>"
+                + "<p>If you don't recognize this activity, lock your account and sign out every"
+                + " active session immediately:</p>"
+                + ResendHttpClient.htmlButton(
+                    platformLink("account-alert/lock", rawAlertToken), "This wasn't me")
+                + "<p>This link expires in 7 days and can only be used once.</p>";
     httpClient.send(
         toAddress,
         "New sign-in to your Clavaris account",
@@ -275,8 +287,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
             + "</li><li>Time: "
             + occurredAt
             + "</li></ul>"
-            + "<p>If this was you, no action is needed. If you don't recognize this activity,"
-            + " change your password and review your active sessions.</p>");
+            + actionParagraph);
   }
 
   private String link(

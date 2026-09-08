@@ -17,16 +17,20 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
+import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformVerificationTokenRepository;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccount;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformKnownDevice;
+import com.clavaris.identity.domain.model.PlatformVerificationToken;
+import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /** TD-FUT-026: platform-tier mirror of {@code RecordAccountLoginDeviceServiceTest}. */
@@ -43,6 +47,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
   private PlatformAccountRepository platformAccounts;
   private PlatformMailSender mailSender;
   private AuditEventRecorder auditEvents;
+  private PlatformVerificationTokenRepository verificationTokens;
   private RecordPlatformAccountLoginDeviceService service;
   private PlatformAccount account;
 
@@ -52,9 +57,15 @@ class RecordPlatformAccountLoginDeviceServiceTest {
     platformAccounts = mock(PlatformAccountRepository.class);
     mailSender = mock(PlatformMailSender.class);
     auditEvents = mock(AuditEventRecorder.class);
+    verificationTokens = mock(PlatformVerificationTokenRepository.class);
     service =
         new RecordPlatformAccountLoginDeviceService(
-            knownDevices, platformAccounts, mailSender, auditEvents, MIGRATION_CUTOVER_AT);
+            knownDevices,
+            platformAccounts,
+            mailSender,
+            auditEvents,
+            MIGRATION_CUTOVER_AT,
+            verificationTokens);
 
     account = PlatformAccount.register(new Email("operator@example.com"));
     when(platformAccounts.findById(account.id())).thenReturn(Optional.of(account));
@@ -90,7 +101,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
     verify(knownDevices).save(any(PlatformKnownDevice.class));
     verify(mailSender)
         .sendNewPlatformDeviceLoginNotification(
-            eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any());
+            eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any(), any());
     verify(auditEvents)
         .write(
             eq(AuditActor.platformAccount(account.id().value())),
@@ -98,6 +109,50 @@ class RecordPlatformAccountLoginDeviceServiceTest {
             eq("PlatformKnownDevice"),
             any(),
             isNull());
+  }
+
+  // TD-FUT-031: same token-minting proof as recordaccountlogindevice.
+  // RecordAccountLoginDeviceServiceTest's own identical case.
+  @Test
+  void mintsAndPersistsANewDeviceAlertTokenAndPassesItToTheNotification() {
+    Optional<String> result =
+        service.handle(
+            new RecordPlatformAccountLoginDeviceCommand(
+                account.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+
+    ArgumentCaptor<PlatformVerificationToken> savedToken =
+        ArgumentCaptor.forClass(PlatformVerificationToken.class);
+    verify(verificationTokens).save(savedToken.capture());
+    assertThat(savedToken.getValue().platformAccountId()).isEqualTo(account.id());
+    assertThat(savedToken.getValue().type())
+        .isEqualTo(VerificationTokenType.NEW_DEVICE_LOGIN_ALERT);
+
+    ArgumentCaptor<String> rawAlertToken = ArgumentCaptor.forClass(String.class);
+    verify(mailSender)
+        .sendNewPlatformDeviceLoginNotification(
+            eq(account.email().value()),
+            eq("Mozilla/5.0"),
+            eq("1.2.3.4"),
+            any(),
+            rawAlertToken.capture());
+    assertThat(rawAlertToken.getValue()).isNotBlank();
+  }
+
+  @Test
+  void aFailedTokenMintDegradesToANotificationWithNoActionLinkInsteadOfPropagating() {
+    doThrow(new RuntimeException("Postgres hiccup")).when(verificationTokens).save(any());
+
+    Optional<String> result =
+        service.handle(
+            new RecordPlatformAccountLoginDeviceCommand(
+                account.id(), "Mozilla/5.0", "1.2.3.4", null));
+
+    assertThat(result).isPresent();
+    verify(mailSender)
+        .sendNewPlatformDeviceLoginNotification(
+            eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any(), isNull());
   }
 
   @Test
@@ -111,7 +166,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
                 account.id(), "Mozilla/5.0", "1.2.3.4", "an-unrecognized-cookie-value"));
 
     assertThat(result).isPresent();
-    verify(mailSender).sendNewPlatformDeviceLoginNotification(any(), any(), any(), any());
+    verify(mailSender).sendNewPlatformDeviceLoginNotification(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -132,7 +187,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
   void aFailedNotificationEmailNeverPropagatesAndTheDeviceRowIsStillWritten() {
     doThrow(new MailDeliveryException("Resend is down"))
         .when(mailSender)
-        .sendNewPlatformDeviceLoginNotification(any(), any(), any(), any());
+        .sendNewPlatformDeviceLoginNotification(any(), any(), any(), any(), any());
 
     Optional<String> result =
         service.handle(
@@ -158,7 +213,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
     verify(knownDevices).save(any(PlatformKnownDevice.class));
     verify(mailSender)
         .sendNewPlatformDeviceLoginNotification(
-            eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any());
+            eq(account.email().value()), eq("Mozilla/5.0"), eq("1.2.3.4"), any(), any());
   }
 
   @Test
@@ -173,7 +228,8 @@ class RecordPlatformAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(knownDevices).save(any(PlatformKnownDevice.class));
-    verify(mailSender, never()).sendNewPlatformDeviceLoginNotification(any(), any(), any(), any());
+    verify(mailSender, never())
+        .sendNewPlatformDeviceLoginNotification(any(), any(), any(), any(), any());
     verify(auditEvents)
         .write(any(), eq("platform_account.new_device_detected"), any(), any(), isNull());
   }
@@ -248,7 +304,7 @@ class RecordPlatformAccountLoginDeviceServiceTest {
     assertThat(result).isPresent();
     verify(mailSender)
         .sendNewPlatformDeviceLoginNotification(
-            eq(preExisting.email().value()), any(), any(), any());
+            eq(preExisting.email().value()), any(), any(), any(), any());
   }
 
   @Test
@@ -271,7 +327,8 @@ class RecordPlatformAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(mailSender)
-        .sendNewPlatformDeviceLoginNotification(eq(brandNew.email().value()), any(), any(), any());
+        .sendNewPlatformDeviceLoginNotification(
+            eq(brandNew.email().value()), any(), any(), any(), any());
   }
 
   @Test
@@ -285,7 +342,8 @@ class RecordPlatformAccountLoginDeviceServiceTest {
 
     assertThat(result).isPresent();
     verify(knownDevices).save(any(PlatformKnownDevice.class));
-    verify(mailSender, never()).sendNewPlatformDeviceLoginNotification(any(), any(), any(), any());
+    verify(mailSender, never())
+        .sendNewPlatformDeviceLoginNotification(any(), any(), any(), any(), any());
     verify(auditEvents)
         .write(any(), eq("platform_account.new_device_detected"), any(), any(), isNull());
   }
