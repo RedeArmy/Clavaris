@@ -2,9 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -161,10 +159,12 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
    * The JSON envelope actually stored in Redis — {@code status}/{@code contentType}/{@code body}
    * are {@code null} while {@link #inProgress()}, populated once {@link #done}.
    *
-   * <p>{@link #equals}/{@link #hashCode}/{@link #toString} overridden explicitly — same "a record's
-   * own generated versions compare/print an array field by reference, not content" reasoning {@link
-   * IdempotentResponse}'s own identical override documents, for {@link #body}, the one array
-   * component here.
+   * <p>Deliberately no {@code equals}/{@code hashCode}/{@code toString} override, unlike {@link
+   * IdempotentResponse}'s own identical-shaped array field — nothing in this codebase ever compares
+   * or prints two {@code StoredEntry} instances; every real read here goes through {@link
+   * #inProgress()}/{@link #requestBodyHash()}/{@link #status()}/{@link #contentType()}/{@link
+   * #body()}, the plain accessors. Overriding the array-comparison behavior speculatively, with no
+   * real call site to exercise it, would just be untested dead code.
    */
   private record StoredEntry(
       boolean inProgress, String requestBodyHash, Integer status, String contentType, byte[] body) {
@@ -177,52 +177,6 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
         final String requestBodyHash, final IdempotentResponse response) {
       return new StoredEntry(
           false, requestBodyHash, response.status(), response.contentType(), response.body());
-    }
-
-    // PMD.LongVariable: thatRequestBodyHash names exactly what it is — same "deliberate,
-    // descriptive name over an arbitrary shortening" convention this codebase applies everywhere
-    // else this rule fires (e.g. RedisFixedWindowRateLimiter's own identical suppression).
-    @SuppressWarnings("PMD.LongVariable")
-    @Override
-    public boolean equals(final Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other
-          instanceof
-          StoredEntry(
-              boolean thatInProgress,
-              String thatRequestBodyHash,
-              Integer thatStatus,
-              String thatContentType,
-              byte[] thatBody))) {
-        return false;
-      }
-      return inProgress == thatInProgress
-          && Objects.equals(requestBodyHash, thatRequestBodyHash)
-          && Objects.equals(status, thatStatus)
-          && Objects.equals(contentType, thatContentType)
-          && Arrays.equals(body, thatBody);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(inProgress, requestBodyHash, status, contentType, Arrays.hashCode(body));
-    }
-
-    @Override
-    public String toString() {
-      return "StoredEntry[inProgress="
-          + inProgress
-          + ", requestBodyHash="
-          + requestBodyHash
-          + ", status="
-          + status
-          + ", contentType="
-          + contentType
-          + ", body="
-          + Arrays.toString(body)
-          + ']';
     }
   }
 }

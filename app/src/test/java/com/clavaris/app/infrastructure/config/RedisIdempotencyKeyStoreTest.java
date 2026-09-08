@@ -1,10 +1,12 @@
 package com.clavaris.app.infrastructure.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -118,6 +120,47 @@ class RedisIdempotencyKeyStoreTest {
   // technique RedisFixedWindowRateLimiterTest's own identical test uses.
   @Test
   void failsOpenWhenRedisIsUnreachable() {
+    withDeadRedisStore(
+        storeAgainstDeadRedis -> {
+          IdempotencyClaimResult result =
+              storeAgainstDeadRedis.claim("test:unreachable", "body-hash");
+
+          assertThat(result.outcome())
+              .as(
+                  "a Redis outage must fail OPEN — the admin API must never be taken down by "
+                      + "idempotency bookkeeping being unavailable")
+              .isEqualTo(IdempotencyOutcome.CLAIMED);
+        });
+  }
+
+  // See RedisIdempotencyKeyStore#complete's own Javadoc: by the time this runs, the real mutation
+  // already succeeded — a failure to cache its outcome must degrade silently, never surface as an
+  // error to a caller who already got a real, correct response.
+  @Test
+  void completeDegradesSilentlyWhenRedisIsUnreachable() {
+    withDeadRedisStore(
+        storeAgainstDeadRedis ->
+            assertThatCode(
+                    () ->
+                        storeAgainstDeadRedis.complete(
+                            "test:unreachable",
+                            "body-hash",
+                            new IdempotentResponse(201, "application/json", "{}".getBytes())))
+                .as("must never propagate — the real mutation already succeeded")
+                .doesNotThrowAnyException());
+  }
+
+  // See RedisIdempotencyKeyStore#release's own Javadoc: a stuck claim only means a later retry
+  // sees IN_PROGRESS/CONFLICT until its own claimTtl lapses — degraded, never broken.
+  @Test
+  void releaseDegradesSilentlyWhenRedisIsUnreachable() {
+    withDeadRedisStore(
+        storeAgainstDeadRedis ->
+            assertThatCode(() -> storeAgainstDeadRedis.release("test:unreachable"))
+                .doesNotThrowAnyException());
+  }
+
+  private static void withDeadRedisStore(final Consumer<RedisIdempotencyKeyStore> test) {
     LettuceClientConfiguration shortTimeout =
         LettuceClientConfiguration.builder().commandTimeout(Duration.ofMillis(500)).build();
     LettuceConnectionFactory deadFactory =
@@ -130,13 +173,7 @@ class RedisIdempotencyKeyStoreTest {
         new RedisIdempotencyKeyStore(deadTemplate, new ObjectMapper(), NO_OP_METRICS, 30, 86400);
 
     try {
-      IdempotencyClaimResult result = storeAgainstDeadRedis.claim("test:unreachable", "body-hash");
-
-      assertThat(result.outcome())
-          .as(
-              "a Redis outage must fail OPEN — the admin API must never be taken down by "
-                  + "idempotency bookkeeping being unavailable")
-          .isEqualTo(IdempotencyOutcome.CLAIMED);
+      test.accept(storeAgainstDeadRedis);
     } finally {
       deadFactory.destroy();
     }

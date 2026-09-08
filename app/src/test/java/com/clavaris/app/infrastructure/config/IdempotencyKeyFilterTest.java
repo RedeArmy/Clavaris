@@ -239,6 +239,47 @@ class IdempotencyKeyFilterTest {
   }
 
   @Test
+  void aReplayableClaimWithNoContentTypeOrBodyReplaysJustTheStatus() throws Exception {
+    // A cached 204-shaped response — proves the two null-guards in replay() degrade correctly
+    // rather than NPE-ing.
+    IdempotencyKeyStore store = mock(IdempotencyKeyStore.class);
+    when(store.claim(anyString(), anyString()))
+        .thenReturn(IdempotencyClaimResult.replay(new IdempotentResponse(204, null, null)));
+    IdempotencyKeyFilter filter =
+        new IdempotencyKeyFilter(store, KEY_HASHER, OBJECT_MAPPER, NO_OP_METRICS);
+    authenticateAsClient("platform-client-a");
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/api/v1/admin/organizations");
+    request.addHeader("Idempotency-Key", "retry-1");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(chain.getRequest()).isNull();
+    assertThat(response.getStatus()).isEqualTo(204);
+    assertThat(response.getContentAsByteArray()).isEmpty();
+  }
+
+  @Test
+  void passesThroughUnchangedWhenTheIdempotencyKeyHeaderIsPresentButBlank() throws Exception {
+    IdempotencyKeyStore store = mock(IdempotencyKeyStore.class);
+    IdempotencyKeyFilter filter =
+        new IdempotencyKeyFilter(store, KEY_HASHER, OBJECT_MAPPER, NO_OP_METRICS);
+    authenticateAsClient("platform-client-a");
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/api/v1/admin/organizations");
+    request.addHeader("Idempotency-Key", "   ");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(chain.getRequest()).isNotNull();
+    verify(store, never()).claim(anyString(), anyString());
+  }
+
+  @Test
   void scopesTheRedisKeyByTheAuthenticatedClientIdNotOnlyTheRawHeaderValue() throws Exception {
     // Two different clients using the exact same self-chosen "retry-1" key must never collide.
     IdempotencyKeyStore store = mock(IdempotencyKeyStore.class);
