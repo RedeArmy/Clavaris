@@ -309,44 +309,19 @@ jobs:
       # this step itself fail — and this whole job fail — the moment
       # SonarCloud's Quality Gate comes back red, not just "analysis ran."
       #
-      # Explicit sonar.coverage.jacoco.xmlReportPaths — this is the SECOND
-      # attempt at this exact problem, the first one (a **-glob pointed at
-      # app/target/site/jacoco-aggregate/jacoco.xml) confirmed live NOT to
-      # work: SonarCloud still reported the same files at 0.0% afterwards.
-      # Root cause, confirmed against SonarSource's own community docs on
-      # this exact scenario: this property is resolved separately for EACH
-      # module, relative to THAT module's own basedir — a `**` glob can only
-      # ever search within a module's own subtree, so from
-      # identity-module's own analysis context it could never reach
-      # app/target/..., a sibling directory, no matter how the glob was
-      # written. The fix the docs describe ("set this property in every
-      # module on which the coverage should be imported") means an explicit
-      # path that's actually reachable from each module's own basedir —
-      # ../app/... — not a glob.
+      # sonar.coverage.jacoco.xmlReportPaths is deliberately NOT passed here as a -D flag anymore
+      # (2026-09-09) — see each of the 6 real modules' own pom.xml <properties> for where it lives
+      # now, and clavaris-parent's own pom.xml comment for the full history of why (two prior
+      # attempts: a `**`-glob that never worked, then a blanket -D that worked for the 6 real
+      # modules but incorrectly also applied to this root aggregator, which has no sources).
       #
-      # The underlying gap this exists for: RegisterAccountIntegrationTest
-      # lives in app/, not identity-module/, because it needs the full
-      # Spring context + aggregated Flyway migrations only app has (same
-      # reasoning as FlywayMigrationIntegrationTest). It genuinely exercises
-      # identity-module's persistence adapters end to end against a real
-      # Postgres, but identity-module's own default report only ever
-      # correlates identity-module's own exec data against its own compiled
-      # classes. app/pom.xml's report-aggregate execution (run only there,
-      # since app is the one module that already depends on every business
-      # module) combines every reactor module's exec data against every
-      # dependency's own compiled classes into one file at
-      # app/target/site/jacoco-aggregate/jacoco.xml; every business module
-      # is a direct child of the repo root, so ../app/... resolves correctly
-      # from any of their basedirs (including app's own — app/../app/...
-      # normalises back to itself).
-      #
-      # sonar.javascript.lcov.reportPaths=lcov.info: same per-module-basedir resolution as
-      # sonar.coverage.jacoco.xmlReportPaths above, applied to app/lcov.info (the "Run JS tests
-      # with coverage" step just above generates it inside app/, so "lcov.info" alone is already
-      # correct from app's own basedir). Every other module resolves this same literal value to
-      # its own nonexistent <module>/lcov.info — harmless, same tolerance as a JaCoCo report
-      # pointing at a module with no coverage of that kind, since only app has any JS source
-      # under its own sonar.sources.
+      # sonar.javascript.lcov.reportPaths=lcov.info: same per-module-basedir resolution SonarSource
+      # documents for sonar.coverage.jacoco.xmlReportPaths, applied to app/lcov.info (the "Run JS
+      # tests with coverage" step just above generates it inside app/, so "lcov.info" alone is
+      # already correct from app's own basedir). Every other module resolves this same literal value
+      # to its own nonexistent <module>/lcov.info — harmless, same tolerance as a JaCoCo report
+      # pointing at a module with no coverage of that kind, since only app has any JS source under
+      # its own sonar.sources.
       #
       # SDE-III review, 2026-09-04 — three SonarCloud analysis warnings investigated and closed,
       # not just tolerated (the two that used to be explained away below now have an actual fix,
@@ -365,36 +340,18 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
-          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
           -Dsonar.sources=src/main/java,src/main/resources
           -Dsonar.javascript.lcov.reportPaths=lcov.info
           -Dsonar.plsql.file.suffixes=
 
-      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...". Root
-      # cause confirmed 2026-09-06 (this comment's own 2026-09-04 predecessor, blaming `common`
-      # having zero tests, was confirmed live to no longer be the explanation — every one of the
-      # six real modules produces its own jacoco.xml after `mvn clean verify`): `clavaris-parent`
-      # (root pom.xml, packaging=pom) has no src/main/java of its own — this property resolves per
-      # module relative to THAT module's own basedir, and from the repo root,
-      # "../app/target/site/jacoco-aggregate/jacoco.xml" resolves OUTSIDE the repository entirely
-      # (confirmed: realpath -m from the repo root), never to a real file regardless of build order
-      # or completeness. Genuinely inert either way (zero source lines in that module means coverage
-      # has nothing to attach to even if the paths did resolve).
-      #
-      # A `sonar.skip=true` fix on the root pom (explicitly overridden back to `false` in each of
-      # the six real modules' own pom.xml) was tried the same week and reverted days later — real
-      # regression, caught live: `sonar:sonar` is an aggregator mojo, executed exactly ONCE against
-      # this root project regardless of the reactor's own module count, and it reads `sonar.skip`
-      # from THIS project's own resolved properties for that one invocation. A child module's own
-      # override is never consulted for "should the aggregate submission happen at all" — only
-      # per-sensor properties like `sonar.coverage.jacoco.xmlReportPaths` above get resolved per
-      # module. Setting `sonar.skip=true` here silently skipped the ENTIRE analysis submission for
-      # every module in the reactor, on every PR, not just this one module's own irrelevant
-      # coverage warning — confirmed live: "sonar.skip = true: Skipping analysis" was the very last
-      # line of every affected run, no analysis ever reached SonarCloud. **Do not reintroduce
-      # `sonar.skip` anywhere in this repo's pom.xml tree to silence this warning** — it is
-      # genuinely not fixable that way. Tolerated as harmless, cosmetic noise instead, same class of
-      # accepted gap as the PL/SQL Data Dictionary warning below.
+      # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...", historically
+      # fired for `clavaris-parent` (root pom.xml, packaging=pom, no src/main/java of its own) —
+      # full history, including a real sonar.skip regression this project already lived through once
+      # and must never repeat, is in clavaris-parent's own pom.xml comment on this property, not
+      # duplicated here. 2026-09-09: fixed by moving sonar.coverage.jacoco.xmlReportPaths out of this
+      # command entirely and into each of the 6 real modules' own pom.xml — clavaris-parent now has
+      # no value configured for it at all, so nothing here should try to resolve a path for it.
+      # Implemented, not yet live-verified — confirm this warning is actually gone on the next run.
       #
       # "Some thymeleaf templates are not indexed: you may want to add 'src/main/resources' in the
       # scanned files of this project to detect java XSS vulnerabilities". Real gap, now fixed:

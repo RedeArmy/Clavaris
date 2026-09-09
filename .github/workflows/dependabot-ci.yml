@@ -155,7 +155,6 @@ jobs:
           -Dsonar.organization=redearmy
           -Dsonar.host.url=https://sonarcloud.io
           -Dsonar.qualitygate.wait=true
-          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml
           -Dsonar.sources=src/main/java,src/main/resources
           -Dsonar.plsql.file.suffixes=
 

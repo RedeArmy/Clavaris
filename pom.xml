@@ -100,23 +100,30 @@
              (11.0.26 is not, as of this writing) — this is the latest
              available patch release, not an arbitrary bump. -->
         <tomcat.version>11.0.25</tomcat.version>
-        <!-- SonarCloud analysis warning, confirmed live: "No coverage report can be found with
-             sonar.coverage.jacoco.xmlReportPaths=...". This module (clavaris-parent, packaging=pom)
-             has no src/main/java of its own, and the warning is real and permanent for the reason
-             explained in ci.yml's own comment on this exact property — but DO NOT "fix" this with
-             sonar.skip on this pom, even scoped with per-child overrides (tried 2026-09-06, reverted
-             the same week once it broke every PR's analysis): the sonar-maven-plugin's own
-             sonar:sonar goal is an aggregator mojo, executed exactly once against this root project
-             regardless of the reactor's own module count, and it reads sonar.skip from THIS
-             project's own resolved properties for that one invocation — a child module's own
-             override of the property never gets consulted for "should the aggregate submission
-             happen at all," only sonar.coverage.jacoco.xmlReportPaths-style per-sensor properties
-             get resolved per module. Setting sonar.skip=true here silently skips the entire
-             analysis submission for the whole reactor, not just this module's own irrelevant
-             coverage warning — confirmed live: "sonar.skip = true: Skipping analysis" was the very
-             last line of every affected CI run, no analysis ever reached SonarCloud. This warning is
-             genuinely not fixable without that regression — tolerated as harmless, cosmetic noise
-             instead, same class of accepted gap as ci.yml's own PL/SQL Data Dictionary warning. -->
+        <!-- SonarCloud analysis warning, "No coverage report can be found with
+             sonar.coverage.jacoco.xmlReportPaths=...": this module (clavaris-parent, packaging=pom)
+             has no src/main/java of its own. DO NOT "fix" this with sonar.skip on this pom, even
+             scoped with per-child overrides (tried 2026-09-06, reverted the same week once it broke
+             every PR's analysis): the sonar-maven-plugin's own sonar:sonar goal is an aggregator
+             mojo, executed exactly once against this root project regardless of the reactor's own
+             module count, and it reads sonar.skip from THIS project's own resolved properties for
+             that one invocation — a child module's own override of the property never gets consulted
+             for "should the aggregate submission happen at all." Setting sonar.skip=true here
+             silently skips the entire analysis submission for the whole reactor, not just this
+             module's own irrelevant coverage warning — confirmed live: "sonar.skip = true: Skipping
+             analysis" was the very last line of every affected CI run, no analysis ever reached
+             SonarCloud. **Never reintroduce sonar.skip anywhere in this pom.xml tree for this.**
+
+             2026-09-09: root-caused why the warning fired at all, not just why sonar.skip can't fix
+             it — this property genuinely IS resolved per module (ci.yml's own comment on it already
+             established this for the ../app/... relative-path fix), but was being set via one
+             blanket -D on the mvn command line, applying the identical (wrong-for-this-module) value
+             to clavaris-parent too. Fixed by moving the property out of the CLI entirely and into
+             each of the 6 real modules' own pom.xml <properties> instead (see each module's own
+             comment on it) — clavaris-parent now has no value for it at all, so its own sensor has
+             nothing to look for instead of a path that can never resolve. Implemented, not yet
+             live-verified against a real SonarCloud run — confirm the warning is actually gone on
+             the next CI pass before treating this as closed. -->
     </properties>
 
     <!--
