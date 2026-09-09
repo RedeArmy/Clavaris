@@ -225,6 +225,10 @@ jobs:
       # every `mvn verify` elsewhere in this workflow already relies on).
       # -DskipTests: this job scans dependencies, it doesn't need to
       # re-run the test suite build-and-test already covers.
+      # -DsuppressionFiles: owasp-suppressions.xml (repo root) — each entry
+      # names one exact CVE against one exact package, with a justification
+      # checked against that CVE's own advisory text, never a blanket
+      # exclusion (see the file's own header comment).
       - name: OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
@@ -234,6 +238,7 @@ jobs:
           -DdataDirectory=$HOME/.dependency-check-data
           -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
           -DnvdApiDelay=2000
+          -DsuppressionFiles=owasp-suppressions.xml
 
       - name: Upload dependency-check report
         if: always()

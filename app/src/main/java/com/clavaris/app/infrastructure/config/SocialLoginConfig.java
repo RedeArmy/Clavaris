@@ -1,6 +1,8 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
@@ -10,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -58,9 +61,12 @@ import org.springframework.web.client.RestTemplate;
  * different TD-PERF-009 methods below — every one of connectTimeoutSeconds/readTimeoutSeconds/
  * socialLoginUserInfoRestOperations names exactly what it is, not accidentally long, same precedent
  * IdentityUseCaseConfig's own identical class-level suppression already documents for the same
- * shape of false positive.
+ * shape of false positive. PMD.CouplingBetweenObjects: this class wires an entire OAuth2 client
+ * security chain (token exchange, two userinfo flavors, rate limiting, the new circuit breaker) —
+ * same "wiring, not sprawl" rationale OrganizationAuthorizationServerConfig's own identical
+ * suppression already documents for a comparably-shaped config class.
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
+@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.CouplingBetweenObjects"})
 @Configuration
 class SocialLoginConfig {
 
@@ -83,6 +89,31 @@ class SocialLoginConfig {
     return factory;
   }
 
+  // SDE-III optimization pass, P2 point 4: shared by both beans below, same reasoning
+  // timeoutConfiguredRequestFactory's own Javadoc already documents for the timeout config —
+  // Google's/GitHub's own token-exchange and userinfo calls all need the same circuit-breaker
+  // tuning, isolated per target host at request time (see
+  // CircuitBreakerClientHttpRequestInterceptor
+  // 's own Javadoc for why one shared instance, not one per bean, is still correct).
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ ClientHttpRequestInterceptor socialLoginCircuitBreakerInterceptor(
+      @Value("${clavaris.resilience.social-login.failure-rate-threshold:50}")
+          final float failureRateThreshold,
+      @Value("${clavaris.resilience.social-login.sliding-window-size:10}")
+          final int slidingWindowSize,
+      @Value("${clavaris.resilience.social-login.wait-duration-in-open-state-seconds:30}")
+          final long waitDurationInOpenStateSeconds,
+      final SecurityMetricsRecorder metrics) {
+    return new CircuitBreakerClientHttpRequestInterceptor(
+        CircuitBreakerConfig.custom()
+            .failureRateThreshold(failureRateThreshold)
+            .slidingWindowSize(slidingWindowSize)
+            .waitDurationInOpenState(Duration.ofSeconds(waitDurationInOpenStateSeconds))
+            .build(),
+        metrics);
+  }
+
   // TD-PERF-009: Spring Security's own default token-response client sets no connect/read
   // timeout at all — confirmed by reading AbstractRestClientOAuth2AccessTokenResponseClient's
   // real source (7.1.1), not assumed. With Tomcat capped at 50 threads (TD-PERF-007), a hung
@@ -100,11 +131,15 @@ class SocialLoginConfig {
           @Value("${clavaris.oauth2.social-login.connect-timeout-seconds:5}")
               final long connectTimeoutSeconds,
           @Value("${clavaris.oauth2.social-login.read-timeout-seconds:10}")
-              final long readTimeoutSeconds) {
+              final long readTimeoutSeconds,
+          final ClientHttpRequestInterceptor socialLoginCircuitBreakerInterceptor) {
     final RestClient restClient =
         RestClient.builder()
             .requestFactory(
                 timeoutConfiguredRequestFactory(connectTimeoutSeconds, readTimeoutSeconds))
+            // SDE-III optimization pass, P2 point 4 — see this class's own Javadoc above
+            // (socialLoginCircuitBreakerInterceptor) for why one shared instance is correct here.
+            .requestInterceptor(socialLoginCircuitBreakerInterceptor)
             .configureMessageConverters(
                 messageConverters -> {
                   messageConverters.addCustomConverter(new FormHttpMessageConverter());
@@ -132,11 +167,15 @@ class SocialLoginConfig {
       @Value("${clavaris.oauth2.social-login.connect-timeout-seconds:5}")
           final long connectTimeoutSeconds,
       @Value("${clavaris.oauth2.social-login.read-timeout-seconds:10}")
-          final long readTimeoutSeconds) {
+          final long readTimeoutSeconds,
+      final ClientHttpRequestInterceptor socialLoginCircuitBreakerInterceptor) {
     final RestTemplate restTemplate =
         new RestTemplate(
             timeoutConfiguredRequestFactory(connectTimeoutSeconds, readTimeoutSeconds));
     restTemplate.setErrorHandler(new OAuth2ErrorResponseErrorHandler());
+    // SDE-III optimization pass, P2 point 4 — same shared interceptor as
+    // socialLoginAccessTokenResponseClient's own identical addition.
+    restTemplate.getInterceptors().add(socialLoginCircuitBreakerInterceptor);
     return restTemplate;
   }
 

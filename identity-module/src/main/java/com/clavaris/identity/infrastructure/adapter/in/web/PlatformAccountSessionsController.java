@@ -8,7 +8,6 @@ import com.clavaris.identity.application.usecase.revokeplatformaccountsession.Re
 import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionUseCase;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Controller;
@@ -65,8 +64,7 @@ public class PlatformAccountSessionsController {
                 Collectors.toMap(
                     ActivePlatformAccountSession::sessionId,
                     session -> UserAgentLabel.friendly(session.userAgent()))));
-    final HttpSession currentSession = request.getSession(false);
-    model.addAttribute("currentSessionId", currentSession == null ? null : currentSession.getId());
+    model.addAttribute("currentSessionId", CurrentSessionSupport.currentSessionId(request));
     return SESSIONS_VIEW;
   }
 
@@ -84,10 +82,10 @@ public class PlatformAccountSessionsController {
     return "redirect:/platform/account/sessions";
   }
 
+  // See CurrentSessionSupport#requireResolved's own Javadoc — same TD-ARCH-016-shaped extraction
+  // as AccountSessionsController's own identical helper.
   private PlatformAccountId requireCurrentPlatformAccount(final HttpServletRequest request) {
-    return currentPlatformAccount
-        .resolve(request)
-        .orElseThrow(
-            () -> new IllegalStateException("No authenticated PlatformAccount on this request"));
+    return CurrentSessionSupport.requireResolved(
+        currentPlatformAccount.resolve(request), "PlatformAccount");
   }
 }

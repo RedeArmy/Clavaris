@@ -51,6 +51,17 @@
              of hard-failing — confirmed live under JDK 25. Bumped for the
              same reason as spotless.version above. -->
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
+        <!-- SDE-III optimization pass, P2 point 4: the circuit-breaker primitive
+             CircuitBreakerMetricsBinder (common module) builds on, wrapping every
+             genuinely external HTTP dependency this codebase has (Resend, GitHub's
+             REST API, Google/GitHub's own OAuth2 endpoints). Core artifact only
+             (resilience4j-circuitbreaker, no Spring Boot starter/autoconfiguration) —
+             this codebase wires each breaker itself, deliberately, the same
+             "framework provides the primitive, this codebase owns the wiring"
+             posture already used for Resilience4j's sibling concerns here
+             (RedisFixedWindowRateLimiter's own hand-rolled Lua script, not a
+             third-party rate-limiter starter). -->
+        <resilience4j.version>2.3.0</resilience4j.version>
         <!-- Left unpinned, Maven re-resolves "latest compatible" on every
              build by walking plugin metadata newest-first — confirmed live:
              it tried (and rejected) four Maven-4-only 4.0.0-beta-N releases

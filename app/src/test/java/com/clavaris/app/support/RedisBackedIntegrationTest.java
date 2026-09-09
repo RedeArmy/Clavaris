@@ -1,5 +1,7 @@
 package com.clavaris.app.support;
 
+import java.util.concurrent.TimeUnit;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -23,9 +25,29 @@ import org.testcontainers.utility.DockerImageName;
  * RateLimitingIntegrationTest} already did it (no dedicated Testcontainers Redis module dependency
  * in this project, hence {@code @DynamicPropertySource} rather than {@code @ServiceConnection}) —
  * extend this class instead of duplicating the container/property-source boilerplate.
+ *
+ * <p>Also the one shared place that neutralizes both of this module's known short-interval
+ * background jobs for the duration of any test — see {@link
+ * #WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS} below and {@link
+ * SessionCleanupCronDisabledForTestsConfig}'s own Javadoc — so a subclass never has to reason about
+ * either one racing its own container teardown.
  */
 @Testcontainers
+@Import(SessionCleanupCronDisabledForTestsConfig.class)
 public abstract class RedisBackedIntegrationTest {
+
+  // A real Spring Test context lives only as long as its own class's tests (or until the context
+  // cache evicts it) — but WebhookDispatchScheduler's own production defaults (5-10s) are tuned for
+  // real responsiveness, short enough that a real tick can fire mid-suite and then race a
+  // Postgres/Redis container tearing down under it. Confirmed live: exactly this race produced
+  // sporadic ERROR-level `event=webhook_dispatch_tick_failed`/`event=webhook_delivery_tick_failed`
+  // (CannotCreateTransactionException, a dying HikariPool) during otherwise-green full-reactor runs
+  // — flaky, environment-timing-dependent log noise, not a real product defect (real coverage of
+  // both use cases already exists via WebhookDispatchSchedulerTest's own mocks and each service's
+  // dedicated Testcontainers-backed test). A one-year initial delay never elapses within any test
+  // run's finite lifetime, so neither tick ever actually fires here.
+  private static final long WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS =
+      TimeUnit.DAYS.toMillis(365);
 
   @Container
   static final GenericContainer<?> REDIS =
@@ -35,6 +57,12 @@ public abstract class RedisBackedIntegrationTest {
   static void redisProperties(final DynamicPropertyRegistry registry) {
     registry.add("spring.data.redis.host", REDIS::getHost);
     registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+    registry.add(
+        "clavaris.webhook.dispatch-initial-delay-ms",
+        () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);
+    registry.add(
+        "clavaris.webhook.delivery-initial-delay-ms",
+        () -> WEBHOOK_SCHEDULER_NEVER_FIRES_IN_A_TEST_MS);
   }
 
   // TD-ARCH-002: exposes this same shared container's real host/port to subclasses outside this

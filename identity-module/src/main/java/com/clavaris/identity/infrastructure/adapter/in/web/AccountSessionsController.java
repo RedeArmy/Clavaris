@@ -8,7 +8,6 @@ import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAcco
 import com.clavaris.identity.application.usecase.revokeaccountsession.SessionNotFoundException;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -76,8 +75,7 @@ public class AccountSessionsController {
                     session -> UserAgentLabel.friendly(session.userAgent()))));
     // Lets the template label/mark the row for the browser making this very request, without this
     // controller needing to duplicate any of ActiveAccountSession's own fields to identify it.
-    final HttpSession currentSession = request.getSession(false);
-    model.addAttribute("currentSessionId", currentSession == null ? null : currentSession.getId());
+    model.addAttribute("currentSessionId", CurrentSessionSupport.currentSessionId(request));
     // So the per-row revoke form can build its own action URL without reaching into the request
     // for a path variable Thymeleaf doesn't otherwise expose to it.
     model.addAttribute("organizationId", organizationId);
@@ -105,12 +103,10 @@ public class AccountSessionsController {
   }
 
   // Not expected to ever actually be empty — app's own security chain guarantees an authenticated
-  // tenant Account before this controller runs — but a checked, explicit failure here is still
-  // safer than an unchecked NoSuchElementException, same rationale as
-  // PlatformOrganizationDashboardController's own identical helper.
+  // tenant Account before this controller runs — see CurrentSessionSupport#requireResolved's own
+  // Javadoc for the full rationale (shared with PlatformAccountSessionsController's own identical
+  // need, TD-ARCH-016-shaped extraction).
   private AccountId requireCurrentAccount(final HttpServletRequest request) {
-    return currentAccount
-        .resolve(request)
-        .orElseThrow(() -> new IllegalStateException("No authenticated Account on this request"));
+    return CurrentSessionSupport.requireResolved(currentAccount.resolve(request), "Account");
   }
 }
