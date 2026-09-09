@@ -226,7 +226,127 @@ name silently miss the real one in production. Fixed by adding explicit `name:` 
 that file, confirmed safe to do now (before any real production instance holds real data) rather
 than a live migration hazard.
 
-## 7. What this runbook does not cover, on purpose
+## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
+
+Everything in §1–§7 above describes the single-VM artifact itself, deployable to any host with a
+public IP. This section is specifically about **pre-production**: a real rehearsal of that exact
+artifact — same `docker-compose.prod.yml`, same Caddy, same `.env` shape — on a VirtualBox VM on a
+home network, before ever touching the real production host (Oracle Cloud's Always Free tier,
+Ampere A1 shape). The goal is to catch real deployment problems (a missing `.env` value, a
+firewall rule, a health-check timing issue) against the actual artifact, not a hand-wavier "it
+should work" read of this document.
+
+### 7a. VM specification
+
+| | Pre-production (VirtualBox, as actually built) | Production target (Oracle Always Free, Ampere A1) |
+|---|---|---|
+| vCPU | 2 | 2 OCPU |
+| RAM | 6 GB | 12 GB |
+| Disk | 40 GB | up to 200 GB (boot + block) |
+| OS | Ubuntu Server 26.04.1 LTS | Ubuntu (same) |
+
+**Named gap, not silently assumed away**: §2a's own capacity-tuning table above sizes
+`TOMCAT_MAX_THREADS`/`DB_HIKARI_MAX_POOL_SIZE` against a **3-vCPU** reference machine
+(TD-PERF-007) — Oracle's Always Free Ampere A1 tier, in its single most powerful configuration,
+gives only **2 OCPU total**, below that reference point, and this pre-production VM matches that
+same 2-vCPU ceiling deliberately (rehearsing the real target's CPU shape, not just its RAM).
+Confirmed against Oracle's own current published Always Free specs, not assumed from memory
+(Oracle's own numbers have changed over time and third-party summaries disagree).
+
+**Retuned values for this 2-vCPU host** (both environments — this VM and the eventual Oracle
+host share the same vCPU count, so the same retuned values apply to both, not just one):
+
+| Setting | §2a's 3-vCPU default | 2-vCPU value | Reasoning |
+|---|---|---|---|
+| `TOMCAT_MAX_THREADS` | 50 | **34** | Scaled proportionally to real core count (50 × 2/3 ≈ 33.3, rounded up) — Argon2id verification is CPU-bound, not just memory-bound, so keeping the 3-vCPU thread count on 2 real cores would only grow the queue behind the CPU's actual parallel capacity, not real throughput. |
+| `DB_HIKARI_MAX_POOL_SIZE` | 10 | **5** | HikariCP's own `((core_count * 2) + spindle_count)` guidance applied literally to 2 cores: (2 × 2) + 1 = 5. |
+| `DB_HIKARI_CONNECTION_TIMEOUT_MS` | 10000 | **10000, unchanged** | Not core-count-dependent — this bounds how long a request waits for a pool connection, which doesn't scale with vCPU count the way thread/pool *sizes* do. |
+| `JAVA_OPTS` (`-Xmx`) | `1536m` | **`-Xmx1024m -Xms512m`** | Worst-case concurrent Argon2 memory at 34 threads: 34 × ~19MiB ≈ 646MiB — 1024m leaves comfortable heap/GC headroom above that without reserving memory this smaller host doesn't have much of to spare. |
+| `mem_limit` (`app` service) | `2g` | **`2g`, unchanged** | This VM's real 6GB (more than the 4GB originally assumed) leaves enough headroom for Postgres/Redis/Caddy alongside a 2g `app` container without shrinking it — only the *JVM's own* heap ceiling needed to come down with the lower thread count, not the container's outer memory budget. |
+
+Set the three Spring-consumed values (`TOMCAT_MAX_THREADS`, `DB_HIKARI_MAX_POOL_SIZE`,
+`DB_HIKARI_CONNECTION_TIMEOUT_MS`) directly in `docker-compose.prod.yml`'s own `app.environment`
+block, not `.env` alone — §2a above already explains why a blank `.env` value for these three
+doesn't do what it looks like it should. `JAVA_OPTS` is the one exception that *is* safe to set in
+`.env` alone (same section's own explanation).
+
+VirtualBox network mode: **Bridged**, not NAT — this VM needs genuine outbound internet access for
+both ngrok (§8b) and the self-hosted Actions runner (§8c), neither of which need any *inbound*
+port opened on the host's own router. NAT with manual port-forwarding works too if bridged isn't
+available on the network, but adds a step bridged doesn't need.
+
+### 7b. ngrok — exposing the app, not deploying to it
+
+ngrok's only job here is making the running app reachable from the internet for real end-to-end
+testing (an OAuth provider's own redirect callback, a webhook delivery target, JobSeeker's own dev
+environment reaching this instance) — it is deliberately **not** part of how a new build gets onto
+this host (see §8c for that). Install it on the VM itself (`snap install ngrok` or the tarball from
+ngrok's own downloads page), authenticate with `ngrok config add-authtoken <token>`, then:
+
+```bash
+ngrok http 80
+```
+
+**Known, deliberate divergence from real production, named here rather than discovered later**: in
+real production (a real domain's DNS `A` record pointing at Oracle's own public IP), Caddy performs
+its own Let's Encrypt HTTP-01 challenge and terminates TLS itself (ADR-0018 Decision 1). Behind
+ngrok's free tier, ngrok's own edge terminates TLS instead — Caddy in this pre-production rehearsal
+serves plain HTTP behind the tunnel, not real Let's Encrypt-issued TLS. This is an accepted gap for
+rehearsing everything else (compose file, health checks, migrations, `.env` shape, the deploy/
+rollback mechanism itself) — it does not rehearse Caddy's own ACME flow. Closing that specific gap
+too would need ngrok's paid reserved-domain tier with a raw TCP tunnel to port 80/443 (letting
+Caddy's own ACME challenge reach it unmodified) — not done by default here; revisit if rehearsing
+the ACME flow itself becomes worth the added cost before the real Oracle cutover.
+
+### 7c. Automatic deployment — self-hosted GitHub Actions runner
+
+`ci.yml`'s own `deploy-preprod` job (`needs: ci-passed`, gated to `push` on `master` only) runs
+`deploy.sh` (§4 above) automatically on every merge — no one needs to SSH in and run it by hand.
+This works without opening any inbound port on the VM's own router/firewall: a **self-hosted GitHub
+Actions runner**, installed as a service directly on this VM, polls GitHub over an outbound HTTPS
+connection for work — the same direction ngrok's own tunnel and every other outbound connection
+this VM makes already goes, never inbound.
+
+**Why a self-hosted runner instead of a GitHub-hosted runner SSHing in**: this VM has no public IP
+of its own (it's behind a home router/NAT) — a GitHub-hosted runner has no address to SSH to at
+all without something bridging that gap, and the obvious bridge (tunneling SSH through ngrok) needs
+a *stable* address, which ngrok's free tier doesn't give (the address changes every time the tunnel
+restarts) — a paid reserved TCP address would fix that, but at that point a self-hosted runner is
+simpler, needs no SSH key material stored in GitHub Secrets at all, and is the pattern GitHub's own
+docs recommend specifically for exactly this shape of problem (a private/NAT'd deployment target).
+
+Setup, once per host (see GitHub's own `Settings → Actions → Runners → New self-hosted runner` for
+the exact, account-specific download/token commands — not reproduced here since the registration
+token is single-use and account-specific):
+
+```bash
+# As the 'clavaris' user (the same deploy user bootstrap.sh already created):
+su - clavaris
+mkdir actions-runner && cd actions-runner
+# ... download + extract the runner tarball GitHub's own UI gives you ...
+./config.sh --url https://github.com/RedeArmy/Clavaris --token <token-from-github-ui> --labels preprod
+```
+
+Then, as root, install it as a systemd service so it survives reboots and doesn't depend on an
+open terminal session:
+
+```bash
+cd /home/clavaris/actions-runner
+./svc.sh install clavaris
+./svc.sh start
+```
+
+The `preprod` label (not bare `self-hosted`) is deliberate: the day a second self-hosted runner is
+registered on the real Oracle production host, it gets its own `production` label instead, and
+`ci.yml`'s own `deploy-preprod` job (`runs-on: [self-hosted, preprod]`) can never accidentally pick
+up production's runner or vice versa — two independent deploy targets, never conflated by an
+ambiguous shared label. A future production deploy job should very likely gate on a GitHub
+Environment with a required reviewer (unlike `pre-production`'s own unattended-by-design flow here)
+— not added now because that host doesn't exist yet, but the `environment:` block already in
+`ci.yml`'s `deploy-preprod` job is exactly where that protection rule would attach for its own
+`production` counterpart, with zero job-logic changes needed to add it later.
+
+## 8. What this runbook does not cover, on purpose
 
 - **Off-site/geo-redundant backup copies** — §6b above is honest that this is not yet automated;
   backups currently live on the same disk as the data they back up.
