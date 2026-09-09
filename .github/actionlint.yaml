@@ -1,0 +1,15 @@
+# deployment-runbook.md §7 / ADR-0018 addendum, 2026-09-09: actionlint has no way to know about
+# self-hosted runner labels that only exist in this repo's own registered runners (they aren't
+# part of GitHub's own hosted-runner catalog) — without this file, `runs-on: [self-hosted, preprod]`
+# in ci.yml is flagged as an "unknown label", a false positive for a label that's real and
+# intentional (deployment-runbook.md §7c), not a typo. `production` is declared preemptively for
+# the same reason that job's own comment names: the day a second self-hosted runner is registered
+# on the real Oracle production host, its own deploy job needs this label too, and this file
+# shouldn't need a follow-up edit to stop flagging it.
+#
+# Not wired into any CI job — actionlint runs ad hoc against this repo's workflow files (same
+# manual-Docker-image technique TD-SEC-027 already established), never as its own required check.
+self-hosted-runner:
+  labels:
+    - preprod
+    - production

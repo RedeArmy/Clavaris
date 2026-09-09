@@ -450,3 +450,52 @@ jobs:
             echo "One or more required jobs did not succeed — failing the aggregate check."
             exit 1
           fi
+
+  # ADR-0018 addendum, 2026-09-09: real CD, not just a manually-run deploy.sh. The pre-production
+  # host is a VirtualBox VM on a home network — GitHub's own cloud runners have no way to reach it
+  # inbound (no public IP, NAT/firewall in the way), so this deliberately does NOT SSH in from a
+  # GitHub-hosted runner. Instead: a self-hosted GitHub Actions runner installed directly on the
+  # target VM (deployment-runbook.md §7) polls GitHub outbound over HTTPS — zero inbound ports
+  # needed for deployment at all, unlike tunneling SSH through ngrok, which would need a stable
+  # reserved address (ngrok's free tier doesn't give one) and adds a credential (an SSH key) this
+  # approach doesn't need. ngrok's own only job in this setup is exposing the running app for
+  # OAuth/webhook testing — a completely separate concern from how a new build gets deployed.
+  #
+  # `needs: ci-passed`, no explicit `if:` on that dependency, deliberately — a `needs:` job that
+  # itself has no `if:` only runs when everything it depends on actually succeeded (not "ran"),
+  # which is exactly ci-passed's own job (fail loudly on any real failure, see its own steps
+  # above). The `if:` below only narrows *which events* should ever attempt a deploy at all — a
+  # PR's own CI run also produces a successful ci-passed, and must never trigger this.
+  #
+  # `runs-on: [self-hosted, preprod]`, not bare `self-hosted` — this environment's own runner is
+  # registered with the `preprod` label (deployment-runbook.md §7) specifically so a second runner,
+  # registered later on the real production host with a `production` label instead, can be targeted
+  # by its own separate job without either one accidentally picking up the other's work the moment
+  # two self-hosted runners exist in this same repo.
+  #
+  # `environment: pre-production` — no required reviewers/wait timer configured (this deploys
+  # automatically on every merge to master, matching deploy.sh's own "fast, with an automatic
+  # health-check rollback" design, ADR-0018) — but it gives this deploy a real entry in GitHub's own
+  # Environments/Deployments UI (history, which commit is live, a place to add required reviewers
+  # later without changing this job at all, e.g. once a `production` environment is added for the
+  # real Oracle host and that one *should* gate on manual approval).
+  deploy-preprod:
+    name: Deploy to pre-production
+    runs-on: [self-hosted, preprod]
+    needs: ci-passed
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    environment:
+      name: pre-production
+      url: ${{ vars.PREPROD_URL }}
+    steps:
+      # deploy.sh itself already lives on this host (bootstrap.sh's own DEPLOY_DIR,
+      # deployment-runbook.md §3) — no checkout needed here, same "the deploy host only ever needs
+      # the three deployment files, never this repo's own source" posture bootstrap.sh's own
+      # comment already establishes. This step runs as whichever OS user the runner service itself
+      # runs as (deployment-runbook.md §7 sets this to the 'clavaris' deploy user specifically, the
+      # same one deploy.sh has always assumed) — docker compose needs no elevated privileges once
+      # that user is in the docker group, exactly as bootstrap.sh already arranges.
+      - name: Run deploy.sh (pulls latest image, health-checks, auto-rolls-back on failure)
+        run: |
+          cd /opt/clavaris
+          ./deploy.sh
