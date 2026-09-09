@@ -18,6 +18,12 @@
         module allowed to depend on both organization-module and identity-module).
     </description>
 
+    <properties>
+        <!-- 2026-09-09: see identity-module/pom.xml's own comment on this same property for the
+             full history (moved here, and into each of the other 5 real modules, from a blanket -D
+             on ci.yml's own sonarcloud step that incorrectly also applied to clavaris-parent). -->
+        <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+    </properties>
 
     <dependencies>
         <!-- TD-SEC-007: AuditEventRecorder — CreateOrganizationService/SetRateLimitPolicyFor

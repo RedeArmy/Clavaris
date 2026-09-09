@@ -26,6 +26,21 @@
              templates to index — the other modules' src/main/resources is just Flyway migrations
              and application config, nothing this property changes anything about. -->
         <sonar.sources>src/main/java,src/main/resources</sonar.sources>
+        <!-- 2026-09-09: moved here (and into each of the other 5 real modules' own pom.xml) from a
+             blanket -D on ci.yml's own sonarcloud step — that CLI flag applied the identical value
+             to clavaris-parent too, which has no source of its own and can never resolve
+             "../app/..." from its own basedir, producing a permanent "no coverage report can be
+             found" warning there. This property is resolved per module, relative to THAT module's
+             own basedir (confirmed against SonarSource's own docs) — declaring it here, not at the
+             reactor root, is what the docs actually recommend for this exact scenario. See
+             clavaris-parent's own pom.xml comment on this property for the full history.
+             app/pom.xml's report-aggregate execution combines every reactor module's exec data
+             against every dependency's own compiled classes into one file at
+             app/target/site/jacoco-aggregate/jacoco.xml — this module's own persistence adapters
+             are genuinely exercised by RegisterAccountIntegrationTest, which lives in app/ (needs
+             the full Spring context), so this module's own default per-module report alone would
+             miss that real coverage. -->
+        <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencies>
