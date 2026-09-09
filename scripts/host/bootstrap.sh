@@ -49,6 +49,17 @@ fi
 
 log "Setting up ${DEPLOY_DIR}"
 mkdir -p "${DEPLOY_DIR}"
+# Found live, 2026-09-09: mkdir above runs as root, so without this the directory itself stays
+# root:root (mode 755) even though every file this script places inside it gets chowned to
+# DEPLOY_USER below — clavaris can read/cd into it but can't create a new file there. Confirmed
+# live: deployment-runbook.md §3's own next documented step (curl -o deploy.sh, run as the
+# '${DEPLOY_USER}' user) failed with "curl: (23) client returned ERROR on write", a permission
+# denial, not a network error, the first time this flow was actually followed end to end on a
+# fresh VM. Chowning the directory itself, not just the files this script happens to create in it,
+# is what actually lets the deploy user own everything under its own deploy directory going
+# forward (deploy.sh itself, and later backup-postgres.sh's own backups/ subdirectory) — the same
+# ownership boundary the rest of this script already assumes exists.
+chown "${DEPLOY_USER}:${DEPLOY_USER}" "${DEPLOY_DIR}"
 cd "${DEPLOY_DIR}"
 
 # Deliberately NOT a full `git clone` of the whole monorepo — the production host only ever needs
