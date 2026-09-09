@@ -95,6 +95,26 @@ services:
       PLATFORM_BOOTSTRAP_CLIENT_SECRET: ${PLATFORM_BOOTSTRAP_CLIENT_SECRET:?PLATFORM_BOOTSTRAP_CLIENT_SECRET must be set explicitly in .env}
       RESEND_API_KEY: ${RESEND_API_KEY:?RESEND_API_KEY must be set explicitly in .env}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:?MAIL_FROM_ADDRESS must be set explicitly in .env}
+      # Found live, 2026-09-09: this service was missing every one of the five variables below
+      # entirely — application.yml's own ${VAR:dev-only-...} defaults for each one are public,
+      # hardcoded values (this repo is public), so a deployment through this exact file would have
+      # silently used a real security-critical value that anyone who can read this repository
+      # already knows, for both AES-256-GCM at-rest encryption keys — a decryptable-by-anyone
+      # "encryption" is worse than an honest, loud startup failure. Required (:?...), same posture
+      # as every other real secret in this block, not a soft ${VAR:-} passthrough: Spring's own
+      # YAML ${VAR:default} placeholder only substitutes its default when the property is
+      # genuinely absent, never when present-but-empty (deployment-runbook.md §2a's own identical
+      # finding for TOMCAT_MAX_THREADS/DB_HIKARI_*) — a blank .env value passed through as ${VAR:-}
+      # would hand Spring an empty string instead of falling back to the (already unsafe) default,
+      # breaking OAuth2 client registration/AES key decoding at startup instead of protecting
+      # anything. Required and loud is strictly safer than either silent alternative.
+      WEBHOOK_SECRET_ENCRYPTION_KEY: ${WEBHOOK_SECRET_ENCRYPTION_KEY:?WEBHOOK_SECRET_ENCRYPTION_KEY must be set explicitly in .env — openssl rand -base64 32, never the repo's own public dev default}
+      SOCIAL_CREDENTIAL_ENCRYPTION_KEY: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:?SOCIAL_CREDENTIAL_ENCRYPTION_KEY must be set explicitly in .env — openssl rand -base64 32, never the repo's own public dev default}
+      IDEMPOTENCY_KEY_HASH_SECRET: ${IDEMPOTENCY_KEY_HASH_SECRET:?IDEMPOTENCY_KEY_HASH_SECRET must be set explicitly in .env}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID must be set explicitly in .env — any non-blank placeholder is fine if this deployment won't enable Google login for any Organization yet}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:?GOOGLE_OAUTH_CLIENT_SECRET must be set explicitly in .env — same placeholder-is-fine-if-unused note as GOOGLE_OAUTH_CLIENT_ID above}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:?GITHUB_OAUTH_CLIENT_ID must be set explicitly in .env — same placeholder-is-fine-if-unused note as GOOGLE_OAUTH_CLIENT_ID above}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:?GITHUB_OAUTH_CLIENT_SECRET must be set explicitly in .env — same placeholder-is-fine-if-unused note as GOOGLE_OAUTH_CLIENT_ID above}
     volumes:
       - clavaris-signing-keys-data:/app/data
     depends_on:
