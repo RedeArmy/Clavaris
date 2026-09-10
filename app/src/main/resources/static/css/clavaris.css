@@ -271,3 +271,158 @@ main {
   height: 1px;
   background: var(--clavaris-border);
 }
+
+/*
+ * Landing page (IndexController, "/") — the one page in this system that isn't a form. Reuses
+ * every token above (color, spacing, radius, shadow) but needs its own layout primitives: a full-
+ * width page (not the centered single-card shell every hosted form uses), a nav bar, a hero, and a
+ * feature grid. Kept deliberately minimal — one hero, one feature grid, one footer, no additional
+ * sections — matching this page's own job (orient a new operator toward /platform/register or
+ * /platform/login, not explain the whole product).
+ */
+
+.clavaris-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.clavaris-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) 0;
+}
+
+.clavaris-nav__brand {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--clavaris-text-primary);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.clavaris-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.clavaris-nav__actions a:not(.clavaris-button) {
+  color: var(--clavaris-text-muted);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.clavaris-nav__actions a:not(.clavaris-button):hover {
+  color: var(--clavaris-text-primary);
+}
+
+.clavaris-nav .clavaris-button {
+  display: inline-block;
+  width: auto;
+  padding: var(--space-2) var(--space-4);
+}
+
+.clavaris-hero {
+  padding: var(--space-12) 0 var(--space-8);
+  text-align: center;
+}
+
+.clavaris-hero__eyebrow {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--clavaris-brand-color);
+  background: color-mix(in srgb, var(--clavaris-brand-color) 12%, transparent);
+  border-radius: 999px;
+}
+
+.clavaris-hero h1 {
+  margin: 0 0 var(--space-5);
+  font-size: clamp(2.25rem, 4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.clavaris-hero p {
+  max-width: 640px;
+  margin: 0 auto var(--space-8);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-hero__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.clavaris-hero__actions .clavaris-button {
+  display: inline-block;
+  width: auto;
+  padding: var(--space-3) var(--space-6);
+}
+
+.clavaris-features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-8) 0 var(--space-12);
+}
+
+@media (max-width: 900px) {
+  .clavaris-features {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .clavaris-features {
+    grid-template-columns: 1fr;
+  }
+
+  .clavaris-nav__actions a:not(.clavaris-button) {
+    display: none;
+  }
+}
+
+.clavaris-feature {
+  padding: var(--space-6);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-lg);
+}
+
+.clavaris-feature h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.clavaris-feature p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) 0 var(--space-8);
+  border-top: 1px solid var(--clavaris-border);
+  font-size: 0.8125rem;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-footer a {
+  color: inherit;
+}
