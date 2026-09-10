@@ -1,0 +1,26 @@
+<!--
+  Shared head-section boilerplate for every hosted page (login, register, consent, password
+  recovery, session management, device trust) — before this fragment existed, each of the 40
+  templates in this module repeated its own head section, and none of them linked any stylesheet at
+  all (zero shared visual design; see clavaris.css's own header comment for the full design-system
+  rationale).
+
+  Referenced from a page template via Thymeleaf's own fragment-replacement expression, passing that
+  page's real title as this fragment's one parameter (see login.html/index.html for a real caller).
+
+  The style block's own th:if condition is the exact ADR-0009 §3 hook that already existed per-page
+  before this fragment — moved here unchanged, now actually consumed by clavaris.css's own
+  --clavaris-brand-color-driven components instead of being an inert variable. Explicitly
+  null-guards the branding object itself, not just its primaryColor property — this fragment is
+  shared with platform-tier pages (platform/login.html and siblings), which never put a branding
+  attribute in the model at all (ADR-0020 Decision 2: the platform tier's own login is never
+  tenant-configurable), so an unguarded property access would fail to resolve on those pages.
+-->
+<head th:fragment="head(pageTitle)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="${pageTitle}">Clavaris</title>
+    <link rel="stylesheet" th:href="@{/css/clavaris.css}"/>
+    <style th:if="${branding != null and branding.primaryColor != null and branding.primaryColor.isPresent()}"
+           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see ADR-0009 §3 */</style>
+</head>

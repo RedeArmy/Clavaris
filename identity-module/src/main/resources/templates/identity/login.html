@@ -1,13 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
-    <title th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ' — Sign in'">Sign in — Clavaris</title>
-    <!-- ADR-0009 §3: primaryColor becomes a CSS custom property, never inlined into an attribute a
-         script could read/write — the value itself is already validated (ClientBranding's own
-         #RGB/#RRGGBB check) before it ever reaches this template. -->
-    <style th:if="${branding.primaryColor.isPresent()}"
-           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see this block's own comment above */</style>
+<head th:replace="~{identity/fragments/head :: head(${branding.applicationDisplayName.orElse('Clavaris')} + ' — Sign in')}">
+    <title>Sign in — Clavaris</title>
 </head>
 <!-- ADR-0009 §1: data-modal marks this render as happening inside a consumer's own iframe
      (display=modal) — login-submit-guard.js's own sibling script below reads this to decide
@@ -16,67 +10,57 @@
      this attribute, so a plain in-frame link would otherwise dead-end there). -->
 <body th:attr="data-modal=${modal}">
 <main>
-    <h1 th:if="${branding.logoUrl.isEmpty()}" th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ': Sign in'">Sign in</h1>
-    <!-- Branding logo replaces the plain text heading, never both — an operator who configured a
-         logo already expects it to stand in for the wordmark, not sit above a duplicate. -->
-    <img th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
-         th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
+    <div class="clavaris-card">
+        <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
+             th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
+        <h1 th:if="${branding.logoUrl.isEmpty()}" th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ': Sign in'">Sign in</h1>
 
-    <p th:if="${loginError}">Invalid email or password.</p>
-    <p th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
-    <p th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
-    <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
-         alongside loginError above, since the password was never actually checked either way. -->
-    <p th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${loginError}">Invalid email or password.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
+        <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
+             alongside loginError above, since the password was never actually checked either way. -->
+        <p class="clavaris-alert clavaris-alert--error" th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
 
-    <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <form th:action="@{''}" th:object="${form}" method="post" data-login-form>
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <div>
-            <label for="email">Email</label>
-            <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
-            <p th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+            <div th:replace="~{identity/fragments/email-password-fields :: fields}"></div>
+
+            <button class="clavaris-button" type="submit">Sign in</button>
+        </form>
+
+        <!-- ADR-0020 Decision 3, BR-ID-12: only ever the providers this Organization has actually
+             enabled — email/password above is never gated by this, always shown regardless.
+             ADR-0009 §1: data-social-login marks these links for login-submit-guard.js's own
+             window.open() treatment when data-modal is set on <body> above. -->
+        <div th:if="${not #lists.isEmpty(socialProviders)}">
+            <div class="clavaris-divider">Or</div>
+            <p th:each="provider : ${socialProviders}">
+                <!-- Clerk "customize redirect URLs" parity: this is a plain link, not a form
+                     resubmission, so clientId/redirectUrl must be explicitly appended here —
+                     Thymeleaf's own link-expression syntax omits a param entirely when its value is
+                     null, so this renders no query string at all for the common case. -->
+                <a class="clavaris-button clavaris-button--secondary" data-social-login
+                   th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}"
+                   th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
+            </p>
         </div>
 
-        <div>
-            <label for="password">Password</label>
-            <input id="password" type="password" th:field="*{password}" autocomplete="current-password" required/>
-            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+        <!-- ADR-0024 §3: only ever the passwordless methods this Organization has actually enabled,
+             same "policy computed fresh on every render" posture as the social-provider block above. -->
+        <div class="clavaris-links" th:if="${emailCodeSignInEnabled}">
+            <a th:href="@{login/email-code}">Sign in with an email code</a>
+        </div>
+        <div class="clavaris-links" th:if="${emailLinkSignInEnabled}">
+            <a th:href="@{login/email-link}">Sign in with an email link</a>
+        </div>
+        <div class="clavaris-links" th:if="${usernameSignInEnabled}">
+            <a th:href="@{login/username}">Sign in with a username</a>
         </div>
 
-        <button type="submit">Sign in</button>
-    </form>
-
-    <!-- ADR-0020 Decision 3, BR-ID-12: only ever the providers this Organization has actually
-         enabled — email/password above is never gated by this, always shown regardless.
-         ADR-0009 §1: data-social-login marks these links for login-submit-guard.js's own
-         window.open() treatment when data-modal is set on <body> above. -->
-    <div th:if="${not #lists.isEmpty(socialProviders)}">
-        <p>Or sign in with:</p>
-        <p th:each="provider : ${socialProviders}">
-            <!-- Clerk "customize redirect URLs" parity: this is a plain link, not a form
-                 resubmission, so clientId/redirectUrl must be explicitly appended here —
-                 Thymeleaf's own link-expression syntax omits a param entirely when its value is
-                 null, so this renders no query string at all for the common case. -->
-            <a data-social-login
-               th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}"
-               th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
-        </p>
+        <p class="clavaris-links"><a th:href="@{forgot-password}">Forgot your password?</a></p>
     </div>
-
-    <!-- ADR-0024 §3: only ever the passwordless methods this Organization has actually enabled,
-         same "policy computed fresh on every render" posture as the social-provider block above. -->
-    <div th:if="${emailCodeSignInEnabled}">
-        <p><a th:href="@{login/email-code}">Sign in with an email code</a></p>
-    </div>
-    <div th:if="${emailLinkSignInEnabled}">
-        <p><a th:href="@{login/email-link}">Sign in with an email link</a></p>
-    </div>
-    <div th:if="${usernameSignInEnabled}">
-        <p><a th:href="@{login/username}">Sign in with a username</a></p>
-    </div>
-
-    <p><a th:href="@{forgot-password}">Forgot your password?</a></p>
 </main>
 <!-- Code review finding (2026-09-01): client-side, same-origin-only cross-tab submit guard — see
      ContentSecurityPolicyHeaderWriter's own Javadoc and login-submit-guard.js's own header comment

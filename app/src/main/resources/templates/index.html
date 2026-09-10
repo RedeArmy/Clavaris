@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head('Clavaris — Self-hosted OIDC/OAuth2 identity provider')}">
+    <title>Clavaris — Self-hosted OIDC/OAuth2 identity provider</title>
+</head>
+<body>
+<div class="clavaris-page">
+    <nav class="clavaris-nav">
+        <span class="clavaris-nav__brand">Clavaris</span>
+        <div class="clavaris-nav__actions">
+            <a th:href="@{/platform/login}">Sign in</a>
+            <a class="clavaris-button" th:href="@{/platform/register}">Get started</a>
+        </div>
+    </nav>
+
+    <main>
+        <section class="clavaris-hero">
+            <span class="clavaris-hero__eyebrow">Self-hosted identity infrastructure</span>
+            <h1>Identity infrastructure<br/>you actually own</h1>
+            <p>A standalone OIDC/OAuth2 provider with real per-tenant isolation — your data, your
+                signing keys, your deployment. Standard protocol, zero proprietary lock-in.</p>
+            <div class="clavaris-hero__actions">
+                <a class="clavaris-button" th:href="@{/platform/register}">Get started</a>
+                <a class="clavaris-button clavaris-button--secondary" th:href="@{/platform/login}">Sign in</a>
+            </div>
+        </section>
+
+        <!-- Content grounded in this project's own documented differentiators
+             (docs/00-vision/clerk-feature-analysis.md §11) — not generic marketing filler. -->
+        <section class="clavaris-features">
+            <article class="clavaris-feature">
+                <h3>Real tenant isolation</h3>
+                <p>Every Organization gets its own signing keys, its own issuer, its own JWKS. A
+                    compromised key affects one tenant — never the platform.</p>
+            </article>
+            <article class="clavaris-feature">
+                <h3>Zero lock-in</h3>
+                <p>Standard OIDC/OAuth2 only. Integrate with any compliant library, in any
+                    language, in under a day — nothing proprietary to migrate away from later.</p>
+            </article>
+            <article class="clavaris-feature">
+                <h3>Your infrastructure, your data</h3>
+                <p>Self-hosted by design. Every credential, every session, every audit event lives
+                    in infrastructure you run — not a third party's cloud.</p>
+            </article>
+            <article class="clavaris-feature">
+                <h3>No paywalled reliability</h3>
+                <p>One uptime target for every deployment, not a number that improves the more you
+                    pay.</p>
+            </article>
+        </section>
+    </main>
+
+    <footer class="clavaris-footer">
+        <span>&copy; Clavaris</span>
+        <a href="https://github.com/RedeArmy/Clavaris">GitHub</a>
+    </footer>
+</div>
+</body>
+</html>

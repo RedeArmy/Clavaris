@@ -1,0 +1,428 @@
+/*
+ * Clavaris hosted-UI design system — identity-module/organization-module's own 40 Thymeleaf
+ * templates (login, registration, consent, password recovery, session management, device trust)
+ * had zero shared visual design until now: no stylesheet, no shared layout, each page a standalone
+ * document relying on browser defaults. This file is the single, shared stylesheet every hosted
+ * page includes via layout/base.html.
+ *
+ * Structural foundation (spacing scale, elevation system, border-radius scale, type hierarchy
+ * approach, motion timing) reverse-engineered from clerk.com via skillui — Clerk is this project's
+ * own documented UX inspiration (market-research.md §1). Colors are deliberately NOT Clerk's own
+ * (their signature #5de3ff cyan would read as a copy, not an inspiration) — Clavaris's own accent
+ * (amber, #f59e0b) replaces it; the neutral grays are generic, not brand-identifying, and are kept.
+ *
+ * Fonts: Geist Sans/Mono only (Vercel, SIL Open Font License, free to self-host) — Clerk's own
+ * page also surfaced Suisse Int'l/Söhne, both commercial fonts under separate paid licenses,
+ * deliberately not vendored here.
+ *
+ * --clavaris-brand-color (set inline per-request by login.html/register.html/etc. from
+ * ClientBranding.primaryColor, ADR-0009 §3) overrides --clavaris-accent wherever a client has
+ * configured one — the hook already existed before this file; this is what actually connects it to
+ * a real rendered color instead of an unused CSS variable.
+ */
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geistSans-Regular.woff2") format("woff2");
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geistMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  /* Color */
+  --clavaris-bg: #f7f7f8;
+  --clavaris-surface: #ffffff;
+  --clavaris-text-primary: #131316;
+  --clavaris-text-muted: #5e5f6e;
+  --clavaris-border: #d9d9de;
+  --clavaris-border-strong: #b7b8c2;
+  --clavaris-accent: #f59e0b;
+  --clavaris-accent-hover: #d97706;
+  --clavaris-accent-contrast: #131316;
+  --clavaris-danger: #ef4444;
+  --clavaris-danger-bg: #fef2f2;
+  --clavaris-success: #16a34a;
+  --clavaris-success-bg: #f0fdf4;
+  /* ADR-0009 §3: the per-tenant override point — every component below reads *this* variable,
+     never --clavaris-accent directly, so a configured client brand color reaches every button/
+     link/focus-ring with no per-component change needed. */
+  --clavaris-brand-color: var(--clavaris-accent);
+
+  /* Spacing — 4px grid, same base unit skillui found on clerk.com */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Elevation — simplified from Clerk's own multi-layer tokens to two real use cases this UI
+     actually has: a card sitting on the page background, and a transient overlay (none of the 40
+     templates use a modal today, kept for the day one does). */
+  --shadow-card: 0 1px 2px rgba(19, 19, 22, 0.04), 0 4px 12px rgba(19, 19, 22, 0.06);
+  --shadow-overlay: 0 8px 24px rgba(19, 19, 22, 0.16), 0 2px 6px rgba(19, 19, 22, 0.08);
+
+  --font-sans: "Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --clavaris-bg: #0f0f11;
+    --clavaris-surface: #18181b;
+    --clavaris-text-primary: #f7f7f8;
+    --clavaris-text-muted: #9394a1;
+    --clavaris-border: #2f3037;
+    --clavaris-border-strong: #42434d;
+    --clavaris-danger-bg: #2a1414;
+    --clavaris-success-bg: #10261a;
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--clavaris-bg);
+  color: var(--clavaris-text-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* login.html/register.html/etc. wrap their form in <main> — one shared centered-card layout for
+   every hosted page, so a new template gets this for free by using layout/base.html. */
+main {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.clavaris-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-8) var(--space-6);
+}
+
+.clavaris-card__logo {
+  display: block;
+  max-height: 32px;
+  margin: 0 auto var(--space-4);
+}
+
+.clavaris-card h1 {
+  margin: 0 0 var(--space-6);
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.clavaris-field {
+  margin-bottom: var(--space-4);
+}
+
+.clavaris-field label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-field input {
+  width: 100%;
+  padding: var(--space-3);
+  font: inherit;
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.clavaris-field input:focus {
+  outline: none;
+  border-color: var(--clavaris-brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
+}
+
+.clavaris-field-error {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8125rem;
+  color: var(--clavaris-danger);
+}
+
+.clavaris-button {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  color: var(--clavaris-accent-contrast);
+  background: var(--clavaris-brand-color);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: filter 150ms ease-out;
+}
+
+.clavaris-button:hover {
+  filter: brightness(0.92);
+}
+
+.clavaris-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 35%, transparent);
+}
+
+/* Social-login/secondary links (register.html's own "Sign in with Google/GitHub" rows) — outlined,
+   never competing visually with the one primary brand-colored action per page. */
+.clavaris-button--secondary {
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+}
+
+.clavaris-button--secondary:hover {
+  filter: none;
+  background: var(--clavaris-bg);
+}
+
+.clavaris-alert {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+}
+
+.clavaris-alert--error {
+  color: var(--clavaris-danger);
+  background: var(--clavaris-danger-bg);
+}
+
+.clavaris-alert--success {
+  color: var(--clavaris-success);
+  background: var(--clavaris-success-bg);
+}
+
+.clavaris-links {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-links a {
+  color: var(--clavaris-brand-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.clavaris-links a:hover {
+  text-decoration: underline;
+}
+
+.clavaris-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-6) 0;
+  color: var(--clavaris-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clavaris-divider::before,
+.clavaris-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--clavaris-border);
+}
+
+/*
+ * Landing page (IndexController, "/") — the one page in this system that isn't a form. Reuses
+ * every token above (color, spacing, radius, shadow) but needs its own layout primitives: a full-
+ * width page (not the centered single-card shell every hosted form uses), a nav bar, a hero, and a
+ * feature grid. Kept deliberately minimal — one hero, one feature grid, one footer, no additional
+ * sections — matching this page's own job (orient a new operator toward /platform/register or
+ * /platform/login, not explain the whole product).
+ */
+
+.clavaris-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.clavaris-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) 0;
+}
+
+.clavaris-nav__brand {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--clavaris-text-primary);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.clavaris-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.clavaris-nav__actions a:not(.clavaris-button) {
+  color: var(--clavaris-text-muted);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.clavaris-nav__actions a:not(.clavaris-button):hover {
+  color: var(--clavaris-text-primary);
+}
+
+.clavaris-nav .clavaris-button {
+  display: inline-block;
+  width: auto;
+  padding: var(--space-2) var(--space-4);
+}
+
+.clavaris-hero {
+  padding: var(--space-12) 0 var(--space-8);
+  text-align: center;
+}
+
+.clavaris-hero__eyebrow {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--clavaris-brand-color);
+  background: color-mix(in srgb, var(--clavaris-brand-color) 12%, transparent);
+  border-radius: 999px;
+}
+
+.clavaris-hero h1 {
+  margin: 0 0 var(--space-5);
+  font-size: clamp(2.25rem, 4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.clavaris-hero p {
+  max-width: 640px;
+  margin: 0 auto var(--space-8);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-hero__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.clavaris-hero__actions .clavaris-button {
+  display: inline-block;
+  width: auto;
+  padding: var(--space-3) var(--space-6);
+}
+
+.clavaris-features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-8) 0 var(--space-12);
+}
+
+@media (max-width: 900px) {
+  .clavaris-features {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .clavaris-features {
+    grid-template-columns: 1fr;
+  }
+
+  .clavaris-nav__actions a:not(.clavaris-button) {
+    display: none;
+  }
+}
+
+.clavaris-feature {
+  padding: var(--space-6);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-lg);
+}
+
+.clavaris-feature h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.clavaris-feature p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) 0 var(--space-8);
+  border-top: 1px solid var(--clavaris-border);
+  font-size: 0.8125rem;
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-footer a {
+  color: inherit;
+}

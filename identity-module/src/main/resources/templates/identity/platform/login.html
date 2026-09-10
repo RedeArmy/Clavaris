@@ -1,44 +1,33 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<head th:replace="~{identity/fragments/head :: head('Sign in — Clavaris')}">
     <title>Sign in — Clavaris</title>
 </head>
 <body>
 <main>
-    <h1>Sign in to Clavaris</h1>
+    <div class="clavaris-card">
+        <h1>Sign in to Clavaris</h1>
 
-    <p th:if="${loginError}">Invalid email or password.</p>
-    <p th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${loginError}">Invalid email or password.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
 
-    <form th:action="@{''}" th:object="${form}" method="post">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <div>
-            <label for="email">Email</label>
-            <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
-            <p th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
-        </div>
+            <div th:replace="~{identity/fragments/email-password-fields :: fields}"></div>
 
-        <div>
-            <label for="password">Password</label>
-            <input id="password" type="password" th:field="*{password}" autocomplete="current-password" required/>
-            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
-        </div>
+            <button class="clavaris-button" type="submit">Sign in</button>
+        </form>
 
-        <button type="submit">Sign in</button>
-    </form>
+        <!-- ADR-0020 Decision 2: Clavaris's own Sign In is Google/GitHub/email, all three permanently
+             available — unlike the tenant-tier login page, nothing here is ever tenant-configurable. -->
+        <div class="clavaris-divider">Or</div>
+        <p><a class="clavaris-button clavaris-button--secondary" th:href="@{login/social/google}">Sign in with Google</a></p>
+        <p><a class="clavaris-button clavaris-button--secondary" th:href="@{login/social/github}">Sign in with GitHub</a></p>
 
-    <!-- ADR-0020 Decision 2: Clavaris's own Sign In is Google/GitHub/email, all three permanently
-         available — unlike the tenant-tier login page, nothing here is ever tenant-configurable. -->
-    <div>
-        <p>Or sign in with:</p>
-        <p><a th:href="@{login/social/google}">Sign in with Google</a></p>
-        <p><a th:href="@{login/social/github}">Sign in with GitHub</a></p>
+        <p class="clavaris-links"><a th:href="@{forgot-password}">Forgot your password?</a></p>
+        <p class="clavaris-links"><a th:href="@{register}">Create an account</a></p>
     </div>
-
-    <p><a th:href="@{forgot-password}">Forgot your password?</a></p>
-    <p><a th:href="@{register}">Create an account</a></p>
 </main>
 </body>
 </html>
