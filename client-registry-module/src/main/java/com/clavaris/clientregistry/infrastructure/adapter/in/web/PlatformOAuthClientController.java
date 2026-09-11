@@ -75,10 +75,6 @@ public class PlatformOAuthClientController {
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String GRANT_TYPE_OPTIONS_ATTRIBUTE = "grantTypeOptions";
 
-  // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
-  // every other dashboard controller's own identical constant.
-  private static final String HX_REQUEST_HEADER = "HX-Request";
-
   private final RegisterOAuthClientUseCase registerClient;
   private final ListOAuthClientsUseCase listClients;
   private final DeactivateOAuthClientUseCase deactivateClient;
@@ -108,9 +104,11 @@ public class PlatformOAuthClientController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
+        DashboardControllerSupport.requireOwnedOrganizationName(
+            organizationId, ownerPlatformAccountId, organizationResolver);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
     populateClientsModel(model, organizationId);
@@ -128,14 +126,16 @@ public class PlatformOAuthClientController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final RegisterOAuthClientForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
+        DashboardControllerSupport.requireOwnedOrganizationName(
+            organizationId, ownerPlatformAccountId, organizationResolver);
     populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
       populateClientsModel(model, organizationId);
-      return isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
+      return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
     }
 
     final RegisterOAuthClientResult result;
@@ -161,7 +161,7 @@ public class PlatformOAuthClientController {
     model.addAttribute("justRegisteredClientId", result.client().clientId());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
     populateClientsModel(model, organizationId);
-    return isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
+    return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
@@ -173,16 +173,19 @@ public class PlatformOAuthClientController {
       @PathVariable final UUID organizationId,
       @PathVariable final String clientId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
-    requireClientBelongsToOrganization(organizationId, clientId);
+        DashboardControllerSupport.requireOwnedOrganizationName(
+            organizationId, ownerPlatformAccountId, organizationResolver);
+    DashboardControllerSupport.requireClientIdBelongsToOrganization(
+        listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
 
     deactivateClient.handle(
         new DeactivateOAuthClientCommand(
             clientId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    if (isHtmxRequest(request)) {
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
       populateClientsModel(model, organizationId);
@@ -198,10 +201,13 @@ public class PlatformOAuthClientController {
       @PathVariable final UUID organizationId,
       @PathVariable final String clientId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
-    requireClientBelongsToOrganization(organizationId, clientId);
+        DashboardControllerSupport.requireOwnedOrganizationName(
+            organizationId, ownerPlatformAccountId, organizationResolver);
+    DashboardControllerSupport.requireClientIdBelongsToOrganization(
+        listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
 
     final RotateOAuthClientSecretResult result =
         rotateClientSecret.handle(
@@ -213,7 +219,7 @@ public class PlatformOAuthClientController {
     model.addAttribute("justRegisteredClientId", result.clientId());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
     populateClientsModel(model, organizationId);
-    return isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
+    return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
   private void populateHeaderModel(
@@ -225,41 +231,5 @@ public class PlatformOAuthClientController {
 
   private void populateClientsModel(final Model model, final UUID organizationId) {
     model.addAttribute("clients", listClients.handle(organizationId));
-  }
-
-  // The anti-enumeration check DeactivateOAuthClientCommand/RotateOAuthClientSecretCommand can't
-  // do themselves — neither carries an organizationId, both key off clientId alone. Reuses the
-  // already-organizationId-scoped ListOAuthClientsUseCase rather than adding a new "get one
-  // client" port, so a clientId belonging to a different Organization 404s before the mutating
-  // use case ever runs. Same pattern PlatformOrganizationClientController's own identical method
-  // already established.
-  private void requireClientBelongsToOrganization(
-      final UUID organizationId, final String clientId) {
-    final boolean belongsHere =
-        listClients.handle(organizationId).stream()
-            .map(OAuthClient::clientId)
-            .anyMatch(clientId::equals);
-    if (!belongsHere) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-    }
-  }
-
-  private String requireOwnedOrganizationName(
-      final UUID organizationId, final UUID ownerPlatformAccountId) {
-    return organizationResolver
-        .resolveName(organizationId, ownerPlatformAccountId)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-  }
-
-  private static boolean isHtmxRequest(final HttpServletRequest request) {
-    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
-  }
-
-  // Same rationale as every other dashboard controller's own identical method.
-  private UUID requireCurrentPlatformAccount(final HttpServletRequest request) {
-    return currentPlatformAccount
-        .resolve(request)
-        .orElseThrow(
-            () -> new IllegalStateException("No authenticated PlatformAccount on this request"));
   }
 }
