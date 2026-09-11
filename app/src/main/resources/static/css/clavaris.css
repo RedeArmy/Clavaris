@@ -272,6 +272,50 @@ main {
   background: var(--clavaris-border);
 }
 
+/* Sessions pages (account/sessions.html, platform/account-sessions.html) are the first hosted page
+   with genuinely tabular content — .clavaris-card's own 400px max-width (a deliberate constraint
+   for a single-column form) doesn't fit a multi-column table. Widened, not a different component:
+   same border/radius/shadow tokens as .clavaris-card, just more room. */
+.clavaris-card--wide {
+  max-width: 720px;
+}
+
+.clavaris-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.clavaris-table th {
+  padding: var(--space-3);
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clavaris-text-muted);
+  border-bottom: 1px solid var(--clavaris-border);
+}
+
+.clavaris-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--clavaris-border);
+  vertical-align: top;
+}
+
+.clavaris-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* .clavaris-button defaults to a full-width block (the one-action-per-form shape every other
+   hosted page has) — this is the one modifier that un-does that for a button sitting inline
+   inside a table cell or alongside other content. */
+.clavaris-button--inline {
+  display: inline-block;
+  width: auto;
+  padding: var(--space-2) var(--space-4);
+}
+
 /*
  * Landing page (IndexController, "/") — the one page in this system that isn't a form. Reuses
  * every token above (color, spacing, radius, shadow) but needs its own layout primitives: a full-

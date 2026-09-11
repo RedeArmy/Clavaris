@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head('Account locked — Clavaris')}">
     <title>Account locked — Clavaris</title>
 </head>
 <body>
 <main>
-    <h1>Account locked</h1>
-    <p>
-        This account has been locked and signed out of every active session. Contact support to
-        restore access.
-    </p>
+    <div class="clavaris-card">
+        <h1>Account locked</h1>
+        <p>
+            This account has been locked and signed out of every active session. Contact support to
+            restore access.
+        </p>
+    </div>
 </main>
 </body>
 </html>

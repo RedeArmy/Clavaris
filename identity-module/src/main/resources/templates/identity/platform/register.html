@@ -1,38 +1,39 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<head th:replace="~{identity/fragments/head :: head('Create your Clavaris account')}">
     <title>Create your Clavaris account</title>
 </head>
 <body>
 <main>
-    <h1>Create your Clavaris account</h1>
+    <div class="clavaris-card">
+        <h1>Create your Clavaris account</h1>
 
-    <form th:action="@{''}" th:object="${form}" method="post">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <div>
-            <label for="email">Email</label>
-            <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
-            <p th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
-        </div>
+            <div class="clavaris-field">
+                <label for="email">Email</label>
+                <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+            </div>
 
-        <div>
-            <label for="password">Password</label>
-            <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
-            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
-        </div>
+            <div class="clavaris-field">
+                <label for="password">Password</label>
+                <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+            </div>
 
-        <div>
-            <label for="confirmPassword">Confirm password</label>
-            <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password" required/>
-            <p th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}">Confirmation error</p>
-        </div>
+            <div class="clavaris-field">
+                <label for="confirmPassword">Confirm password</label>
+                <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}">Confirmation error</p>
+            </div>
 
-        <button type="submit">Create account</button>
-    </form>
+            <button class="clavaris-button" type="submit">Create account</button>
+        </form>
 
-    <p><a th:href="@{login}">Already have an account? Sign in</a></p>
+        <p class="clavaris-links"><a th:href="@{login}">Already have an account? Sign in</a></p>
+    </div>
 </main>
 </body>
 </html>
