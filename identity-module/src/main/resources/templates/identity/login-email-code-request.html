@@ -1,27 +1,28 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<head th:replace="~{identity/fragments/head :: head('Sign in with a code — Clavaris')}">
     <title>Sign in with a code — Clavaris</title>
 </head>
 <body>
 <main>
-    <h1>Sign in with a code</h1>
-    <p>Enter your email address and we'll send you a one-time code.</p>
+    <div class="clavaris-card">
+        <h1>Sign in with a code</h1>
+        <p>Enter your email address and we'll send you a one-time code.</p>
 
-    <form th:action="@{''}" th:object="${form}" method="post">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <div>
-            <label for="email">Email</label>
-            <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
-            <p th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
-        </div>
+            <div class="clavaris-field">
+                <label for="email">Email</label>
+                <input id="email" type="email" th:field="*{email}" autocomplete="email" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+            </div>
 
-        <button type="submit">Send code</button>
-    </form>
+            <button class="clavaris-button" type="submit">Send code</button>
+        </form>
 
-    <p><a th:href="@{../}">Back to sign in</a></p>
+        <p class="clavaris-links"><a th:href="@{../}">Back to sign in</a></p>
+    </div>
 </main>
 </body>
 </html>

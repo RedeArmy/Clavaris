@@ -1,30 +1,31 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<head th:replace="~{identity/fragments/head :: head('Lock this account — Clavaris')}">
     <title>Lock this account — Clavaris</title>
 </head>
 <body>
 <main>
-    <h1>Lock this account</h1>
-    <!-- Deliberately not auto-submitted on page load — see ConfirmNewDeviceLoginAlertController/
-         ConfirmNewPlatformDeviceLoginAlertController's own Javadoc for why this must be a genuine,
-         human-initiated click, not a bare GET. Shared by both controllers (SonarCloud duplication
-         finding, 2026-09-09): the platform-tier confirm page was byte-identical to this one save
-         for that comment — deleted rather than kept as a second copy, same "reuse
-         ConfirmNewDeviceLoginAlertForm as-is" precedent ConfirmNewPlatformDeviceLoginAlertController
-         already establishes for the form object. -->
-    <p>
-        We'll lock this account and sign it out of every active session immediately. If this was
-        actually you signing in, close this page — no action is needed.
-    </p>
+    <div class="clavaris-card">
+        <h1>Lock this account</h1>
+        <!-- Deliberately not auto-submitted on page load — see ConfirmNewDeviceLoginAlertController/
+             ConfirmNewPlatformDeviceLoginAlertController's own Javadoc for why this must be a genuine,
+             human-initiated click, not a bare GET. Shared by both controllers (SonarCloud duplication
+             finding, 2026-09-09): the platform-tier confirm page was byte-identical to this one save
+             for that comment — deleted rather than kept as a second copy, same "reuse
+             ConfirmNewDeviceLoginAlertForm as-is" precedent ConfirmNewPlatformDeviceLoginAlertController
+             already establishes for the form object. -->
+        <p>
+            We'll lock this account and sign it out of every active session immediately. If this was
+            actually you signing in, close this page — no action is needed.
+        </p>
 
-    <form th:action="@{''}" th:object="${form}" method="post">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-        <input type="hidden" th:field="*{token}"/>
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="hidden" th:field="*{token}"/>
 
-        <button type="submit">This wasn't me — lock the account</button>
-    </form>
+            <button class="clavaris-button" type="submit">This wasn't me — lock the account</button>
+        </form>
+    </div>
 </main>
 </body>
 </html>

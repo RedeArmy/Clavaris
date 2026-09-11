@@ -1,38 +1,39 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<head th:replace="~{identity/fragments/head :: head('Sign in with username — Clavaris')}">
     <title>Sign in with username — Clavaris</title>
 </head>
 <body>
 <main>
-    <h1>Sign in with username</h1>
+    <div class="clavaris-card">
+        <h1>Sign in with username</h1>
 
-    <p th:if="${loginError}">Invalid username or password.</p>
-    <p th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
-    <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
-         alongside loginError above, since the password was never actually checked either way. -->
-    <p th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${loginError}">Invalid username or password.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>
+        <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
+             alongside loginError above, since the password was never actually checked either way. -->
+        <p class="clavaris-alert clavaris-alert--error" th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
 
-    <form th:action="@{''}" th:object="${form}" method="post">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <div>
-            <label for="username">Username</label>
-            <input id="username" type="text" th:field="*{username}" autocomplete="username" required/>
-            <p th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
-        </div>
+            <div class="clavaris-field">
+                <label for="username">Username</label>
+                <input id="username" type="text" th:field="*{username}" autocomplete="username" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
+            </div>
 
-        <div>
-            <label for="password">Password</label>
-            <input id="password" type="password" th:field="*{password}" autocomplete="current-password" required/>
-            <p th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
-        </div>
+            <div class="clavaris-field">
+                <label for="password">Password</label>
+                <input id="password" type="password" th:field="*{password}" autocomplete="current-password" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
+            </div>
 
-        <button type="submit">Sign in</button>
-    </form>
+            <button class="clavaris-button" type="submit">Sign in</button>
+        </form>
 
-    <p><a th:href="@{../}">Back to sign in</a></p>
+        <p class="clavaris-links"><a th:href="@{../}">Back to sign in</a></p>
+    </div>
 </main>
 </body>
 </html>
