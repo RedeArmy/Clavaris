@@ -30,6 +30,8 @@ import com.clavaris.organization.application.usecase.getaccountauthenticationpol
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysService;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysUseCase;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
+import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountService;
+import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsService;
@@ -134,6 +136,13 @@ class OrganizationUseCaseConfig {
   /* package */ ListOrganizationsForPlatformAccountUseCase
       listOrganizationsForPlatformAccountUseCase(final OrganizationRepository organizations) {
     return new ListOrganizationsForPlatformAccountService(organizations);
+  }
+
+  // ADR-0025: the dashboard's own Organization-detail read.
+  @Bean
+  /* package */ GetOrganizationForPlatformAccountUseCase getOrganizationForPlatformAccountUseCase(
+      final OrganizationRepository organizations) {
+    return new GetOrganizationForPlatformAccountService(organizations);
   }
 
   // ADR-0010 §6.2: the hard system-wide cap no Organization's own RateLimitPolicy may ever

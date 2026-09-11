@@ -1,30 +1,80 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <meta charset="UTF-8"/>
+<head th:replace="~{organization/fragments/head :: head('Your organizations — Clavaris')}">
     <title>Your organizations — Clavaris</title>
 </head>
 <body>
-<main>
-    <h1>Your organizations</h1>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <!-- ADR-0025: the one real HTMX interaction in this first dashboard increment — the create
+             form below posts here via hx-post, and PlatformOrganizationDashboardController#create
+             returns just this whole fragment (re-rendering both the updated table and a fresh,
+             blank form) when the request carries HTMX's own HX-Request header, instead of a full
+             redirect. Works identically with JavaScript disabled — hx-post degrades to nothing,
+             but the form's own plain method="post"/th:action submit (a real, unconditional
+             fallback, not emulated) still redirects normally; HTMX only intercepts the submit when
+             it's actually loaded and active. -->
+        <div id="dashboard-content" th:fragment="content" class="clavaris-dashboard__inner">
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Your organizations</h1>
+                    <p>Each Organization is a fully isolated tenant — its own accounts, OAuth
+                        clients, and signing keys.</p>
+                </div>
+            </div>
 
-    <ul>
-        <li th:each="organization : ${organizations}" th:text="${organization.name()}">Organization name</li>
-        <li th:if="${#lists.isEmpty(organizations)}">You don't have any organizations yet.</li>
-    </ul>
+            <div class="clavaris-section">
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(organizations)}">
+                    <p class="clavaris-empty-state">You don't have any organizations yet — create your first one below.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(organizations)}">
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Environment</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="organization : ${organizations}">
+                        <td th:text="${organization.name()}">Organization name</td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${organization.environment()}">DEVELOPMENT</span>
+                        </td>
+                        <td th:text="${organization.createdAt()}">Created at</td>
+                        <td>
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">View</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
 
-    <h2>Create a new organization</h2>
-    <form th:action="@{''}" th:object="${form}" method="post">
-        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div class="clavaris-section">
+                <h2>Create a new organization</h2>
+                <div class="clavaris-section-card">
+                    <form th:action="@{''}" th:object="${form}" method="post"
+                          th:attr="hx-post=@{''}" hx-target="#dashboard-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <div>
-            <label for="name">Name</label>
-            <input id="name" type="text" th:field="*{name}" required/>
-            <p th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                        <div class="clavaris-field">
+                            <label for="name">Name</label>
+                            <input id="name" type="text" th:field="*{name}" required/>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Create organization</button>
+                    </form>
+                </div>
+            </div>
         </div>
-
-        <button type="submit">Create organization</button>
-    </form>
-</main>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
 </body>
 </html>

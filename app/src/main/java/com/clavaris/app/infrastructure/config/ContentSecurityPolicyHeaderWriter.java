@@ -100,7 +100,21 @@ import org.springframework.security.web.header.HeaderWriter;
  * unrelated, non-modal consent render later in the same browser session can never inherit a stale
  * "was modal once" flag — the exact shape of regression the reverted blanket-drop attempt above
  * hit.
+ *
+ * <p><b>ADR-0025: the admin dashboard's own policy.</b> {@code /platform/dashboard/**} gets {@code
+ * script-src 'self'} — same shape as {@link #LOGIN_PAGE_POLICY}, for the same reason: a real,
+ * same-origin, project-vendored script (HTMX, self-hosted under {@code /js/htmx.min.js}, never a
+ * CDN), never {@code 'unsafe-inline'}/{@code 'unsafe-eval'} (HTMX's own attribute-driven model
+ * needs neither — confirmed against its own docs, not assumed). Deliberately its own named policy,
+ * not a reuse of {@code LOGIN_PAGE_POLICY} — the two happen to be identical today, but they relax
+ * for structurally different reasons (one script tag vs. a whole app shell) and this project's own
+ * established convention ({@code STRICT_POLICY} vs. {@code LOGIN_PAGE_POLICY} themselves) is a
+ * named constant per real reason, not one shared just because the text matches right now.
  */
+// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on 4 of this
+// class's own long, descriptively-named constants — same false-positive rationale
+// OrganizationAuthorizationServerConfig's own identical class-level suppression documents.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   private static final String HEADER_NAME = "Content-Security-Policy";
@@ -154,6 +168,20 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // platform tier's own login template (a different page, no such script).
   private static final Pattern LOGIN_PAGE_PATH = Pattern.compile("^/o/[^/]+/login$");
 
+  // ADR-0025: same relaxation, own named policy — see this class's own Javadoc for why not reused.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String DASHBOARD_PAGE_POLICY =
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+          + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+
+  // Matches every page under the dashboard app shell — PlatformDashboardSecurityConfig's own
+  // securityMatcher already scopes the whole /platform/** chain to ROLE_PLATFORM_ACCOUNT (this
+  // sub-path included), so this pattern only needs to distinguish "dashboard" from "login/register/
+  // forgot-password" on that same chain, not re-enforce authentication itself.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final Pattern DASHBOARD_PAGE_PATH = Pattern.compile("^/platform/dashboard(/.*)?$");
+
   private final EmbeddingEligibilityChecker embeddingChecker;
 
   // Constructed only by each SecurityFilterChain builder's own `new
@@ -204,6 +232,9 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     }
     if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
       return withRelaxedFrameAncestorsIfDisplayModal(LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM);
+    }
+    if (DASHBOARD_PAGE_PATH.matcher(requestUri).matches()) {
+      return DASHBOARD_PAGE_POLICY;
     }
     return STRICT_POLICY;
   }

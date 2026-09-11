@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Clavaris')}">
+    <title>Organization — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> / <span th:text="${organization.name()}">Organization</span></p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1 th:text="${organization.name()}">Organization name</h1>
+                    <p>
+                        <span class="clavaris-badge"
+                              th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                              th:text="${organization.environment()}">DEVELOPMENT</span>
+                        &#183; Created <span th:text="${organization.createdAt()}">date</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="clavaris-section">
+                <h2>Workspaces</h2>
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(workspaces)}">
+                    <p class="clavaris-empty-state">No workspaces yet.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(workspaces)}">
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Created</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="workspace : ${workspaces}">
+                        <td th:text="${workspace.name()}">Workspace name</td>
+                        <td th:text="${workspace.createdAt()}">Created at</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
