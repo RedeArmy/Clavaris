@@ -51,6 +51,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- ADR-0025: PlatformOrganizationClientController is this module's first Thymeleaf-
+             rendering controller (every prior one here was REST-only) — same dependency
+             organization-module's/identity-module's own pom.xml already declares for their own
+             dashboard/hosted-UI pages. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
         <!-- @NotEmpty/@NotBlank on RegisterOAuthClientRequest — starter-web alone doesn't pull in
              a Bean Validation implementation (Hibernate Validator) since Spring Boot 3. -->
         <dependency>

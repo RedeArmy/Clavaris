@@ -1,14 +1,14 @@
 <!--
   Sidebar for every /platform/dashboard/** page owned by this module's own templates (ADR-0025).
   One real destination today (Organizations, the dashboard's own root) — more items land here as
-  their own sections ship (Workspaces, OAuth clients, webhooks, ... all reachable from an
+  their own sections ship (Workspaces, Secret Keys, webhooks, ... all reachable from an
   Organization's own detail page for now, not promoted to top-level nav until each has its own
   cross-Organization view worth linking directly).
 
-  identity-module keeps its own copy of this exact fragment
-  (identity/platform/fragments/dashboard-nav.html) for its account-sessions.html page — see that
-  copy's own comment for why it's a deliberate duplicate, not a cross-module th:replace. Keep the
-  two in sync by hand.
+  identity-module and client-registry-module each keep their own copy of this exact fragment
+  (identity/platform/fragments/dashboard-nav.html, clientregistry/platform/fragments/dashboard-nav.html)
+  for their own dashboard pages — see either copy's own comment for why it's a deliberate
+  duplicate, not a cross-module th:replace. Keep all three in sync by hand.
 
   th:fragment parameter "active": which top-level section to highlight — a plain string compared
   against by each link below, not an enum (Thymeleaf has no clean way to pass one across a

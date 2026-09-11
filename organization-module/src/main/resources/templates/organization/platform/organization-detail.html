@@ -68,6 +68,21 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Owned by client-registry-module (ADR-0023/ADR-0025) — a plain link, not an
+                 embedded fragment: that page's own controller lives in a different module, and
+                 this page stays organization-module's own read, unmodified by that module's
+                 writes. Same "link out, don't embed across a module boundary" choice this page's
+                 own Workspace "View" links already make one level down. -->
+            <div class="clavaris-section">
+                <h2>Secret Keys</h2>
+                <div class="clavaris-section-card">
+                    <p>Secret Keys a consuming application uses to call the management API on this
+                        Organization's own behalf.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/secret-keys(organizationId=${organization.id()})}">Manage Secret Keys</a>
+                </div>
+            </div>
         </div>
     </main>
 </div>
