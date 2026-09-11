@@ -7,12 +7,16 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
+import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
+import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import java.util.List;
 import java.util.Optional;
@@ -29,9 +33,7 @@ import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 
 /**
  * Same standalone MockMvc + real Thymeleaf setup as {@code
- * PlatformOrganizationClientControllerTest}. No deactivate/rotate-secret tests here — see {@code
- * PlatformOAuthClientController}'s own Javadoc for why those actions don't exist for this domain
- * type.
+ * PlatformOrganizationClientControllerTest}.
  */
 class PlatformOAuthClientControllerTest {
 
@@ -39,6 +41,8 @@ class PlatformOAuthClientControllerTest {
 
   private RegisterOAuthClientUseCase registerClient;
   private ListOAuthClientsUseCase listClients;
+  private DeactivateOAuthClientUseCase deactivateClient;
+  private RotateOAuthClientSecretUseCase rotateClientSecret;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -48,6 +52,8 @@ class PlatformOAuthClientControllerTest {
   void setUp() {
     registerClient = mock(RegisterOAuthClientUseCase.class);
     listClients = mock(ListOAuthClientsUseCase.class);
+    deactivateClient = mock(DeactivateOAuthClientUseCase.class);
+    rotateClientSecret = mock(RotateOAuthClientSecretUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -74,7 +80,12 @@ class PlatformOAuthClientControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformOAuthClientController(
-                    registerClient, listClients, organizationResolver, currentPlatformAccount))
+                    registerClient,
+                    listClients,
+                    deactivateClient,
+                    rotateClientSecret,
+                    organizationResolver,
+                    currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -166,5 +177,55 @@ class PlatformOAuthClientControllerTest {
         .andExpect(view().name("clientregistry/platform/organization-oauth-clients"));
 
     Mockito.verify(registerClient, never()).handle(any());
+  }
+
+  @Test
+  void plainDeactivatePostRedirectsOnSuccess() throws Exception {
+    OAuthClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath()));
+
+    Mockito.verify(deactivateClient).handle(any());
+  }
+
+  @Test
+  void deactivateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
+    when(listClients.handle(organizationId)).thenReturn(List.of());
+
+    mockMvc
+        .perform(post(basePath() + "/test_someone_elses/deactivate"))
+        .andExpect(status().isNotFound());
+
+    Mockito.verify(deactivateClient, never()).handle(any());
+  }
+
+  @Test
+  void plainRotateSecretPostRendersThePageDirectlyWithTheNewSecretNeverARedirect()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    when(rotateClientSecret.handle(any()))
+        .thenReturn(new RotateOAuthClientSecretResult(client.clientId(), "new-raw-secret"));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/rotate-secret"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("clientregistry/platform/organization-oauth-clients"))
+        .andExpect(model().attribute("justRegisteredRawSecret", "new-raw-secret"));
+  }
+
+  @Test
+  void rotateSecretReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
+    when(listClients.handle(organizationId)).thenReturn(List.of());
+
+    mockMvc
+        .perform(post(basePath() + "/test_someone_elses/rotate-secret"))
+        .andExpect(status().isNotFound());
+
+    Mockito.verify(rotateClientSecret, never()).handle(any());
   }
 }

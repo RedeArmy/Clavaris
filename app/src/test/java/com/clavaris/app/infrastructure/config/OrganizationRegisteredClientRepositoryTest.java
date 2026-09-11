@@ -208,6 +208,100 @@ class OrganizationRegisteredClientRepositoryTest {
     assertThat(found.getPostLogoutRedirectUris()).isEmpty();
   }
 
+  // SDE-III review, 2026-09-11: findByClientId had zero dedicated coverage before this pass (only
+  // findById above did) — these are its first tests, added alongside the new active-flag filter
+  // this method now applies.
+  @Test
+  void findByClientIdResolvesAnActiveClientBelongingToTheCurrentOrganization() {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient client =
+        OAuthClient.register(
+            ORGANIZATION_ID,
+            "a-client-id",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findByClientId("a-client-id")).thenReturn(Optional.of(client));
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findByClientId("a-client-id");
+
+    assertThat(found).isNotNull();
+    assertThat(found.getClientId()).isEqualTo("a-client-id");
+  }
+
+  // TD-SEC-018/ADR-0023: the real, load-bearing behavior behind adding OAuthClient#active — the
+  // very next client_credentials/authorization attempt against a deactivated client must fail
+  // here, before any secret verification even runs, same treatment
+  // PlatformRegisteredClientRepository already gives PlatformClient/OrganizationClient.
+  @Test
+  void findByClientIdReturnsNullForADeactivatedClient() {
+    setOrganizationContext(ORGANIZATION_ID);
+    OAuthClient deactivated =
+        OAuthClient.register(
+                ORGANIZATION_ID,
+                "a-deactivated-client-id",
+                "argon2id$hashed",
+                List.of("https://example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of())
+            .deactivate();
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findByClientId("a-deactivated-client-id"))
+        .thenReturn(Optional.of(deactivated));
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findByClientId("a-deactivated-client-id");
+
+    assertThat(found).isNull();
+  }
+
+  @Test
+  void findByClientIdReturnsNullForARealClientBelongingToADifferentOrganization() {
+    setOrganizationContext(ORGANIZATION_ID);
+    UUID otherOrganizationId = UUID.randomUUID();
+    OAuthClient client =
+        OAuthClient.register(
+            otherOrganizationId,
+            "someone-elses-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    when(oauthClients.findByClientId("someone-elses-client")).thenReturn(Optional.of(client));
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findByClientId("someone-elses-client");
+
+    assertThat(found).isNull();
+  }
+
+  @Test
+  void findByClientIdReturnsNullWhenTheCurrentIssuerIsNotAnOrganizationIssuer() {
+    AuthorizationServerContextHolder.setContext(
+        issuerContext("https://clavaris.example.com/oauth2/token"));
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    OrganizationRegisteredClientRepository repository =
+        new OrganizationRegisteredClientRepository(oauthClients);
+
+    RegisteredClient found = repository.findByClientId("any-client-id");
+
+    assertThat(found).isNull();
+    verify(oauthClients, never()).findByClientId(any());
+  }
+
   private static void setOrganizationContext(final UUID organizationId) {
     AuthorizationServerContextHolder.setContext(
         issuerContext("https://clavaris.example.com/o/" + organizationId));

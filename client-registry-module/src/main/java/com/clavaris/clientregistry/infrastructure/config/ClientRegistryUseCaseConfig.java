@@ -8,6 +8,8 @@ import com.clavaris.clientregistry.application.usecase.createorganizationclient.
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientSecretGenerator;
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientService;
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientService;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
@@ -23,6 +25,7 @@ import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAut
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsService;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationEnvironmentChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientService;
@@ -30,6 +33,8 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.RequestClientDomainConfigService;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.RequestClientDomainConfigUseCase;
+import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretService;
+import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretService;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.PlatformClientSecretGenerator;
@@ -87,9 +92,10 @@ class ClientRegistryUseCaseConfig {
       final OrganizationExistsChecker orgExistsChecker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final ClientSecretHasher hasher,
+      final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new RegisterOAuthClientService(
-        oauthClients, orgExistsChecker, environmentChecker, hasher, auditEvents);
+        oauthClients, orgExistsChecker, environmentChecker, hasher, secretGenerator, auditEvents);
   }
 
   // SDE-III review, 2026-09-11: the dashboard's own real OAuthClient listing page — see
@@ -99,6 +105,25 @@ class ClientRegistryUseCaseConfig {
   /* package */ ListOAuthClientsUseCase listOAuthClientsUseCase(
       final OAuthClientRepository oauthClients) {
     return new ListOAuthClientsService(oauthClients);
+  }
+
+  // SDE-III review, 2026-09-11: the domain-layer gap TD-FUT-032 previously named as out of scope —
+  // see OAuthClient#deactivate's own Javadoc.
+  @Bean
+  /* package */ DeactivateOAuthClientUseCase deactivateOAuthClientUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new DeactivateOAuthClientService(oauthClients, auditEvents);
+  }
+
+  // SDE-III review, 2026-09-11: same gap-closing as deactivateOAuthClientUseCase above — see
+  // OAuthClient#rotateSecret's own Javadoc.
+  @Bean
+  /* package */ RotateOAuthClientSecretUseCase rotateOAuthClientSecretUseCase(
+      final OAuthClientRepository oauthClients,
+      final ClientSecretHasher hasher,
+      final OAuthClientSecretGenerator secretGenerator,
+      final AuditEventRecorder auditEvents) {
+    return new RotateOAuthClientSecretService(oauthClients, hasher, secretGenerator, auditEvents);
   }
 
   // TD-SEC-018

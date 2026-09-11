@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccount;
@@ -69,6 +72,7 @@ class ImpersonateAccountIntegrationTest extends RedisBackedIntegrationTest {
 
   @Autowired private PlatformAccountRepository platformAccounts;
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private DeactivateOAuthClientUseCase deactivateOAuthClient;
 
   // registerAccount below is a cookie/session-backed, CSRF-protected form flow (GET renders the
   // form + session cookie + CSRF token, POST must carry the same session back) — a plain
@@ -189,6 +193,27 @@ class ImpersonateAccountIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(response.statusCode())
         .as("BR-ORG-02/ADR-0010: a client from a different Organization must never be usable here")
+        .isEqualTo(400);
+  }
+
+  // SDE-III review, 2026-09-11: the real, load-bearing behavior behind adding OAuthClient#active —
+  // an operator impersonating a user "as" a just-deactivated client must not be able to silently
+  // bypass that deactivation.
+  @Test
+  void rejectsAClientThatHasBeenDeactivated() throws Exception {
+    String platformToken = requestPlatformAccessToken(IMPERSONATE_SCOPE);
+    UUID organizationId = createOrganization(platformToken, "Deactivated Client Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, "openid");
+    UUID accountId =
+        registerAccount(organizationId, "deactivated-client@example.com", "a-correct-password");
+    deactivateOAuthClient.handle(
+        new DeactivateOAuthClientCommand(
+            client.clientId(), AuditActor.platformClient("test-platform-client")));
+
+    HttpResponse<String> response = impersonate(platformToken, accountId, client.clientId(), "[]");
+
+    assertThat(response.statusCode())
+        .as("TD-SEC-018/ADR-0023: a deactivated client must never be usable here either")
         .isEqualTo(400);
   }
 

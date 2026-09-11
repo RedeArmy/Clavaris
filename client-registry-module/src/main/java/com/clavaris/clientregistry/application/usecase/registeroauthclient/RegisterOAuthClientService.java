@@ -3,8 +3,6 @@ package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -19,14 +17,15 @@ import java.util.UUID;
  * environment it belongs to. Purely a visual/structural convention, same as Clerk's own — nothing
  * in {@code OrganizationRegisteredClientRepository}'s own lookup logic branches on this prefix; the
  * real isolation is Organization-scoped issuer/JWKS (ADR-0010 §5), not the prefix string.
+ *
+ * <p>SDE-III review, 2026-09-11: raw-secret generation moved to {@link OAuthClientSecretGenerator}
+ * (was this class's own private {@code SecureRandom} logic) so {@code
+ * rotateoauthclientsecret.RotateOAuthClientSecretService} can reuse it — same "one small port per
+ * credential type, shared between create and rotate" shape {@code
+ * OrganizationClientSecretGenerator} already established for the sibling credential type.
  */
 @SuppressWarnings("PMD.LongVariable")
 public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
-
-  // 256 bits — same order of magnitude as the RSA-2048 signing keys this credential ultimately
-  // guards access to; Base64url encoding keeps the raw secret transport/display-safe without an
-  // extra encoding step at the controller.
-  private static final int SECRET_LENGTH = 32;
 
   private static final String DEVELOPMENT_CLIENT_ID_PREFIX = "test_";
   private static final String PRODUCTION_CLIENT_ID_PREFIX = "live_";
@@ -38,8 +37,8 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
   private final OrganizationEnvironmentChecker environmentChecker;
 
   private final ClientSecretHasher hasher;
+  private final OAuthClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
-  private final SecureRandom secureRandom = new SecureRandom();
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
   // other multi-collaborator constructor in this codebase.
@@ -48,11 +47,13 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
       final OrganizationExistsChecker orgExistsChecker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final ClientSecretHasher hasher,
+      final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.oauthClients = oauthClients;
     this.orgExistsChecker = orgExistsChecker;
     this.environmentChecker = environmentChecker;
     this.hasher = hasher;
+    this.secretGenerator = secretGenerator;
     this.auditEvents = auditEvents;
   }
 
@@ -71,7 +72,7 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
             ? DEVELOPMENT_CLIENT_ID_PREFIX
             : PRODUCTION_CLIENT_ID_PREFIX;
     final String clientId = clientIdPrefix + UUID.randomUUID();
-    final String rawClientSecret = generateRawSecret();
+    final String rawClientSecret = secretGenerator.generate();
     final OAuthClient client =
         OAuthClient.register(
             command.organizationId(),
@@ -94,11 +95,5 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
         command.organizationId().toString(),
         "clientId=" + clientId);
     return new RegisterOAuthClientResult(client, rawClientSecret);
-  }
-
-  private String generateRawSecret() {
-    final byte[] bytes = new byte[SECRET_LENGTH];
-    secureRandom.nextBytes(bytes);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 }

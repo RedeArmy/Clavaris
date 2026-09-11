@@ -342,9 +342,93 @@ class OAuthClientTest {
             List.of("openid"),
             true,
             List.of(),
-            persistedCreatedAt);
+            persistedCreatedAt,
+            true);
 
     assertThat(client.id()).isEqualTo(persistedId);
     assertThat(client.createdAt()).isEqualTo(persistedCreatedAt);
+  }
+
+  @Test
+  void registerIsActiveByDefault() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThat(client.active()).isTrue();
+  }
+
+  // SDE-III review, 2026-09-11: the domain-layer gap TD-FUT-032 previously named as out of scope —
+  // same rationale as OrganizationClient#deactivate/PlatformClient#deactivate's own identical
+  // tests.
+  @Test
+  void deactivateReturnsAnInactiveCopyKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    OAuthClient deactivated = client.deactivate();
+
+    assertThat(deactivated.active()).isFalse();
+    assertThat(deactivated.id()).isEqualTo(client.id());
+    assertThat(deactivated.clientId()).isEqualTo(client.clientId());
+    assertThat(deactivated.clientSecretHash()).isEqualTo(client.clientSecretHash());
+    assertThat(deactivated.redirectUris()).isEqualTo(client.redirectUris());
+    assertThat(deactivated.createdAt()).isEqualTo(client.createdAt());
+  }
+
+  @Test
+  void rotateSecretReturnsACopyWithTheNewHashKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    OAuthClient rotated = client.rotateSecret("argon2id$new-hashed");
+
+    assertThat(rotated.clientSecretHash()).isEqualTo("argon2id$new-hashed");
+    assertThat(rotated.id()).isEqualTo(client.id());
+    assertThat(rotated.clientId()).isEqualTo(client.clientId());
+    assertThat(rotated.active()).isEqualTo(client.active());
+    assertThat(rotated.createdAt()).isEqualTo(client.createdAt());
+  }
+
+  @Test
+  void rotateSecretDoesNotReactivateAnAlreadyDeactivatedClient() {
+    OAuthClient deactivated =
+        OAuthClient.register(
+                organizationId,
+                "a-client",
+                "argon2id$hashed",
+                List.of("https://example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of())
+            .deactivate();
+
+    OAuthClient rotated = deactivated.rotateSecret("argon2id$new-hashed");
+
+    assertThat(rotated.active()).isFalse();
   }
 }

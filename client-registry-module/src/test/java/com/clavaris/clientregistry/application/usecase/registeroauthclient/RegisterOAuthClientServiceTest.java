@@ -26,6 +26,9 @@ class RegisterOAuthClientServiceTest {
   private OrganizationExistsChecker organizationExistsChecker;
   private OrganizationEnvironmentChecker environmentChecker;
   private ClientSecretHasher hasher;
+  // A real, simple stub rather than a Mockito mock — generatesADifferentClientIdAndSecretOnEachCall
+  // below needs distinct values per call, same as the real SecureRandom-backed adapter would give.
+  private final OAuthClientSecretGenerator secretGenerator = () -> UUID.randomUUID().toString();
   private AuditEventRecorder auditEvents;
   private RegisterOAuthClientService service;
 
@@ -38,7 +41,12 @@ class RegisterOAuthClientServiceTest {
     auditEvents = mock(AuditEventRecorder.class);
     service =
         new RegisterOAuthClientService(
-            oauthClients, organizationExistsChecker, environmentChecker, hasher, auditEvents);
+            oauthClients,
+            organizationExistsChecker,
+            environmentChecker,
+            hasher,
+            secretGenerator,
+            auditEvents);
 
     when(organizationExistsChecker.exists(organizationId)).thenReturn(true);
     when(hasher.hash(anyString())).thenReturn("argon2id$hashed");

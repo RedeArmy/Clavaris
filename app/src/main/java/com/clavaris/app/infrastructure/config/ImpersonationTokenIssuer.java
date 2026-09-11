@@ -148,9 +148,14 @@ class ImpersonationTokenIssuer {
    * @param baseUrl this deployment's own scheme+host+port, as seen on the current admin request —
    *     see this class's own Javadoc for why it must come from there, not a fixed config value.
    * @throws ImpersonationClientNotFoundException if {@code clientId} doesn't resolve to a
-   *     registered {@code OAuthClient}, or resolves to one belonging to a *different* Organization
+   *     registered {@code OAuthClient}, resolves to one belonging to a *different* Organization
    *     than the target Account's own (ADR-0010: masked identically to "not found", same
-   *     cross-tenant discipline {@code OrganizationRegisteredClientRepository} already applies)
+   *     cross-tenant discipline {@code OrganizationRegisteredClientRepository} already applies), or
+   *     (SDE-III review, 2026-09-11) resolves to a deactivated one — an operator impersonating a
+   *     user "as" a client whose own credentials were just revoked would silently defeat
+   *     deactivation as a security control, same TD-SEC-018/ADR-0023 treatment {@code
+   *     OrganizationRegisteredClientRepository#findByClientId}'s own identical filter now applies
+   *     to every real client_credentials/authorization request against this same client.
    * @throws ImpersonationScopeNotAllowedException if {@code requestedScopes} contains anything
    *     outside the resolved client's own {@code allowedScopes}
    */
@@ -181,6 +186,7 @@ class ImpersonationTokenIssuer {
     return oauthClients
         .findByClientId(clientId)
         .filter(candidate -> candidate.organizationId().equals(organizationId.value()))
+        .filter(OAuthClient::active)
         .orElseThrow(() -> new ImpersonationClientNotFoundException(clientId));
   }
 

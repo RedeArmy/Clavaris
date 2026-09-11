@@ -28,6 +28,16 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
  * CurrentOrganizationContext}'s and treating a mismatch identically to "client not found". Covered
  * by a dedicated live cross-tenant rejection test, not just a happy-path one, per the addendum's
  * own call-out of this residual risk.
+ *
+ * <p>SDE-III review, 2026-09-11: {@code findByClientId} now also filters by {@link
+ * OAuthClient#active()} — same TD-SEC-018/ADR-0023 treatment {@code
+ * PlatformRegisteredClientRepository#findByClientId}'s own identical filter already gives {@code
+ * PlatformClient}/{@code OrganizationClient}, applied here now that {@code OAuthClient} itself has
+ * an {@code active} flag to check. {@code findById} deliberately does NOT filter by it, same
+ * rationale as that sibling's own identical comment: this overload reconstructs an already-issued
+ * authorization row (revoke, refresh-token reload), and filtering it out for a now-deactivated
+ * client would break the ability to revoke that same client's own lingering tokens during an
+ * incident — the opposite of what deactivation is for.
  */
 final class OrganizationRegisteredClientRepository implements RegisteredClientRepository {
 
@@ -85,6 +95,11 @@ final class OrganizationRegisteredClientRepository implements RegisteredClientRe
     return oauthClients
         .findByClientId(clientId)
         .filter(client -> client.organizationId().equals(orgId.get()))
+        // TD-SEC-018/ADR-0023: a deactivated client must resolve to "not found" here — this is
+        // what actually enforces DeactivateOAuthClientService's own consequence, same treatment
+        // PlatformRegisteredClientRepository#findByClientId already gives its own two credential
+        // types.
+        .filter(OAuthClient::active)
         .map(OrganizationRegisteredClientRepository::toRegisteredClient)
         .orElse(null);
   }

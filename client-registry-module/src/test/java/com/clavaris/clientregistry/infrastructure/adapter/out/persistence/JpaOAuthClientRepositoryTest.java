@@ -74,6 +74,55 @@ class JpaOAuthClientRepositoryTest {
     // TD-FUT-018: same "prove it's really wired, not just present" bar as requireConsent above.
     assertThat(found.get().postLogoutRedirectUris())
         .containsExactly("https://jobseeker.example.com/logged-out");
+    // SDE-III review, 2026-09-11: a freshly-registered client is active by default.
+    assertThat(found.get().active()).isTrue();
+  }
+
+  // SDE-III review, 2026-09-11: the real, load-bearing behavior behind switching save() from an
+  // insert-only entityManager.persist to SpringData's own upsert save — a second save() call for
+  // the same id must update the existing row, not throw a duplicate-key violation.
+  @Test
+  void savingAnAlreadyPersistedClientAgainUpdatesTheExistingRowRatherThanFailing() {
+    OAuthClient client =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "an-updatable-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(client);
+
+    OAuthClient deactivated = client.deactivate();
+    repository.save(deactivated);
+    Optional<OAuthClient> found = repository.findByClientId("an-updatable-client-id");
+
+    assertThat(found).isPresent();
+    assertThat(found.get().id()).isEqualTo(client.id());
+    assertThat(found.get().active()).isFalse();
+  }
+
+  @Test
+  void savingARotatedSecretUpdatesTheClientSecretHash() {
+    OAuthClient client =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "a-rotatable-client-id",
+            "argon2id$original-hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(client);
+
+    repository.save(client.rotateSecret("argon2id$rotated-hashed"));
+    Optional<OAuthClient> found = repository.findByClientId("a-rotatable-client-id");
+
+    assertThat(found).isPresent();
+    assertThat(found.get().clientSecretHash()).isEqualTo("argon2id$rotated-hashed");
   }
 
   @Test

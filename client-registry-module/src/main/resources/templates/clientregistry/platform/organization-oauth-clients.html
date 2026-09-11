@@ -27,10 +27,10 @@
 
             <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
                  PlatformOrganizationClientController's own Javadoc for the general shape this page
-                 mirrors. Create never redirects even on a plain form submit — the raw client secret
-                 can't safely travel through one. Unlike Secret Keys, there is no deactivate/rotate
-                 row action here: OAuthClient has no active flag and no domain-level secret-rotation
-                 method today (see PlatformOAuthClientController's own Javadoc). -->
+                 mirrors. Create/rotate-secret never redirect even on a plain form submit — the raw
+                 client secret can't safely travel through one; deactivate keeps the usual
+                 redirect-on-success shape since it carries no secret (see
+                 PlatformOAuthClientController's own Javadoc). -->
             <div id="clients-content" th:fragment="clients" class="clavaris-section">
                 <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                     <strong>New client secret for <code th:text="${justRegisteredClientId}">clientId</code>:</strong>
@@ -49,7 +49,9 @@
                         <th>Grant Types</th>
                         <th>Scopes</th>
                         <th>Consent</th>
+                        <th>Status</th>
                         <th>Created</th>
+                        <th></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -63,7 +65,30 @@
                                   th:classappend="${client.requireConsent()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${client.requireConsent()} ? 'Required' : 'Skipped'">Required</span>
                         </td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${client.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${client.active()} ? 'Active' : 'Inactive'">Active</span>
+                        </td>
                         <td th:text="${client.createdAt()}">Created at</td>
+                        <td>
+                            <div class="clavaris-row-actions" th:if="${client.active()}">
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/rotate-secret(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/rotate-secret(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                      hx-target="#clients-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rotate secret</button>
+                                </form>
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/deactivate(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/deactivate(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                      hx-target="#clients-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                     </tbody>
                 </table>
