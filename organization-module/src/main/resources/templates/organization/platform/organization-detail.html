@@ -98,6 +98,18 @@
                        th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organization.id()})}">Manage OAuth Clients</a>
                 </div>
             </div>
+
+            <!-- Owned by identity-module (ADR-0010 §5.2/ADR-0025) — same "link out, don't embed
+                 across a module boundary" reasoning as the two sections above. -->
+            <div class="clavaris-section">
+                <h2>Signing Keys</h2>
+                <div class="clavaris-section-card">
+                    <p>The RS256 key pair this Organization's own tenant issuer signs tokens under —
+                        rotate with overlap, self-service, from this page's own linked view.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/signing-keys(organizationId=${organization.id()})}">Manage Signing Keys</a>
+                </div>
+            </div>
         </div>
     </main>
 </div>
