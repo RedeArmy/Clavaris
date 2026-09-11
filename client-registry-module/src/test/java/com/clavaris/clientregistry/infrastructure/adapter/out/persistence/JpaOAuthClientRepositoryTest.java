@@ -109,6 +109,45 @@ class JpaOAuthClientRepositoryTest {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();
   }
 
+  // SDE-III review, 2026-09-11: this method genuinely didn't exist until now — see this port's own
+  // Javadoc (technical-debt-register.md TD-FUT-032) for why.
+  @Test
+  void findAllByOrganizationIdReturnsOnlyThatOrganizationsOwnClients() {
+    UUID organizationId = UUID.randomUUID();
+    UUID otherOrganizationId = UUID.randomUUID();
+    OAuthClient ownClient =
+        OAuthClient.register(
+            organizationId,
+            "own-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    OAuthClient otherOrganizationClient =
+        OAuthClient.register(
+            otherOrganizationId,
+            "other-org-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(ownClient);
+    repository.save(otherOrganizationClient);
+
+    List<OAuthClient> found = repository.findAllByOrganizationId(organizationId);
+
+    assertThat(found).extracting(OAuthClient::clientId).containsExactly("own-client-id");
+  }
+
+  @Test
+  void findAllByOrganizationIdIsEmptyForAnOrganizationWithNoClients() {
+    assertThat(repository.findAllByOrganizationId(UUID.randomUUID())).isEmpty();
+  }
+
   // @Import, not @ComponentScan — see JpaPlatformClientRepositoryTest's own TestConfig comment
   // for why: this package also holds that test's nested TestConfig, and scanning the whole
   // package here would pick it up too, double-registering Spring Data repositories across both

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -28,6 +29,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * CreateOrganizationControllerTest ({@code @WebMvcTest} doesn't exist in this Spring Boot version).
  */
 class RegisterOAuthClientControllerTest {
+
+  // Same standalone-MockMvc "resolve Authentication via .principal(...)" pattern as
+  // SetRedirectPolicyControllerTest's own identical constant.
+  private static final TestingAuthenticationToken ACTING_PLATFORM_CLIENT =
+      new TestingAuthenticationToken("test-platform-client", null);
 
   private final UUID organizationId = UUID.randomUUID();
   private RegisterOAuthClientUseCase useCase;
@@ -59,7 +65,8 @@ class RegisterOAuthClientControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
-                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}"))
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.clientId").value("a-client-id"))
         .andExpect(jsonPath("$.clientSecret").value("the-raw-secret"))
@@ -90,7 +97,8 @@ class RegisterOAuthClientControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
-                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}"))
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isCreated());
 
     ArgumentCaptor<RegisterOAuthClientCommand> captor =
@@ -120,7 +128,8 @@ class RegisterOAuthClientControllerTest {
                 .content(
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
                         + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"],"
-                        + "\"requireConsent\":false}"))
+                        + "\"requireConsent\":false}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.requireConsent").value(false));
 
@@ -137,7 +146,8 @@ class RegisterOAuthClientControllerTest {
             post("/api/v1/admin/organizations/" + organizationId + "/clients")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"redirectUris\":[],\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[]}"))
+                    "{\"redirectUris\":[],\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[]}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isBadRequest());
   }
 
@@ -151,7 +161,8 @@ class RegisterOAuthClientControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
-                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[]}"))
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[]}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isNotFound());
   }
 
@@ -177,7 +188,8 @@ class RegisterOAuthClientControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
-                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}"))
+                        + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"]}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isCreated());
 
     ArgumentCaptor<RegisterOAuthClientCommand> captor =
@@ -207,7 +219,8 @@ class RegisterOAuthClientControllerTest {
                 .content(
                     "{\"redirectUris\":[\"https://jobseeker.example.com/callback\"],"
                         + "\"allowedGrantTypes\":[\"authorization_code\"],\"allowedScopes\":[\"openid\"],"
-                        + "\"postLogoutRedirectUris\":[\"https://jobseeker.example.com/logged-out\"]}"))
+                        + "\"postLogoutRedirectUris\":[\"https://jobseeker.example.com/logged-out\"]}")
+                .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isCreated())
         .andExpect(
             jsonPath("$.postLogoutRedirectUris[0]")

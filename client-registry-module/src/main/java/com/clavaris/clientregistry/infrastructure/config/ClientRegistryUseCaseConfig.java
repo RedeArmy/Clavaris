@@ -18,6 +18,8 @@ import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.Get
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigUseCase;
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsService;
+import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsService;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
@@ -57,8 +59,14 @@ import org.springframework.context.annotation.Configuration;
 // per use case (this file's own doc comment) — the redirect-policy/client-branding use cases
 // tipped both counts over PMD's default thresholds. Same "wiring, not sprawl" reasoning
 // OrganizationUseCaseConfig's own class-level suppression already documents for an identical
-// situation.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+// situation. PMD.TooManyMethods: same reasoning — one more @Bean method (listOAuthClientsUseCase)
+// tipped this count over threshold too.
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects",
+  "PMD.TooManyMethods"
+})
 @Configuration
 class ClientRegistryUseCaseConfig {
 
@@ -78,9 +86,19 @@ class ClientRegistryUseCaseConfig {
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
-      final ClientSecretHasher hasher) {
+      final ClientSecretHasher hasher,
+      final AuditEventRecorder auditEvents) {
     return new RegisterOAuthClientService(
-        oauthClients, orgExistsChecker, environmentChecker, hasher);
+        oauthClients, orgExistsChecker, environmentChecker, hasher, auditEvents);
+  }
+
+  // SDE-III review, 2026-09-11: the dashboard's own real OAuthClient listing page — see
+  // ListOAuthClientsUseCase's own Javadoc for why this bean, and the repository method it depends
+  // on, didn't exist until now.
+  @Bean
+  /* package */ ListOAuthClientsUseCase listOAuthClientsUseCase(
+      final OAuthClientRepository oauthClients) {
+    return new ListOAuthClientsService(oauthClients);
   }
 
   // TD-SEC-018

@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +26,15 @@ public interface OAuthClientRepository {
   // RegisteredClientRepository.findById's own parameter naming (the SPI this ultimately serves).
   @SuppressWarnings("PMD.ShortVariable")
   Optional<OAuthClient> findById(UUID id);
+
+  /**
+   * SDE-III review, 2026-09-11: genuinely missing until now — added alongside the dashboard's own
+   * real {@code OAuthClient} listing page. {@code OrganizationClientRepository} (the Secret Key
+   * one) already had this exact method, which is what caused the original naming mix-up documented
+   * in {@code technical-debt-register.md} TD-FUT-032: this method's absence is the real, concrete
+   * signal that "OAuth client management" hadn't actually shipped yet.
+   */
+  List<OAuthClient> findAllByOrganizationId(UUID organizationId);
 
   /**
    * BR-DATA-02/03's own organization-level equivalent — every {@code OAuthClient} this Organization

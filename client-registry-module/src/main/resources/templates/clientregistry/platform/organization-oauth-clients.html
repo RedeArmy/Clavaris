@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{clientregistry/fragments/head :: head(${organizationName} + ' — OAuth Clients — Clavaris')}">
+    <title>OAuth Clients — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{clientregistry/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>OAuth Clients</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>OAuth Clients</h1>
+                    <p>The end-user OIDC login client registrations this Organization's own consuming
+                        application(s) use to authenticate real end users against — distinct from
+                        Secret Keys (ADR-0010's <code>OAuthClient</code>, not ADR-0023's
+                        <code>OrganizationClient</code>). Each secret is shown exactly once, at
+                        registration — Clavaris never stores or displays it again.</p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
+                 PlatformOrganizationClientController's own Javadoc for the general shape this page
+                 mirrors. Create never redirects even on a plain form submit — the raw client secret
+                 can't safely travel through one. Unlike Secret Keys, there is no deactivate/rotate
+                 row action here: OAuthClient has no active flag and no domain-level secret-rotation
+                 method today (see PlatformOAuthClientController's own Javadoc). -->
+            <div id="clients-content" th:fragment="clients" class="clavaris-section">
+                <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
+                    <strong>New client secret for <code th:text="${justRegisteredClientId}">clientId</code>:</strong>
+                    <code th:text="${justRegisteredRawSecret}">secret</code><br/>
+                    Copy this now — it will not be shown again.
+                </p>
+
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(clients)}">
+                    <p class="clavaris-empty-state">No OAuth Clients yet — register the first one below.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(clients)}">
+                    <thead>
+                    <tr>
+                        <th>Client ID</th>
+                        <th>Redirect URIs</th>
+                        <th>Grant Types</th>
+                        <th>Scopes</th>
+                        <th>Consent</th>
+                        <th>Created</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="client : ${clients}">
+                        <td><code th:text="${client.clientId()}">client id</code></td>
+                        <td th:text="${#lists.size(client.redirectUris())} + ' URI(s)'">N URI(s)</td>
+                        <td th:text="${#strings.listJoin(client.allowedGrantTypes(), ', ')}">grant types</td>
+                        <td th:text="${#lists.size(client.allowedScopes())} + ' scope(s)'">N scope(s)</td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${client.requireConsent()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${client.requireConsent()} ? 'Required' : 'Skipped'">Required</span>
+                        </td>
+                        <td th:text="${client.createdAt()}">Created at</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="clavaris-section-card">
+                    <h2>Register a new OAuth Client</h2>
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}"
+                          th:object="${createForm}" method="post"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}"
+                          hx-target="#clients-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <div class="clavaris-field">
+                            <label for="redirectUris">Redirect URIs (one per line)</label>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('redirectUris')}" th:errors="*{redirectUris}">Redirect URIs error</p>
+                            <textarea id="redirectUris" th:field="*{redirectUris}" rows="3" placeholder="https://jobseeker.example.com/callback"></textarea>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('allowedGrantTypes')}" th:errors="*{allowedGrantTypes}">Grant types error</p>
+                            <div th:each="grantType : ${grantTypeOptions}">
+                                <label>
+                                    <input type="checkbox" th:field="*{allowedGrantTypes}" th:value="${grantType}"/>
+                                    <span th:text="${grantType}">grant type</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <label for="allowedScopes">Scopes (one per line, optional)</label>
+                            <textarea id="allowedScopes" th:field="*{allowedScopes}" rows="3" placeholder="openid"></textarea>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <label>
+                                <input type="checkbox" th:field="*{requireConsent}"/>
+                                Require consent screen
+                            </label>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <label for="postLogoutRedirectUris">Post-logout redirect URIs (one per line, optional)</label>
+                            <textarea id="postLogoutRedirectUris" th:field="*{postLogoutRedirectUris}" rows="2"></textarea>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Register OAuth Client</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>

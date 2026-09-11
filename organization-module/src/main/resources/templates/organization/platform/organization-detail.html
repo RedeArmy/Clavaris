@@ -83,6 +83,21 @@
                        th:href="@{/platform/dashboard/organizations/{organizationId}/secret-keys(organizationId=${organization.id()})}">Manage Secret Keys</a>
                 </div>
             </div>
+
+            <!-- Same "link out, don't embed across a module boundary" reasoning as the Secret Keys
+                 section above — also owned by client-registry-module, ADR-0010/ADR-0025. Distinct
+                 concept from Secret Keys: this is real end-user OIDC login client registration
+                 (technical-debt-register.md TD-FUT-032's own naming-mix-up paragraph documents why
+                 that distinction matters). -->
+            <div class="clavaris-section">
+                <h2>OAuth Clients</h2>
+                <div class="clavaris-section-card">
+                    <p>The end-user OIDC login client registrations this Organization's own
+                        consuming application(s) use to authenticate real end users against.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organization.id()})}">Manage OAuth Clients</a>
+                </div>
+            </div>
         </div>
     </main>
 </div>

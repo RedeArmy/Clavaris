@@ -2,6 +2,7 @@ package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.common.application.port.AuditEventRecorder;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
@@ -37,17 +38,22 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
   private final OrganizationEnvironmentChecker environmentChecker;
 
   private final ClientSecretHasher hasher;
+  private final AuditEventRecorder auditEvents;
   private final SecureRandom secureRandom = new SecureRandom();
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
+  // other multi-collaborator constructor in this codebase.
   public RegisterOAuthClientService(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
-      final ClientSecretHasher hasher) {
+      final ClientSecretHasher hasher,
+      final AuditEventRecorder auditEvents) {
     this.oauthClients = oauthClients;
     this.orgExistsChecker = orgExistsChecker;
     this.environmentChecker = environmentChecker;
     this.hasher = hasher;
+    this.auditEvents = auditEvents;
   }
 
   @Override
@@ -78,6 +84,15 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
             command.postLogoutRedirectUris());
 
     oauthClients.save(client);
+
+    // Never the raw secret, never the hash — same BR-DATA-01 discipline as every other audited
+    // secret-bearing action in this codebase (e.g. CreateOrganizationClientService).
+    auditEvents.write(
+        command.actor(),
+        "oauth_client.registered",
+        "Organization",
+        command.organizationId().toString(),
+        "clientId=" + clientId);
     return new RegisterOAuthClientResult(client, rawClientSecret);
   }
 

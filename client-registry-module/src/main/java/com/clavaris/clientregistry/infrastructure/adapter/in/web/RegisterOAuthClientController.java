@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Organ
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
+import com.clavaris.common.domain.model.AuditActor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -47,7 +49,8 @@ class RegisterOAuthClientController {
   @PostMapping("/api/v1/admin/organizations/{organizationId}/clients")
   /* package */ ResponseEntity<RegisterOAuthClientResponse> register(
       @PathVariable final UUID organizationId,
-      @Valid @RequestBody final RegisterOAuthClientRequest request) {
+      @Valid @RequestBody final RegisterOAuthClientRequest request,
+      final Authentication authentication) {
     final RegisterOAuthClientResult result;
     try {
       result =
@@ -64,7 +67,8 @@ class RegisterOAuthClientController {
                   Objects.requireNonNullElse(request.requireConsent(), Boolean.TRUE),
                   // TD-FUT-018: an omitted field means "not configured" (empty allowlist), same
                   // resolve-absence-at-the-boundary discipline as requireConsent above.
-                  Objects.requireNonNullElse(request.postLogoutRedirectUris(), List.of())));
+                  Objects.requireNonNullElse(request.postLogoutRedirectUris(), List.of()),
+                  AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
     }
