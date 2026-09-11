@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${workspace.name()} + ' — ' + ${organization.name()} + ' — Clavaris')}">
+    <title>Workspace — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span th:text="${workspace.name()}">Workspace</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1 th:text="${workspace.name()}">Workspace name</h1>
+                    <p>Created <span th:text="${workspace.createdAt()}">date</span></p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: same HTMX-fragment shape as dashboard.html/organization-detail.html's
+                 own fragments — every member action below (add, change role, remove) re-renders
+                 just this whole fragment when the request carries HX-Request; a real full-page GET
+                 produces the exact same markup, so the page works identically with JavaScript
+                 disabled. -->
+            <div id="members-content" th:fragment="members" class="clavaris-section">
+                <h2>Members</h2>
+
+                <p class="clavaris-alert clavaris-alert--error" th:if="${emailAlreadyRegisteredError}">That email is already registered in this Organization.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">A workspace must always keep at least one admin — choose a different admin first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotRemoveLastAdminError}">A workspace must always keep at least one admin — promote another member first.</p>
+
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(members)}">
+                    <p class="clavaris-empty-state">No members yet — add the first one below.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(members)}">
+                    <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th>Role</th>
+                        <th>Joined</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="member : ${members}">
+                        <td th:text="${member.accountId()}">Account id</td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${member.role().name() == 'ADMIN'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${member.role()}">MEMBER</span>
+                        </td>
+                        <td th:text="${member.createdAt()}">Joined at</td>
+                        <td>
+                            <div class="clavaris-row-actions">
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
+                                      hx-target="#members-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <select name="newRole">
+                                        <option value="ADMIN" th:selected="${member.role().name() == 'ADMIN'}">Admin</option>
+                                        <option value="MEMBER" th:selected="${member.role().name() == 'MEMBER'}">Member</option>
+                                    </select>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Update role</button>
+                                </form>
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/remove(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/remove(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
+                                      hx-target="#members-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="clavaris-section-card">
+                    <h2>Add a member</h2>
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                          th:object="${memberForm}" method="post"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                          hx-target="#members-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <div class="clavaris-field">
+                            <label for="member-email">Email</label>
+                            <input id="member-email" type="email" th:field="*{email}" required/>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <label for="member-role">Role</label>
+                            <select id="member-role" th:field="*{role}">
+                                <option th:each="roleOption : ${T(com.clavaris.organization.domain.model.WorkspaceRole).values()}"
+                                        th:value="${roleOption}" th:text="${roleOption}"></option>
+                            </select>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Add member</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>

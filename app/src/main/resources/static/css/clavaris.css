@@ -316,6 +316,24 @@ main {
   padding: var(--space-2) var(--space-4);
 }
 
+/* Workspace-detail page (ADR-0025): a table cell holding more than one inline form/button (the
+   role-change select+button next to the remove button) — plain flow would stack them as blocks. */
+.clavaris-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.clavaris-row-actions select {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  background: var(--clavaris-surface);
+  color: var(--clavaris-text-primary);
+}
+
 /*
  * Admin dashboard (/platform/dashboard/**, ADR-0025) — the one hosted surface that isn't a
  * single-card form: a sidebar-navigated app shell over real data (Organizations, Workspaces, OAuth

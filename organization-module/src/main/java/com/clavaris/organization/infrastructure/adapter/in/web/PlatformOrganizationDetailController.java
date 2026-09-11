@@ -17,12 +17,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * ADR-0025: the dashboard's own Organization-detail hub — {@code GET
- * /platform/dashboard/organizations/{organizationId}}. Read-only for this pass: shows the
- * Organization's own identity (name, environment, created date) and its Workspaces
- * (ListWorkspacesForOrganizationUseCase, already existed for the REST admin API — reused here
- * unchanged, not duplicated). Mutating actions from this page (promote to production, delete,
- * create/manage a Workspace, register an OAuth client) are a deliberately separate, later increment
- * — see technical-debt-register.md's own dashboard-rollout row for the full plan.
+ * /platform/dashboard/organizations/{organizationId}}. This controller itself stays read-only: the
+ * page's own "create workspace" form (bound to the {@code workspaceForm} attribute added below)
+ * posts to {@link PlatformWorkspaceController}, a separate controller, not a method here — same
+ * split {@link PlatformOrganizationDashboardController}/this class already have for Organizations.
+ * Other mutating actions on this page (promote to production, delete, register an OAuth client)
+ * remain a deliberately separate, later increment — see technical-debt-register.md's own
+ * dashboard-rollout row for the full plan.
  *
  * <p>{@code organizationId} resolves through {@link GetOrganizationForPlatformAccountUseCase},
  * never a bare {@code OrganizationRepository} call from this controller — see that use case's own
@@ -77,6 +78,7 @@ public class PlatformOrganizationDetailController {
     model.addAttribute(
         "workspaces",
         listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
+    model.addAttribute("workspaceForm", new CreateWorkspaceForm());
     return DETAIL_VIEW;
   }
 }
