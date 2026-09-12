@@ -61,8 +61,13 @@
                                       th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
                                       hx-target="#members-content" hx-swap="outerHTML">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <label class="clavaris-visually-hidden" th:for="${'new-role-' + member.accountId()}">New role for <span th:text="${member.accountId()}">account</span></label>
-                                    <select th:id="${'new-role-' + member.accountId()}" name="newRole">
+                                    <!-- Static "for"/"id" fallback values below, both overridden by their own
+                                         th:for/th:id at render time with the real per-row unique id: a static
+                                         analyzer reading this template's raw source (not Thymeleaf's rendered
+                                         output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                                         alone, for this accessibility rule. -->
+                                    <label class="clavaris-visually-hidden" for="new-role" th:for="${'new-role-' + member.accountId()}">New role for <span th:text="${member.accountId()}">account</span></label>
+                                    <select id="new-role" th:id="${'new-role-' + member.accountId()}" name="newRole">
                                         <option value="ADMIN" th:selected="${member.role().name() == 'ADMIN'}">Admin</option>
                                         <option value="MEMBER" th:selected="${member.role().name() == 'MEMBER'}">Member</option>
                                     </select>
