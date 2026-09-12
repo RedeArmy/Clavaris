@@ -1,8 +1,8 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -95,24 +95,18 @@ class PlatformOrganizationDetailControllerTest {
 
     // Same anti-enumeration posture as RedirectUrlResolverBridge/ClientBrandingProviderBridge:
     // ownership is checked inside the use case, never bypassed by this controller.
-    org.mockito.Mockito.verify(getOrganization)
-        .handle(eq(new GetOrganizationForPlatformAccountQuery(organizationId, OWNER_ID)));
+    verify(getOrganization)
+        .handle(new GetOrganizationForPlatformAccountQuery(organizationId, OWNER_ID));
   }
 
+  // Deliberately one test, not two: an unknown organizationId and one owned by a different
+  // PlatformAccount both resolve to the exact same Optional.empty() from the use case, so a
+  // separate "different owner" test body would just be this same test copy-pasted — the use
+  // case itself is what enforces ownership (its own dedicated unit test covers that distinction);
+  // this test only proves the controller surfaces the use case's "not found" result as a real
+  // 404 either way, never leaking a distinguishable 403 for a not-mine-but-real organization.
   @Test
-  void returnsNotFoundForAnUnknownOrganizationId() throws Exception {
-    when(getOrganization.handle(any())).thenReturn(Optional.empty());
-
-    mockMvc
-        .perform(get("/platform/dashboard/organizations/{organizationId}", UUID.randomUUID()))
-        .andExpect(status().isNotFound());
-  }
-
-  @Test
-  void returnsNotFoundForAnOrganizationOwnedByADifferentPlatformAccount() throws Exception {
-    // The use case itself is what enforces ownership (its own dedicated unit test covers that);
-    // this test only proves the controller surfaces the use case's "not found" result as a real
-    // 404, never leaking a distinguishable 403 for a not-mine-but-real organization.
+  void returnsNotFoundWhenTheOrganizationIsUnknownOrNotOwnedByTheCurrentAccount() throws Exception {
     when(getOrganization.handle(any())).thenReturn(Optional.empty());
 
     mockMvc

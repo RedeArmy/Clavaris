@@ -307,6 +307,23 @@ main {
   border-bottom: none;
 }
 
+/* Standard "sr-only" pattern — keeps a form control's own <label> in the accessibility tree
+   (screen readers, browser autofill) without a visible line of table-row real estate. First
+   real use: workspace-detail.html's own per-row role <select>, whose action is already named
+   by its own table column header, so a second visible "Role" label per row would be redundant
+   clutter, not a real label a sighted user needs. */
+.clavaris-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* .clavaris-button defaults to a full-width block (the one-action-per-form shape every other
    hosted page has) — this is the one modifier that un-does that for a button sitting inline
    inside a table cell or alongside other content. */

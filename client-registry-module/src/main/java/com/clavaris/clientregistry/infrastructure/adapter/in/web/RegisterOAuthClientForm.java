@@ -101,11 +101,13 @@ public class RegisterOAuthClientForm {
     return splitLines(postLogoutRedirectUris);
   }
 
-  // One entry per line, trimmed, blank lines dropped — the same "textarea as a poor man's list
-  // input" convention this codebase has no earlier precedent for (every prior multi-value form
-  // field was a fixed-vocabulary checkbox list instead), needed here because these three fields
-  // are genuinely open-ended free text, not a small enumerable set. PMD.OnlyOneReturn: the early
-  // "blank input" exit is clearer than folding it into the stream pipeline below.
+  // One entry per line, trimmed, blank lines dropped. A free-text textarea standing in for a
+  // multi-value list input has no earlier precedent in this codebase (every prior multi-value
+  // form field was a fixed-vocabulary checkbox list instead), needed here since these three
+  // fields are genuinely open-ended free text, not a small enumerable set.
+  //
+  // The early return for a blank input reads more clearly than folding that case into the
+  // stream pipeline that follows it.
   @SuppressWarnings("PMD.OnlyOneReturn")
   private static List<String> splitLines(final String raw) {
     if (raw == null || raw.isBlank()) {

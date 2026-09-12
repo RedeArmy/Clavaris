@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -23,7 +24,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -139,7 +139,7 @@ class PlatformOAuthClientControllerTest {
         .andExpect(view().name("clientregistry/platform/organization-oauth-clients"))
         .andExpect(model().attribute("justRegisteredRawSecret", "raw-secret-shown-once"));
 
-    Mockito.verify(registerClient).handle(any());
+    verify(registerClient).handle(any());
   }
 
   @Test
@@ -166,7 +166,7 @@ class PlatformOAuthClientControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("clientregistry/platform/organization-oauth-clients"));
 
-    Mockito.verify(registerClient, never()).handle(any());
+    verify(registerClient, never()).handle(any());
   }
 
   @Test
@@ -176,7 +176,7 @@ class PlatformOAuthClientControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("clientregistry/platform/organization-oauth-clients"));
 
-    Mockito.verify(registerClient, never()).handle(any());
+    verify(registerClient, never()).handle(any());
   }
 
   @Test
@@ -189,7 +189,7 @@ class PlatformOAuthClientControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(basePath()));
 
-    Mockito.verify(deactivateClient).handle(any());
+    verify(deactivateClient).handle(any());
   }
 
   @Test
@@ -200,7 +200,7 @@ class PlatformOAuthClientControllerTest {
         .perform(post(basePath() + "/test_someone_elses/deactivate"))
         .andExpect(status().isNotFound());
 
-    Mockito.verify(deactivateClient, never()).handle(any());
+    verify(deactivateClient, never()).handle(any());
   }
 
   @Test
@@ -226,6 +226,6 @@ class PlatformOAuthClientControllerTest {
         .perform(post(basePath() + "/test_someone_elses/rotate-secret"))
         .andExpect(status().isNotFound());
 
-    Mockito.verify(rotateClientSecret, never()).handle(any());
+    verify(rotateClientSecret, never()).handle(any());
   }
 }

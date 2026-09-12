@@ -39,6 +39,7 @@ public class PlatformOrganizationDashboardController {
 
   private static final String DASHBOARD_VIEW = "organization/platform/dashboard";
   private static final String CONTENT_FRAGMENT = DASHBOARD_VIEW + " :: content";
+  private static final String ORGANIZATIONS_ATTRIBUTE = "organizations";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — present on every
   // request HTMX itself issues, absent on an ordinary browser navigation/form submit.
@@ -61,7 +62,7 @@ public class PlatformOrganizationDashboardController {
   public String showDashboard(final HttpServletRequest request, final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     model.addAttribute(
-        "organizations",
+        ORGANIZATIONS_ATTRIBUTE,
         listOrganizations.handle(
             new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
     model.addAttribute("form", new CreateOrganizationForm());
@@ -78,7 +79,7 @@ public class PlatformOrganizationDashboardController {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     if (bindingResult.hasErrors()) {
       model.addAttribute(
-          "organizations",
+          ORGANIZATIONS_ATTRIBUTE,
           listOrganizations.handle(
               new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
       return isHtmxRequest(request) ? CONTENT_FRAGMENT : DASHBOARD_VIEW;
@@ -104,7 +105,7 @@ public class PlatformOrganizationDashboardController {
       // second, full-navigation round trip for a request whose whole point was avoiding one. A
       // fresh, blank CreateOrganizationForm is exactly what a real GET would also produce.
       model.addAttribute(
-          "organizations",
+          ORGANIZATIONS_ATTRIBUTE,
           listOrganizations.handle(
               new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
       model.addAttribute("form", new CreateOrganizationForm());

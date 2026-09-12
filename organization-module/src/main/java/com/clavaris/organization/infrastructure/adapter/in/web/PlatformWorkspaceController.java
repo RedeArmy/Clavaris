@@ -84,6 +84,7 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACE_DETAIL_VIEW = "organization/platform/workspace-detail";
   private static final String MEMBERS_FRAGMENT = WORKSPACE_DETAIL_VIEW + " :: members";
   private static final String MEMBER_FORM_ATTRIBUTE = "memberForm";
+  private static final String ORGANIZATION_ATTRIBUTE = "organization";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
   // PlatformOrganizationDashboardController's own identical constant.
@@ -99,6 +100,8 @@ public class PlatformWorkspaceController {
   private final RemoveWorkspaceMemberUseCase removeMemberUseCase;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
+  // other multi-collaborator constructor in this codebase.
   public PlatformWorkspaceController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final GetWorkspaceForOrganizationUseCase getWorkspace,
@@ -132,7 +135,7 @@ public class PlatformWorkspaceController {
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     if (bindingResult.hasErrors()) {
-      model.addAttribute("organization", organization);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       model.addAttribute(
           "workspaces",
           listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
@@ -147,7 +150,7 @@ public class PlatformWorkspaceController {
             organizationId, form.getName(), AuditActor.platformAccount(ownerPlatformAccountId)));
 
     if (isHtmxRequest(request)) {
-      model.addAttribute("organization", organization);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       model.addAttribute(
           "workspaces",
           listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
@@ -295,7 +298,7 @@ public class PlatformWorkspaceController {
 
   private void populateMembersModel(
       final Model model, final Organization organization, final Workspace workspace) {
-    model.addAttribute("organization", organization);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     model.addAttribute("workspace", workspace);
     model.addAttribute(
         "members", listMembers.handle(new ListWorkspaceMembersQuery(workspace.id())));

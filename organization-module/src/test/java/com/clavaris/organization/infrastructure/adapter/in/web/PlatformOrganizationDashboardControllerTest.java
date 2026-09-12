@@ -95,7 +95,8 @@ class PlatformOrganizationDashboardControllerTest {
 
   @Test
   void plainFormPostRedirectsAfterCreatingAnOrganization() throws Exception {
-    when(createOrganization.handle(any())).thenReturn(mock(CreateOrganizationResult.class));
+    CreateOrganizationResult result = mock(CreateOrganizationResult.class);
+    when(createOrganization.handle(any())).thenReturn(result);
 
     mockMvc
         .perform(post("/platform/dashboard").param("name", "New Co"))
@@ -119,7 +120,8 @@ class PlatformOrganizationDashboardControllerTest {
   // not a redirect — the whole point of hx-target/hx-swap on the page's own form.
   @Test
   void htmxPostReturnsTheContentFragmentInsteadOfARedirect() throws Exception {
-    when(createOrganization.handle(any())).thenReturn(mock(CreateOrganizationResult.class));
+    CreateOrganizationResult result = mock(CreateOrganizationResult.class);
+    when(createOrganization.handle(any())).thenReturn(result);
 
     mockMvc
         .perform(post("/platform/dashboard").param("name", "New Co").header("HX-Request", "true"))

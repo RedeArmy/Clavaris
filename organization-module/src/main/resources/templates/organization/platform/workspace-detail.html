@@ -61,7 +61,8 @@
                                       th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
                                       hx-target="#members-content" hx-swap="outerHTML">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <select name="newRole">
+                                    <label class="clavaris-visually-hidden" th:for="${'new-role-' + member.accountId()}">New role for <span th:text="${member.accountId()}">account</span></label>
+                                    <select th:id="${'new-role-' + member.accountId()}" name="newRole">
                                         <option value="ADMIN" th:selected="${member.role().name() == 'ADMIN'}">Admin</option>
                                         <option value="MEMBER" th:selected="${member.role().name() == 'MEMBER'}">Member</option>
                                     </select>
