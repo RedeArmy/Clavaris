@@ -49,6 +49,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- ADR-0025: PlatformWebhookEndpointController is this module's first Thymeleaf-rendering
+             controller (every prior one here was REST-only) — same dependency client-registry-
+             module's own pom.xml already declares for its own identical situation. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>

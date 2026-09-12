@@ -6,8 +6,9 @@
   module's aggregated runtime classpath, not from either module's own standalone-MockMvc controller
   tests.
 
-  Keep in sync with organization-module's and identity-module's own copies by hand if a nav item is
-  added, removed, or reordered.
+  webhook-module keeps a fourth copy (webhook/platform/fragments/dashboard-nav.html) for the same
+  reason. Keep in sync with organization-module's, identity-module's, and webhook-module's own
+  copies by hand if a nav item is added, removed, or reordered.
 -->
 <aside th:fragment="sidebar(active)" class="clavaris-sidebar">
     <a class="clavaris-sidebar__brand" th:href="@{/platform/dashboard}">Clavaris</a>
