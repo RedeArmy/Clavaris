@@ -58,9 +58,10 @@ public final class OAuthClient {
   private final boolean requireConsent;
   private final List<String> postLogoutRedirectUris;
   private final Instant createdAt;
+  private final boolean active;
 
   // One parameter per persisted column — same rationale as this class's own TooManyMethods
-  // suppression above: a rehydration factory for a 10-column aggregate takes 10 parameters, not a
+  // suppression above: a rehydration factory for a 11-column aggregate takes 11 parameters, not a
   // sign this constructor does too much. Introducing a synthetic parameter-object purely to dodge
   // the threshold would add indirection without removing any real complexity.
   @SuppressWarnings("java:S107")
@@ -74,7 +75,8 @@ public final class OAuthClient {
       final List<String> allowedScopes,
       final boolean requireConsent,
       final List<String> postLogoutRedirectUris,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final boolean active) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.clientId = requireNonBlank(clientId, "clientId");
@@ -90,6 +92,7 @@ public final class OAuthClient {
     // way, same reasoning requireValidRedirectUris already applies to redirectUris.
     this.postLogoutRedirectUris = requireValidAbsoluteUris(postLogoutRedirectUris);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+    this.active = active;
   }
 
   /**
@@ -121,7 +124,8 @@ public final class OAuthClient {
         allowedScopes,
         requireConsent,
         postLogoutRedirectUris,
-        Instant.now());
+        Instant.now(),
+        true);
   }
 
   /**
@@ -141,7 +145,8 @@ public final class OAuthClient {
       final List<String> allowedScopes,
       final boolean requireConsent,
       final List<String> postLogoutRedirectUris,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final boolean active) {
     return new OAuthClient(
         id,
         organizationId,
@@ -152,7 +157,49 @@ public final class OAuthClient {
         allowedScopes,
         requireConsent,
         postLogoutRedirectUris,
-        createdAt);
+        createdAt,
+        active);
+  }
+
+  /**
+   * SDE-III review, 2026-09-11: added alongside the dashboard's own deactivate action — same
+   * rationale as {@code OrganizationClient#deactivate}/{@code PlatformClient#deactivate}. Revoking
+   * this client's own already-issued tokens is a separate, existing concern ({@code
+   * OrganizationRegisteredClientRepository}'s own lookup path), not this method's job —
+   * deactivating only stops *new* authorization/token requests for this client from succeeding.
+   */
+  public OAuthClient deactivate() {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        postLogoutRedirectUris,
+        createdAt,
+        false);
+  }
+
+  /**
+   * Same rationale as {@code OrganizationClient#rotateSecret}/{@code PlatformClient#rotateSecret}.
+   */
+  public OAuthClient rotateSecret(
+      @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        newClientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        postLogoutRedirectUris,
+        createdAt,
+        active);
   }
 
   private static String requireNonBlank(final String value, final String fieldName) {
@@ -309,5 +356,9 @@ public final class OAuthClient {
 
   public Instant createdAt() {
     return createdAt;
+  }
+
+  public boolean active() {
+    return active;
   }
 }

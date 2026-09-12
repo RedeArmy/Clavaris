@@ -48,6 +48,8 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionReposi
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountService;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationService;
+import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationService;
 import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountService;
@@ -85,6 +87,7 @@ import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountService;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -179,6 +182,18 @@ class IdentityUseCaseConfig {
       final AuditEventRecorder auditEvents) {
     return new PurgeSigningKeyForOrganizationService(
         signingKeys, keyMaterial, activateSigningKeyForOrganizationUseCase, auditEvents);
+  }
+
+  // SDE-III review, 2026-09-11: the dashboard's own signing-key listing page — see
+  // ListSigningKeysForOrganizationUseCase's own Javadoc for why this bean didn't exist until now.
+  // Same jwks-overlap-hours property app's own OrganizationAuthorizationServerConfig already reads
+  // for the real JWKS-serving path — one source of truth for "what should still be visible."
+  @Bean
+  /* package */ ListSigningKeysForOrganizationUseCase listSigningKeysForOrganizationUseCase(
+      final SigningKeyRepository signingKeys,
+      @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours) {
+    return new ListSigningKeysForOrganizationService(
+        signingKeys, Duration.ofHours(jwksOverlapHours));
   }
 
   @Bean

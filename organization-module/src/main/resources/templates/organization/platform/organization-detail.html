@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Clavaris')}">
+    <title>Organization — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> / <span th:text="${organization.name()}">Organization</span></p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1 th:text="${organization.name()}">Organization name</h1>
+                    <p>
+                        <span class="clavaris-badge"
+                              th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                              th:text="${organization.environment()}">DEVELOPMENT</span>
+                        &#183; Created <span th:text="${organization.createdAt()}">date</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: same HTMX-fragment shape as dashboard.html's own "content" div — the
+                 create-workspace form below posts to PlatformWorkspaceController#create, which
+                 re-renders just this whole fragment (updated table + a fresh, blank form) when the
+                 request carries HX-Request; a real full-page GET produces the exact same markup. -->
+            <div id="workspaces-content" th:fragment="workspaces" class="clavaris-section">
+                <h2>Workspaces</h2>
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(workspaces)}">
+                    <p class="clavaris-empty-state">No workspaces yet.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(workspaces)}">
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="workspace : ${workspaces}">
+                        <td th:text="${workspace.name()}">Workspace name</td>
+                        <td th:text="${workspace.createdAt()}">Created at</td>
+                        <td>
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()})}">View</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="clavaris-section-card">
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces(organizationId=${organization.id()})}"
+                          th:object="${workspaceForm}" method="post"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces(organizationId=${organization.id()})}"
+                          hx-target="#workspaces-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <div class="clavaris-field">
+                            <label for="workspace-name">New workspace name</label>
+                            <input id="workspace-name" type="text" th:field="*{name}" required/>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Create workspace</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Owned by client-registry-module (ADR-0023/ADR-0025) — a plain link, not an
+                 embedded fragment: that page's own controller lives in a different module, and
+                 this page stays organization-module's own read, unmodified by that module's
+                 writes. Same "link out, don't embed across a module boundary" choice this page's
+                 own Workspace "View" links already make one level down. -->
+            <div class="clavaris-section">
+                <h2>Secret Keys</h2>
+                <div class="clavaris-section-card">
+                    <p>Secret Keys a consuming application uses to call the management API on this
+                        Organization's own behalf.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/secret-keys(organizationId=${organization.id()})}">Manage Secret Keys</a>
+                </div>
+            </div>
+
+            <!-- Same "link out, don't embed across a module boundary" reasoning as the Secret Keys
+                 section above — also owned by client-registry-module, ADR-0010/ADR-0025. Distinct
+                 concept from Secret Keys: this is real end-user OIDC login client registration
+                 (technical-debt-register.md TD-FUT-032's own naming-mix-up paragraph documents why
+                 that distinction matters). -->
+            <div class="clavaris-section">
+                <h2>OAuth Clients</h2>
+                <div class="clavaris-section-card">
+                    <p>The end-user OIDC login client registrations this Organization's own
+                        consuming application(s) use to authenticate real end users against.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organization.id()})}">Manage OAuth Clients</a>
+                </div>
+            </div>
+
+            <!-- Owned by identity-module (ADR-0010 §5.2/ADR-0025) — same "link out, don't embed
+                 across a module boundary" reasoning as the two sections above. -->
+            <div class="clavaris-section">
+                <h2>Signing Keys</h2>
+                <div class="clavaris-section-card">
+                    <p>The RS256 key pair this Organization's own tenant issuer signs tokens under —
+                        rotate with overlap, self-service, from this page's own linked view.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/signing-keys(organizationId=${organization.id()})}">Manage Signing Keys</a>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>

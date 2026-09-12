@@ -10,6 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
+import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.common.domain.model.AuditActor;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,11 +19,17 @@ import org.junit.jupiter.api.Test;
 
 class RegisterOAuthClientServiceTest {
 
+  private static final AuditActor ACTOR = AuditActor.platformClient("test-platform-client");
+
   private final UUID organizationId = UUID.randomUUID();
   private OAuthClientRepository oauthClients;
   private OrganizationExistsChecker organizationExistsChecker;
   private OrganizationEnvironmentChecker environmentChecker;
   private ClientSecretHasher hasher;
+  // A real, simple stub rather than a Mockito mock — generatesADifferentClientIdAndSecretOnEachCall
+  // below needs distinct values per call, same as the real SecureRandom-backed adapter would give.
+  private final OAuthClientSecretGenerator secretGenerator = () -> UUID.randomUUID().toString();
+  private AuditEventRecorder auditEvents;
   private RegisterOAuthClientService service;
 
   @BeforeEach
@@ -30,9 +38,15 @@ class RegisterOAuthClientServiceTest {
     organizationExistsChecker = mock(OrganizationExistsChecker.class);
     environmentChecker = mock(OrganizationEnvironmentChecker.class);
     hasher = mock(ClientSecretHasher.class);
+    auditEvents = mock(AuditEventRecorder.class);
     service =
         new RegisterOAuthClientService(
-            oauthClients, organizationExistsChecker, environmentChecker, hasher);
+            oauthClients,
+            organizationExistsChecker,
+            environmentChecker,
+            hasher,
+            secretGenerator,
+            auditEvents);
 
     when(organizationExistsChecker.exists(organizationId)).thenReturn(true);
     when(hasher.hash(anyString())).thenReturn("argon2id$hashed");
@@ -48,13 +62,39 @@ class RegisterOAuthClientServiceTest {
                 List.of("authorization_code"),
                 List.of("openid"),
                 true,
-                List.of()));
+                List.of(),
+                ACTOR));
 
     assertThat(result.client().organizationId()).isEqualTo(organizationId);
     assertThat(result.client().clientId()).isNotBlank();
     assertThat(result.client().clientSecretHash()).isEqualTo("argon2id$hashed");
     assertThat(result.rawClientSecret()).isNotBlank();
     verify(oauthClients).save(result.client());
+  }
+
+  // SDE-III review, 2026-09-11: RegisterOAuthClientService used to audit nothing at all — the one
+  // create-shaped use case in this module that didn't. This is the real, load-bearing behavior
+  // proving that gap is closed, not just that the command accepts an actor.
+  @Test
+  void auditsTheRegistrationUnderTheGivenActorNeverLoggingTheRawSecret() {
+    RegisterOAuthClientResult result =
+        service.handle(
+            new RegisterOAuthClientCommand(
+                organizationId,
+                List.of("https://jobseeker.example.com/callback"),
+                List.of("authorization_code"),
+                List.of("openid"),
+                true,
+                List.of(),
+                ACTOR));
+
+    verify(auditEvents)
+        .write(
+            ACTOR,
+            "oauth_client.registered",
+            "Organization",
+            organizationId.toString(),
+            "clientId=" + result.client().clientId());
   }
 
   @Test
@@ -67,7 +107,8 @@ class RegisterOAuthClientServiceTest {
                 List.of("authorization_code"),
                 List.of("openid"),
                 true,
-                List.of()));
+                List.of(),
+                ACTOR));
 
     // The stored hash must never equal the raw secret handed back to the caller — that would mean
     // the "hasher" silently did nothing.
@@ -83,7 +124,8 @@ class RegisterOAuthClientServiceTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
-            List.of());
+            List.of(),
+            ACTOR);
 
     RegisterOAuthClientResult first = service.handle(command);
     RegisterOAuthClientResult second = service.handle(command);
@@ -107,7 +149,8 @@ class RegisterOAuthClientServiceTest {
             List.of("authorization_code"),
             List.of("openid"),
             true,
-            List.of());
+            List.of(),
+            ACTOR);
 
     assertThatExceptionOfType(OrganizationNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -127,7 +170,8 @@ class RegisterOAuthClientServiceTest {
                 List.of("authorization_code"),
                 List.of("openid"),
                 true,
-                List.of("https://jobseeker.example.com/logged-out")));
+                List.of("https://jobseeker.example.com/logged-out"),
+                ACTOR));
 
     assertThat(result.client().postLogoutRedirectUris())
         .containsExactly("https://jobseeker.example.com/logged-out");
@@ -146,7 +190,8 @@ class RegisterOAuthClientServiceTest {
                 List.of("authorization_code"),
                 List.of("openid"),
                 true,
-                List.of()));
+                List.of(),
+                ACTOR));
 
     assertThat(result.client().clientId()).startsWith("live_");
   }
@@ -163,7 +208,8 @@ class RegisterOAuthClientServiceTest {
                 List.of("authorization_code"),
                 List.of("openid"),
                 true,
-                List.of()));
+                List.of(),
+                ACTOR));
 
     assertThat(result.client().clientId()).startsWith("test_");
   }

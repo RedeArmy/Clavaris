@@ -30,6 +30,10 @@ import com.clavaris.organization.application.usecase.getaccountauthenticationpol
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysService;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysUseCase;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
+import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountService;
+import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationService;
+import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsService;
@@ -136,6 +140,13 @@ class OrganizationUseCaseConfig {
     return new ListOrganizationsForPlatformAccountService(organizations);
   }
 
+  // ADR-0025: the dashboard's own Organization-detail read.
+  @Bean
+  /* package */ GetOrganizationForPlatformAccountUseCase getOrganizationForPlatformAccountUseCase(
+      final OrganizationRepository organizations) {
+    return new GetOrganizationForPlatformAccountService(organizations);
+  }
+
   // ADR-0010 §6.2: the hard system-wide cap no Organization's own RateLimitPolicy may ever
   // exceed — an operational value, not a domain constant, so it's configured here rather than
   // hardcoded in RateLimitPolicy itself. Default (6000/min = 100 req/s) is 10x
@@ -239,6 +250,15 @@ class OrganizationUseCaseConfig {
   /* package */ ListWorkspaceMembersUseCase listWorkspaceMembersUseCase(
       final WorkspaceMembershipRepository memberships) {
     return new ListWorkspaceMembersService(memberships);
+  }
+
+  // ADR-0025: the dashboard's own Workspace-detail-page ownership check — confirms a workspaceId
+  // named in a /platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId} URL
+  // actually belongs to that same, already-ownership-verified organizationId.
+  @Bean
+  /* package */ GetWorkspaceForOrganizationUseCase getWorkspaceForOrganizationUseCase(
+      final WorkspaceRepository workspaces) {
+    return new GetWorkspaceForOrganizationService(workspaces);
   }
 
   // PMD.LinguisticNaming: same false positive SetRateLimitPolicyForOrganizationUseCase's own

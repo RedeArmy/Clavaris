@@ -23,6 +23,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * /platform/login}. {@code app}'s own {@code PlatformDashboardSecurityConfig} enforces the
  * authentication requirement; this controller only ever runs once a request already carries an
  * authenticated {@code PlatformAccount} session.
+ *
+ * <p>ADR-0025: {@code create} below branches on HTMX's own {@code HX-Request} header — present, it
+ * returns just the {@code content} fragment (dashboard.html's own {@code th:fragment="content"}
+ * div, covering both the organizations table and the create form) so {@code hx-target="
+ * #dashboard-content"}/{@code hx-swap="outerHTML"} on the page's own form can swap it in without a
+ * full navigation; absent (JavaScript disabled, or a non-browser client), the exact same {@code
+ * redirect:}/full-page-render behavior this controller already had is unchanged — HTMX is a
+ * progressive enhancement here, never a requirement for this page to work.
  */
 @SuppressWarnings("PMD.LongVariable")
 @Controller
@@ -30,6 +38,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class PlatformOrganizationDashboardController {
 
   private static final String DASHBOARD_VIEW = "organization/platform/dashboard";
+  private static final String CONTENT_FRAGMENT = DASHBOARD_VIEW + " :: content";
+  private static final String ORGANIZATIONS_ATTRIBUTE = "organizations";
+
+  // HTMX's own request header (https://htmx.org/reference/#request_headers) — present on every
+  // request HTMX itself issues, absent on an ordinary browser navigation/form submit.
+  private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private final CreateOrganizationUseCase createOrganization;
   private final ListOrganizationsForPlatformAccountUseCase listOrganizations;
@@ -48,7 +62,7 @@ public class PlatformOrganizationDashboardController {
   public String showDashboard(final HttpServletRequest request, final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     model.addAttribute(
-        "organizations",
+        ORGANIZATIONS_ATTRIBUTE,
         listOrganizations.handle(
             new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
     model.addAttribute("form", new CreateOrganizationForm());
@@ -65,10 +79,10 @@ public class PlatformOrganizationDashboardController {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     if (bindingResult.hasErrors()) {
       model.addAttribute(
-          "organizations",
+          ORGANIZATIONS_ATTRIBUTE,
           listOrganizations.handle(
               new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
-      return DASHBOARD_VIEW;
+      return isHtmxRequest(request) ? CONTENT_FRAGMENT : DASHBOARD_VIEW;
     }
 
     // Not caught here: CreateOrganizationUseCase now validates ownerPlatformAccountId against a
@@ -86,7 +100,22 @@ public class PlatformOrganizationDashboardController {
             ownerPlatformAccountId,
             AuditActor.platformAccount(ownerPlatformAccountId)));
 
+    if (isHtmxRequest(request)) {
+      // Re-rendered directly (200), not "redirect:" — HTMX's own redirect-following would mean a
+      // second, full-navigation round trip for a request whose whole point was avoiding one. A
+      // fresh, blank CreateOrganizationForm is exactly what a real GET would also produce.
+      model.addAttribute(
+          ORGANIZATIONS_ATTRIBUTE,
+          listOrganizations.handle(
+              new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
+      model.addAttribute("form", new CreateOrganizationForm());
+      return CONTENT_FRAGMENT;
+    }
     return "redirect:/platform/dashboard";
+  }
+
+  private static boolean isHtmxRequest(final HttpServletRequest request) {
+    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
   }
 
   // Not expected to ever actually be empty — app's own security chain guarantees an authenticated

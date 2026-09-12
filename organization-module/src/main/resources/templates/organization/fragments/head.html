@@ -1,0 +1,23 @@
+<!--
+  Local copy of identity-module's own identity/fragments/head.html (same 5 lines: charset,
+  viewport, title, clavaris.css link, ADR-0009 §3 brand-color hook) — deliberate duplication, not
+  drift. Each module (identity-module, organization-module) owns only its own domain code per
+  CLAUDE.md §7.2's dependency rule; no module here declares a Maven dependency on another
+  bounded-context module, in main or test scope, which is exactly what a shared cross-module
+  Thymeleaf fragment would otherwise require (both modules' own standalone-MockMvc + real-Thymeleaf
+  controller tests, the established pattern in this codebase, render module-local templates only —
+  a cross-module th:replace works in the app module's aggregated runtime classpath but breaks these
+  tests at the module level, which is how this duplication was actually found: it's what surfaced
+  the original single shared fragment as untestable in isolation).
+
+  Keep in sync with identity-module's identity/fragments/head.html by hand if either changes —
+  five lines, low churn, an explicit trade favoring per-module test self-containment over DRY.
+-->
+<head th:fragment="head(pageTitle)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="${pageTitle}">Clavaris</title>
+    <link rel="stylesheet" th:href="@{/css/clavaris.css}"/>
+    <style th:if="${branding != null and branding.primaryColor != null and branding.primaryColor.isPresent()}"
+           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see ADR-0009 §3 */</style>
+</head>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Signing Keys — Clavaris')}">
+    <title>Signing Keys — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Signing Keys</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Signing Keys</h1>
+                    <p>The RS256 key pair this Organization's own tenant issuer signs tokens under
+                        (ADR-0010 §5.2). Rotating retires the current key and activates a fresh one —
+                        the retired key keeps publishing in JWKS for the configured overlap window,
+                        so any already-issued, still-valid token keeps verifying until it naturally
+                        expires.</p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section. Rotation
+                 carries no secret to protect (the private key material never leaves
+                 OrganizationSigningKeyMaterialFactory) — unlike Secret Keys/OAuth Client secrets, a
+                 successful rotation follows this codebase's normal "success redirects, HTMX gets a
+                 fragment" convention. See PlatformSigningKeyController's own Javadoc for why
+                 emergency purge has no button here at all. -->
+            <div id="keys-content" th:fragment="keys" class="clavaris-section">
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(keys)}">
+                    <thead>
+                    <tr>
+                        <th>Key ID</th>
+                        <th>Algorithm</th>
+                        <th>Status</th>
+                        <th>Active from</th>
+                        <th>Retired at</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="key : ${keys}">
+                        <td><code th:text="${key.kid()}">kid</code></td>
+                        <td th:text="${key.algorithm()}">RS256</td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${key.retiredAt().isEmpty()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${key.retiredAt().isEmpty()} ? 'Active' : 'Retired (in overlap)'">Active</span>
+                        </td>
+                        <td th:text="${key.activeFrom()}">Active from</td>
+                        <td th:text="${key.retiredAt().orElse(null)}">—</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="clavaris-section-card">
+                    <h2>Rotate now</h2>
+                    <p>Generates a fresh key, activates it immediately, and retires the current one
+                        with the normal overlap window.</p>
+                    <form method="post"
+                          th:action="@{/platform/dashboard/organizations/{organizationId}/signing-keys/rotate(organizationId=${organizationId})}"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/signing-keys/rotate(organizationId=${organizationId})}"
+                          hx-target="#keys-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Rotate signing key</button>
+                    </form>
+                </div>
+
+                <div class="clavaris-section-card">
+                    <h2>Emergency key purge</h2>
+                    <p>Reserved for a <strong>confirmed</strong> key compromise — unlike rotation
+                        above, a purge breaks every currently-valid token signed under the purged key
+                        immediately, with no overlap window. This is an operator-only action, not
+                        available from this dashboard — contact support if you believe a key has been
+                        compromised.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>

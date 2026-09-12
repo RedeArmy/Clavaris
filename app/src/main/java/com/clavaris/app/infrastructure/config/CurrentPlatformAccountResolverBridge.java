@@ -17,9 +17,15 @@ import org.springframework.stereotype.Component;
  * source {@link PlatformAccountSessionRevokerBridge} keys its own {@code SessionRegistry} lookup
  * by.
  *
+ * <p>Also implements client-registry-module's own identically-shaped port ({@code
+ * clientregistry.infrastructure.adapter.in.web.CurrentPlatformAccountResolver}) — one bridge class
+ * for both, same "structurally identical but deliberately separate ports, one bridge" precedent
+ * {@code OrganizationExistsCheckerBridge} already establishes, since both return the exact same
+ * {@code Optional<UUID>} (no erasure conflict, unlike the identity-module case below).
+ *
  * <p>TD-FUT-026 (closed 2026-09-02): identity-module's own same-shaped port, {@link
  * IdentityCurrentPlatformAccountResolverBridge}, is a SEPARATE class, not this one implementing a
- * second interface — {@code resolve(HttpServletRequest)} would then need two different return types
+ * third interface — {@code resolve(HttpServletRequest)} would then need two different return types
  * on the exact same erasure ({@code Optional<UUID>} here vs. {@code Optional<PlatformAccountId>}
  * there), which Java cannot express on one class. The auth-check logic itself is still duplicated
  * across the two, deliberately — the alternative (one shared private helper returning {@code
@@ -27,7 +33,9 @@ import org.springframework.stereotype.Component;
  * lines of logic.
  */
 @Component
-class CurrentPlatformAccountResolverBridge implements CurrentPlatformAccountResolver {
+class CurrentPlatformAccountResolverBridge
+    implements CurrentPlatformAccountResolver,
+        com.clavaris.clientregistry.infrastructure.adapter.in.web.CurrentPlatformAccountResolver {
 
   // The exact authority SpringSecurityPlatformAuthenticatedSessionEstablisher grants and no
   // tenant-tier session ever carries — see this constant's use in resolve() below.

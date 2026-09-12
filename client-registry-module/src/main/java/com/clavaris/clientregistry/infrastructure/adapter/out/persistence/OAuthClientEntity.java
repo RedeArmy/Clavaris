@@ -55,6 +55,11 @@ public class OAuthClientEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  // SDE-III review, 2026-09-11: same deactivate-without-delete convention as
+  // OrganizationClientEntity/PlatformClientEntity's own identical column.
+  @Column(nullable = false)
+  private boolean active;
+
   protected OAuthClientEntity() {}
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
@@ -70,7 +75,8 @@ public class OAuthClientEntity {
       final String allowedScopes,
       final boolean requireConsent,
       final String postLogoutRedirectUris,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final boolean active) {
     this.id = id;
     this.organizationId = organizationId;
     this.clientId = clientId;
@@ -81,6 +87,7 @@ public class OAuthClientEntity {
     this.requireConsent = requireConsent;
     this.postLogoutRedirectUris = postLogoutRedirectUris;
     this.createdAt = createdAt;
+    this.active = active;
   }
 
   public UUID getId() {
@@ -121,5 +128,9 @@ public class OAuthClientEntity {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public boolean isActive() {
+    return active;
   }
 }
