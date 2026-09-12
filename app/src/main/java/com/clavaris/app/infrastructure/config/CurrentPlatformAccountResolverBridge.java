@@ -17,10 +17,11 @@ import org.springframework.stereotype.Component;
  * source {@link PlatformAccountSessionRevokerBridge} keys its own {@code SessionRegistry} lookup
  * by.
  *
- * <p>Also implements client-registry-module's own identically-shaped port ({@code
- * clientregistry.infrastructure.adapter.in.web.CurrentPlatformAccountResolver}) — one bridge class
- * for both, same "structurally identical but deliberately separate ports, one bridge" precedent
- * {@code OrganizationExistsCheckerBridge} already establishes, since both return the exact same
+ * <p>Also implements client-registry-module's and webhook-module's own identically-shaped ports
+ * ({@code clientregistry.infrastructure.adapter.in.web.CurrentPlatformAccountResolver}, {@code
+ * webhook.infrastructure.adapter.in.web.CurrentPlatformAccountResolver}) — one bridge class for all
+ * three, same "structurally identical but deliberately separate ports, one bridge" precedent {@code
+ * OrganizationExistsCheckerBridge} already establishes, since all three return the exact same
  * {@code Optional<UUID>} (no erasure conflict, unlike the identity-module case below).
  *
  * <p>TD-FUT-026 (closed 2026-09-02): identity-module's own same-shaped port, {@link
@@ -35,7 +36,8 @@ import org.springframework.stereotype.Component;
 @Component
 class CurrentPlatformAccountResolverBridge
     implements CurrentPlatformAccountResolver,
-        com.clavaris.clientregistry.infrastructure.adapter.in.web.CurrentPlatformAccountResolver {
+        com.clavaris.clientregistry.infrastructure.adapter.in.web.CurrentPlatformAccountResolver,
+        com.clavaris.webhook.infrastructure.adapter.in.web.CurrentPlatformAccountResolver {
 
   // The exact authority SpringSecurityPlatformAuthenticatedSessionEstablisher grants and no
   // tenant-tier session ever carries — see this constant's use in resolve() below.

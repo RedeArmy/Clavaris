@@ -110,6 +110,18 @@
                        th:href="@{/platform/dashboard/organizations/{organizationId}/signing-keys(organizationId=${organization.id()})}">Manage Signing Keys</a>
                 </div>
             </div>
+
+            <!-- Owned by webhook-module (ADR-0007/ADR-0025) — same "link out, don't embed across a
+                 module boundary" reasoning as the sections above. -->
+            <div class="clavaris-section">
+                <h2>Webhook Endpoints</h2>
+                <div class="clavaris-section-card">
+                    <p>URLs this Organization's own consuming application(s) receive event
+                        deliveries at.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organization.id()})}">Manage Webhook Endpoints</a>
+                </div>
+            </div>
         </div>
     </main>
 </div>

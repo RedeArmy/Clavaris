@@ -14,11 +14,17 @@ import org.springframework.stereotype.Component;
  * and the exact same ownership-filter logic organization-module's own {@code
  * GetOrganizationForPlatformAccountService} applies for its own dashboard controllers, just
  * projected down to a bare name since that's all this module's own dashboard page ever needs.
+ *
+ * <p>Also implements webhook-module's own identically-shaped port ({@code
+ * webhook.infrastructure.adapter.in.web.OrganizationForPlatformAccountResolver}) — one bridge class
+ * for both, same identical-erasure reasoning {@link CurrentPlatformAccountResolverBridge}'s own
+ * Javadoc documents for its own three interfaces.
  */
 @SuppressWarnings("PMD.LongVariable")
 @Component
 class OrganizationForPlatformAccountResolverBridge
-    implements OrganizationForPlatformAccountResolver {
+    implements OrganizationForPlatformAccountResolver,
+        com.clavaris.webhook.infrastructure.adapter.in.web.OrganizationForPlatformAccountResolver {
 
   private final OrganizationRepository organizations;
 

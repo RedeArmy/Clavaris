@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Webhook Endpoints — Clavaris')}">
+    <title>Webhook Endpoints — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Webhook Endpoints</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Webhook Endpoints</h1>
+                    <p>URLs this Organization's own consuming application(s) receive event
+                        deliveries at (ADR-0007). Each delivery is signed with this endpoint's own
+                        secret — shown exactly once, at registration or rotation.</p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
+                 PlatformOrganizationClientController's own Javadoc for the general shape this page
+                 mirrors. Register/rotate-secret never redirect even on a plain form submit — the
+                 raw signing secret can't safely travel through one. Unlike Secret Keys/OAuth
+                 Clients, this endpoint supports both deactivate AND reactivate, so both actions
+                 appear per row (see PlatformWebhookEndpointController's own Javadoc). -->
+            <div id="endpoints-content" th:fragment="endpoints" class="clavaris-section">
+                <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
+                    <strong>New signing secret for endpoint <code th:text="${justRegisteredEndpointId}">endpointId</code>:</strong>
+                    <code th:text="${justRegisteredRawSecret}">secret</code><br/>
+                    Copy this now — it will not be shown again.
+                </p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${unsafeWebhookUrlError}">
+                    That URL isn't safe to deliver webhooks to (it resolves to a private, loopback,
+                    or otherwise internal network address).
+                </p>
+
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(endpoints)}">
+                    <p class="clavaris-empty-state">No webhook endpoints yet — register the first one below.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(endpoints)}">
+                    <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th>Description</th>
+                        <th>Event Types</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="endpoint : ${endpoints}">
+                        <td><code th:text="${endpoint.url()}">url</code></td>
+                        <td th:text="${endpoint.description()}">description</td>
+                        <td th:text="${#strings.listJoin(endpoint.subscribedEventTypes(), ', ')}">event types</td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${endpoint.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
+                        </td>
+                        <td th:text="${endpoint.createdAt()}">Created at</td>
+                        <td>
+                            <div class="clavaris-row-actions">
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/rotate-secret(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/rotate-secret(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                                      hx-target="#endpoints-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rotate secret</button>
+                                </form>
+                                <form method="post" th:if="${endpoint.active()}"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deactivate(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deactivate(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                                      hx-target="#endpoints-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
+                                </form>
+                                <form method="post" th:unless="${endpoint.active()}"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/activate(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/activate(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                                      hx-target="#endpoints-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Reactivate</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="clavaris-section-card">
+                    <h2>Register a new webhook endpoint</h2>
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}"
+                          th:object="${createForm}" method="post"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}"
+                          hx-target="#endpoints-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <div class="clavaris-field">
+                            <label for="webhook-url">URL</label>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('url')}" th:errors="*{url}">URL error</p>
+                            <input id="webhook-url" type="url" th:field="*{url}" placeholder="https://example.com/webhooks/clavaris" required/>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <label for="webhook-description">Description (optional)</label>
+                            <input id="webhook-description" type="text" th:field="*{description}"/>
+                        </div>
+
+                        <div class="clavaris-field">
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('subscribedEventTypes')}" th:errors="*{subscribedEventTypes}">Event types error</p>
+                            <div th:each="eventType : ${eventTypeOptions}">
+                                <label>
+                                    <input type="checkbox" th:field="*{subscribedEventTypes}" th:value="${eventType}"/>
+                                    <span th:text="${eventType}">event type</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Register endpoint</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>
