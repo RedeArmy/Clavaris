@@ -12,6 +12,7 @@ import com.clavaris.organization.domain.model.WorkspaceMembership;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ADR-0025: the dashboard's own audit-log query — the one item {@code technical-debt-register.md}'s
@@ -77,7 +78,20 @@ public class GetAuditLogForOrganizationService implements GetAuditLogForOrganiza
     this.auditEvents = auditEvents;
   }
 
+  // SDE-III performance pass, 2026-09-13 (TD-PERF-021): this method's own workspace→membership
+  // fan-out below is a real sequential N+1 (one query per Workspace, inside a loop) plus 3 more
+  // independent round trips (OAuth Client ids, Webhook Endpoint ids, the final audit query itself)
+  // — previously none of it ran inside a shared transaction, so every one of those W+4 round trips
+  // independently checked a connection out of, and back into, HikariCP's own pool (sized to 10,
+  // TD-PERF-007) instead of one connection held for the whole logical read. readOnly=true, not a
+  // plain @Transactional: this method only ever reads, so Hibernate's own dirty-checking flush plan
+  // is pure overhead here, and the annotation now documents that intent for whoever reads this
+  // signature next, not just this call. Does not eliminate the N+1 shape itself (a real, bigger
+  // fan-out redesign — batching every workspace's membership query into one IN (...) call — is
+  // tracked as its own follow-up in TD-PERF-021, not silently done here); this is the safe,
+  // narrowly-scoped half of that fix: one connection for the whole read, not W+4.
   @Override
+  @Transactional(readOnly = true)
   public List<AuditEvent> handle(final UUID organizationId) {
     final List<AuditEventTargetRef> targets = new ArrayList<>();
     targets.add(new AuditEventTargetRef("Organization", organizationId.toString()));
