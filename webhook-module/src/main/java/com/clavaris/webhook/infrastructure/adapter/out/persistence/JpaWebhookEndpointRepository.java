@@ -90,6 +90,16 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
         .toList();
   }
 
+  // Same reasoning as insert()'s own @Transactional above: a Spring Data derived delete query
+  // needs a real, currently-open transaction on this thread — the real production call path
+  // already has one (DeleteOrganizationService.handle is @Transactional), but this method must
+  // not depend on every future caller remembering that.
+  @Override
+  @Transactional
+  public void deleteAllByOrganizationId(final UUID organizationId) {
+    endpoints.deleteAllByOrganizationId(organizationId);
+  }
+
   private WebhookEndpoint toDomain(final WebhookEndpointEntity entity) {
     return WebhookEndpoint.reconstitute(
         entity.getId(),

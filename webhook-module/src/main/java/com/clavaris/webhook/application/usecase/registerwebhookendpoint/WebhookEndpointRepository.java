@@ -61,4 +61,13 @@ public interface WebhookEndpointRepository {
    * one dispatch tick, rather than re-fetched from Postgres for each one.
    */
   List<WebhookEndpoint> findActiveByOrganizationId(UUID organizationId);
+
+  /**
+   * TD-FUT-032/SDE-III review, 2026-09-13: {@code DeleteOrganizationService}'s own cross-module
+   * erasure call (via {@code OrganizationWebhookDataEraser}) — {@code organization_id} carries no
+   * FK to {@code organizations} at all (a deliberate cross-module boundary, this table's own
+   * migration comment), so without this method a deleted Organization's own endpoints would
+   * silently survive as orphaned rows.
+   */
+  void deleteAllByOrganizationId(UUID organizationId);
 }

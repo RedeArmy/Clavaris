@@ -10,4 +10,6 @@ interface SpringDataWebhookEndpointJpaRepository
   List<WebhookEndpointEntity> findAllByOrganizationId(UUID organizationId);
 
   List<WebhookEndpointEntity> findAllByOrganizationIdAndActiveTrue(UUID organizationId);
+
+  void deleteAllByOrganizationId(UUID organizationId);
 }

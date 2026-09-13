@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Delete Organization — Clavaris')}">
+    <title>Delete Organization — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span>Delete</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Delete Organization</h1>
+                </div>
+            </div>
+
+            <!-- TD-FUT-032: the first genuine two-step confirmation flow in this codebase — see
+                 PlatformDeleteOrganizationController's own Javadoc for the full design. -->
+            <div class="clavaris-section">
+                <div class="clavaris-section-card">
+                    <p class="clavaris-alert clavaris-alert--error">
+                        <strong>This is permanent and cannot be undone.</strong> Deleting
+                        <strong th:text="${organization.name()}">Organization</strong> destroys:
+                    </p>
+                    <ul>
+                        <li>Every Account in this Organization's own account pool, and everything
+                            tied to each one — password credentials, sessions, refresh tokens</li>
+                        <li>Every Secret Key and OAuth Client this Organization ever registered</li>
+                        <li>Every signing key this Organization ever rotated through</li>
+                        <li>Every Webhook Endpoint and its delivery history</li>
+                        <li>Every Workspace and Workspace membership</li>
+                    </ul>
+                    <p th:if="${organization.linkedEnvironmentOrganizationId().isPresent()}">
+                        This Organization is paired with a linked environment — that Organization
+                        will be unlinked, but not deleted, and will remain fully intact on its own.
+                    </p>
+
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationExpiredError}">
+                        That confirmation expired or was already used — a fresh one has been
+                        issued below. Please confirm again.
+                    </p>
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${nameMismatchError}">
+                        The name you typed didn't match — a fresh confirmation has been issued
+                        below. Please try again.
+                    </p>
+
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/delete(organizationId=${organization.id()})}"
+                          method="post">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <input type="hidden" name="confirmationToken" th:value="${confirmationToken}"/>
+
+                        <div class="clavaris-field">
+                            <label for="confirmed-name">
+                                Type <strong th:text="${organization.name()}">the Organization's name</strong> to confirm
+                            </label>
+                            <input id="confirmed-name" type="text" name="confirmedName" autocomplete="off" required/>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete this Organization permanently</button>
+                        <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                           th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

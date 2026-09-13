@@ -24,6 +24,7 @@ import com.clavaris.organization.application.usecase.deleteorganization.EventOut
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationOAuthClientsEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationTokenRevoker;
+import com.clavaris.organization.application.usecase.deleteorganization.OrganizationWebhookDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationService;
@@ -211,6 +212,7 @@ class OrganizationUseCaseConfig {
       @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
       @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
+      final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new DeleteOrganizationService(
@@ -218,6 +220,7 @@ class OrganizationUseCaseConfig {
         organizationTokenRevoker,
         identityDataEraser,
         oauthClientsEraser,
+        webhookDataEraser,
         auditEvents,
         eventOutboxWriter);
   }

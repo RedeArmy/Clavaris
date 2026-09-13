@@ -45,4 +45,6 @@ interface SpringDataWebhookDeliveryJpaRepository
   // FAILED rows are never swept regardless of age, since they may still be legitimately due for a
   // future retry.
   long deleteByCreatedAtBeforeAndStatusIn(Instant cutoff, List<String> statuses);
+
+  void deleteAllByOrganizationId(UUID organizationId);
 }
