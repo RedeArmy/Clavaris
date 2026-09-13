@@ -12,9 +12,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
+import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedQuery;
+import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
@@ -43,6 +47,7 @@ class PlatformWebhookEndpointControllerTest {
 
   private RegisterWebhookEndpointUseCase registerEndpoint;
   private ListWebhookEndpointsForOrganizationUseCase listEndpoints;
+  private ListWebhookEndpointsForOrganizationPagedUseCase listEndpointsPaged;
   private DeactivateWebhookEndpointUseCase deactivateEndpoint;
   private ActivateWebhookEndpointUseCase activateEndpoint;
   private RotateWebhookEndpointSecretUseCase rotateEndpointSecret;
@@ -55,6 +60,7 @@ class PlatformWebhookEndpointControllerTest {
   void setUp() {
     registerEndpoint = mock(RegisterWebhookEndpointUseCase.class);
     listEndpoints = mock(ListWebhookEndpointsForOrganizationUseCase.class);
+    listEndpointsPaged = mock(ListWebhookEndpointsForOrganizationPagedUseCase.class);
     deactivateEndpoint = mock(DeactivateWebhookEndpointUseCase.class);
     activateEndpoint = mock(ActivateWebhookEndpointUseCase.class);
     rotateEndpointSecret = mock(RotateWebhookEndpointSecretUseCase.class);
@@ -66,6 +72,7 @@ class PlatformWebhookEndpointControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
     when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(listEndpointsPaged.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -86,6 +93,7 @@ class PlatformWebhookEndpointControllerTest {
                 new PlatformWebhookEndpointController(
                     registerEndpoint,
                     listEndpoints,
+                    listEndpointsPaged,
                     deactivateEndpoint,
                     activateEndpoint,
                     rotateEndpointSecret,
@@ -108,15 +116,43 @@ class PlatformWebhookEndpointControllerTest {
         "encrypted-secret");
   }
 
+  private static Page<WebhookEndpoint> emptyPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
   @Test
   void showsTheOrganizationsWebhookEndpoints() throws Exception {
-    when(listEndpoints.handle(any())).thenReturn(List.of(sampleEndpoint()));
+    WebhookEndpoint endpoint = sampleEndpoint();
+    when(listEndpointsPaged.handle(any()))
+        .thenReturn(new Page<>(List.of(endpoint), 0, PageRequest.DEFAULT_SIZE, 1));
 
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(view().name("webhook/platform/organization-webhook-endpoints"))
-        .andExpect(model().attribute("organizationName", "Acme Co"));
+        .andExpect(model().attribute("organizationName", "Acme Co"))
+        .andExpect(model().attribute("endpoints", List.of(endpoint)));
+  }
+
+  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  @Test
+  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
+    mockMvc.perform(get(basePath()).param("page", "2"));
+
+    verify(listEndpointsPaged)
+        .handle(
+            new ListWebhookEndpointsForOrganizationPagedQuery(
+                organizationId, new PageRequest(2, PageRequest.DEFAULT_SIZE)));
+  }
+
+  // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the endpoints
+  // fragment, not the full page.
+  @Test
+  void htmxGetReturnsTheEndpointsFragmentInsteadOfTheFullPage() throws Exception {
+    mockMvc
+        .perform(get(basePath()).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("webhook/platform/organization-webhook-endpoints :: endpoints"));
   }
 
   @Test
