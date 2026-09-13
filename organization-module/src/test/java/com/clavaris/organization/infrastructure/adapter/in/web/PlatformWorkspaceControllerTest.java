@@ -19,6 +19,8 @@ import com.clavaris.organization.application.usecase.changeworkspacememberrole.C
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.RateLimitPolicySnapshot;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
@@ -56,6 +58,7 @@ class PlatformWorkspaceControllerTest {
   private AddWorkspaceMemberUseCase addMember;
   private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private RemoveWorkspaceMemberUseCase removeMember;
+  private GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
   private Organization organization;
@@ -71,6 +74,7 @@ class PlatformWorkspaceControllerTest {
     addMember = mock(AddWorkspaceMemberUseCase.class);
     changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
     removeMember = mock(RemoveWorkspaceMemberUseCase.class);
+    getRateLimitPolicy = mock(GetRateLimitPolicyForOrganizationUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
     organization = Organization.register("Acme Co", OWNER_ID);
@@ -81,6 +85,8 @@ class PlatformWorkspaceControllerTest {
     when(getWorkspace.handle(any())).thenReturn(Optional.of(workspace));
     when(listWorkspaces.handle(any())).thenReturn(List.of());
     when(listMembers.handle(any())).thenReturn(List.of());
+    when(getRateLimitPolicy.handle(any()))
+        .thenReturn(new RateLimitPolicySnapshot(600, false, null));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -107,6 +113,7 @@ class PlatformWorkspaceControllerTest {
                     addMember,
                     changeMemberRole,
                     removeMember,
+                    getRateLimitPolicy,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();

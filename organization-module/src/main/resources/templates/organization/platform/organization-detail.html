@@ -122,6 +122,27 @@
                        th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organization.id()})}">Manage Webhook Endpoints</a>
                 </div>
             </div>
+
+            <!-- Owned by this module itself (ADR-0010 §6.2/ADR-0025) — display-only on purpose:
+                 TD-FUT-002 keeps tuning this ceiling operator-managed only in v1 ("tenant
+                 self-service is a v1.1 item... gated on audit logging shipping first"), so unlike
+                 every other section on this page there is no form or link-out here, only the
+                 current effective value. -->
+            <div class="clavaris-section">
+                <h2>Rate Limit</h2>
+                <div class="clavaris-section-card">
+                    <p>The per-minute request ceiling this Organization's own tenant issuer
+                        enforces (ADR-0010 §6.2) — a noisy-neighbor guard, separate from the fixed,
+                        system-wide anti-abuse limits every tenant shares.</p>
+                    <p>
+                        <strong th:text="${rateLimitPolicy.requestsPerMinute()} + ' requests/minute'">600 requests/minute</strong>
+                        <span class="clavaris-badge clavaris-badge--muted" th:unless="${rateLimitPolicy.customized()}">System default</span>
+                        <span class="clavaris-badge clavaris-badge--success" th:if="${rateLimitPolicy.customized()}">Custom</span>
+                    </p>
+                    <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${rateLimitPolicy.updatedAt()}">date</span> by a Clavaris operator.</p>
+                    <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — contact support to request a higher ceiling.</p>
+                </div>
+            </div>
         </div>
     </main>
 </div>

@@ -32,6 +32,8 @@ import com.clavaris.organization.application.usecase.getorganizationapikeys.GetO
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountService;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationService;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
@@ -168,6 +170,19 @@ class OrganizationUseCaseConfig {
       final AuditEventRecorder auditEvents) {
     return new SetRateLimitPolicyForOrganizationService(
         organizations, policies, hardSystemWideCap, auditEvents);
+  }
+
+  // ADR-0025: the dashboard's own read-only Rate Limit display (TD-FUT-002 keeps tuning it
+  // operator-managed only in v1) — same clavaris.rate-limit.capacity.default-requests-per-minute
+  // value OrganizationCapacityRateLimitingFilter (app) already enforces, one config source of
+  // truth for what "no override" actually means.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicyForOrganizationUseCase(
+      final RateLimitPolicyRepository policies,
+      @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
+          final int systemDefaultRequestsPerMinute) {
+    return new GetRateLimitPolicyForOrganizationService(policies, systemDefaultRequestsPerMinute);
   }
 
   @Bean
