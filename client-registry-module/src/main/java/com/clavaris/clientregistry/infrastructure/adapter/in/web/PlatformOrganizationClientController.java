@@ -111,13 +111,6 @@ public class PlatformOrganizationClientController {
   // PlatformOrganizationDashboardController for the full reasoning. This GET also branches on
   // HX-Request — a pagination link is itself an hx-get, and its hx-target can't safely receive a
   // full HTML document.
-  //
-  // CPD-OFF: pmd:cpd-check now matches this method's own ownership-resolution preamble against
-  // PlatformOAuthClientController#showList's identical shape — the same already-accepted "two
-  // controllers, genuinely unrelated beyond four shared fragments, not worth a common superclass"
-  // trade-off DashboardControllerSupport's own Javadoc already documents (CPD finding,
-  // 2026-09-11), just large enough with this method's own new pagination lines added to also cross
-  // CPD's line/token threshold, not a new duplication this pass introduced on its own.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
@@ -125,21 +118,25 @@ public class PlatformOrganizationClientController {
       @PathVariable final UUID organizationId,
       @RequestParam(defaultValue = "0") final int page,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
-    populateHeaderModel(model, organizationId, organizationName);
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateOrganizationClientForm());
-    populateClientsModel(model, organizationId, page);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    renderSecretKeysList(model, organizationId, owned.organizationName(), page);
     if (DashboardControllerSupport.isHtmxRequest(request)) {
       return CLIENTS_FRAGMENT;
     }
     return LIST_VIEW;
   }
 
-  // CPD-ON
+  // Shared by showList's own initial render and every mutation's HTMX-fragment re-render — see
+  // each call site's own comment for why this exact trio (header, fresh create form, current
+  // page of clients) always travels together.
+  private void renderSecretKeysList(
+      final Model model, final UUID organizationId, final String organizationName, final int page) {
+    populateHeaderModel(model, organizationId, organizationName);
+    model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateOrganizationClientForm());
+    populateClientsModel(model, organizationId, page);
+  }
 
   // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't
   // safely travel through one. PMD.OnlyOneReturn: create/error each need their own exit, same
@@ -152,14 +149,13 @@ public class PlatformOrganizationClientController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final CreateOrganizationClientForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
-    populateHeaderModel(model, organizationId, organizationName);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    final UUID ownerPlatformAccountId = owned.ownerPlatformAccountId();
 
     if (bindingResult.hasErrors()) {
+      populateHeaderModel(model, organizationId, owned.organizationName());
       populateClientsModel(model, organizationId, 0);
       return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
     }
@@ -181,17 +177,12 @@ public class PlatformOrganizationClientController {
 
     model.addAttribute("justCreatedRawSecret", result.rawClientSecret());
     model.addAttribute("justCreatedClientId", result.organizationClient().clientId());
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateOrganizationClientForm());
-    populateClientsModel(model, organizationId, 0);
+    renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
   // controller's own identical "after a mutation succeeds" suppression.
-  //
-  // CPD-OFF: same DashboardControllerSupport-documented, already-accepted trade-off as
-  // showList's own identical marker above — this method's ownership-resolution-then-anti-
-  // enumeration-check preamble matches PlatformOAuthClientController#deactivate's.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{clientId}/deactivate")
   public String deactivate(
@@ -199,24 +190,19 @@ public class PlatformOrganizationClientController {
       @PathVariable final UUID organizationId,
       @PathVariable final String clientId,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
     DashboardControllerSupport.requireClientIdBelongsToOrganization(
         listClients.handle(organizationId).stream().map(OrganizationClient::clientId).toList(),
         clientId);
-    // CPD-ON
 
     deactivateClient.handle(
         new DeactivateOrganizationClientCommand(
-            clientId, AuditActor.platformAccount(ownerPlatformAccountId)));
+            clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
 
     if (DashboardControllerSupport.isHtmxRequest(request)) {
-      populateHeaderModel(model, organizationId, organizationName);
-      model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateOrganizationClientForm());
-      populateClientsModel(model, organizationId, 0);
+      renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
       return CLIENTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/secret-keys";
@@ -229,11 +215,9 @@ public class PlatformOrganizationClientController {
       @PathVariable final UUID organizationId,
       @PathVariable final String clientId,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
     DashboardControllerSupport.requireClientIdBelongsToOrganization(
         listClients.handle(organizationId).stream().map(OrganizationClient::clientId).toList(),
         clientId);
@@ -241,13 +225,11 @@ public class PlatformOrganizationClientController {
     final RotateOrganizationClientSecretResult result =
         rotateClientSecret.handle(
             new RotateOrganizationClientSecretCommand(
-                clientId, AuditActor.platformAccount(ownerPlatformAccountId)));
+                clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
 
-    populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute("justCreatedRawSecret", result.rawSecret());
     model.addAttribute("justCreatedClientId", result.clientId());
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateOrganizationClientForm());
-    populateClientsModel(model, organizationId, 0);
+    renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
