@@ -74,10 +74,6 @@ public class PlatformWebhookEndpointController {
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String EVENT_TYPE_OPTIONS_ATTRIBUTE = "eventTypeOptions";
 
-  // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
-  // every other dashboard controller's own identical constant.
-  private static final String HX_REQUEST_HEADER = "HX-Request";
-
   private final RegisterWebhookEndpointUseCase registerEndpoint;
   private final ListWebhookEndpointsForOrganizationUseCase listEndpoints;
   private final DeactivateWebhookEndpointUseCase deactivateEndpoint;
@@ -110,9 +106,12 @@ public class PlatformWebhookEndpointController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
     populateEndpointsModel(model, organizationId);
@@ -130,14 +129,19 @@ public class PlatformWebhookEndpointController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final RegisterWebhookEndpointForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
       populateEndpointsModel(model, organizationId);
-      return isHtmxRequest(request) ? ENDPOINTS_FRAGMENT : LIST_VIEW;
+      return WebhookDashboardControllerSupport.isHtmxRequest(request)
+          ? ENDPOINTS_FRAGMENT
+          : LIST_VIEW;
     }
 
     final RegisterWebhookEndpointResult result;
@@ -162,14 +166,18 @@ public class PlatformWebhookEndpointController {
       model.addAttribute("unsafeWebhookUrlError", true);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
       populateEndpointsModel(model, organizationId);
-      return isHtmxRequest(request) ? ENDPOINTS_FRAGMENT : LIST_VIEW;
+      return WebhookDashboardControllerSupport.isHtmxRequest(request)
+          ? ENDPOINTS_FRAGMENT
+          : LIST_VIEW;
     }
 
     model.addAttribute("justRegisteredRawSecret", result.rawSigningSecret());
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
     populateEndpointsModel(model, organizationId);
-    return isHtmxRequest(request) ? ENDPOINTS_FRAGMENT : LIST_VIEW;
+    return WebhookDashboardControllerSupport.isHtmxRequest(request)
+        ? ENDPOINTS_FRAGMENT
+        : LIST_VIEW;
   }
 
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
@@ -181,16 +189,20 @@ public class PlatformWebhookEndpointController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID endpointId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
-    requireEndpointBelongsToOrganization(organizationId, endpointId);
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+        listEndpoints, organizationId, endpointId);
 
     deactivateEndpoint.handle(
         new DeactivateWebhookEndpointCommand(
             endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    if (isHtmxRequest(request)) {
+    if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
       populateEndpointsModel(model, organizationId);
@@ -206,16 +218,20 @@ public class PlatformWebhookEndpointController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID endpointId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
-    requireEndpointBelongsToOrganization(organizationId, endpointId);
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+        listEndpoints, organizationId, endpointId);
 
     activateEndpoint.handle(
         new ActivateWebhookEndpointCommand(
             endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    if (isHtmxRequest(request)) {
+    if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
       populateEndpointsModel(model, organizationId);
@@ -231,10 +247,14 @@ public class PlatformWebhookEndpointController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID endpointId,
       final Model model) {
-    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
     final String organizationName =
-        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId);
-    requireEndpointBelongsToOrganization(organizationId, endpointId);
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+        listEndpoints, organizationId, endpointId);
 
     final RotateWebhookEndpointSecretResult result =
         rotateEndpointSecret.handle(
@@ -246,7 +266,9 @@ public class PlatformWebhookEndpointController {
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
     populateEndpointsModel(model, organizationId);
-    return isHtmxRequest(request) ? ENDPOINTS_FRAGMENT : LIST_VIEW;
+    return WebhookDashboardControllerSupport.isHtmxRequest(request)
+        ? ENDPOINTS_FRAGMENT
+        : LIST_VIEW;
   }
 
   private void populateHeaderModel(
@@ -261,40 +283,5 @@ public class PlatformWebhookEndpointController {
     model.addAttribute(
         "endpoints",
         listEndpoints.handle(new ListWebhookEndpointsForOrganizationQuery(organizationId)));
-  }
-
-  // The anti-enumeration check Deactivate/Activate/RotateWebhookEndpointSecretCommand can't do
-  // themselves — none of the three carries an organizationId, all key off endpointId alone.
-  // Reuses the already-organizationId-scoped ListWebhookEndpointsForOrganizationUseCase rather
-  // than adding a new "get one endpoint" port, so an endpointId belonging to a different
-  // Organization 404s before the mutating use case ever runs.
-  private void requireEndpointBelongsToOrganization(
-      final UUID organizationId, final UUID endpointId) {
-    final boolean belongsHere =
-        listEndpoints.handle(new ListWebhookEndpointsForOrganizationQuery(organizationId)).stream()
-            .map(WebhookEndpoint::id)
-            .anyMatch(endpointId::equals);
-    if (!belongsHere) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-    }
-  }
-
-  private String requireOwnedOrganizationName(
-      final UUID organizationId, final UUID ownerPlatformAccountId) {
-    return organizationResolver
-        .resolveName(organizationId, ownerPlatformAccountId)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-  }
-
-  private static boolean isHtmxRequest(final HttpServletRequest request) {
-    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
-  }
-
-  // Same rationale as every other dashboard controller's own identical method.
-  private UUID requireCurrentPlatformAccount(final HttpServletRequest request) {
-    return currentPlatformAccount
-        .resolve(request)
-        .orElseThrow(
-            () -> new IllegalStateException("No authenticated PlatformAccount on this request"));
   }
 }

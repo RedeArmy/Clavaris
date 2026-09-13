@@ -19,5 +19,16 @@ public enum WebhookDeliveryStatus {
   SUCCEEDED,
 
   /** Every retry attempt was used up without success — terminal, visible for manual replay. */
-  EXHAUSTED
+  EXHAUSTED;
+
+  /**
+   * BR-WEBHOOK-03: only a delivery in one of these terminal states may be manually replayed — see
+   * {@code ReplayWebhookDeliveryService}'s own Javadoc for why (an idempotency guard against racing
+   * the ordinary retry engine, which still owns any {@code PENDING}/not-yet-due {@code FAILED}
+   * row). Single source of truth for this check — both the service and the dashboard's own per-row
+   * "Replay" button visibility read it from here rather than each keeping their own copy.
+   */
+  public boolean isReplayable() {
+    return this == SUCCEEDED || this == EXHAUSTED;
+  }
 }

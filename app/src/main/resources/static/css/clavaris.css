@@ -489,6 +489,11 @@ main {
   background: var(--clavaris-success-bg);
 }
 
+.clavaris-badge--error {
+  color: var(--clavaris-danger);
+  background: var(--clavaris-danger-bg);
+}
+
 .clavaris-breadcrumb {
   margin-bottom: var(--space-4);
   font-size: 0.8125rem;

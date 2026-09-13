@@ -67,6 +67,8 @@
                         <td th:text="${endpoint.createdAt()}">Created at</td>
                         <td>
                             <div class="clavaris-row-actions">
+                                <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                   th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deliveries(organizationId=${organizationId},endpointId=${endpoint.id()})}">Deliveries</a>
                                 <form method="post"
                                       th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/rotate-secret(organizationId=${organizationId},endpointId=${endpoint.id()})}"
                                       th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/rotate-secret(organizationId=${organizationId},endpointId=${endpoint.id()})}"
