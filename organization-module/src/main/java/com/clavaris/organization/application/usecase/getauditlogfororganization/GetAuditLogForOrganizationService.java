@@ -3,8 +3,7 @@ package com.clavaris.organization.application.usecase.getauditlogfororganization
 import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.domain.model.AuditEvent;
 import com.clavaris.common.domain.model.AuditEventTargetRef;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersQuery;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.domain.model.Workspace;
@@ -32,8 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
  * .secret_rotated}, {@code signing_key.*} — all of these already target {@code "Organization"}
  * itself, so a single {@code ("Organization", organizationId)} ref covers every one of them, no
  * fan-out needed); {@code Workspace}/{@code WorkspaceMembership} events (resolved via {@link
- * ListWorkspacesForOrganizationUseCase}/{@link ListWorkspaceMembersUseCase}, both already native to
- * this module); {@code OAuthClient}-scoped config ({@code client_branding.set}, {@code
+ * ListWorkspacesForOrganizationUseCase}, then a single batched {@link
+ * WorkspaceMembershipRepository#findAllByWorkspaceIds} call across every Workspace found —
+ * TD-PERF-021, not one {@code ListWorkspaceMembersUseCase} call per Workspace the way this method
+ * originally worked); {@code OAuthClient}-scoped config ({@code client_branding.set}, {@code
  * client_domain_config.*}, {@code redirect_policy.set} — these target the client's own id, not
  * {@code "Organization"}, so they need the {@link OAuthClientIdsForAuditLogProvider} fan-out);
  * {@code WebhookEndpoint} lifecycle events (via {@link WebhookEndpointIdsForAuditLogProvider}).
@@ -58,7 +59,7 @@ public class GetAuditLogForOrganizationService implements GetAuditLogForOrganiza
   private static final int MAX_RESULTS = 100;
 
   private final ListWorkspacesForOrganizationUseCase listWorkspaces;
-  private final ListWorkspaceMembersUseCase listMembers;
+  private final WorkspaceMembershipRepository memberships;
   private final OAuthClientIdsForAuditLogProvider oauthClientIds;
   private final WebhookEndpointIdsForAuditLogProvider webhookEndpointIds;
   private final AuditEventReader auditEvents;
@@ -67,29 +68,29 @@ public class GetAuditLogForOrganizationService implements GetAuditLogForOrganiza
   // other multi-collaborator constructor in this codebase.
   public GetAuditLogForOrganizationService(
       final ListWorkspacesForOrganizationUseCase listWorkspaces,
-      final ListWorkspaceMembersUseCase listMembers,
+      final WorkspaceMembershipRepository memberships,
       final OAuthClientIdsForAuditLogProvider oauthClientIds,
       final WebhookEndpointIdsForAuditLogProvider webhookEndpointIds,
       final AuditEventReader auditEvents) {
     this.listWorkspaces = listWorkspaces;
-    this.listMembers = listMembers;
+    this.memberships = memberships;
     this.oauthClientIds = oauthClientIds;
     this.webhookEndpointIds = webhookEndpointIds;
     this.auditEvents = auditEvents;
   }
 
-  // SDE-III performance pass, 2026-09-13 (TD-PERF-021): this method's own workspace→membership
-  // fan-out below is a real sequential N+1 (one query per Workspace, inside a loop) plus 3 more
-  // independent round trips (OAuth Client ids, Webhook Endpoint ids, the final audit query itself)
-  // — previously none of it ran inside a shared transaction, so every one of those W+4 round trips
-  // independently checked a connection out of, and back into, HikariCP's own pool (sized to 10,
-  // TD-PERF-007) instead of one connection held for the whole logical read. readOnly=true, not a
-  // plain @Transactional: this method only ever reads, so Hibernate's own dirty-checking flush plan
-  // is pure overhead here, and the annotation now documents that intent for whoever reads this
-  // signature next, not just this call. Does not eliminate the N+1 shape itself (a real, bigger
-  // fan-out redesign — batching every workspace's membership query into one IN (...) call — is
-  // tracked as its own follow-up in TD-PERF-021, not silently done here); this is the safe,
-  // narrowly-scoped half of that fix: one connection for the whole read, not W+4.
+  // SDE-III performance pass, 2026-09-13 (TD-PERF-021): this method used to call
+  // ListWorkspaceMembersUseCase once per Workspace inside the loop below — a real, confirmed N+1
+  // (an Organization with W Workspaces made W separate round trips just for membership ids), on top
+  // of 2 more independent round trips (OAuth Client ids, Webhook Endpoint ids) and the final audit
+  // query itself, none of it sharing a transaction. Two fixes, both now applied: (1)
+  // @Transactional(readOnly = true) — one connection now covers the whole read instead of W+4
+  // separate HikariCP (sized to 10, TD-PERF-007) checkouts, and the annotation documents genuine
+  // read-only intent; (2) the loop itself no longer queries per Workspace — every Workspace id is
+  // collected first, then a single WorkspaceMembershipRepository#findAllByWorkspaceIds(...) call
+  // (one IN (...) query) returns every membership across every Workspace at once. Memberships are
+  // grouped back into target refs directly (workspace id isn't needed for that, only the
+  // membership's own id), so no second pass keyed by workspace is required.
   @Override
   @Transactional(readOnly = true)
   public List<AuditEvent> handle(final UUID organizationId) {
@@ -98,13 +99,12 @@ public class GetAuditLogForOrganizationService implements GetAuditLogForOrganiza
 
     final List<Workspace> workspaces =
         listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
+    final List<UUID> workspaceIds = workspaces.stream().map(Workspace::id).toList();
     for (final Workspace workspace : workspaces) {
       targets.add(new AuditEventTargetRef("Workspace", workspace.id().toString()));
-      final List<WorkspaceMembership> memberships =
-          listMembers.handle(new ListWorkspaceMembersQuery(workspace.id()));
-      for (final WorkspaceMembership membership : memberships) {
-        targets.add(new AuditEventTargetRef("WorkspaceMembership", membership.id().toString()));
-      }
+    }
+    for (final WorkspaceMembership membership : memberships.findAllByWorkspaceIds(workspaceIds)) {
+      targets.add(new AuditEventTargetRef("WorkspaceMembership", membership.id().toString()));
     }
 
     for (final String oauthClientId : oauthClientIds.oauthClientIds(organizationId)) {

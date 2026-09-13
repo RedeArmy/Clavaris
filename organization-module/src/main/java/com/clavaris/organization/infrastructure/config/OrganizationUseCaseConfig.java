@@ -198,12 +198,12 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ GetAuditLogForOrganizationUseCase getAuditLogForOrganizationUseCase(
       final ListWorkspacesForOrganizationUseCase listWorkspaces,
-      final ListWorkspaceMembersUseCase listMembers,
+      final WorkspaceMembershipRepository memberships,
       final OAuthClientIdsForAuditLogProvider oauthClientIds,
       final WebhookEndpointIdsForAuditLogProvider webhookEndpointIds,
       final AuditEventReader auditEvents) {
     return new GetAuditLogForOrganizationService(
-        listWorkspaces, listMembers, oauthClientIds, webhookEndpointIds, auditEvents);
+        listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
   }
 
   @Bean

@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -47,18 +48,30 @@ class OrphanedOAuthClientCleanupJob {
       """;
 
   private final JdbcTemplate jdbcTemplate;
+  private final PostgresAdvisoryJobLock jobLock;
 
   // Constructed only by Spring's own component scan (via @Component above).
-  /* package */ OrphanedOAuthClientCleanupJob(final JdbcTemplate jdbcTemplate) {
+  /* package */ OrphanedOAuthClientCleanupJob(
+      final JdbcTemplate jdbcTemplate, final PostgresAdvisoryJobLock jobLock) {
     this.jdbcTemplate = jdbcTemplate;
+    this.jobLock = jobLock;
   }
 
   // Daily, off-peak (03:50 server time) — staggered 5/20 minutes after
   // OAuth2AuthorizationRetentionJob (03:45) / EventOutboxRetentionJob (03:30) so none contend for
   // the same window; a cheap, index-backed (ux_oauth_clients_client_id, small table) delete.
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see identity-module's KnownDeviceRetentionJob
+  // for why @Transactional stays on this externally-invoked method, not the private one it
+  // delegates to (Spring AOP self-invocation).
   @Scheduled(cron = "0 50 3 * * *")
   @Transactional
   /* package */ void sweepOrphanedClients() {
+    jobLock.runIfLockAcquired(
+        "orphaned_oauth_client_cleanup", LOG, this::sweepOrphanedClientsLocked);
+  }
+
+  private void sweepOrphanedClientsLocked() {
     final int deleted = jdbcTemplate.update(DELETE_ORPHANED_SQL);
     if (deleted > 0) {
       // Deliberately logs only the count, never which clients (BR-DATA-01) — same convention

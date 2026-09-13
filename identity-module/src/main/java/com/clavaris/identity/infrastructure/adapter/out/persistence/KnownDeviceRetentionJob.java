@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
@@ -38,22 +39,38 @@ class KnownDeviceRetentionJob {
 
   private final SpringDataKnownDeviceJpaRepository knownDevices;
   private final int retentionDays;
+  private final PostgresAdvisoryJobLock jobLock;
 
   // Constructed only by Spring's own component scan (via @Component above).
   /* package */ KnownDeviceRetentionJob(
       final SpringDataKnownDeviceJpaRepository knownDevices,
-      @Value("${clavaris.known-device.retention-days:400}") final int retentionDays) {
+      @Value("${clavaris.known-device.retention-days:400}") final int retentionDays,
+      final PostgresAdvisoryJobLock jobLock) {
     this.knownDevices = knownDevices;
     this.retentionDays = retentionDays;
+    this.jobLock = jobLock;
   }
 
   // Daily, off-peak (04:00 server time) — staggered after EventOutboxRetentionJob's own 03:30 slot
   // and AccountAuthMethodIntegrityCheckJob's own 03:45 slot, same "no other scheduled job to
   // coordinate against yet, just don't collide" reasoning those jobs' own Javadoc already
   // documents.
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see that class's own Javadoc. @Transactional
+  // stays on THIS method, not the private one it delegates to below — Spring's proxy only
+  // intercepts an externally-invoked call (the scheduler calling this bean through its proxy is
+  // exactly that), never a self-invocation via `this::`, so a private method invoked that way
+  // would silently run with no transaction at all if @Transactional were moved onto it instead.
+  // The self-invoked private method still correctly participates in the transaction this method
+  // opens (Spring's transaction binding is thread-local, not proxy-call-based) — it just can't
+  // open a NEW one of its own via its own annotation, which it doesn't need to.
   @Scheduled(cron = "0 0 4 * * *")
   @Transactional
   /* package */ void sweepStaleDevices() {
+    jobLock.runIfLockAcquired("known_device_retention", LOG, this::sweepStaleDevicesLocked);
+  }
+
+  private void sweepStaleDevicesLocked() {
     final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
     final long deleted = knownDevices.deleteByLastSeenAtBefore(cutoff);
     if (deleted > 0) {

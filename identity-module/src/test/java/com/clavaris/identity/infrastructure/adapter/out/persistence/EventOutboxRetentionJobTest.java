@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -84,6 +85,6 @@ class EventOutboxRetentionJobTest {
           @ComponentScan.Filter(
               type = FilterType.ASSIGNABLE_TYPE,
               classes = SpringDataEventOutboxJpaRepository.class))
-  @Import(EventOutboxRetentionJob.class)
+  @Import({EventOutboxRetentionJob.class, PostgresAdvisoryJobLock.class})
   static class TestConfig {}
 }

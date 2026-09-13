@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,17 +31,29 @@ class AccountAuthMethodIntegrityCheckJob {
       LoggerFactory.getLogger(AccountAuthMethodIntegrityCheckJob.class);
 
   private final SpringDataAccountJpaRepository accounts;
+  private final PostgresAdvisoryJobLock jobLock;
 
   // Constructed only by Spring's own component scan (via @Component above).
-  /* package */ AccountAuthMethodIntegrityCheckJob(final SpringDataAccountJpaRepository accounts) {
+  /* package */ AccountAuthMethodIntegrityCheckJob(
+      final SpringDataAccountJpaRepository accounts, final PostgresAdvisoryJobLock jobLock) {
     this.accounts = accounts;
+    this.jobLock = jobLock;
   }
 
   // Daily, off-peak (03:45 — 15 minutes after EventOutboxRetentionJob's own 03:30 slot, same "no
   // other scheduled job to coordinate against yet" reasoning that job's own Javadoc documents,
   // just staggered rather than colliding).
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see that class's own Javadoc. A second
+  // instance racing this exact tick simply skips it rather than logging the same orphan count
+  // twice.
   @Scheduled(cron = "0 45 3 * * *")
   /* package */ void checkForOrphanedAccounts() {
+    jobLock.runIfLockAcquired(
+        "account_auth_method_integrity_check", LOG, this::checkForOrphanedAccountsLocked);
+  }
+
+  private void checkForOrphanedAccountsLocked() {
     final long orphanCount = accounts.countAccountsWithNoAuthMethod();
     if (orphanCount > 0) {
       LOG.warn(

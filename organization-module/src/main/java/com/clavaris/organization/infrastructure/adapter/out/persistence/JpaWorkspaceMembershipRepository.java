@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,6 +65,11 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
   @Override
   public List<WorkspaceMembership> findAllByWorkspaceId(final UUID workspaceId) {
     return memberships.findAllByWorkspaceId(workspaceId).stream().map(this::toDomain).toList();
+  }
+
+  @Override
+  public List<WorkspaceMembership> findAllByWorkspaceIds(final Collection<UUID> workspaceIds) {
+    return memberships.findAllByWorkspaceIdIn(workspaceIds).stream().map(this::toDomain).toList();
   }
 
   @Override

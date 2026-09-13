@@ -104,6 +104,40 @@ class JpaWorkspaceMembershipRepositoryTest {
     assertThat(found).extracting(WorkspaceMembership::id).containsExactly(inA.id());
   }
 
+  // TD-PERF-021: real-Postgres proof for GetAuditLogForOrganizationService's own batched
+  // replacement of what used to be one findAllByWorkspaceId call per Workspace inside a loop.
+  @Test
+  void findAllByWorkspaceIdsReturnsMembershipsAcrossEveryGivenWorkspace() {
+    UUID workspaceA = newPersistedWorkspaceId();
+    UUID workspaceB = newPersistedWorkspaceId();
+    UUID workspaceC = newPersistedWorkspaceId();
+    WorkspaceMembership inA =
+        WorkspaceMembership.join(workspaceA, UUID.randomUUID(), WorkspaceRole.MEMBER);
+    WorkspaceMembership inB =
+        WorkspaceMembership.join(workspaceB, UUID.randomUUID(), WorkspaceRole.ADMIN);
+    WorkspaceMembership inC =
+        WorkspaceMembership.join(workspaceC, UUID.randomUUID(), WorkspaceRole.MEMBER);
+    repository.save(inA);
+    repository.save(inB);
+    repository.save(inC);
+
+    List<WorkspaceMembership> found =
+        repository.findAllByWorkspaceIds(List.of(workspaceA, workspaceB));
+
+    assertThat(found)
+        .extracting(WorkspaceMembership::id)
+        .containsExactlyInAnyOrder(inA.id(), inB.id());
+  }
+
+  @Test
+  void findAllByWorkspaceIdsReturnsEmptyForAnEmptyCollectionRatherThanEveryMembership() {
+    repository.save(
+        WorkspaceMembership.join(
+            newPersistedWorkspaceId(), UUID.randomUUID(), WorkspaceRole.ADMIN));
+
+    assertThat(repository.findAllByWorkspaceIds(List.of())).isEmpty();
+  }
+
   @Test
   void findAllByAccountIdReturnsOnlyThatAccountsMemberships() {
     UUID accountId = UUID.randomUUID();
