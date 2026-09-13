@@ -1,7 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,9 +121,8 @@ class PlatformOrganizationDashboardControllerTest {
   void rendersPaginationControlsOnlyWhenMoreThanOnePageExists() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
     when(listOrganizations.handle(
-            eq(
-                new ListOrganizationsForPlatformAccountPagedQuery(
-                    OWNER_ID, new PageRequest(0, PageRequest.DEFAULT_SIZE)))))
+            new ListOrganizationsForPlatformAccountPagedQuery(
+                OWNER_ID, new PageRequest(0, PageRequest.DEFAULT_SIZE))))
         .thenReturn(new Page<>(List.of(organization), 0, PageRequest.DEFAULT_SIZE, 21));
 
     mockMvc
