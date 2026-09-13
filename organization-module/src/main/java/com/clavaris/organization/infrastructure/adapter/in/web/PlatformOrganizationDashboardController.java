@@ -1,10 +1,13 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationCommand;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountQuery;
-import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedQuery;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedUseCase;
+import com.clavaris.organization.domain.model.Organization;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * ADR-0012: the session-authenticated dashboard a {@code PlatformAccount} uses to create and list
@@ -40,33 +44,49 @@ public class PlatformOrganizationDashboardController {
   private static final String DASHBOARD_VIEW = "organization/platform/dashboard";
   private static final String CONTENT_FRAGMENT = DASHBOARD_VIEW + " :: content";
   private static final String ORGANIZATIONS_ATTRIBUTE = "organizations";
+  private static final String PAGE_ATTRIBUTE = "organizationsPage";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — present on every
   // request HTMX itself issues, absent on an ordinary browser navigation/form submit.
   private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private final CreateOrganizationUseCase createOrganization;
-  private final ListOrganizationsForPlatformAccountUseCase listOrganizations;
+  private final ListOrganizationsForPlatformAccountPagedUseCase listOrganizations;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformOrganizationDashboardController(
       final CreateOrganizationUseCase createOrganization,
-      final ListOrganizationsForPlatformAccountUseCase listOrganizations,
+      final ListOrganizationsForPlatformAccountPagedUseCase listOrganizations,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.createOrganization = createOrganization;
     this.listOrganizations = listOrganizations;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // TD-PERF-020: page is 0-indexed, same convention PageRequest's own Javadoc documents — a
+  // negative or absurdly large value is caught by PageRequest's own constructor, surfacing as a
+  // 500 (a hand-typed/manipulated ?page= is not a real user flow this page's own links ever
+  // produce, so a hard failure here is acceptable, same posture every other unvalidated-input path
+  // in this codebase that isn't itself a security boundary already takes).
   @GetMapping
-  public String showDashboard(final HttpServletRequest request, final Model model) {
+  public String showDashboard(
+      final HttpServletRequest request,
+      @RequestParam(defaultValue = "0") final int page,
+      final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
-    model.addAttribute(
-        ORGANIZATIONS_ATTRIBUTE,
-        listOrganizations.handle(
-            new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
+    addOrganizationsToModel(model, ownerPlatformAccountId, page);
     model.addAttribute("form", new CreateOrganizationForm());
     return DASHBOARD_VIEW;
+  }
+
+  private void addOrganizationsToModel(
+      final Model model, final UUID ownerPlatformAccountId, final int page) {
+    final Page<Organization> organizationsPage =
+        listOrganizations.handle(
+            new ListOrganizationsForPlatformAccountPagedQuery(
+                ownerPlatformAccountId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute(ORGANIZATIONS_ATTRIBUTE, organizationsPage.content());
+    model.addAttribute(PAGE_ATTRIBUTE, organizationsPage);
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -78,10 +98,7 @@ public class PlatformOrganizationDashboardController {
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     if (bindingResult.hasErrors()) {
-      model.addAttribute(
-          ORGANIZATIONS_ATTRIBUTE,
-          listOrganizations.handle(
-              new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
+      addOrganizationsToModel(model, ownerPlatformAccountId, 0);
       return isHtmxRequest(request) ? CONTENT_FRAGMENT : DASHBOARD_VIEW;
     }
 
@@ -103,11 +120,10 @@ public class PlatformOrganizationDashboardController {
     if (isHtmxRequest(request)) {
       // Re-rendered directly (200), not "redirect:" — HTMX's own redirect-following would mean a
       // second, full-navigation round trip for a request whose whole point was avoiding one. A
-      // fresh, blank CreateOrganizationForm is exactly what a real GET would also produce.
-      model.addAttribute(
-          ORGANIZATIONS_ATTRIBUTE,
-          listOrganizations.handle(
-              new ListOrganizationsForPlatformAccountQuery(ownerPlatformAccountId)));
+      // fresh, blank CreateOrganizationForm is exactly what a real GET would also produce. Page 0
+      // — a newly-created Organization sorts first (newest-first ordering), so this is exactly
+      // where it becomes visible, same as a real GET with no ?page= would show too.
+      addOrganizationsToModel(model, ownerPlatformAccountId, 0);
       model.addAttribute("form", new CreateOrganizationForm());
       return CONTENT_FRAGMENT;
     }

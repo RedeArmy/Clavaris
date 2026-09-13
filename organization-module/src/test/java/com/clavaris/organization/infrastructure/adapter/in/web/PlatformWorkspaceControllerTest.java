@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
@@ -22,8 +24,9 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.RateLimitPolicySnapshot;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.CannotRemoveLastAdminException;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
 import com.clavaris.organization.domain.model.Organization;
@@ -52,8 +55,8 @@ class PlatformWorkspaceControllerTest {
 
   private GetOrganizationForPlatformAccountUseCase getOrganization;
   private GetWorkspaceForOrganizationUseCase getWorkspace;
-  private ListWorkspacesForOrganizationUseCase listWorkspaces;
-  private ListWorkspaceMembersUseCase listMembers;
+  private ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
+  private ListWorkspaceMembersPagedUseCase listMembers;
   private CreateWorkspaceUseCase createWorkspace;
   private AddWorkspaceMemberUseCase addMember;
   private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
@@ -68,8 +71,8 @@ class PlatformWorkspaceControllerTest {
   void setUp() {
     getOrganization = mock(GetOrganizationForPlatformAccountUseCase.class);
     getWorkspace = mock(GetWorkspaceForOrganizationUseCase.class);
-    listWorkspaces = mock(ListWorkspacesForOrganizationUseCase.class);
-    listMembers = mock(ListWorkspaceMembersUseCase.class);
+    listWorkspaces = mock(ListWorkspacesForOrganizationPagedUseCase.class);
+    listMembers = mock(ListWorkspaceMembersPagedUseCase.class);
     createWorkspace = mock(CreateWorkspaceUseCase.class);
     addMember = mock(AddWorkspaceMemberUseCase.class);
     changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
@@ -83,8 +86,8 @@ class PlatformWorkspaceControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
     when(getWorkspace.handle(any())).thenReturn(Optional.of(workspace));
-    when(listWorkspaces.handle(any())).thenReturn(List.of());
-    when(listMembers.handle(any())).thenReturn(List.of());
+    when(listWorkspaces.handle(any())).thenReturn(emptyWorkspacesPage());
+    when(listMembers.handle(any())).thenReturn(emptyMembersPage());
     when(getRateLimitPolicy.handle(any()))
         .thenReturn(new RateLimitPolicySnapshot(600, false, null));
 
@@ -127,6 +130,14 @@ class PlatformWorkspaceControllerTest {
     return workspacesPath() + "/" + workspace.id() + "/members";
   }
 
+  private static Page<Workspace> emptyWorkspacesPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
+  private static Page<WorkspaceMembership> emptyMembersPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
   @Test
   void plainCreatePostRedirectsAfterCreatingAWorkspace() throws Exception {
     when(createWorkspace.handle(any())).thenReturn(workspace);
@@ -163,7 +174,8 @@ class PlatformWorkspaceControllerTest {
   void showsTheWorkspaceAndItsMembers() throws Exception {
     WorkspaceMembership membership =
         WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), WorkspaceRole.ADMIN);
-    when(listMembers.handle(any())).thenReturn(List.of(membership));
+    when(listMembers.handle(any()))
+        .thenReturn(new Page<>(List.of(membership), 0, PageRequest.DEFAULT_SIZE, 1));
 
     mockMvc
         .perform(get(workspacesPath() + "/" + workspace.id()))
@@ -171,6 +183,28 @@ class PlatformWorkspaceControllerTest {
         .andExpect(view().name("organization/platform/workspace-detail"))
         .andExpect(model().attribute("workspace", workspace))
         .andExpect(model().attribute("members", List.of(membership)));
+  }
+
+  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  @Test
+  void getPassesTheRequestedPageThroughToTheMembersUseCase() throws Exception {
+    mockMvc.perform(get(workspacesPath() + "/" + workspace.id()).param("page", "4"));
+
+    verify(listMembers)
+        .handle(
+            new ListWorkspaceMembersPagedQuery(
+                workspace.id(), new PageRequest(4, PageRequest.DEFAULT_SIZE)));
+  }
+
+  // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the members
+  // fragment, not the full page — same reasoning
+  // PlatformOrganizationDetailControllerTest's own identical test documents.
+  @Test
+  void htmxGetReturnsTheMembersFragmentInsteadOfTheFullPage() throws Exception {
+    mockMvc
+        .perform(get(workspacesPath() + "/" + workspace.id()).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-detail :: members"));
   }
 
   @Test

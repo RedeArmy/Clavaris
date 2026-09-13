@@ -1,5 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
@@ -7,13 +9,21 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
  * Implements the outbound port; maps between {@code domain.model.WorkspaceMembership} and {@link
  * WorkspaceMembershipEntity}.
+ *
+ * <p>PMD.TooManyMethods (TD-PERF-020/TD-PERF-021's own {@code findPageByWorkspaceId}/{@code
+ * findAllByWorkspaceIds} pushed this past the default threshold): every method here backs a real,
+ * distinct {@code WorkspaceMembershipRepository} port method this module's use cases actually need
+ * — same "one port, several use cases" shape {@code AccountRepository}'s own identical suppression
+ * documents, not a design smell to split up.
  */
+@SuppressWarnings("PMD.TooManyMethods")
 @Repository
 class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository {
 
@@ -70,6 +80,25 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
   @Override
   public List<WorkspaceMembership> findAllByWorkspaceIds(final Collection<UUID> workspaceIds) {
     return memberships.findAllByWorkspaceIdIn(workspaceIds).stream().map(this::toDomain).toList();
+  }
+
+  // TD-PERF-020: newest-first, id as a tiebreaker — same reasoning JpaOrganizationRepository's own
+  // identical findPageOwnedBy already documents.
+  @Override
+  public Page<WorkspaceMembership> findPageByWorkspaceId(
+      final UUID workspaceId, final PageRequest pageRequest) {
+    final org.springframework.data.domain.Page<WorkspaceMembershipEntity> page =
+        memberships.findAllByWorkspaceId(
+            workspaceId,
+            org.springframework.data.domain.PageRequest.of(
+                pageRequest.page(),
+                pageRequest.size(),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
+    return new Page<>(
+        page.getContent().stream().map(this::toDomain).toList(),
+        pageRequest.page(),
+        pageRequest.size(),
+        page.getTotalElements());
   }
 
   @Override

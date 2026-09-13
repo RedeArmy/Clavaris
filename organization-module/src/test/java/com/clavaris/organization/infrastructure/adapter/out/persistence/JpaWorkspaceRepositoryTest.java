@@ -3,10 +3,13 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -84,6 +87,43 @@ class JpaWorkspaceRepositoryTest {
   @Test
   void findByIdReturnsEmptyForAnUnknownId() {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();
+  }
+
+  // TD-PERF-020: real-Postgres proof of the paginated sibling, newest-first — same
+  // "reconstitute with explicit createdAt instants, not a real wall-clock gap" discipline
+  // JpaOrganizationRepositoryTest's own identical test already establishes.
+  @Test
+  void findPageByOrganizationIdReturnsOnePageAtATimeNewestFirst() {
+    UUID organizationId = newPersistedOrganizationId();
+    Instant now = Instant.now();
+    Workspace first = reconstituteAt(organizationId, "First Created", now.minusSeconds(20));
+    Workspace second = reconstituteAt(organizationId, "Second Created", now.minusSeconds(10));
+    Workspace third = reconstituteAt(organizationId, "Third Created", now);
+    repository.save(first);
+    repository.save(second);
+    repository.save(third);
+    // A different Organization's own Workspace must never leak into this one's own page.
+    repository.save(Workspace.register(newPersistedOrganizationId(), "Someone Else's Workspace"));
+
+    Page<Workspace> firstPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(0, 2));
+
+    assertThat(firstPage.content())
+        .extracting(Workspace::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(firstPage.totalElements()).isEqualTo(3);
+    assertThat(firstPage.hasNext()).isTrue();
+
+    Page<Workspace> secondPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(1, 2));
+
+    assertThat(secondPage.content()).extracting(Workspace::id).containsExactly(first.id());
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  private static Workspace reconstituteAt(
+      final UUID organizationId, final String name, final Instant createdAt) {
+    return Workspace.reconstitute(UUID.randomUUID(), organizationId, name, createdAt);
   }
 
   @Configuration

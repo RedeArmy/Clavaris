@@ -1,20 +1,25 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedQuery;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import java.util.List;
 import java.util.Optional;
@@ -39,17 +44,17 @@ class PlatformOrganizationDashboardControllerTest {
   private static final UUID OWNER_ID = UUID.randomUUID();
 
   private CreateOrganizationUseCase createOrganization;
-  private ListOrganizationsForPlatformAccountUseCase listOrganizations;
+  private ListOrganizationsForPlatformAccountPagedUseCase listOrganizations;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     createOrganization = mock(CreateOrganizationUseCase.class);
-    listOrganizations = mock(ListOrganizationsForPlatformAccountUseCase.class);
+    listOrganizations = mock(ListOrganizationsForPlatformAccountPagedUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
-    when(listOrganizations.handle(any())).thenReturn(List.of());
+    when(listOrganizations.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -73,6 +78,10 @@ class PlatformOrganizationDashboardControllerTest {
             .build();
   }
 
+  private static Page<Organization> emptyPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
   @Test
   void getRendersTheEmptyStateWhenTheAccountOwnsNoOrganizations() throws Exception {
     mockMvc
@@ -85,12 +94,44 @@ class PlatformOrganizationDashboardControllerTest {
   @Test
   void getListsEveryOrganizationTheAccountOwns() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
-    when(listOrganizations.handle(any())).thenReturn(List.of(organization));
+    when(listOrganizations.handle(any()))
+        .thenReturn(new Page<>(List.of(organization), 0, PageRequest.DEFAULT_SIZE, 1));
 
     mockMvc
         .perform(get("/platform/dashboard"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("organizations", List.of(organization)));
+  }
+
+  // TD-PERF-020: proves ?page= is actually threaded into the query, not silently ignored — a
+  // real, live-rendered proof the pagination wiring works end to end, not just that the use case
+  // interface accepts a PageRequest.
+  @Test
+  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
+    mockMvc.perform(get("/platform/dashboard").param("page", "2")).andExpect(status().isOk());
+
+    verify(listOrganizations)
+        .handle(
+            new ListOrganizationsForPlatformAccountPagedQuery(
+                OWNER_ID, new PageRequest(2, PageRequest.DEFAULT_SIZE)));
+  }
+
+  // Real Thymeleaf rendering proof that the Previous/Next nav only appears once there's a second
+  // page to go to — not just that the controller resolves without throwing.
+  @Test
+  void rendersPaginationControlsOnlyWhenMoreThanOnePageExists() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(listOrganizations.handle(
+            eq(
+                new ListOrganizationsForPlatformAccountPagedQuery(
+                    OWNER_ID, new PageRequest(0, PageRequest.DEFAULT_SIZE)))))
+        .thenReturn(new Page<>(List.of(organization), 0, PageRequest.DEFAULT_SIZE, 21));
+
+    mockMvc
+        .perform(get("/platform/dashboard"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("clavaris-pagination")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Page 1 of 2")));
   }
 
   @Test

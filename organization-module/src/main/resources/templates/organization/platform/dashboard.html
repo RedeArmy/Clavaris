@@ -55,6 +55,27 @@
                     </tbody>
                 </table>
                 </div>
+
+                <!-- TD-PERF-020: page-number pagination (PageRequest/Page, common module) — see
+                     PlatformOrganizationDashboardController's own Javadoc. hx-get keeps this
+                     consistent with the create form's own hx-post above (same #dashboard-content
+                     fragment target); the plain th:href is the real, unconditional fallback with
+                     JavaScript disabled, not an emulation. -->
+                <nav class="clavaris-pagination" th:if="${organizationsPage.totalPages() > 1}"
+                     aria-label="Organizations pages">
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${organizationsPage.hasPrevious()}"
+                       th:href="@{/platform/dashboard(page=${organizationsPage.page() - 1})}"
+                       th:attr="hx-get=@{/platform/dashboard(page=${organizationsPage.page() - 1})}"
+                       hx-target="#dashboard-content" hx-swap="outerHTML">Previous</a>
+                    <span class="clavaris-pagination__status"
+                          th:text="'Page ' + (${organizationsPage.page()} + 1) + ' of ' + ${organizationsPage.totalPages()}">Page 1 of 1</span>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${organizationsPage.hasNext()}"
+                       th:href="@{/platform/dashboard(page=${organizationsPage.page() + 1})}"
+                       th:attr="hx-get=@{/platform/dashboard(page=${organizationsPage.page() + 1})}"
+                       hx-target="#dashboard-content" hx-swap="outerHTML">Next</a>
+                </nav>
             </div>
 
             <div class="clavaris-section">

@@ -88,6 +88,24 @@
                 </table>
                 </div>
 
+                <!-- TD-PERF-020: same page-number pagination shape as the Organizations/Workspaces
+                     tables — see PlatformWorkspaceController's own Javadoc. -->
+                <nav class="clavaris-pagination" th:if="${membersPage.totalPages() > 1}"
+                     aria-label="Members pages">
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${membersPage.hasPrevious()}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() - 1})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() - 1})}"
+                       hx-target="#members-content" hx-swap="outerHTML">Previous</a>
+                    <span class="clavaris-pagination__status"
+                          th:text="'Page ' + (${membersPage.page()} + 1) + ' of ' + ${membersPage.totalPages()}">Page 1 of 1</span>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${membersPage.hasNext()}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() + 1})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() + 1})}"
+                       hx-target="#members-content" hx-swap="outerHTML">Next</a>
+                </nav>
+
                 <div class="clavaris-section-card">
                     <h2>Add a member</h2>
                     <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members(organizationId=${organization.id()},workspaceId=${workspace.id()})}"

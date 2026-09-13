@@ -1,5 +1,7 @@
 package com.clavaris.organization.application.usecase.addworkspacemember;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.Collection;
@@ -23,6 +25,14 @@ public interface WorkspaceMembershipRepository {
   Optional<WorkspaceMembership> findByWorkspaceIdAndAccountId(UUID workspaceId, UUID accountId);
 
   List<WorkspaceMembership> findAllByWorkspaceId(UUID workspaceId);
+
+  /**
+   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllByWorkspaceId} — used only
+   * by {@code ListWorkspaceMembersPagedService}. {@link #findAllByWorkspaceId} itself stays
+   * untouched: {@code WorkspaceRoleClaimsCustomizer}-adjacent callers and the REST admin API's own
+   * {@code ListWorkspaceMembersController} both genuinely need the full, unbounded list.
+   */
+  Page<WorkspaceMembership> findPageByWorkspaceId(UUID workspaceId, PageRequest pageRequest);
 
   /**
    * TD-PERF-021: {@code GetAuditLogForOrganizationService}'s own batched replacement for what used
