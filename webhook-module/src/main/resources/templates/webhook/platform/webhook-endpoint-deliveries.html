@@ -38,7 +38,8 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(deliveries)}">
                     <p class="clavaris-empty-state">No deliveries yet for this endpoint.</p>
                 </div>
-                <table class="clavaris-table" th:unless="${#lists.isEmpty(deliveries)}">
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(deliveries)}">
+                <table class="clavaris-table">
                     <thead>
                     <tr>
                         <th>Event Type</th>
@@ -48,7 +49,7 @@
                         <th>Last Response</th>
                         <th>Last Error</th>
                         <th>Created</th>
-                        <th></th>
+                        <th><span class="clavaris-visually-hidden">Actions</span></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -78,6 +79,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </main>

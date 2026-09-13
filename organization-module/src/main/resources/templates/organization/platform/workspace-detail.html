@@ -36,13 +36,14 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(members)}">
                     <p class="clavaris-empty-state">No members yet — add the first one below.</p>
                 </div>
-                <table class="clavaris-table" th:unless="${#lists.isEmpty(members)}">
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(members)}">
+                <table class="clavaris-table">
                     <thead>
                     <tr>
                         <th>Account</th>
                         <th>Role</th>
                         <th>Joined</th>
-                        <th></th>
+                        <th><span class="clavaris-visually-hidden">Actions</span></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -85,6 +86,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <div class="clavaris-section-card">
                     <h2>Add a member</h2>

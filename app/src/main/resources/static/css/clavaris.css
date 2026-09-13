@@ -175,6 +175,43 @@ main {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
 }
 
+/* SDE-III UI audit, 2026-09-13: .clavaris-field previously only styled `input` — the dashboard's
+   own workspace-detail.html "Role" <select> and organization-oauth-clients.html's three
+   <textarea> fields (redirectUris/allowedScopes/postLogoutRedirectUris) were both real, live gaps
+   this missed, rendering with the browser's own unstyled default appearance next to otherwise
+   polished inputs on the exact same form. */
+.clavaris-field select,
+.clavaris-field textarea {
+  width: 100%;
+  padding: var(--space-3);
+  font: inherit;
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.clavaris-field textarea {
+  resize: vertical;
+}
+
+.clavaris-field select:focus,
+.clavaris-field textarea:focus {
+  outline: none;
+  border-color: var(--clavaris-brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
+}
+
+/* Same brand-color-over-browser-blue reasoning as the focus rings above — every checkbox/radio in
+   the dashboard (scope/grant-type/event-type selection, "Require consent screen") otherwise
+   renders in the browser's own default blue, clashing with the amber accent every button, link,
+   and focus ring in this design system already uses. Supported in every evergreen browser. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--clavaris-brand-color);
+}
+
 .clavaris-field-error {
   margin: var(--space-2) 0 0;
   font-size: 0.8125rem;
@@ -319,6 +356,27 @@ main {
   border-bottom: none;
 }
 
+.clavaris-table tbody tr:hover {
+  background: var(--clavaris-bg);
+}
+
+/* SDE-III UI audit, 2026-09-13: --font-mono was defined at the top of this file but never actually
+   referenced anywhere in it — a real dead variable, not deliberately reserved for later. The
+   dashboard renders exactly the kind of values a monospace face exists for (client ids, kids,
+   URLs, UUIDs, secrets) inside <code>, all in the body's own proportional font until now. */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* Wraps every <table class="clavaris-table"> in the dashboard (ADR-0025) — a wide table (many
+   columns, or a long client id/URL/UUID value inside one) must scroll inside this container, never
+   force the whole page to scroll horizontally. No page here had this before; a long-enough OAuth
+   Client row (8 columns) or webhook URL was a real, live overflow risk on a narrow viewport. */
+.clavaris-table-wrapper {
+  overflow-x: auto;
+}
+
 /* Standard "sr-only" pattern — keeps a form control's own <label> in the accessibility tree
    (screen readers, browser autofill) without a visible line of table-row real estate. First
    real use: workspace-detail.html's own per-row role <select>, whose action is already named
@@ -361,6 +419,12 @@ main {
   border-radius: var(--radius-md);
   background: var(--clavaris-surface);
   color: var(--clavaris-text-primary);
+}
+
+.clavaris-row-actions select:focus-visible {
+  outline: none;
+  border-color: var(--clavaris-brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
 }
 
 /*
@@ -473,11 +537,25 @@ main {
   padding: var(--space-6);
 }
 
+/* Two or more cards in the same section (e.g. Danger Zone's own promote/delete split, SDE-III UI
+   audit 2026-09-13) stack with real spacing between them — a sibling combinator, not a modifier
+   class or inline style, so any future "more than one card per section" case gets this for free. */
+.clavaris-section-card + .clavaris-section-card {
+  margin-top: var(--space-4);
+}
+
 /* Danger Zone (TD-FUT-032, promote-to-production/delete-Organization) — a visibly distinct
    border, not just alert text, so the one genuinely destructive section on organization-detail.html
    reads as different from every read-only/reversible one above it at a glance. */
 .clavaris-section-card--danger {
   border-color: var(--clavaris-danger);
+}
+
+/* Same GitHub/Clerk-style "Danger Zone" convention: the section heading itself carries the danger
+   color too, not just the card border — a card border alone reads as "different" when scanning
+   the page, not necessarily as "destructive." */
+.clavaris-section--danger h2 {
+  color: var(--clavaris-danger);
 }
 
 .clavaris-empty-state {
