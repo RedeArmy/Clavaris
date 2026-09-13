@@ -52,6 +52,7 @@ public class PlatformCreateProductionEnvironmentController {
 
   private static final String FORM_VIEW = "organization/platform/promote-to-production";
   private static final String FORM_ATTRIBUTE = "promoteForm";
+  private static final String ORGANIZATION_ATTRIBUTE = "organization";
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final CreateProductionEnvironmentUseCase createProductionEnvironment;
@@ -74,7 +75,7 @@ public class PlatformCreateProductionEnvironmentController {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
-    model.addAttribute("organization", organization);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     model.addAttribute(FORM_ATTRIBUTE, new CreateProductionEnvironmentForm());
     return FORM_VIEW;
   }
@@ -93,7 +94,7 @@ public class PlatformCreateProductionEnvironmentController {
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     if (bindingResult.hasErrors()) {
-      model.addAttribute("organization", organization);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       return FORM_VIEW;
     }
 
@@ -110,7 +111,7 @@ public class PlatformCreateProductionEnvironmentController {
       // TD-FUT-032: surfaced as a form error, same "a human filling out this form needs to see
       // why," not a bare 409, posture UnsafeWebhookUrlException's own handling already establishes
       // for an identical situation.
-      model.addAttribute("organization", organization);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       model.addAttribute(FORM_ATTRIBUTE, form);
       model.addAttribute("notEligibleError", true);
       return FORM_VIEW;

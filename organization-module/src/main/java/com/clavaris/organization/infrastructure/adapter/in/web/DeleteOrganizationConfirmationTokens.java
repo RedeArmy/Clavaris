@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -57,15 +58,23 @@ final class DeleteOrganizationConfirmationTokens {
     final Object raw = session.getAttribute(attributeName);
     // Single-use: removed on this very first check, regardless of the outcome below.
     session.removeAttribute(attributeName);
-    if (!(raw instanceof Entry entry) || Instant.now().isAfter(entry.expiresAt())) {
+    if (!(raw instanceof Entry(String token, Instant expiresAt))
+        || Instant.now().isAfter(expiresAt)) {
       return false;
     }
-    return entry.token().equals(submittedToken);
+    return token.equals(submittedToken);
   }
 
   private static String attributeName(final UUID organizationId) {
     return SESSION_ATTRIBUTE_PREFIX + organizationId;
   }
 
-  private record Entry(String token, Instant expiresAt) {}
+  // This app's own HttpSession is Redis-backed (Spring Session, not in-memory) — any object
+  // stored as a session attribute must survive real serialization, not just work by accident in a
+  // single-JVM test. String/Instant are both already Serializable; this record just needs to
+  // declare it too.
+  private record Entry(String token, Instant expiresAt) implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+  }
 }

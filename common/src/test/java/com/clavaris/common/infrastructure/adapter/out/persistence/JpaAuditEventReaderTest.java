@@ -7,6 +7,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
 import com.clavaris.common.domain.model.AuditEventTargetRef;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ class JpaAuditEventReaderTest {
 
   @Autowired private AuditEventRecorder recorder;
   @Autowired private AuditEventReader reader;
+  @Autowired private SpringDataAuditEventJpaRepository springDataRepository;
 
   @Test
   void returnsOnlyRowsMatchingAnyOfTheGivenTargetRefs() {
@@ -85,17 +87,35 @@ class JpaAuditEventReaderTest {
   }
 
   @Test
-  void returnsNewestFirst() throws InterruptedException {
+  void returnsNewestFirst() {
+    // Two rows inserted directly via the Spring Data repository, not AuditEventRecorder — its own
+    // write() always stamps occurredAt as Instant.now(), no injectable clock, so proving ordering
+    // through it would need a real wall-clock gap (a Thread.sleep, flagged by SonarCloud/S2925 as
+    // exactly the kind of flaky-by-construction test it is). Fixed, far-apart timestamps here are
+    // deterministic and instant.
     UUID organizationId = UUID.randomUUID();
-    AuditActor actor = AuditActor.platformAccount(UUID.randomUUID());
-
-    recorder.write(
-        actor, "organization.created", "Organization", organizationId.toString(), "first");
-    // A real, if small, wall-clock gap — occurredAt is Instant.now() with no artificial clock
-    // injected, so two calls in the same millisecond would otherwise make this test flaky.
-    Thread.sleep(5);
-    recorder.write(
-        actor, "rate_limit_policy.set", "Organization", organizationId.toString(), "second");
+    Instant earlier = Instant.now().minusSeconds(60);
+    Instant later = Instant.now();
+    springDataRepository.save(
+        new AuditEventEntity(
+            UUID.randomUUID(),
+            "PLATFORM_ACCOUNT",
+            UUID.randomUUID().toString(),
+            "organization.created",
+            "Organization",
+            organizationId.toString(),
+            "first",
+            earlier));
+    springDataRepository.save(
+        new AuditEventEntity(
+            UUID.randomUUID(),
+            "PLATFORM_ACCOUNT",
+            UUID.randomUUID().toString(),
+            "rate_limit_policy.set",
+            "Organization",
+            organizationId.toString(),
+            "second",
+            later));
 
     List<AuditEvent> result =
         reader.findRecentForTargets(
