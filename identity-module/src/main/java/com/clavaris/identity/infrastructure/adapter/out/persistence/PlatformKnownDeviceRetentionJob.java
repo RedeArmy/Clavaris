@@ -1,8 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,13 +46,10 @@ class PlatformKnownDeviceRetentionJob {
   }
 
   private void sweepStaleDevicesLocked() {
-    final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-    final long deleted = knownDevices.deleteByLastSeenAtBefore(cutoff);
-    if (deleted > 0) {
-      LOG.info(
-          "event=platform_known_device_retention_swept deletedCount={} retentionDays={}",
-          deleted,
-          retentionDays);
-    }
+    KnownDeviceRetentionSweeper.sweep(
+        LOG,
+        "platform_known_device_retention_swept",
+        knownDevices::deleteByLastSeenAtBefore,
+        retentionDays);
   }
 }
