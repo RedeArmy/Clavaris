@@ -110,6 +110,79 @@
                        th:href="@{/platform/dashboard/organizations/{organizationId}/signing-keys(organizationId=${organization.id()})}">Manage Signing Keys</a>
                 </div>
             </div>
+
+            <!-- Owned by webhook-module (ADR-0007/ADR-0025) — same "link out, don't embed across a
+                 module boundary" reasoning as the sections above. -->
+            <div class="clavaris-section">
+                <h2>Webhook Endpoints</h2>
+                <div class="clavaris-section-card">
+                    <p>URLs this Organization's own consuming application(s) receive event
+                        deliveries at.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organization.id()})}">Manage Webhook Endpoints</a>
+                </div>
+            </div>
+
+            <!-- Owned by this module itself (ADR-0010 §6.2/ADR-0025) — display-only on purpose:
+                 TD-FUT-002 keeps tuning this ceiling operator-managed only in v1 ("tenant
+                 self-service is a v1.1 item... gated on audit logging shipping first"), so unlike
+                 every other section on this page there is no form or link-out here, only the
+                 current effective value. -->
+            <div class="clavaris-section">
+                <h2>Rate Limit</h2>
+                <div class="clavaris-section-card">
+                    <p>The per-minute request ceiling this Organization's own tenant issuer
+                        enforces (ADR-0010 §6.2) — a noisy-neighbor guard, separate from the fixed,
+                        system-wide anti-abuse limits every tenant shares.</p>
+                    <p>
+                        <strong th:text="${rateLimitPolicy.requestsPerMinute()} + ' requests/minute'">600 requests/minute</strong>
+                        <span class="clavaris-badge clavaris-badge--muted" th:unless="${rateLimitPolicy.customized()}">System default</span>
+                        <span class="clavaris-badge clavaris-badge--success" th:if="${rateLimitPolicy.customized()}">Custom</span>
+                    </p>
+                    <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${rateLimitPolicy.updatedAt()}">date</span> by a Clavaris operator.</p>
+                    <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — contact support to request a higher ceiling.</p>
+                </div>
+            </div>
+
+            <!-- Owned by this module itself (ADR-0025, TD-SEC-007) — a link out like Secret
+                 Keys/OAuth Clients/Signing Keys/Webhook Endpoints above, not inlined like Rate
+                 Limit: up to 100 rows doesn't belong crammed into this page the way a single-value
+                 display does. -->
+            <div class="clavaris-section">
+                <h2>Audit Log</h2>
+                <div class="clavaris-section-card">
+                    <p>Recent administrative changes to this Organization's own configuration and
+                        owned resources.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/audit-log(organizationId=${organization.id()})}">View Audit Log</a>
+                </div>
+            </div>
+
+            <!-- TD-FUT-032: the only genuinely destructive/irreversible section on this page —
+                 both actions are their own separate pages with their own confirmation flow, never
+                 a single-click inline form the way every other section above is. See
+                 PlatformCreateProductionEnvironmentController/PlatformDeleteOrganizationController
+                 for the full design. -->
+            <div class="clavaris-section">
+                <h2>Danger Zone</h2>
+                <div class="clavaris-section-card clavaris-section-card--danger">
+                    <div th:if="${organization.environment().name() == 'DEVELOPMENT' and organization.linkedEnvironmentOrganizationId().isEmpty()}">
+                        <p>Promote this DEVELOPMENT Organization by creating its paired PRODUCTION
+                            sibling.</p>
+                        <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                           th:href="@{/platform/dashboard/organizations/{organizationId}/promote-to-production(organizationId=${organization.id()})}">Promote to Production</a>
+                    </div>
+                    <p th:unless="${organization.environment().name() == 'DEVELOPMENT' and organization.linkedEnvironmentOrganizationId().isEmpty()}">
+                        This Organization can't be promoted to production — it's either already a
+                        PRODUCTION environment, or it already has a linked one.
+                    </p>
+                    <hr/>
+                    <p>Permanently delete this Organization and its entire owned account pool.
+                        This cannot be undone.</p>
+                    <a class="clavaris-button clavaris-button--danger clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/delete(organizationId=${organization.id()})}">Delete Organization</a>
+                </div>
+            </div>
         </div>
     </main>
 </div>

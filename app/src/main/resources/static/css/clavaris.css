@@ -219,6 +219,18 @@ main {
   background: var(--clavaris-bg);
 }
 
+/* Delete-Organization's own confirm button (TD-FUT-032) — the one destructive-action button in
+   this codebase that isn't a plain inline secondary form action, so it gets its own explicit
+   danger color rather than reusing --secondary and relying on the surrounding alert text alone. */
+.clavaris-button--danger {
+  color: #fff;
+  background: var(--clavaris-danger);
+}
+
+.clavaris-button--danger:hover {
+  filter: brightness(0.88);
+}
+
 .clavaris-alert {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
@@ -461,6 +473,13 @@ main {
   padding: var(--space-6);
 }
 
+/* Danger Zone (TD-FUT-032, promote-to-production/delete-Organization) — a visibly distinct
+   border, not just alert text, so the one genuinely destructive section on organization-detail.html
+   reads as different from every read-only/reversible one above it at a glance. */
+.clavaris-section-card--danger {
+  border-color: var(--clavaris-danger);
+}
+
 .clavaris-empty-state {
   padding: var(--space-6);
   text-align: center;
@@ -487,6 +506,11 @@ main {
 .clavaris-badge--success {
   color: var(--clavaris-success);
   background: var(--clavaris-success-bg);
+}
+
+.clavaris-badge--error {
+  color: var(--clavaris-danger);
+  background: var(--clavaris-danger-bg);
 }
 
 .clavaris-breadcrumb {

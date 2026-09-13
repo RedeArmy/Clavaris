@@ -46,4 +46,13 @@ public interface WebhookDeliveryRepository {
    * short claiming transaction rather than around the HTTP call that follows.
    */
   List<WebhookDelivery> claimDueBatch(int limit);
+
+  /**
+   * TD-FUT-032/SDE-III review, 2026-09-13: {@code DeleteOrganizationService}'s own cross-module
+   * erasure call (via {@code OrganizationWebhookDataEraser}) — same rationale {@link
+   * com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository#deleteAllByOrganizationId}
+   * already documents. {@code organizationId} is denormalized onto this table directly (see {@code
+   * WebhookDelivery}'s own Javadoc), so this doesn't need to go through {@code endpointId} at all.
+   */
+  void deleteAllByOrganizationId(UUID organizationId);
 }

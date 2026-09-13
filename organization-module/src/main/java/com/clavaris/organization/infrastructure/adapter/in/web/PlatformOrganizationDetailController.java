@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.domain.model.Organization;
@@ -30,6 +31,11 @@ import org.springframework.web.server.ResponseStatusException;
  * Javadoc for the cross-tenant ownership check this indirection exists to enforce. A 404, not a
  * 403, for an Organization that exists but belongs to someone else — same anti-enumeration posture
  * that use case's own Javadoc documents.
+ *
+ * <p>The {@code rateLimitPolicy} attribute (backed by {@link
+ * GetRateLimitPolicyForOrganizationUseCase}) is deliberately display-only — TD-FUT-002/ADR-0010
+ * §6.2 keep tuning this ceiling operator-managed only in v1, so unlike every other section on this
+ * page there is no form or link-out to change it here, only the current effective value.
  */
 // PMD.LongVariable: currentPlatformAccount/ownerPlatformAccountId (field/constructor param/local
 // each) are long by design, not accidentally — same class-level-suppression precedent
@@ -43,14 +49,17 @@ public class PlatformOrganizationDetailController {
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final ListWorkspacesForOrganizationUseCase listWorkspaces;
+  private final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformOrganizationDetailController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final ListWorkspacesForOrganizationUseCase listWorkspaces,
+      final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.listWorkspaces = listWorkspaces;
+    this.getRateLimitPolicy = getRateLimitPolicy;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
@@ -79,6 +88,7 @@ public class PlatformOrganizationDetailController {
         "workspaces",
         listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
     model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+    model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
     return DETAIL_VIEW;
   }
 }

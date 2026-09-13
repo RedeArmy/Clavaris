@@ -1,0 +1,17 @@
+<!--
+  Local copy of organization-module's own organization/platform/fragments/dashboard-nav.html — same
+  deliberate-duplication rationale as identity-module's/client-registry-module's own local copies
+  document: no module here declares a Maven dependency on another, so a single shared sidebar
+  fragment would only be reachable from the app module's aggregated runtime classpath, not from
+  either module's own standalone-MockMvc controller tests.
+
+  Keep in sync with organization-module's, identity-module's, and client-registry-module's own
+  copies by hand if a nav item is added, removed, or reordered.
+-->
+<aside th:fragment="sidebar(active)" class="clavaris-sidebar">
+    <a class="clavaris-sidebar__brand" th:href="@{/platform/dashboard}">Clavaris</a>
+    <nav class="clavaris-sidebar__nav">
+        <a th:href="@{/platform/dashboard}" th:classappend="${active == 'organizations'} ? 'active'">Organizations</a>
+        <a th:href="@{/platform/account/sessions}" th:classappend="${active == 'sessions'} ? 'active'">Your sessions</a>
+    </nav>
+</aside>

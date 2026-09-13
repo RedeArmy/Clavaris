@@ -125,6 +125,20 @@ class OrganizationTest {
   }
 
   @Test
+  void withoutLinkedEnvironmentClearsAnExistingLink() {
+    final Organization linked =
+        Organization.register("JobSeeker", ownerPlatformAccountId)
+            .withLinkedEnvironmentOrganizationId(UUID.randomUUID());
+
+    final Organization unlinked = linked.withoutLinkedEnvironment();
+
+    assertThat(unlinked.linkedEnvironmentOrganizationId()).isEmpty();
+    // The original instance is untouched — same immutable-update shape every other with* method
+    // here already establishes.
+    assertThat(linked.linkedEnvironmentOrganizationId()).isPresent();
+  }
+
+  @Test
   void registerStartsWithSocialLoginDisabledAndNoProviders() {
     final Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
 

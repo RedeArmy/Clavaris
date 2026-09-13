@@ -193,6 +193,24 @@ class JpaWebhookEndpointRepositoryTest {
         .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
+  // TD-FUT-032/SDE-III review, 2026-09-13: DeleteOrganizationService's own cross-module erasure.
+  @Test
+  void deleteAllByOrganizationIdRemovesOnlyThatOrganizationsOwnEndpoints() {
+    UUID organizationId = UUID.randomUUID();
+    UUID otherOrganizationId = UUID.randomUUID();
+    repository.save(
+        WebhookEndpoint.register(organizationId, "https://a.example.com", null, List.of("x"), "s"));
+    WebhookEndpoint other =
+        WebhookEndpoint.register(
+            otherOrganizationId, "https://b.example.com", null, List.of("x"), "s");
+    repository.save(other);
+
+    repository.deleteAllByOrganizationId(organizationId);
+
+    assertThat(repository.findAllByOrganizationId(organizationId)).isEmpty();
+    assertThat(repository.findById(other.id())).isPresent();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(basePackageClasses = SpringDataWebhookEndpointJpaRepository.class)

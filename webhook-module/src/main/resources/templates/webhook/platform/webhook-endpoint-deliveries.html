@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Webhook Deliveries — Clavaris')}">
+    <title>Webhook Deliveries — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <span>Deliveries</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Webhook Deliveries</h1>
+                    <p>Recent delivery attempts for <code th:text="${endpointUrl}">endpoint url</code>
+                        (ADR-0007, BR-WEBHOOK-03). A delivery already in a terminal state
+                        (Succeeded/Exhausted) can be manually replayed — the next dispatcher tick
+                        picks it up exactly like any ordinary retry.</p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
+                 PlatformWebhookEndpointController's own Javadoc for the general shape this page
+                 mirrors. Replay carries no secret, so — unlike register/rotate-secret on the
+                 endpoints page — it keeps the normal redirect-on-success convention. -->
+            <div id="deliveries-content" th:fragment="deliveries" class="clavaris-section">
+                <p class="clavaris-alert clavaris-alert--error" th:if="${notReplayableError}">
+                    That delivery is still owned by the ordinary retry engine (not yet in a
+                    terminal state) — it can't be replayed right now.
+                </p>
+
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(deliveries)}">
+                    <p class="clavaris-empty-state">No deliveries yet for this endpoint.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(deliveries)}">
+                    <thead>
+                    <tr>
+                        <th>Event Type</th>
+                        <th>Status</th>
+                        <th>Attempts</th>
+                        <th>Last Attempt</th>
+                        <th>Last Response</th>
+                        <th>Last Error</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="delivery : ${deliveries}">
+                        <td th:text="${delivery.eventType()}">event type</td>
+                        <td>
+                            <span class="clavaris-badge"
+                                  th:classappend="${delivery.status().name() == 'SUCCEEDED'} ? 'clavaris-badge--success' : (${delivery.status().name() == 'FAILED' or delivery.status().name() == 'EXHAUSTED'} ? 'clavaris-badge--error' : 'clavaris-badge--muted')"
+                                  th:text="${delivery.status().name()}">status</span>
+                        </td>
+                        <td th:text="${delivery.attemptCount()}">attempts</td>
+                        <td th:text="${delivery.lastAttemptAt()} ?: '—'">last attempt</td>
+                        <td th:text="${delivery.lastResponseStatus()} ?: '—'">last response</td>
+                        <td th:text="${delivery.lastError()} ?: '—'">last error</td>
+                        <td th:text="${delivery.createdAt()}">created</td>
+                        <td>
+                            <div class="clavaris-row-actions" th:if="${delivery.status().isReplayable()}">
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}/replay(organizationId=${organizationId},endpointId=${endpointId},deliveryId=${delivery.id()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}/replay(organizationId=${organizationId},endpointId=${endpointId},deliveryId=${delivery.id()})}"
+                                      hx-target="#deliveries-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Replay</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>

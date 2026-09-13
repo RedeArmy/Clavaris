@@ -184,6 +184,40 @@ public final class Organization {
   }
 
   /**
+   * The other half of {@link #withLinkedEnvironmentOrganizationId} — clears the link entirely
+   * (SDE-III review, 2026-09-13, real bug found and closed): {@code
+   * linked_environment_organization_id} is a self-referencing FK with no {@code ON DELETE} clause
+   * (deliberately, so a stray cascade can never silently orphan a live tenant's own pairing), so
+   * deleting one side of an already-promoted DEVELOPMENT/PRODUCTION pair would otherwise raise a
+   * raw, unhandled foreign-key-violation from Postgres — {@code DeleteOrganizationService} calls
+   * this on the *surviving* sibling before the other row's own {@code DELETE} runs, in the same
+   * transaction. The surviving Organization itself is otherwise untouched — still real, just no
+   * longer paired with anything.
+   *
+   * <p><b>DEVELOPMENT and PRODUCTION are, and remain, fully independent account pools</b>
+   * (ADR-0010) — confirmed explicitly as a real requirement, not assumed: this method changes
+   * {@code linkedEnvironmentOrganizationId} and nothing else. Every other field — {@code name},
+   * {@code ownerPlatformAccountId}, {@code socialLoginEnabled}/{@code allowedSocialProviders},
+   * {@code environment}, {@code createdAt} — is carried over unchanged, and no {@code Account},
+   * {@code Workspace}, or {@code OAuthClient} belonging to the surviving sibling is read, written,
+   * or even referenced here. A user added or removed in one environment was never visible in the
+   * other to begin with (each is its own {@code Organization} row with its own account pool per
+   * ADR-0010) — this method exists purely to keep the *pairing pointer* from dangling once the
+   * other side is gone, not to reconcile any data between the two.
+   */
+  public Organization withoutLinkedEnvironment() {
+    return new Organization(
+        id,
+        name,
+        createdAt,
+        ownerPlatformAccountId,
+        socialLoginEnabled,
+        allowedSocialProviders,
+        environment,
+        null);
+  }
+
+  /**
    * ADR-0020 Decision 3: returns a new instance with an updated social-login policy — same
    * immutable-update shape {@code RateLimitPolicy.withRequestsPerMinute} already establishes for
    * this module's own aggregates, not an in-place mutator. {@code enabled = false} is always valid

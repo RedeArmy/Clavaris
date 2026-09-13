@@ -9,11 +9,28 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * BR-DATA-02/03's own organization-level equivalent: {@code POST
- * /api/v1/admin/organizations/{organizationId}:delete} — a real, permanent hard delete of an entire
- * consuming system's own account pool. Never self-service, never triggered by the Organization's
- * own owning {@code PlatformAccount} — the single most destructive operation this management API
- * exposes, gated by its own dedicated scope for that reason.
+ * BR-DATA-02/03's own organization-level equivalent: reachable via {@code POST
+ * /api/v1/admin/organizations/{organizationId}:delete} (operator, {@code
+ * AuditActor#platformClient}) or the dashboard's own Danger Zone (self-service, {@code
+ * AuditActor#platformAccount}, gated behind a real confirmation flow — see {@code
+ * PlatformDeleteOrganizationController}'s own Javadoc) — a real, permanent hard delete of an entire
+ * consuming system's own account pool, still the single most destructive operation this management
+ * API exposes regardless of which caller triggers it.
+ *
+ * <p><b>Corrected, TD-FUT-032 (2026-09-13):</b> this Javadoc previously said "never self-service,
+ * never triggered by the Organization's own owning {@code PlatformAccount}." See {@code
+ * DeleteOrganizationCommand}'s own Javadoc for the same correction, in full.
+ *
+ * <p>SDE-III review, 2026-09-13 — two real bugs found and closed in the same pass as the dashboard
+ * widening above, not by it: (1) an already-{@code PRODUCTION}-linked Organization's own {@code
+ * linkedEnvironmentOrganizationId} self-referencing FK has no {@code ON DELETE} clause, so deleting
+ * either side of a linked pair previously raised a raw, unhandled foreign-key-violation from
+ * Postgres — this class now unlinks the surviving sibling first (see {@link
+ * com.clavaris.organization.domain.model.Organization#withoutLinkedEnvironment}), in the same
+ * transaction. (2) {@link OrganizationWebhookDataEraser} closes a real, previously-silent gap: this
+ * class erased identity-module/client-registry-module data from day one, but never webhook-module's
+ * (ADR-0007, shipped 2026-09-02, after this service was first written) — every {@code
+ * WebhookEndpoint}/{@code WebhookDelivery} row survived a delete as an orphan until this fix.
  *
  * <p><b>Erasure is application-layer here, not database-cascade</b> — a deliberate departure from
  * individual account deletion's own approach (which does cascade at the DB level, migration {@code
@@ -75,6 +92,8 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
   @SuppressWarnings("PMD.LongVariable")
   private final OrganizationOAuthClientsEraser oauthClientsEraser;
 
+  private final OrganizationWebhookDataEraser webhookDataEraser;
+
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
@@ -86,12 +105,14 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
       @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
       @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
+      final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.organizations = organizations;
     this.organizationTokenRevoker = organizationTokenRevoker;
     this.identityDataEraser = identityDataEraser;
     this.oauthClientsEraser = oauthClientsEraser;
+    this.webhookDataEraser = webhookDataEraser;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -110,13 +131,24 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
             .findById(command.organizationId())
             .orElseThrow(() -> new OrganizationNotFoundException(command.organizationId()));
 
+    // Real bug, SDE-III review 2026-09-13: the surviving sibling of an already-promoted
+    // DEVELOPMENT/PRODUCTION pair must be unlinked before this row's own DELETE runs below, or
+    // Postgres raises a raw foreign-key-violation on the self-referencing
+    // linked_environment_organization_id column — see Organization#withoutLinkedEnvironment's own
+    // Javadoc and this class's own class-level Javadoc.
+    organization
+        .linkedEnvironmentOrganizationId()
+        .flatMap(organizations::findById)
+        .ifPresent(sibling -> organizations.save(sibling.withoutLinkedEnvironment()));
+
     // Must run before the erasure calls below remove the accounts/oauth_clients rows this port's
     // own implementation queries by organizationId — see this class's own Javadoc.
     organizationTokenRevoker.revokeAllTokensFor(command.organizationId());
 
-    // No ordering dependency between these two — see this class's own Javadoc.
+    // No ordering dependency between these three — see this class's own Javadoc.
     identityDataEraser.eraseAllFor(command.organizationId());
     oauthClientsEraser.eraseAllFor(command.organizationId());
+    webhookDataEraser.eraseAllFor(command.organizationId());
 
     auditEvents.write(
         command.actor(),

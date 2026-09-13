@@ -3,10 +3,7 @@ package com.clavaris.webhook.application.usecase.replaywebhookdelivery;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDeliveryRepository;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
-import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import java.time.Instant;
-import java.util.EnumSet;
-import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -46,11 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
  * boundary" discipline every other audited mutation in this codebase (e.g. {@code
  * SuspendAccountService}) already follows.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class ReplayWebhookDeliveryService implements ReplayWebhookDeliveryUseCase {
-
-  private static final Set<WebhookDeliveryStatus> REPLAYABLE_STATUSES =
-      EnumSet.of(WebhookDeliveryStatus.SUCCEEDED, WebhookDeliveryStatus.EXHAUSTED);
 
   private final WebhookDeliveryRepository deliveries;
   private final AuditEventRecorder auditEvents;
@@ -75,7 +68,7 @@ public class ReplayWebhookDeliveryService implements ReplayWebhookDeliveryUseCas
       throw new WebhookDeliveryNotFoundException(command.deliveryId());
     }
 
-    if (!REPLAYABLE_STATUSES.contains(existing.status())) {
+    if (!existing.status().isReplayable()) {
       throw new WebhookDeliveryNotReplayableException(existing.id(), existing.status());
     }
 

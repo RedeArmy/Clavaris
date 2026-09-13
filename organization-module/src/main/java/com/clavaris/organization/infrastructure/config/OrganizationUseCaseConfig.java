@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.config;
 
+import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberService;
@@ -23,15 +24,22 @@ import com.clavaris.organization.application.usecase.deleteorganization.EventOut
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationIdentityDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationOAuthClientsEraser;
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationTokenRevoker;
+import com.clavaris.organization.application.usecase.deleteorganization.OrganizationWebhookDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationService;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.OAuthClientIdsForAuditLogProvider;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.WebhookEndpointIdsForAuditLogProvider;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysService;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysUseCase;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountService;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationService;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
@@ -170,12 +178,41 @@ class OrganizationUseCaseConfig {
         organizations, policies, hardSystemWideCap, auditEvents);
   }
 
+  // ADR-0025: the dashboard's own read-only Rate Limit display (TD-FUT-002 keeps tuning it
+  // operator-managed only in v1) — same clavaris.rate-limit.capacity.default-requests-per-minute
+  // value OrganizationCapacityRateLimitingFilter (app) already enforces, one config source of
+  // truth for what "no override" actually means.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicyForOrganizationUseCase(
+      final RateLimitPolicyRepository policies,
+      @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
+          final int systemDefaultRequestsPerMinute) {
+    return new GetRateLimitPolicyForOrganizationService(policies, systemDefaultRequestsPerMinute);
+  }
+
+  // ADR-0025, TD-SEC-007: the dashboard's own audit-log query — see
+  // GetAuditLogForOrganizationService's own Javadoc for the exact fan-out this performs and what's
+  // deliberately out of scope.
+  @SuppressWarnings("PMD.LongVariable")
+  @Bean
+  /* package */ GetAuditLogForOrganizationUseCase getAuditLogForOrganizationUseCase(
+      final ListWorkspacesForOrganizationUseCase listWorkspaces,
+      final ListWorkspaceMembersUseCase listMembers,
+      final OAuthClientIdsForAuditLogProvider oauthClientIds,
+      final WebhookEndpointIdsForAuditLogProvider webhookEndpointIds,
+      final AuditEventReader auditEvents) {
+    return new GetAuditLogForOrganizationService(
+        listWorkspaces, listMembers, oauthClientIds, webhookEndpointIds, auditEvents);
+  }
+
   @Bean
   /* package */ DeleteOrganizationUseCase deleteOrganizationUseCase(
       final OrganizationRepository organizations,
       @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
       @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
+      final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new DeleteOrganizationService(
@@ -183,6 +220,7 @@ class OrganizationUseCaseConfig {
         organizationTokenRevoker,
         identityDataEraser,
         oauthClientsEraser,
+        webhookDataEraser,
         auditEvents,
         eventOutboxWriter);
   }

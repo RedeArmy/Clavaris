@@ -331,18 +331,41 @@ jobs:
       # added as a repo secret (2026-08-18). Branch protection on `master` requiring the
       # `ci-passed` aggregator job below (not this job individually) is a GitHub repo setting only
       # an admin can configure — nothing in this workflow file can set that from here.
-      - name: Build, test, and analyse
+      - name: Build and test
+        run: mvn -B verify
+
+      # SDE-III fix, 2026-09-13: this used to be chained onto `mvn verify` in one command (see
+      # this job's own git history) — real problem, hit twice in a row on two separate CI runs,
+      # not hypothetical: SonarCloud's own API (`GET /api/settings/values.protobuf`, called before
+      # this plugin's analysis even starts) returned a transient 503 both times, always *after*
+      # the entire ~8-9 minute build/test/PMD pass above had already succeeded. Splitting the
+      # analysis into its own step means a retry here only re-runs the ~1-2 minute upload, not the
+      # whole test suite again. A plain bash retry loop, not a third-party retry Action — keeps
+      # this self-contained rather than adding a new external Action to trust for something this
+      # small, same reasoning that keeps this workflow's own dependency surface deliberately
+      # narrow elsewhere. Retries on ANY failure, including a genuine red Quality Gate — wastes a
+      # little CI time re-attempting a real failure, but that's rare next to how often the 503
+      # above has actually happened, and not worth the complexity of parsing Sonar's own output to
+      # tell the two apart.
+      - name: Analyse with SonarCloud
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: >
-          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
-          -Dsonar.projectKey=RedeArmy_Clavaris
-          -Dsonar.organization=redearmy
-          -Dsonar.host.url=https://sonarcloud.io
-          -Dsonar.qualitygate.wait=true
-          -Dsonar.sources=src/main/java,src/main/resources
-          -Dsonar.javascript.lcov.reportPaths=lcov.info
-          -Dsonar.plsql.file.suffixes=
+        run: |
+          for attempt in 1 2 3; do
+            if mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar \
+              -Dsonar.projectKey=RedeArmy_Clavaris \
+              -Dsonar.organization=redearmy \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dsonar.qualitygate.wait=true \
+              -Dsonar.sources=src/main/java,src/main/resources \
+              -Dsonar.javascript.lcov.reportPaths=lcov.info \
+              -Dsonar.plsql.file.suffixes=; then
+              exit 0
+            fi
+            echo "SonarCloud analysis attempt $attempt failed, retrying in 30s..." >&2
+            sleep 30
+          done
+          exit 1
 
       # "No coverage report can be found with sonar.coverage.jacoco.xmlReportPaths=...", historically
       # fired for `clavaris-parent` (root pom.xml, packaging=pom, no src/main/java of its own) —

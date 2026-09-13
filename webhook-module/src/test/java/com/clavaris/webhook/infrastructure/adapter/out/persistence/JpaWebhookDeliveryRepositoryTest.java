@@ -273,6 +273,40 @@ class JpaWebhookDeliveryRepositoryTest {
     return endpoint.id();
   }
 
+  // TD-FUT-032/SDE-III review, 2026-09-13: DeleteOrganizationService's own cross-module erasure.
+  @Test
+  void deleteAllByOrganizationIdRemovesOnlyThatOrganizationsOwnDeliveries() {
+    UUID organizationId = UUID.randomUUID();
+    UUID otherOrganizationId = UUID.randomUUID();
+    WebhookDelivery delivery =
+        WebhookDelivery.schedule(
+            newPersistedEndpointId(),
+            organizationId,
+            UUID.randomUUID(),
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null);
+    WebhookDelivery other =
+        WebhookDelivery.schedule(
+            newPersistedEndpointId(),
+            otherOrganizationId,
+            UUID.randomUUID(),
+            "Account",
+            UUID.randomUUID(),
+            "account.created",
+            "{}",
+            null);
+    repository.insert(delivery);
+    repository.insert(other);
+
+    repository.deleteAllByOrganizationId(organizationId);
+
+    assertThat(repository.findById(delivery.id())).isEmpty();
+    assertThat(repository.findById(other.id())).isPresent();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(

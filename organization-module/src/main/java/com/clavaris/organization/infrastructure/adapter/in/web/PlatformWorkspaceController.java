@@ -13,6 +13,7 @@ import com.clavaris.organization.application.usecase.createworkspace.CreateWorks
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationQuery;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersQuery;
@@ -98,10 +99,12 @@ public class PlatformWorkspaceController {
   private final AddWorkspaceMemberUseCase addMemberUseCase;
   private final ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private final RemoveWorkspaceMemberUseCase removeMemberUseCase;
+  private final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other multi-collaborator constructor in this codebase.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"}) // one parameter per collaborating
+  // port — same rationale as every other multi-collaborator constructor in this codebase; the
+  // 10th (getRateLimitPolicy) tipped PMD's own threshold, not Sonar's, hence both suppressions now.
   public PlatformWorkspaceController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final GetWorkspaceForOrganizationUseCase getWorkspace,
@@ -111,6 +114,7 @@ public class PlatformWorkspaceController {
       final AddWorkspaceMemberUseCase addMemberUseCase,
       final ChangeWorkspaceMemberRoleUseCase changeMemberRole,
       final RemoveWorkspaceMemberUseCase removeMemberUseCase,
+      final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
@@ -120,6 +124,7 @@ public class PlatformWorkspaceController {
     this.addMemberUseCase = addMemberUseCase;
     this.changeMemberRole = changeMemberRole;
     this.removeMemberUseCase = removeMemberUseCase;
+    this.getRateLimitPolicy = getRateLimitPolicy;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
@@ -139,6 +144,12 @@ public class PlatformWorkspaceController {
       model.addAttribute(
           "workspaces",
           listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
+      // A plain (non-HTMX) validation error re-renders the WHOLE organization-detail page, Rate
+      // Limit section included — same reason "organization"/"workspaces" are populated here too,
+      // not just on PlatformOrganizationDetailController's own GET. Real bug this exact gap caused
+      // once already (SDE-III review, 2026-09-12): the template referenced this attribute
+      // unconditionally before this fix, NPE-ing on this one re-render path.
+      model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
       return isHtmxRequest(request) ? WORKSPACES_FRAGMENT : ORGANIZATION_DETAIL_VIEW;
     }
 

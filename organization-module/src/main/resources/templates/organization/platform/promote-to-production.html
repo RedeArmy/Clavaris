@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Promote to Production — Clavaris')}">
+    <title>Promote to Production — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span>Promote to Production</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Promote to Production</h1>
+                </div>
+            </div>
+
+            <div class="clavaris-section">
+                <div class="clavaris-section-card">
+                    <p>Creates a brand-new <strong>PRODUCTION</strong> Organization paired with
+                        this <strong>DEVELOPMENT</strong> one. Nothing is copied — no Accounts, no
+                        OAuth Clients, no Workspaces — the new Organization starts empty, with its
+                        own signing key and its own tenant issuer. This cannot be undone: once
+                        created, this Organization can never be paired with a different one.</p>
+
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${notEligibleError}">
+                        This Organization can't be promoted right now — it's either not a
+                        DEVELOPMENT environment, or it already has a linked production environment.
+                    </p>
+
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/promote-to-production(organizationId=${organization.id()})}"
+                          th:object="${promoteForm}" method="post">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                        <div class="clavaris-field">
+                            <label for="production-name">Name for the production environment</label>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                            <input id="production-name" type="text" th:field="*{name}" required/>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Create production environment</button>
+                        <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                           th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
