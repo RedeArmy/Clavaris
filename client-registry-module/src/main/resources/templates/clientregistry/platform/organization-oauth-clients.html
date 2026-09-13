@@ -41,7 +41,8 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(clients)}">
                     <p class="clavaris-empty-state">No OAuth Clients yet — register the first one below.</p>
                 </div>
-                <table class="clavaris-table" th:unless="${#lists.isEmpty(clients)}">
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(clients)}">
+                <table class="clavaris-table">
                     <thead>
                     <tr>
                         <th>Client ID</th>
@@ -51,7 +52,7 @@
                         <th>Consent</th>
                         <th>Status</th>
                         <th>Created</th>
-                        <th></th>
+                        <th><span class="clavaris-visually-hidden">Actions</span></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -92,6 +93,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <div class="clavaris-section-card">
                     <h2>Register a new OAuth Client</h2>

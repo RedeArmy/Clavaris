@@ -32,7 +32,16 @@
                  fragment" convention. See PlatformSigningKeyController's own Javadoc for why
                  emergency purge has no button here at all. -->
             <div id="keys-content" th:fragment="keys" class="clavaris-section">
-                <table class="clavaris-table" th:unless="${#lists.isEmpty(keys)}">
+                <!-- SDE-III UI audit, 2026-09-13: every sibling list page on this dashboard has an
+                     empty-state card for a zero-row table; this one was missing it. Practically
+                     unreachable today (BR-ORG-06: an Organization always has at least one active
+                     signing key from creation), kept anyway for the same consistency/robustness
+                     reasoning every other list page already gets it. -->
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(keys)}">
+                    <p class="clavaris-empty-state">No signing keys found for this Organization.</p>
+                </div>
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(keys)}">
+                <table class="clavaris-table">
                     <thead>
                     <tr>
                         <th>Key ID</th>
@@ -56,6 +65,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <div class="clavaris-section-card">
                     <h2>Rotate now</h2>

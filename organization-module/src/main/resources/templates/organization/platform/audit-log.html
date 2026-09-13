@@ -32,7 +32,8 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
                     <p class="clavaris-empty-state">No audit events recorded yet for this Organization.</p>
                 </div>
-                <table class="clavaris-table" th:unless="${#lists.isEmpty(auditEvents)}">
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(auditEvents)}">
+                <table class="clavaris-table">
                     <thead>
                     <tr>
                         <th>When</th>
@@ -52,6 +53,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </main>

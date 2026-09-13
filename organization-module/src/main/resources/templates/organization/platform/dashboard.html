@@ -28,13 +28,14 @@
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(organizations)}">
                     <p class="clavaris-empty-state">You don't have any organizations yet — create your first one below.</p>
                 </div>
-                <table class="clavaris-table" th:unless="${#lists.isEmpty(organizations)}">
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(organizations)}">
+                <table class="clavaris-table">
                     <thead>
                     <tr>
                         <th>Name</th>
                         <th>Environment</th>
                         <th>Created</th>
-                        <th></th>
+                        <th><span class="clavaris-visually-hidden">Actions</span></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -53,6 +54,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div class="clavaris-section">
