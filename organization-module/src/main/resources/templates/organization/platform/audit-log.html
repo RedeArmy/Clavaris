@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Audit Log — Clavaris')}">
+    <title>Audit Log — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span>Audit Log</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Audit Log</h1>
+                    <p>The most recent administrative changes to this Organization's own
+                        configuration and owned resources (TD-SEC-007). Covers Organization
+                        settings, Workspaces/members, OAuth Client configuration, and Webhook
+                        Endpoints — end-user Account activity and individual webhook delivery
+                        replays are not included in this view yet.</p>
+                </div>
+            </div>
+
+            <!-- ADR-0025: the first fully read-only dashboard page in this codebase — no form, no
+                 HTMX target, plain bounded list (see GetAuditLogForOrganizationUseCase's own
+                 Javadoc for the MAX_RESULTS=100 cap and the deliberate scope this page covers). -->
+            <div class="clavaris-section">
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
+                    <p class="clavaris-empty-state">No audit events recorded yet for this Organization.</p>
+                </div>
+                <table class="clavaris-table" th:unless="${#lists.isEmpty(auditEvents)}">
+                    <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Actor</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Detail</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="event : ${auditEvents}">
+                        <td th:text="${event.occurredAt()}">timestamp</td>
+                        <td><code th:text="${event.actor().type()} + ':' + ${event.actor().id()}">actor</code></td>
+                        <td><code th:text="${event.action()}">action</code></td>
+                        <td><code th:text="${event.targetType()} + ':' + ${event.targetId().orElse('—')}">target</code></td>
+                        <td th:text="${event.detail().orElse('—')}">detail</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/htmx.min.js}" defer></script>
+</body>
+</html>

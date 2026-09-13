@@ -143,6 +143,20 @@
                     <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — contact support to request a higher ceiling.</p>
                 </div>
             </div>
+
+            <!-- Owned by this module itself (ADR-0025, TD-SEC-007) — a link out like Secret
+                 Keys/OAuth Clients/Signing Keys/Webhook Endpoints above, not inlined like Rate
+                 Limit: up to 100 rows doesn't belong crammed into this page the way a single-value
+                 display does. -->
+            <div class="clavaris-section">
+                <h2>Audit Log</h2>
+                <div class="clavaris-section-card">
+                    <p>Recent administrative changes to this Organization's own configuration and
+                        owned resources.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/audit-log(organizationId=${organization.id()})}">View Audit Log</a>
+                </div>
+            </div>
         </div>
     </main>
 </div>
