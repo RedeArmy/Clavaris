@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -195,6 +198,53 @@ class JpaOAuthClientRepositoryTest {
   @Test
   void findAllByOrganizationIdIsEmptyForAnOrganizationWithNoClients() {
     assertThat(repository.findAllByOrganizationId(UUID.randomUUID())).isEmpty();
+  }
+
+  // TD-PERF-020: real-Postgres proof of the paginated sibling, newest-first — same
+  // "reconstitute with explicit createdAt instants" discipline organization-module's
+  // JpaOrganizationRepositoryTest own identical test already establishes.
+  @Test
+  void findPageByOrganizationIdReturnsOnePageAtATimeNewestFirst() {
+    UUID organizationId = UUID.randomUUID();
+    Instant now = Instant.now();
+    OAuthClient first = reconstituteAt(organizationId, "client-first", now.minusSeconds(20));
+    OAuthClient second = reconstituteAt(organizationId, "client-second", now.minusSeconds(10));
+    OAuthClient third = reconstituteAt(organizationId, "client-third", now);
+    repository.save(first);
+    repository.save(second);
+    repository.save(third);
+    repository.save(reconstituteAt(UUID.randomUUID(), "client-other-org", now));
+
+    Page<OAuthClient> firstPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(0, 2));
+
+    assertThat(firstPage.content())
+        .extracting(OAuthClient::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(firstPage.totalElements()).isEqualTo(3);
+    assertThat(firstPage.hasNext()).isTrue();
+
+    Page<OAuthClient> secondPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(1, 2));
+
+    assertThat(secondPage.content()).extracting(OAuthClient::id).containsExactly(first.id());
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  private static OAuthClient reconstituteAt(
+      final UUID organizationId, final String clientId, final Instant createdAt) {
+    return OAuthClient.reconstitute(
+        UUID.randomUUID(),
+        organizationId,
+        clientId,
+        "hash",
+        List.of("https://example.com/callback"),
+        List.of("authorization_code"),
+        List.of("openid"),
+        true,
+        List.of(),
+        createdAt,
+        true);
   }
 
   // @Import, not @ComponentScan — see JpaPlatformClientRepositoryTest's own TestConfig comment

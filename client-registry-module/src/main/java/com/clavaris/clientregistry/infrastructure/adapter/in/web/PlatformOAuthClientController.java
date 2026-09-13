@@ -3,6 +3,8 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationNotFoundException;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
@@ -12,6 +14,8 @@ import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.R
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -63,7 +68,11 @@ import org.springframework.web.server.ResponseStatusException;
  * are shown exactly once and have nowhere safe to travel through a redirect (never a URL query
  * string, browser history, or server access log).
  */
-@SuppressWarnings("PMD.LongVariable")
+// PMD.ExcessiveImports (TD-PERF-020's own ListOAuthClientsPagedQuery/UseCase pushed this past the
+// default threshold of 30): every import here backs a real, distinct collaborator this controller
+// genuinely needs — same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own
+// class-level Javadoc documents for an identical situation.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
 public class PlatformOAuthClientController {
@@ -77,6 +86,7 @@ public class PlatformOAuthClientController {
 
   private final RegisterOAuthClientUseCase registerClient;
   private final ListOAuthClientsUseCase listClients;
+  private final ListOAuthClientsPagedUseCase listClientsPaged;
   private final DeactivateOAuthClientUseCase deactivateClient;
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
   private final OrganizationForPlatformAccountResolver organizationResolver;
@@ -87,22 +97,37 @@ public class PlatformOAuthClientController {
   public PlatformOAuthClientController(
       final RegisterOAuthClientUseCase registerClient,
       final ListOAuthClientsUseCase listClients,
+      final ListOAuthClientsPagedUseCase listClientsPaged,
       final DeactivateOAuthClientUseCase deactivateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerClient = registerClient;
     this.listClients = listClients;
+    this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
     this.rotateClientSecret = rotateClientSecret;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // TD-PERF-020: page is 0-indexed — see organization-module's
+  // PlatformOrganizationDashboardController for the full reasoning. This GET also branches on
+  // HX-Request — a pagination link is itself an hx-get, and its hx-target can't safely receive a
+  // full HTML document.
+  //
+  // CPD-OFF: pmd:cpd-check now matches this method's own ownership-resolution preamble against
+  // PlatformOrganizationClientController#showList's identical shape — the same already-accepted
+  // "two controllers, genuinely unrelated beyond four shared fragments, not worth a common
+  // superclass" trade-off DashboardControllerSupport's own Javadoc already documents (CPD finding,
+  // 2026-09-11), just large enough with this method's own new pagination lines added to also cross
+  // CPD's line/token threshold, not a new duplication this pass introduced on its own.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
+      @RequestParam(defaultValue = "0") final int page,
       final Model model) {
     final UUID ownerPlatformAccountId =
         DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
@@ -111,9 +136,14 @@ public class PlatformOAuthClientController {
             organizationId, ownerPlatformAccountId, organizationResolver);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-    populateClientsModel(model, organizationId);
+    populateClientsModel(model, organizationId, page);
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      return CLIENTS_FRAGMENT;
+    }
     return LIST_VIEW;
   }
+
+  // CPD-ON
 
   // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't
   // safely travel through one. PMD.OnlyOneReturn: create/error each need their own exit, same
@@ -134,7 +164,7 @@ public class PlatformOAuthClientController {
     populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
-      populateClientsModel(model, organizationId);
+      populateClientsModel(model, organizationId, 0);
       return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
     }
 
@@ -160,12 +190,16 @@ public class PlatformOAuthClientController {
     model.addAttribute("justRegisteredRawSecret", result.rawClientSecret());
     model.addAttribute("justRegisteredClientId", result.client().clientId());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-    populateClientsModel(model, organizationId);
+    populateClientsModel(model, organizationId, 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
   // controller's own identical "after a mutation succeeds" suppression.
+  //
+  // CPD-OFF: same DashboardControllerSupport-documented, already-accepted trade-off as
+  // showList's own identical marker above — this method's ownership-resolution-then-anti-
+  // enumeration-check preamble matches PlatformOrganizationClientController#deactivate's.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{clientId}/deactivate")
   public String deactivate(
@@ -180,6 +214,7 @@ public class PlatformOAuthClientController {
             organizationId, ownerPlatformAccountId, organizationResolver);
     DashboardControllerSupport.requireClientIdBelongsToOrganization(
         listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
+    // CPD-ON
 
     deactivateClient.handle(
         new DeactivateOAuthClientCommand(
@@ -188,7 +223,7 @@ public class PlatformOAuthClientController {
     if (DashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-      populateClientsModel(model, organizationId);
+      populateClientsModel(model, organizationId, 0);
       return CLIENTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/oauth-clients";
@@ -218,7 +253,7 @@ public class PlatformOAuthClientController {
     model.addAttribute("justRegisteredRawSecret", result.rawSecret());
     model.addAttribute("justRegisteredClientId", result.clientId());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-    populateClientsModel(model, organizationId);
+    populateClientsModel(model, organizationId, 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
@@ -229,7 +264,12 @@ public class PlatformOAuthClientController {
     model.addAttribute(GRANT_TYPE_OPTIONS_ATTRIBUTE, OAuthGrantTypeOptions.DASHBOARD_OPTIONS);
   }
 
-  private void populateClientsModel(final Model model, final UUID organizationId) {
-    model.addAttribute("clients", listClients.handle(organizationId));
+  private void populateClientsModel(final Model model, final UUID organizationId, final int page) {
+    final Page<OAuthClient> clientsPage =
+        listClientsPaged.handle(
+            new ListOAuthClientsPagedQuery(
+                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute("clients", clientsPage.content());
+    model.addAttribute("clientsPage", clientsPage);
   }
 }

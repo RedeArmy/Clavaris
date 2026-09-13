@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.domain.model.Page;
 import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.Workspace;
 import jakarta.persistence.EntityManager;
@@ -69,18 +70,15 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
   @Override
   public Page<Workspace> findPageByOrganizationId(
       final UUID organizationId, final PageRequest pageRequest) {
-    final org.springframework.data.domain.Page<WorkspaceEntity> page =
+    return SpringDataPageMapper.toPage(
         workspaces.findAllByOrganizationId(
             organizationId,
             org.springframework.data.domain.PageRequest.of(
                 pageRequest.page(),
                 pageRequest.size(),
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
-    return new Page<>(
-        page.getContent().stream().map(this::toDomain).toList(),
-        pageRequest.page(),
-        pageRequest.size(),
-        page.getTotalElements());
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
+        pageRequest,
+        this::toDomain);
   }
 
   private Workspace toDomain(final WorkspaceEntity entity) {

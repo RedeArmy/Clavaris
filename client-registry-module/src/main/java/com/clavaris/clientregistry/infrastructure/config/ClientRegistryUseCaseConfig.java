@@ -22,8 +22,12 @@ import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclien
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsService;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedService;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsService;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedService;
+import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationEnvironmentChecker;
@@ -107,6 +111,13 @@ class ClientRegistryUseCaseConfig {
     return new ListOAuthClientsService(oauthClients);
   }
 
+  // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.
+  @Bean
+  /* package */ ListOAuthClientsPagedUseCase listOAuthClientsPagedUseCase(
+      final OAuthClientRepository oauthClients) {
+    return new ListOAuthClientsPagedService(oauthClients);
+  }
+
   // SDE-III review, 2026-09-11: the domain-layer gap TD-FUT-032 previously named as out of scope —
   // see OAuthClient#deactivate's own Javadoc.
   @Bean
@@ -186,6 +197,13 @@ class ClientRegistryUseCaseConfig {
   /* package */ ListOrganizationClientsUseCase listOrganizationClientsUseCase(
       final OrganizationClientRepository organizationClients) {
     return new ListOrganizationClientsService(organizationClients);
+  }
+
+  // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.
+  @Bean
+  /* package */ ListOrganizationClientsPagedUseCase listOrganizationClientsPagedUseCase(
+      final OrganizationClientRepository organizationClients) {
+    return new ListOrganizationClientsPagedService(organizationClients);
   }
 
   // Clerk "customize redirect URLs" parity. PMD.LinguisticNaming: same false positive
