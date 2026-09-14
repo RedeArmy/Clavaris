@@ -2,14 +2,14 @@ package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
-import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -68,20 +68,43 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
     organizationClients.deleteAllByOrganizationId(organizationId);
   }
 
-  // TD-PERF-020: newest-first, id as a tiebreaker — same reasoning JpaOrganizationRepository's own
-  // identical findPageOwnedBy already documents.
+  // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
+  // organization-module's own JpaOrganizationRepository#findKeysetPageOwnedBy already documents.
   @Override
-  public Page<OrganizationClient> findPageByOrganizationId(
-      final UUID organizationId, final PageRequest pageRequest) {
-    return SpringDataPageMapper.toPage(
-        organizationClients.findAllByOrganizationId(
-            organizationId,
-            org.springframework.data.domain.PageRequest.of(
-                pageRequest.page(),
-                pageRequest.size(),
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
-        pageRequest,
-        this::toDomain);
+  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
+  public KeysetPage<OrganizationClient> findKeysetPageByOrganizationId(
+      final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final org.springframework.data.domain.PageRequest limit =
+        org.springframework.data.domain.PageRequest.of(0, pageRequest.size() + 1);
+    if (pageRequest.after() != null) {
+      final KeysetCursor cursor = pageRequest.after();
+      return SpringDataKeysetPageMapper.forward(
+          organizationClients.findPageByOrganizationIdAfter(
+              organizationId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          true,
+          this::toDomain,
+          this::cursorOf);
+    }
+    if (pageRequest.before() != null) {
+      final KeysetCursor cursor = pageRequest.before();
+      return SpringDataKeysetPageMapper.backward(
+          organizationClients.findPageByOrganizationIdBefore(
+              organizationId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          this::toDomain,
+          this::cursorOf);
+    }
+    return SpringDataKeysetPageMapper.forward(
+        organizationClients.findFirstPageByOrganizationId(organizationId, limit),
+        pageRequest.size(),
+        false,
+        this::toDomain,
+        this::cursorOf);
+  }
+
+  private KeysetCursor cursorOf(final OrganizationClientEntity entity) {
+    return new KeysetCursor(entity.getCreatedAt(), entity.getId());
   }
 
   private OrganizationClient toDomain(final OrganizationClientEntity entity) {

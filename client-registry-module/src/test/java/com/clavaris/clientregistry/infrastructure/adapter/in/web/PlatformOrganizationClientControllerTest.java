@@ -22,8 +22,9 @@ import com.clavaris.clientregistry.application.usecase.rotateorganizationclients
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -108,15 +109,20 @@ class PlatformOrganizationClientControllerTest {
         organizationId, "sk_test_abc", "hashed-secret", List.of(PlatformScopes.WORKSPACES_WRITE));
   }
 
-  private static Page<OrganizationClient> emptyPage() {
-    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  private static KeysetPage<OrganizationClient> emptyPage() {
+    return new KeysetPage<>(List.of(), null, null, false, false);
+  }
+
+  private static KeysetCursor cursorOf(final OrganizationClient client) {
+    return new KeysetCursor(client.createdAt(), client.id());
   }
 
   @Test
   void showsTheOrganizationsClients() throws Exception {
     OrganizationClient client = sampleClient();
+    KeysetCursor cursor = cursorOf(client);
     when(listClientsPaged.handle(any()))
-        .thenReturn(new Page<>(List.of(client), 0, PageRequest.DEFAULT_SIZE, 1));
+        .thenReturn(new KeysetPage<>(List.of(client), cursor, cursor, false, false));
 
     mockMvc
         .perform(get(basePath()))
@@ -223,15 +229,17 @@ class PlatformOrganizationClientControllerTest {
     verify(rotateClientSecret, never()).handle(any());
   }
 
-  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
+  // query.
   @Test
-  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
-    mockMvc.perform(get(basePath()).param("page", "2"));
+  void getPassesTheAfterCursorThroughToTheUseCase() throws Exception {
+    KeysetCursor cursor = new KeysetCursor(java.time.Instant.now(), UUID.randomUUID());
+
+    mockMvc.perform(get(basePath()).param("after", cursor.encode()));
 
     verify(listClientsPaged)
         .handle(
-            new ListOrganizationClientsPagedQuery(
-                organizationId, new PageRequest(2, PageRequest.DEFAULT_SIZE)));
+            new ListOrganizationClientsPagedQuery(organizationId, KeysetPageRequest.after(cursor)));
   }
 
   // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the clients

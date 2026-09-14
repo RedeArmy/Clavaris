@@ -95,21 +95,20 @@
                 </table>
                 </div>
 
-                <!-- TD-PERF-020: same page-number pagination shape as the Organizations table —
-                     see PlatformOAuthClientController's own Javadoc. -->
-                <nav class="clavaris-pagination" th:if="${clientsPage.totalPages() > 1}"
+                <!-- TD-PERF-020 (keyset revision, 2026-09-14): same keyset pagination shape as the
+                     Organizations table — see PlatformOAuthClientController's own Javadoc. -->
+                <nav class="clavaris-pagination"
+                     th:if="${clientsPage.hasPrevious() or clientsPage.hasNext()}"
                      aria-label="OAuth Clients pages">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${clientsPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},page=${clientsPage.page() - 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},page=${clientsPage.page() - 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},before=${clientsPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},before=${clientsPage.startCursor().encode()})}"
                        hx-target="#clients-content" hx-swap="outerHTML">Previous</a>
-                    <span class="clavaris-pagination__status"
-                          th:text="'Page ' + (${clientsPage.page()} + 1) + ' of ' + ${clientsPage.totalPages()}">Page 1 of 1</span>
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${clientsPage.hasNext()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},page=${clientsPage.page() + 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},page=${clientsPage.page() + 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},after=${clientsPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId},after=${clientsPage.endCursor().encode()})}"
                        hx-target="#clients-content" hx-swap="outerHTML">Next</a>
                 </nav>
 

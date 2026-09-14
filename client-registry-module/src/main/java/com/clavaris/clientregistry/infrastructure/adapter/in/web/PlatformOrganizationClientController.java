@@ -15,8 +15,8 @@ import com.clavaris.clientregistry.application.usecase.rotateorganizationclients
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Optional;
@@ -111,21 +111,26 @@ public class PlatformOrganizationClientController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // TD-PERF-020: page is 0-indexed — see organization-module's
-  // PlatformOrganizationDashboardController for the full reasoning. This GET also branches on
-  // HX-Request — a pagination link is itself an hx-get, and its hx-target can't safely receive a
-  // full HTML document.
+  // TD-PERF-020 (keyset revision, 2026-09-14): ?after=/?before= carry an opaque KeysetCursor
+  // token — see organization-module's PlatformOrganizationDashboardController for the full
+  // reasoning. This GET also branches on HX-Request — a pagination link is itself an hx-get, and
+  // its hx-target can't safely receive a full HTML document.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @RequestParam(defaultValue = "0") final int page,
+      @RequestParam(required = false) final String after,
+      @RequestParam(required = false) final String before,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
         DashboardControllerSupport.requireOwnedOrganization(
             request, organizationId, currentPlatformAccount, organizationResolver);
-    renderSecretKeysList(model, organizationId, owned.organizationName(), page);
+    renderSecretKeysList(
+        model,
+        organizationId,
+        owned.organizationName(),
+        KeysetPageRequest.fromCursors(after, before));
     if (DashboardControllerSupport.isHtmxRequest(request)) {
       return CLIENTS_FRAGMENT;
     }
@@ -136,10 +141,13 @@ public class PlatformOrganizationClientController {
   // each call site's own comment for why this exact trio (header, fresh create form, current
   // page of clients) always travels together.
   private void renderSecretKeysList(
-      final Model model, final UUID organizationId, final String organizationName, final int page) {
+      final Model model,
+      final UUID organizationId,
+      final String organizationName,
+      final KeysetPageRequest pageRequest) {
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateOrganizationClientForm());
-    populateClientsModel(model, organizationId, page);
+    populateClientsModel(model, organizationId, pageRequest);
   }
 
   // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't
@@ -181,7 +189,8 @@ public class PlatformOrganizationClientController {
 
     model.addAttribute("justCreatedRawSecret", result.rawClientSecret());
     model.addAttribute("justCreatedClientId", result.organizationClient().clientId());
-    renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
+    renderSecretKeysList(
+        model, organizationId, owned.organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
@@ -202,7 +211,8 @@ public class PlatformOrganizationClientController {
             clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
 
     if (DashboardControllerSupport.isHtmxRequest(request)) {
-      renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
+      renderSecretKeysList(
+          model, organizationId, owned.organizationName(), KeysetPageRequest.first());
       return CLIENTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/secret-keys";
@@ -225,7 +235,8 @@ public class PlatformOrganizationClientController {
 
     model.addAttribute("justCreatedRawSecret", result.rawSecret());
     model.addAttribute("justCreatedClientId", result.clientId());
-    renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
+    renderSecretKeysList(
+        model, organizationId, owned.organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
@@ -247,7 +258,7 @@ public class PlatformOrganizationClientController {
       return Optional.empty();
     }
     populateHeaderModel(model, organizationId, owned.organizationName());
-    populateClientsModel(model, organizationId, 0);
+    populateClientsModel(model, organizationId, KeysetPageRequest.first());
     return Optional.of(
         DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW);
   }
@@ -273,11 +284,10 @@ public class PlatformOrganizationClientController {
     model.addAttribute(ALL_SCOPES_ATTRIBUTE, PlatformScopes.BOOTSTRAP_DEFAULT);
   }
 
-  private void populateClientsModel(final Model model, final UUID organizationId, final int page) {
-    final Page<OrganizationClient> clientsPage =
-        listClientsPaged.handle(
-            new ListOrganizationClientsPagedQuery(
-                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+  private void populateClientsModel(
+      final Model model, final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final KeysetPage<OrganizationClient> clientsPage =
+        listClientsPaged.handle(new ListOrganizationClientsPagedQuery(organizationId, pageRequest));
     model.addAttribute("clients", clientsPage.content());
     model.addAttribute("clientsPage", clientsPage);
   }

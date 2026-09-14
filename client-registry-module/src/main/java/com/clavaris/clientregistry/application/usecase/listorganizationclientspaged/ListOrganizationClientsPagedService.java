@@ -2,7 +2,7 @@ package com.clavaris.clientregistry.application.usecase.listorganizationclientsp
 
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 
 // PMD.LongVariable: organizationClients names exactly what it is — same convention
 // JpaOrganizationClientRepository's own identical suppression already establishes.
@@ -17,8 +17,8 @@ public class ListOrganizationClientsPagedService implements ListOrganizationClie
   }
 
   @Override
-  public Page<OrganizationClient> handle(final ListOrganizationClientsPagedQuery query) {
-    return organizationClients.findPageByOrganizationId(
+  public KeysetPage<OrganizationClient> handle(final ListOrganizationClientsPagedQuery query) {
+    return organizationClients.findKeysetPageByOrganizationId(
         query.organizationId(), query.pageRequest());
   }
 }
