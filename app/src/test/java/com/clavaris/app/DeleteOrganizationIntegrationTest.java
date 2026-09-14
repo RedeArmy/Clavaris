@@ -39,14 +39,14 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * BR-DATA-02/03's own organization-level equivalent: {@code POST
  * /api/v1/admin/organizations/{organizationId}:delete} — proves the whole erasure chain ({@link
- * com.clavaris.app.infrastructure.config.OrganizationTokenRevokerBridge}, {@link
- * com.clavaris.app.infrastructure.config.OrganizationIdentityDataEraserBridge}, {@link
- * com.clavaris.app.infrastructure.config.OrganizationOAuthClientsEraserBridge}) with real rows in
- * every affected table, not mocked ports — same "confirmed live, not assumed" bar as {@code
- * DeleteAccountIntegrationTest}. Deliberately builds one row in every table this Organization owns
- * (an Account with a real Authorization Code exchange, an OAuthClient, a SigningKey — auto-
- * provisioned at creation, a RateLimitPolicy) so the after-state assertions prove something real
- * was actually removed, not just that empty tables stayed empty.
+ * com.clavaris.app.infrastructure.adapter.out.bridge.OrganizationTokenRevokerBridge}, {@link
+ * com.clavaris.app.infrastructure.adapter.out.bridge.OrganizationIdentityDataEraserBridge}, {@link
+ * com.clavaris.app.infrastructure.adapter.out.bridge.OrganizationOAuthClientsEraserBridge}) with
+ * real rows in every affected table, not mocked ports — same "confirmed live, not assumed" bar as
+ * {@code DeleteAccountIntegrationTest}. Deliberately builds one row in every table this
+ * Organization owns (an Account with a real Authorization Code exchange, an OAuthClient, a
+ * SigningKey — auto- provisioned at creation, a RateLimitPolicy) so the after-state assertions
+ * prove something real was actually removed, not just that empty tables stayed empty.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)

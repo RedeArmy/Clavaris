@@ -1,5 +1,14 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.IdempotencyKeyFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.IdempotencyKeyStore;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationClientOwnershipFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifiers;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
+import com.clavaris.app.infrastructure.adapter.out.security.IdempotencyKeyHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
@@ -50,7 +59,17 @@ import tools.jackson.databind.ObjectMapper;
 // ExcessiveParameterList: ADR-0023 added two more collaborators (accounts/workspaces) to the one
 // SecurityFilterChain bean this class wires — same "wiring, not sprawl" reasoning
 // PlatformAuthorizationServerConfig's own identical suppression already documents.
-@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.ExcessiveParameterList"})
+// ExcessiveImports: TD-ARCH-021 (app module hexagonal reorganization, 2026-09-14) — every
+// filter/hasher this class wires (AntiAbuseRateLimitingFilter, IdempotencyKeyFilter, the
+// RateLimit*/IdempotencyKey* types) now lives in its own adapter subpackage instead of sharing
+// this one flat package, so each needs its own import where none was needed before. Real
+// collaborator count is unchanged by the move — same "wiring, not sprawl" reasoning as the
+// suppression just above, not new coupling this pass introduced.
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.ExcessiveParameterList",
+  "PMD.ExcessiveImports"
+})
 @Configuration
 class AdminApiSecurityConfig {
 

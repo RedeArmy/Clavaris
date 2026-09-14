@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
@@ -116,18 +118,18 @@ class PlatformTokenIssuanceIntegrationTest extends RedisBackedIntegrationTest {
     tokenRevocationLogAppender.list.clear();
   }
 
-  // By fully-qualified name, not TokenIssuanceEventLogger.class — that class is deliberately
-  // package-private (same convention as every other class in app.infrastructure.config), and
-  // Logback resolves loggers by name, so no import/visibility relaxation is needed to reach it.
+  // By class, not a hardcoded fully-qualified name — TD-ARCH-021 (app module hexagonal
+  // reorganization): both classes now live in adapter/out/security and are public, so resolving
+  // the logger via TokenIssuanceEventLogger.class/TokenRevocationEventLogger.class survives a
+  // future package move the way a hardcoded string literal (this test's own previous shape)
+  // silently didn't — it broke exactly this way once already, when the classes moved out of
+  // app.infrastructure.config.
   private static Logger tokenIssuanceLogger() {
-    return (Logger)
-        LoggerFactory.getLogger("com.clavaris.app.infrastructure.config.TokenIssuanceEventLogger");
+    return (Logger) LoggerFactory.getLogger(TokenIssuanceEventLogger.class);
   }
 
   private static Logger tokenRevocationLogger() {
-    return (Logger)
-        LoggerFactory.getLogger(
-            "com.clavaris.app.infrastructure.config.TokenRevocationEventLogger");
+    return (Logger) LoggerFactory.getLogger(TokenRevocationEventLogger.class);
   }
 
   @Test

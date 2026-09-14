@@ -1,5 +1,11 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifiers;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
+import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,10 +42,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * POST without the token is rejected, one with it succeeds.
  */
 @Configuration
-class DefaultSecurityConfig {
+public class DefaultSecurityConfig {
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ DefaultSecurityConfig() {
+  public DefaultSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean method below.
   }
 
@@ -50,7 +56,7 @@ class DefaultSecurityConfig {
   // doesn't widen, not one this change is responsible for closing.
   @Bean
   @Order(6)
-  /* package */ SecurityFilterChain defaultSecurityFilterChain(
+  public SecurityFilterChain defaultSecurityFilterChain(
       final HttpSecurity http,
       final RateLimiter rateLimiter,
       @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,

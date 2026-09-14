@@ -1,5 +1,16 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifiers;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
+import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
+import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
+import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.OrganizationClientClaimCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.infrastructure.adapter.out.security.PlatformSigningKeyMaterial;
 import com.nimbusds.jose.jwk.JWKSet;

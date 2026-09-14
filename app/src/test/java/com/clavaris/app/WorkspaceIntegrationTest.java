@@ -40,8 +40,8 @@ import tools.jackson.databind.ObjectMapper;
  * provisioning a real {@code Account} and triggering a real password-reset email, change role,
  * remove member) plus the two ADR-0007 cascade obligations this feature closed: {@code
  * WorkspaceMembership} erasure on {@code Account} hard-delete ({@link
- * com.clavaris.app.infrastructure.config.WorkspaceMembershipEraserBridge}) and the free DB-level
- * cascade on {@code Organization} hard-delete.
+ * com.clavaris.app.infrastructure.adapter.out.bridge.WorkspaceMembershipEraserBridge}) and the free
+ * DB-level cascade on {@code Organization} hard-delete.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)

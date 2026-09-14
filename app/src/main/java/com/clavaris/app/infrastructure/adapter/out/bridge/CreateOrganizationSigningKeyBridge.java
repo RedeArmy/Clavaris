@@ -1,0 +1,58 @@
+package com.clavaris.app.infrastructure.adapter.out.bridge;
+
+import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationUseCase;
+import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SigningKey;
+import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
+import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
+
+/**
+ * Adapts organization-module's {@link SigningKeyProvisioner} outbound port to identity-module's
+ * real key-generation/activation machinery — the bridge lives in {@code app}, not either business
+ * module, because it needs both at once and {@code app} is the one module allowed to (the
+ * module-graph's dependency rule).
+ *
+ * <p>Landed in this PR (not the later platform-tier composition PR) because organization-module's
+ * own {@code OrganizationUseCaseConfig} eagerly wires a {@code CreateOrganizationUseCase} bean that
+ * requires a {@code SigningKeyProvisioner} — confirmed live on CI: without this class present
+ * somewhere on {@code app}'s classpath, {@code app}'s pre-existing full-context tests (which
+ * predate this feature) failed to start at all, not just this feature's own tests. Deferring this
+ * bridge to a separate PR would have meant "organization-module's own PR breaks master's existing
+ * tests until a second, unrelated PR also lands" — not an acceptable intermediate state for a
+ * trunk-based workflow (git-workflow.md §1: every PR keeps {@code master} deployable).
+ */
+@Component
+class CreateOrganizationSigningKeyBridge implements SigningKeyProvisioner {
+
+  // ADR-0002 — the only algorithm this codebase issues signing keys under, platform or
+  // per-Organization.
+  private static final String ALGORITHM = "RS256";
+
+  private final ActivateSigningKeyForOrganizationUseCase keyActivator;
+  private final OrganizationSigningKeyMaterialFactory materialFactory;
+
+  /* package */ CreateOrganizationSigningKeyBridge(
+      final ActivateSigningKeyForOrganizationUseCase keyActivator,
+      final OrganizationSigningKeyMaterialFactory materialFactory) {
+    this.keyActivator = keyActivator;
+    this.materialFactory = materialFactory;
+  }
+
+  @Override
+  public ProvisionedSigningKey provisionFor(final UUID organizationId) {
+    final OrganizationId orgId = new OrganizationId(organizationId);
+    // Generate the real key material first, then record it as active (BR-ORG-06) — the reverse
+    // order would leave a metadata row claiming an active key that doesn't actually exist yet.
+    final String kid = materialFactory.generateFor(orgId);
+    final SigningKey activated = keyActivator.handle(orgId, kid, ALGORITHM);
+    // TD-SEC-051: generateFor no longer caches by itself — see SigningKeyMaterialGenerator's own
+    // Javadoc. No real race exists at this specific call site (a brand-new Organization's own id
+    // is never shared by a concurrent caller), but every caller follows the same two-step contract
+    // for consistency, and this org's first token issuance would otherwise pay one avoidable
+    // cache-miss reload for no reason.
+    materialFactory.cacheActive(orgId, kid);
+    return new ProvisionedSigningKey(activated.id(), activated.kid(), activated.algorithm());
+  }
+}

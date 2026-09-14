@@ -31,8 +31,8 @@ import tools.jackson.databind.ObjectMapper;
  * exists to prevent: a real {@code OrganizationClient}'s own minted token, obtained via a real
  * {@code POST /oauth2/token} Basic-Auth exchange, reaching its own Organization's admin-API
  * resources but rejected against a different Organization's — not assumed from {@link
- * com.clavaris.app.infrastructure.config.OrganizationClientOwnershipFilterTest}'s own unit coverage
- * alone.
+ * com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationClientOwnershipFilterTest}'s
+ * own unit coverage alone.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers

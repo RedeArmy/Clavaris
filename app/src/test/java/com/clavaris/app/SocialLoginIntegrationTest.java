@@ -54,9 +54,9 @@ import tools.jackson.databind.ObjectMapper;
  * {@code OAuth2AuthorizationRequestRedirectFilter} building the real authorization URL → the
  * provider's own redirect back → {@code OAuth2LoginAuthenticationFilter} exchanging the code and
  * fetching the profile → {@link
- * com.clavaris.app.infrastructure.config.GitHubVerifiedEmailUserService}'s own second {@code GET
- * /user/emails} call → {@code SocialLoginAuthenticationSuccessHandler} routing into the real use
- * case and establishing a real session) — same "confirmed live, not assumed" bar {@link
+ * com.clavaris.app.infrastructure.adapter.out.security.GitHubVerifiedEmailUserService}'s own second
+ * {@code GET /user/emails} call → {@code SocialLoginAuthenticationSuccessHandler} routing into the
+ * real use case and establishing a real session) — same "confirmed live, not assumed" bar {@link
  * AuthorizationCodeFlowIntegrationTest} already set for the password-based flow.
  *
  * <p>GitHub, not Google: no OIDC ID-token/JWKS machinery to simulate, so the provider side of this

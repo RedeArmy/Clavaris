@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
@@ -138,12 +139,10 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     tokenIssuanceLogAppender.list.clear();
   }
 
-  // By fully-qualified name, not TokenIssuanceEventLogger.class — that class is deliberately
-  // package-private (same convention as every other class in app.infrastructure.config), and
-  // Logback resolves loggers by name, so no import/visibility relaxation is needed to reach it.
+  // By class, not a hardcoded fully-qualified name — see PlatformTokenIssuanceIntegrationTest's
+  // own identical fix (TD-ARCH-021) for why a string literal here silently broke once already.
   private static Logger tokenIssuanceLogger() {
-    return (Logger)
-        LoggerFactory.getLogger("com.clavaris.app.infrastructure.config.TokenIssuanceEventLogger");
+    return (Logger) LoggerFactory.getLogger(TokenIssuanceEventLogger.class);
   }
 
   @Test

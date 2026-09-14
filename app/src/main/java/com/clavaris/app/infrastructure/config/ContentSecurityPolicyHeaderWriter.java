@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -115,7 +116,7 @@ import org.springframework.security.web.header.HeaderWriter;
 // class's own long, descriptively-named constants — same false-positive rationale
 // OrganizationAuthorizationServerConfig's own identical class-level suppression documents.
 @SuppressWarnings("PMD.AvoidDuplicateLiterals")
-final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
+public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   private static final String HEADER_NAME = "Content-Security-Policy";
   private static final String DISPLAY_PARAM = "display";
@@ -188,8 +189,7 @@ final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // ContentSecurityPolicyHeaderWriter(checker)` call — see this class's own Javadoc for why every
   // site passes one even though only OrganizationAuthorizationServerConfig's own chain ever
   // actually invokes it.
-  /* package */ ContentSecurityPolicyHeaderWriter(
-      final EmbeddingEligibilityChecker embeddingChecker) {
+  public ContentSecurityPolicyHeaderWriter(final EmbeddingEligibilityChecker embeddingChecker) {
     this.embeddingChecker = embeddingChecker;
   }
 
