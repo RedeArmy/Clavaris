@@ -115,19 +115,35 @@ spring:
             # to learn whether a GitHub account's email is actually verified — the base /user
             # response has no verified flag at all) needs it, or the call comes back empty.
             scope: read:user,user:email
-  # SDE-III performance pass, 2026-09-13 (TD-PERF-024): previously unset — Spring Boot's own bare
-  # default resource handler serves /css/clavaris.css, /js/htmx.min.js, and the self-hosted Geist
-  # fonts with no explicit Cache-Control at all, so every dashboard navigation re-validates these
-  # assets instead of trusting a cached copy. 1h, not a long-lived immutable max-age: none of these
-  # paths are content-hashed (no /css/clavaris.a1b2c3.css cache-busting filename), so a real deploy
-  # changing clavaris.css must still be picked up by an already-open browser tab within a bounded
-  # window — content-hashed static assets (enabling a real immutable, far-future max-age safely) is
-  # its own separate, larger follow-up, not bundled into this config-only pass.
+  # SDE-III performance pass, 2026-09-13 (TD-PERF-024, content-hash revision 2026-09-14):
+  # previously unset — Spring Boot's own bare default resource handler served /css/clavaris.css,
+  # /js/htmx.min.js, and the self-hosted Geist fonts with no explicit Cache-Control at all, so
+  # every dashboard navigation re-validated these assets instead of trusting a cached copy. This
+  # pass's own first cut used a bounded 1h max-age deliberately, since none of these paths were
+  # content-hashed yet — noted then as its own separate follow-up, now built: chain.strategy
+  # .content below is Spring's own built-in MD5-content-hash URL versioning (e.g.
+  # /css/clavaris-a1b2c3d4.css), combined with StaticResourceVersioningConfig's
+  # ResourceUrlEncodingFilter bean (app module) so every existing th:href/th:src="@{...}" link
+  # across every template is rewritten to the current hash automatically — no template edits
+  # needed anywhere. A real deploy that changes clavaris.css produces a new hash and therefore a
+  # new URL, so a long, effectively-immutable max-age is now safe: an already-open browser tab
+  # still has the OLD hashed URL cached (harmless, that exact content genuinely never changes
+  # again), while every freshly-rendered page already links to the NEW hash. paths: /** covers
+  # every static resource this app serves (css/js/fonts), and CssLinkResourceTransformer (enabled
+  # automatically alongside content versioning) rewrites clavaris.css's own @font-face url(...)
+  # references to their hashed URLs too, so the fonts get the same treatment without their own
+  # template reference to rewrite.
   web:
     resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /**
       cache:
         cachecontrol:
-          max-age: 1h
+          max-age: 365d
+          cache-public: true
   # TD-ARCH-002 (closed): NOT spring.session.* — confirmed by inspecting the resolved
   # spring-boot-autoconfigure-4.1.0 jar directly that Spring Boot 4.x ships zero session-related
   # autoconfiguration classes (unlike the still-autoconfigured spring-boot-data-redis module
