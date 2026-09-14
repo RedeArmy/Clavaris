@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.support.RedisBackedIntegrationTest;
 import com.clavaris.app.support.TestMailSenderConfig;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;

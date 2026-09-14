@@ -1,5 +1,16 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifiers;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
+import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.security.CircuitBreakerClientHttpRequestInterceptor;
+import com.clavaris.app.infrastructure.adapter.out.security.GitHubVerifiedEmailUserService;
+import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.SocialLoginAuthenticationFailureHandler;
+import com.clavaris.app.infrastructure.adapter.out.security.SocialLoginAuthenticationSuccessHandler;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
@@ -64,9 +75,18 @@ import org.springframework.web.client.RestTemplate;
  * shape of false positive. PMD.CouplingBetweenObjects: this class wires an entire OAuth2 client
  * security chain (token exchange, two userinfo flavors, rate limiting, the new circuit breaker) —
  * same "wiring, not sprawl" rationale OrganizationAuthorizationServerConfig's own identical
- * suppression already documents for a comparably-shaped config class.
+ * suppression already documents for a comparably-shaped config class. PMD.ExcessiveImports:
+ * TD-ARCH-021 (app module hexagonal reorganization, 2026-09-14) — same reasoning
+ * AdminApiSecurityConfig's own identical suppression documents; this class wires the most
+ * collaborators of any config class in the module (OAuth2 client registration, the circuit breaker,
+ * both userinfo flavors, rate limiting), each now importing from its own adapter subpackage instead
+ * of sharing this one flat package.
  */
-@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.CouplingBetweenObjects",
+  "PMD.ExcessiveImports"
+})
 @Configuration
 class SocialLoginConfig {
 

@@ -1,5 +1,29 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationRateLimitRules;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantAccountOnlySecurityContextFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantSessionConcurrencyFilter;
+import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
+import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegisteredClientRepository;
+import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
+import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
+import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
+import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
+import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJwkSource;
+import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
+import com.clavaris.app.infrastructure.adapter.out.security.SessionBackedRefreshTokenGenerator;
+import com.clavaris.app.infrastructure.adapter.out.security.SpringSecurityAuthenticatedSessionEstablisher;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
+import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
+import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceAwareOidcUserInfoMapper;
+import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceRoleClaimsCustomizer;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
@@ -112,7 +136,7 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
   "PMD.CouplingBetweenObjects"
 })
 @Configuration
-class OrganizationAuthorizationServerConfig {
+public class OrganizationAuthorizationServerConfig {
 
   // Appears 4 times across securityMatcher/authorizeHttpRequests/two RateLimitRules below — one
   // constant, not four literals that could silently drift apart (PMD.AvoidDuplicateLiterals).
@@ -144,7 +168,7 @@ class OrganizationAuthorizationServerConfig {
   private static final String CONSENT_PATH_PATTERN = "/oauth2/consent";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ OrganizationAuthorizationServerConfig() {
+  public OrganizationAuthorizationServerConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
@@ -233,7 +257,7 @@ class OrganizationAuthorizationServerConfig {
   // same repository instance. Same "share the instance explicitly, don't rely on a default" lesson
   // spike 0001's Appendix B/§5.3 already taught this codebase for JWKSource.
   @Bean
-  /* package */ SecurityContextRepository securityContextRepository() {
+  public SecurityContextRepository securityContextRepository() {
     return new HttpSessionSecurityContextRepository();
   }
 
@@ -245,7 +269,7 @@ class OrganizationAuthorizationServerConfig {
   // between a compromised Postgres backup and every currently-valid access/ID token/authorization
   // code being directly usable.
   @Bean
-  /* package */ BearerTokenHasher bearerTokenHasher(
+  public BearerTokenHasher bearerTokenHasher(
       @Value("${clavaris.oauth2.token-hash-secret}") final String tokenHashSecret) {
     return new BearerTokenHasher(tokenHashSecret);
   }
@@ -256,14 +280,14 @@ class OrganizationAuthorizationServerConfig {
   // (clavaris.rate-limit.key-hash-secret), never clavaris.oauth2.token-hash-secret reused — see
   // RateLimitKeyHasher's own Javadoc for why the two must not share one key.
   @Bean
-  /* package */ RateLimitKeyHasher rateLimitKeyHasher(
+  public RateLimitKeyHasher rateLimitKeyHasher(
       @Value("${clavaris.rate-limit.key-hash-secret}") final String rateLimitKeyHashSecret) {
     return new RateLimitKeyHasher(rateLimitKeyHashSecret);
   }
 
   @Bean
   @Order(3)
-  /* package */ SecurityFilterChain organizationAuthorizationServerSecurityFilterChain(
+  public SecurityFilterChain organizationAuthorizationServerSecurityFilterChain(
       final HttpSecurity http,
       final OAuthClientRepository oauthClients,
       final SigningKeyRepository signingKeys,

@@ -1,5 +1,12 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifiers;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
+import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.security.PlatformLoginRedirectEntryPoint;
+import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,7 +47,7 @@ import org.springframework.session.security.SpringSessionBackedSessionRegistry;
  * already keeps this registry's view current, the publisher's job under the old registry).
  */
 @Configuration
-class PlatformDashboardSecurityConfig {
+public class PlatformDashboardSecurityConfig {
 
   // Every authenticated-but-rejected path on this chain (concurrent-session expiry, permitAll
   // list, the wrong-tier accessDeniedHandler) sends the browser to the same one page — a single
@@ -49,7 +56,7 @@ class PlatformDashboardSecurityConfig {
   private static final String PLATFORM_LOGIN_PATH = "/platform/login";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ PlatformDashboardSecurityConfig() {
+  public PlatformDashboardSecurityConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
@@ -63,7 +70,7 @@ class PlatformDashboardSecurityConfig {
   // old SessionRegistryImpl's local map in sync with real container events; this registry has no
   // local map to keep in sync.
   @Bean
-  /* package */ SessionRegistry sessionRegistry(
+  public SessionRegistry sessionRegistry(
       final FindByIndexNameSessionRepository<? extends Session> sessionRepository) {
     return new SpringSessionBackedSessionRegistry<>(sessionRepository);
   }
@@ -75,7 +82,7 @@ class PlatformDashboardSecurityConfig {
   @SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList"})
   @Bean
   @Order(5)
-  /* package */ SecurityFilterChain platformDashboardSecurityFilterChain(
+  public SecurityFilterChain platformDashboardSecurityFilterChain(
       final HttpSecurity http,
       final SessionRegistry sessionRegistry,
       final RateLimiter rateLimiter,

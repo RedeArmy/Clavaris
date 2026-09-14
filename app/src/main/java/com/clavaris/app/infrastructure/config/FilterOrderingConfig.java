@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.CustomDomainRequestRewriteFilter;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -30,18 +31,16 @@ import org.springframework.web.servlet.resource.ResourceUrlEncodingFilter;
  * the other, only both running before Spring Security.
  */
 @Configuration
-class FilterOrderingConfig {
+public class FilterOrderingConfig {
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
-  /* package */ FilterOrderingConfig() {
+  public FilterOrderingConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
   @Bean
-  /* package */ FilterRegistrationBean<CustomDomainRequestRewriteFilter>
-      customDomainRequestRewriteFilter(
-          final ClientDomainConfigRepository domainConfigs,
-          final OAuthClientRepository oauthClients) {
+  public FilterRegistrationBean<CustomDomainRequestRewriteFilter> customDomainRequestRewriteFilter(
+      final ClientDomainConfigRepository domainConfigs, final OAuthClientRepository oauthClients) {
     final FilterRegistrationBean<CustomDomainRequestRewriteFilter> registration =
         new FilterRegistrationBean<>(
             new CustomDomainRequestRewriteFilter(domainConfigs, oauthClients));
@@ -51,7 +50,7 @@ class FilterOrderingConfig {
   }
 
   @Bean
-  /* package */ FilterRegistrationBean<ResourceUrlEncodingFilter> resourceUrlEncodingFilter() {
+  public FilterRegistrationBean<ResourceUrlEncodingFilter> resourceUrlEncodingFilter() {
     final FilterRegistrationBean<ResourceUrlEncodingFilter> registration =
         new FilterRegistrationBean<>(new ResourceUrlEncodingFilter());
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
