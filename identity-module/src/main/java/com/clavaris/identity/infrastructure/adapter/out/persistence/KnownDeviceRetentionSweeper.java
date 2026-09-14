@@ -2,7 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import org.slf4j.Logger;
 
 /**
@@ -20,8 +20,11 @@ import org.slf4j.Logger;
  * knownDevices::deleteByLastSeenAtBefore}), not a shared repository interface — {@link
  * SpringDataKnownDeviceJpaRepository}/{@link SpringDataPlatformKnownDeviceJpaRepository} are two
  * genuinely different Spring Data repositories over two different entity types; a {@code
- * Function<Instant, Long>} needs nothing more than the one method both already expose with the
- * identical signature.
+ * ToLongFunction<Instant>} needs nothing more than the one method both already expose with the
+ * identical signature. {@code ToLongFunction} over {@code Function<Instant, Long>} (SonarCloud
+ * finding, 2026-09-13): both repository methods already declare a primitive {@code long} return
+ * type — the boxed {@code Function} forced an unboxing on every call this specialised interface
+ * avoids.
  */
 /* package */ final class KnownDeviceRetentionSweeper {
 
@@ -35,10 +38,10 @@ import org.slf4j.Logger;
   /* package */ static void sweep(
       final Logger log,
       final String eventName,
-      final Function<Instant, Long> deleteByLastSeenAtBefore,
+      final ToLongFunction<Instant> deleteByLastSeenAtBefore,
       final int retentionDays) {
     final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-    final long deleted = deleteByLastSeenAtBefore.apply(cutoff);
+    final long deleted = deleteByLastSeenAtBefore.applyAsLong(cutoff);
     if (deleted > 0) {
       log.info("event={} deletedCount={} retentionDays={}", eventName, deleted, retentionDays);
     }
