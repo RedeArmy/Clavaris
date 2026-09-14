@@ -1,6 +1,6 @@
 package com.clavaris.organization.application.usecase.listworkspacememberspaged;
 
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 
@@ -13,7 +13,7 @@ public class ListWorkspaceMembersPagedService implements ListWorkspaceMembersPag
   }
 
   @Override
-  public Page<WorkspaceMembership> handle(final ListWorkspaceMembersPagedQuery query) {
-    return memberships.findPageByWorkspaceId(query.workspaceId(), query.pageRequest());
+  public KeysetPage<WorkspaceMembership> handle(final ListWorkspaceMembersPagedQuery query) {
+    return memberships.findKeysetPageByWorkspaceId(query.workspaceId(), query.pageRequest());
   }
 }

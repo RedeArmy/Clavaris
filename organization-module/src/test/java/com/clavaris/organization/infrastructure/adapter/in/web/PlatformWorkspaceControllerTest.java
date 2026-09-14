@@ -13,8 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
@@ -130,12 +131,16 @@ class PlatformWorkspaceControllerTest {
     return workspacesPath() + "/" + workspace.id() + "/members";
   }
 
-  private static Page<Workspace> emptyWorkspacesPage() {
-    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  private static KeysetPage<Workspace> emptyWorkspacesPage() {
+    return new KeysetPage<>(List.of(), null, null, false, false);
   }
 
-  private static Page<WorkspaceMembership> emptyMembersPage() {
-    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  private static KeysetPage<WorkspaceMembership> emptyMembersPage() {
+    return new KeysetPage<>(List.of(), null, null, false, false);
+  }
+
+  private static KeysetCursor cursorOf(final WorkspaceMembership membership) {
+    return new KeysetCursor(membership.createdAt(), membership.id());
   }
 
   @Test
@@ -174,8 +179,9 @@ class PlatformWorkspaceControllerTest {
   void showsTheWorkspaceAndItsMembers() throws Exception {
     WorkspaceMembership membership =
         WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), WorkspaceRole.ADMIN);
+    KeysetCursor cursor = cursorOf(membership);
     when(listMembers.handle(any()))
-        .thenReturn(new Page<>(List.of(membership), 0, PageRequest.DEFAULT_SIZE, 1));
+        .thenReturn(new KeysetPage<>(List.of(membership), cursor, cursor, false, false));
 
     mockMvc
         .perform(get(workspacesPath() + "/" + workspace.id()))
@@ -185,15 +191,17 @@ class PlatformWorkspaceControllerTest {
         .andExpect(model().attribute("members", List.of(membership)));
   }
 
-  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
+  // query.
   @Test
-  void getPassesTheRequestedPageThroughToTheMembersUseCase() throws Exception {
-    mockMvc.perform(get(workspacesPath() + "/" + workspace.id()).param("page", "4"));
+  void getPassesTheAfterCursorThroughToTheMembersUseCase() throws Exception {
+    KeysetCursor cursor = new KeysetCursor(java.time.Instant.now(), UUID.randomUUID());
+
+    mockMvc.perform(get(workspacesPath() + "/" + workspace.id()).param("after", cursor.encode()));
 
     verify(listMembers)
         .handle(
-            new ListWorkspaceMembersPagedQuery(
-                workspace.id(), new PageRequest(4, PageRequest.DEFAULT_SIZE)));
+            new ListWorkspaceMembersPagedQuery(workspace.id(), KeysetPageRequest.after(cursor)));
   }
 
   // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the members

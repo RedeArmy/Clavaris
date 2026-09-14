@@ -13,8 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedQuery;
@@ -77,8 +78,12 @@ class PlatformOrganizationDashboardControllerTest {
             .build();
   }
 
-  private static Page<Organization> emptyPage() {
-    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  private static KeysetPage<Organization> emptyPage() {
+    return new KeysetPage<>(List.of(), null, null, false, false);
+  }
+
+  private static KeysetCursor cursorOf(final Organization organization) {
+    return new KeysetCursor(organization.createdAt(), organization.id());
   }
 
   @Test
@@ -93,8 +98,9 @@ class PlatformOrganizationDashboardControllerTest {
   @Test
   void getListsEveryOrganizationTheAccountOwns() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
+    KeysetCursor cursor = cursorOf(organization);
     when(listOrganizations.handle(any()))
-        .thenReturn(new Page<>(List.of(organization), 0, PageRequest.DEFAULT_SIZE, 1));
+        .thenReturn(new KeysetPage<>(List.of(organization), cursor, cursor, false, false));
 
     mockMvc
         .perform(get("/platform/dashboard"))
@@ -102,34 +108,50 @@ class PlatformOrganizationDashboardControllerTest {
         .andExpect(model().attribute("organizations", List.of(organization)));
   }
 
-  // TD-PERF-020: proves ?page= is actually threaded into the query, not silently ignored — a
-  // real, live-rendered proof the pagination wiring works end to end, not just that the use case
-  // interface accepts a PageRequest.
+  // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
+  // query, not silently ignored — a real, live-rendered proof the pagination wiring works end to
+  // end, not just that the use case interface accepts a KeysetPageRequest.
   @Test
-  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
-    mockMvc.perform(get("/platform/dashboard").param("page", "2")).andExpect(status().isOk());
+  void getPassesTheAfterCursorThroughToTheUseCase() throws Exception {
+    KeysetCursor cursor = new KeysetCursor(java.time.Instant.now(), UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/platform/dashboard").param("after", cursor.encode()))
+        .andExpect(status().isOk());
 
     verify(listOrganizations)
         .handle(
             new ListOrganizationsForPlatformAccountPagedQuery(
-                OWNER_ID, new PageRequest(2, PageRequest.DEFAULT_SIZE)));
+                OWNER_ID, KeysetPageRequest.after(cursor)));
   }
 
-  // Real Thymeleaf rendering proof that the Previous/Next nav only appears once there's a second
-  // page to go to — not just that the controller resolves without throwing.
+  // Real Thymeleaf rendering proof that the Previous/Next nav only appears once there's actually
+  // a further page to go to — not just that the controller resolves without throwing.
   @Test
-  void rendersPaginationControlsOnlyWhenMoreThanOnePageExists() throws Exception {
+  void rendersPaginationControlsOnlyWhenAFurtherPageExists() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
+    KeysetCursor cursor = cursorOf(organization);
     when(listOrganizations.handle(
-            new ListOrganizationsForPlatformAccountPagedQuery(
-                OWNER_ID, new PageRequest(0, PageRequest.DEFAULT_SIZE))))
-        .thenReturn(new Page<>(List.of(organization), 0, PageRequest.DEFAULT_SIZE, 21));
+            new ListOrganizationsForPlatformAccountPagedQuery(OWNER_ID, KeysetPageRequest.first())))
+        .thenReturn(new KeysetPage<>(List.of(organization), cursor, cursor, true, false));
 
     mockMvc
         .perform(get("/platform/dashboard"))
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("clavaris-pagination")))
-        .andExpect(content().string(org.hamcrest.Matchers.containsString("Page 1 of 2")));
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Next")));
+  }
+
+  @Test
+  void rendersNoPaginationControlsWhenThereIsOnlyOnePage() throws Exception {
+    mockMvc
+        .perform(get("/platform/dashboard"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("clavaris-pagination"))));
   }
 
   @Test

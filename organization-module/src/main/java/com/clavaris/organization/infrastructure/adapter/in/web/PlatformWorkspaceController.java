@@ -1,8 +1,8 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
@@ -156,7 +156,7 @@ public class PlatformWorkspaceController {
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     if (bindingResult.hasErrors()) {
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-      addWorkspacesToModel(model, organizationId, 0);
+      addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
       // A plain (non-HTMX) validation error re-renders the WHOLE organization-detail page, Rate
       // Limit section included — same reason "organization"/"workspaces" are populated here too,
       // not just on PlatformOrganizationDetailController's own GET. Real bug this exact gap caused
@@ -175,39 +175,43 @@ public class PlatformWorkspaceController {
 
     if (isHtmxRequest(request)) {
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-      // Page 0 — a newly-created Workspace sorts first (newest-first ordering), same reasoning
-      // PlatformOrganizationDashboardController's own identical create() already documents.
-      addWorkspacesToModel(model, organizationId, 0);
+      // The first page (no cursor) — a newly-created Workspace sorts first (newest-first
+      // ordering), same reasoning PlatformOrganizationDashboardController's own identical
+      // create() already documents.
+      addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
       model.addAttribute("workspaceForm", new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId;
   }
 
-  private void addWorkspacesToModel(final Model model, final UUID organizationId, final int page) {
-    final Page<Workspace> workspacesPage =
+  private void addWorkspacesToModel(
+      final Model model, final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final KeysetPage<Workspace> workspacesPage =
         listWorkspaces.handle(
-            new ListWorkspacesForOrganizationPagedQuery(
-                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+            new ListWorkspacesForOrganizationPagedQuery(organizationId, pageRequest));
     model.addAttribute("workspaces", workspacesPage.content());
     model.addAttribute("workspacesPage", workspacesPage);
   }
 
-  // TD-PERF-020: page is 0-indexed — see PlatformOrganizationDashboardController's own identical
-  // parameter for the full reasoning.
+  // TD-PERF-020 (keyset revision, 2026-09-14): ?after=/?before= carry an opaque KeysetCursor
+  // token — see PlatformOrganizationDashboardController's own identical parameter for the full
+  // reasoning.
   @GetMapping("/{workspaceId}")
   public String showDetail(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
-      @RequestParam(defaultValue = "0") final int page,
+      @RequestParam(required = false) final String after,
+      @RequestParam(required = false) final String before,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-    populateMembersModel(model, organization, workspace, page);
+    populateMembersModel(
+        model, organization, workspace, KeysetPageRequest.fromCursors(after, before));
     // TD-PERF-020: same "a pagination link is itself an hx-get, and its hx-target can't safely
     // receive a full HTML document" reasoning PlatformOrganizationDetailController's own identical
     // branching documents.
@@ -228,7 +232,7 @@ public class PlatformWorkspaceController {
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     if (bindingResult.hasErrors()) {
-      populateMembersModel(model, organization, workspace, 0);
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -247,7 +251,7 @@ public class PlatformWorkspaceController {
     } catch (final AccountProvisioner.AccountAlreadyExistsException _) {
       model.addAttribute("emailAlreadyRegisteredError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, form);
-      populateMembersModel(model, organization, workspace, 0);
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -277,7 +281,7 @@ public class PlatformWorkspaceController {
     } catch (final CannotDemoteLastAdminException _) {
       model.addAttribute("cannotDemoteLastAdminError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-      populateMembersModel(model, organization, workspace, 0);
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -306,7 +310,7 @@ public class PlatformWorkspaceController {
     } catch (final CannotRemoveLastAdminException _) {
       model.addAttribute("cannotRemoveLastAdminError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-      populateMembersModel(model, organization, workspace, 0);
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -326,7 +330,7 @@ public class PlatformWorkspaceController {
       final Model model) {
     if (isHtmxRequest(request)) {
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-      populateMembersModel(model, organization, workspace, 0);
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return MEMBERS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/"
@@ -339,13 +343,11 @@ public class PlatformWorkspaceController {
       final Model model,
       final Organization organization,
       final Workspace workspace,
-      final int page) {
+      final KeysetPageRequest pageRequest) {
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     model.addAttribute("workspace", workspace);
-    final Page<WorkspaceMembership> membersPage =
-        listMembers.handle(
-            new ListWorkspaceMembersPagedQuery(
-                workspace.id(), new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    final KeysetPage<WorkspaceMembership> membersPage =
+        listMembers.handle(new ListWorkspaceMembersPagedQuery(workspace.id(), pageRequest));
     model.addAttribute("members", membersPage.content());
     model.addAttribute("membersPage", membersPage);
   }

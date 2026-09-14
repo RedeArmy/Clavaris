@@ -1,15 +1,15 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
-import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.Workspace;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,20 +65,43 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
     return workspaces.findOrganizationIdById(workspaceId);
   }
 
-  // TD-PERF-020: newest-first, id as a tiebreaker — same reasoning JpaOrganizationRepository's own
-  // identical findPageOwnedBy already documents.
+  // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
+  // JpaOrganizationRepository's own identical findKeysetPageOwnedBy already documents.
   @Override
-  public Page<Workspace> findPageByOrganizationId(
-      final UUID organizationId, final PageRequest pageRequest) {
-    return SpringDataPageMapper.toPage(
-        workspaces.findAllByOrganizationId(
-            organizationId,
-            org.springframework.data.domain.PageRequest.of(
-                pageRequest.page(),
-                pageRequest.size(),
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
-        pageRequest,
-        this::toDomain);
+  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
+  public KeysetPage<Workspace> findKeysetPageByOrganizationId(
+      final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final org.springframework.data.domain.PageRequest limit =
+        org.springframework.data.domain.PageRequest.of(0, pageRequest.size() + 1);
+    if (pageRequest.after() != null) {
+      final KeysetCursor cursor = pageRequest.after();
+      return SpringDataKeysetPageMapper.forward(
+          workspaces.findPageByOrganizationIdAfter(
+              organizationId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          true,
+          this::toDomain,
+          this::cursorOf);
+    }
+    if (pageRequest.before() != null) {
+      final KeysetCursor cursor = pageRequest.before();
+      return SpringDataKeysetPageMapper.backward(
+          workspaces.findPageByOrganizationIdBefore(
+              organizationId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          this::toDomain,
+          this::cursorOf);
+    }
+    return SpringDataKeysetPageMapper.forward(
+        workspaces.findFirstPageByOrganizationId(organizationId, limit),
+        pageRequest.size(),
+        false,
+        this::toDomain,
+        this::cursorOf);
+  }
+
+  private KeysetCursor cursorOf(final WorkspaceEntity entity) {
+    return new KeysetCursor(entity.getCreatedAt(), entity.getId());
   }
 
   private Workspace toDomain(final WorkspaceEntity entity) {

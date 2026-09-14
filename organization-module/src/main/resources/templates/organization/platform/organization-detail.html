@@ -53,21 +53,21 @@
                     </table>
                 </div>
 
-                <!-- TD-PERF-020: same page-number pagination shape as dashboard.html's own
-                     Organizations table — see PlatformOrganizationDetailController's own Javadoc. -->
-                <nav class="clavaris-pagination" th:if="${workspacesPage.totalPages() > 1}"
+                <!-- TD-PERF-020 (keyset revision, 2026-09-14): same keyset pagination shape as
+                     dashboard.html's own Organizations table — see
+                     PlatformOrganizationDetailController's own Javadoc. -->
+                <nav class="clavaris-pagination"
+                     th:if="${workspacesPage.hasPrevious() or workspacesPage.hasNext()}"
                      aria-label="Workspaces pages">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${workspacesPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},page=${workspacesPage.page() - 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},page=${workspacesPage.page() - 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},before=${workspacesPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},before=${workspacesPage.startCursor().encode()})}"
                        hx-target="#workspaces-content" hx-swap="outerHTML">Previous</a>
-                    <span class="clavaris-pagination__status"
-                          th:text="'Page ' + (${workspacesPage.page()} + 1) + ' of ' + ${workspacesPage.totalPages()}">Page 1 of 1</span>
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${workspacesPage.hasNext()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},page=${workspacesPage.page() + 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},page=${workspacesPage.page() + 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},after=${workspacesPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()},after=${workspacesPage.endCursor().encode()})}"
                        hx-target="#workspaces-content" hx-swap="outerHTML">Next</a>
                 </nav>
 

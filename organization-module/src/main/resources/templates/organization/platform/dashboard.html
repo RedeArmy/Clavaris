@@ -56,24 +56,26 @@
                 </table>
                 </div>
 
-                <!-- TD-PERF-020: page-number pagination (PageRequest/Page, common module) — see
-                     PlatformOrganizationDashboardController's own Javadoc. hx-get keeps this
-                     consistent with the create form's own hx-post above (same #dashboard-content
-                     fragment target); the plain th:href is the real, unconditional fallback with
-                     JavaScript disabled, not an emulation. -->
-                <nav class="clavaris-pagination" th:if="${organizationsPage.totalPages() > 1}"
+                <!-- TD-PERF-020 (keyset revision, 2026-09-14): KeysetPageRequest/KeysetPage (common
+                     module) — see PlatformOrganizationDashboardController's own Javadoc. No "Page X
+                     of Y": a keyset page deliberately never computes a total (that COUNT(*) is
+                     exactly what this pagination shape exists to avoid). ?before=/?after= each carry
+                     the opaque cursor of the row already at that edge of this page, never a page
+                     number. hx-get keeps this consistent with the create form's own hx-post above
+                     (same #dashboard-content fragment target); the plain th:href is the real,
+                     unconditional fallback with JavaScript disabled, not an emulation. -->
+                <nav class="clavaris-pagination"
+                     th:if="${organizationsPage.hasPrevious() or organizationsPage.hasNext()}"
                      aria-label="Organizations pages">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${organizationsPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard(page=${organizationsPage.page() - 1})}"
-                       th:attr="hx-get=@{/platform/dashboard(page=${organizationsPage.page() - 1})}"
+                       th:href="@{/platform/dashboard(before=${organizationsPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard(before=${organizationsPage.startCursor().encode()})}"
                        hx-target="#dashboard-content" hx-swap="outerHTML">Previous</a>
-                    <span class="clavaris-pagination__status"
-                          th:text="'Page ' + (${organizationsPage.page()} + 1) + ' of ' + ${organizationsPage.totalPages()}">Page 1 of 1</span>
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${organizationsPage.hasNext()}"
-                       th:href="@{/platform/dashboard(page=${organizationsPage.page() + 1})}"
-                       th:attr="hx-get=@{/platform/dashboard(page=${organizationsPage.page() + 1})}"
+                       th:href="@{/platform/dashboard(after=${organizationsPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard(after=${organizationsPage.endCursor().encode()})}"
                        hx-target="#dashboard-content" hx-swap="outerHTML">Next</a>
                 </nav>
             </div>
