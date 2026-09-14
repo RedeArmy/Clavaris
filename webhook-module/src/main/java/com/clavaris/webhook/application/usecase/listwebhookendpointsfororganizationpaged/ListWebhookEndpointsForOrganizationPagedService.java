@@ -1,6 +1,6 @@
 package com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged;
 
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 
@@ -15,7 +15,8 @@ public class ListWebhookEndpointsForOrganizationPagedService
   }
 
   @Override
-  public Page<WebhookEndpoint> handle(final ListWebhookEndpointsForOrganizationPagedQuery query) {
-    return endpoints.findPageByOrganizationId(query.organizationId(), query.pageRequest());
+  public KeysetPage<WebhookEndpoint> handle(
+      final ListWebhookEndpointsForOrganizationPagedQuery query) {
+    return endpoints.findKeysetPageByOrganizationId(query.organizationId(), query.pageRequest());
   }
 }

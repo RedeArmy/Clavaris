@@ -3,8 +3,8 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Duration;
@@ -218,7 +218,7 @@ class JpaWebhookEndpointRepositoryTest {
   // "reconstitute with explicit createdAt instants" discipline organization-module's
   // JpaOrganizationRepositoryTest own identical test already establishes.
   @Test
-  void findPageByOrganizationIdReturnsOnePageAtATimeNewestFirst() {
+  void findKeysetPageByOrganizationIdReturnsNewestFirstAndSupportsForwardAndBackwardNavigation() {
     UUID organizationId = UUID.randomUUID();
     Instant now = Instant.now();
     WebhookEndpoint first =
@@ -231,20 +231,33 @@ class JpaWebhookEndpointRepositoryTest {
     repository.save(third);
     repository.save(reconstituteAt(UUID.randomUUID(), "https://other-org.example.com", now));
 
-    Page<WebhookEndpoint> firstPage =
-        repository.findPageByOrganizationId(organizationId, new PageRequest(0, 2));
+    KeysetPage<WebhookEndpoint> firstPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 2));
 
     assertThat(firstPage.content())
         .extracting(WebhookEndpoint::id)
         .containsExactly(third.id(), second.id());
-    assertThat(firstPage.totalElements()).isEqualTo(3);
     assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.hasPrevious()).isFalse();
 
-    Page<WebhookEndpoint> secondPage =
-        repository.findPageByOrganizationId(organizationId, new PageRequest(1, 2));
+    KeysetPage<WebhookEndpoint> secondPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(firstPage.endCursor(), null, 2));
 
     assertThat(secondPage.content()).extracting(WebhookEndpoint::id).containsExactly(first.id());
     assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.hasPrevious()).isTrue();
+
+    KeysetPage<WebhookEndpoint> backToFirstPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, secondPage.startCursor(), 2));
+
+    assertThat(backToFirstPage.content())
+        .extracting(WebhookEndpoint::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(backToFirstPage.hasNext()).isTrue();
+    assertThat(backToFirstPage.hasPrevious()).isFalse();
   }
 
   private static WebhookEndpoint reconstituteAt(
