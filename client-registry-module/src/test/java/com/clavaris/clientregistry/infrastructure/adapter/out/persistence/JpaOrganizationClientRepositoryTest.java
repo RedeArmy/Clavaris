@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -120,11 +120,12 @@ class JpaOrganizationClientRepositoryTest {
     assertThat(repository.findByClientId("sk_test_untouched")).isPresent();
   }
 
-  // TD-PERF-020: real-Postgres proof of the paginated sibling, newest-first — same
-  // "reconstitute with explicit createdAt instants" discipline organization-module's
-  // JpaOrganizationRepositoryTest own identical test already establishes.
+  // TD-PERF-020 (keyset revision, 2026-09-14): real-Postgres proof of the paginated sibling,
+  // newest-first, forward and backward navigation — same "reconstitute with explicit createdAt
+  // instants" discipline organization-module's JpaOrganizationRepositoryTest own identical test
+  // already establishes.
   @Test
-  void findPageByOrganizationIdReturnsOnePageAtATimeNewestFirst() {
+  void findKeysetPageByOrganizationIdReturnsNewestFirstAndSupportsForwardAndBackwardNavigation() {
     UUID organizationId = UUID.randomUUID();
     Instant now = Instant.now();
     OrganizationClient first =
@@ -138,20 +139,33 @@ class JpaOrganizationClientRepositoryTest {
     repository.save(
         OrganizationClient.register(UUID.randomUUID(), "sk_test_other-org", "hash", List.of()));
 
-    Page<OrganizationClient> firstPage =
-        repository.findPageByOrganizationId(organizationId, new PageRequest(0, 2));
+    KeysetPage<OrganizationClient> firstPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 2));
 
     assertThat(firstPage.content())
         .extracting(OrganizationClient::id)
         .containsExactly(third.id(), second.id());
-    assertThat(firstPage.totalElements()).isEqualTo(3);
     assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.hasPrevious()).isFalse();
 
-    Page<OrganizationClient> secondPage =
-        repository.findPageByOrganizationId(organizationId, new PageRequest(1, 2));
+    KeysetPage<OrganizationClient> secondPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(firstPage.endCursor(), null, 2));
 
     assertThat(secondPage.content()).extracting(OrganizationClient::id).containsExactly(first.id());
     assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.hasPrevious()).isTrue();
+
+    KeysetPage<OrganizationClient> backToFirstPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, secondPage.startCursor(), 2));
+
+    assertThat(backToFirstPage.content())
+        .extracting(OrganizationClient::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(backToFirstPage.hasNext()).isTrue();
+    assertThat(backToFirstPage.hasPrevious()).isFalse();
   }
 
   private static OrganizationClient reconstituteAt(

@@ -246,7 +246,7 @@ Requested again, same MAANG-caliber framing as §15: strengths/weaknesses, debt 
 
 **Points worth implementing next:**
 1. **Flip the GitHub branch-auto-delete setting** — the cheapest, highest-leverage item in this pass; closes a finding that has now cost three separate review passes' worth of manual attention.
-2. **The external security review** — unchanged advice, now literally the only item left below 100% on the checklist that isn't a deliberately-deferred future-debt row (TD-FUT-020/021, TD-FUT-002). Everything else this project's own engineering can control is done; this one isn't in engineering's control to close alone.
+2. **The external security review** — unchanged advice, now literally the only item left below 100% on the checklist that isn't a deliberately-deferred future-debt row (TD-FUT-020/021 — TD-FUT-002 closed 2026-09-14, self-service `RateLimitPolicy` tuning, `technical-debt-register.md` §6). Everything else this project's own engineering can control is done; this one isn't in engineering's control to close alone.
 3. TD-PROC-002's remaining 29 docs, TD-ARCH-008, TD-PROC-009 — all still open, all still smaller than item 2, unchanged from §14/§15.
 
 **Completion estimate — unchanged from the two follow-ups above, and that's itself the finding worth stating plainly:**

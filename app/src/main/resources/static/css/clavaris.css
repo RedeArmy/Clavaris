@@ -218,6 +218,15 @@ input[type="radio"] {
   color: var(--clavaris-danger);
 }
 
+/* TD-FUT-002 (self-service rate-limit tuning): a non-error helper line under a field — e.g. "up
+   to N requests/minute" telling an Organization owner the bound before they submit, not just
+   after a rejected value. Same size as .clavaris-field-error, muted color instead of danger. */
+.clavaris-field-hint {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8125rem;
+  color: var(--clavaris-text-muted);
+}
+
 .clavaris-button {
   display: block;
   width: 100%;
@@ -377,19 +386,15 @@ code {
   overflow-x: auto;
 }
 
-/* TD-PERF-020: Previous/Next controls shared by every one of this dashboard's six paginated list
-   pages (Organizations, Workspaces, Workspace Members, Secret Keys, OAuth Clients, Webhook
-   Endpoints) — one rule set, not six copies. */
+/* TD-PERF-020 (keyset revision, 2026-09-14): Previous/Next controls shared by every one of this
+   dashboard's six paginated list pages (Organizations, Workspaces, Workspace Members, Secret
+   Keys, OAuth Clients, Webhook Endpoints) — one rule set, not six copies. No __status text
+   anymore: a keyset page never computes a total, so there is no "Page X of Y" to show. */
 .clavaris-pagination {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   margin-top: var(--space-4);
-}
-
-.clavaris-pagination__status {
-  color: var(--clavaris-text-muted);
-  font-size: 0.8125rem;
 }
 
 /* Standard "sr-only" pattern — keeps a form control's own <label> in the accessibility tree

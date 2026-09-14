@@ -1,8 +1,10 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -39,6 +41,15 @@ import org.springframework.web.server.ResponseStatusException;
  * TD-PERF-020's own pagination code added a fifth. Collapsing the pair into one call and one
  * returned {@link OwnedOrganization} removes that duplicated token sequence at its source, not by
  * hiding it from one tool's own view.
+ *
+ * <p><b>SonarCloud CPD finding (CI, 2026-09-14):</b> {@code showList}'s own body — resolve
+ * ownership, render the requested page into the model, branch HTMX-fragment-vs-full-view — matched
+ * across both controllers closely enough to clear the cross-file duplication threshold, the moment
+ * TD-PERF-020 added the method to both the same day. {@link #showPaginatedList} is the same
+ * "extract the exact duplicated sequence into this class" response as every finding above,
+ * parameterized by a {@link BiConsumer} for the one genuinely controller-specific step — populating
+ * that controller's own model attributes via its own private {@code renderXList} method, which
+ * {@link #showPaginatedList} itself has no business knowing about.
  */
 @SuppressWarnings("PMD.LongVariable")
 final class DashboardControllerSupport {
@@ -89,6 +100,37 @@ final class DashboardControllerSupport {
     final String organizationName =
         requireOwnedOrganizationName(organizationId, ownerPlatformAccountId, organizationResolver);
     return new OwnedOrganization(ownerPlatformAccountId, organizationName);
+  }
+
+  /**
+   * The pair of view names every dashboard mutation in both controllers already branches on
+   * (HTMX-fragment vs. plain full-page render) — SonarCloud (CI, 2026-09-14) flagged {@link
+   * #showPaginatedList} at 8 parameters, one over its own 7-parameter ceiling, the moment this pair
+   * joined the other 6. Bundled here rather than trimmed elsewhere: the same "a small ports-record
+   * parameter object, not a flat parameter list" fix shape {@code PrimaryFactorLoginPorts} already
+   * established for an identical finding (TD-ARCH-016, technical-debt-register.md §6) — {@code
+   * fragmentView}/{@code fullView} are a genuine unit (neither means anything without the other),
+   * unlike the method's other 6 parameters, which are each a distinct, unrelated collaborator.
+   */
+  /* package */ record PaginatedViewNames(String fragmentView, String fullView) {}
+
+  // The exact showList body both controllers repeated — see this class's own 2026-09-14 Javadoc
+  // addendum above. renderList is invoked with the OwnedOrganization this method already resolved
+  // (so the caller never has to re-resolve organizationName itself) and the same pageRequest the
+  // caller already built from its own ?after=/?before= params.
+  /* package */ static String showPaginatedList(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final CurrentPlatformAccountResolver currentPlatformAccount,
+      final OrganizationForPlatformAccountResolver organizationResolver,
+      final KeysetPageRequest pageRequest,
+      final BiConsumer<OwnedOrganization, KeysetPageRequest> renderList,
+      final PaginatedViewNames viewNames) {
+    final OwnedOrganization owned =
+        requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    renderList.accept(owned, pageRequest);
+    return isHtmxRequest(request) ? viewNames.fragmentView() : viewNames.fullView();
   }
 
   // The anti-enumeration check neither DeactivateOrganizationClientCommand/

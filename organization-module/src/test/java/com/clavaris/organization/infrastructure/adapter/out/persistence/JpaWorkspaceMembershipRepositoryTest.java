@@ -2,8 +2,8 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
@@ -141,11 +141,11 @@ class JpaWorkspaceMembershipRepositoryTest {
     assertThat(repository.findAllByWorkspaceIds(List.of())).isEmpty();
   }
 
-  // TD-PERF-020: real-Postgres proof of the paginated sibling, newest-first — same
-  // "reconstitute with explicit createdAt instants" discipline JpaOrganizationRepositoryTest's own
-  // identical test already establishes.
+  // TD-PERF-020 (keyset revision, 2026-09-14): real-Postgres proof of the paginated sibling,
+  // newest-first, forward and backward navigation — same "reconstitute with explicit createdAt
+  // instants" discipline JpaOrganizationRepositoryTest's own identical test already establishes.
   @Test
-  void findPageByWorkspaceIdReturnsOnePageAtATimeNewestFirst() {
+  void findKeysetPageByWorkspaceIdReturnsNewestFirstAndSupportsForwardAndBackwardNavigation() {
     UUID workspaceId = newPersistedWorkspaceId();
     Instant now = Instant.now();
     WorkspaceMembership first =
@@ -161,22 +161,34 @@ class JpaWorkspaceMembershipRepositoryTest {
         WorkspaceMembership.join(
             newPersistedWorkspaceId(), UUID.randomUUID(), WorkspaceRole.MEMBER));
 
-    Page<WorkspaceMembership> firstPage =
-        repository.findPageByWorkspaceId(workspaceId, new PageRequest(0, 2));
+    KeysetPage<WorkspaceMembership> firstPage =
+        repository.findKeysetPageByWorkspaceId(workspaceId, new KeysetPageRequest(null, null, 2));
 
     assertThat(firstPage.content())
         .extracting(WorkspaceMembership::id)
         .containsExactly(third.id(), second.id());
-    assertThat(firstPage.totalElements()).isEqualTo(3);
     assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.hasPrevious()).isFalse();
 
-    Page<WorkspaceMembership> secondPage =
-        repository.findPageByWorkspaceId(workspaceId, new PageRequest(1, 2));
+    KeysetPage<WorkspaceMembership> secondPage =
+        repository.findKeysetPageByWorkspaceId(
+            workspaceId, new KeysetPageRequest(firstPage.endCursor(), null, 2));
 
     assertThat(secondPage.content())
         .extracting(WorkspaceMembership::id)
         .containsExactly(first.id());
     assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.hasPrevious()).isTrue();
+
+    KeysetPage<WorkspaceMembership> backToFirstPage =
+        repository.findKeysetPageByWorkspaceId(
+            workspaceId, new KeysetPageRequest(null, secondPage.startCursor(), 2));
+
+    assertThat(backToFirstPage.content())
+        .extracting(WorkspaceMembership::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(backToFirstPage.hasNext()).isTrue();
+    assertThat(backToFirstPage.hasPrevious()).isFalse();
   }
 
   private static WorkspaceMembership reconstituteAt(

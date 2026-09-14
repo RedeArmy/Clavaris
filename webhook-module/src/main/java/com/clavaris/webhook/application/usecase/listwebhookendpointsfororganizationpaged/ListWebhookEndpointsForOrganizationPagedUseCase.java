@@ -1,10 +1,10 @@
 package com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged;
 
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 
 /**
- * TD-PERF-020: the dashboard's own paginated sibling of {@code
+ * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@code
  * ListWebhookEndpointsForOrganizationUseCase} — that use case stays unbounded and remains the one
  * {@code PlatformWebhookEndpointController} uses for its own anti-enumeration ownership check
  * (deactivate/activate/rotate-secret must recognize an endpointId regardless of which page the
@@ -15,5 +15,5 @@ import com.clavaris.webhook.domain.model.WebhookEndpoint;
 @FunctionalInterface
 public interface ListWebhookEndpointsForOrganizationPagedUseCase {
 
-  Page<WebhookEndpoint> handle(ListWebhookEndpointsForOrganizationPagedQuery query);
+  KeysetPage<WebhookEndpoint> handle(ListWebhookEndpointsForOrganizationPagedQuery query);
 }

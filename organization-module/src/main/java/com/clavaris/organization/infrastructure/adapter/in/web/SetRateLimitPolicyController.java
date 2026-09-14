@@ -19,11 +19,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * ADR-0010 §6.2, BR-ORG-05: {@code PUT /api/v1/admin/organizations/{organizationId}/rate-limit-
- * policy} — the capacity layer's per-Organization aggregate ceiling, operator-managed only in v1
+ * policy} — the capacity layer's per-Organization aggregate ceiling, {@code PlatformClient}-gated
  * (never a tenant's own token — {@code AdminApiSecurityConfig} enforces platform-tier-only, same as
- * every other {@code /api/v1/admin/**} endpoint). A real code path, not raw SQL against production
- * — same reasoning TD-SEC-018 already flagged as the gap to avoid repeating for {@code
- * PlatformClient} rotation.
+ * every other {@code /api/v1/admin/**} endpoint), and deliberately unscoped to any one Organization
+ * (a {@code PlatformClient} token represents Clavaris operating on any tenant, unlike the dashboard
+ * path below). A real code path, not raw SQL against production — same reasoning TD-SEC-018 already
+ * flagged as the gap to avoid repeating for {@code PlatformClient} rotation.
+ *
+ * <p>TD-FUT-002 (self-service tuning, shipped): a second, ownership-scoped caller now exists — the
+ * session-authenticated dashboard ({@code PlatformRateLimitPolicyController}, organization-module's
+ * own web adapter) — reusing the exact same {@link SetRateLimitPolicyForOrganizationUseCase} this
+ * REST endpoint calls, not a parallel implementation. This endpoint itself is unchanged by that:
+ * still {@code PlatformClient}-only, still unscoped.
  *
  * <p>Deliberately never touches the anti-abuse layer (ADR-0010 §6.1) — that layer is fixed and
  * system-wide by design, never tenant-configurable, so it has no corresponding write endpoint at

@@ -1,7 +1,7 @@
 package com.clavaris.webhook.application.usecase.registerwebhookendpoint;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.util.List;
 import java.util.Optional;
@@ -46,14 +46,17 @@ public interface WebhookEndpointRepository {
   List<WebhookEndpoint> findAllByOrganizationId(UUID organizationId);
 
   /**
-   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllByOrganizationId} — used
-   * only by {@code ListWebhookEndpointsForOrganizationPagedService}'s own display query. {@link
+   * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
+   * #findAllByOrganizationId} — used only by {@code
+   * ListWebhookEndpointsForOrganizationPagedService}'s own display query. {@link
    * #findAllByOrganizationId} itself stays untouched — {@code PlatformWebhookEndpointController}'s
-   * own anti-enumeration ownership check ({@code WebhookDashboardControllerSupport
-   * #requireEndpointBelongsToOrganization}), {@code PlatformWebhookDeliveryController}, and the
-   * audit-log id provider all genuinely need the full, unbounded list.
+   * own anti-enumeration ownership check ({@code
+   * WebhookDashboardControllerSupport#requireEndpointBelongsToOrganization}), {@code
+   * PlatformWebhookDeliveryController}, and the audit-log id provider all genuinely need the full,
+   * unbounded list.
    */
-  Page<WebhookEndpoint> findPageByOrganizationId(UUID organizationId, PageRequest pageRequest);
+  KeysetPage<WebhookEndpoint> findKeysetPageByOrganizationId(
+      UUID organizationId, KeysetPageRequest pageRequest);
 
   /**
    * ADR-0007 §1: active endpoints subscribed to this event, for a single (organization, event type)

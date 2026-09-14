@@ -1,11 +1,13 @@
 package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 interface SpringDataOrganizationClientJpaRepository
     extends JpaRepository<OrganizationClientEntity, UUID> {
@@ -14,8 +16,46 @@ interface SpringDataOrganizationClientJpaRepository
 
   List<OrganizationClientEntity> findAllByOrganizationId(UUID organizationId);
 
-  // TD-PERF-020: backs OrganizationClientRepository#findPageByOrganizationId.
-  Page<OrganizationClientEntity> findAllByOrganizationId(UUID organizationId, Pageable pageable);
-
   void deleteAllByOrganizationId(UUID organizationId);
+
+  // TD-PERF-020 (keyset revision, 2026-09-14): backs
+  // OrganizationClientRepository#findKeysetPageByOrganizationId — see
+  // SpringDataOrganizationJpaRepository's own Javadoc (organization-module) for why three @Query
+  // methods back this instead of one Pageable-driven derived method.
+  @Query(
+      """
+      SELECT c FROM OrganizationClientEntity c
+      WHERE c.organizationId = :organizationId
+      ORDER BY c.createdAt DESC, c.id DESC
+      """)
+  List<OrganizationClientEntity> findFirstPageByOrganizationId(
+      @Param("organizationId") UUID organizationId, Pageable pageable);
+
+  @Query(
+      """
+      SELECT c FROM OrganizationClientEntity c
+      WHERE c.organizationId = :organizationId
+        AND (c.createdAt < :cursorCreatedAt
+             OR (c.createdAt = :cursorCreatedAt AND c.id < :cursorId))
+      ORDER BY c.createdAt DESC, c.id DESC
+      """)
+  List<OrganizationClientEntity> findPageByOrganizationIdAfter(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      Pageable pageable);
+
+  @Query(
+      """
+      SELECT c FROM OrganizationClientEntity c
+      WHERE c.organizationId = :organizationId
+        AND (c.createdAt > :cursorCreatedAt
+             OR (c.createdAt = :cursorCreatedAt AND c.id > :cursorId))
+      ORDER BY c.createdAt ASC, c.id ASC
+      """)
+  List<OrganizationClientEntity> findPageByOrganizationIdBefore(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      Pageable pageable);
 }

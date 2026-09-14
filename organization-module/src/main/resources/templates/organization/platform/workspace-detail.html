@@ -88,21 +88,21 @@
                 </table>
                 </div>
 
-                <!-- TD-PERF-020: same page-number pagination shape as the Organizations/Workspaces
-                     tables — see PlatformWorkspaceController's own Javadoc. -->
-                <nav class="clavaris-pagination" th:if="${membersPage.totalPages() > 1}"
+                <!-- TD-PERF-020 (keyset revision, 2026-09-14): same keyset pagination shape as the
+                     Organizations/Workspaces tables — see PlatformWorkspaceController's own
+                     Javadoc. -->
+                <nav class="clavaris-pagination"
+                     th:if="${membersPage.hasPrevious() or membersPage.hasNext()}"
                      aria-label="Members pages">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${membersPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() - 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() - 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},before=${membersPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},before=${membersPage.startCursor().encode()})}"
                        hx-target="#members-content" hx-swap="outerHTML">Previous</a>
-                    <span class="clavaris-pagination__status"
-                          th:text="'Page ' + (${membersPage.page()} + 1) + ' of ' + ${membersPage.totalPages()}">Page 1 of 1</span>
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${membersPage.hasNext()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() + 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},page=${membersPage.page() + 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},after=${membersPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},after=${membersPage.endCursor().encode()})}"
                        hx-target="#members-content" hx-swap="outerHTML">Next</a>
                 </nav>
 
@@ -135,6 +135,6 @@
         </div>
     </main>
 </div>
-<script th:src="@{/js/htmx.min.js}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
 </body>
 </html>

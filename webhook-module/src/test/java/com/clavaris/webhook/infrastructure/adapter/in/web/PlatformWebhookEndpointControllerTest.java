@@ -12,8 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
@@ -116,15 +117,20 @@ class PlatformWebhookEndpointControllerTest {
         "encrypted-secret");
   }
 
-  private static Page<WebhookEndpoint> emptyPage() {
-    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  private static KeysetPage<WebhookEndpoint> emptyPage() {
+    return new KeysetPage<>(List.of(), null, null, false, false);
+  }
+
+  private static KeysetCursor cursorOf(final WebhookEndpoint endpoint) {
+    return new KeysetCursor(endpoint.createdAt(), endpoint.id());
   }
 
   @Test
   void showsTheOrganizationsWebhookEndpoints() throws Exception {
     WebhookEndpoint endpoint = sampleEndpoint();
+    KeysetCursor cursor = cursorOf(endpoint);
     when(listEndpointsPaged.handle(any()))
-        .thenReturn(new Page<>(List.of(endpoint), 0, PageRequest.DEFAULT_SIZE, 1));
+        .thenReturn(new KeysetPage<>(List.of(endpoint), cursor, cursor, false, false));
 
     mockMvc
         .perform(get(basePath()))
@@ -134,15 +140,18 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(model().attribute("endpoints", List.of(endpoint)));
   }
 
-  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
+  // query.
   @Test
-  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
-    mockMvc.perform(get(basePath()).param("page", "2"));
+  void getPassesTheAfterCursorThroughToTheUseCase() throws Exception {
+    KeysetCursor cursor = new KeysetCursor(java.time.Instant.now(), UUID.randomUUID());
+
+    mockMvc.perform(get(basePath()).param("after", cursor.encode()));
 
     verify(listEndpointsPaged)
         .handle(
             new ListWebhookEndpointsForOrganizationPagedQuery(
-                organizationId, new PageRequest(2, PageRequest.DEFAULT_SIZE)));
+                organizationId, KeysetPageRequest.after(cursor)));
   }
 
   // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the endpoints

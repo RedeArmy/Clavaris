@@ -2,7 +2,7 @@ package com.clavaris.clientregistry.application.usecase.listoauthclientspaged;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 
 public class ListOAuthClientsPagedService implements ListOAuthClientsPagedUseCase {
 
@@ -13,7 +13,7 @@ public class ListOAuthClientsPagedService implements ListOAuthClientsPagedUseCas
   }
 
   @Override
-  public Page<OAuthClient> handle(final ListOAuthClientsPagedQuery query) {
-    return oauthClients.findPageByOrganizationId(query.organizationId(), query.pageRequest());
+  public KeysetPage<OAuthClient> handle(final ListOAuthClientsPagedQuery query) {
+    return oauthClients.findKeysetPageByOrganizationId(query.organizationId(), query.pageRequest());
   }
 }

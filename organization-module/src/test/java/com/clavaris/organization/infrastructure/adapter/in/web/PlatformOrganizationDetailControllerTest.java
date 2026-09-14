@@ -9,8 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
@@ -55,7 +56,7 @@ class PlatformOrganizationDetailControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(listWorkspaces.handle(any())).thenReturn(emptyPage());
     when(getRateLimitPolicy.handle(any()))
-        .thenReturn(new RateLimitPolicySnapshot(600, false, null));
+        .thenReturn(new RateLimitPolicySnapshot(600, false, null, 6000));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -79,17 +80,22 @@ class PlatformOrganizationDetailControllerTest {
             .build();
   }
 
-  private static Page<Workspace> emptyPage() {
-    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  private static KeysetPage<Workspace> emptyPage() {
+    return new KeysetPage<>(List.of(), null, null, false, false);
+  }
+
+  private static KeysetCursor cursorOf(final Workspace workspace) {
+    return new KeysetCursor(workspace.createdAt(), workspace.id());
   }
 
   @Test
   void showsTheOrganizationAndItsWorkspacesWhenOwnedByTheCurrentAccount() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
     Workspace workspace = Workspace.register(organization.id(), "Engineering");
+    KeysetCursor cursor = cursorOf(workspace);
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
     when(listWorkspaces.handle(any()))
-        .thenReturn(new Page<>(List.of(workspace), 0, PageRequest.DEFAULT_SIZE, 1));
+        .thenReturn(new KeysetPage<>(List.of(workspace), cursor, cursor, false, false));
 
     mockMvc
         .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
@@ -103,7 +109,7 @@ class PlatformOrganizationDetailControllerTest {
   void showsTheOrganizationsEffectiveRateLimitPolicy() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
     RateLimitPolicySnapshot customized =
-        new RateLimitPolicySnapshot(1200, true, java.time.Instant.now());
+        new RateLimitPolicySnapshot(1200, true, java.time.Instant.now(), 6000);
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
     when(getRateLimitPolicy.handle(any())).thenReturn(customized);
 
@@ -142,20 +148,22 @@ class PlatformOrganizationDetailControllerTest {
         .andExpect(status().isNotFound());
   }
 
-  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
+  // query.
   @Test
-  void passesTheRequestedPageThroughToTheUseCase() throws Exception {
+  void passesTheAfterCursorThroughToTheUseCase() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
+    KeysetCursor cursor = new KeysetCursor(java.time.Instant.now(), UUID.randomUUID());
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
 
     mockMvc.perform(
         get("/platform/dashboard/organizations/{organizationId}", organization.id())
-            .param("page", "3"));
+            .param("after", cursor.encode()));
 
     verify(listWorkspaces)
         .handle(
             new ListWorkspacesForOrganizationPagedQuery(
-                organization.id(), new PageRequest(3, PageRequest.DEFAULT_SIZE)));
+                organization.id(), KeysetPageRequest.after(cursor)));
   }
 
   // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the workspaces

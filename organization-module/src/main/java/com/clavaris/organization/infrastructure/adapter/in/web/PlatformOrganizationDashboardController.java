@@ -1,8 +1,8 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationCommand;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedQuery;
@@ -63,28 +63,28 @@ public class PlatformOrganizationDashboardController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // TD-PERF-020: page is 0-indexed, same convention PageRequest's own Javadoc documents — a
-  // negative or absurdly large value is caught by PageRequest's own constructor, surfacing as a
-  // 500 (a hand-typed/manipulated ?page= is not a real user flow this page's own links ever
-  // produce, so a hard failure here is acceptable, same posture every other unvalidated-input path
-  // in this codebase that isn't itself a security boundary already takes).
+  // TD-PERF-020 (keyset revision, 2026-09-14): ?after=/?before= carry an opaque KeysetCursor
+  // token, never a raw page number — see KeysetPageRequest's own Javadoc. A malformed/tampered
+  // token surfaces as a 500 via KeysetCursor#decode, same "not a real user flow, a hard failure is
+  // acceptable" posture the page-number version this replaces already documented.
   @GetMapping
   public String showDashboard(
       final HttpServletRequest request,
-      @RequestParam(defaultValue = "0") final int page,
+      @RequestParam(required = false) final String after,
+      @RequestParam(required = false) final String before,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
-    addOrganizationsToModel(model, ownerPlatformAccountId, page);
+    addOrganizationsToModel(
+        model, ownerPlatformAccountId, KeysetPageRequest.fromCursors(after, before));
     model.addAttribute("form", new CreateOrganizationForm());
     return DASHBOARD_VIEW;
   }
 
   private void addOrganizationsToModel(
-      final Model model, final UUID ownerPlatformAccountId, final int page) {
-    final Page<Organization> organizationsPage =
+      final Model model, final UUID ownerPlatformAccountId, final KeysetPageRequest pageRequest) {
+    final KeysetPage<Organization> organizationsPage =
         listOrganizations.handle(
-            new ListOrganizationsForPlatformAccountPagedQuery(
-                ownerPlatformAccountId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+            new ListOrganizationsForPlatformAccountPagedQuery(ownerPlatformAccountId, pageRequest));
     model.addAttribute(ORGANIZATIONS_ATTRIBUTE, organizationsPage.content());
     model.addAttribute(PAGE_ATTRIBUTE, organizationsPage);
   }
@@ -98,7 +98,7 @@ public class PlatformOrganizationDashboardController {
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     if (bindingResult.hasErrors()) {
-      addOrganizationsToModel(model, ownerPlatformAccountId, 0);
+      addOrganizationsToModel(model, ownerPlatformAccountId, KeysetPageRequest.first());
       return isHtmxRequest(request) ? CONTENT_FRAGMENT : DASHBOARD_VIEW;
     }
 
@@ -120,10 +120,11 @@ public class PlatformOrganizationDashboardController {
     if (isHtmxRequest(request)) {
       // Re-rendered directly (200), not "redirect:" — HTMX's own redirect-following would mean a
       // second, full-navigation round trip for a request whose whole point was avoiding one. A
-      // fresh, blank CreateOrganizationForm is exactly what a real GET would also produce. Page 0
-      // — a newly-created Organization sorts first (newest-first ordering), so this is exactly
-      // where it becomes visible, same as a real GET with no ?page= would show too.
-      addOrganizationsToModel(model, ownerPlatformAccountId, 0);
+      // fresh, blank CreateOrganizationForm is exactly what a real GET would also produce. The
+      // first page (no cursor) — a newly-created Organization sorts first (newest-first
+      // ordering), so this is exactly where it becomes visible, same as a real GET with no
+      // ?after=/?before= would show too.
+      addOrganizationsToModel(model, ownerPlatformAccountId, KeysetPageRequest.first());
       model.addAttribute("form", new CreateOrganizationForm());
       return CONTENT_FRAGMENT;
     }

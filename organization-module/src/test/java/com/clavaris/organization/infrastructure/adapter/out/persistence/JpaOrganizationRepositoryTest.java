@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.within;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
@@ -133,41 +133,58 @@ class JpaOrganizationRepositoryTest {
         .containsExactlyInAnyOrder(ownedByA1.id(), ownedByA2.id());
   }
 
-  // TD-PERF-020: real-Postgres proof of the paginated sibling — page size, total element count,
-  // and newest-first ordering all come from the actual query, not assumed from the mapping code.
-  // Built via Organization.reconstitute with explicit, deliberately-spaced createdAt instants
-  // (not three real-time Organization.register calls a few microseconds apart) — same "don't rely
-  // on a real wall-clock gap to prove an ordering" discipline JpaAuditEventReaderTest's own
-  // returnsNewestFirst rewrite already established, avoiding a SonarCloud/S2925-flagged
-  // Thread.sleep and, more importantly, avoiding a genuinely flaky assertion on a busy machine.
+  // TD-PERF-020 (keyset revision, 2026-09-14): real-Postgres proof of the paginated sibling —
+  // newest-first ordering, forward ("after") navigation, and backward ("before") navigation all
+  // come from the actual three-@Query implementation, not assumed from the mapping code. Built via
+  // Organization.reconstitute with explicit, deliberately-spaced createdAt instants (not four
+  // real-time Organization.register calls a few microseconds apart) — same "don't rely on a real
+  // wall-clock gap to prove an ordering" discipline JpaAuditEventReaderTest's own
+  // returnsNewestFirst
+  // rewrite already established, avoiding a SonarCloud/S2925-flagged Thread.sleep and, more
+  // importantly, avoiding a genuinely flaky assertion on a busy machine.
   @Test
-  void findPageOwnedByReturnsOnePageAtATimeNewestFirst() {
+  void findKeysetPageOwnedByReturnsNewestFirstAndSupportsForwardAndBackwardNavigation() {
     UUID owner = UUID.randomUUID();
     Instant now = Instant.now();
-    Organization first = reconstituteAt(owner, "First Created", now.minusSeconds(20));
-    Organization second = reconstituteAt(owner, "Second Created", now.minusSeconds(10));
-    Organization third = reconstituteAt(owner, "Third Created", now);
+    Organization first = reconstituteAt(owner, "First Created", now.minusSeconds(30));
+    Organization second = reconstituteAt(owner, "Second Created", now.minusSeconds(20));
+    Organization third = reconstituteAt(owner, "Third Created", now.minusSeconds(10));
+    Organization fourth = reconstituteAt(owner, "Fourth Created", now);
     repository.save(first);
     repository.save(second);
     repository.save(third);
+    repository.save(fourth);
     // A different owner's own Organization must never leak into this owner's own page.
     repository.save(Organization.register("Someone Else's Org", UUID.randomUUID()));
 
-    Page<Organization> firstPage = repository.findPageOwnedBy(owner, new PageRequest(0, 2));
+    KeysetPage<Organization> firstPage =
+        repository.findKeysetPageOwnedBy(owner, new KeysetPageRequest(null, null, 2));
 
     assertThat(firstPage.content())
         .extracting(Organization::id)
-        .containsExactly(third.id(), second.id());
-    assertThat(firstPage.totalElements()).isEqualTo(3);
-    assertThat(firstPage.totalPages()).isEqualTo(2);
+        .containsExactly(fourth.id(), third.id());
     assertThat(firstPage.hasNext()).isTrue();
     assertThat(firstPage.hasPrevious()).isFalse();
 
-    Page<Organization> secondPage = repository.findPageOwnedBy(owner, new PageRequest(1, 2));
+    KeysetPage<Organization> secondPage =
+        repository.findKeysetPageOwnedBy(
+            owner, new KeysetPageRequest(firstPage.endCursor(), null, 2));
 
-    assertThat(secondPage.content()).extracting(Organization::id).containsExactly(first.id());
+    assertThat(secondPage.content())
+        .extracting(Organization::id)
+        .containsExactly(second.id(), first.id());
     assertThat(secondPage.hasNext()).isFalse();
     assertThat(secondPage.hasPrevious()).isTrue();
+
+    KeysetPage<Organization> backToFirstPage =
+        repository.findKeysetPageOwnedBy(
+            owner, new KeysetPageRequest(null, secondPage.startCursor(), 2));
+
+    assertThat(backToFirstPage.content())
+        .extracting(Organization::id)
+        .containsExactly(fourth.id(), third.id());
+    assertThat(backToFirstPage.hasNext()).isTrue();
+    assertThat(backToFirstPage.hasPrevious()).isFalse();
   }
 
   private static Organization reconstituteAt(
@@ -184,12 +201,15 @@ class JpaOrganizationRepositoryTest {
   }
 
   @Test
-  void findPageOwnedByReturnsAnEmptyPageForAnOwnerWithNoOrganizations() {
-    Page<Organization> page = repository.findPageOwnedBy(UUID.randomUUID(), PageRequest.first());
+  void findKeysetPageOwnedByReturnsAnEmptyPageForAnOwnerWithNoOrganizations() {
+    KeysetPage<Organization> page =
+        repository.findKeysetPageOwnedBy(UUID.randomUUID(), KeysetPageRequest.first());
 
     assertThat(page.isEmpty()).isTrue();
-    assertThat(page.totalElements()).isZero();
-    assertThat(page.totalPages()).isZero();
+    assertThat(page.startCursor()).isNull();
+    assertThat(page.endCursor()).isNull();
+    assertThat(page.hasNext()).isFalse();
+    assertThat(page.hasPrevious()).isFalse();
   }
 
   // TD-PERF-019: proves insert() genuinely uses persist() semantics (fails loudly on a duplicate

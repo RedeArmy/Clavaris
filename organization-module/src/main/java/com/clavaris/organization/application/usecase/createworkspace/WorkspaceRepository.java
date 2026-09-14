@@ -1,7 +1,7 @@
 package com.clavaris.organization.application.usecase.createworkspace;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.domain.model.Workspace;
 import java.util.List;
 import java.util.Optional;
@@ -24,12 +24,14 @@ public interface WorkspaceRepository {
   List<Workspace> findAllByOrganizationId(UUID organizationId);
 
   /**
-   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllByOrganizationId} — used
-   * only by {@code ListWorkspacesForOrganizationPagedService}. {@link #findAllByOrganizationId}
-   * itself stays untouched: {@code GetAuditLogForOrganizationService}/{@code
-   * ListWorkspacesController} (the REST admin API) both genuinely need the full, unbounded list.
+   * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
+   * #findAllByOrganizationId} — used only by {@code ListWorkspacesForOrganizationPagedService}.
+   * {@link #findAllByOrganizationId} itself stays untouched: {@code
+   * GetAuditLogForOrganizationService}/{@code ListWorkspacesController} (the REST admin API) both
+   * genuinely need the full, unbounded list.
    */
-  Page<Workspace> findPageByOrganizationId(UUID organizationId, PageRequest pageRequest);
+  KeysetPage<Workspace> findKeysetPageByOrganizationId(
+      UUID organizationId, KeysetPageRequest pageRequest);
 
   // webhook-module's EventOutboxWriter needs organizationId, not the full Workspace — same
   // "scalar projection over full-entity lookup" precedent as AccountRepository's own identical

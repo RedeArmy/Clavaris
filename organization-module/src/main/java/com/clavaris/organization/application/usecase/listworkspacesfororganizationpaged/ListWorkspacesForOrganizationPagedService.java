@@ -1,6 +1,6 @@
 package com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged;
 
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.Workspace;
 
@@ -14,7 +14,7 @@ public class ListWorkspacesForOrganizationPagedService
   }
 
   @Override
-  public Page<Workspace> handle(final ListWorkspacesForOrganizationPagedQuery query) {
-    return workspaces.findPageByOrganizationId(query.organizationId(), query.pageRequest());
+  public KeysetPage<Workspace> handle(final ListWorkspacesForOrganizationPagedQuery query) {
+    return workspaces.findKeysetPageByOrganizationId(query.organizationId(), query.pageRequest());
   }
 }

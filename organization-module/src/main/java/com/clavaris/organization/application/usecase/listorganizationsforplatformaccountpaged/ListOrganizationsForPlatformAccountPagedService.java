@@ -1,6 +1,6 @@
 package com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged;
 
-import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 
@@ -15,7 +15,8 @@ public class ListOrganizationsForPlatformAccountPagedService
   }
 
   @Override
-  public Page<Organization> handle(final ListOrganizationsForPlatformAccountPagedQuery query) {
-    return organizations.findPageOwnedBy(query.ownerPlatformAccountId(), query.pageRequest());
+  public KeysetPage<Organization> handle(
+      final ListOrganizationsForPlatformAccountPagedQuery query) {
+    return organizations.findKeysetPageOwnedBy(query.ownerPlatformAccountId(), query.pageRequest());
   }
 }

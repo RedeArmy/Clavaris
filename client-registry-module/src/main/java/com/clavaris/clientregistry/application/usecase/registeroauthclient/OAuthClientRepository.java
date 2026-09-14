@@ -1,8 +1,8 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
 import com.clavaris.clientregistry.domain.model.OAuthClient;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,14 +39,15 @@ public interface OAuthClientRepository {
   List<OAuthClient> findAllByOrganizationId(UUID organizationId);
 
   /**
-   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllByOrganizationId} — used
-   * only by {@code ListOAuthClientsPagedService}'s own display query. {@link
-   * #findAllByOrganizationId} itself stays untouched — {@code PlatformOAuthClientController} still
-   * resolves a {@code clientId} path variable against the FULL, unbounded list before any mutation
-   * (deactivate/rotate), a real anti-enumeration ownership check that must never miss a client
-   * sitting on a page the dashboard isn't currently displaying.
+   * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
+   * #findAllByOrganizationId} — used only by {@code ListOAuthClientsPagedService}'s own display
+   * query. {@link #findAllByOrganizationId} itself stays untouched — {@code
+   * PlatformOAuthClientController} still resolves a {@code clientId} path variable against the
+   * FULL, unbounded list before any mutation (deactivate/rotate), a real anti-enumeration ownership
+   * check that must never miss a client sitting on a page the dashboard isn't currently displaying.
    */
-  Page<OAuthClient> findPageByOrganizationId(UUID organizationId, PageRequest pageRequest);
+  KeysetPage<OAuthClient> findKeysetPageByOrganizationId(
+      UUID organizationId, KeysetPageRequest pageRequest);
 
   /**
    * BR-DATA-02/03's own organization-level equivalent — every {@code OAuthClient} this Organization

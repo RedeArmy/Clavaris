@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
@@ -35,9 +36,13 @@ import org.springframework.web.server.ResponseStatusException;
  * that use case's own Javadoc documents.
  *
  * <p>The {@code rateLimitPolicy} attribute (backed by {@link
- * GetRateLimitPolicyForOrganizationUseCase}) is deliberately display-only — TD-FUT-002/ADR-0010
- * §6.2 keep tuning this ceiling operator-managed only in v1, so unlike every other section on this
- * page there is no form or link-out to change it here, only the current effective value.
+ * GetRateLimitPolicyForOrganizationUseCase}) is a read, same as every other section's own model
+ * attribute here — this controller itself stays read-only. TD-FUT-002 (self-service tuning,
+ * shipped): the Rate Limit section's own form now posts to a separate controller, {@code
+ * PlatformRateLimitPolicyController}, same read/write split every other section on this page
+ * already has (compare the create-workspace form above, which posts to {@code
+ * PlatformWorkspaceController}, not a method here) — {@code rateLimitForm} (a fresh, blank {@link
+ * SetRateLimitPolicyForm}) is added to the model below for exactly that form to bind to.
  */
 // PMD.LongVariable: currentPlatformAccount/ownerPlatformAccountId (field/constructor param/local
 // each) are long by design, not accidentally — same class-level-suppression precedent
@@ -70,18 +75,20 @@ public class PlatformOrganizationDetailController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // TD-PERF-020: page is 0-indexed — see PlatformOrganizationDashboardController's own identical
-  // parameter for the full reasoning. This GET now also branches on HX-Request — new for this
-  // controller (every prior GET across this dashboard always rendered the full page, since nothing
-  // on a plain GET ever needed a fragment before pagination's own Previous/Next links did): a
-  // pagination link is itself an hx-get, and its hx-target (#workspaces-content) can't safely
-  // receive a full HTML document the way hx-swap="outerHTML" would otherwise apply it.
+  // TD-PERF-020 (keyset revision, 2026-09-14): ?after=/?before= carry an opaque KeysetCursor
+  // token — see PlatformOrganizationDashboardController's own identical parameter for the full
+  // reasoning. This GET also branches on HX-Request — new for this controller (every prior GET
+  // across this dashboard always rendered the full page, since nothing on a plain GET ever needed
+  // a fragment before pagination's own Previous/Next links did): a pagination link is itself an
+  // hx-get, and its hx-target (#workspaces-content) can't safely receive a full HTML document the
+  // way hx-swap="outerHTML" would otherwise apply it.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showDetail(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @RequestParam(defaultValue = "0") final int page,
+      @RequestParam(required = false) final String after,
+      @RequestParam(required = false) final String before,
       final Model model) {
     final UUID ownerPlatformAccountId =
         currentPlatformAccount
@@ -99,12 +106,15 @@ public class PlatformOrganizationDetailController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
     model.addAttribute("organization", organization);
-    addWorkspacesToModel(model, organizationId, page);
+    addWorkspacesToModel(model, organizationId, KeysetPageRequest.fromCursors(after, before));
     model.addAttribute("workspaceForm", new CreateWorkspaceForm());
     if (isHtmxRequest(request)) {
       return WORKSPACES_FRAGMENT;
     }
     model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
+    // TD-FUT-002 (self-service tuning, shipped): a fresh, blank form each GET — same convention
+    // as workspaceForm above, bound by PlatformRateLimitPolicyController#set, not this controller.
+    model.addAttribute("rateLimitForm", new SetRateLimitPolicyForm());
     return DETAIL_VIEW;
   }
 
@@ -112,12 +122,11 @@ public class PlatformOrganizationDetailController {
     return "true".equals(request.getHeader(HX_REQUEST_HEADER));
   }
 
-  private void addWorkspacesToModel(final Model model, final UUID organizationId, final int page) {
-    final com.clavaris.common.domain.model.Page<com.clavaris.organization.domain.model.Workspace>
-        workspacesPage =
-            listWorkspaces.handle(
-                new ListWorkspacesForOrganizationPagedQuery(
-                    organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+  private void addWorkspacesToModel(
+      final Model model, final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final KeysetPage<com.clavaris.organization.domain.model.Workspace> workspacesPage =
+        listWorkspaces.handle(
+            new ListWorkspacesForOrganizationPagedQuery(organizationId, pageRequest));
     model.addAttribute("workspaces", workspacesPage.content());
     model.addAttribute("workspacesPage", workspacesPage);
   }

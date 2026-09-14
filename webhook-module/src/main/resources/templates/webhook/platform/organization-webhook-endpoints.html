@@ -98,21 +98,20 @@
                 </table>
                 </div>
 
-                <!-- TD-PERF-020: same page-number pagination shape as the Organizations table —
-                     see PlatformWebhookEndpointController's own Javadoc. -->
-                <nav class="clavaris-pagination" th:if="${endpointsPage.totalPages() > 1}"
+                <!-- TD-PERF-020 (keyset revision, 2026-09-14): same keyset pagination shape as the
+                     Organizations table — see PlatformWebhookEndpointController's own Javadoc. -->
+                <nav class="clavaris-pagination"
+                     th:if="${endpointsPage.hasPrevious() or endpointsPage.hasNext()}"
                      aria-label="Webhook Endpoints pages">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${endpointsPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},page=${endpointsPage.page() - 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},page=${endpointsPage.page() - 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},before=${endpointsPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},before=${endpointsPage.startCursor().encode()})}"
                        hx-target="#endpoints-content" hx-swap="outerHTML">Previous</a>
-                    <span class="clavaris-pagination__status"
-                          th:text="'Page ' + (${endpointsPage.page()} + 1) + ' of ' + ${endpointsPage.totalPages()}">Page 1 of 1</span>
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${endpointsPage.hasNext()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},page=${endpointsPage.page() + 1})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},page=${endpointsPage.page() + 1})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},after=${endpointsPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId},after=${endpointsPage.endCursor().encode()})}"
                        hx-target="#endpoints-content" hx-swap="outerHTML">Next</a>
                 </nav>
 
@@ -152,6 +151,6 @@
         </div>
     </main>
 </div>
-<script th:src="@{/js/htmx.min.js}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
 </body>
 </html>

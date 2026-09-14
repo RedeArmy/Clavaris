@@ -22,13 +22,15 @@ class GetRateLimitPolicyForOrganizationServiceTest {
     RateLimitPolicy stored = RateLimitPolicy.define(organizationId, 1200, HARD_SYSTEM_WIDE_CAP);
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.of(stored));
     GetRateLimitPolicyForOrganizationService service =
-        new GetRateLimitPolicyForOrganizationService(policies, SYSTEM_DEFAULT_REQUESTS_PER_MINUTE);
+        new GetRateLimitPolicyForOrganizationService(
+            policies, SYSTEM_DEFAULT_REQUESTS_PER_MINUTE, HARD_SYSTEM_WIDE_CAP);
 
     RateLimitPolicySnapshot result = service.handle(organizationId);
 
     assertThat(result.requestsPerMinute()).isEqualTo(1200);
     assertThat(result.customized()).isTrue();
     assertThat(result.updatedAt()).isEqualTo(stored.updatedAt());
+    assertThat(result.hardCapRequestsPerMinute()).isEqualTo(HARD_SYSTEM_WIDE_CAP);
   }
 
   @Test
@@ -37,7 +39,8 @@ class GetRateLimitPolicyForOrganizationServiceTest {
     UUID organizationId = UUID.randomUUID();
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
     GetRateLimitPolicyForOrganizationService service =
-        new GetRateLimitPolicyForOrganizationService(policies, SYSTEM_DEFAULT_REQUESTS_PER_MINUTE);
+        new GetRateLimitPolicyForOrganizationService(
+            policies, SYSTEM_DEFAULT_REQUESTS_PER_MINUTE, HARD_SYSTEM_WIDE_CAP);
 
     RateLimitPolicySnapshot result = service.handle(organizationId);
 
@@ -46,5 +49,6 @@ class GetRateLimitPolicyForOrganizationServiceTest {
     assertThat(result.updatedAt())
         .as("no real row exists, so there is nothing real to timestamp")
         .isNull();
+    assertThat(result.hardCapRequestsPerMinute()).isEqualTo(HARD_SYSTEM_WIDE_CAP);
   }
 }

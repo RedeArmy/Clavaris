@@ -6,6 +6,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.web.servlet.resource.ResourceUrlEncodingFilter;
 
 /**
  * ADR-0009 §2/§4: registers {@link CustomDomainRequestRewriteFilter} as a plain servlet filter, not
@@ -18,13 +19,22 @@ import org.springframework.core.Ordered;
  * is {@code 0}, so Spring Security's own filter sits at {@code -100} — {@code
  * Ordered.HIGHEST_PRECEDENCE} (the JVM's own {@code Integer.MIN_VALUE}) is comfortably earlier than
  * that with no risk of a future Spring Boot patch nudging the two back into the wrong order.
+ *
+ * <p>TD-PERF-024 (content-hash revision, 2026-09-14): {@link ResourceUrlEncodingFilter} needs the
+ * exact same early-registration treatment — it works by wrapping {@code HttpServletResponse} so
+ * every later {@code response.encodeURL(...)} call (which is what Thymeleaf's Spring dialect
+ * already calls internally for every {@code @{...}} link expression) resolves the content-hashed
+ * URL instead of the bare one. Not a Spring Boot auto-registered bean by default, same "would land
+ * at {@code LOWEST_PRECEDENCE} otherwise" reasoning as {@code customDomainRequestRewriteFilter}
+ * above; ordered identically since neither filter's own behavior depends on running before or after
+ * the other, only both running before Spring Security.
  */
 @Configuration
 class FilterOrderingConfig {
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ FilterOrderingConfig() {
-    // Intentionally empty — this class holds no state, only the @Bean method below.
+    // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
   @Bean
@@ -35,6 +45,15 @@ class FilterOrderingConfig {
     final FilterRegistrationBean<CustomDomainRequestRewriteFilter> registration =
         new FilterRegistrationBean<>(
             new CustomDomainRequestRewriteFilter(domainConfigs, oauthClients));
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+    registration.addUrlPatterns("/*");
+    return registration;
+  }
+
+  @Bean
+  /* package */ FilterRegistrationBean<ResourceUrlEncodingFilter> resourceUrlEncodingFilter() {
+    final FilterRegistrationBean<ResourceUrlEncodingFilter> registration =
+        new FilterRegistrationBean<>(new ResourceUrlEncodingFilter());
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
     registration.addUrlPatterns("/*");
     return registration;

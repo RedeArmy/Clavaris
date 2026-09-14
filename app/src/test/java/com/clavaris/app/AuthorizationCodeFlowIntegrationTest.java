@@ -402,7 +402,11 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(loginPage.body())
         .as("login.html must wire up the mutex on its own form and load the script")
         .contains("data-login-form")
-        .contains("/js/login-submit-guard.js");
+        // TD-PERF-024 (content-hash revision, 2026-09-14): the rendered src is now
+        // /js/login-submit-guard-<hash>.js, not the bare path — see
+        // StaticResourceVersioningIntegrationTest for the dedicated content-hashing proof; this
+        // assertion only needs to confirm the right script is wired up, hash or no hash.
+        .containsPattern("/js/login-submit-guard(-[0-9a-f]+)?\\.js");
     // The login page's own policy: real script-src, same-origin only — neither the strict
     // default (script-src 'none') nor the consent page's ('unsafe-inline').
     assertThat(loginPage.headers().firstValue("Content-Security-Policy"))

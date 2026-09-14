@@ -1,7 +1,7 @@
 package com.clavaris.organization.application.usecase.createorganization;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.domain.model.Organization;
 import java.util.List;
 import java.util.Optional;
@@ -45,15 +45,17 @@ public interface OrganizationRepository {
       @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId);
 
   /**
-   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllOwnedBy} — used only by
-   * {@code ListOrganizationsForPlatformAccountPagedService}, never internally (every other caller
-   * of this module's own use cases genuinely needs the full, unbounded list — see that class's own
-   * Javadoc). {@link #findAllOwnedBy} itself is deliberately untouched, not replaced: it has no
-   * other real caller today, but changing a port's return shape out from under every future one is
-   * a bigger, riskier change than adding a second, purpose-built method.
+   * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
+   * #findAllOwnedBy} — used only by {@code ListOrganizationsForPlatformAccountPagedService}, never
+   * internally (every other caller of this module's own use cases genuinely needs the full,
+   * unbounded list — see that class's own Javadoc). {@link #findAllOwnedBy} itself is deliberately
+   * untouched, not replaced: it has no other real caller today, but changing a port's return shape
+   * out from under every future one is a bigger, riskier change than adding a second, purpose-built
+   * method.
    */
-  Page<Organization> findPageOwnedBy(
-      @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId, PageRequest pageRequest);
+  KeysetPage<Organization> findKeysetPageOwnedBy(
+      @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId,
+      KeysetPageRequest pageRequest);
 
   /**
    * BR-DATA-02/03's own organization-level equivalent: a real, permanent hard delete. Only cascades

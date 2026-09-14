@@ -1,8 +1,8 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointCommand;
@@ -116,16 +116,17 @@ public class PlatformWebhookEndpointController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // TD-PERF-020: page is 0-indexed — see organization-module's
-  // PlatformOrganizationDashboardController for the full reasoning. This GET also branches on
-  // HX-Request — a pagination link is itself an hx-get, and its hx-target can't safely receive a
-  // full HTML document.
+  // TD-PERF-020 (keyset revision, 2026-09-14): ?after=/?before= carry an opaque KeysetCursor
+  // token — see organization-module's PlatformOrganizationDashboardController for the full
+  // reasoning. This GET also branches on HX-Request — a pagination link is itself an hx-get, and
+  // its hx-target can't safely receive a full HTML document.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @RequestParam(defaultValue = "0") final int page,
+      @RequestParam(required = false) final String after,
+      @RequestParam(required = false) final String before,
       final Model model) {
     final UUID ownerPlatformAccountId =
         WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
@@ -135,7 +136,7 @@ public class PlatformWebhookEndpointController {
             organizationResolver, organizationId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId, page);
+    populateEndpointsModel(model, organizationId, KeysetPageRequest.fromCursors(after, before));
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       return ENDPOINTS_FRAGMENT;
     }
@@ -162,7 +163,7 @@ public class PlatformWebhookEndpointController {
     populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
-      populateEndpointsModel(model, organizationId, 0);
+      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
       return WebhookDashboardControllerSupport.isHtmxRequest(request)
           ? ENDPOINTS_FRAGMENT
           : LIST_VIEW;
@@ -189,7 +190,7 @@ public class PlatformWebhookEndpointController {
       // filling out this form needs to see why their submission was rejected.
       model.addAttribute("unsafeWebhookUrlError", true);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
-      populateEndpointsModel(model, organizationId, 0);
+      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
       return WebhookDashboardControllerSupport.isHtmxRequest(request)
           ? ENDPOINTS_FRAGMENT
           : LIST_VIEW;
@@ -198,7 +199,7 @@ public class PlatformWebhookEndpointController {
     model.addAttribute("justRegisteredRawSecret", result.rawSigningSecret());
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId, 0);
+    populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
     return WebhookDashboardControllerSupport.isHtmxRequest(request)
         ? ENDPOINTS_FRAGMENT
         : LIST_VIEW;
@@ -229,7 +230,7 @@ public class PlatformWebhookEndpointController {
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-      populateEndpointsModel(model, organizationId, 0);
+      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
       return ENDPOINTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/webhook-endpoints";
@@ -258,7 +259,7 @@ public class PlatformWebhookEndpointController {
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-      populateEndpointsModel(model, organizationId, 0);
+      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
       return ENDPOINTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/webhook-endpoints";
@@ -289,7 +290,7 @@ public class PlatformWebhookEndpointController {
     model.addAttribute("justRegisteredRawSecret", result.rawNewSigningSecret());
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId, 0);
+    populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
     return WebhookDashboardControllerSupport.isHtmxRequest(request)
         ? ENDPOINTS_FRAGMENT
         : LIST_VIEW;
@@ -304,11 +305,10 @@ public class PlatformWebhookEndpointController {
   }
 
   private void populateEndpointsModel(
-      final Model model, final UUID organizationId, final int page) {
-    final Page<WebhookEndpoint> endpointsPage =
+      final Model model, final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final KeysetPage<WebhookEndpoint> endpointsPage =
         listEndpointsPaged.handle(
-            new ListWebhookEndpointsForOrganizationPagedQuery(
-                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+            new ListWebhookEndpointsForOrganizationPagedQuery(organizationId, pageRequest));
     model.addAttribute("endpoints", endpointsPage.content());
     model.addAttribute("endpointsPage", endpointsPage);
   }

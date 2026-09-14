@@ -1,8 +1,9 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import com.clavaris.common.domain.model.Page;
-import com.clavaris.common.domain.model.PageRequest;
-import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
@@ -11,7 +12,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -91,24 +91,45 @@ class JpaOrganizationRepository implements OrganizationRepository {
         .toList();
   }
 
-  // TD-PERF-020: newest-first (createdAt descending), id descending as a tiebreaker — the same
-  // order every dashboard list already reads naturally from Postgres, made explicit and stable
-  // here since pagination without a fully deterministic ORDER BY has no guaranteed row order
-  // across pages (createdAt alone can tie at typical timestamp resolution, which would otherwise
-  // make which rows land on which page arbitrary rather than stable).
+  // TD-PERF-020 (keyset revision, 2026-09-14): newest-first (createdAt descending, id descending
+  // as a tiebreaker) — see SpringDataOrganizationJpaRepository's own Javadoc for why three
+  // separate @Query methods back this instead of one Pageable-driven derived method.
   @Override
-  @SuppressWarnings("PMD.LongVariable")
-  public Page<Organization> findPageOwnedBy(
-      final UUID ownerPlatformAccountId, final PageRequest pageRequest) {
-    return SpringDataPageMapper.toPage(
-        organizations.findAllByOwnerPlatformAccountId(
-            ownerPlatformAccountId,
-            org.springframework.data.domain.PageRequest.of(
-                pageRequest.page(),
-                pageRequest.size(),
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
-        pageRequest,
-        this::toDomain);
+  @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"}) // three real, distinct exits —
+  // first/after/before.
+  public KeysetPage<Organization> findKeysetPageOwnedBy(
+      final UUID ownerPlatformAccountId, final KeysetPageRequest pageRequest) {
+    final org.springframework.data.domain.PageRequest limit =
+        org.springframework.data.domain.PageRequest.of(0, pageRequest.size() + 1);
+    if (pageRequest.after() != null) {
+      final KeysetCursor cursor = pageRequest.after();
+      return SpringDataKeysetPageMapper.forward(
+          organizations.findPageOwnedByAfter(
+              ownerPlatformAccountId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          true,
+          this::toDomain,
+          this::cursorOf);
+    }
+    if (pageRequest.before() != null) {
+      final KeysetCursor cursor = pageRequest.before();
+      return SpringDataKeysetPageMapper.backward(
+          organizations.findPageOwnedByBefore(
+              ownerPlatformAccountId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          this::toDomain,
+          this::cursorOf);
+    }
+    return SpringDataKeysetPageMapper.forward(
+        organizations.findFirstPageOwnedBy(ownerPlatformAccountId, limit),
+        pageRequest.size(),
+        false,
+        this::toDomain,
+        this::cursorOf);
+  }
+
+  private KeysetCursor cursorOf(final OrganizationEntity entity) {
+    return new KeysetCursor(entity.getCreatedAt(), entity.getId());
   }
 
   @Override
