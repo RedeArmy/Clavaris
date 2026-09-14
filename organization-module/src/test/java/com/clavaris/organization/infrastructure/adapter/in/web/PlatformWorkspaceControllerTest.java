@@ -90,7 +90,7 @@ class PlatformWorkspaceControllerTest {
     when(listWorkspaces.handle(any())).thenReturn(emptyWorkspacesPage());
     when(listMembers.handle(any())).thenReturn(emptyMembersPage());
     when(getRateLimitPolicy.handle(any()))
-        .thenReturn(new RateLimitPolicySnapshot(600, false, null));
+        .thenReturn(new RateLimitPolicySnapshot(600, false, null, 6000));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();

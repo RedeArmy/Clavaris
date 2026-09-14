@@ -192,17 +192,22 @@ class OrganizationUseCaseConfig {
         organizations, policies, hardSystemWideCap, auditEvents);
   }
 
-  // ADR-0025: the dashboard's own read-only Rate Limit display (TD-FUT-002 keeps tuning it
-  // operator-managed only in v1) — same clavaris.rate-limit.capacity.default-requests-per-minute
-  // value OrganizationCapacityRateLimitingFilter (app) already enforces, one config source of
-  // truth for what "no override" actually means.
+  // ADR-0025: the dashboard's own Rate Limit display — same
+  // clavaris.rate-limit.capacity.default-requests-per-minute value
+  // OrganizationCapacityRateLimitingFilter (app) already enforces, one config source of truth for
+  // what "no override" actually means. TD-FUT-002 (self-service tuning, shipped): also injects
+  // the same hardSystemWideCap value setRateLimitPolicyForOrganizationUseCase below already
+  // does — see RateLimitPolicySnapshot's own Javadoc for why this read side now needs it too.
   @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicyForOrganizationUseCase(
       final RateLimitPolicyRepository policies,
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
-          final int systemDefaultRequestsPerMinute) {
-    return new GetRateLimitPolicyForOrganizationService(policies, systemDefaultRequestsPerMinute);
+          final int systemDefaultRequestsPerMinute,
+      @Value("${clavaris.rate-limit.capacity.hard-cap-requests-per-minute:6000}")
+          final int hardSystemWideCap) {
+    return new GetRateLimitPolicyForOrganizationService(
+        policies, systemDefaultRequestsPerMinute, hardSystemWideCap);
   }
 
   // ADR-0025, TD-SEC-007: the dashboard's own audit-log query — see

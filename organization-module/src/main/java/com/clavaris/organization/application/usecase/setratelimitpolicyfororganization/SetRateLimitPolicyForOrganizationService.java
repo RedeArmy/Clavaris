@@ -6,15 +6,16 @@ import com.clavaris.organization.domain.model.RateLimitPolicy;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * ADR-0010 §6.2, BR-ORG-05: v1 is operator-managed only — this use case is reached exclusively via
- * the platform-tier management API ({@code AdminApiSecurityConfig}, {@code
- * PlatformScopes.RATE_LIMIT_POLICY_WRITE}), same separation of concerns as {@code
- * CreateOrganizationService}.
+ * ADR-0010 §6.2, BR-ORG-05: reachable via the platform-tier management API ({@code
+ * AdminApiSecurityConfig}, {@code PlatformScopes.RATE_LIMIT_POLICY_WRITE}, same separation of
+ * concerns as {@code CreateOrganizationService}) and, since TD-FUT-002 (self-service tuning,
+ * shipped), also via the session-authenticated dashboard ({@code PlatformRateLimitPolicyController}
+ * — a second caller, not a second implementation; see {@link
+ * SetRateLimitPolicyForOrganizationCommand}'s own Javadoc for the full split).
  *
- * <p>TD-SEC-007: also writes the {@code rate_limit_policy.set} audit event in the same transaction
- * — named explicitly in the technical-debt register as a hard blocking dependency for v1.1's
- * self-service tuning (TD-FUT-002), and a real gap today regardless: every operator change to a
- * tenant's own capacity ceiling was previously unaudited.
+ * <p>TD-SEC-007: also writes the {@code rate_limit_policy.set} audit event in the same transaction,
+ * regardless of which actor triggered the write — every change to a tenant's own capacity ceiling
+ * is audited, operator- or self-service-triggered alike.
  */
 public class SetRateLimitPolicyForOrganizationService
     implements SetRateLimitPolicyForOrganizationUseCase {

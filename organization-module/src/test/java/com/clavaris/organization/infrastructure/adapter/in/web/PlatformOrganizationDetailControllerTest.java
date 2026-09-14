@@ -56,7 +56,7 @@ class PlatformOrganizationDetailControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(listWorkspaces.handle(any())).thenReturn(emptyPage());
     when(getRateLimitPolicy.handle(any()))
-        .thenReturn(new RateLimitPolicySnapshot(600, false, null));
+        .thenReturn(new RateLimitPolicySnapshot(600, false, null, 6000));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -109,7 +109,7 @@ class PlatformOrganizationDetailControllerTest {
   void showsTheOrganizationsEffectiveRateLimitPolicy() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
     RateLimitPolicySnapshot customized =
-        new RateLimitPolicySnapshot(1200, true, java.time.Instant.now());
+        new RateLimitPolicySnapshot(1200, true, java.time.Instant.now(), 6000);
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
     when(getRateLimitPolicy.handle(any())).thenReturn(customized);
 

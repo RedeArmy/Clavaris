@@ -163,6 +163,10 @@ public class PlatformWorkspaceController {
       // once already (SDE-III review, 2026-09-12): the template referenced this attribute
       // unconditionally before this fix, NPE-ing on this one re-render path.
       model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
+      // TD-FUT-002 (self-service tuning, shipped): same reasoning as rateLimitPolicy just above —
+      // the Rate Limit section's own form now needs rateLimitForm bound on every full-page render
+      // of this template, this one included, not just PlatformRateLimitPolicyController's own.
+      model.addAttribute("rateLimitForm", new SetRateLimitPolicyForm());
       return isHtmxRequest(request) ? WORKSPACES_FRAGMENT : ORGANIZATION_DETAIL_VIEW;
     }
 

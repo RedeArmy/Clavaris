@@ -218,6 +218,15 @@ input[type="radio"] {
   color: var(--clavaris-danger);
 }
 
+/* TD-FUT-002 (self-service rate-limit tuning): a non-error helper line under a field — e.g. "up
+   to N requests/minute" telling an Organization owner the bound before they submit, not just
+   after a rejected value. Same size as .clavaris-field-error, muted color instead of danger. */
+.clavaris-field-hint {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8125rem;
+  color: var(--clavaris-text-muted);
+}
+
 .clavaris-button {
   display: block;
   width: 100%;
