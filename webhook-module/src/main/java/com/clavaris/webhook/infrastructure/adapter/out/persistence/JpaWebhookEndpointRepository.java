@@ -1,5 +1,8 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.persistence.EntityManager;
@@ -7,6 +10,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -18,8 +22,13 @@ import tools.jackson.databind.ObjectMapper;
  * <p>TD-PERF-019: {@code insert} calls {@link EntityManager#persist} directly — see {@code
  * WebhookEndpointRepository#insert}'s own Javadoc for which call site that's safe for and why
  * {@code save} itself is unchanged.
+ *
+ * <p>PMD.TooManyMethods (TD-PERF-020's own {@code findPageByOrganizationId} pushed this past the
+ * default threshold): every method here backs a real, distinct {@code WebhookEndpointRepository}
+ * port method this module's use cases actually need — same "one port, several use cases" shape
+ * {@code AccountRepository}'s own identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings("PMD.ShortVariable")
+@SuppressWarnings({"PMD.ShortVariable", "PMD.TooManyMethods"})
 @Repository
 class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
 
@@ -69,6 +78,22 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   @Override
   public List<WebhookEndpoint> findAllByOrganizationId(final UUID organizationId) {
     return endpoints.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
+  }
+
+  // TD-PERF-020: newest-first, id as a tiebreaker — same reasoning JpaOrganizationRepository's own
+  // identical findPageOwnedBy already documents.
+  @Override
+  public Page<WebhookEndpoint> findPageByOrganizationId(
+      final UUID organizationId, final PageRequest pageRequest) {
+    return SpringDataPageMapper.toPage(
+        endpoints.findAllByOrganizationId(
+            organizationId,
+            org.springframework.data.domain.PageRequest.of(
+                pageRequest.page(),
+                pageRequest.size(),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
+        pageRequest,
+        this::toDomain);
   }
 
   @Override

@@ -1,6 +1,8 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
@@ -16,15 +18,16 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationQuery;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersQuery;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.CannotRemoveLastAdminException;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
+import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -74,7 +77,19 @@ import org.springframework.web.server.ResponseStatusException;
 // must still be the literal, not the constant, so one duplicate remains) and "PMD.OnlyOneReturn",
 // repeated once per handler method that legitimately needs it, same false-positive class
 // ContentSecurityPolicyHeaderWriter's own identical class-level suppression already documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
+// PMD.TooManyMethods/PMD.CouplingBetweenObjects (TD-PERF-020's own pagination wiring —
+// addWorkspacesToModel, isHtmxRequest, the two new Paged use-case fields — pushed both past their
+// default thresholds): this controller already owns five distinct Workspace/Member-mutating
+// endpoints plus their shared read-model helpers; splitting it along resource lines (Workspaces vs.
+// Members) is a real, larger refactor for a future pass, not a fix this pagination increment should
+// bundle in.
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.ExcessiveImports",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.TooManyMethods",
+  "PMD.CouplingBetweenObjects"
+})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceController {
@@ -93,8 +108,8 @@ public class PlatformWorkspaceController {
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final GetWorkspaceForOrganizationUseCase getWorkspace;
-  private final ListWorkspacesForOrganizationUseCase listWorkspaces;
-  private final ListWorkspaceMembersUseCase listMembers;
+  private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
+  private final ListWorkspaceMembersPagedUseCase listMembers;
   private final CreateWorkspaceUseCase createWorkspace;
   private final AddWorkspaceMemberUseCase addMemberUseCase;
   private final ChangeWorkspaceMemberRoleUseCase changeMemberRole;
@@ -108,8 +123,8 @@ public class PlatformWorkspaceController {
   public PlatformWorkspaceController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final GetWorkspaceForOrganizationUseCase getWorkspace,
-      final ListWorkspacesForOrganizationUseCase listWorkspaces,
-      final ListWorkspaceMembersUseCase listMembers,
+      final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
+      final ListWorkspaceMembersPagedUseCase listMembers,
       final CreateWorkspaceUseCase createWorkspace,
       final AddWorkspaceMemberUseCase addMemberUseCase,
       final ChangeWorkspaceMemberRoleUseCase changeMemberRole,
@@ -141,9 +156,7 @@ public class PlatformWorkspaceController {
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     if (bindingResult.hasErrors()) {
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-      model.addAttribute(
-          "workspaces",
-          listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
+      addWorkspacesToModel(model, organizationId, 0);
       // A plain (non-HTMX) validation error re-renders the WHOLE organization-detail page, Rate
       // Limit section included — same reason "organization"/"workspaces" are populated here too,
       // not just on PlatformOrganizationDetailController's own GET. Real bug this exact gap caused
@@ -162,28 +175,43 @@ public class PlatformWorkspaceController {
 
     if (isHtmxRequest(request)) {
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-      model.addAttribute(
-          "workspaces",
-          listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
+      // Page 0 — a newly-created Workspace sorts first (newest-first ordering), same reasoning
+      // PlatformOrganizationDashboardController's own identical create() already documents.
+      addWorkspacesToModel(model, organizationId, 0);
       model.addAttribute("workspaceForm", new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId;
   }
 
+  private void addWorkspacesToModel(final Model model, final UUID organizationId, final int page) {
+    final Page<Workspace> workspacesPage =
+        listWorkspaces.handle(
+            new ListWorkspacesForOrganizationPagedQuery(
+                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute("workspaces", workspacesPage.content());
+    model.addAttribute("workspacesPage", workspacesPage);
+  }
+
+  // TD-PERF-020: page is 0-indexed — see PlatformOrganizationDashboardController's own identical
+  // parameter for the full reasoning.
   @GetMapping("/{workspaceId}")
   public String showDetail(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
+      @RequestParam(defaultValue = "0") final int page,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-    populateMembersModel(model, organization, workspace);
-    return WORKSPACE_DETAIL_VIEW;
+    populateMembersModel(model, organization, workspace, page);
+    // TD-PERF-020: same "a pagination link is itself an hx-get, and its hx-target can't safely
+    // receive a full HTML document" reasoning PlatformOrganizationDetailController's own identical
+    // branching documents.
+    return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -200,7 +228,7 @@ public class PlatformWorkspaceController {
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     if (bindingResult.hasErrors()) {
-      populateMembersModel(model, organization, workspace);
+      populateMembersModel(model, organization, workspace, 0);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -219,7 +247,7 @@ public class PlatformWorkspaceController {
     } catch (final AccountProvisioner.AccountAlreadyExistsException _) {
       model.addAttribute("emailAlreadyRegisteredError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, form);
-      populateMembersModel(model, organization, workspace);
+      populateMembersModel(model, organization, workspace, 0);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -249,7 +277,7 @@ public class PlatformWorkspaceController {
     } catch (final CannotDemoteLastAdminException _) {
       model.addAttribute("cannotDemoteLastAdminError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-      populateMembersModel(model, organization, workspace);
+      populateMembersModel(model, organization, workspace, 0);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -278,7 +306,7 @@ public class PlatformWorkspaceController {
     } catch (final CannotRemoveLastAdminException _) {
       model.addAttribute("cannotRemoveLastAdminError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-      populateMembersModel(model, organization, workspace);
+      populateMembersModel(model, organization, workspace, 0);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -298,7 +326,7 @@ public class PlatformWorkspaceController {
       final Model model) {
     if (isHtmxRequest(request)) {
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
-      populateMembersModel(model, organization, workspace);
+      populateMembersModel(model, organization, workspace, 0);
       return MEMBERS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/"
@@ -308,11 +336,18 @@ public class PlatformWorkspaceController {
   }
 
   private void populateMembersModel(
-      final Model model, final Organization organization, final Workspace workspace) {
+      final Model model,
+      final Organization organization,
+      final Workspace workspace,
+      final int page) {
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     model.addAttribute("workspace", workspace);
-    model.addAttribute(
-        "members", listMembers.handle(new ListWorkspaceMembersQuery(workspace.id())));
+    final Page<WorkspaceMembership> membersPage =
+        listMembers.handle(
+            new ListWorkspaceMembersPagedQuery(
+                workspace.id(), new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute("members", membersPage.content());
+    model.addAttribute("membersPage", membersPage);
   }
 
   private Organization requireOwnedOrganization(

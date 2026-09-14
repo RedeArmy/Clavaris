@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
@@ -67,22 +68,33 @@ class OAuth2AuthorizationRetentionJob {
 
   private final JdbcTemplate jdbcTemplate;
   private final int retentionGraceDays;
+  private final PostgresAdvisoryJobLock jobLock;
 
   // Constructed only by Spring's own component scan (via @Component above).
   /* package */ OAuth2AuthorizationRetentionJob(
       final JdbcTemplate jdbcTemplate,
       @Value("${clavaris.oauth2-authorization.retention-grace-days:1}")
-          final int retentionGraceDays) {
+          final int retentionGraceDays,
+      final PostgresAdvisoryJobLock jobLock) {
     this.jdbcTemplate = jdbcTemplate;
     this.retentionGraceDays = retentionGraceDays;
+    this.jobLock = jobLock;
   }
 
   // Daily, off-peak (03:45 server time) — 15 minutes after EventOutboxRetentionJob's own 03:30
   // slot, so the two never contend for the same window; both are cheap, index-backed deletes on
   // tables with no other scheduled writer at that hour.
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see identity-module's KnownDeviceRetentionJob
+  // for why @Transactional stays on this externally-invoked method, not the private one it
+  // delegates to (Spring AOP self-invocation).
   @Scheduled(cron = "0 45 3 * * *")
   @Transactional
   /* package */ void sweepExpiredRows() {
+    jobLock.runIfLockAcquired("oauth2_authorization_retention", LOG, this::sweepExpiredRowsLocked);
+  }
+
+  private void sweepExpiredRowsLocked() {
     final Instant cutoff = Instant.now().minus(retentionGraceDays, ChronoUnit.DAYS);
     final int deleted = jdbcTemplate.update(DELETE_EXPIRED_SQL, java.sql.Timestamp.from(cutoff));
     if (deleted > 0) {

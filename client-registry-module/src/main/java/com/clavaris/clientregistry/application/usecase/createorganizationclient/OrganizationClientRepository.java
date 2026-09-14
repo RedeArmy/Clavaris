@@ -1,6 +1,8 @@
 package com.clavaris.clientregistry.application.usecase.createorganizationclient;
 
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,6 +25,16 @@ public interface OrganizationClientRepository {
   Optional<OrganizationClient> findById(UUID id);
 
   List<OrganizationClient> findAllByOrganizationId(UUID organizationId);
+
+  /**
+   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllByOrganizationId} — used
+   * only by {@code ListOrganizationClientsPagedService}'s own display query. {@link
+   * #findAllByOrganizationId} itself stays untouched — {@code PlatformOrganizationClientController}
+   * still resolves a {@code clientId} path variable against the FULL, unbounded list before any
+   * mutation (deactivate/rotate), a real anti-enumeration ownership check that must never miss a
+   * client sitting on a page the dashboard isn't currently displaying.
+   */
+  Page<OrganizationClient> findPageByOrganizationId(UUID organizationId, PageRequest pageRequest);
 
   void save(OrganizationClient organizationClient);
 

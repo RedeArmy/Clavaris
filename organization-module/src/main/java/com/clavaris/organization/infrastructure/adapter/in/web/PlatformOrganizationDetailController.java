@@ -1,10 +1,11 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -46,15 +48,20 @@ import org.springframework.web.server.ResponseStatusException;
 public class PlatformOrganizationDetailController {
 
   private static final String DETAIL_VIEW = "organization/platform/organization-detail";
+  private static final String WORKSPACES_FRAGMENT = DETAIL_VIEW + " :: workspaces";
+
+  // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
+  // PlatformOrganizationDashboardController's own identical constant.
+  private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
-  private final ListWorkspacesForOrganizationUseCase listWorkspaces;
+  private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformOrganizationDetailController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
-      final ListWorkspacesForOrganizationUseCase listWorkspaces,
+      final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
       final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
@@ -63,10 +70,18 @@ public class PlatformOrganizationDetailController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // TD-PERF-020: page is 0-indexed — see PlatformOrganizationDashboardController's own identical
+  // parameter for the full reasoning. This GET now also branches on HX-Request — new for this
+  // controller (every prior GET across this dashboard always rendered the full page, since nothing
+  // on a plain GET ever needed a fragment before pagination's own Previous/Next links did): a
+  // pagination link is itself an hx-get, and its hx-target (#workspaces-content) can't safely
+  // receive a full HTML document the way hx-swap="outerHTML" would otherwise apply it.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showDetail(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
+      @RequestParam(defaultValue = "0") final int page,
       final Model model) {
     final UUID ownerPlatformAccountId =
         currentPlatformAccount
@@ -84,11 +99,26 @@ public class PlatformOrganizationDetailController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
     model.addAttribute("organization", organization);
-    model.addAttribute(
-        "workspaces",
-        listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)));
+    addWorkspacesToModel(model, organizationId, page);
     model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+    if (isHtmxRequest(request)) {
+      return WORKSPACES_FRAGMENT;
+    }
     model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
     return DETAIL_VIEW;
+  }
+
+  private static boolean isHtmxRequest(final HttpServletRequest request) {
+    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
+  }
+
+  private void addWorkspacesToModel(final Model model, final UUID organizationId, final int page) {
+    final com.clavaris.common.domain.model.Page<com.clavaris.organization.domain.model.Workspace>
+        workspacesPage =
+            listWorkspaces.handle(
+                new ListWorkspacesForOrganizationPagedQuery(
+                    organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute("workspaces", workspacesPage.content());
+    model.addAttribute("workspacesPage", workspacesPage);
   }
 }

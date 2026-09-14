@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -111,6 +112,6 @@ class PlatformKnownDeviceRetentionJobTest {
           @ComponentScan.Filter(
               type = FilterType.ASSIGNABLE_TYPE,
               classes = SpringDataPlatformKnownDeviceJpaRepository.class))
-  @Import(PlatformKnownDeviceRetentionJob.class)
+  @Import({PlatformKnownDeviceRetentionJob.class, PostgresAdvisoryJobLock.class})
   static class TestConfig {}
 }

@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.within;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -128,6 +131,65 @@ class JpaOrganizationRepositoryTest {
     assertThat(found)
         .extracting(Organization::id)
         .containsExactlyInAnyOrder(ownedByA1.id(), ownedByA2.id());
+  }
+
+  // TD-PERF-020: real-Postgres proof of the paginated sibling — page size, total element count,
+  // and newest-first ordering all come from the actual query, not assumed from the mapping code.
+  // Built via Organization.reconstitute with explicit, deliberately-spaced createdAt instants
+  // (not three real-time Organization.register calls a few microseconds apart) — same "don't rely
+  // on a real wall-clock gap to prove an ordering" discipline JpaAuditEventReaderTest's own
+  // returnsNewestFirst rewrite already established, avoiding a SonarCloud/S2925-flagged
+  // Thread.sleep and, more importantly, avoiding a genuinely flaky assertion on a busy machine.
+  @Test
+  void findPageOwnedByReturnsOnePageAtATimeNewestFirst() {
+    UUID owner = UUID.randomUUID();
+    Instant now = Instant.now();
+    Organization first = reconstituteAt(owner, "First Created", now.minusSeconds(20));
+    Organization second = reconstituteAt(owner, "Second Created", now.minusSeconds(10));
+    Organization third = reconstituteAt(owner, "Third Created", now);
+    repository.save(first);
+    repository.save(second);
+    repository.save(third);
+    // A different owner's own Organization must never leak into this owner's own page.
+    repository.save(Organization.register("Someone Else's Org", UUID.randomUUID()));
+
+    Page<Organization> firstPage = repository.findPageOwnedBy(owner, new PageRequest(0, 2));
+
+    assertThat(firstPage.content())
+        .extracting(Organization::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(firstPage.totalElements()).isEqualTo(3);
+    assertThat(firstPage.totalPages()).isEqualTo(2);
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.hasPrevious()).isFalse();
+
+    Page<Organization> secondPage = repository.findPageOwnedBy(owner, new PageRequest(1, 2));
+
+    assertThat(secondPage.content()).extracting(Organization::id).containsExactly(first.id());
+    assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.hasPrevious()).isTrue();
+  }
+
+  private static Organization reconstituteAt(
+      final UUID owner, final String name, final Instant createdAt) {
+    return Organization.reconstitute(
+        UUID.randomUUID(),
+        name,
+        createdAt,
+        owner,
+        false,
+        List.of(),
+        OrganizationEnvironment.DEVELOPMENT,
+        null);
+  }
+
+  @Test
+  void findPageOwnedByReturnsAnEmptyPageForAnOwnerWithNoOrganizations() {
+    Page<Organization> page = repository.findPageOwnedBy(UUID.randomUUID(), PageRequest.first());
+
+    assertThat(page.isEmpty()).isTrue();
+    assertThat(page.totalElements()).isZero();
+    assertThat(page.totalPages()).isZero();
   }
 
   // TD-PERF-019: proves insert() genuinely uses persist() semantics (fails loudly on a duplicate

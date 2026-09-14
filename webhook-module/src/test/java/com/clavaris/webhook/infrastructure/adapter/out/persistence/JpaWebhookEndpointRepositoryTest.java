@@ -3,9 +3,12 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -209,6 +212,54 @@ class JpaWebhookEndpointRepositoryTest {
 
     assertThat(repository.findAllByOrganizationId(organizationId)).isEmpty();
     assertThat(repository.findById(other.id())).isPresent();
+  }
+
+  // TD-PERF-020: real-Postgres proof of the paginated sibling, newest-first — same
+  // "reconstitute with explicit createdAt instants" discipline organization-module's
+  // JpaOrganizationRepositoryTest own identical test already establishes.
+  @Test
+  void findPageByOrganizationIdReturnsOnePageAtATimeNewestFirst() {
+    UUID organizationId = UUID.randomUUID();
+    Instant now = Instant.now();
+    WebhookEndpoint first =
+        reconstituteAt(organizationId, "https://first.example.com", now.minusSeconds(20));
+    WebhookEndpoint second =
+        reconstituteAt(organizationId, "https://second.example.com", now.minusSeconds(10));
+    WebhookEndpoint third = reconstituteAt(organizationId, "https://third.example.com", now);
+    repository.save(first);
+    repository.save(second);
+    repository.save(third);
+    repository.save(reconstituteAt(UUID.randomUUID(), "https://other-org.example.com", now));
+
+    Page<WebhookEndpoint> firstPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(0, 2));
+
+    assertThat(firstPage.content())
+        .extracting(WebhookEndpoint::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(firstPage.totalElements()).isEqualTo(3);
+    assertThat(firstPage.hasNext()).isTrue();
+
+    Page<WebhookEndpoint> secondPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(1, 2));
+
+    assertThat(secondPage.content()).extracting(WebhookEndpoint::id).containsExactly(first.id());
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  private static WebhookEndpoint reconstituteAt(
+      final UUID organizationId, final String url, final Instant createdAt) {
+    return WebhookEndpoint.reconstitute(
+        UUID.randomUUID(),
+        organizationId,
+        url,
+        null,
+        List.of("x"),
+        "s",
+        null,
+        null,
+        true,
+        createdAt);
   }
 
   @Configuration

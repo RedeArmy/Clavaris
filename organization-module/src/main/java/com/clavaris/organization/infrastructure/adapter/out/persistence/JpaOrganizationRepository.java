@@ -1,5 +1,8 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
@@ -8,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -23,7 +27,13 @@ import tools.jackson.databind.ObjectMapper;
  * <p>TD-PERF-019: {@code insert} calls {@link EntityManager#persist} directly — see {@code
  * OrganizationRepository#insert}'s own Javadoc for which call sites that's safe for and why {@code
  * save} itself is unchanged.
+ *
+ * <p>PMD.TooManyMethods (TD-PERF-020's own {@code findPageOwnedBy} pushed this past the default
+ * threshold): every method here backs a real, distinct {@code OrganizationRepository} port method
+ * this module's use cases actually need — same "one port, several use cases" shape {@code
+ * AccountRepository}'s own identical suppression documents, not a design smell to split up.
  */
+@SuppressWarnings("PMD.TooManyMethods")
 @Repository
 class JpaOrganizationRepository implements OrganizationRepository {
 
@@ -79,6 +89,26 @@ class JpaOrganizationRepository implements OrganizationRepository {
     return organizations.findAllByOwnerPlatformAccountId(ownerPlatformAccountId).stream()
         .map(this::toDomain)
         .toList();
+  }
+
+  // TD-PERF-020: newest-first (createdAt descending), id descending as a tiebreaker — the same
+  // order every dashboard list already reads naturally from Postgres, made explicit and stable
+  // here since pagination without a fully deterministic ORDER BY has no guaranteed row order
+  // across pages (createdAt alone can tie at typical timestamp resolution, which would otherwise
+  // make which rows land on which page arbitrary rather than stable).
+  @Override
+  @SuppressWarnings("PMD.LongVariable")
+  public Page<Organization> findPageOwnedBy(
+      final UUID ownerPlatformAccountId, final PageRequest pageRequest) {
+    return SpringDataPageMapper.toPage(
+        organizations.findAllByOwnerPlatformAccountId(
+            ownerPlatformAccountId,
+            org.springframework.data.domain.PageRequest.of(
+                pageRequest.page(),
+                pageRequest.size(),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
+        pageRequest,
+        this::toDomain);
   }
 
   @Override

@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,6 +91,6 @@ class AccountAuthMethodIntegrityCheckJobTest {
           @ComponentScan.Filter(
               type = FilterType.ASSIGNABLE_TYPE,
               classes = SpringDataAccountJpaRepository.class))
-  @Import(AccountAuthMethodIntegrityCheckJob.class)
+  @Import({AccountAuthMethodIntegrityCheckJob.class, PostgresAdvisoryJobLock.class})
   static class TestConfig {}
 }

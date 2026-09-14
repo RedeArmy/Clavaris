@@ -3,6 +3,8 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationNotFoundException;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
@@ -12,8 +14,11 @@ import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.R
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -24,6 +29,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -63,7 +69,14 @@ import org.springframework.web.server.ResponseStatusException;
  * are shown exactly once and have nowhere safe to travel through a redirect (never a URL query
  * string, browser history, or server access log).
  */
-@SuppressWarnings("PMD.LongVariable")
+// PMD.ExcessiveImports (TD-PERF-020's own ListOAuthClientsPagedQuery/UseCase pushed this past the
+// default threshold of 30): every import here backs a real, distinct collaborator this controller
+// genuinely needs — same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own
+// class-level Javadoc documents for an identical situation.
+// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.OnlyOneReturn" itself, applied on four
+// separate handler/helper methods — same ContentSecurityPolicyHeaderWriter precedent for an
+// identical situation with "PMD.LongVariable".
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
 public class PlatformOAuthClientController {
@@ -77,6 +90,7 @@ public class PlatformOAuthClientController {
 
   private final RegisterOAuthClientUseCase registerClient;
   private final ListOAuthClientsUseCase listClients;
+  private final ListOAuthClientsPagedUseCase listClientsPaged;
   private final DeactivateOAuthClientUseCase deactivateClient;
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
   private final OrganizationForPlatformAccountResolver organizationResolver;
@@ -87,32 +101,49 @@ public class PlatformOAuthClientController {
   public PlatformOAuthClientController(
       final RegisterOAuthClientUseCase registerClient,
       final ListOAuthClientsUseCase listClients,
+      final ListOAuthClientsPagedUseCase listClientsPaged,
       final DeactivateOAuthClientUseCase deactivateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerClient = registerClient;
     this.listClients = listClients;
+    this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
     this.rotateClientSecret = rotateClientSecret;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // TD-PERF-020: page is 0-indexed — see organization-module's
+  // PlatformOrganizationDashboardController for the full reasoning. This GET also branches on
+  // HX-Request — a pagination link is itself an hx-get, and its hx-target can't safely receive a
+  // full HTML document.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
+      @RequestParam(defaultValue = "0") final int page,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    renderOAuthClientsList(model, organizationId, owned.organizationName(), page);
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      return CLIENTS_FRAGMENT;
+    }
+    return LIST_VIEW;
+  }
+
+  // Shared by showList's own initial render and every mutation's HTMX-fragment re-render — see
+  // each call site's own comment for why this exact trio (header, fresh create form, current
+  // page of clients) always travels together.
+  private void renderOAuthClientsList(
+      final Model model, final UUID organizationId, final String organizationName, final int page) {
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-    populateClientsModel(model, organizationId);
-    return LIST_VIEW;
+    populateClientsModel(model, organizationId, page);
   }
 
   // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't
@@ -126,16 +157,15 @@ public class PlatformOAuthClientController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final RegisterOAuthClientForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
-    populateHeaderModel(model, organizationId, organizationName);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    final UUID ownerPlatformAccountId = owned.ownerPlatformAccountId();
 
-    if (bindingResult.hasErrors()) {
-      populateClientsModel(model, organizationId);
-      return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
+    final Optional<String> validationErrorView =
+        renderOAuthClientsValidationErrors(request, organizationId, owned, bindingResult, model);
+    if (validationErrorView.isPresent()) {
+      return validationErrorView.get();
     }
 
     final RegisterOAuthClientResult result;
@@ -159,8 +189,7 @@ public class PlatformOAuthClientController {
 
     model.addAttribute("justRegisteredRawSecret", result.rawClientSecret());
     model.addAttribute("justRegisteredClientId", result.client().clientId());
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-    populateClientsModel(model, organizationId);
+    renderOAuthClientsList(model, organizationId, owned.organizationName(), 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
@@ -173,22 +202,15 @@ public class PlatformOAuthClientController {
       @PathVariable final UUID organizationId,
       @PathVariable final String clientId,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
-    DashboardControllerSupport.requireClientIdBelongsToOrganization(
-        listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        requireOwnedOAuthClient(request, organizationId, clientId);
 
     deactivateClient.handle(
         new DeactivateOAuthClientCommand(
-            clientId, AuditActor.platformAccount(ownerPlatformAccountId)));
+            clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
 
     if (DashboardControllerSupport.isHtmxRequest(request)) {
-      populateHeaderModel(model, organizationId, organizationName);
-      model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-      populateClientsModel(model, organizationId);
+      renderOAuthClientsList(model, organizationId, owned.organizationName(), 0);
       return CLIENTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/oauth-clients";
@@ -201,25 +223,54 @@ public class PlatformOAuthClientController {
       @PathVariable final UUID organizationId,
       @PathVariable final String clientId,
       final Model model) {
-    final UUID ownerPlatformAccountId =
-        DashboardControllerSupport.requireCurrentPlatformAccount(request, currentPlatformAccount);
-    final String organizationName =
-        DashboardControllerSupport.requireOwnedOrganizationName(
-            organizationId, ownerPlatformAccountId, organizationResolver);
-    DashboardControllerSupport.requireClientIdBelongsToOrganization(
-        listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
+    final DashboardControllerSupport.OwnedOrganization owned =
+        requireOwnedOAuthClient(request, organizationId, clientId);
 
     final RotateOAuthClientSecretResult result =
         rotateClientSecret.handle(
             new RotateOAuthClientSecretCommand(
-                clientId, AuditActor.platformAccount(ownerPlatformAccountId)));
+                clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
 
-    populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute("justRegisteredRawSecret", result.rawSecret());
     model.addAttribute("justRegisteredClientId", result.clientId());
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterOAuthClientForm());
-    populateClientsModel(model, organizationId);
+    renderOAuthClientsList(model, organizationId, owned.organizationName(), 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
+  }
+
+  // create()'s own preamble-plus-validation-error-branch matched
+  // PlatformOrganizationClientController#create's identical shape once every identifier involved
+  // (CLIENTS_FRAGMENT/LIST_VIEW/populateHeaderModel/populateClientsModel) crossed the 10-line
+  // SonarCloud threshold — same class-local, distinctly-named-per-controller fix as
+  // requireOwnedOAuthClient above. Optional<String>, not a plain early return, since the caller
+  // still owns the method's real early exit. PMD.OnlyOneReturn: the empty/present split is the
+  // point of the method, same rationale as every other multi-exit handler in this codebase.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private Optional<String> renderOAuthClientsValidationErrors(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final DashboardControllerSupport.OwnedOrganization owned,
+      final BindingResult bindingResult,
+      final Model model) {
+    if (!bindingResult.hasErrors()) {
+      return Optional.empty();
+    }
+    populateHeaderModel(model, organizationId, owned.organizationName());
+    populateClientsModel(model, organizationId, 0);
+    return Optional.of(
+        DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW);
+  }
+
+  // deactivate()/rotateSecret() both need "who owns this Organization, and does clientId
+  // actually belong to it" before touching anything — SonarCloud-flagged intra-class
+  // duplication (2026-09-13) once both call sites landed with the identical 6-line preamble.
+  private DashboardControllerSupport.OwnedOrganization requireOwnedOAuthClient(
+      final HttpServletRequest request, final UUID organizationId, final String clientId) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    DashboardControllerSupport.requireClientIdBelongsToOrganization(
+        listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
+    return owned;
   }
 
   private void populateHeaderModel(
@@ -229,7 +280,12 @@ public class PlatformOAuthClientController {
     model.addAttribute(GRANT_TYPE_OPTIONS_ATTRIBUTE, OAuthGrantTypeOptions.DASHBOARD_OPTIONS);
   }
 
-  private void populateClientsModel(final Model model, final UUID organizationId) {
-    model.addAttribute("clients", listClients.handle(organizationId));
+  private void populateClientsModel(final Model model, final UUID organizationId, final int page) {
+    final Page<OAuthClient> clientsPage =
+        listClientsPaged.handle(
+            new ListOAuthClientsPagedQuery(
+                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute("clients", clientsPage.content());
+    model.addAttribute("clientsPage", clientsPage);
   }
 }

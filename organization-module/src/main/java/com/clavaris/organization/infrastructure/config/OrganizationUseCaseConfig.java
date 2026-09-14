@@ -44,12 +44,18 @@ import com.clavaris.organization.application.usecase.getworkspacefororganization
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedService;
+import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsService;
 import com.clavaris.organization.application.usecase.listorganizationsocialcredentials.ListOrganizationSocialCredentialsUseCase;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersService;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedService;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationService;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedService;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberRefreshTokenRevoker;
@@ -148,6 +154,14 @@ class OrganizationUseCaseConfig {
     return new ListOrganizationsForPlatformAccountService(organizations);
   }
 
+  // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc for why
+  // this is additive, not a replacement of the bean directly above.
+  @Bean
+  /* package */ ListOrganizationsForPlatformAccountPagedUseCase
+      listOrganizationsForPlatformAccountPagedUseCase(final OrganizationRepository organizations) {
+    return new ListOrganizationsForPlatformAccountPagedService(organizations);
+  }
+
   // ADR-0025: the dashboard's own Organization-detail read.
   @Bean
   /* package */ GetOrganizationForPlatformAccountUseCase getOrganizationForPlatformAccountUseCase(
@@ -198,12 +212,12 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ GetAuditLogForOrganizationUseCase getAuditLogForOrganizationUseCase(
       final ListWorkspacesForOrganizationUseCase listWorkspaces,
-      final ListWorkspaceMembersUseCase listMembers,
+      final WorkspaceMembershipRepository memberships,
       final OAuthClientIdsForAuditLogProvider oauthClientIds,
       final WebhookEndpointIdsForAuditLogProvider webhookEndpointIds,
       final AuditEventReader auditEvents) {
     return new GetAuditLogForOrganizationService(
-        listWorkspaces, listMembers, oauthClientIds, webhookEndpointIds, auditEvents);
+        listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
   }
 
   @Bean
@@ -284,10 +298,24 @@ class OrganizationUseCaseConfig {
     return new ListWorkspacesForOrganizationService(workspaces);
   }
 
+  // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.
+  @Bean
+  /* package */ ListWorkspacesForOrganizationPagedUseCase listWorkspacesForOrganizationPagedUseCase(
+      final WorkspaceRepository workspaces) {
+    return new ListWorkspacesForOrganizationPagedService(workspaces);
+  }
+
   @Bean
   /* package */ ListWorkspaceMembersUseCase listWorkspaceMembersUseCase(
       final WorkspaceMembershipRepository memberships) {
     return new ListWorkspaceMembersService(memberships);
+  }
+
+  // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.
+  @Bean
+  /* package */ ListWorkspaceMembersPagedUseCase listWorkspaceMembersPagedUseCase(
+      final WorkspaceMembershipRepository memberships) {
+    return new ListWorkspaceMembersPagedService(memberships);
   }
 
   // ADR-0025: the dashboard's own Workspace-detail-page ownership check — confirms a workspaceId

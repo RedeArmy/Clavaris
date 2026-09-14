@@ -1,12 +1,15 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointUseCase;
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationQuery;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
+import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedQuery;
+import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.OrganizationNotFoundException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -62,7 +66,15 @@ import org.springframework.web.server.ResponseStatusException;
  * safe to travel through a redirect; deactivate/activate carry no secret, so both keep this
  * codebase's normal "success redirects, HTMX gets a fragment" convention.
  */
-@SuppressWarnings("PMD.LongVariable")
+// PMD.ExcessiveImports (TD-PERF-020's own ListWebhookEndpointsForOrganizationPagedQuery/UseCase
+// pushed this past the default threshold of 30): every import here backs a real, distinct
+// collaborator this controller genuinely needs — same "wiring, not sprawl" reasoning
+// OrganizationUseCaseConfig's own class-level Javadoc documents for an identical situation.
+// PMD.AvoidDuplicateLiterals: "PMD.OnlyOneReturn" is repeated once per handler method that
+// legitimately needs it (create/deactivate/activate/showList, TD-PERF-020's own HX-Request
+// branch added the fourth) — same false-positive class ContentSecurityPolicyHeaderWriter's own
+// identical class-level suppression already documents.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints")
 public class PlatformWebhookEndpointController {
@@ -76,6 +88,7 @@ public class PlatformWebhookEndpointController {
 
   private final RegisterWebhookEndpointUseCase registerEndpoint;
   private final ListWebhookEndpointsForOrganizationUseCase listEndpoints;
+  private final ListWebhookEndpointsForOrganizationPagedUseCase listEndpointsPaged;
   private final DeactivateWebhookEndpointUseCase deactivateEndpoint;
   private final ActivateWebhookEndpointUseCase activateEndpoint;
   private final RotateWebhookEndpointSecretUseCase rotateEndpointSecret;
@@ -87,6 +100,7 @@ public class PlatformWebhookEndpointController {
   public PlatformWebhookEndpointController(
       final RegisterWebhookEndpointUseCase registerEndpoint,
       final ListWebhookEndpointsForOrganizationUseCase listEndpoints,
+      final ListWebhookEndpointsForOrganizationPagedUseCase listEndpointsPaged,
       final DeactivateWebhookEndpointUseCase deactivateEndpoint,
       final ActivateWebhookEndpointUseCase activateEndpoint,
       final RotateWebhookEndpointSecretUseCase rotateEndpointSecret,
@@ -94,6 +108,7 @@ public class PlatformWebhookEndpointController {
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerEndpoint = registerEndpoint;
     this.listEndpoints = listEndpoints;
+    this.listEndpointsPaged = listEndpointsPaged;
     this.deactivateEndpoint = deactivateEndpoint;
     this.activateEndpoint = activateEndpoint;
     this.rotateEndpointSecret = rotateEndpointSecret;
@@ -101,10 +116,16 @@ public class PlatformWebhookEndpointController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // TD-PERF-020: page is 0-indexed — see organization-module's
+  // PlatformOrganizationDashboardController for the full reasoning. This GET also branches on
+  // HX-Request — a pagination link is itself an hx-get, and its hx-target can't safely receive a
+  // full HTML document.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
+      @RequestParam(defaultValue = "0") final int page,
       final Model model) {
     final UUID ownerPlatformAccountId =
         WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
@@ -114,7 +135,10 @@ public class PlatformWebhookEndpointController {
             organizationResolver, organizationId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId);
+    populateEndpointsModel(model, organizationId, page);
+    if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
+      return ENDPOINTS_FRAGMENT;
+    }
     return LIST_VIEW;
   }
 
@@ -138,7 +162,7 @@ public class PlatformWebhookEndpointController {
     populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
-      populateEndpointsModel(model, organizationId);
+      populateEndpointsModel(model, organizationId, 0);
       return WebhookDashboardControllerSupport.isHtmxRequest(request)
           ? ENDPOINTS_FRAGMENT
           : LIST_VIEW;
@@ -165,7 +189,7 @@ public class PlatformWebhookEndpointController {
       // filling out this form needs to see why their submission was rejected.
       model.addAttribute("unsafeWebhookUrlError", true);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
-      populateEndpointsModel(model, organizationId);
+      populateEndpointsModel(model, organizationId, 0);
       return WebhookDashboardControllerSupport.isHtmxRequest(request)
           ? ENDPOINTS_FRAGMENT
           : LIST_VIEW;
@@ -174,7 +198,7 @@ public class PlatformWebhookEndpointController {
     model.addAttribute("justRegisteredRawSecret", result.rawSigningSecret());
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId);
+    populateEndpointsModel(model, organizationId, 0);
     return WebhookDashboardControllerSupport.isHtmxRequest(request)
         ? ENDPOINTS_FRAGMENT
         : LIST_VIEW;
@@ -205,7 +229,7 @@ public class PlatformWebhookEndpointController {
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-      populateEndpointsModel(model, organizationId);
+      populateEndpointsModel(model, organizationId, 0);
       return ENDPOINTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/webhook-endpoints";
@@ -234,7 +258,7 @@ public class PlatformWebhookEndpointController {
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-      populateEndpointsModel(model, organizationId);
+      populateEndpointsModel(model, organizationId, 0);
       return ENDPOINTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/webhook-endpoints";
@@ -265,7 +289,7 @@ public class PlatformWebhookEndpointController {
     model.addAttribute("justRegisteredRawSecret", result.rawNewSigningSecret());
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId);
+    populateEndpointsModel(model, organizationId, 0);
     return WebhookDashboardControllerSupport.isHtmxRequest(request)
         ? ENDPOINTS_FRAGMENT
         : LIST_VIEW;
@@ -279,9 +303,13 @@ public class PlatformWebhookEndpointController {
         EVENT_TYPE_OPTIONS_ATTRIBUTE, KnownWebhookEventTypeOptions.DASHBOARD_OPTIONS);
   }
 
-  private void populateEndpointsModel(final Model model, final UUID organizationId) {
-    model.addAttribute(
-        "endpoints",
-        listEndpoints.handle(new ListWebhookEndpointsForOrganizationQuery(organizationId)));
+  private void populateEndpointsModel(
+      final Model model, final UUID organizationId, final int page) {
+    final Page<WebhookEndpoint> endpointsPage =
+        listEndpointsPaged.handle(
+            new ListWebhookEndpointsForOrganizationPagedQuery(
+                organizationId, new PageRequest(page, PageRequest.DEFAULT_SIZE)));
+    model.addAttribute("endpoints", endpointsPage.content());
+    model.addAttribute("endpointsPage", endpointsPage);
   }
 }

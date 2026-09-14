@@ -11,7 +11,7 @@ import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
 import com.clavaris.common.domain.model.AuditEventTargetRef;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
@@ -26,7 +26,7 @@ class GetAuditLogForOrganizationServiceTest {
   void resolvesEveryOwnedResourceIntoATargetRefBeforeQuerying() {
     ListWorkspacesForOrganizationUseCase listWorkspaces =
         mock(ListWorkspacesForOrganizationUseCase.class);
-    ListWorkspaceMembersUseCase listMembers = mock(ListWorkspaceMembersUseCase.class);
+    WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
     OAuthClientIdsForAuditLogProvider oauthClientIds =
         mock(OAuthClientIdsForAuditLogProvider.class);
     WebhookEndpointIdsForAuditLogProvider webhookEndpointIds =
@@ -41,7 +41,8 @@ class GetAuditLogForOrganizationServiceTest {
     String webhookEndpointId = UUID.randomUUID().toString();
 
     when(listWorkspaces.handle(any())).thenReturn(List.of(workspace));
-    when(listMembers.handle(any())).thenReturn(List.of(membership));
+    when(memberships.findAllByWorkspaceIds(List.of(workspace.id())))
+        .thenReturn(List.of(membership));
     when(oauthClientIds.oauthClientIds(organizationId)).thenReturn(List.of(oauthClientId));
     when(webhookEndpointIds.webhookEndpointIds(organizationId))
         .thenReturn(List.of(webhookEndpointId));
@@ -56,7 +57,7 @@ class GetAuditLogForOrganizationServiceTest {
 
     GetAuditLogForOrganizationService service =
         new GetAuditLogForOrganizationService(
-            listWorkspaces, listMembers, oauthClientIds, webhookEndpointIds, auditEvents);
+            listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
 
     List<AuditEvent> result = service.handle(organizationId);
 
@@ -72,11 +73,45 @@ class GetAuditLogForOrganizationServiceTest {
             100);
   }
 
+  // TD-PERF-021: the whole reason this batched call exists — proves the fan-out asks for every
+  // found Workspace's own memberships in one call, not one call per Workspace (the N+1 this row
+  // fixed). Two Workspaces, one shared findAllByWorkspaceIds(...) invocation with both ids.
+  @Test
+  void batchesMembershipLookupAcrossEveryWorkspaceInOneCall() {
+    ListWorkspacesForOrganizationUseCase listWorkspaces =
+        mock(ListWorkspacesForOrganizationUseCase.class);
+    WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
+    OAuthClientIdsForAuditLogProvider oauthClientIds =
+        mock(OAuthClientIdsForAuditLogProvider.class);
+    WebhookEndpointIdsForAuditLogProvider webhookEndpointIds =
+        mock(WebhookEndpointIdsForAuditLogProvider.class);
+    AuditEventReader auditEvents = mock(AuditEventReader.class);
+
+    UUID organizationId = UUID.randomUUID();
+    Workspace engineering = Workspace.register(organizationId, "Engineering");
+    Workspace sales = Workspace.register(organizationId, "Sales");
+
+    when(listWorkspaces.handle(any())).thenReturn(List.of(engineering, sales));
+    when(memberships.findAllByWorkspaceIds(any())).thenReturn(List.of());
+    when(oauthClientIds.oauthClientIds(organizationId)).thenReturn(List.of());
+    when(webhookEndpointIds.webhookEndpointIds(organizationId)).thenReturn(List.of());
+    when(auditEvents.findRecentForTargets(any(), eq(100))).thenReturn(List.of());
+
+    GetAuditLogForOrganizationService service =
+        new GetAuditLogForOrganizationService(
+            listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
+
+    service.handle(organizationId);
+
+    // Exactly one call, covering both Workspace ids — not one call per Workspace.
+    verify(memberships).findAllByWorkspaceIds(List.of(engineering.id(), sales.id()));
+  }
+
   @Test
   void alwaysIncludesTheOrganizationsOwnTargetRefEvenWithNoOwnedResourcesAtAll() {
     ListWorkspacesForOrganizationUseCase listWorkspaces =
         mock(ListWorkspacesForOrganizationUseCase.class);
-    ListWorkspaceMembersUseCase listMembers = mock(ListWorkspaceMembersUseCase.class);
+    WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
     OAuthClientIdsForAuditLogProvider oauthClientIds =
         mock(OAuthClientIdsForAuditLogProvider.class);
     WebhookEndpointIdsForAuditLogProvider webhookEndpointIds =
@@ -85,13 +120,14 @@ class GetAuditLogForOrganizationServiceTest {
 
     UUID organizationId = UUID.randomUUID();
     when(listWorkspaces.handle(any())).thenReturn(List.of());
+    when(memberships.findAllByWorkspaceIds(List.of())).thenReturn(List.of());
     when(oauthClientIds.oauthClientIds(organizationId)).thenReturn(List.of());
     when(webhookEndpointIds.webhookEndpointIds(organizationId)).thenReturn(List.of());
     when(auditEvents.findRecentForTargets(any(), eq(100))).thenReturn(List.of());
 
     GetAuditLogForOrganizationService service =
         new GetAuditLogForOrganizationService(
-            listWorkspaces, listMembers, oauthClientIds, webhookEndpointIds, auditEvents);
+            listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
 
     service.handle(organizationId);
 

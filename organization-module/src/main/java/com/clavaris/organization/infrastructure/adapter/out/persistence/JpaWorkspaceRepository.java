@@ -1,11 +1,15 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.Workspace;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +63,22 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
   @Override
   public Optional<UUID> findOrganizationIdById(final UUID workspaceId) {
     return workspaces.findOrganizationIdById(workspaceId);
+  }
+
+  // TD-PERF-020: newest-first, id as a tiebreaker — same reasoning JpaOrganizationRepository's own
+  // identical findPageOwnedBy already documents.
+  @Override
+  public Page<Workspace> findPageByOrganizationId(
+      final UUID organizationId, final PageRequest pageRequest) {
+    return SpringDataPageMapper.toPage(
+        workspaces.findAllByOrganizationId(
+            organizationId,
+            org.springframework.data.domain.PageRequest.of(
+                pageRequest.page(),
+                pageRequest.size(),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
+        pageRequest,
+        this::toDomain);
   }
 
   private Workspace toDomain(final WorkspaceEntity entity) {

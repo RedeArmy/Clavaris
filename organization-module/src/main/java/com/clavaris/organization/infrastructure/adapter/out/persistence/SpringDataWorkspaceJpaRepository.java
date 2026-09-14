@@ -3,6 +3,8 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 interface SpringDataWorkspaceJpaRepository extends JpaRepository<WorkspaceEntity, UUID> {
 
   List<WorkspaceEntity> findAllByOrganizationId(UUID organizationId);
+
+  // TD-PERF-020: backs WorkspaceRepository#findPageByOrganizationId.
+  Page<WorkspaceEntity> findAllByOrganizationId(UUID organizationId, Pageable pageable);
 
   // Same "scalar projection over full-entity lookup" precedent as identity-module's own
   // SpringDataAccountJpaRepository#findOrganizationIdById.

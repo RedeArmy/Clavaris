@@ -2,10 +2,14 @@ package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataPageMapper;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -62,6 +66,22 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
   @Override
   public void deleteAllByOrganizationId(final UUID organizationId) {
     organizationClients.deleteAllByOrganizationId(organizationId);
+  }
+
+  // TD-PERF-020: newest-first, id as a tiebreaker — same reasoning JpaOrganizationRepository's own
+  // identical findPageOwnedBy already documents.
+  @Override
+  public Page<OrganizationClient> findPageByOrganizationId(
+      final UUID organizationId, final PageRequest pageRequest) {
+    return SpringDataPageMapper.toPage(
+        organizationClients.findAllByOrganizationId(
+            organizationId,
+            org.springframework.data.domain.PageRequest.of(
+                pageRequest.page(),
+                pageRequest.size(),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))),
+        pageRequest,
+        this::toDomain);
   }
 
   private OrganizationClient toDomain(final OrganizationClientEntity entity) {

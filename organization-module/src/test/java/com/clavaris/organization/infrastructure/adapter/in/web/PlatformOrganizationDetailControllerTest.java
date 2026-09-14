@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.RateLimitPolicySnapshot;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
+import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
 import java.util.List;
@@ -38,7 +41,7 @@ class PlatformOrganizationDetailControllerTest {
   private static final UUID OWNER_ID = UUID.randomUUID();
 
   private GetOrganizationForPlatformAccountUseCase getOrganization;
-  private ListWorkspacesForOrganizationUseCase listWorkspaces;
+  private ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -46,11 +49,11 @@ class PlatformOrganizationDetailControllerTest {
   @BeforeEach
   void setUp() {
     getOrganization = mock(GetOrganizationForPlatformAccountUseCase.class);
-    listWorkspaces = mock(ListWorkspacesForOrganizationUseCase.class);
+    listWorkspaces = mock(ListWorkspacesForOrganizationPagedUseCase.class);
     getRateLimitPolicy = mock(GetRateLimitPolicyForOrganizationUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
-    when(listWorkspaces.handle(any())).thenReturn(List.of());
+    when(listWorkspaces.handle(any())).thenReturn(emptyPage());
     when(getRateLimitPolicy.handle(any()))
         .thenReturn(new RateLimitPolicySnapshot(600, false, null));
 
@@ -76,12 +79,17 @@ class PlatformOrganizationDetailControllerTest {
             .build();
   }
 
+  private static Page<Workspace> emptyPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
   @Test
   void showsTheOrganizationAndItsWorkspacesWhenOwnedByTheCurrentAccount() throws Exception {
     Organization organization = Organization.register("Acme Co", OWNER_ID);
     Workspace workspace = Workspace.register(organization.id(), "Engineering");
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
-    when(listWorkspaces.handle(any())).thenReturn(List.of(workspace));
+    when(listWorkspaces.handle(any()))
+        .thenReturn(new Page<>(List.of(workspace), 0, PageRequest.DEFAULT_SIZE, 1));
 
     mockMvc
         .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
@@ -132,5 +140,37 @@ class PlatformOrganizationDetailControllerTest {
     mockMvc
         .perform(get("/platform/dashboard/organizations/{organizationId}", UUID.randomUUID()))
         .andExpect(status().isNotFound());
+  }
+
+  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  @Test
+  void passesTheRequestedPageThroughToTheUseCase() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
+
+    mockMvc.perform(
+        get("/platform/dashboard/organizations/{organizationId}", organization.id())
+            .param("page", "3"));
+
+    verify(listWorkspaces)
+        .handle(
+            new ListWorkspacesForOrganizationPagedQuery(
+                organization.id(), new PageRequest(3, PageRequest.DEFAULT_SIZE)));
+  }
+
+  // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the workspaces
+  // fragment, not the full page — the fragment's own hx-target/hx-swap="outerHTML" would otherwise
+  // splice a whole second HTML document into one div.
+  @Test
+  void htmxGetReturnsTheWorkspacesFragmentInsteadOfTheFullPage() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
+
+    mockMvc
+        .perform(
+            get("/platform/dashboard/organizations/{organizationId}", organization.id())
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail :: workspaces"));
   }
 }

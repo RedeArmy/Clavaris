@@ -14,11 +14,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
+import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +45,7 @@ class PlatformOAuthClientControllerTest {
 
   private RegisterOAuthClientUseCase registerClient;
   private ListOAuthClientsUseCase listClients;
+  private ListOAuthClientsPagedUseCase listClientsPaged;
   private DeactivateOAuthClientUseCase deactivateClient;
   private RotateOAuthClientSecretUseCase rotateClientSecret;
   private OrganizationForPlatformAccountResolver organizationResolver;
@@ -52,6 +57,7 @@ class PlatformOAuthClientControllerTest {
   void setUp() {
     registerClient = mock(RegisterOAuthClientUseCase.class);
     listClients = mock(ListOAuthClientsUseCase.class);
+    listClientsPaged = mock(ListOAuthClientsPagedUseCase.class);
     deactivateClient = mock(DeactivateOAuthClientUseCase.class);
     rotateClientSecret = mock(RotateOAuthClientSecretUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
@@ -62,6 +68,7 @@ class PlatformOAuthClientControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
     when(listClients.handle(any())).thenReturn(List.of());
+    when(listClientsPaged.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -82,6 +89,7 @@ class PlatformOAuthClientControllerTest {
                 new PlatformOAuthClientController(
                     registerClient,
                     listClients,
+                    listClientsPaged,
                     deactivateClient,
                     rotateClientSecret,
                     organizationResolver,
@@ -106,15 +114,43 @@ class PlatformOAuthClientControllerTest {
         List.of());
   }
 
+  private static Page<OAuthClient> emptyPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
   @Test
   void showsTheOrganizationsClients() throws Exception {
-    when(listClients.handle(organizationId)).thenReturn(List.of(sampleClient()));
+    OAuthClient client = sampleClient();
+    when(listClientsPaged.handle(any()))
+        .thenReturn(new Page<>(List.of(client), 0, PageRequest.DEFAULT_SIZE, 1));
 
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(view().name("clientregistry/platform/organization-oauth-clients"))
-        .andExpect(model().attribute("organizationName", "Acme Co"));
+        .andExpect(model().attribute("organizationName", "Acme Co"))
+        .andExpect(model().attribute("clients", List.of(client)));
+  }
+
+  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  @Test
+  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
+    mockMvc.perform(get(basePath()).param("page", "3"));
+
+    verify(listClientsPaged)
+        .handle(
+            new ListOAuthClientsPagedQuery(
+                organizationId, new PageRequest(3, PageRequest.DEFAULT_SIZE)));
+  }
+
+  // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the clients
+  // fragment, not the full page.
+  @Test
+  void htmxGetReturnsTheClientsFragmentInsteadOfTheFullPage() throws Exception {
+    mockMvc
+        .perform(get(basePath()).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("clientregistry/platform/organization-oauth-clients :: clients"));
   }
 
   @Test

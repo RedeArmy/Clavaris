@@ -377,6 +377,21 @@ code {
   overflow-x: auto;
 }
 
+/* TD-PERF-020: Previous/Next controls shared by every one of this dashboard's six paginated list
+   pages (Organizations, Workspaces, Workspace Members, Secret Keys, OAuth Clients, Webhook
+   Endpoints) — one rule set, not six copies. */
+.clavaris-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.clavaris-pagination__status {
+  color: var(--clavaris-text-muted);
+  font-size: 0.8125rem;
+}
+
 /* Standard "sr-only" pattern — keeps a form control's own <label> in the accessibility tree
    (screen readers, browser autofill) without a visible line of table-row real estate. First
    real use: workspace-detail.html's own per-row role <select>, whose action is already named

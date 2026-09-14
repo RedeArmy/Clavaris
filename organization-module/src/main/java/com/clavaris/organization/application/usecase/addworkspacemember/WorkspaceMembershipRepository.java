@@ -1,7 +1,10 @@
 package com.clavaris.organization.application.usecase.addworkspacemember;
 
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +25,25 @@ public interface WorkspaceMembershipRepository {
   Optional<WorkspaceMembership> findByWorkspaceIdAndAccountId(UUID workspaceId, UUID accountId);
 
   List<WorkspaceMembership> findAllByWorkspaceId(UUID workspaceId);
+
+  /**
+   * TD-PERF-020: the dashboard's own paginated sibling of {@link #findAllByWorkspaceId} — used only
+   * by {@code ListWorkspaceMembersPagedService}. {@link #findAllByWorkspaceId} itself stays
+   * untouched: {@code WorkspaceRoleClaimsCustomizer}-adjacent callers and the REST admin API's own
+   * {@code ListWorkspaceMembersController} both genuinely need the full, unbounded list.
+   */
+  Page<WorkspaceMembership> findPageByWorkspaceId(UUID workspaceId, PageRequest pageRequest);
+
+  /**
+   * TD-PERF-021: {@code GetAuditLogForOrganizationService}'s own batched replacement for what used
+   * to be one {@link #findAllByWorkspaceId} call per Workspace inside a loop — a real, confirmed
+   * N+1 (an Organization with W Workspaces made W separate round trips just for membership ids). A
+   * single {@code workspace_id IN (...)} query returns every membership across every given
+   * Workspace at once; an empty {@code workspaceIds} short-circuits to an empty result with no
+   * query sent at all (Spring Data's own {@code In} derived-query handling), the correct behavior
+   * for an Organization with zero Workspaces.
+   */
+  List<WorkspaceMembership> findAllByWorkspaceIds(Collection<UUID> workspaceIds);
 
   /**
    * {@code WorkspaceRoleClaimsCustomizer}'s own lookup (app module) — resolves whether an

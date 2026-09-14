@@ -115,6 +115,19 @@ spring:
             # to learn whether a GitHub account's email is actually verified — the base /user
             # response has no verified flag at all) needs it, or the call comes back empty.
             scope: read:user,user:email
+  # SDE-III performance pass, 2026-09-13 (TD-PERF-024): previously unset — Spring Boot's own bare
+  # default resource handler serves /css/clavaris.css, /js/htmx.min.js, and the self-hosted Geist
+  # fonts with no explicit Cache-Control at all, so every dashboard navigation re-validates these
+  # assets instead of trusting a cached copy. 1h, not a long-lived immutable max-age: none of these
+  # paths are content-hashed (no /css/clavaris.a1b2c3.css cache-busting filename), so a real deploy
+  # changing clavaris.css must still be picked up by an already-open browser tab within a bounded
+  # window — content-hashed static assets (enabling a real immutable, far-future max-age safely) is
+  # its own separate, larger follow-up, not bundled into this config-only pass.
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          max-age: 1h
   # TD-ARCH-002 (closed): NOT spring.session.* — confirmed by inspecting the resolved
   # spring-boot-autoconfigure-4.1.0 jar directly that Spring Boot 4.x ships zero session-related
   # autoconfiguration classes (unlike the still-autoconfigured spring-boot-data-redis module
@@ -387,6 +400,18 @@ management:
 # of the codebase; this block is what backs the remaining Thymeleaf-rendered hosted-UI controllers,
 # which fall through to Spring Boot's own BasicErrorController, never this project's own code.
 server:
+  # SDE-III performance pass, 2026-09-13 (TD-PERF-023): previously unset anywhere — Spring Boot's
+  # own default is compression OFF. Every dashboard HTML page (sidebar + head fragment repeated on
+  # every one of the 11 /platform/dashboard/** pages) and clavaris.css (~700 lines) shipped fully
+  # uncompressed over the wire on every request. min-response-size below Boot's own 2KB default
+  # (1KB) since these responses regularly land just under that default; mime-types explicit rather
+  # than trusting Boot's own default list, since it already covers exactly what this app serves
+  # (HTML/CSS/JS/JSON) and nothing this app doesn't (no image/video compression attempted, which
+  # would waste CPU compressing already-compressed formats).
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: text/html,text/css,application/javascript,application/json,text/plain
   tomcat:
     threads:
       # TD-PERF-007: previously left at Spring Boot's own default (200), with no reasoning behind

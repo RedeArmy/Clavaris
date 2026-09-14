@@ -16,10 +16,14 @@ import com.clavaris.clientregistry.application.usecase.createorganizationclient.
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedQuery;
+import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +46,7 @@ class PlatformOrganizationClientControllerTest {
 
   private CreateOrganizationClientUseCase createClient;
   private ListOrganizationClientsUseCase listClients;
+  private ListOrganizationClientsPagedUseCase listClientsPaged;
   private DeactivateOrganizationClientUseCase deactivateClient;
   private RotateOrganizationClientSecretUseCase rotateClientSecret;
   private OrganizationForPlatformAccountResolver organizationResolver;
@@ -53,6 +58,7 @@ class PlatformOrganizationClientControllerTest {
   void setUp() {
     createClient = mock(CreateOrganizationClientUseCase.class);
     listClients = mock(ListOrganizationClientsUseCase.class);
+    listClientsPaged = mock(ListOrganizationClientsPagedUseCase.class);
     deactivateClient = mock(DeactivateOrganizationClientUseCase.class);
     rotateClientSecret = mock(RotateOrganizationClientSecretUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
@@ -63,6 +69,7 @@ class PlatformOrganizationClientControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
     when(listClients.handle(any())).thenReturn(List.of());
+    when(listClientsPaged.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -83,6 +90,7 @@ class PlatformOrganizationClientControllerTest {
                 new PlatformOrganizationClientController(
                     createClient,
                     listClients,
+                    listClientsPaged,
                     deactivateClient,
                     rotateClientSecret,
                     organizationResolver,
@@ -100,15 +108,22 @@ class PlatformOrganizationClientControllerTest {
         organizationId, "sk_test_abc", "hashed-secret", List.of(PlatformScopes.WORKSPACES_WRITE));
   }
 
+  private static Page<OrganizationClient> emptyPage() {
+    return new Page<>(List.of(), 0, PageRequest.DEFAULT_SIZE, 0);
+  }
+
   @Test
   void showsTheOrganizationsClients() throws Exception {
-    when(listClients.handle(organizationId)).thenReturn(List.of(sampleClient()));
+    OrganizationClient client = sampleClient();
+    when(listClientsPaged.handle(any()))
+        .thenReturn(new Page<>(List.of(client), 0, PageRequest.DEFAULT_SIZE, 1));
 
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(view().name("clientregistry/platform/organization-secret-keys"))
-        .andExpect(model().attribute("organizationName", "Acme Co"));
+        .andExpect(model().attribute("organizationName", "Acme Co"))
+        .andExpect(model().attribute("clients", List.of(client)));
   }
 
   @Test
@@ -206,5 +221,26 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(status().isNotFound());
 
     verify(rotateClientSecret, never()).handle(any());
+  }
+
+  // TD-PERF-020: proves ?page= is actually threaded into the query.
+  @Test
+  void getPassesTheRequestedPageThroughToTheUseCase() throws Exception {
+    mockMvc.perform(get(basePath()).param("page", "2"));
+
+    verify(listClientsPaged)
+        .handle(
+            new ListOrganizationClientsPagedQuery(
+                organizationId, new PageRequest(2, PageRequest.DEFAULT_SIZE)));
+  }
+
+  // TD-PERF-020: an HTMX-originated pagination link (hx-get) must get back just the clients
+  // fragment, not the full page.
+  @Test
+  void htmxGetReturnsTheClientsFragmentInsteadOfTheFullPage() throws Exception {
+    mockMvc
+        .perform(get(basePath()).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("clientregistry/platform/organization-secret-keys :: clients"));
   }
 }

@@ -1,5 +1,6 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -28,20 +29,33 @@ class WebhookDeliveryRetentionJob {
 
   private final SpringDataWebhookDeliveryJpaRepository deliveries;
   private final int retentionDays;
+  private final PostgresAdvisoryJobLock jobLock;
 
   /* package */ WebhookDeliveryRetentionJob(
       final SpringDataWebhookDeliveryJpaRepository deliveries,
-      @Value("${clavaris.webhook.delivery-retention-days:90}") final int retentionDays) {
+      @Value("${clavaris.webhook.delivery-retention-days:90}") final int retentionDays,
+      final PostgresAdvisoryJobLock jobLock) {
     this.deliveries = deliveries;
     this.retentionDays = retentionDays;
+    this.jobLock = jobLock;
   }
 
   // Daily, off-peak (04:00 server time) — after EventOutboxRetentionJob's own 03:30 slot, same
   // "no other scheduled job to coordinate against yet, revisit cadence once real volume exists"
   // posture that job's own Javadoc already documents.
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — distinct from WebhookDispatchScheduler's own
+  // two ticks (already safe via SELECT ... FOR UPDATE SKIP LOCKED, a different mechanism entirely
+  // — this job needed its own guard because a plain DELETE has no row to lock against). See
+  // KnownDeviceRetentionJob's own identical shape for why @Transactional stays on this
+  // externally-invoked method, not the private one it delegates to (Spring AOP self-invocation).
   @Scheduled(cron = "0 0 4 * * *")
   @Transactional
   /* package */ void sweepExpiredRows() {
+    jobLock.runIfLockAcquired("webhook_delivery_retention", LOG, this::sweepExpiredRowsLocked);
+  }
+
+  private void sweepExpiredRowsLocked() {
     final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
     final long deleted = deliveries.deleteByCreatedAtBeforeAndStatusIn(cutoff, TERMINAL_STATUSES);
     if (deleted > 0) {

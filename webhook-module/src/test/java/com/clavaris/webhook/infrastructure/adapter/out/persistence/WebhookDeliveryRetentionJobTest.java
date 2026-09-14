@@ -2,6 +2,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -110,6 +111,6 @@ class WebhookDeliveryRetentionJobTest {
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(basePackageClasses = SpringDataWebhookDeliveryJpaRepository.class)
-  @Import(WebhookDeliveryRetentionJob.class)
+  @Import({WebhookDeliveryRetentionJob.class, PostgresAdvisoryJobLock.class})
   static class TestConfig {}
 }

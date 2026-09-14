@@ -29,6 +29,16 @@ import org.springframework.web.server.ResponseStatusException;
  * parameter for a single call site. PMD.LongVariable: every parameter here names exactly what it is
  * — same "deliberate, descriptive name over an arbitrary shortening" convention this codebase
  * applies everywhere else this rule fires.
+ *
+ * <p><b>SonarCloud duplication finding (CI, TD-PERF-020's own pagination pass), 2026-09-13:</b>
+ * {@link #requireOwnedOrganization} is the further step this class's own 2026-09-11 Javadoc above
+ * declined to take at the time — {@code requireCurrentPlatformAccount} then {@code
+ * requireOwnedOrganizationName}, called in that exact two-statement sequence, is itself what
+ * SonarCloud's own duplication analysis (a real detector this class's local {@code pmd:cpd-check}
+ * pass could not fully account for) matched at four call sites in each controller once
+ * TD-PERF-020's own pagination code added a fifth. Collapsing the pair into one call and one
+ * returned {@link OwnedOrganization} removes that duplicated token sequence at its source, not by
+ * hiding it from one tool's own view.
  */
 @SuppressWarnings("PMD.LongVariable")
 final class DashboardControllerSupport {
@@ -37,6 +47,12 @@ final class DashboardControllerSupport {
   private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private DashboardControllerSupport() {}
+
+  /**
+   * {@code ownerPlatformAccountId}/{@code organizationName} — see {@link
+   * #requireOwnedOrganization}.
+   */
+  /* package */ record OwnedOrganization(UUID ownerPlatformAccountId, String organizationName) {}
 
   /* package */ static boolean isHtmxRequest(final HttpServletRequest request) {
     return "true".equals(request.getHeader(HX_REQUEST_HEADER));
@@ -58,6 +74,21 @@ final class DashboardControllerSupport {
     return organizationResolver
         .resolveName(organizationId, ownerPlatformAccountId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+  }
+
+  // The exact two-statement sequence every handler method in both controllers repeated at its own
+  // call site — see this class's own 2026-09-13 Javadoc addendum above for why this one call now
+  // replaces it.
+  /* package */ static OwnedOrganization requireOwnedOrganization(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final CurrentPlatformAccountResolver currentPlatformAccount,
+      final OrganizationForPlatformAccountResolver organizationResolver) {
+    final UUID ownerPlatformAccountId =
+        requireCurrentPlatformAccount(request, currentPlatformAccount);
+    final String organizationName =
+        requireOwnedOrganizationName(organizationId, ownerPlatformAccountId, organizationResolver);
+    return new OwnedOrganization(ownerPlatformAccountId, organizationName);
   }
 
   // The anti-enumeration check neither DeactivateOrganizationClientCommand/

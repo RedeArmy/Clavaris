@@ -1,7 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,26 +21,35 @@ class PlatformKnownDeviceRetentionJob {
 
   private final SpringDataPlatformKnownDeviceJpaRepository knownDevices;
   private final int retentionDays;
+  private final PostgresAdvisoryJobLock jobLock;
 
   /* package */ PlatformKnownDeviceRetentionJob(
       final SpringDataPlatformKnownDeviceJpaRepository knownDevices,
-      @Value("${clavaris.platform-known-device.retention-days:400}") final int retentionDays) {
+      @Value("${clavaris.platform-known-device.retention-days:400}") final int retentionDays,
+      final PostgresAdvisoryJobLock jobLock) {
     this.knownDevices = knownDevices;
     this.retentionDays = retentionDays;
+    this.jobLock = jobLock;
   }
 
   // 04:15 — staggered one slot after KnownDeviceRetentionJob's own 04:00, same "don't collide"
   // reasoning every scheduled job in this codebase already documents.
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see KnownDeviceRetentionJob's own identical
+  // shape for why @Transactional stays on this externally-invoked method, not the private one it
+  // delegates to (Spring AOP self-invocation).
   @Scheduled(cron = "0 15 4 * * *")
   @Transactional
   /* package */ void sweepStaleDevices() {
-    final Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
-    final long deleted = knownDevices.deleteByLastSeenAtBefore(cutoff);
-    if (deleted > 0) {
-      LOG.info(
-          "event=platform_known_device_retention_swept deletedCount={} retentionDays={}",
-          deleted,
-          retentionDays);
-    }
+    jobLock.runIfLockAcquired(
+        "platform_known_device_retention", LOG, this::sweepStaleDevicesLocked);
+  }
+
+  private void sweepStaleDevicesLocked() {
+    KnownDeviceRetentionSweeper.sweep(
+        LOG,
+        "platform_known_device_retention_swept",
+        knownDevices::deleteByLastSeenAtBefore,
+        retentionDays);
   }
 }

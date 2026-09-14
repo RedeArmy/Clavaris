@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
+import com.clavaris.common.domain.model.Page;
+import com.clavaris.common.domain.model.PageRequest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,6 +118,46 @@ class JpaOrganizationClientRepositoryTest {
 
     assertThat(repository.findByClientId("sk_test_to-delete")).isEmpty();
     assertThat(repository.findByClientId("sk_test_untouched")).isPresent();
+  }
+
+  // TD-PERF-020: real-Postgres proof of the paginated sibling, newest-first — same
+  // "reconstitute with explicit createdAt instants" discipline organization-module's
+  // JpaOrganizationRepositoryTest own identical test already establishes.
+  @Test
+  void findPageByOrganizationIdReturnsOnePageAtATimeNewestFirst() {
+    UUID organizationId = UUID.randomUUID();
+    Instant now = Instant.now();
+    OrganizationClient first =
+        reconstituteAt(organizationId, "sk_test_first", now.minusSeconds(20));
+    OrganizationClient second =
+        reconstituteAt(organizationId, "sk_test_second", now.minusSeconds(10));
+    OrganizationClient third = reconstituteAt(organizationId, "sk_test_third", now);
+    repository.save(first);
+    repository.save(second);
+    repository.save(third);
+    repository.save(
+        OrganizationClient.register(UUID.randomUUID(), "sk_test_other-org", "hash", List.of()));
+
+    Page<OrganizationClient> firstPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(0, 2));
+
+    assertThat(firstPage.content())
+        .extracting(OrganizationClient::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(firstPage.totalElements()).isEqualTo(3);
+    assertThat(firstPage.hasNext()).isTrue();
+
+    Page<OrganizationClient> secondPage =
+        repository.findPageByOrganizationId(organizationId, new PageRequest(1, 2));
+
+    assertThat(secondPage.content()).extracting(OrganizationClient::id).containsExactly(first.id());
+    assertThat(secondPage.hasNext()).isFalse();
+  }
+
+  private static OrganizationClient reconstituteAt(
+      final UUID organizationId, final String clientId, final Instant createdAt) {
+    return OrganizationClient.reconstitute(
+        UUID.randomUUID(), organizationId, clientId, "hash", List.of(), createdAt, true);
   }
 
   @Configuration

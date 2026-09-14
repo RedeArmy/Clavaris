@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.EventOutboxRetentionSweeper;
+import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,21 +36,32 @@ class EventOutboxRetentionJob {
 
   private final SpringDataEventOutboxJpaRepository outbox;
   private final int retentionDays;
+  private final PostgresAdvisoryJobLock jobLock;
 
   // Constructed only by Spring's own component scan (via @Component above).
   /* package */ EventOutboxRetentionJob(
       final SpringDataEventOutboxJpaRepository outbox,
-      @Value("${clavaris.event-outbox.retention-days:90}") final int retentionDays) {
+      @Value("${clavaris.event-outbox.retention-days:90}") final int retentionDays,
+      final PostgresAdvisoryJobLock jobLock) {
     this.outbox = outbox;
     this.retentionDays = retentionDays;
+    this.jobLock = jobLock;
   }
 
   // Daily, off-peak (03:30 server time) — no other scheduled job exists yet in this codebase to
   // coordinate against, and this table has zero rows in any real environment today, so contention
   // isn't a concern; revisit the cadence once real traffic gives this table real volume.
+  //
+  // TD-FUT-033: guarded by PostgresAdvisoryJobLock — see KnownDeviceRetentionJob's own identical
+  // shape for why @Transactional stays on this externally-invoked method, not the private one it
+  // delegates to (Spring AOP self-invocation).
   @Scheduled(cron = "0 30 3 * * *")
   @Transactional
   /* package */ void sweepExpiredRows() {
+    jobLock.runIfLockAcquired("event_outbox_retention", LOG, this::sweepExpiredRowsLocked);
+  }
+
+  private void sweepExpiredRowsLocked() {
     EventOutboxRetentionSweeper.sweep(LOG, outbox, retentionDays);
   }
 }
