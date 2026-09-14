@@ -191,11 +191,7 @@ public class PlatformOrganizationClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
-    DashboardControllerSupport.requireClientIdBelongsToOrganization(
-        listClients.handle(organizationId).stream().map(OrganizationClient::clientId).toList(),
-        clientId);
+        requireOwnedSecretKey(request, organizationId, clientId);
 
     deactivateClient.handle(
         new DeactivateOrganizationClientCommand(
@@ -216,11 +212,7 @@ public class PlatformOrganizationClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
-    DashboardControllerSupport.requireClientIdBelongsToOrganization(
-        listClients.handle(organizationId).stream().map(OrganizationClient::clientId).toList(),
-        clientId);
+        requireOwnedSecretKey(request, organizationId, clientId);
 
     final RotateOrganizationClientSecretResult result =
         rotateClientSecret.handle(
@@ -231,6 +223,20 @@ public class PlatformOrganizationClientController {
     model.addAttribute("justCreatedClientId", result.clientId());
     renderSecretKeysList(model, organizationId, owned.organizationName(), 0);
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
+  }
+
+  // deactivate()/rotateSecret() both need "who owns this Organization, and does clientId
+  // actually belong to it" before touching anything — SonarCloud-flagged intra-class
+  // duplication (2026-09-13) once both call sites landed with the identical 6-line preamble.
+  private DashboardControllerSupport.OwnedOrganization requireOwnedSecretKey(
+      final HttpServletRequest request, final UUID organizationId, final String clientId) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    DashboardControllerSupport.requireClientIdBelongsToOrganization(
+        listClients.handle(organizationId).stream().map(OrganizationClient::clientId).toList(),
+        clientId);
+    return owned;
   }
 
   private void populateHeaderModel(
