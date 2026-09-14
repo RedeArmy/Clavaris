@@ -150,8 +150,7 @@ public class PlatformOrganizationClientController {
         KeysetPageRequest.fromCursors(after, before),
         (owned, pageRequest) ->
             renderSecretKeysList(model, organizationId, owned.organizationName(), pageRequest),
-        CLIENTS_FRAGMENT,
-        LIST_VIEW);
+        new DashboardControllerSupport.PaginatedViewNames(CLIENTS_FRAGMENT, LIST_VIEW));
   }
 
   // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't

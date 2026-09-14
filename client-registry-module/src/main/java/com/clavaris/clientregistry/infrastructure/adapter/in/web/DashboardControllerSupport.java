@@ -102,6 +102,18 @@ final class DashboardControllerSupport {
     return new OwnedOrganization(ownerPlatformAccountId, organizationName);
   }
 
+  /**
+   * The pair of view names every dashboard mutation in both controllers already branches on
+   * (HTMX-fragment vs. plain full-page render) — SonarCloud (CI, 2026-09-14) flagged {@link
+   * #showPaginatedList} at 8 parameters, one over its own 7-parameter ceiling, the moment this pair
+   * joined the other 6. Bundled here rather than trimmed elsewhere: the same "a small ports-record
+   * parameter object, not a flat parameter list" fix shape {@code PrimaryFactorLoginPorts} already
+   * established for an identical finding (TD-ARCH-016, technical-debt-register.md §6) — {@code
+   * fragmentView}/{@code fullView} are a genuine unit (neither means anything without the other),
+   * unlike the method's other 6 parameters, which are each a distinct, unrelated collaborator.
+   */
+  /* package */ record PaginatedViewNames(String fragmentView, String fullView) {}
+
   // The exact showList body both controllers repeated — see this class's own 2026-09-14 Javadoc
   // addendum above. renderList is invoked with the OwnedOrganization this method already resolved
   // (so the caller never has to re-resolve organizationName itself) and the same pageRequest the
@@ -113,13 +125,12 @@ final class DashboardControllerSupport {
       final OrganizationForPlatformAccountResolver organizationResolver,
       final KeysetPageRequest pageRequest,
       final BiConsumer<OwnedOrganization, KeysetPageRequest> renderList,
-      final String fragmentView,
-      final String fullView) {
+      final PaginatedViewNames viewNames) {
     final OwnedOrganization owned =
         requireOwnedOrganization(
             request, organizationId, currentPlatformAccount, organizationResolver);
     renderList.accept(owned, pageRequest);
-    return isHtmxRequest(request) ? fragmentView : fullView;
+    return isHtmxRequest(request) ? viewNames.fragmentView() : viewNames.fullView();
   }
 
   // The anti-enumeration check neither DeactivateOrganizationClientCommand/
