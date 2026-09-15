@@ -25,10 +25,21 @@ interface SpringDataWebhookDeliveryJpaRepository
   // concurrently (ADR-0007 §1's own NFR concurrency note), same pattern the outbox tables'
   // dispatcher-facing read side already uses. JPQL has no FOR UPDATE SKIP LOCKED syntax, hence
   // native.
+  //
+  // Correctness bug fixed (SDE-III review, 2026-09-14): the PENDING branch used to have no
+  // next_attempt_at filter at all, so WebhookDelivery.lease() — which only ever pushes
+  // next_attempt_at into the future and never changes status — was silently not honored for
+  // PENDING rows. A row claimed by one dispatcher tick (still PENDING, HTTP attempt in flight or
+  // stuck on an uncaught exception) was immediately re-claimable by the very next tick, causing
+  // real duplicate delivery under horizontal scaling and a tight, backoff-free retry loop instead
+  // of respecting delivery-claim-lease. Both branches now share the identical next_attempt_at <=
+  // :now gate — a freshly scheduled or replayed row is unaffected (schedule()/resetForReplay()
+  // both stamp next_attempt_at = now, already <= any later poll), but a just-leased row correctly
+  // stays invisible to this query until its lease actually expires.
   @Query(
       value =
-          "select id from webhook_deliveries where (status = 'PENDING' or (status = 'FAILED' and"
-              + " next_attempt_at <= :now)) order by next_attempt_at asc limit :limit for update"
+          "select id from webhook_deliveries where status in ('PENDING', 'FAILED') and"
+              + " next_attempt_at <= :now order by next_attempt_at asc limit :limit for update"
               + " skip locked",
       nativeQuery = true)
   List<UUID> selectDueIdsForUpdateSkipLocked(@Param("now") Instant now, @Param("limit") int limit);

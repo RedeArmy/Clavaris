@@ -6,6 +6,7 @@ import com.clavaris.identity.domain.model.RefreshToken;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +63,11 @@ class JpaRefreshTokenRepository implements RefreshTokenRepository {
   @Override
   public void revokeAllActiveForAccount(final AccountId accountId) {
     refreshTokens.revokeAllActiveForAccount(accountId.value(), Instant.now());
+  }
+
+  @Override
+  public boolean revokeIfActive(final UUID refreshTokenId, final Instant revokedAt) {
+    return refreshTokens.revokeIfActive(refreshTokenId, revokedAt) > 0;
   }
 
   private RefreshToken toDomain(final RefreshTokenEntity entity) {

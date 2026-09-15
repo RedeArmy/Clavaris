@@ -127,6 +127,28 @@ class JpaWebhookDeliveryRepositoryTest {
     assertThat(afterClaim.nextAttemptAt()).isAfter(beforeClaim.plusSeconds(60));
   }
 
+  // Regression test for the bug fixed in SpringDataWebhookDeliveryJpaRepository (SDE-III review,
+  // 2026-09-14): claimDueBatch's own lease() only ever pushes next_attempt_at into the future,
+  // never changes status away from PENDING — before the fix, the claim query's PENDING branch had
+  // no next_attempt_at filter at all, so the very next tick re-claimed the same row while the
+  // first claimant's HTTP attempt (or an uncaught-exception retry loop) was still in flight. This
+  // is exactly what claimDueBatchLeasesEveryClaimedRowIntoTheNearFuture proves the lease *sets*,
+  // but that test never re-queries — this one proves the lease is actually *honored*.
+  @Test
+  void aClaimedPendingRowIsNotReclaimableBeforeItsLeaseExpires() {
+    WebhookDelivery pending = scheduledDelivery();
+    repository.save(pending);
+
+    List<WebhookDelivery> firstClaim = repository.claimDueBatch(10);
+    List<WebhookDelivery> secondClaimImmediatelyAfter = repository.claimDueBatch(10);
+
+    assertThat(firstClaim).extracting(WebhookDelivery::id).contains(pending.id());
+    assertThat(secondClaimImmediatelyAfter)
+        .as("a row leased by the first claim must stay invisible to the very next poll tick")
+        .extracting(WebhookDelivery::id)
+        .doesNotContain(pending.id());
+  }
+
   @Test
   void claimDueBatchRespectsTheLimit() {
     for (int i = 0; i < 5; i++) {

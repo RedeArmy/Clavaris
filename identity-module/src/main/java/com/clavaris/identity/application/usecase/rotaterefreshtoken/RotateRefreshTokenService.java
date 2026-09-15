@@ -13,6 +13,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,24 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>TD-SEC-031 (SDE-III review, 2026-08-26): {@link AccountSessionRevoker} added to the reuse
  * cascade in {@link #handleReuse} — see that port's own Javadoc for why a token/session revocation
  * cascade is incomplete without it.
+ *
+ * <p><b>SDE-III review, 2026-09-14 — TOCTOU race found and closed:</b> {@link #handle} used to
+ * revoke the presented token via a plain in-memory {@link RefreshToken#revoke()} followed by {@code
+ * refreshTokens.save(presented)} — a read-check-then-write with no guard. Two concurrent
+ * presentations of the same still-active token (a stolen token used in parallel with the legitimate
+ * client, or any retry/double-submit race) could both pass {@link RefreshToken#isActive()} under
+ * PostgreSQL's default READ COMMITTED isolation, both "successfully" revoke, and both mint a valid
+ * rotated child — silently defeating BR-ID-03's reuse-detection cascade, the exact invariant this
+ * class's own Javadoc above calls the system's single highest-value security guarantee. This
+ * codebase had already solved the identical race class for signing-key activation with a Postgres
+ * advisory lock ({@code activatesigningkeyfororganization.SigningKeyRepository#lockForRotation});
+ * the fix here is a conditional update instead ({@link RefreshTokenRepository#revokeIfActive}),
+ * since this is the module's single highest-write-volume path and an advisory lock's overhead on
+ * every refresh isn't warranted when a plain {@code WHERE revoked_at IS NULL} guard closes the same
+ * race. The loser of a race now observes {@code revokeIfActive} return {@code false} and is routed
+ * into {@link #handleReuse} exactly like an ordinary reuse detection — see {@link
+ * RefreshTokenRepository#revokeIfActive}'s own Javadoc for why this is correct under READ
+ * COMMITTED.
  *
  * <p><b>SDE-III review, 2026-09-03 — real gap found and closed:</b> this method never checked the
  * presented token's own {@code Account} status at all — a refresh token issued before an account
@@ -145,11 +164,16 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       throw new RequestedScopeExceedsAuthorizedScopeException();
     }
 
+    // TOCTOU race fix (SDE-III review, 2026-09-14, see class Javadoc): an atomic, conditional
+    // consume, not a plain revoke()+save(). This MUST be the first mutation — before session.touch
+    // below — so a losing, concurrent presentation of this same token never leaves a stray session
+    // update behind on what turns out to be a reuse event. Extracted (PMD.CyclomaticComplexity —
+    // handle() was already at the default threshold, same precedent assertAccountActive above and
+    // handleReuse below already establish for this exact class).
+    consumeOrTreatAsReuse(presented);
+
     session.touch();
     sessions.save(session);
-
-    presented.revoke();
-    refreshTokens.save(presented);
 
     final String newRawValue = RefreshTokenSecret.generateRawValue();
     final RefreshToken rotated =
@@ -205,6 +229,21 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
           account.status());
       throw new InvalidRefreshTokenException();
     }
+  }
+
+  // See this class's own Javadoc ("SDE-III review, 2026-09-14") — the atomic, conditional consume
+  // that closes the TOCTOU race, extracted for the same PMD.CyclomaticComplexity reason as
+  // assertAccountActive above.
+  private void consumeOrTreatAsReuse(final RefreshToken presented) {
+    final boolean wonRotationRace = refreshTokens.revokeIfActive(presented.id(), Instant.now());
+    if (!wonRotationRace) {
+      // Another transaction already revoked this exact token between our read above and this
+      // UPDATE — indistinguishable from, and handled identically to, presenting an
+      // already-rotated-away token: BR-ID-03's reuse cascade, not a silent second success.
+      handleReuse(presented.accountId());
+      throw new RefreshTokenReuseDetectedException();
+    }
+    presented.revoke(); // keeps the in-memory aggregate consistent with the row this just updated.
   }
 
   // BR-ID-03: "revokes every active token for that account, not just the reused one" — completed
