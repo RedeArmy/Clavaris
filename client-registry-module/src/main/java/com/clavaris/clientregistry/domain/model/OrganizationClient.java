@@ -72,6 +72,16 @@ public final class OrganizationClient {
   /**
    * @param clientSecretHash the already-hashed value — this factory never sees or accepts a raw
    *     secret, same discipline as {@code PlatformClient#register}.
+   *     <p>SDE-III review, 2026-09-15: {@code allowedScopes} is validated via {@link
+   *     PlatformScopes#requireValidScopesForOrganizationClient}, not the private constructor's own
+   *     generic {@link PlatformScopes#requireValidScopes} — the narrower check, applied here and
+   *     only here (never on {@link #reconstitute}, so rehydrating an already-persisted row can
+   *     never fail even if a v1.1 policy change later widens what's allowed), so no caller of this
+   *     factory — the operator's own REST API or the dashboard's tenant self-service form — can
+   *     ever mint a Secret Key holding an operator-only scope. See {@link
+   *     PlatformScopes#OPERATOR_ONLY}'s own Javadoc for the regression this closes.
+   * @throws IllegalArgumentException if any entry isn't a known scope, or is reserved to {@code
+   *     PlatformClient}-only administration
    */
   public static OrganizationClient register(
       final UUID organizationId,
@@ -83,7 +93,7 @@ public final class OrganizationClient {
         organizationId,
         clientId,
         clientSecretHash,
-        allowedScopes,
+        PlatformScopes.requireValidScopesForOrganizationClient(allowedScopes),
         Instant.now(),
         true);
   }

@@ -188,6 +188,13 @@ public class PlatformOrganizationClientController {
       // organizationId exists — but a loud 404 is still safer than assuming that can never race
       // with a concurrent deletion.
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final IllegalArgumentException _) {
+      // SDE-III review, 2026-09-15: OrganizationClient.register's own scope validation — populated
+      // ALL_SCOPES_ATTRIBUTE above already excludes every PlatformScopes.OPERATOR_ONLY option, so
+      // reaching this catch means the request bypassed the rendered form entirely (a raw POST, or a
+      // stale/tampered form submission) — a loud 400 is correct here, not a silent 500 from
+      // GlobalExceptionHandler's own catch-all.
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
 
     model.addAttribute("justCreatedRawSecret", result.rawClientSecret());
@@ -284,7 +291,12 @@ public class PlatformOrganizationClientController {
       final Model model, final UUID organizationId, final String organizationName) {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
-    model.addAttribute(ALL_SCOPES_ATTRIBUTE, PlatformScopes.BOOTSTRAP_DEFAULT);
+    // SDE-III review, 2026-09-15: ORGANIZATION_CLIENT_ALLOWED, not BOOTSTRAP_DEFAULT — this
+    // dashboard mints an OrganizationClient (Secret Key), which can never hold an
+    // PlatformScopes.OPERATOR_ONLY scope (OrganizationClient#register enforces this structurally
+    // regardless of what this form submits); narrowing the choices here means the operator-only
+    // scopes are never even offered, instead of being offered and then rejected after submit.
+    model.addAttribute(ALL_SCOPES_ATTRIBUTE, PlatformScopes.ORGANIZATION_CLIENT_ALLOWED);
   }
 
   private void populateClientsModel(

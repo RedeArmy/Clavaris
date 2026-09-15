@@ -33,13 +33,18 @@ class CreateOrganizationClientController {
     this.useCase = useCase;
   }
 
-  // Two exits (404 on a missing Organization, 201 on success) — same rationale as
-  // RegisterOAuthClientController's own identical suppression.
+  // Three exits (404 on a missing Organization, 400 on an invalid/operator-only scope, 201 on
+  // success) — same rationale as RegisterOAuthClientController's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Mint a new OrganizationClient / Secret Key for an Organization (ADR-0023)")
   @ApiResponse(
       responseCode = "201",
       description = "Created — clientSecret is shown here exactly once, never retrievable again")
+  @ApiResponse(
+      responseCode = "400",
+      description =
+          "allowedScopes contains an unknown scope, or one reserved to PlatformClient-only"
+              + " administration (PlatformScopes.OPERATOR_ONLY)")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
   @PostMapping("/api/v1/admin/organizations/{organizationId}/secret-keys")
   /* package */ ResponseEntity<CreateOrganizationClientResponse> create(
@@ -56,6 +61,12 @@ class CreateOrganizationClientController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
+    } catch (final IllegalArgumentException _) {
+      // SDE-III review, 2026-09-15: OrganizationClient.register's own scope validation throws this
+      // for an unknown scope, or one PlatformScopes.OPERATOR_ONLY reserves to PlatformClient-only
+      // administration — same IllegalArgumentException-to-400 convention as
+      // SetRateLimitPolicyController's own identical catch.
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(CreateOrganizationClientResponse.from(result));

@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,61 @@ class OrganizationClientTest {
                     "sk_test_abc",
                     "argon2id$hashed",
                     List.of("not-a-real-scope")));
+  }
+
+  // SDE-III review, 2026-09-15: the real regression this guards — before this fix, register()
+  // validated allowedScopes via PlatformScopes.requireValidScopes alone, which only checks "is
+  // this a real, known scope," so a tenant-minted Secret Key could legally hold
+  // RATE_LIMIT_POLICY_WRITE/SIGNING_KEYS_ROTATE/SOCIAL_LOGIN_POLICY_WRITE — three scopes this
+  // codebase's own PlatformScopes.OPERATOR_ONLY documents as "operator-managed only in v1,"
+  // directly contradicting CLAUDE.md §6's locked rate-limit decision.
+  @Test
+  void registerRejectsEveryOperatorOnlyScope() {
+    for (final String operatorOnlyScope : PlatformScopes.OPERATOR_ONLY) {
+      assertThatIllegalArgumentException()
+          .as("register() must reject the operator-only scope %s", operatorOnlyScope)
+          .isThrownBy(
+              () ->
+                  OrganizationClient.register(
+                      UUID.randomUUID(),
+                      "sk_test_abc",
+                      "argon2id$hashed",
+                      List.of(operatorOnlyScope)));
+    }
+  }
+
+  @Test
+  void registerRejectsAnOperatorOnlyScopeEvenAlongsideOtherwiseValidScopes() {
+    // Not just "the whole list is operator-only" — one disallowed entry among several allowed
+    // ones must still fail closed, not silently drop just that entry.
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OrganizationClient.register(
+                    UUID.randomUUID(),
+                    "sk_test_abc",
+                    "argon2id$hashed",
+                    List.of(
+                        PlatformScopes.WORKSPACES_WRITE, PlatformScopes.RATE_LIMIT_POLICY_WRITE)));
+  }
+
+  // Deliberately asymmetric with registerRejectsEveryOperatorOnlyScope above: reconstitute()
+  // rehydrates a row that was already persisted, so it must never reject one an earlier, looser
+  // v1 policy allowed to be written — the fix is about closing the mint path, not about making an
+  // already-existing row impossible to read back. See OrganizationClient#register's own Javadoc.
+  @Test
+  void reconstituteStillAcceptsAnOperatorOnlyScopeUnlikeRegister() {
+    OrganizationClient rehydrated =
+        OrganizationClient.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "sk_test_legacy",
+            "argon2id$hashed",
+            List.of(PlatformScopes.RATE_LIMIT_POLICY_WRITE),
+            Instant.now(),
+            true);
+
+    assertThat(rehydrated.allowedScopes()).containsExactly(PlatformScopes.RATE_LIMIT_POLICY_WRITE);
   }
 
   @Test
