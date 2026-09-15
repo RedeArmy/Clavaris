@@ -61,7 +61,7 @@
              posture already used for Resilience4j's sibling concerns here
              (RedisFixedWindowRateLimiter's own hand-rolled Lua script, not a
              third-party rate-limiter starter). -->
-        <resilience4j.version>2.3.0</resilience4j.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
         <!-- Left unpinned, Maven re-resolves "latest compatible" on every
              build by walking plugin metadata newest-first — confirmed live:
              it tried (and rejected) four Maven-4-only 4.0.0-beta-N releases
