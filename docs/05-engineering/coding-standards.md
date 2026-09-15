@@ -25,6 +25,27 @@ Given this system's security-critical nature, this standard is applied with part
 - Anything touching refresh token rotation or reuse detection (reference BR-ID-03).
 - Anything touching `redirect_uris` matching (reference BR-CLIENT-01).
 
+**Enforced, not aspirational (2026-09-14)**: an SDE-III review of `Account.java` (identity-module)
+found the "1-3 lines" bound itself had drifted into multi-paragraph essays on several methods —
+correct BR/ADR content, wrong shape, real reading-speed cost at 277 lines with more comment text
+than code. Fixed by trimming every offending Javadoc back to the stated bound, cutting restated
+behavior and narrated incident history while keeping every BR/ADR citation and the load-bearing
+"why." The rule in this section is the actual ceiling to hold a file to, not a target that erodes
+once a real incident (a caught bug, a live-verified gotcha) makes one comment feel like it deserves
+more space — write the fact in 1-3 lines instead, the same discipline that already applies to every
+other comment.
+
+### 3a. Record-style accessor convention (shared PMD suppression rationale)
+
+Several domain aggregates/value objects (`Account`, `Session`, `RefreshToken`, `SigningKey`,
+`WebhookDelivery`, `WebhookEndpoint`, `KeyStoreScope`, `PlatformSigningKeyMaterial`) use short,
+field-matching accessor names (`id()`, `email()`, ...) deliberately, the same shape a Java `record`
+gets for free — not an accidental data-holder smell. This trips three PMD rules on every such class:
+`AvoidFieldNameMatchingMethodName`, `ShortVariable`, `ShortMethodName`. Suppress all three with a
+one-line `@SuppressWarnings` pointing back to this section (`coding-standards.md §3a`) instead of
+re-deriving the justification per class — the convention is documented once, here, so it doesn't
+have to be re-argued in every aggregate's own class Javadoc.
+
 ## 4. Security-specific conventions
 
 - Never log a credential, token, or password hash — not even at `DEBUG` level, not even temporarily during development (BR-DATA-01). If a debugging session needs to inspect a value like this, do it in a debugger, not a log statement.

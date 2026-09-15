@@ -7,34 +7,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * BR-ID-03: a continuous login, opened at the first successful token issuance for an interactive
- * grant and closed by explicit revocation. One {@code Session} owns a chain of rotated {@link
- * RefreshToken}s (domain-model.md §2) — kept as a separate aggregate from {@code RefreshToken}
- * rather than merged into it, per domain-model.md §8's own resolution, because reuse-detection
- * needs to reason about the rotation chain, not just whichever token is currently active.
+ * BR-ID-03: a continuous login, opened at first token issuance, closed by explicit revocation. Owns
+ * a chain of rotated {@link RefreshToken}s, kept as its own aggregate (domain-model.md §8) since
+ * reuse-detection needs the whole chain, not just the active token — distinct from the Redis-backed
+ * {@code HttpSession} the hosted UI uses; the two are related but neither implies the other's
+ * lifecycle.
  *
- * <p>Deliberately distinct from the servlet-container {@code HttpSession} the hosted login/consent
- * UI uses (Redis-backed since TD-ARCH-002 closed) — this is the OAuth2/OIDC-level concept of "one
- * continuous authorization," a business record, not web-tier state. The two are related (a browser
- * login opens both) but neither implies the other's lifecycle.
+ * <p>{@code scopes} is fixed at {@link #open} (RFC 6749 §6). {@code user_agent} stays deliberately
+ * unpopulated — rotation/reuse-detection never needed it; the self-service sessions page ({@code
+ * AccountSessionsController}) is built on {@code HttpSession} state instead.
  *
- * <p>{@code scopes} is fixed at {@link #open}: RFC 6749 §6 forbids a refresh grant from ever
- * requesting more than what was originally authorized, so every {@link RefreshToken} issued under
- * this session's chain is validated against this same, unchanging set.
- *
- * <p><b>Known, deliberate simplification, still true:</b> data-model.md's original sketch of {@code
- * sessions} included a {@code user_agent} column; this implementation still doesn't populate one —
- * rotation and reuse detection (BR-ID-03) still don't need it. The "list your active
- * sessions/devices" self-service page this comment used to say didn't exist now does ({@code
- * AccountSessionsController}) — but it's built on the Spring-Session-backed {@code HttpSession}
- * store instead (see {@code SessionDeviceAttributes}/{@code KnownDevice}), not on this aggregate.
- * This class and that page track two genuinely different things (see this class's own note above
- * about the two not implying each other's lifecycle); this column staying unpopulated was never
- * actually blocking that feature.
- *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason {@code Account} suppresses them — the deliberate record-style accessor convention
- * used throughout this codebase's value objects.
+ * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",

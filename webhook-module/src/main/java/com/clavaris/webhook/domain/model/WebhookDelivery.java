@@ -5,33 +5,19 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * ADR-0007 §2: one fan-out target for one outbox event — {@code (outboxEventId, endpointId)} is
- * conceptually a compound key (one outbox row can fan out to several endpoints; a given endpoint
- * gets at most one row per outbox event), enforced at the persistence layer, not here.
+ * ADR-0007 §2: one fan-out target for one outbox event — {@code (outboxEventId, endpointId)} is a
+ * compound key (one endpoint gets at most one row per event), enforced at the persistence layer.
  *
- * <p>{@code payload} is a snapshot captured at fan-out time, not a live read of the source {@code
- * event_outbox}/{@code organization_event_outbox} row — a retry hours later must still send the
- * exact bytes that were signed and would be re-signed identically, never a payload that could have
- * silently drifted if the source row were ever mutated.
+ * <p>{@code payload} is a snapshot captured at fan-out time, not a live read of the source outbox
+ * row — a retry hours later must send the exact bytes that were signed, never one that could have
+ * drifted. {@code organizationId} is denormalized from {@link WebhookEndpoint} so retention/listing
+ * queries don't need to join back for every row.
  *
- * <p>{@code organizationId} is denormalized from the owning {@link WebhookEndpoint} — same
- * "explicit column over a join" reasoning {@code AbstractEventOutboxEntity}'s own Javadoc already
- * establishes for the outbox tables themselves: {@code DeliverPendingWebhooksService}'s own
- * retention/listing queries need it without joining back to {@code webhook_endpoints} for every
- * row.
+ * <p>{@code traceId}: the distributed-tracing id of the original inbound request, captured once at
+ * {@code schedule}-time and carried unchanged through every later mutation — {@code null} for a row
+ * whose source predates this column or wasn't written inside a traced request.
  *
- * <p>PMD's DataClass/AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName/LongVariable
- * rules are the same false positives {@code WebhookEndpoint}'s own identical suppression already
- * documents — the deliberate record-style accessor convention this codebase's value objects use
- * throughout, and every field name here is the exact term for what it holds, not arbitrarily long.
- *
- * <p>{@code traceId} (end-to-end traceability, SDE-III webhook review): the distributed-tracing id
- * of the original inbound request that produced the source outbox row, captured once at {@code
- * schedule}-time via {@code OutboxEvent#traceId()} and carried unchanged through every subsequent
- * copy-on-write mutation ({@code lease}/{@code recordSuccess}/{@code recordFailure}/{@code
- * resetForReplay} never change it) — never re-derived, since none of those later steps run on the
- * original request's own thread. {@code null} for any row whose source event predates this column,
- * or was written outside a traced request (e.g. a scheduled job) — always treat it as optional.
+ * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
   "PMD.DataClass",
@@ -165,10 +151,9 @@ public final class WebhookDelivery {
   }
 
   /**
-   * Bumps {@code nextAttemptAt} into the future without recording any real attempt — the lease a
-   * claiming dispatcher instance takes out before it starts the actual (untransacted) HTTP call, so
-   * a second concurrent dispatcher tick can't also pick up the same row mid-flight. See {@code
-   * DeliverPendingWebhooksService}'s own Javadoc for the full reasoning.
+   * Bumps {@code nextAttemptAt} into the future without recording an attempt — the lease a claiming
+   * dispatcher takes before the real HTTP call, so a second concurrent tick can't pick up the same
+   * row (see {@code DeliverPendingWebhooksService}).
    */
   public WebhookDelivery lease(final Instant leaseUntil) {
     return new WebhookDelivery(
@@ -211,11 +196,9 @@ public final class WebhookDelivery {
   }
 
   /**
-   * @param nextAttemptAt when the next retry is due, or {@code null} to mark this delivery {@link
-   *     WebhookDeliveryStatus#EXHAUSTED} — the caller ({@code DeliverPendingWebhooksService}) owns
-   *     the "how many attempts is too many" policy (an operational value, not a domain constant,
-   *     same reasoning {@code WebhookEndpoint.rotateSecret}'s own overlap-window parameter already
-   *     establishes) and the backoff math ({@code WebhookRetrySchedule}).
+   * @param nextAttemptAt when the next retry is due, or {@code null} to mark {@link
+   *     WebhookDeliveryStatus#EXHAUSTED} — the caller owns the retry-count policy and backoff math
+   *     ({@code WebhookRetrySchedule}).
    */
   public WebhookDelivery recordFailure(
       final Integer responseStatus,

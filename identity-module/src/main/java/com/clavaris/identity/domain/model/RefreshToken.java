@@ -6,30 +6,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * BR-ID-03: single-use, rotate-on-use. The bearer value itself is never stored here or anywhere
- * else in this system — only {@link #tokenHash}, the same hash-not-plaintext principle already
- * applied to {@code PasswordCredential} and every other bearer secret this project designed its own
- * schema for (data-model.md §2). This is a deliberate contrast with {@code oauth2_authorization}
- * (TD-SEC-019): that table stores every token's raw value because Spring Authorization Server's own
- * {@code JdbcOAuth2AuthorizationService} requires it for its {@code findByToken} lookup, with no
- * supported way to hash on write — refresh tokens specifically don't inherit that gap, because
- * BR-ID-03's rotation/reuse-detection logic never goes through {@code OAuth2AuthorizationService}
- * at all; it's validated entirely against this table instead.
+ * BR-ID-03: single-use, rotate-on-use. Only {@link #tokenHash} is stored, never the bearer value —
+ * same hash-not-plaintext principle as {@code PasswordCredential} (data-model.md §2). Unlike {@code
+ * oauth2_authorization} (TD-SEC-019, which stores raw values because Spring Authorization Server's
+ * own lookup requires it), this table never goes through that service at all.
  *
- * <p>{@link #rotatedFromId} forms the chain domain-model.md §2 calls out by name: "presenting a
- * token whose chain shows it was already superseded triggers revocation of the entire session's
- * token family." In this implementation that check collapses to one field, not a chain walk: the
- * only two things that ever set {@link #revokedAt} on a refresh token are (a) rotating it away —
- * the exact moment its successor is issued — or (b) the reuse-detection cascade itself revoking
- * every token for the account. Both cases mean "this value must never work again," so a presented
- * token whose own row already has {@code revokedAt} set is reuse, full stop — {@code rotatedFromId}
- * is kept as the audit trail for why and when a row was superseded (walkable for investigation,
- * same spirit as {@code SigningKey.retiredAt}), not as a second source of truth the reuse check
- * itself needs to consult.
+ * <p>{@link #rotatedFromId} is an audit trail, not the reuse check's own source of truth: the only
+ * two things that ever set {@link #revokedAt} are rotating away or the reuse-detection cascade —
+ * either way, a presented token whose row already has {@code revokedAt} set is reuse, full stop.
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason {@code Account} suppresses them — the deliberate record-style accessor convention
- * used throughout this codebase's value objects.
+ * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",

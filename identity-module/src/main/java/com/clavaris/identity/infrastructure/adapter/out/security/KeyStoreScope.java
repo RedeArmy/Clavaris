@@ -5,22 +5,15 @@ import java.util.UUID;
 
 /**
  * TD-SEC-054: which signing-key-store file (and derived password) an operation targets — the
- * platform tier's own singleton file, or one Organization's own file. Exists so {@link
- * SigningKeyStore} never again backs every key this process ever needs with one shared file
- * protected by one shared password (see that class's own corrected Javadoc for the historical
- * design this replaces) — one file, one independently-derived password, per scope, so a single
- * leaked file (a stray backup, a support engineer's debug copy) exposes only that scope's own key
- * material, not the platform's or every other Organization's too.
+ * platform tier's own file, or one Organization's own. One file/password per scope, so a single
+ * leaked file exposes only that scope's own key material, not the platform's or every other
+ * Organization's too.
  *
- * <p>Package-private and only ever constructed by {@link OrganizationSigningKeyMaterialFactory}/
- * {@link PlatformSigningKeyMaterial} — external callers never need to know this type exists, they
- * pass an {@code OrganizationId} (or nothing, for the platform tier) to the factory's own public
- * methods, which convert to a scope internally.
+ * <p>Package-private, only constructed by {@link OrganizationSigningKeyMaterialFactory}/{@link
+ * PlatformSigningKeyMaterial} — external callers pass an {@code OrganizationId} (or nothing, for
+ * the platform tier) to the factory instead.
  *
- * <p>PMD's ShortVariable/ShortMethodName/AvoidFieldNameMatchingMethodName rules flag {@code id}
- * (field, constructor parameter, and accessor alike) for the same reason this codebase's other
- * value objects suppress them — the deliberate record-style accessor convention used throughout,
- * not an accidentally terse name.
+ * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
   "PMD.ShortVariable",
