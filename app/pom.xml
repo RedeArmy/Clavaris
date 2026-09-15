@@ -145,8 +145,8 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <!-- 2.x doesn't support Spring Framework 7/Boot 4 — confirmed: 3.0.0 is the first
                  version with that support, 3.0.1 specifically fixed a 7.0.2 compat regression;
-                 3.1.0 is the latest available on Maven Central as of this writing. -->
-            <version>3.1.0</version>
+                 3.1.1 is the latest available on Maven Central as of this writing. -->
+            <version>3.1.1</version>
         </dependency>
 
         <!-- DB health indicator (DataSourceHealthIndicator) is auto-configured once
