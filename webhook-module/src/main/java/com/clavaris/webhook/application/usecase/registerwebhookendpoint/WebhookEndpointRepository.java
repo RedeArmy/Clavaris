@@ -3,6 +3,7 @@ package com.clavaris.webhook.application.usecase.registerwebhookendpoint;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +43,20 @@ public interface WebhookEndpointRepository {
    */
   @SuppressWarnings("PMD.ShortVariable")
   Optional<WebhookEndpoint> findById(UUID id);
+
+  /**
+   * TD-PERF-025 (SDE-III review, 2026-09-15): {@code
+   * com.clavaris.webhook.application.usecase.deliverpendingwebhooks.DeliverPendingWebhooksService}'s
+   * own batch-fetch — one query for every distinct {@code endpointId} in a claimed delivery batch
+   * (up to {@code batchSize}, 50 by default), instead of {@link #findById} once per claimed
+   * delivery. Same "fetch once per distinct key in the batch, not once per row" fix {@link
+   * com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsService}'s
+   * own {@code findActiveByOrganizationId} memoization (TD-PERF-005) already applies one layer up
+   * (by Organization, for fan-out); this is the delivery-side sibling of that same problem, keyed
+   * by endpoint instead. Duplicate ids in {@code ids} cost nothing extra — {@code
+   * JpaRepository#findAllById} already de-duplicates its own {@code WHERE id IN (...)} query.
+   */
+  List<WebhookEndpoint> findAllByIds(Collection<UUID> ids);
 
   List<WebhookEndpoint> findAllByOrganizationId(UUID organizationId);
 

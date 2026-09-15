@@ -8,6 +8,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.persistence.EntityManager;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,6 +74,11 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   @Override
   public Optional<WebhookEndpoint> findById(final UUID id) {
     return endpoints.findById(id).map(this::toDomain);
+  }
+
+  @Override
+  public List<WebhookEndpoint> findAllByIds(final Collection<UUID> ids) {
+    return endpoints.findAllById(ids).stream().map(this::toDomain).toList();
   }
 
   @Override
