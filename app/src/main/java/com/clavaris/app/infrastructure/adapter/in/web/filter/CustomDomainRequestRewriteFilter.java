@@ -37,15 +37,26 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * target is always {@code /o/{organizationId}/...}, so that one prefix alone is a complete loop
  * guard (a bare {@code /oauth2/...} must NOT be excluded here: that is exactly the shape of the
  * very request this filter exists to rewrite on a real custom domain). Static assets ({@code
- * /js/**}) and operational endpoints ({@code /actuator/**}) are deliberately excluded — they are
- * genuinely origin-wide, not tenant-scoped, and the hosted login page's own {@code @{/js/...}}
- * references would 404 under an {@code /o/{organizationId}} prefix that no static-resource handler
- * is ever mounted at.
+ * /js/**}, {@code /css/**}, {@code /fonts/**} — every subdirectory {@code app}'s own {@code
+ * src/main/resources/static} actually has) and operational endpoints ({@code /actuator/**}) are
+ * deliberately excluded — they are genuinely origin-wide, not tenant-scoped, and the hosted login
+ * page's own {@code @{/css/clavaris.css}}/{@code @{/js/...}} references (that stylesheet's own
+ * {@code @font-face} rules pulling from {@code /fonts/**} in turn) would 404 under an {@code
+ * /o/{organizationId}} prefix that no static-resource handler is ever mounted at.
+ *
+ * <p><b>SDE-III review, 2026-09-15 — real bug found and closed:</b> only {@code /js/} was excluded
+ * here, even though {@code identity/fragments/head.html} (every hosted login/consent/error page)
+ * references {@code /css/clavaris.css}, which itself {@code @font-face}s two files under {@code
+ * /fonts/}. On a real ADR-0009 verified custom domain, a browser's GET for either got rewritten to
+ * {@code /o/{organizationId}/css/clavaris.css} — a path no static-resource handler is mounted at —
+ * a 404, so every hosted page served on a custom domain rendered with zero CSS and no web fonts.
  */
 public final class CustomDomainRequestRewriteFilter extends OncePerRequestFilter {
 
   private static final String ORG_PREFIX = "/o/";
-  private static final String STATIC_PREFIX = "/js/";
+  private static final String JS_PREFIX = "/js/";
+  private static final String CSS_PREFIX = "/css/";
+  private static final String FONTS_PREFIX = "/fonts/";
   private static final String ACTUATOR_PREFIX = "/actuator/";
 
   private final ClientDomainConfigRepository domainConfigs;
@@ -85,7 +96,9 @@ public final class CustomDomainRequestRewriteFilter extends OncePerRequestFilter
 
   private static boolean isExcludedFromRewrite(final String pathWithinApp) {
     return pathWithinApp.startsWith(ORG_PREFIX)
-        || pathWithinApp.startsWith(STATIC_PREFIX)
+        || pathWithinApp.startsWith(JS_PREFIX)
+        || pathWithinApp.startsWith(CSS_PREFIX)
+        || pathWithinApp.startsWith(FONTS_PREFIX)
         || pathWithinApp.startsWith(ACTUATOR_PREFIX);
   }
 

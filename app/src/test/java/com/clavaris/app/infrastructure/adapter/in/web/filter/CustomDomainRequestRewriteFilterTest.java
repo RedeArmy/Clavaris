@@ -138,4 +138,47 @@ class CustomDomainRequestRewriteFilterTest {
     assertThat(chain.getRequest()).isNotNull();
     verify(domainConfigs, never()).findByHostname(org.mockito.ArgumentMatchers.any());
   }
+
+  // SDE-III review, 2026-09-15 — the real regression this guards: identity/fragments/head.html
+  // (every hosted login/consent/error page) references /css/clavaris.css, which itself
+  // @font-faces two files under /fonts/ — neither prefix was excluded before this fix, so both
+  // got rewritten to /o/{organizationId}/css/... and /o/{organizationId}/fonts/..., paths no
+  // static-resource handler is mounted at, 404ing every hosted page's CSS and web fonts on a real
+  // verified custom domain.
+  @Test
+  void neverRewritesCssAssetRequestsEvenOnAVerifiedCustomDomain() throws Exception {
+    ClientDomainConfigRepository domainConfigs = mock(ClientDomainConfigRepository.class);
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    CustomDomainRequestRewriteFilter filter =
+        new CustomDomainRequestRewriteFilter(domainConfigs, oauthClients);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/css/clavaris.css");
+    request.setServerName("login.example.com");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getForwardedUrl()).isNull();
+    assertThat(chain.getRequest()).isNotNull();
+    verify(domainConfigs, never()).findByHostname(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void neverRewritesFontAssetRequestsEvenOnAVerifiedCustomDomain() throws Exception {
+    ClientDomainConfigRepository domainConfigs = mock(ClientDomainConfigRepository.class);
+    OAuthClientRepository oauthClients = mock(OAuthClientRepository.class);
+    CustomDomainRequestRewriteFilter filter =
+        new CustomDomainRequestRewriteFilter(domainConfigs, oauthClients);
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/fonts/geistSans-Regular.woff2");
+    request.setServerName("login.example.com");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getForwardedUrl()).isNull();
+    assertThat(chain.getRequest()).isNotNull();
+    verify(domainConfigs, never()).findByHostname(org.mockito.ArgumentMatchers.any());
+  }
 }
