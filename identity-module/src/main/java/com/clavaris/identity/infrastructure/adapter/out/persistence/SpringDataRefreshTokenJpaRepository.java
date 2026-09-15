@@ -21,4 +21,13 @@ interface SpringDataRefreshTokenJpaRepository extends JpaRepository<RefreshToken
           + "where r.accountId = :accountId and r.revokedAt is null")
   int revokeAllActiveForAccount(
       @Param("accountId") UUID accountId, @Param("revokedAt") Instant revokedAt);
+
+  // RefreshTokenRepository#revokeIfActive's own Javadoc — the row-count returned by this single-row
+  // conditional UPDATE is the whole fix: 1 if this call revoked it, 0 if another call already had.
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "update RefreshTokenEntity r set r.revokedAt = :revokedAt "
+          + "where r.id = :refreshTokenId and r.revokedAt is null")
+  int revokeIfActive(
+      @Param("refreshTokenId") UUID refreshTokenId, @Param("revokedAt") Instant revokedAt);
 }

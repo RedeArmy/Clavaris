@@ -75,6 +75,10 @@ class RotateRefreshTokenServiceTest {
     // review (2026-09-03) status check every test below now passes through unless a test
     // deliberately overrides this stub to prove the rejection path itself.
     when(accounts.findById(accountId)).thenReturn(Optional.of(activeAccount()));
+    // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-14) —
+    // every test below exercises the ordinary, uncontested rotation path unless it deliberately
+    // overrides this stub to prove the lost-race/reuse path itself.
+    when(refreshTokens.revokeIfActive(any(), any())).thenReturn(true);
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -143,7 +147,8 @@ class RotateRefreshTokenServiceTest {
     assertThat(result.newRawToken()).isNotBlank().isNotEqualTo(rawValue);
     assertThat(result.newExpiresAt()).isEqualTo(newExpiresAt);
     assertThat(active.isRevoked()).isTrue();
-    verify(refreshTokens).save(any()); // the revoked old
+    verify(refreshTokens).revokeIfActive(eq(active.id()), any()); // the atomic consume of the old
+    verify(refreshTokens, never()).save(any()); // no plain save — the conditional update did it
     verify(refreshTokens).insert(any()); // the new
     verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
     verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
@@ -258,6 +263,47 @@ class RotateRefreshTokenServiceTest {
   }
 
   @Test
+  void losingTheConditionalConsumeRaceIsTreatedAsReuseAndRevokesEveryActiveTokenForTheAccount() {
+    // TOCTOU regression test (SDE-III review, 2026-09-14): the read above sees an active token
+    // (unlike detectsReuseOfAnAlreadyRotatedTokenAndRevokesEveryActiveTokenForTheAccount, where
+    // it's already revoked at read time) — the race is only observable at the conditional-update
+    // step, when a concurrent transaction won it first. revokeIfActive returning false here is
+    // exactly that: this test's own stub simulates the loser's view of the race.
+    Session session = activeSession();
+    String rawValue = "a-token-someone-else-raced-us-for";
+    RefreshToken active = activeTokenFor(session, rawValue);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+    when(refreshTokens.revokeIfActive(eq(active.id()), any())).thenReturn(false);
+    when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.of(organizationId));
+    RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
+
+    assertThatExceptionOfType(RefreshTokenReuseDetectedException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(active.isRevoked())
+        .as("the loser never calls revoke() itself — the winning transaction's row update stands")
+        .isFalse();
+    // Losing the race must never leave a stray session touch behind, nor mint a rotated child —
+    // the ordering in handle() puts the conditional consume before both.
+    verify(sessions, never()).save(any());
+    verify(refreshTokens, never()).insert(any());
+    // Same BR-ID-03 cascade as an ordinary already-revoked-at-read-time reuse.
+    verify(refreshTokens).revokeAllActiveForAccount(accountId);
+    verify(sessions).revokeAllActiveForAccount(accountId);
+    verify(accountTokenRevoker).revokeAllTokensFor(accountId);
+    verify(accountSessionRevoker).revokeAllSessionsFor(accountId);
+    verify(outbox)
+        .write(
+            eq("refresh_token.reuse_detected"),
+            eq(accountId),
+            eq(organizationId),
+            any(RefreshTokenReuseDetectedEvent.class));
+    verify(metrics).increment("clavaris.auth.refresh_token.reuse_detected");
+  }
+
+  @Test
   void rejectsARequestedScopeExceedingWhatWasOriginallyAuthorizedWithoutConsumingTheToken() {
     // RFC 6749 §6 — and a real bug this test guards against: this check must run before any
     // mutation, or a rejected over-scoped request would silently burn the presented token anyway
@@ -279,6 +325,7 @@ class RotateRefreshTokenServiceTest {
         .as("a rejected over-scoped request must leave the presented token fully usable")
         .isFalse();
     verify(refreshTokens, never()).save(any());
+    verify(refreshTokens, never()).revokeIfActive(any(), any());
     verify(refreshTokens, never()).insert(any());
     verify(sessions, never()).save(any());
     verify(sessions, never()).insert(any());

@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,10 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,6 +50,7 @@ class JpaRefreshTokenRepositoryTest {
   @Autowired private RefreshTokenRepository repository;
   @Autowired private SessionRepository sessions;
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private AccountId accountId;
   private Session session;
@@ -53,12 +58,27 @@ class JpaRefreshTokenRepositoryTest {
   @BeforeEach
   void seedAnAccountAndSession() {
     accountId = new AccountId(UUID.randomUUID());
-    jdbcTemplate.update(
-        "insert into accounts (id, organization_id, email, status, created_at) "
-            + "values (?, ?, ?, 'ACTIVE', now())",
-        accountId.value(),
-        UUID.randomUUID(),
-        "refresh-token-owner-" + accountId.value() + "@example.com");
+    // BR-ID-02's deferred constraint trigger ("never zero auth methods") only ever fires at real
+    // COMMIT — every other test in this class runs inside the class-level @Transactional's
+    // rollback-only wrapping, which never commits and so never actually evaluates it, but
+    // concurrentRevokeIfActiveCallsAgainstTheSameTokenNeverBothWin_realConcurrencyProof below opts
+    // out of that wrapping (Propagation.NOT_SUPPORTED) to prove real cross-transaction concurrency,
+    // and genuinely commits. Both inserts must land in the same transaction, or the account-only
+    // insert already violates BR-ID-02 before the credential insert below ever runs.
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              jdbcTemplate.update(
+                  "insert into accounts (id, organization_id, email, status, created_at) "
+                      + "values (?, ?, ?, 'ACTIVE', now())",
+                  accountId.value(),
+                  UUID.randomUUID(),
+                  "refresh-token-owner-" + accountId.value() + "@example.com");
+              jdbcTemplate.update(
+                  "insert into password_credentials (account_id, password_hash) values (?, ?)",
+                  accountId.value(),
+                  "not-a-real-hash-this-suite-never-logs-in");
+            });
     session = Session.open(accountId, List.of("openid"));
     sessions.save(session);
   }
@@ -141,6 +161,69 @@ class JpaRefreshTokenRepositoryTest {
     assertThat(repository.findByTokenHash("hash-one").orElseThrow().isActive()).isFalse();
     assertThat(repository.findByTokenHash("hash-two").orElseThrow().isActive()).isFalse();
     assertThat(repository.findByTokenHash("hash-three").orElseThrow().isActive()).isTrue();
+  }
+
+  // RefreshTokenRepository#revokeIfActive's own Javadoc (SDE-III review, 2026-09-14) — the whole
+  // fix is that a second call against an already-revoked row reports 0 rows touched, not 1. A
+  // single-threaded, deterministic proof of that row-count semantic; real concurrent-caller
+  // behavior is proved separately below, since sequential calls in one transaction can't show
+  // whether a genuinely concurrent second caller is forced to re-check the WHERE clause.
+  @Test
+  void revokeIfActiveReturnsTrueOnceThenFalseForTheSameToken() {
+    RefreshToken token =
+        RefreshToken.issue(session.id(), accountId, "race-hash", Instant.now().plusSeconds(3600));
+    repository.save(token);
+
+    boolean firstCall = repository.revokeIfActive(token.id(), Instant.now());
+    boolean secondCall = repository.revokeIfActive(token.id(), Instant.now());
+
+    assertThat(firstCall).as("the only call against a still-active token must win").isTrue();
+    assertThat(secondCall)
+        .as("a second call against the now-already-revoked row must report it lost, not repeat")
+        .isFalse();
+    assertThat(repository.findByTokenHash("race-hash").orElseThrow().isRevoked()).isTrue();
+  }
+
+  // BR-ID-03's real TOCTOU-fix proof: RotateRefreshTokenServiceTest already proves the service
+  // layer treats a lost race as reuse using a mocked repository, which can only show the *service*
+  // reacts correctly to a stubbed false — it cannot prove PostgreSQL itself actually forces the
+  // loser of two genuinely concurrent transactions to observe that false. This test proves that,
+  // against a real database, the same way JpaWebhookDeliveryRepositoryTest's own SKIP LOCKED proof
+  // does for its own concurrency guarantee — two separate threads, two separate transactions, two
+  // separate connections, racing the exact same row.
+  //
+  // Propagation.NOT_SUPPORTED: escapes this class's own @Transactional (which would otherwise wrap
+  // this method's @BeforeEach-seeded row in an uncommitted outer transaction invisible to the two
+  // genuinely separate transactions below) — the seeded token here commits for real, exactly like
+  // JpaWebhookDeliveryRepositoryTest's own un-annotated class already relies on.
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void concurrentRevokeIfActiveCallsAgainstTheSameTokenNeverBothWin_realConcurrencyProof() {
+    RefreshToken token =
+        RefreshToken.issue(
+            session.id(), accountId, "concurrent-race-hash", Instant.now().plusSeconds(3600));
+    repository.save(token);
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+    CompletableFuture<Boolean> callA =
+        CompletableFuture.supplyAsync(
+            () ->
+                transactionTemplate.execute(
+                    status -> repository.revokeIfActive(token.id(), Instant.now())));
+    CompletableFuture<Boolean> callB =
+        CompletableFuture.supplyAsync(
+            () ->
+                transactionTemplate.execute(
+                    status -> repository.revokeIfActive(token.id(), Instant.now())));
+
+    boolean wonByA = Boolean.TRUE.equals(callA.join());
+    boolean wonByB = Boolean.TRUE.equals(callB.join());
+
+    assertThat(wonByA ^ wonByB)
+        .as("exactly one of two concurrent callers may ever revoke the same active token")
+        .isTrue();
+    assertThat(repository.findByTokenHash("concurrent-race-hash").orElseThrow().isRevoked())
+        .isTrue();
   }
 
   @Configuration
