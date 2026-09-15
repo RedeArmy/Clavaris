@@ -10,30 +10,17 @@ import org.springframework.stereotype.Component;
 /**
  * Holds the platform issuer's own RSA key pair (ADR-0002: RS256).
  *
- * <p>TD-SEC-002 (closed): on construction, this bean first checks whether {@code
- * platform_signing_keys} already has an active row <em>and</em> {@link SigningKeyStore} already has
- * matching material for that row's {@code kid} — the durable-restart case, where a previous process
- * already generated and persisted a key. Only when that lookup comes up empty (the true first-ever
- * boot, or a compromised key's row/keystore entry was deliberately removed — see {@code
- * incident-response-signing-key-compromise.md} §3) is a brand-new key pair generated. Every process
- * restart used to generate a fresh key pair unconditionally, invalidating every previously-issued
- * platform token; a routine deploy is no longer indistinguishable from a mass logout.
+ * <p>TD-SEC-002 (closed): on construction, checks for an already-persisted active key first (a
+ * durable restart) before generating a fresh one — a process restart used to generate a new key
+ * pair unconditionally, invalidating every previously-issued platform token (a routine deploy
+ * acting like a mass logout).
  *
- * <p>This class deliberately exposes only {@code java.security} types, not a Nimbus {@code
- * JWKSource} — building the actual {@code JWKSource<SecurityContext>} Spring Authorization Server's
- * filters read (spike §5.3, Appendix B) is protocol wiring that belongs in {@code app}'s own
- * infrastructure config, alongside the rest of the platform issuer's {@code SecurityFilterChain} —
- * not something identity-module itself needs to depend on
- * spring-security-oauth2-authorization-server to produce.
+ * <p>Exposes only {@code java.security} types, not a Nimbus {@code JWKSource} — building the real
+ * {@code JWKSource<SecurityContext>} is protocol wiring that belongs in {@code app}'s own config,
+ * not something identity-module needs spring-security-oauth2-authorization-server for.
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName rule flags {@code keyPair}/{@code kid} for the same
- * reason {@code Account} suppresses it — the deliberate record-style accessor convention used
- * throughout this codebase's value objects.
- *
- * <p>TD-SEC-054 (closed): this tier's key material now lives in its own {@link
- * KeyStoreScope#platform} file, separate from every Organization's own — see {@link
- * SigningKeyStore}'s own Javadoc for why the platform tier sharing one file with every tenant used
- * to mean a storage-layer compromise was never actually scoped to one tenant at all.
+ * <p>TD-SEC-054 (closed): key material now lives in its own {@link KeyStoreScope#platform} file,
+ * separate from every Organization's own. PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 @Component

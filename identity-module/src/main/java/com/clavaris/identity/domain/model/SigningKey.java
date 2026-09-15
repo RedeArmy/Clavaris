@@ -5,20 +5,13 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * BR-ORG-04: every {@code Organization} owns its own RS256 signing key pair — metadata-only here,
- * same split as {@link PlatformSigningKey}: the real key material never lives in this table
- * (data-model.md §2), only in {@code
- * infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory}. Structurally separate
- * from {@link PlatformSigningKey} on purpose (ADR-0010, Organization provisioning) — a
- * platform-tier key and a tenant's own key must never be confusable with each other.
+ * BR-ORG-04: every {@code Organization} owns its own RS256 key pair — metadata-only here, same
+ * split as {@link PlatformSigningKey}; the real key material lives in {@code
+ * OrganizationSigningKeyMaterialFactory} (data-model.md §2). Structurally separate from {@link
+ * PlatformSigningKey} (ADR-0010) — a platform-tier key and a tenant's own must never be confusable.
  *
- * <p>Shared state/lifecycle (everything except {@link #organizationId()}) lives on {@link
- * AbstractSigningKey} — see its own Javadoc for why this pair shares a base without a generic
- * owning-id type parameter (TD-ARCH-009).
- *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable rules flag this class for the same reason
- * {@link Account} suppresses them — the deliberate record-style accessor convention used throughout
- * this codebase's value objects.
+ * <p>Shared state/lifecycle lives on {@link AbstractSigningKey} (TD-ARCH-009). PMD suppressions
+ * below: coding-standards.md §3a.
  */
 @SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortVariable"})
 public final class SigningKey extends AbstractSigningKey {

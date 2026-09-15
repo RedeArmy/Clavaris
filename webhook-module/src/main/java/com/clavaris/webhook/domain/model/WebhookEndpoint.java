@@ -9,38 +9,21 @@ import java.util.UUID;
 
 /**
  * ADR-0007 §1/§2: a consumer's registered "push events here" URL, scoped to exactly one
- * Organization (ADR-0010) — one Organization may register several endpoints (e.g. a production and
- * a staging URL), each with its own independent signing secret and event-type subscription. {@code
- * organizationId} is a raw {@link UUID}, not identity-module's own {@code OrganizationId} value
- * type, same module-independence reason {@code OAuthClient}'s own field stays primitive-typed — the
- * hexagonal dependency rule applied at the module-graph level.
+ * Organization (ADR-0010) — one Organization may register several endpoints, each with its own
+ * signing secret and event-type subscription. {@code organizationId} is a raw {@link UUID}, not
+ * identity-module's own value type, same module-independence reason {@code OAuthClient}'s own field
+ * stays primitive-typed.
  *
- * <p>The signing secret itself is stored already-encrypted ({@code currentSecretEncrypted}) —
- * unlike {@code OAuthClient.clientSecretHash} (a one-way hash, only ever used to verify an inbound
- * credential), this secret must be recoverable in cleartext at delivery time to compute an outbound
- * HMAC signature, so a one-way hash cannot be the storage shape here. Encryption/decryption is an
- * infrastructure concern (see {@code WebhookSigningSecretCipher}) — this class only ever holds and
- * moves the already-encrypted string, the same "hashing happens at the port boundary" discipline
- * {@code OAuthClient}'s own Javadoc establishes for its own secret.
+ * <p>The signing secret is stored already-encrypted ({@code currentSecretEncrypted}), not hashed —
+ * unlike {@code OAuthClient.clientSecretHash}, it must be recoverable in cleartext at delivery time
+ * to compute an outbound HMAC signature. Encryption/decryption is an infrastructure concern ({@code
+ * WebhookSigningSecretCipher}); this class only holds and moves the encrypted string.
  *
- * <p><b>Secret rotation (ADR-0007's own first open question, resolved):</b> {@link #rotateSecret}
- * keeps the previous secret alongside the new one, valid until {@code previousSecretExpiresAt} —
- * the dispatcher signs every delivery with both while the overlap window is open (Stripe's own
- * "multiple signatures during rotation" pattern), giving the endpoint owner time to switch their
- * own verification code over before the old secret stops being honoured. Same "current + previous
- * with bounded overlap" shape as {@code SigningKey} rotation in identity-module, applied to a
- * symmetric secret instead of an asymmetric key pair.
+ * <p>{@link #rotateSecret} keeps the previous secret valid until {@code previousSecretExpiresAt} —
+ * the dispatcher signs with both during the overlap window (Stripe's own rotation pattern), same
+ * "current + previous with bounded overlap" shape as identity-module's {@code SigningKey}.
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason {@code OAuthClient} suppresses them — the deliberate record-style accessor
- * convention used throughout this codebase's value objects. TooManyMethods is the same shape of
- * false positive: ten one-line accessors plus factories/mutators is what a value object with this
- * many fields looks like, not a sign this class does too much. LongVariable: every one of these
- * field names is the exact, spec-shaped term for what it holds, not arbitrarily long — same
- * precedent {@code OAuthClient}'s own suppression already establishes. Unlike {@code
- * WebhookDelivery}, this class's own {@code rotateSecret}/{@code deactivate}/{@code activate}/
- * {@code subscribesTo}/{@code activeSecretsEncrypted} methods carry enough real behaviour that
- * PMD's own DataClass metric doesn't flag it — no suppression needed for that one.
+ * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
@@ -217,18 +200,12 @@ public final class WebhookEndpoint {
     return value;
   }
 
-  // BR-WEBHOOK-07: https only. Signing a payload proves it came from Clavaris and wasn't altered
-  // in transit, but says nothing about confidentiality — a plain-http delivery would still expose
-  // the payload (and, structurally, everything an attacker needs to forge a valid signature isn't
-  // in the payload, but the payload itself can carry ids/roles worth keeping off the wire in the
-  // clear) to any network observer. Same "meaningless without TLS" reasoning redirect_uris would
-  // have if BR-CLIENT-01 allowed a bare http:// entry.
+  // BR-WEBHOOK-07: https only — a signature proves origin/integrity, not confidentiality; plain
+  // http would still expose the payload to any network observer.
   //
-  // TD-ARCH-019: the well-formedness/absoluteness/https-only check itself is delegated to the
-  // shared common/ validator — this SSRF-adjacent (private/loopback/cloud-metadata) address check
-  // is a separate, deliberately later concern, done at registration and delivery time by
-  // WebhookUrlSsrfChecker (TD-SEC-053), not here: this constructor-time check only proves the URL
-  // is well-shaped, not that it's safe to actually connect to.
+  // TD-ARCH-019: only checks well-formedness/https here — the separate SSRF-adjacent
+  // (private/loopback/cloud-metadata) address check is WebhookUrlSsrfChecker's own job
+  // (TD-SEC-053), not this constructor's.
   private static String requireValidUrl(final String url) {
     requireNonBlank(url, "url");
     return AbsoluteHttpsUrlValidator.requireAbsoluteHttps(url, "url");

@@ -5,20 +5,13 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Aggregate root. BR-ID-02: an {@code Account} is never valid with zero authentication methods —
- * enforced here, in the aggregate, not in a use-case service, so the invariant holds no matter
- * which future use case touches an account. ADR-0010: {@code organizationId} is mandatory and
- * immutable — there is no factory path that produces an {@code Account} without a tenant.
+ * Aggregate root. BR-ID-02: never valid with zero authentication methods, enforced here so no
+ * future use case can bypass it. ADR-0010: {@code organizationId} is mandatory and immutable.
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * its many single-word accessors ({@code id()}, {@code email()}, ...) matching the field names they
- * read — that's the deliberate record-style accessor convention used throughout this codebase's
- * value objects ({@code AccountId.value()}, etc.), not an accidental data-holder shape.
- * (PMD.DataClass itself no longer fires here — enough real behaviour now lives in this class, e.g.
- * {@link #verifyEmail()}/{@link #resetPasswordCredential}, that PMD stopped considering it a bag of
- * fields, which is exactly the point.) TooManyMethods is suppressed below: an aggregate root
- * accumulating one more mutator per use case that touches it (BR-ID-02, BR-ID-04, BR-ID-05) is
- * growth in the right place, not a sign this class should be split.
+ * <p>PMD suppressions below back the record-style accessor convention documented once in
+ * coding-standards.md §3a, not an accidental data-holder shape. {@code TooManyMethods}: one more
+ * mutator per use case that touches this aggregate (BR-ID-02, BR-ID-04, BR-ID-05) is growth in the
+ * right place, not a signal to split the class.
  */
 @SuppressWarnings({
   "PMD.TooManyMethods",
@@ -35,24 +28,17 @@ public final class Account {
   private final Instant createdAt;
   private Instant emailVerifiedAt;
 
-  // Not final: mutated by suspend()/reactivate() (BR-ID-08) — the future use case this field's own
-  // comment used to anticipate has now arrived, so the PMD.ImmutableField suppression that used to
-  // sit here is gone too (PMD's own UnnecessaryWarningSuppression rule correctly flags a
-  // suppression for a violation that no longer fires).
+  // Not final: mutated by suspend()/reactivate() (BR-ID-08).
   private AccountStatus status;
 
   private PasswordCredential passwordCredential;
 
-  // ADR-0024 §4: an optional, additional identifier — Account.email stays the mandatory, primary
-  // identity (see AccountAuthenticationPolicy's own Javadoc for why making email itself optional
-  // is out of scope) — never set at construction, only via assignUsername below, same "attach
-  // after the fact" convention attachPasswordCredential already establishes.
+  // ADR-0024 §4: optional secondary identifier, attached after registration via assignUsername —
+  // email stays the mandatory primary identity.
   private Username username;
 
-  // Clerk "session tasks" parity: an admin-forced "must change password before this account may
-  // finish signing in again" marker (null for the overwhelming common case — never forced). Not a
-  // boolean: the timestamp itself is useful audit context (when was this required), same reasoning
-  // emailVerifiedAt already establishes for "presence/absence plus a timestamp" over a bare flag.
+  // Clerk "session tasks" parity: admin-forced password-reset marker, null when not required. A
+  // timestamp, not a boolean, for its audit value (same reasoning as emailVerifiedAt).
   private Instant passwordResetRequiredAt;
 
   private Account(
@@ -69,10 +55,9 @@ public final class Account {
   }
 
   /**
-   * Registers a new account. Deliberately does not attach a credential — a caller must call {@link
-   * #attachPasswordCredential(String)} (or link a {@code SocialIdentity}, ADR-0020) in the same use
-   * case, before the aggregate is persisted, so that "an Account with no credential yet" is never a
-   * state observable outside this package (BR-ID-02).
+   * Registers a new account without a credential attached — the caller must attach one (password or
+   * a social identity, ADR-0020) before persisting, so "no credential yet" is never observable
+   * outside this package (BR-ID-02).
    */
   public static Account register(final OrganizationId organizationId, final Email email) {
     return new Account(
@@ -80,15 +65,11 @@ public final class Account {
   }
 
   /**
-   * Attaches a password credential to this (freshly registered) account. BR-ID-01: only ever
-   * receives an already-hashed value — see {@link PasswordCredential#issue}. Throws if a credential
-   * is already attached: this method models registration-time attachment, not a password-change
-   * flow (a separate, future use case with its own invariants — e.g. requiring the current
-   * password, per BR-ID-04's "assume prior sessions compromised" stance on reset).
+   * Attaches a password credential at registration time — BR-ID-01: {@code passwordHash} must
+   * already be hashed (see {@link PasswordCredential#issue}). Throws if one is already attached;
+   * password changes go through {@link #resetPasswordCredential}, not this method.
    */
-  // PMD.NullAssignment: the null below deliberately CLEARS passwordResetRequiredAt (an
-  // already-satisfied requirement), not an accidental discard of a value worth keeping — see the
-  // comment on that line for why.
+  // PMD.NullAssignment: deliberately clears passwordResetRequiredAt, not an accidental discard.
   @SuppressWarnings("PMD.NullAssignment")
   public void attachPasswordCredential(final String passwordHash) {
     if (this.passwordCredential != null) {
@@ -96,19 +77,14 @@ public final class Account {
           "Account " + id.value() + " already has a password credential attached");
     }
     this.passwordCredential = PasswordCredential.issue(id, passwordHash);
-    // Clerk "session tasks" parity: same "any real password-setting call satisfies the
-    // requirement" reasoning as resetPasswordCredential's own identical statement — covers the
-    // edge case of a password-optional account (ADR-0024 §5) being forced to set its first
-    // password rather than rotate an existing one.
+    // Clerk "session tasks" parity: setting a password always clears any pending requirement.
     this.passwordResetRequiredAt = null;
   }
 
   /**
-   * ADR-0024 §4: assigns this (freshly registered) account's username — same "attach after the
-   * fact, never at construction" convention {@link #attachPasswordCredential} already establishes.
-   * {@code RegisterAccountService} is the only caller in v1 (no separate "change username" use case
-   * exists yet) — throws if one is already assigned, same registration-time-only invariant {@link
-   * #attachPasswordCredential}'s own guard establishes for its own field.
+   * ADR-0024 §4: assigns the username (registration-time only, no separate "change" use case in v1)
+   * — throws if one is already assigned, same invariant {@link #attachPasswordCredential} enforces
+   * for its own field.
    */
   public void assignUsername(final Username username) {
     if (this.username != null) {
@@ -118,17 +94,10 @@ public final class Account {
   }
 
   /**
-   * Rehydrates an existing row — preserves the real persisted {@code id}/{@code createdAt}/{@code
-   * status}, same discipline as {@code SigningKey#reconstitute}/{@code OAuthClient#reconstitute}.
-   * Unlike {@link #register}, this accepts an already-issued {@link PasswordCredential} directly
-   * (via {@link PasswordCredential#reconstitute}) rather than going through {@link
-   * #attachPasswordCredential(String)} — that method's "must not already have one" guard models a
-   * registration-time invariant, not a rehydration-from-storage one. {@code passwordCredential} may
-   * be {@code null} for an account whose only authentication method is a social identity (ADR-0020)
-   * — BR-ID-02 still guarantees at least one exists, just not necessarily this one.
-   *
-   * @param username ADR-0024 §4: {@code null} for every account that never set one (the common
-   *     case) — see {@link #assignUsername} for why this is never set at construction time.
+   * Rehydrates an existing row, preserving the real {@code id}/{@code createdAt}/{@code status}.
+   * {@code passwordCredential}/{@code username} may be {@code null} (a social-identity-only
+   * account, ADR-0020; a username never assigned, ADR-0024 §4) — BR-ID-02 still guarantees at least
+   * one authentication method exists.
    */
   @SuppressWarnings("java:S107")
   public static Account reconstitute(
@@ -186,10 +155,8 @@ public final class Account {
   }
 
   /**
-   * Confirms the email of record — {@code ConfirmEmailVerificationService} calls this only after
-   * validating a single-use {@code VerificationToken} (BR-ID-05). Idempotent by design: a token is
-   * single-use so this normally runs once, but re-confirming an already-verified account is a
-   * harmless no-op, not an error worth failing the request over.
+   * Confirms the email (BR-ID-05, after a single-use {@code VerificationToken} check). Idempotent —
+   * re-confirming an already-verified account is a harmless no-op.
    */
   public void verifyEmail() {
     if (this.emailVerifiedAt == null) {
@@ -198,22 +165,10 @@ public final class Account {
   }
 
   /**
-   * Replaces the account's password credential's hash in place — the password-reset flow
-   * (BR-ID-04), not registration-time attachment ({@link #attachPasswordCredential}), which is why
-   * this method exists separately and has no "must not already have one" guard. Requires an
-   * existing credential: a reset presupposes something to reset, and an account with only a (not
-   * yet implemented) social identity has no password to replace — that case is the caller's (the
-   * use case's) responsibility to reject before ever reaching this method, not this method's to
-   * silently attach a first one.
-   *
-   * <p>Deliberately reuses the existing credential's own {@code id} via {@link
-   * PasswordCredential#reconstitute} rather than {@link PasswordCredential#issue}, which mints a
-   * fresh random one — confirmed live (a real integration test, not just inspection) that minting a
-   * new id here makes {@code JpaAccountRepository#save} attempt an INSERT of a second {@code
-   * password_credentials} row for the same account, violating the table's own {@code
-   * UNIQUE(account_id)} constraint (data-model.md §2) the moment a real reset ran end to end. This
-   * is an update to the one credential row an account may ever have, not a replacement of it with
-   * an unrelated new one.
+   * Password-reset flow (BR-ID-04) — replaces the hash in place; requires an existing credential.
+   * {@link #attachPasswordCredential} is registration-time only, not this. Reuses the existing
+   * row's own {@code id} rather than minting a fresh one (confirmed live: a fresh id
+   * duplicate-inserts against {@code password_credentials}' own {@code UNIQUE(account_id)}).
    */
   // PMD.NullAssignment: same deliberate-clear rationale as attachPasswordCredential's own
   // identical suppression.
@@ -226,20 +181,13 @@ public final class Account {
     this.passwordCredential =
         PasswordCredential.reconstitute(
             this.passwordCredential.id(), id, newPasswordHash, Instant.now());
-    // Clerk "session tasks" parity: a real password change (via any of this method's callers,
-    // self-service ConfirmPasswordResetService included) always satisfies an outstanding
-    // requirement — there is no separate "acknowledge the requirement without actually changing
-    // the password" path, so clearing it here (rather than in each individual caller) is the one
-    // place this can never be missed.
+    // Clerk "session tasks" parity: any real password change clears an outstanding requirement.
     this.passwordResetRequiredAt = null;
   }
 
   /**
-   * Clerk "session tasks" parity: an operator-forced "must set a new password before this account
-   * may finish signing in again" — {@code ForcePasswordResetForAccountService}'s own state
-   * transition. Idempotent, same reasoning as {@link #suspend()}: re-forcing an already-pending
-   * requirement doesn't stamp a fresh timestamp — the original "since when" is the more useful
-   * audit fact to keep.
+   * Clerk "session tasks" parity: operator-forced password reset before the next sign-in completes.
+   * Idempotent — re-forcing keeps the original timestamp, the more useful audit fact.
    */
   public void requirePasswordReset() {
     if (this.passwordResetRequiredAt == null) {
@@ -248,15 +196,9 @@ public final class Account {
   }
 
   /**
-   * Reversible ban/suspend — {@code SuspendAccountService}'s own state transition. {@code
-   * AuthenticateWithPasswordService} already rejects any non-{@link AccountStatus#ACTIVE} account
-   * before touching the password hash at all, so this method's only job is the transition itself;
-   * killing an already-live session/token is the calling service's own responsibility (same "domain
-   * mutates state, use case orchestrates side effects" split every other mutator here follows).
-   * Idempotent, same reasoning as {@link #verifyEmail()}: re-suspending an already-{@code
-   * SUSPENDED} account is a harmless no-op, not an error worth failing the request over. Does
-   * nothing to a {@link AccountStatus#DELETED} account — that status is terminal (BR-DATA-03, a
-   * hard delete in v1), never reversible by this method.
+   * Reversible suspend (BR-ID-08) — {@code AuthenticateWithPasswordService} already rejects any
+   * non-{@code ACTIVE} account, so killing a live session/token is the calling use case's job, not
+   * this method's. Idempotent; no-ops on a terminal {@code DELETED} account (BR-DATA-03).
    */
   public void suspend() {
     if (this.status == AccountStatus.ACTIVE) {
@@ -264,11 +206,7 @@ public final class Account {
     }
   }
 
-  /**
-   * Reverses {@link #suspend()} — {@code ReactivateAccountService}'s own state transition.
-   * Idempotent, same reasoning as {@link #suspend()}. Does nothing to a {@link
-   * AccountStatus#DELETED} account, same terminal-status reasoning as {@link #suspend()}.
-   */
+  /** Reverses {@link #suspend()} — same idempotent and terminal-status handling. */
   public void reactivate() {
     if (this.status == AccountStatus.SUSPENDED) {
       this.status = AccountStatus.ACTIVE;
