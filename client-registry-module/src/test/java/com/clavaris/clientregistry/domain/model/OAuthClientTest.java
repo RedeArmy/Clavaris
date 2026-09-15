@@ -343,10 +343,61 @@ class OAuthClientTest {
             true,
             List.of(),
             persistedCreatedAt,
-            true);
+            true,
+            3);
 
     assertThat(client.id()).isEqualTo(persistedId);
     assertThat(client.createdAt()).isEqualTo(persistedCreatedAt);
+    assertThat(client.version()).isEqualTo(3);
+  }
+
+  // SDE-III review, 2026-09-15: version() semantics — see ConcurrentClientModificationException's
+  // own Javadoc for the lost-update race the whole field exists to close. Both mutators must
+  // preserve the current in-memory version unchanged (the real increment happens at the DB layer,
+  // via the JPA entity's own @Version field, at the next successful save()) — asserted against a
+  // real, nonzero, reconstitute()-read version, not register()'s always-0 default.
+  @Test
+  void rotateSecretPreservesTheCurrentVersionRatherThanResettingIt() {
+    OAuthClient rehydrated =
+        OAuthClient.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            "a-client",
+            "old-hash",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OAuthClient rotated = rehydrated.rotateSecret("new-hash");
+
+    assertThat(rotated.version()).isEqualTo(5);
+  }
+
+  @Test
+  void deactivatePreservesTheCurrentVersionRatherThanResettingIt() {
+    OAuthClient rehydrated =
+        OAuthClient.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            "a-client",
+            "hash",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OAuthClient deactivated = rehydrated.deactivate();
+
+    assertThat(deactivated.version()).isEqualTo(5);
   }
 
   @Test

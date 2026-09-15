@@ -1,11 +1,13 @@
 package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.PlatformClient;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -45,16 +47,25 @@ class JpaPlatformClientRepository implements PlatformClientRepository {
     return platformClients.findById(id).map(this::toDomain);
   }
 
+  // SDE-III review, 2026-09-15: same conflict translation, and same saveAndFlush-not-save
+  // reasoning, as JpaOAuthClientRepository's own identical catch — see
+  // ConcurrentClientModificationException's own Javadoc for the rationale. Highest-value
+  // credential in the system — the one this race matters most for.
   @Override
   public void save(final PlatformClient platformClient) {
-    platformClients.save(
-        new PlatformClientEntity(
-            platformClient.id(),
-            platformClient.clientId(),
-            platformClient.clientSecretHash(),
-            objectMapper.writeValueAsString(platformClient.allowedScopes()),
-            platformClient.createdAt(),
-            platformClient.active()));
+    try {
+      platformClients.saveAndFlush(
+          new PlatformClientEntity(
+              platformClient.id(),
+              platformClient.clientId(),
+              platformClient.clientSecretHash(),
+              objectMapper.writeValueAsString(platformClient.allowedScopes()),
+              platformClient.createdAt(),
+              platformClient.active(),
+              platformClient.version()));
+    } catch (final OptimisticLockingFailureException _) {
+      throw new ConcurrentClientModificationException(platformClient.clientId());
+    }
   }
 
   private PlatformClient toDomain(final PlatformClientEntity entity) {
@@ -66,6 +77,7 @@ class JpaPlatformClientRepository implements PlatformClientRepository {
         entity.getClientSecretHash(),
         scopes,
         entity.getCreatedAt(),
-        entity.isActive());
+        entity.isActive(),
+        entity.getVersion());
   }
 }

@@ -12,6 +12,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretCommand;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.KeysetPage;
@@ -217,9 +218,15 @@ public class PlatformOAuthClientController {
     final DashboardControllerSupport.OwnedOrganization owned =
         requireOwnedOAuthClient(request, organizationId, clientId);
 
-    deactivateClient.handle(
-        new DeactivateOAuthClientCommand(
-            clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    try {
+      deactivateClient.handle(
+          new DeactivateOAuthClientCommand(
+              clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final ConcurrentClientModificationException _) {
+      // SDE-III review, 2026-09-15: OAuthClient's own @Version-backed conflict — see
+      // ConcurrentClientModificationException's own Javadoc for the lost-update race this closes.
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
 
     if (DashboardControllerSupport.isHtmxRequest(request)) {
       renderOAuthClientsList(
@@ -239,10 +246,15 @@ public class PlatformOAuthClientController {
     final DashboardControllerSupport.OwnedOrganization owned =
         requireOwnedOAuthClient(request, organizationId, clientId);
 
-    final RotateOAuthClientSecretResult result =
-        rotateClientSecret.handle(
-            new RotateOAuthClientSecretCommand(
-                clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    final RotateOAuthClientSecretResult result;
+    try {
+      result =
+          rotateClientSecret.handle(
+              new RotateOAuthClientSecretCommand(
+                  clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
 
     model.addAttribute("justRegisteredRawSecret", result.rawSecret());
     model.addAttribute("justRegisteredClientId", result.clientId());

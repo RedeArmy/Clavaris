@@ -1,7 +1,9 @@
 package com.clavaris.app.infrastructure.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
+import org.springframework.session.web.http.CookieSerializer;
 
 /**
  * TD-ARCH-002 (closed): {@code HttpSession} backed by real Redis, not servlet-container heap — a
@@ -40,6 +42,17 @@ import org.springframework.session.data.redis.config.annotation.web.http.EnableR
  * its cron — see that test config's own Javadoc for why a property override couldn't do it). Real
  * deployments are unaffected: this class's own annotation attribute, and therefore production's
  * real minute-by-minute cleanup, is untouched.
+ *
+ * <p><b>SDE-III review, 2026-09-15 — real bug found and closed:</b> {@link
+ * #sessionCookieSerializer()} below is Spring Session's own documented customization point (a
+ * {@code CookieSerializer} bean anywhere in the context is auto-wired into {@code
+ * SpringHttpSessionConfiguration}, which {@code @EnableRedisIndexedHttpSession} builds on top of,
+ * with no further wiring needed here) — left unset before this fix, so the session cookie shipped
+ * with Spring Session's own default {@code SameSite=Lax} everywhere, including for the {@code
+ * display=modal} embedded/iframe login flow {@code ContentSecurityPolicyHeaderWriter}'s own {@code
+ * frame-ancestors} relaxation exists to support. See {@link ModalAwareSessionCookieSerializer}'s
+ * own Javadoc for the full failure mode this closes and why the fix is conditional, not a blanket
+ * {@code SameSite=None}.
  */
 @Configuration
 @EnableRedisIndexedHttpSession(
@@ -50,5 +63,10 @@ class DistributedSessionConfig {
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ DistributedSessionConfig() {
     // Intentionally empty — this class holds no state, only the class-level annotation above.
+  }
+
+  @Bean
+  /* package */ CookieSerializer sessionCookieSerializer() {
+    return new ModalAwareSessionCookieSerializer();
   }
 }

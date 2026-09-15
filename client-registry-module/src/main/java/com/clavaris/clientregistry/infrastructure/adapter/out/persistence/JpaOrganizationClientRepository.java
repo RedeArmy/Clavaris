@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
@@ -10,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,17 +52,25 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
         .toList();
   }
 
+  // SDE-III review, 2026-09-15: same conflict translation, and same saveAndFlush-not-save
+  // reasoning, as JpaOAuthClientRepository's own identical catch — see
+  // ConcurrentClientModificationException's own Javadoc for the rationale.
   @Override
   public void save(final OrganizationClient organizationClient) {
-    organizationClients.save(
-        new OrganizationClientEntity(
-            organizationClient.id(),
-            organizationClient.organizationId(),
-            organizationClient.clientId(),
-            organizationClient.clientSecretHash(),
-            objectMapper.writeValueAsString(organizationClient.allowedScopes()),
-            organizationClient.createdAt(),
-            organizationClient.active()));
+    try {
+      organizationClients.saveAndFlush(
+          new OrganizationClientEntity(
+              organizationClient.id(),
+              organizationClient.organizationId(),
+              organizationClient.clientId(),
+              organizationClient.clientSecretHash(),
+              objectMapper.writeValueAsString(organizationClient.allowedScopes()),
+              organizationClient.createdAt(),
+              organizationClient.active(),
+              organizationClient.version()));
+    } catch (final OptimisticLockingFailureException _) {
+      throw new ConcurrentClientModificationException(organizationClient.clientId());
+    }
   }
 
   @Override
@@ -117,6 +127,7 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
         entity.getClientSecretHash(),
         scopes,
         entity.getCreatedAt(),
-        entity.isActive());
+        entity.isActive(),
+        entity.getVersion());
   }
 }

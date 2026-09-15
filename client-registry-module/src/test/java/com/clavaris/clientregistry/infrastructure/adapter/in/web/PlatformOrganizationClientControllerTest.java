@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.clavaris.clientregistry.application.usecase.listorganizationclientspa
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.common.domain.model.KeysetCursor;
@@ -179,6 +181,36 @@ class PlatformOrganizationClientControllerTest {
     verify(createClient, never()).handle(any());
   }
 
+  // SDE-III review, 2026-09-15: the create form must never even offer an operator-only scope as a
+  // checkbox option — see PlatformScopes.OPERATOR_ONLY's own Javadoc for the regression this
+  // guards (an Organization minting its own Secret Key with RATE_LIMIT_POLICY_WRITE via this exact
+  // dashboard).
+  @Test
+  void theAllScopesModelAttributeExcludesEveryOperatorOnlyScope() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("allScopes", PlatformScopes.ORGANIZATION_CLIENT_ALLOWED));
+  }
+
+  // Defense in depth: OrganizationClient.register's own domain-level guard is the real,
+  // unconditional invariant (proved directly in OrganizationClientTest) — this proves the web
+  // layer surfaces that as a clean 400, not GlobalExceptionHandler's catch-all 500, when a request
+  // bypasses the rendered form (a raw POST, or a stale/tampered submission).
+  @Test
+  void createRespondsBadRequestWhenTheUseCaseRejectsAnOperatorOnlyScope() throws Exception {
+    when(createClient.handle(any()))
+        .thenThrow(
+            new IllegalArgumentException(
+                "allowedScopes contains an operator-only scope not permitted on an"
+                    + " OrganizationClient: "
+                    + PlatformScopes.RATE_LIMIT_POLICY_WRITE));
+
+    mockMvc
+        .perform(post(basePath()).param("allowedScopes", PlatformScopes.RATE_LIMIT_POLICY_WRITE))
+        .andExpect(status().isBadRequest());
+  }
+
   @Test
   void plainDeactivatePostRedirectsOnSuccess() throws Exception {
     OrganizationClient client = sampleClient();
@@ -227,6 +259,33 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(status().isNotFound());
 
     verify(rotateClientSecret, never()).handle(any());
+  }
+
+  // SDE-III review, 2026-09-15: the web-layer half of the optimistic-locking fix — see
+  // PlatformOAuthClientControllerTest's own identical pair for the full rationale.
+  @Test
+  void deactivateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OrganizationClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    doThrow(new ConcurrentClientModificationException(client.clientId()))
+        .when(deactivateClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void rotateSecretReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OrganizationClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    when(rotateClientSecret.handle(any()))
+        .thenThrow(new ConcurrentClientModificationException(client.clientId()));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/rotate-secret"))
+        .andExpect(status().isConflict());
   }
 
   // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the

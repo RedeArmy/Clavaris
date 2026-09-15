@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
@@ -270,5 +272,35 @@ class PlatformOAuthClientControllerTest {
         .andExpect(status().isNotFound());
 
     verify(rotateClientSecret, never()).handle(any());
+  }
+
+  // SDE-III review, 2026-09-15: the web-layer half of the optimistic-locking fix — OAuthClient's
+  // own @Version-backed conflict (proved directly against real Postgres in
+  // JpaOAuthClientRepositoryTest) is the real, unconditional guarantee; these prove it surfaces
+  // as a clean 409, not Spring MVC's default 500 for an unhandled ResponseStatusException-less
+  // RuntimeException.
+  @Test
+  void deactivateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OAuthClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    doThrow(new ConcurrentClientModificationException(client.clientId()))
+        .when(deactivateClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void rotateSecretReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OAuthClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    when(rotateClientSecret.handle(any()))
+        .thenThrow(new ConcurrentClientModificationException(client.clientId()));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/rotate-secret"))
+        .andExpect(status().isConflict());
   }
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -60,6 +61,14 @@ public class OAuthClientEntity {
   @Column(nullable = false)
   private boolean active;
 
+  // SDE-III review, 2026-09-15: closes a real lost-update race — see
+  // ConcurrentClientModificationException's own Javadoc for the full rationale. @Version, not a
+  // plain @Column: Hibernate manages this field itself (SELECTs it, includes it in every UPDATE's
+  // WHERE clause, increments it, and throws on a mismatch) — no application code ever sets it.
+  @Version
+  @Column(nullable = false)
+  private int version;
+
   protected OAuthClientEntity() {}
 
   // One parameter per persisted column — same convention as every other *Entity in this codebase
@@ -76,7 +85,8 @@ public class OAuthClientEntity {
       final boolean requireConsent,
       final String postLogoutRedirectUris,
       final Instant createdAt,
-      final boolean active) {
+      final boolean active,
+      final int version) {
     this.id = id;
     this.organizationId = organizationId;
     this.clientId = clientId;
@@ -88,6 +98,7 @@ public class OAuthClientEntity {
     this.postLogoutRedirectUris = postLogoutRedirectUris;
     this.createdAt = createdAt;
     this.active = active;
+    this.version = version;
   }
 
   public UUID getId() {
@@ -132,5 +143,9 @@ public class OAuthClientEntity {
 
   public boolean isActive() {
     return active;
+  }
+
+  public int getVersion() {
+    return version;
   }
 }

@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
@@ -10,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -40,21 +42,38 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
     this.objectMapper = objectMapper;
   }
 
+  // SDE-III review, 2026-09-15: ConcurrentClientModificationException's own Javadoc has the full
+  // rationale — client.version() is the version this OAuthClient was read at (unchanged through
+  // deactivate()/rotateSecret()'s own immutable-mutation shape), so merge()'s own version check
+  // against the real, current DB row is exactly the guard a racing deactivate+rotate-secret pair
+  // needed. OptimisticLockingFailureException, Spring's own portable exception — never the
+  // JPA/Hibernate-specific one — is the only type this catch ever needs to know about.
+  //
+  // saveAndFlush, not save: confirmed live (a real integration test initially failed on exactly
+  // this) that Hibernate defers a merge()'s actual UPDATE to flush/commit time by default, well
+  // after this method already returned — the conflict was thrown from the *caller's* transaction
+  // commit, past this catch entirely, silently defeating it. Forcing the flush here makes the
+  // version check run synchronously, inside this try, where the catch below can actually see it.
   @Override
   public void save(final OAuthClient client) {
-    oauthClients.save(
-        new OAuthClientEntity(
-            client.id(),
-            client.organizationId(),
-            client.clientId(),
-            client.clientSecretHash(),
-            objectMapper.writeValueAsString(client.redirectUris()),
-            objectMapper.writeValueAsString(client.allowedGrantTypes()),
-            objectMapper.writeValueAsString(client.allowedScopes()),
-            client.requireConsent(),
-            objectMapper.writeValueAsString(client.postLogoutRedirectUris()),
-            client.createdAt(),
-            client.active()));
+    try {
+      oauthClients.saveAndFlush(
+          new OAuthClientEntity(
+              client.id(),
+              client.organizationId(),
+              client.clientId(),
+              client.clientSecretHash(),
+              objectMapper.writeValueAsString(client.redirectUris()),
+              objectMapper.writeValueAsString(client.allowedGrantTypes()),
+              objectMapper.writeValueAsString(client.allowedScopes()),
+              client.requireConsent(),
+              objectMapper.writeValueAsString(client.postLogoutRedirectUris()),
+              client.createdAt(),
+              client.active(),
+              client.version()));
+    } catch (final OptimisticLockingFailureException _) {
+      throw new ConcurrentClientModificationException(client.clientId());
+    }
   }
 
   @Override
@@ -132,7 +151,8 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
         entity.isRequireConsent(),
         readJsonArray(entity.getPostLogoutRedirectUris()),
         entity.getCreatedAt(),
-        entity.isActive());
+        entity.isActive(),
+        entity.getVersion());
   }
 
   private List<String> readJsonArray(final String json) {

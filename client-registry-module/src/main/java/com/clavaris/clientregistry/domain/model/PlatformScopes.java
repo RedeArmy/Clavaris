@@ -243,6 +243,34 @@ public final class PlatformScopes {
           CLIENT_BRANDING_WRITE,
           CLIENT_DOMAIN_WRITE);
 
+  /**
+   * SDE-III review, 2026-09-15 — real gap found and closed: every scope above whose own Javadoc
+   * already says "operator-only"/"operator-managed only in v1" ({@link #RATE_LIMIT_POLICY_WRITE},
+   * ADR-0010 §6.2; {@link #SIGNING_KEYS_ROTATE}, TD-SEC-008/ADR-0010 §5.2; {@link
+   * #SOCIAL_LOGIN_POLICY_WRITE}, ADR-0020 Decision 3) was still mintable into a tenant-owned {@code
+   * OrganizationClient} (Secret Key) via ADR-0025's self-service dashboard, because {@link
+   * #requireValidScopes} only ever checked "is this a real, known scope," never "is this scope
+   * reserved to the operator's own {@code PlatformClient}." CLAUDE.md §6 locks this exact
+   * distinction for the rate-limit case ("operator-managed only in v1, tenant self-service is a
+   * v1.1 item gated on audit logging") — an Organization minting its own Secret Key with this scope
+   * was a live contradiction of that decision, not a hypothetical. See {@link
+   * #requireValidScopesForOrganizationClient}, the narrower validator {@code
+   * OrganizationClient#register} now calls instead of the generic one below.
+   */
+  public static final List<String> OPERATOR_ONLY =
+      List.of(RATE_LIMIT_POLICY_WRITE, SIGNING_KEYS_ROTATE, SOCIAL_LOGIN_POLICY_WRITE);
+
+  /**
+   * ADR-0023 / SDE-III review, 2026-09-15: {@link #BOOTSTRAP_DEFAULT} minus {@link #OPERATOR_ONLY}
+   * — the vocabulary {@code PlatformOrganizationClientController}'s own create-form now offers, so
+   * the dashboard never presents an option {@link #requireValidScopesForOrganizationClient} would
+   * reject anyway. A {@code List}, not a {@code Set}: iteration order must stay stable and match
+   * {@link #BOOTSTRAP_DEFAULT}'s own declared order, the same convention every other scope-list
+   * constant on this class already follows.
+   */
+  public static final List<String> ORGANIZATION_CLIENT_ALLOWED =
+      BOOTSTRAP_DEFAULT.stream().filter(scope -> !OPERATOR_ONLY.contains(scope)).toList();
+
   private PlatformScopes() {}
 
   /**
@@ -254,6 +282,11 @@ public final class PlatformScopes {
    * third one: {@link #BOOTSTRAP_DEFAULT} is already the single source of truth for "every platform
    * scope that exists," so the validation that reads it lives next to it.
    *
+   * <p>{@code PlatformClient} (the operator's own credential, ADR-0023) is the only caller that
+   * still uses this directly — it alone may hold every scope that exists, {@link #OPERATOR_ONLY}
+   * included. {@code OrganizationClient} calls {@link #requireValidScopesForOrganizationClient}
+   * instead, never this method.
+   *
    * @throws IllegalArgumentException if any entry isn't a member of {@link #BOOTSTRAP_DEFAULT}
    */
   public static List<String> requireValidScopes(final List<String> allowedScopes) {
@@ -264,5 +297,35 @@ public final class PlatformScopes {
       }
     }
     return List.copyOf(allowedScopes);
+  }
+
+  /**
+   * ADR-0023 / SDE-III review, 2026-09-15: the narrower validator for a tenant-owned {@code
+   * OrganizationClient} (Secret Key) — see {@link #OPERATOR_ONLY}'s own Javadoc for the real
+   * regression this closes. Delegates to {@link #requireValidScopes} first (still must be a real,
+   * known {@code platform:*} scope), then additionally rejects any {@link #OPERATOR_ONLY} entry.
+   * Applies regardless of which caller mints the credential (the REST admin API or the dashboard's
+   * own self-service form, {@code CreateOrganizationClientController}/{@code
+   * PlatformOrganizationClientController}) — the invariant is about what an {@code
+   * OrganizationClient} may ever hold, not about who is minting it: an operator handing one of
+   * these scopes to a brand-new Secret Key would defeat the "operator-managed only" restriction
+   * exactly as much as a tenant granting it to themselves, once that Secret Key exists and can be
+   * used on the tenant's own behalf.
+   *
+   * @throws IllegalArgumentException if any entry isn't a known scope, or is reserved to {@code
+   *     PlatformClient}-only administration ({@link #OPERATOR_ONLY})
+   */
+  public static List<String> requireValidScopesForOrganizationClient(
+      final List<String> allowedScopes) {
+    final List<String> validated = requireValidScopes(allowedScopes);
+    for (final String scope : validated) {
+      if (OPERATOR_ONLY.contains(scope)) {
+        throw new IllegalArgumentException(
+            "allowedScopes contains an operator-only scope not permitted on an"
+                + " OrganizationClient: "
+                + scope);
+      }
+    }
+    return validated;
   }
 }
