@@ -71,7 +71,7 @@ class OrganizationEventOutboxRetentionJobTest {
   @Test
   void sweepsRowsThatWereAllAlreadyPublishedWithoutTreatingThatAsAnAnomaly() {
     // Distinct from the mixed-status case above: every swept row was already published, so the
-    // job's own "deleted > 0 && stillUnpublished == 0" branch (plain info log, not a warning) is
+    // job's own "deleted > 0 && deadLettered == 0" branch (plain info log, not a warning) is
     // the one exercised here — both post-sweep logging outcomes now have real coverage.
     insertRow(Instant.now().minus(100, ChronoUnit.DAYS), Instant.now().minus(99, ChronoUnit.DAYS));
 
@@ -80,6 +80,53 @@ class OrganizationEventOutboxRetentionJobTest {
     Long remaining =
         jdbcTemplate.queryForObject("select count(*) from organization_event_outbox", Long.class);
     assertThat(remaining).isZero();
+  }
+
+  // SDE-III review, 2026-09-15: the real regression this guards — before this fix, a swept
+  // still-unpublished row was gone for good the moment deleteByOccurredAtBefore ran; only a WARN
+  // log's count survived it. Proves the row's full content now survives the sweep somewhere an
+  // operator can actually go look at, not just a number.
+  @Test
+  void unpublishedRowsSweptPastRetentionAreArchivedToTheDeadLetterTable() {
+    UUID id = UUID.randomUUID();
+    Instant occurredAt = Instant.now().minus(100, ChronoUnit.DAYS);
+    jdbcTemplate.update(
+        "insert into organization_event_outbox (id, organization_id, aggregate_type,"
+            + " aggregate_id, event_type, payload, occurred_at, published_at) values (?, ?,"
+            + " 'Organization', ?, 'organization.deleted', '{\"foo\":\"bar\"}', ?, null)",
+        id,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        Timestamp.from(occurredAt));
+
+    job.sweepExpiredRows();
+
+    Long deadLetterCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from organization_event_outbox_dead_letters where id = ?",
+            Long.class,
+            id);
+    assertThat(deadLetterCount).isEqualTo(1L);
+    String payload =
+        jdbcTemplate.queryForObject(
+            "select payload from organization_event_outbox_dead_letters where id = ?",
+            String.class,
+            id);
+    assertThat(payload).isEqualTo("{\"foo\":\"bar\"}");
+  }
+
+  // Companion to the test above: a row that WAS successfully published never needed a dead
+  // letter in the first place — only rows nothing ever consumed are worth preserving.
+  @Test
+  void publishedRowsSweptPastRetentionAreNotArchivedToTheDeadLetterTable() {
+    insertRow(Instant.now().minus(100, ChronoUnit.DAYS), Instant.now().minus(99, ChronoUnit.DAYS));
+
+    job.sweepExpiredRows();
+
+    Long deadLetterCount =
+        jdbcTemplate.queryForObject(
+            "select count(*) from organization_event_outbox_dead_letters", Long.class);
+    assertThat(deadLetterCount).isZero();
   }
 
   private void insertRow(final Instant occurredAt, final Instant publishedAt) {

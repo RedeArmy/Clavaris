@@ -11,11 +11,22 @@ import org.springframework.data.repository.query.Param;
 interface SpringDataEventOutboxJpaRepository
     extends JpaRepository<EventOutboxEntity, UUID>, EventOutboxRetentionRepository {
 
-  // TD-TEST-002 (EventOutboxRetentionJob, infrastructure/config): counted separately from the
-  // delete below purely so the sweep can WARN when it discards a row nothing has consumed yet —
-  // see that class's own Javadoc for why this distinction matters.
+  // SDE-III review, 2026-09-15: a single native INSERT...SELECT, not a Java-side read-then-write —
+  // copies every still-unpublished row older than cutoff into event_outbox_dead_letters in one
+  // round trip before deleteByOccurredAtBefore below removes it from this table. See
+  // EventOutboxRetentionRepository#archiveUnpublishedBefore's own Javadoc for why this exists.
   @Override
-  long countByOccurredAtBeforeAndPublishedAtIsNull(Instant cutoff);
+  @Modifying
+  @Query(
+      value =
+          "insert into event_outbox_dead_letters "
+              + "(id, organization_id, aggregate_type, aggregate_id, event_type, payload, "
+              + "trace_id, occurred_at) "
+              + "select id, organization_id, aggregate_type, aggregate_id, event_type, payload, "
+              + "trace_id, occurred_at "
+              + "from event_outbox where occurred_at < :cutoff and published_at is null",
+      nativeQuery = true)
+  long archiveUnpublishedBefore(@Param("cutoff") Instant cutoff);
 
   // Deliberately a bulk JPQL DELETE, not Spring Data's derived deleteBy...(...) convention: the
   // derived form loads every matching row into the persistence context one at a time before

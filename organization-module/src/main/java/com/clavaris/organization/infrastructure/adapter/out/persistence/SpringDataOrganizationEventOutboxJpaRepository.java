@@ -14,9 +14,20 @@ import org.springframework.data.repository.query.Param;
 interface SpringDataOrganizationEventOutboxJpaRepository
     extends JpaRepository<OrganizationEventOutboxEntity, UUID>, EventOutboxRetentionRepository {
 
-  // Same rationale as identity-module's own identical pair of methods (EventOutboxRetentionJob).
+  // Same rationale as identity-module's own identical query (SpringDataEventOutboxJpaRepository).
   @Override
-  long countByOccurredAtBeforeAndPublishedAtIsNull(Instant cutoff);
+  @Modifying
+  @Query(
+      value =
+          "insert into organization_event_outbox_dead_letters "
+              + "(id, organization_id, aggregate_type, aggregate_id, event_type, payload, "
+              + "trace_id, occurred_at) "
+              + "select id, organization_id, aggregate_type, aggregate_id, event_type, payload, "
+              + "trace_id, occurred_at "
+              + "from organization_event_outbox where occurred_at < :cutoff and published_at is"
+              + " null",
+      nativeQuery = true)
+  long archiveUnpublishedBefore(@Param("cutoff") Instant cutoff);
 
   @Override
   @Modifying

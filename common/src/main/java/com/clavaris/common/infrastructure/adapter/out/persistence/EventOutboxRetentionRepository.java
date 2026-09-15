@@ -11,7 +11,17 @@ import java.time.Instant;
  */
 public interface EventOutboxRetentionRepository {
 
-  long countByOccurredAtBeforeAndPublishedAtIsNull(Instant cutoff);
+  /**
+   * SDE-III review, 2026-09-15 — closes a real data-loss gap: the sweep used to only count
+   * still-unpublished rows about to be purged (a WARN-level number), then delete them right along
+   * with everything else — no way to ever recover or even inspect which specific events were lost.
+   * This copies every row older than {@code cutoff} that was never published into this module's own
+   * {@code *_dead_letters} table (one native {@code INSERT ... SELECT}, not a row-by-row Java-side
+   * copy) before {@link #deleteByOccurredAtBefore} removes it from the live table, and returns how
+   * many rows it archived — the sweeper still WARNs using that same count, but now the events
+   * themselves survive the sweep for manual investigation or replay instead of being destroyed.
+   */
+  long archiveUnpublishedBefore(Instant cutoff);
 
   long deleteByOccurredAtBefore(Instant cutoff);
 }
