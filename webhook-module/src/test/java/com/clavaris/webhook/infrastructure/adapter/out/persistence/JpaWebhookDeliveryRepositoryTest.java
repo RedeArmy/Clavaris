@@ -134,15 +134,27 @@ class JpaWebhookDeliveryRepositoryTest {
   // first claimant's HTTP attempt (or an uncaught-exception retry loop) was still in flight. This
   // is exactly what claimDueBatchLeasesEveryClaimedRowIntoTheNearFuture proves the lease *sets*,
   // but that test never re-queries — this one proves the lease is actually *honored*.
+  // Static analysis finding (java:S5838-class), 2026-09-15: the original version of this test
+  // asserted only doesNotContain(pending.id()) on secondClaimImmediatelyAfter, which would pass
+  // just as well if claimDueBatch always returned an empty list for some unrelated reason (e.g.
+  // a broken query) — that's not what this test exists to prove. stillClaimable is saved *after*
+  // the first claim specifically so it is due only on the second call, giving the second claim
+  // something it must return; the assertion below is only meaningful because of that.
   @Test
   void aClaimedPendingRowIsNotReclaimableBeforeItsLeaseExpires() {
     WebhookDelivery pending = scheduledDelivery();
     repository.save(pending);
 
     List<WebhookDelivery> firstClaim = repository.claimDueBatch(10);
+    WebhookDelivery stillClaimable = scheduledDelivery();
+    repository.save(stillClaimable);
     List<WebhookDelivery> secondClaimImmediatelyAfter = repository.claimDueBatch(10);
 
     assertThat(firstClaim).extracting(WebhookDelivery::id).contains(pending.id());
+    assertThat(secondClaimImmediatelyAfter)
+        .as("claimDueBatch must still return other due rows, not just come back empty")
+        .extracting(WebhookDelivery::id)
+        .contains(stillClaimable.id());
     assertThat(secondClaimImmediatelyAfter)
         .as("a row leased by the first claim must stay invisible to the very next poll tick")
         .extracting(WebhookDelivery::id)
