@@ -55,4 +55,30 @@ class FlywayMigrationIntegrationTest extends RedisBackedIntegrationTest {
         .as("nothing should be left un-applied once the context has finished starting")
         .isEmpty();
   }
+
+  // SDE-III review, 2026-09-15 — real deployment-failure risk found and closed: every migration
+  // across all 6 modules' own db/migration folders (merged into one shared Postgres schema/history
+  // in the real app, same "one shared database" reasoning OrganizationEventOutboxEntity's own
+  // Javadoc already documents) uses the VYYYYMMDDHHmmss timestamp scheme, except
+  // V1__enable_pgcrypto.sql - a lone survivor from before that convention existed. A future
+  // migration mistakenly following V1's own sequential-looking precedent (V2__..., V3__...) would
+  // sort BELOW whatever timestamp-versioned migration was applied most recently against a real,
+  // already-migrated database - Flyway's default outOfOrder=false then refuses to apply it at all,
+  // a deployment failure discovered live, not in CI. This test enforces the real convention at
+  // build time instead: every migration's own version must match the timestamp scheme, except this
+  // one, permanently allow-listed exception (see that migration's own comment for why it can never
+  // be safely renamed to fit the pattern after the fact).
+  @Test
+  void everyMigrationVersionFollowsTheTimestampSchemeExceptTheDocumentedV1Exception() {
+    final String grandfatheredVersion = "1";
+    final String timestampVersionPattern = "\\d{14}";
+    assertThat(flyway.info().all())
+        .extracting(migration -> migration.getVersion().getVersion())
+        .filteredOn(version -> !grandfatheredVersion.equals(version))
+        .as(
+            "every migration except the documented V1 baseline must use the VYYYYMMDDHHmmss"
+                + " scheme - a bare sequential version like V2 risks a real out-of-order"
+                + " deployment failure against an already-migrated database")
+        .allSatisfy(version -> assertThat(version).matches(timestampVersionPattern));
+  }
 }
