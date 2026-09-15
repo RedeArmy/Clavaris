@@ -23,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code retentionDays} defaults wide (90 days) specifically so the dispatcher's own real,
  * seconds-scale poll interval sits nowhere near this margin under normal operation. A
  * still-unpublished row being swept is logged as a WARN precisely so that incident is visible in
- * logs, not discovered later as a silently missing webhook delivery.
+ * logs, not discovered later as a silently missing webhook delivery — and, as of the SDE-III
+ * review, 2026-09-15, is also archived to {@code event_outbox_dead_letters} before deletion, so the
+ * event itself survives for investigation or manual replay, not just a count in a log line.
  *
  * <p>The actual sweep-and-log decision lives on {@link EventOutboxRetentionSweeper} (shared with
  * organization-module's own identical job, TD-ARCH-007) — this class only owns the bean/table/
