@@ -3,4 +3,16 @@
 -- pgcrypto is enabled once, project-wide, since every table's primary key is
 -- a uuid (data-model.md §1) — this is the standard place to guarantee that's
 -- available regardless of which module's first real migration lands next.
+--
+-- SDE-III review, 2026-09-15: this filename is the ONE deliberate, permanent exception to the
+-- VYYYYMMDDHHmmss versioning scheme every other migration in this repo uses (see any V2026*
+-- migration's own numbering) - it predates that convention and cannot be safely renamed now
+-- (Flyway's own flyway_schema_history already records it as version "1" against every database
+-- that has ever run this application; changing the version here would make Flyway see it as a
+-- brand-new, never-applied migration against those databases on their next deploy). Never create
+-- a second sequentially-numbered migration (V2__..., V3__...) thinking this file set that
+-- precedent - it didn't, and doing so risks a real "out-of-order migration" deployment failure the
+-- moment its version sorts below whatever timestamp-versioned migration was applied most recently.
+-- FlywayMigrationIntegrationTest#everyMigrationVersionFollowsTheTimestampSchemeExceptTheDocumentedV1Exception
+-- enforces this at build time, allow-listing only this exact file.
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
