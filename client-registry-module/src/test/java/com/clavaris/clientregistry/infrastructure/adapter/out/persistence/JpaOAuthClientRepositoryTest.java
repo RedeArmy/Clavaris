@@ -160,8 +160,12 @@ class JpaOAuthClientRepositoryTest {
 
     repository.save(readerA.deactivate()); // wins: DB version 0 -> 1
 
+    // Only repository.save(...) - the one call actually expected to throw - stays inside the
+    // lambda; readerB.rotateSecret(...) is computed outside it, so a mistaken exception from that
+    // call could never be mistaken for the concurrency conflict this test exists to prove.
+    OAuthClient staleRotate = readerB.rotateSecret("argon2id$rotated-hashed");
     assertThatExceptionOfType(ConcurrentClientModificationException.class)
-        .isThrownBy(() -> repository.save(readerB.rotateSecret("argon2id$rotated-hashed")));
+        .isThrownBy(() -> repository.save(staleRotate));
 
     // The loser's change never landed — active stays false (readerA's own write), the secret
     // hash stays the original one (readerB's rotate never committed).

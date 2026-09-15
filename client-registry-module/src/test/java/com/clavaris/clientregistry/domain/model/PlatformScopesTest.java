@@ -70,8 +70,8 @@ class PlatformScopesTest {
           .as("ORGANIZATION_CLIENT_ALLOWED membership for %s", scope)
           .isEqualTo(!isOperatorOnly);
     }
-    assertThat(PlatformScopes.ORGANIZATION_CLIENT_ALLOWED)
-        .hasSize(PlatformScopes.BOOTSTRAP_DEFAULT.size() - PlatformScopes.OPERATOR_ONLY.size());
+    assertThat(PlatformScopes.BOOTSTRAP_DEFAULT.size() - PlatformScopes.OPERATOR_ONLY.size())
+        .isEqualTo(PlatformScopes.ORGANIZATION_CLIENT_ALLOWED.size());
   }
 
   @Test

@@ -112,6 +112,11 @@ public final class OrganizationClient {
    * @param version SDE-III review, 2026-09-15: the row's real persisted optimistic-lock version —
    *     see this class's own {@code version} field Javadoc.
    */
+  // One parameter per persisted column, same rationale as the private constructor and as
+  // OAuthClient's own identical reconstitute (the version field pushed this one past 7 too).
+  // PMD.ExcessiveParameterList isn't part of this project's active ruleset (pmd-ruleset.xml) —
+  // suppressing it would itself be flagged by PMD.UnnecessaryWarningSuppression.
+  @SuppressWarnings("java:S107")
   public static OrganizationClient reconstitute(
       final UUID id,
       final UUID organizationId,
