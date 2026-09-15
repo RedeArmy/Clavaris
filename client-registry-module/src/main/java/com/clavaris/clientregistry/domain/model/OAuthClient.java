@@ -87,8 +87,9 @@ public final class OAuthClient {
       final int version) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
-    this.clientId = requireNonBlank(clientId, "clientId");
-    this.clientSecretHash = requireNonBlank(clientSecretHash, "clientSecretHash");
+    this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
+    this.clientSecretHash =
+        ClientCredentialFields.requireNonBlank(clientSecretHash, "clientSecretHash");
     this.redirectUris = requireValidRedirectUris(redirectUris);
     this.allowedGrantTypes = List.copyOf(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
     this.allowedScopes = requireValidScopes(allowedScopes);
@@ -217,13 +218,6 @@ public final class OAuthClient {
         createdAt,
         active,
         version);
-  }
-
-  private static String requireNonBlank(final String value, final String fieldName) {
-    if (value == null || value.isBlank()) {
-      throw new IllegalArgumentException(fieldName + " must not be blank");
-    }
-    return value;
   }
 
   private static List<String> requireNonEmpty(final List<String> values, final String fieldName) {

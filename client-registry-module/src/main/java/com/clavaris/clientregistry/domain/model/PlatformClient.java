@@ -52,23 +52,17 @@ public final class PlatformClient {
       final boolean active,
       final int version) {
     this.id = Objects.requireNonNull(id, "id must not be null");
-    this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
+    // Same defensive rationale as PasswordCredential's own blank-hash guard: a hasher bug
+    // producing an empty hash must fail loudly here, not silently reach persistence as a
+    // credential nothing (and everything) authenticates against — for THIS credential
+    // specifically, the highest-value target in the whole system.
+    this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
     this.clientSecretHash =
-        Objects.requireNonNull(clientSecretHash, "clientSecretHash must not be null");
+        ClientCredentialFields.requireNonBlank(clientSecretHash, "clientSecretHash");
     this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     this.version = version;
-    if (clientId.isBlank()) {
-      throw new IllegalArgumentException("clientId must not be blank");
-    }
-    if (clientSecretHash.isBlank()) {
-      // Same defensive rationale as PasswordCredential's own blank-hash guard: a hasher bug
-      // producing an empty hash must fail loudly here, not silently reach persistence as a
-      // credential nothing (and everything) authenticates against — for THIS credential
-      // specifically, the highest-value target in the whole system.
-      throw new IllegalArgumentException("clientSecretHash must not be blank");
-    }
   }
 
   /**

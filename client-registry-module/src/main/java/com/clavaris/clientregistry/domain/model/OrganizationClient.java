@@ -58,22 +58,16 @@ public final class OrganizationClient {
       final int version) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
-    this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
+    // Same defensive rationale as PlatformClient's own identical guard — this credential grants
+    // real admin power over one Organization's own accounts/workspaces, a high-value target even
+    // if not the system-wide one PlatformClient is.
+    this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
     this.clientSecretHash =
-        Objects.requireNonNull(clientSecretHash, "clientSecretHash must not be null");
+        ClientCredentialFields.requireNonBlank(clientSecretHash, "clientSecretHash");
     this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     this.version = version;
-    if (clientId.isBlank()) {
-      throw new IllegalArgumentException("clientId must not be blank");
-    }
-    if (clientSecretHash.isBlank()) {
-      // Same defensive rationale as PlatformClient's own identical guard — this credential grants
-      // real admin power over one Organization's own accounts/workspaces, a high-value target even
-      // if not the system-wide one PlatformClient is.
-      throw new IllegalArgumentException("clientSecretHash must not be blank");
-    }
   }
 
   /**
