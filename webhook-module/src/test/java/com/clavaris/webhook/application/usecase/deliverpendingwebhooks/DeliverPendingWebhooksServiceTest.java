@@ -2,11 +2,13 @@ package com.clavaris.webhook.application.usecase.deliverpendingwebhooks;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,7 +20,6 @@ import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,7 +47,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookEndpoint endpoint = registeredEndpoint();
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
     when(cipher.decrypt(any())).thenReturn("raw-secret");
     when(sender.send(eq(endpoint.url()), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
@@ -64,7 +65,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookEndpoint endpoint = registeredEndpoint();
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
     when(cipher.decrypt(any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(false, 503, "non-2xx status 503"));
@@ -86,7 +87,7 @@ class DeliverPendingWebhooksServiceTest {
             .recordFailure(500, "e1", Instant.now(), Instant.now())
             .recordFailure(500, "e2", Instant.now(), Instant.now());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
     when(cipher.decrypt(any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(false, 500, "boom"));
@@ -107,7 +108,7 @@ class DeliverPendingWebhooksServiceTest {
             .rotateSecret("new-encrypted", java.time.Duration.ofHours(24));
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
     when(cipher.decrypt("new-encrypted")).thenReturn("new-raw");
     when(cipher.decrypt("old-encrypted")).thenReturn("old-raw");
     when(sender.send(any(), anyMap(), anyString()))
@@ -127,7 +128,7 @@ class DeliverPendingWebhooksServiceTest {
     WebhookEndpoint endpoint = registeredEndpoint();
     WebhookDelivery delivery = scheduledDelivery(endpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
     when(cipher.decrypt(any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
@@ -153,7 +154,7 @@ class DeliverPendingWebhooksServiceTest {
             "{}",
             null);
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(endpoint.id())).thenReturn(Optional.of(endpoint));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
     when(cipher.decrypt(any())).thenReturn("raw-secret");
     when(sender.send(any(), anyMap(), anyString()))
         .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
@@ -170,12 +171,37 @@ class DeliverPendingWebhooksServiceTest {
     UUID vanishedEndpointId = UUID.randomUUID();
     WebhookDelivery delivery = scheduledDelivery(vanishedEndpointId);
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
-    when(endpoints.findById(vanishedEndpointId)).thenReturn(Optional.empty());
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of());
 
     service.deliverDueDeliveries();
 
     WebhookDelivery saved = captureSaved();
     assertThat(saved.status()).isEqualTo(WebhookDeliveryStatus.EXHAUSTED);
+  }
+
+  // SDE-III review, 2026-09-15 — real N+1 this test guards against: attemptOneDelivery used to
+  // call endpoints.findById(delivery.endpointId()) once per claimed delivery, even when several
+  // deliveries in the same tick target the same endpoint (a burst fanned out to one subscriber, or
+  // several retries queued together) — up to batchSize individual SELECTs per tick. Three
+  // deliveries against the same endpoint must now still cost exactly one findAllByIds call, never
+  // three, and findById must never be called at all from this code path anymore.
+  @Test
+  void severalDeliveriesAgainstTheSameEndpointFetchItWithOneBatchCallNotOnePerDelivery() {
+    WebhookEndpoint endpoint = registeredEndpoint();
+    WebhookDelivery deliveryOne = scheduledDelivery(endpoint.id());
+    WebhookDelivery deliveryTwo = scheduledDelivery(endpoint.id());
+    WebhookDelivery deliveryThree = scheduledDelivery(endpoint.id());
+    when(deliveries.claimDueBatch(50)).thenReturn(List.of(deliveryOne, deliveryTwo, deliveryThree));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(endpoint));
+    when(cipher.decrypt(any())).thenReturn("raw-secret");
+    when(sender.send(eq(endpoint.url()), anyMap(), anyString()))
+        .thenReturn(new WebhookDeliveryOutcome(true, 200, null));
+
+    service.deliverDueDeliveries();
+
+    verify(endpoints, times(1)).findAllByIds(anyCollection());
+    verify(endpoints, never()).findById(any());
+    verify(deliveries, times(3)).save(any());
   }
 
   // SDE-III review, 2026-09-03 — real bug this test guards against: one delivery whose secret
@@ -195,8 +221,11 @@ class DeliverPendingWebhooksServiceTest {
     WebhookDelivery brokenDelivery = scheduledDelivery(brokenEndpoint.id());
     WebhookDelivery healthyDelivery = scheduledDelivery(healthyEndpoint.id());
     when(deliveries.claimDueBatch(50)).thenReturn(List.of(brokenDelivery, healthyDelivery));
-    when(endpoints.findById(brokenEndpoint.id())).thenReturn(Optional.of(brokenEndpoint));
-    when(endpoints.findById(healthyEndpoint.id())).thenReturn(Optional.of(healthyEndpoint));
+    // Both endpoints come back from the one batch-fetch call this test's own delivery batch
+    // triggers — see DeliverPendingWebhooksService's own Javadoc for why that's now one query,
+    // not one per delivery.
+    when(endpoints.findAllByIds(anyCollection()))
+        .thenReturn(List.of(brokenEndpoint, healthyEndpoint));
     when(cipher.decrypt("undecryptable-secret"))
         .thenThrow(new IllegalStateException("key rotated, old secret no longer decryptable"));
     when(cipher.decrypt("encrypted-secret")).thenReturn("raw-secret");

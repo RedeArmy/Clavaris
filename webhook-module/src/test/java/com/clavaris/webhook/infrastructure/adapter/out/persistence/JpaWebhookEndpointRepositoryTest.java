@@ -93,6 +93,30 @@ class JpaWebhookEndpointRepositoryTest {
     assertThat(found).extracting(WebhookEndpoint::id).containsExactly(ownedByA.id());
   }
 
+  // SDE-III review, 2026-09-15 (TD-PERF-025): DeliverPendingWebhooksService's own batch-fetch —
+  // one WHERE id IN (...) call for every distinct endpoint in a claimed delivery batch, replacing
+  // what used to be findById once per delivery.
+  @Test
+  void findAllByIdsReturnsOnlyTheRequestedEndpointsAndIgnoresUnknownIds() {
+    UUID organizationId = UUID.randomUUID();
+    WebhookEndpoint first =
+        WebhookEndpoint.register(organizationId, "https://a.example.com", null, List.of("x"), "s");
+    WebhookEndpoint second =
+        WebhookEndpoint.register(organizationId, "https://b.example.com", null, List.of("x"), "s");
+    WebhookEndpoint notRequested =
+        WebhookEndpoint.register(organizationId, "https://c.example.com", null, List.of("x"), "s");
+    repository.save(first);
+    repository.save(second);
+    repository.save(notRequested);
+
+    List<WebhookEndpoint> found =
+        repository.findAllByIds(List.of(first.id(), second.id(), UUID.randomUUID()));
+
+    assertThat(found)
+        .extracting(WebhookEndpoint::id)
+        .containsExactlyInAnyOrder(first.id(), second.id());
+  }
+
   @Test
   void findActiveByOrganizationIdAndEventTypeExcludesInactiveAndUnsubscribedEndpoints() {
     UUID organizationId = UUID.randomUUID();
