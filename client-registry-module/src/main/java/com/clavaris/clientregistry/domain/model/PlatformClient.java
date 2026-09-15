@@ -17,15 +17,17 @@ import java.util.UUID;
  * the same reason identity-module's {@code Account} suppresses them — the deliberate record-style
  * accessor convention used throughout this codebase's value objects, not an accidental data-holder
  * shape. DataClass itself is no longer flagged now that {@link #rotateSecret(String)}/{@link
- * #deactivate()} give this class real behavior beyond plain accessors. TooManyMethods no longer
- * flagged either, now that TD-ARCH-004's own scope validation moved to {@link PlatformScopes}
- * itself (shared with {@code OrganizationClient}, closing a real SonarCloud-flagged duplication)
- * rather than staying a private method on this class.
+ * #deactivate()} give this class real behavior beyond plain accessors. TooManyMethods: flagged
+ * again as of the SDE-III review, 2026-09-15, optimistic-locking {@code version} field/accessor —
+ * same "a value object whose method count grows with its field count" reasoning {@link
+ * OAuthClient}/{@code OrganizationClient}'s own identical suppression already documents, not
+ * organic complexity.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
-  "PMD.ShortMethodName"
+  "PMD.ShortMethodName",
+  "PMD.TooManyMethods"
 })
 public final class PlatformClient {
 
@@ -36,13 +38,19 @@ public final class PlatformClient {
   private final Instant createdAt;
   private final boolean active;
 
+  // SDE-III review, 2026-09-15: same optimistic-lock version field as OAuthClient's own identical
+  // addition — see ConcurrentClientModificationException's own Javadoc for the lost-update race
+  // this closes. The highest-value credential in the system is the one this race matters most for.
+  private final int version;
+
   private PlatformClient(
       final UUID id,
       final String clientId,
       final String clientSecretHash,
       final List<String> allowedScopes,
       final Instant createdAt,
-      final boolean active) {
+      final boolean active,
+      final int version) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
     this.clientSecretHash =
@@ -50,6 +58,7 @@ public final class PlatformClient {
     this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
+    this.version = version;
     if (clientId.isBlank()) {
       throw new IllegalArgumentException("clientId must not be blank");
     }
@@ -70,7 +79,7 @@ public final class PlatformClient {
   public static PlatformClient register(
       final String clientId, final String clientSecretHash, final List<String> allowedScopes) {
     return new PlatformClient(
-        UUID.randomUUID(), clientId, clientSecretHash, allowedScopes, Instant.now(), true);
+        UUID.randomUUID(), clientId, clientSecretHash, allowedScopes, Instant.now(), true, 0);
   }
 
   /**
@@ -88,8 +97,10 @@ public final class PlatformClient {
       final String clientSecretHash,
       final List<String> allowedScopes,
       final Instant createdAt,
-      final boolean active) {
-    return new PlatformClient(id, clientId, clientSecretHash, allowedScopes, createdAt, active);
+      final boolean active,
+      final int version) {
+    return new PlatformClient(
+        id, clientId, clientSecretHash, allowedScopes, createdAt, active, version);
   }
 
   /**
@@ -100,7 +111,8 @@ public final class PlatformClient {
    */
   public PlatformClient rotateSecret(
       @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
-    return new PlatformClient(id, clientId, newClientSecretHash, allowedScopes, createdAt, active);
+    return new PlatformClient(
+        id, clientId, newClientSecretHash, allowedScopes, createdAt, active, version);
   }
 
   /**
@@ -112,7 +124,8 @@ public final class PlatformClient {
    * revocation of the credential's ability to mint new tokens, not a live check on every request.
    */
   public PlatformClient deactivate() {
-    return new PlatformClient(id, clientId, clientSecretHash, allowedScopes, createdAt, false);
+    return new PlatformClient(
+        id, clientId, clientSecretHash, allowedScopes, createdAt, false, version);
   }
 
   public UUID id() {
@@ -137,5 +150,9 @@ public final class PlatformClient {
 
   public boolean active() {
     return active;
+  }
+
+  public int version() {
+    return version;
   }
 }

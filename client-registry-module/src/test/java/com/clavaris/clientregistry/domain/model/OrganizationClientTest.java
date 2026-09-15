@@ -109,7 +109,8 @@ class OrganizationClientTest {
             "argon2id$hashed",
             List.of(PlatformScopes.RATE_LIMIT_POLICY_WRITE),
             Instant.now(),
-            true);
+            true,
+            0);
 
     assertThat(rehydrated.allowedScopes()).containsExactly(PlatformScopes.RATE_LIMIT_POLICY_WRITE);
   }
@@ -138,5 +139,46 @@ class OrganizationClientTest {
     assertThat(deactivated.active()).isFalse();
     assertThat(deactivated.id()).isEqualTo(original.id());
     assertThat(deactivated.clientSecretHash()).isEqualTo(original.clientSecretHash());
+  }
+
+  // SDE-III review, 2026-09-15: version() semantics — see ConcurrentClientModificationException's
+  // own Javadoc for the lost-update race the whole field exists to close. Both mutators must
+  // preserve the current in-memory version unchanged (the real increment happens at the DB layer,
+  // via the JPA entity's own @Version field, at the next successful save()) — asserted here
+  // against a real, nonzero, reconstitute()-read version, not register()'s always-0 default.
+  @Test
+  void rotateSecretPreservesTheCurrentVersionRatherThanResettingIt() {
+    OrganizationClient rehydrated =
+        OrganizationClient.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "sk_test_abc",
+            "old-hash",
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OrganizationClient rotated = rehydrated.rotateSecret("new-hash");
+
+    assertThat(rotated.version()).isEqualTo(5);
+  }
+
+  @Test
+  void deactivatePreservesTheCurrentVersionRatherThanResettingIt() {
+    OrganizationClient rehydrated =
+        OrganizationClient.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "sk_test_abc",
+            "hash",
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OrganizationClient deactivated = rehydrated.deactivate();
+
+    assertThat(deactivated.version()).isEqualTo(5);
   }
 }

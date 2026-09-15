@@ -1,8 +1,10 @@
 package com.clavaris.clientregistry.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
@@ -10,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -20,6 +23,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,6 +48,7 @@ class JpaOAuthClientRepositoryTest {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
   @Autowired private OAuthClientRepository repository;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   @Test
   void savesAndReadsBackAnOAuthClient_reconstituteKeepsTheRealPersistedId() {
@@ -126,6 +132,106 @@ class JpaOAuthClientRepositoryTest {
 
     assertThat(found).isPresent();
     assertThat(found.get().clientSecretHash()).isEqualTo("argon2id$rotated-hashed");
+  }
+
+  // SDE-III review, 2026-09-15: the real regression this guards — before this fix, save() built a
+  // brand-new detached entity with no concurrency guard at all, so a second save() against a row
+  // already mutated by another transaction silently won regardless of what it had actually read.
+  // A single-threaded, deterministic proof of the row-count-driven version bump; real concurrent-
+  // caller behavior is proved separately below, since sequential calls in one JVM thread can't
+  // show whether a genuinely concurrent second caller is forced to observe the conflict.
+  @Test
+  void savingAStaleReadLosesToAnAlreadyAppliedConcurrentChange() {
+    OAuthClient client =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "a-racy-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(client); // DB version now 0 (first INSERT)
+
+    // Two independent readers, both looking at the same DB version 0 row.
+    OAuthClient readerA = repository.findByClientId("a-racy-client-id").orElseThrow();
+    OAuthClient readerB = repository.findByClientId("a-racy-client-id").orElseThrow();
+
+    repository.save(readerA.deactivate()); // wins: DB version 0 -> 1
+
+    assertThatExceptionOfType(ConcurrentClientModificationException.class)
+        .isThrownBy(() -> repository.save(readerB.rotateSecret("argon2id$rotated-hashed")));
+
+    // The loser's change never landed — active stays false (readerA's own write), the secret
+    // hash stays the original one (readerB's rotate never committed).
+    OAuthClient found = repository.findByClientId("a-racy-client-id").orElseThrow();
+    assertThat(found.active()).isFalse();
+    assertThat(found.clientSecretHash()).isEqualTo("argon2id$hashed");
+  }
+
+  // BR-something-like real-concurrency proof:
+  // savingAStaleReadLosesToAnAlreadyAppliedConcurrentChange
+  // above only proves the row-version mechanism reacts correctly to a *sequential* stale write —
+  // it cannot prove PostgreSQL/Hibernate actually force a *genuinely concurrent* second
+  // transaction to observe that conflict rather than, say, silently interleaving. This test proves
+  // that, against a real database, the same way JpaRefreshTokenRepositoryTest's own identical
+  // real-concurrency proof does — two separate threads, two separate transactions, two separate
+  // connections, racing the exact same row: one "revoke," one "rotate secret," exactly the
+  // production race this whole fix closes.
+  @Test
+  void concurrentDeactivateAndRotateSecretAgainstTheSameClientNeverBothWin_realConcurrencyProof() {
+    OAuthClient client =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "a-concurrently-raced-client-id",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(client);
+    OAuthClient readAtVersionZero =
+        repository.findByClientId("a-concurrently-raced-client-id").orElseThrow();
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+    // ConcurrentClientModificationException must be caught OUTSIDE transactionTemplate.execute,
+    // not inside its own callback: saveAndFlush's own flush() marks the transaction rollback-only
+    // the instant Hibernate detects the version mismatch (standard JPA behavior — the persistence
+    // context is unusable for the rest of that transaction regardless of whether application code
+    // catches the translated exception afterward), so a callback that swallows the exception and
+    // returns normally makes TransactionTemplate try to commit an already-doomed transaction,
+    // itself throwing UnexpectedRollbackException instead of ever reaching this test's own
+    // assertions — confirmed live, an earlier version of this exact test failed on precisely this.
+    CompletableFuture<Boolean> deactivateAttempt =
+        CompletableFuture.supplyAsync(
+            () -> attemptSave(transactionTemplate, readAtVersionZero.deactivate()));
+    CompletableFuture<Boolean> rotateAttempt =
+        CompletableFuture.supplyAsync(
+            () ->
+                attemptSave(
+                    transactionTemplate,
+                    readAtVersionZero.rotateSecret("argon2id$rotated-hashed")));
+
+    boolean deactivateWon = deactivateAttempt.join();
+    boolean rotateWon = rotateAttempt.join();
+
+    assertThat(deactivateWon ^ rotateWon)
+        .as("exactly one of two concurrent callers may ever win against the same version")
+        .isTrue();
+  }
+
+  // See concurrentDeactivateAndRotateSecretAgainstTheSameClientNeverBothWin_realConcurrencyProof's
+  // own comment for why the catch lives here, outside transactionTemplate.execute's own callback.
+  private boolean attemptSave(
+      final TransactionTemplate transactionTemplate, final OAuthClient toSave) {
+    try {
+      transactionTemplate.executeWithoutResult(status -> repository.save(toSave));
+      return true;
+    } catch (final ConcurrentClientModificationException _) {
+      return false;
+    }
   }
 
   @Test
@@ -258,7 +364,8 @@ class JpaOAuthClientRepositoryTest {
         true,
         List.of(),
         createdAt,
-        true);
+        true,
+        0);
   }
 
   // @Import, not @ComponentScan — see JpaPlatformClientRepositoryTest's own TestConfig comment

@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.clavaris.clientregistry.application.usecase.listorganizationclientspa
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.common.domain.model.KeysetCursor;
@@ -257,6 +259,33 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(status().isNotFound());
 
     verify(rotateClientSecret, never()).handle(any());
+  }
+
+  // SDE-III review, 2026-09-15: the web-layer half of the optimistic-locking fix — see
+  // PlatformOAuthClientControllerTest's own identical pair for the full rationale.
+  @Test
+  void deactivateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OrganizationClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    doThrow(new ConcurrentClientModificationException(client.clientId()))
+        .when(deactivateClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void rotateSecretReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OrganizationClient client = sampleClient();
+    when(listClients.handle(organizationId)).thenReturn(List.of(client));
+    when(rotateClientSecret.handle(any()))
+        .thenThrow(new ConcurrentClientModificationException(client.clientId()));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/rotate-secret"))
+        .andExpect(status().isConflict());
   }
 
   // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the

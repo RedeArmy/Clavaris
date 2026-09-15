@@ -40,6 +40,11 @@ public final class OrganizationClient {
   private final Instant createdAt;
   private final boolean active;
 
+  // SDE-III review, 2026-09-15: same optimistic-lock version field as OAuthClient's own identical
+  // addition — see ConcurrentClientModificationException's own Javadoc for the lost-update race
+  // this closes.
+  private final int version;
+
   @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale as
   // PlatformClient's own identical constructor.
   private OrganizationClient(
@@ -49,7 +54,8 @@ public final class OrganizationClient {
       final String clientSecretHash,
       final List<String> allowedScopes,
       final Instant createdAt,
-      final boolean active) {
+      final boolean active,
+      final int version) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
@@ -58,6 +64,7 @@ public final class OrganizationClient {
     this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
+    this.version = version;
     if (clientId.isBlank()) {
       throw new IllegalArgumentException("clientId must not be blank");
     }
@@ -95,10 +102,16 @@ public final class OrganizationClient {
         clientSecretHash,
         PlatformScopes.requireValidScopesForOrganizationClient(allowedScopes),
         Instant.now(),
-        true);
+        true,
+        0);
   }
 
-  /** Rehydrates an existing row — same rationale as {@code PlatformClient#reconstitute}. */
+  /**
+   * Rehydrates an existing row — same rationale as {@code PlatformClient#reconstitute}.
+   *
+   * @param version SDE-III review, 2026-09-15: the row's real persisted optimistic-lock version —
+   *     see this class's own {@code version} field Javadoc.
+   */
   public static OrganizationClient reconstitute(
       final UUID id,
       final UUID organizationId,
@@ -106,22 +119,30 @@ public final class OrganizationClient {
       final String clientSecretHash,
       final List<String> allowedScopes,
       final Instant createdAt,
-      final boolean active) {
+      final boolean active,
+      final int version) {
     return new OrganizationClient(
-        id, organizationId, clientId, clientSecretHash, allowedScopes, createdAt, active);
+        id, organizationId, clientId, clientSecretHash, allowedScopes, createdAt, active, version);
   }
 
   /** Same rationale as {@code PlatformClient#rotateSecret}. */
   public OrganizationClient rotateSecret(
       @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
     return new OrganizationClient(
-        id, organizationId, clientId, newClientSecretHash, allowedScopes, createdAt, active);
+        id,
+        organizationId,
+        clientId,
+        newClientSecretHash,
+        allowedScopes,
+        createdAt,
+        active,
+        version);
   }
 
   /** Same rationale as {@code PlatformClient#deactivate}. */
   public OrganizationClient deactivate() {
     return new OrganizationClient(
-        id, organizationId, clientId, clientSecretHash, allowedScopes, createdAt, false);
+        id, organizationId, clientId, clientSecretHash, allowedScopes, createdAt, false, version);
   }
 
   public UUID id() {
@@ -150,5 +171,9 @@ public final class OrganizationClient {
 
   public boolean active() {
     return active;
+  }
+
+  public int version() {
+    return version;
   }
 }

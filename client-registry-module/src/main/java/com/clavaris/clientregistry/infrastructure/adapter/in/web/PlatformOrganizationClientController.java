@@ -12,6 +12,7 @@ import com.clavaris.clientregistry.application.usecase.listorganizationclientspa
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretCommand;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretUseCase;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.common.domain.model.AuditActor;
@@ -216,9 +217,15 @@ public class PlatformOrganizationClientController {
     final DashboardControllerSupport.OwnedOrganization owned =
         requireOwnedSecretKey(request, organizationId, clientId);
 
-    deactivateClient.handle(
-        new DeactivateOrganizationClientCommand(
-            clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    try {
+      deactivateClient.handle(
+          new DeactivateOrganizationClientCommand(
+              clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final ConcurrentClientModificationException _) {
+      // SDE-III review, 2026-09-15: OrganizationClient's own @Version-backed conflict — see
+      // ConcurrentClientModificationException's own Javadoc for the lost-update race this closes.
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
 
     if (DashboardControllerSupport.isHtmxRequest(request)) {
       renderSecretKeysList(
@@ -238,10 +245,15 @@ public class PlatformOrganizationClientController {
     final DashboardControllerSupport.OwnedOrganization owned =
         requireOwnedSecretKey(request, organizationId, clientId);
 
-    final RotateOrganizationClientSecretResult result =
-        rotateClientSecret.handle(
-            new RotateOrganizationClientSecretCommand(
-                clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    final RotateOrganizationClientSecretResult result;
+    try {
+      result =
+          rotateClientSecret.handle(
+              new RotateOrganizationClientSecretCommand(
+                  clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
 
     model.addAttribute("justCreatedRawSecret", result.rawSecret());
     model.addAttribute("justCreatedClientId", result.clientId());

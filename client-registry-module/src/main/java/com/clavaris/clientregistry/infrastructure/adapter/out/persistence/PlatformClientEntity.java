@@ -28,7 +28,8 @@ public class PlatformClientEntity extends AbstractClientCredentialEntity {
       final String clientSecretHash,
       final String allowedScopes,
       final Instant createdAt,
-      final boolean active) {
-    super(id, clientId, clientSecretHash, allowedScopes, createdAt, active);
+      final boolean active,
+      final int version) {
+    super(id, clientId, clientSecretHash, allowedScopes, createdAt, active, version);
   }
 }

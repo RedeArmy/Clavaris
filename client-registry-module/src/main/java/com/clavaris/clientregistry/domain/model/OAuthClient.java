@@ -60,8 +60,15 @@ public final class OAuthClient {
   private final Instant createdAt;
   private final boolean active;
 
+  // SDE-III review, 2026-09-15: the row's own optimistic-lock version, read back unchanged by
+  // reconstitute and carried forward unchanged by deactivate()/rotateSecret() — see
+  // ConcurrentClientModificationException's own Javadoc for the lost-update race this closes.
+  // Never set by register() to anything but 0 (a brand-new row), never mutated in memory — the
+  // actual increment happens at the DB layer, via the JPA entity's own @Version field.
+  private final int version;
+
   // One parameter per persisted column — same rationale as this class's own TooManyMethods
-  // suppression above: a rehydration factory for a 11-column aggregate takes 11 parameters, not a
+  // suppression above: a rehydration factory for a 12-column aggregate takes 12 parameters, not a
   // sign this constructor does too much. Introducing a synthetic parameter-object purely to dodge
   // the threshold would add indirection without removing any real complexity.
   @SuppressWarnings("java:S107")
@@ -76,7 +83,8 @@ public final class OAuthClient {
       final boolean requireConsent,
       final List<String> postLogoutRedirectUris,
       final Instant createdAt,
-      final boolean active) {
+      final boolean active,
+      final int version) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
     this.clientId = requireNonBlank(clientId, "clientId");
@@ -93,6 +101,7 @@ public final class OAuthClient {
     this.postLogoutRedirectUris = requireValidAbsoluteUris(postLogoutRedirectUris);
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
+    this.version = version;
   }
 
   /**
@@ -125,7 +134,8 @@ public final class OAuthClient {
         requireConsent,
         postLogoutRedirectUris,
         Instant.now(),
-        true);
+        true,
+        0);
   }
 
   /**
@@ -133,6 +143,9 @@ public final class OAuthClient {
    * PlatformClient#reconstitute}. One parameter per persisted column, same rationale as the private
    * constructor's own identical suppression above — a synthetic parameter object here would add
    * indirection without removing any real complexity.
+   *
+   * @param version SDE-III review, 2026-09-15: the row's real persisted optimistic-lock version —
+   *     see this class's own {@code version} field Javadoc.
    */
   @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static OAuthClient reconstitute(
@@ -146,7 +159,8 @@ public final class OAuthClient {
       final boolean requireConsent,
       final List<String> postLogoutRedirectUris,
       final Instant createdAt,
-      final boolean active) {
+      final boolean active,
+      final int version) {
     return new OAuthClient(
         id,
         organizationId,
@@ -158,7 +172,8 @@ public final class OAuthClient {
         requireConsent,
         postLogoutRedirectUris,
         createdAt,
-        active);
+        active,
+        version);
   }
 
   /**
@@ -180,7 +195,8 @@ public final class OAuthClient {
         requireConsent,
         postLogoutRedirectUris,
         createdAt,
-        false);
+        false,
+        version);
   }
 
   /**
@@ -199,7 +215,8 @@ public final class OAuthClient {
         requireConsent,
         postLogoutRedirectUris,
         createdAt,
-        active);
+        active,
+        version);
   }
 
   private static String requireNonBlank(final String value, final String fieldName) {
@@ -360,5 +377,9 @@ public final class OAuthClient {
 
   public boolean active() {
     return active;
+  }
+
+  public int version() {
+    return version;
   }
 }

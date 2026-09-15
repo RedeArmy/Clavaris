@@ -171,7 +171,7 @@ class JpaOrganizationClientRepositoryTest {
   private static OrganizationClient reconstituteAt(
       final UUID organizationId, final String clientId, final Instant createdAt) {
     return OrganizationClient.reconstitute(
-        UUID.randomUUID(), organizationId, clientId, "hash", List.of(), createdAt, true);
+        UUID.randomUUID(), organizationId, clientId, "hash", List.of(), createdAt, true, 0);
   }
 
   @Configuration
