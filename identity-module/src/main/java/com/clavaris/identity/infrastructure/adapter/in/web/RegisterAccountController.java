@@ -194,11 +194,12 @@ public class RegisterAccountController {
       // a client with only a SIGN_UP policy configured falls through to the platform default here,
       // a deliberate, documented simplification rather than threading a separate action flag
       // through this shared completion endpoint.
-      String target =
-          REDIRECT_ORGANIZATION_PREFIX
-              + organizationId
-              + "/login/email-code/confirm?email="
-              + form.getEmail();
+      // SDE-III review, 2026-09-15 — same real bug, same fix, as
+      // EmailCodeSignInController#requestCode's own identical redirect: email is now appended via
+      // RedirectQueryParams like every other param on this hop, not concatenated directly. See
+      // RedirectQueryParams's own Javadoc for the header/query injection primitive this closes.
+      String target = REDIRECT_ORGANIZATION_PREFIX + organizationId + "/login/email-code/confirm";
+      target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
       target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
       target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
       return target;

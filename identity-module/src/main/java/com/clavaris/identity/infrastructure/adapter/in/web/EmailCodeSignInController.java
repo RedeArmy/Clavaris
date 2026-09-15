@@ -108,8 +108,14 @@ public class EmailCodeSignInController {
         new RequestEmailSignInCodeCommand(
             new OrganizationId(organizationId), new Email(form.getEmail())));
 
-    String target =
-        "redirect:/o/" + organizationId + "/login/email-code/confirm?email=" + form.getEmail();
+    // SDE-III review, 2026-09-15 — real bug found and closed: email used to be concatenated
+    // directly into the redirect target instead of going through RedirectQueryParams, the one
+    // param on this exact hop that wasn't. Hibernate Validator's default @Email pattern permits
+    // '&' in the local part, so a value like "x&foo=bar@example.com" passed validation and could
+    // inject an extra query parameter into this Location header — a real header/query injection
+    // primitive, not just a style inconsistency. See RedirectQueryParams's own Javadoc.
+    String target = "redirect:/o/" + organizationId + "/login/email-code/confirm";
+    target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
     target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
     target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
     return target;

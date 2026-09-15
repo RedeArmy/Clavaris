@@ -335,13 +335,49 @@ class RegisterAccountControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(
             redirectedUrl(
-                "/o/" + ORGANIZATION_ID + "/login/email-code/confirm?email=new-user@example.com"));
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/login/email-code/confirm?email=new-user%40example.com"));
 
     verify(requestEmailSignInCode)
         .handle(
             new RequestEmailSignInCodeCommand(
                 new OrganizationId(ORGANIZATION_ID), new Email("new-user@example.com")));
     verifyNoInteractions(requestEmailVerification);
+  }
+
+  // SDE-III review, 2026-09-15 — same real regression test as
+  // EmailCodeSignInControllerTest#postWithAnEmailContainingAmpersandNeverInjectsAnExtraQueryParameter
+  // for this controller's own identical redirect
+  // (RegisterAccountController#completePasswordlessSignUp).
+  @Test
+  void completingSignUpViaEmailCodeWithAnAmpersandInTheEmailNeverInjectsAnExtraQueryParameter()
+      throws Exception {
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false));
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "x&foo=bar@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/login/email-code/confirm?email=x%26foo%3Dbar%40example.com"));
   }
 
   @Test
