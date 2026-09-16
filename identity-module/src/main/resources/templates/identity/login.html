@@ -42,9 +42,14 @@
                      resubmission, so clientId/redirectUrl must be explicitly appended here —
                      Thymeleaf's own link-expression syntax omits a param entirely when its value is
                      null, so this renders no query string at all for the common case. -->
-                <a class="clavaris-button clavaris-button--secondary" data-social-login
-                   th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}"
-                   th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</a>
+                <a class="clavaris-button clavaris-button--secondary clavaris-button--social" data-social-login
+                   th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}(clientId=${clientId},redirectUrl=${redirectUrl})}">
+                    <!-- Thymeleaf's own preprocessing syntax (__${...}__): the only documented way to
+                         build a dynamic fragment/template name — a plain ${...} inside ~{...} is
+                         evaluated too late to select which template gets loaded. -->
+                    <span th:replace="~{__${'identity/fragments/social-icon-' + #strings.toLowerCase(provider.name())}__ :: icon}"></span>
+                    <span th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</span>
+                </a>
             </p>
         </div>
 

@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -133,6 +135,19 @@ class RegisterAccountControllerTest {
         .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
         .andExpect(status().isOk())
         .andExpect(model().attribute("socialProviders", List.of(SocialProvider.GOOGLE)));
+  }
+
+  // Same rationale as LoginControllerTest's own identical test.
+  @Test
+  void getRendersTheProviderIconNextToItsSignUpButton() throws Exception {
+    when(socialLoginPolicyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(EnumSet.of(SocialProvider.GOOGLE));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("viewBox=\"0 0 48 48\"")))
+        .andExpect(content().string(containsString("Sign up with Google")));
   }
 
   @Test

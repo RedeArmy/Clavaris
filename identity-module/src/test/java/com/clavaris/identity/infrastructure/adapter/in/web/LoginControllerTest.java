@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -153,6 +155,22 @@ class LoginControllerTest {
         .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
         .andExpect(status().isOk())
         .andExpect(model().attribute("socialProviders", List.of(SocialProvider.GOOGLE)));
+  }
+
+  // SDE-III review, 2026-09-16 — social-provider brand icons: proves the actual icon markup
+  // renders next to the button, not just that the page didn't throw (identity/fragments/
+  // social-icon-google.html's own dynamic selection, ${#strings.toLowerCase(provider.name())}
+  // built into the fragment name via Thymeleaf's preprocessing syntax).
+  @Test
+  void getRendersTheProviderIconNextToItsSignInButton() throws Exception {
+    when(policyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(EnumSet.of(SocialProvider.GOOGLE));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("viewBox=\"0 0 48 48\"")))
+        .andExpect(content().string(containsString("Sign in with Google")));
   }
 
   @Test

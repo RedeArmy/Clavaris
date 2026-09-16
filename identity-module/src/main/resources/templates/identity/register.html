@@ -50,9 +50,12 @@
         <div th:if="${not #lists.isEmpty(socialProviders)}">
             <div class="clavaris-divider">Or</div>
             <p th:each="provider : ${socialProviders}">
-                <a class="clavaris-button clavaris-button--secondary"
-                   th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}}"
-                   th:text="${'Sign up with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign up with Provider</a>
+                <a class="clavaris-button clavaris-button--secondary clavaris-button--social"
+                   th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}}">
+                    <!-- Same preprocessing-syntax rationale as login.html's own identical block. -->
+                    <span th:replace="~{__${'identity/fragments/social-icon-' + #strings.toLowerCase(provider.name())}__ :: icon}"></span>
+                    <span th:text="${'Sign up with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign up with Provider</span>
+                </a>
             </p>
         </div>
 

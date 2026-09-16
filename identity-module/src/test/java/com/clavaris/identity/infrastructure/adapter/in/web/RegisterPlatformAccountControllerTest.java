@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -71,6 +73,18 @@ class RegisterPlatformAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/register"))
         .andExpect(model().attributeExists("form"));
+  }
+
+  // Same rationale as PlatformLoginControllerTest's own identical test.
+  @Test
+  void getRendersBothProviderIconsNextToTheirSignUpButtons() throws Exception {
+    mockMvc
+        .perform(get("/platform/register"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("viewBox=\"0 0 48 48\"")))
+        .andExpect(content().string(containsString("Sign up with Google")))
+        .andExpect(content().string(containsString("viewBox=\"0 0 16 16\"")))
+        .andExpect(content().string(containsString("Sign up with GitHub")));
   }
 
   @Test
