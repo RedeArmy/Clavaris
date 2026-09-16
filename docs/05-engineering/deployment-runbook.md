@@ -346,6 +346,51 @@ Environment with a required reviewer (unlike `pre-production`'s own unattended-b
 `ci.yml`'s `deploy-preprod` job is exactly where that protection rule would attach for its own
 `production` counterpart, with zero job-logic changes needed to add it later.
 
+**Live-found failure mode, 2026-09-16 — the runner's own session/registration expires and it stops
+itself, not just disconnects:** `systemctl status` on this service can show `inactive (dead)` with
+no error surfaced there at all — the actual cause only shows up in `journalctl`:
+
+```bash
+sudo journalctl -u actions.runner.RedeArmy-Clavaris.PreProduction.service -n 100 --no-pager
+```
+
+Look for this exact shape — a token-expiry warning immediately followed by a terminal, non-retryable
+failure:
+
+```
+Runner connect error: The token expired on <date>...
+Failed to create a session. The runner registration has been deleted from the server, please re-configure.
+Runner listener exit with terminated error, stop the service, no retry needed.
+```
+
+The service itself gets this right — it recognizes the error as non-retryable and stops cleanly
+rather than looping forever — but that also means a plain `systemctl start`/`svc.sh start` does
+**not** fix it: the runner's own registration is genuinely gone from GitHub's side, and reconnecting
+with the old, now-invalid session just reproduces the identical error. The fix is a real
+re-registration, not a restart:
+
+```bash
+# 1. In GitHub's own UI (Settings → Actions → Runners): remove the stale runner entry if still
+#    listed, then "New self-hosted runner" for a fresh, single-use registration token.
+
+# 2. On the host, as the 'clavaris' user:
+su - clavaris
+cd actions-runner
+sudo ./svc.sh stop
+./config.sh remove
+./config.sh --url https://github.com/RedeArmy/Clavaris --token <new-token-from-step-1> --labels preprod
+
+# 3. As root:
+sudo ./svc.sh install clavaris
+sudo ./svc.sh start
+sudo systemctl status actions.runner.RedeArmy-Clavaris.PreProduction.service
+```
+
+While this is down, `deploy-preprod` doesn't fail — it queues indefinitely waiting for a runner
+carrying the `preprod` label, silently, with no obvious signal on the PR/commit that CD isn't
+actually going to run. Worth checking `journalctl` on this service any time a merge to `master`
+doesn't visibly deploy, before assuming the workflow itself is broken.
+
 ## 8. What this runbook does not cover, on purpose
 
 - **Off-site/geo-redundant backup copies** — §6b above is honest that this is not yet automated;
