@@ -2,6 +2,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,12 @@ interface SpringDataWebhookEndpointJpaRepository
     extends JpaRepository<WebhookEndpointEntity, UUID> {
 
   List<WebhookEndpointEntity> findAllByOrganizationId(UUID organizationId);
+
+  // WebhookEndpointRepository#findByIdAndOrganizationId's own Javadoc — id is already the primary
+  // key, so this is the same single-row lookup findById already is, plus the organizationId
+  // predicate as a second WHERE clause, not an additional index or query shape.
+  @SuppressWarnings("PMD.ShortVariable")
+  Optional<WebhookEndpointEntity> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
   List<WebhookEndpointEntity> findAllByOrganizationIdAndActiveTrue(UUID organizationId);
 

@@ -93,6 +93,28 @@ class JpaWebhookEndpointRepositoryTest {
     assertThat(found).extracting(WebhookEndpoint::id).containsExactly(ownedByA.id());
   }
 
+  // TD-PERF-026 (SDE-III review, 2026-09-16): the O(1) lookup that replaced the dashboard's own
+  // former O(n) "fetch every endpoint, scan in memory" ownership check — see
+  // WebhookEndpointRepository#findByIdAndOrganizationId's own Javadoc.
+  @Test
+  void findByIdAndOrganizationIdReturnsTheEndpointOnlyWhenBothMatch() {
+    UUID organizationA = UUID.randomUUID();
+    UUID organizationB = UUID.randomUUID();
+    WebhookEndpoint ownedByA =
+        WebhookEndpoint.register(organizationA, "https://a.example.com", null, List.of("x"), "s");
+    repository.save(ownedByA);
+
+    assertThat(repository.findByIdAndOrganizationId(ownedByA.id(), organizationA))
+        .map(WebhookEndpoint::id)
+        .contains(ownedByA.id());
+    assertThat(repository.findByIdAndOrganizationId(ownedByA.id(), organizationB))
+        .as("the exact same endpointId under a different organizationId must not match")
+        .isEmpty();
+    assertThat(repository.findByIdAndOrganizationId(UUID.randomUUID(), organizationA))
+        .as("an unknown endpointId must not match regardless of organizationId")
+        .isEmpty();
+  }
+
   // BR-WEBHOOK-08 (SDE-III review, 2026-09-15): WebhookEndpointRepository#countByOrganizationId's
   // own Javadoc — the count backing the registration cap must include a deactivated endpoint too,
   // or the cap could be bypassed by deactivating and re-registering.

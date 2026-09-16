@@ -7,7 +7,7 @@ import com.clavaris.webhook.application.usecase.activatewebhookendpoint.Activate
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointCommand;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointUseCase;
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedQuery;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.OrganizationNotFoundException;
@@ -41,11 +41,10 @@ import org.springframework.web.server.ResponseStatusException;
  * WebhookEndpoint}s. Every write here goes through the exact same use cases the REST admin API
  * already exposes ({@link RegisterWebhookEndpointUseCase}, {@link
  * DeactivateWebhookEndpointUseCase}, {@link ActivateWebhookEndpointUseCase}, {@link
- * RotateWebhookEndpointSecretUseCase}) plus the already-organizationId-scoped {@link
- * ListWebhookEndpointsForOrganizationUseCase} — this controller adds a second,
- * session-authenticated {@link AuditActor#platformAccount} caller, not a second implementation. See
- * {@code RegisterWebhookEndpointCommand}'s own Javadoc for why this widening needed no restriction
- * to correct, unlike its Secret Key/OAuth Client siblings.
+ * RotateWebhookEndpointSecretUseCase}) — this controller adds a second, session-authenticated
+ * {@link AuditActor#platformAccount} caller, not a second implementation. See {@code
+ * RegisterWebhookEndpointCommand}'s own Javadoc for why this widening needed no restriction to
+ * correct, unlike its Secret Key/OAuth Client siblings.
  *
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver} — never
  * a bare repository call — so an organizationId this {@code PlatformAccount} doesn't own resolves
@@ -53,8 +52,10 @@ import org.springframework.web.server.ResponseStatusException;
  * controller in this codebase. Neither {@link DeactivateWebhookEndpointCommand}, {@link
  * ActivateWebhookEndpointCommand}, nor {@link RotateWebhookEndpointSecretCommand} carries an {@code
  * organizationId} of its own (all three key off the endpoint's own {@code endpointId} alone) — this
- * controller resolves the target {@link WebhookEndpoint} via the already-organizationId-scoped
- * {@link ListWebhookEndpointsForOrganizationUseCase} first, so an {@code endpointId} belonging to a
+ * controller resolves the target {@link WebhookEndpoint} via the O(1) {@code
+ * GetWebhookEndpointForOrganizationUseCase} first (TD-PERF-026, SDE-III review, 2026-09-16 — see
+ * {@code WebhookDashboardControllerSupport#requireEndpointBelongsToOrganization}'s own Javadoc for
+ * the O(n) full-organization-list scan this replaced), so an {@code endpointId} belonging to a
  * different Organization 404s before any mutating use case is ever called, not after.
  *
  * <p>Unlike Secret Keys/OAuth Clients, this endpoint has a genuine, independent {@code :activate}
@@ -88,7 +89,7 @@ public class PlatformWebhookEndpointController {
   private static final String EVENT_TYPE_OPTIONS_ATTRIBUTE = "eventTypeOptions";
 
   private final RegisterWebhookEndpointUseCase registerEndpoint;
-  private final ListWebhookEndpointsForOrganizationUseCase listEndpoints;
+  private final GetWebhookEndpointForOrganizationUseCase getEndpoint;
   private final ListWebhookEndpointsForOrganizationPagedUseCase listEndpointsPaged;
   private final DeactivateWebhookEndpointUseCase deactivateEndpoint;
   private final ActivateWebhookEndpointUseCase activateEndpoint;
@@ -96,11 +97,17 @@ public class PlatformWebhookEndpointController {
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
+  // TD-PERF-026 (SDE-III review, 2026-09-16): ListWebhookEndpointsForOrganizationUseCase dropped —
+  // it existed on this controller purely to back requireEndpointBelongsToOrganization's former O(n)
+  // workaround (see that method's own Javadoc), now answered in O(1) by
+  // GetWebhookEndpointForOrganizationUseCase. Same "drop the now-dead ListX dependency" precedent
+  // client-registry-module's own PlatformOrganizationClientController/PlatformOAuthClientController
+  // already established (SDE-III review, 2026-09-15) for an identical shape of workaround.
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
   // other multi-collaborator constructor in this codebase.
   public PlatformWebhookEndpointController(
       final RegisterWebhookEndpointUseCase registerEndpoint,
-      final ListWebhookEndpointsForOrganizationUseCase listEndpoints,
+      final GetWebhookEndpointForOrganizationUseCase getEndpoint,
       final ListWebhookEndpointsForOrganizationPagedUseCase listEndpointsPaged,
       final DeactivateWebhookEndpointUseCase deactivateEndpoint,
       final ActivateWebhookEndpointUseCase activateEndpoint,
@@ -108,7 +115,7 @@ public class PlatformWebhookEndpointController {
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerEndpoint = registerEndpoint;
-    this.listEndpoints = listEndpoints;
+    this.getEndpoint = getEndpoint;
     this.listEndpointsPaged = listEndpointsPaged;
     this.deactivateEndpoint = deactivateEndpoint;
     this.activateEndpoint = activateEndpoint;
@@ -241,7 +248,7 @@ public class PlatformWebhookEndpointController {
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
     WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-        listEndpoints, organizationId, endpointId);
+        getEndpoint, organizationId, endpointId);
 
     deactivateEndpoint.handle(
         new DeactivateWebhookEndpointCommand(
@@ -270,7 +277,7 @@ public class PlatformWebhookEndpointController {
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
     WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-        listEndpoints, organizationId, endpointId);
+        getEndpoint, organizationId, endpointId);
 
     activateEndpoint.handle(
         new ActivateWebhookEndpointCommand(
@@ -299,7 +306,7 @@ public class PlatformWebhookEndpointController {
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
     WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-        listEndpoints, organizationId, endpointId);
+        getEndpoint, organizationId, endpointId);
 
     final RotateWebhookEndpointSecretResult result =
         rotateEndpointSecret.handle(

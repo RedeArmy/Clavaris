@@ -87,6 +87,12 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   }
 
   @Override
+  public Optional<WebhookEndpoint> findByIdAndOrganizationId(
+      final UUID id, final UUID organizationId) {
+    return endpoints.findByIdAndOrganizationId(id, organizationId).map(this::toDomain);
+  }
+
+  @Override
   public long countByOrganizationId(final UUID organizationId) {
     return endpoints.countByOrganizationId(organizationId);
   }

@@ -1,7 +1,7 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationQuery;
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationQuery;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -52,22 +52,23 @@ final class WebhookDashboardControllerSupport {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
   }
 
-  // The anti-enumeration check Deactivate/Activate/RotateWebhookEndpointSecretCommand — and now
+  // The anti-enumeration check Deactivate/Activate/RotateWebhookEndpointSecretCommand — and
   // ListWebhookDeliveriesForEndpointQuery/ReplayWebhookDeliveryCommand — can't do themselves: none
-  // of them carries an organizationId, all key off endpointId alone. Reuses the already-
-  // organizationId-scoped ListWebhookEndpointsForOrganizationUseCase rather than adding a new
-  // "get one endpoint" port, so an endpointId belonging to a different Organization 404s before
-  // any mutating/reading use case ever runs. Returns the resolved WebhookEndpoint itself (not just
-  // a boolean) since PlatformWebhookDeliveryController's own breadcrumb needs its URL.
+  // of them carries an organizationId, all key off endpointId alone. TD-PERF-026 (SDE-III review,
+  // 2026-09-16): now backed by the O(1) GetWebhookEndpointForOrganizationUseCase, not the former
+  // "fetch every endpoint for the Organization, scan in memory for a match" workaround this method
+  // used to inline (see WebhookEndpointRepository#findByIdAndOrganizationId's own Javadoc for the
+  // full before/after) — an endpointId belonging to a different Organization still 404s before any
+  // mutating/reading use case ever runs, just without the O(n) cost on every admin click. Returns
+  // the resolved WebhookEndpoint itself (not just a boolean) since
+  // PlatformWebhookDeliveryController's
+  // own breadcrumb needs its URL.
   /* package */ static WebhookEndpoint requireEndpointBelongsToOrganization(
-      final ListWebhookEndpointsForOrganizationUseCase listEndpoints,
+      final GetWebhookEndpointForOrganizationUseCase getEndpoint,
       final UUID organizationId,
       final UUID endpointId) {
-    return listEndpoints
-        .handle(new ListWebhookEndpointsForOrganizationQuery(organizationId))
-        .stream()
-        .filter(endpoint -> endpoint.id().equals(endpointId))
-        .findFirst()
+    return getEndpoint
+        .handle(new GetWebhookEndpointForOrganizationQuery(organizationId, endpointId))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
   }
 }

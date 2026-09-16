@@ -12,8 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointUseCase;
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryUseCase;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotFoundException;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotReplayableException;
@@ -41,7 +41,7 @@ class PlatformWebhookDeliveryControllerTest {
 
   private ListWebhookDeliveriesForEndpointUseCase listDeliveries;
   private ReplayWebhookDeliveryUseCase replayDelivery;
-  private ListWebhookEndpointsForOrganizationUseCase listEndpoints;
+  private GetWebhookEndpointForOrganizationUseCase getEndpoint;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -52,7 +52,7 @@ class PlatformWebhookDeliveryControllerTest {
   void setUp() {
     listDeliveries = mock(ListWebhookDeliveriesForEndpointUseCase.class);
     replayDelivery = mock(ReplayWebhookDeliveryUseCase.class);
-    listEndpoints = mock(ListWebhookEndpointsForOrganizationUseCase.class);
+    getEndpoint = mock(GetWebhookEndpointForOrganizationUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -67,7 +67,7 @@ class PlatformWebhookDeliveryControllerTest {
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
-    when(listEndpoints.handle(any())).thenReturn(List.of(endpoint));
+    when(getEndpoint.handle(any())).thenReturn(Optional.of(endpoint));
     when(listDeliveries.handle(any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
@@ -89,7 +89,7 @@ class PlatformWebhookDeliveryControllerTest {
                 new PlatformWebhookDeliveryController(
                     listDeliveries,
                     replayDelivery,
-                    listEndpoints,
+                    getEndpoint,
                     organizationResolver,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)
@@ -147,7 +147,7 @@ class PlatformWebhookDeliveryControllerTest {
 
   @Test
   void returnsNotFoundWhenTheEndpointBelongsToADifferentOrganization() throws Exception {
-    when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(getEndpoint.handle(any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(basePath())).andExpect(status().isNotFound());
   }
@@ -176,7 +176,7 @@ class PlatformWebhookDeliveryControllerTest {
 
   @Test
   void replayReturnsNotFoundWhenTheEndpointBelongsToADifferentOrganization() throws Exception {
-    when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(getEndpoint.handle(any())).thenReturn(Optional.empty());
 
     mockMvc
         .perform(post(basePath() + "/" + UUID.randomUUID() + "/replay"))

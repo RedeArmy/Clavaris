@@ -1,9 +1,9 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointQuery;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointUseCase;
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryCommand;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryUseCase;
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.WebhookDeliveryNotFoundException;
@@ -33,10 +33,13 @@ import org.springframework.web.server.ResponseStatusException;
  * ownership helpers — the same anti-enumeration posture {@link PlatformWebhookEndpointController}
  * already established for {@code :deactivate}/{@code :activate}/{@code :rotate-secret}, now shared
  * rather than duplicated a second time (the exact `pmd:cpd-check` lesson that class's own history
- * already taught). Neither {@link ListWebhookDeliveriesForEndpointQuery} nor {@link
- * ReplayWebhookDeliveryCommand} carries an {@code organizationId} of its own — both key off {@code
- * endpointId} alone — so this controller confirms the endpoint actually belongs to the resolved
- * Organization before either use case ever runs, not after.
+ * already taught) and, since TD-PERF-026 (SDE-III review, 2026-09-16), backed by the O(1) {@code
+ * GetWebhookEndpointForOrganizationUseCase} rather than a full-organization-list scan — see {@code
+ * WebhookDashboardControllerSupport#requireEndpointBelongsToOrganization}'s own Javadoc. Neither
+ * {@link ListWebhookDeliveriesForEndpointQuery} nor {@link ReplayWebhookDeliveryCommand} carries an
+ * {@code organizationId} of its own — both key off {@code endpointId} alone — so this controller
+ * confirms the endpoint actually belongs to the resolved Organization before either use case ever
+ * runs, not after.
  *
  * <p>{@link ReplayWebhookDeliveryCommand}'s own endpoint-ownership guard (the {@code deliveryId}
  * must belong to this {@code endpointId}, not just exist) is authoritative and re-checked inside
@@ -65,21 +68,23 @@ public class PlatformWebhookDeliveryController {
 
   private final ListWebhookDeliveriesForEndpointUseCase listDeliveries;
   private final ReplayWebhookDeliveryUseCase replayDelivery;
-  private final ListWebhookEndpointsForOrganizationUseCase listEndpoints;
+  private final GetWebhookEndpointForOrganizationUseCase getEndpoint;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
+  // TD-PERF-026 (SDE-III review, 2026-09-16): ListWebhookEndpointsForOrganizationUseCase dropped —
+  // see PlatformWebhookEndpointController's own identical constructor-comment addendum for why.
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
   // other multi-collaborator constructor in this codebase.
   public PlatformWebhookDeliveryController(
       final ListWebhookDeliveriesForEndpointUseCase listDeliveries,
       final ReplayWebhookDeliveryUseCase replayDelivery,
-      final ListWebhookEndpointsForOrganizationUseCase listEndpoints,
+      final GetWebhookEndpointForOrganizationUseCase getEndpoint,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.listDeliveries = listDeliveries;
     this.replayDelivery = replayDelivery;
-    this.listEndpoints = listEndpoints;
+    this.getEndpoint = getEndpoint;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
   }
@@ -98,7 +103,7 @@ public class PlatformWebhookDeliveryController {
             organizationResolver, organizationId, ownerPlatformAccountId);
     final WebhookEndpoint endpoint =
         WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-            listEndpoints, organizationId, endpointId);
+            getEndpoint, organizationId, endpointId);
 
     populateHeaderModel(model, organizationId, organizationName, endpoint);
     populateDeliveriesModel(model, endpointId);
@@ -124,7 +129,7 @@ public class PlatformWebhookDeliveryController {
             organizationResolver, organizationId, ownerPlatformAccountId);
     final WebhookEndpoint endpoint =
         WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-            listEndpoints, organizationId, endpointId);
+            getEndpoint, organizationId, endpointId);
 
     try {
       replayDelivery.handle(
