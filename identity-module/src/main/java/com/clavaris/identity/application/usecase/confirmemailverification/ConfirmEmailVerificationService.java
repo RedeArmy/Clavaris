@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -16,6 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
  * an internal database write (token consumption, {@code Account.verifyEmail()}, the outbox row), no
  * third-party network call, so there's no reason to split the transaction the way the request side
  * does.
+ *
+ * <p>SDE-III review, 2026-09-15: token consumption goes through {@link
+ * VerificationTokenRepository#consumeIfActive}, not a plain {@code consume()}+{@link
+ * VerificationTokenRepository#save} — see {@code ConfirmPasswordResetService}'s own Javadoc for the
+ * TOCTOU this closes (identical shape here, lower practical impact: a raced double-confirm of an
+ * email address is idempotent in effect, but must still never silently succeed twice).
  */
 public class ConfirmEmailVerificationService implements ConfirmEmailVerificationUseCase {
 
@@ -46,8 +53,10 @@ public class ConfirmEmailVerificationService implements ConfirmEmailVerification
       throw new InvalidVerificationTokenException();
     }
 
-    token.consume();
-    tokens.save(token);
+    // The atomic, authoritative check — see this class's own Javadoc.
+    if (!tokens.consumeIfActive(token.id(), Instant.now())) {
+      throw new InvalidVerificationTokenException();
+    }
 
     final Account account =
         accounts.findById(token.accountId()).orElseThrow(InvalidVerificationTokenException::new);

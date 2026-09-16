@@ -4,7 +4,9 @@ import com.clavaris.identity.application.usecase.requestemailverification.Verifi
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -36,6 +38,11 @@ class JpaVerificationTokenRepository implements VerificationTokenRepository {
             token.tokenHash(),
             token.expiresAt(),
             token.consumedAt().orElse(null)));
+  }
+
+  @Override
+  public boolean consumeIfActive(final UUID tokenId, final Instant consumedAt) {
+    return tokens.consumeIfActive(tokenId, consumedAt) > 0;
   }
 
   private VerificationToken toDomain(final VerificationTokenEntity entity) {

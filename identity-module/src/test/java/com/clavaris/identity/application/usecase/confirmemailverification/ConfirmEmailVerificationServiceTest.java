@@ -40,6 +40,10 @@ class ConfirmEmailVerificationServiceTest {
     accounts = mock(AccountRepository.class);
     outbox = mock(EventOutboxWriter.class);
     service = new ConfirmEmailVerificationService(tokens, accounts, outbox);
+    // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
+    // test below exercises the ordinary, uncontested confirm path unless it deliberately overrides
+    // this stub to prove the lost-race path itself.
+    when(tokens.consumeIfActive(any(), any())).thenReturn(true);
   }
 
   @Test
@@ -57,9 +61,9 @@ class ConfirmEmailVerificationServiceTest {
 
     service.handle(new ConfirmEmailVerificationCommand(rawToken));
 
-    assertThat(token.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
-    verify(tokens).save(token);
+    verify(tokens).consumeIfActive(eq(token.id()), any()); // the atomic consume
+    verify(tokens, never()).save(any()); // no plain save — the conditional update did it
     verify(accounts).save(account);
     verify(outbox).write(eq("account.email_verified"), eq(account.id()), any(), any());
   }
@@ -125,5 +129,28 @@ class ConfirmEmailVerificationServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
+  }
+
+  @Test
+  void losingTheConditionalConsumeRaceIsTreatedAsAnInvalidToken() {
+    // TOCTOU regression test (SDE-III review, 2026-09-15) — see
+    // ConfirmPasswordResetServiceTest's own identical test for the full rationale.
+    Account account = Account.register(organizationId, new Email("raced-user@example.com"));
+    String rawToken = "raced-verification-token";
+    VerificationToken token =
+        VerificationToken.issue(
+            account.id(),
+            VerificationTokenType.EMAIL_VERIFICATION,
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(3600));
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any())).thenReturn(false);
+    ConfirmEmailVerificationCommand command = new ConfirmEmailVerificationCommand(rawToken);
+
+    assertThatExceptionOfType(InvalidVerificationTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).save(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 }

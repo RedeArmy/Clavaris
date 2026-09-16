@@ -4,7 +4,9 @@ import com.clavaris.identity.application.usecase.requestplatformaccountemailveri
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformVerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /** Implements the outbound port; mirrors {@link JpaVerificationTokenRepository}. */
@@ -33,6 +35,11 @@ class JpaPlatformVerificationTokenRepository implements PlatformVerificationToke
             token.tokenHash(),
             token.expiresAt(),
             token.consumedAt().orElse(null)));
+  }
+
+  @Override
+  public boolean consumeIfActive(final UUID tokenId, final Instant consumedAt) {
+    return tokens.consumeIfActive(tokenId, consumedAt) > 0;
   }
 
   private PlatformVerificationToken toDomain(final PlatformVerificationTokenEntity entity) {
