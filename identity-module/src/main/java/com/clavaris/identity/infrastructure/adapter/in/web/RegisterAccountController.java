@@ -223,14 +223,14 @@ public class RegisterAccountController {
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (final IllegalArgumentException _) {
-      // SDE-III review, 2026-09-16: real gap found live - Username's own domain constructor
-      // rejects a shape RegisterAccountForm's own size bound (max 32 characters) alone doesn't
-      // catch (too short, uppercase, spaces, punctuation outside letters/digits/underscore/hyphen
-      // - see that form field's own comment for why the shape check is deliberately not
-      // duplicated there), and nothing here caught it: an uncaught IllegalArgumentException
-      // reaching this method meant an unhandled 500 on sign-up, not a field-level message - the
-      // exact registration-side gap UsernameSignInController's own identical catch already closes
-      // for sign-in.
+      // SDE-III review, 2026-09-16: real gap found live. Username's own domain constructor
+      // rejects a shape the form's own maximum-length check alone does not catch, such as a
+      // too-short value or one containing anything besides letters, digits, underscore, or
+      // hyphen. That form field's own comment already explains why the shape check is
+      // deliberately not duplicated there. Nothing here caught this exception, so it used to
+      // reach this method as an unhandled server error on sign-up instead of a field-level
+      // message. UsernameSignInController already had the matching catch on the sign-in side;
+      // this closes the same gap on the sign-up side.
       bindingResult.rejectValue(
           USERNAME,
           "username.invalid",
