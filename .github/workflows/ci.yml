@@ -261,6 +261,25 @@ jobs:
       - name: Run doc consistency checks
         run: ./scripts/check-doc-consistency.sh
 
+  migration-immutability:
+    name: Flyway migration immutability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Needs origin/master's own history to compare against (what did this file look like
+          # before this PR?) — the default shallow single-commit clone has none. Same requirement,
+          # same fix, as SonarCloud's own job above.
+          fetch-depth: 0
+
+      # Live-found, 2026-09-16: V1__enable_pgcrypto.sql's own comment text was edited twice after
+      # already being applied to pre-production's database — Flyway's checksum validation (by
+      # design) refused to start the app on the next deploy. Nothing else in this repo's CI or
+      # local dev setup could have caught it (every test database here is a fresh, empty
+      # Testcontainers instance — see the script's own header for the full reasoning).
+      - name: Run migration immutability check
+        run: ./scripts/check-migration-immutability.sh
+
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest
@@ -416,7 +435,14 @@ jobs:
     name: CI Passed
     runs-on: ubuntu-latest
     needs:
-      [build-and-test, docker-build, dependency-scan, doc-consistency, sonarcloud]
+      [
+        build-and-test,
+        docker-build,
+        dependency-scan,
+        doc-consistency,
+        migration-immutability,
+        sonarcloud,
+      ]
     # Without this, a failure in any `needs` job skips this one entirely —
     # a "skipped" required check leaves a PR stuck pending forever instead
     # of showing a clear red ✗, which is confusing to debug from the PR
@@ -441,19 +467,22 @@ jobs:
           DOCKER_BUILD_RESULT: ${{ needs.docker-build.result }}
           DEPENDENCY_SCAN_RESULT: ${{ needs.dependency-scan.result }}
           DOC_CONSISTENCY_RESULT: ${{ needs.doc-consistency.result }}
+          MIGRATION_IMMUTABILITY_RESULT: ${{ needs.migration-immutability.result }}
           SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
         run: |
-          echo "PR author:         $PR_AUTHOR"
-          echo "build-and-test:    $BUILD_AND_TEST_RESULT"
-          echo "docker-build:      $DOCKER_BUILD_RESULT"
-          echo "dependency-scan:   $DEPENDENCY_SCAN_RESULT"
-          echo "doc-consistency:   $DOC_CONSISTENCY_RESULT"
-          echo "sonarcloud:        $SONARCLOUD_RESULT"
+          echo "PR author:              $PR_AUTHOR"
+          echo "build-and-test:         $BUILD_AND_TEST_RESULT"
+          echo "docker-build:           $DOCKER_BUILD_RESULT"
+          echo "dependency-scan:        $DEPENDENCY_SCAN_RESULT"
+          echo "doc-consistency:        $DOC_CONSISTENCY_RESULT"
+          echo "migration-immutability: $MIGRATION_IMMUTABILITY_RESULT"
+          echo "sonarcloud:             $SONARCLOUD_RESULT"
 
           FAILED=0
           [ "$BUILD_AND_TEST_RESULT" = "success" ] || FAILED=1
           [ "$DOCKER_BUILD_RESULT" = "success" ] || FAILED=1
           [ "$DOC_CONSISTENCY_RESULT" = "success" ] || FAILED=1
+          [ "$MIGRATION_IMMUTABILITY_RESULT" = "success" ] || FAILED=1
 
           if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
             # Expected shape for this actor: both jobs skip themselves deliberately (their own `if:`

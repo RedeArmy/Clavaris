@@ -36,7 +36,20 @@ log "Pulling latest images"
 docker compose -f "${COMPOSE_FILE}" pull
 
 log "Starting the new version"
-docker compose -f "${COMPOSE_FILE}" up -d
+# Live-found, 2026-09-16: "up -d" itself can fail here, not just the health-poll loop below —
+# caddy's own "depends_on: app: condition: service_healthy" (docker-compose.prod.yml) makes Compose
+# wait for app's healthcheck internally, and if that wait times out, "up -d" exits non-zero with
+# "dependency failed to start: container clavaris-app-1 is unhealthy" *before* app's own healthcheck
+# retries/start_period budget (30s + 5x10s = 80s) has necessarily been exhausted from this script's
+# perspective, and — under `set -e` — killed this whole script right here: no health-poll loop, no
+# rollback, no diagnostic hint, nothing but Compose's own generic dependency error surfaced to CI.
+# `|| true` keeps that from aborting the script; app (and its own postgres/redis dependencies) are
+# already started by the time only caddy's wait fails, so the poll loop below can still reach it.
+if ! docker compose -f "${COMPOSE_FILE}" up -d; then
+  echo "'docker compose up -d' itself reported a failure — likely caddy's own dependency wait on" >&2
+  echo "app's healthcheck timing out, not app having failed to start at all. Falling through to" >&2
+  echo "this script's own health-poll loop instead of trusting that exit code alone." >&2
+fi
 
 log "Waiting for the app to report healthy (up to ${HEALTH_TIMEOUT_SECONDS}s)"
 elapsed=0
@@ -51,22 +64,32 @@ while [ "${elapsed}" -lt "${HEALTH_TIMEOUT_SECONDS}" ]; do
 done
 
 if [ "${healthy}" = true ]; then
-  log "Healthy. Deploy complete — now running:"
+  # app is healthy now, but the earlier "up -d" may be the exact call that failed (the caddy-wait
+  # case above) — re-run it so caddy, which was blocked on app's own healthcheck, actually starts
+  # too, instead of silently leaving this stack one container short of a working deploy.
+  log "Healthy. Starting the remaining services (e.g. caddy, if its own dependency wait blocked it)"
+  docker compose -f "${COMPOSE_FILE}" up -d
+  log "Deploy complete — now running:"
   docker compose -f "${COMPOSE_FILE}" images app
   exit 0
 fi
 
 # Unhealthy within the timeout — this is the "fast doesn't mean unattended-and-broken" half of
-# ADR-0018's own reasoning. Only rolls back if there's a real previous image to roll back to (a
-# first-ever deploy with no prior version has nothing to fall back to, and should fail loudly
-# instead of silently doing nothing).
-echo "App did not become healthy within ${HEALTH_TIMEOUT_SECONDS}s." >&2
+# ADR-0018's own reasoning. Dumped automatically, not just referenced by name, so the actual reason
+# app never came up is right here in this run's own output — CI has no other way to see it, and
+# even on a host, one less round trip than running this by hand after the fact.
+echo "App did not become healthy within ${HEALTH_TIMEOUT_SECONDS}s. Its own logs:" >&2
+docker compose -f "${COMPOSE_FILE}" logs app --tail=100 >&2 || true
+
+# Only rolls back if there's a real previous image to roll back to (a first-ever deploy with no
+# prior version has nothing to fall back to, and should fail loudly instead of silently doing
+# nothing).
 if [ -z "${PREVIOUS_IMAGE_ID}" ]; then
-  fail "No previous image recorded (first deploy?) — nothing to roll back to. Check 'docker compose -f ${COMPOSE_FILE} logs app' by hand."
+  fail "No previous image recorded (first deploy?) — nothing to roll back to. See the logs above."
 fi
 
 log "Rolling back to the previous image (${PREVIOUS_IMAGE_ID})"
 docker tag "${PREVIOUS_IMAGE_ID}" "$(docker compose -f "${COMPOSE_FILE}" config --images app | head -1)"
-docker compose -f "${COMPOSE_FILE}" up -d app
+docker compose -f "${COMPOSE_FILE}" up -d
 
-fail "Deploy failed and was rolled back to the previous image. Check 'docker compose -f ${COMPOSE_FILE} logs app' for why the new version didn't come up healthy before retrying."
+fail "Deploy failed and was rolled back to the previous image. See the logs above for why the new version didn't come up healthy before retrying."

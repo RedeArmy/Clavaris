@@ -27,6 +27,7 @@ Added after ADR-0010 shipped with five other documents left contradicting it (`s
 - [ ] New migration filename follows the timestamp convention (`data-model.md` §4) — never a sequential `V{n}` that could collide with another module's migration.
 - [ ] If the migration **alters a table that can already hold rows** (rename, type change, split/merge, a drop with data implications): a `MigrationDataPreservationTest`-style test exists — seed data on the prior schema version, apply the migration, assert the data survived intact (`test-strategy.md` §3). A migration that only adds new, empty structures doesn't need this.
 - [ ] `spring.jpa.hibernate.ddl-auto` stays `validate` — never changed to `update`/`create` to "make it work locally."
+- [ ] A migration file that already reached `master` is never edited, renamed, or deleted afterward — not even a comment-only tweak (`./scripts/check-migration-immutability.sh` enforces this in CI, `git-workflow.md` §4). Found live, 2026-09-16: two comment-only edits to an already-applied migration broke Flyway's checksum validation against pre-production's own database — every test database here is fresh/empty (Testcontainers), so nothing short of a real, long-lived environment could have caught it before this check existed. Need to fix something in an already-released migration? Add a new migration instead.
 
 ## 2. Changes touching authentication, tokens, or sessions (identity-module)
 
