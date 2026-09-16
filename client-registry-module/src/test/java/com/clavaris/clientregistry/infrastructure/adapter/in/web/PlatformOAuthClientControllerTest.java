@@ -92,7 +92,8 @@ class PlatformOAuthClientControllerTest {
                     deactivateClient,
                     rotateClientSecret,
                     organizationResolver,
-                    currentPlatformAccount))
+                    currentPlatformAccount,
+                    "https://clavaris.example.test"))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -181,6 +182,28 @@ class PlatformOAuthClientControllerTest {
         .andExpect(model().attribute("justRegisteredRawSecret", "raw-secret-shown-once"));
 
     verify(registerClient).handle(any());
+  }
+
+  // Clerk-style "add these to your app" panel — proves the model carries every endpoint a real
+  // OIDC client library needs, built from CLAVARIS_BASE_URL, not guessed at.
+  @Test
+  void plainCreatePostRendersSetupInstructionsForTheConsumerApp() throws Exception {
+    OAuthClient created = sampleClient();
+    when(registerClient.handle(any()))
+        .thenReturn(new RegisterOAuthClientResult(created, "raw-secret-shown-once"));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("redirectUris", "https://jobseeker.example.com/callback")
+                .param("allowedGrantTypes", OAuthGrantTypeOptions.AUTHORIZATION_CODE))
+        .andExpect(status().isOk())
+        .andExpect(
+            model()
+                .attribute(
+                    "setupInstructions",
+                    OidcClientSetupInstructions.from(
+                        organizationId, "https://clavaris.example.test", created)));
   }
 
   @Test

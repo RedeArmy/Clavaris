@@ -38,6 +38,75 @@
                     Copy this now — it will not be shown again.
                 </p>
 
+                <!-- Only present right after a successful create (not after rotate-secret — the
+                     endpoints/redirect URIs/scopes below don't change when only the secret does).
+                     Same "everything to paste into the consumer app, right here" shape Clerk/Auth0
+                     give an operator instead of leaving them to reconstruct these URLs from docs —
+                     see OidcClientSetupInstructions's own Javadoc for where each value comes from. -->
+                <div class="clavaris-section-card" th:if="${setupInstructions}">
+                    <h2>Add these to your application</h2>
+                    <p>Most OIDC client libraries only need the <strong>issuer</strong> (or discovery
+                        URL), <strong>client ID</strong> and <strong>client secret</strong> below —
+                        they fetch every other endpoint themselves from the discovery document.</p>
+                    <div class="clavaris-table-wrapper">
+                        <table class="clavaris-table">
+                            <tbody>
+                            <tr>
+                                <th>Client ID</th>
+                                <td><code th:text="${justRegisteredClientId}">client id</code></td>
+                            </tr>
+                            <tr>
+                                <th>Client secret</th>
+                                <td><code th:text="${justRegisteredRawSecret}">secret</code></td>
+                            </tr>
+                            <tr>
+                                <th>Issuer</th>
+                                <td><code th:text="${setupInstructions.issuer()}">issuer</code></td>
+                            </tr>
+                            <tr>
+                                <th>Discovery URL</th>
+                                <td><code th:text="${setupInstructions.discoveryUrl()}">discovery url</code></td>
+                            </tr>
+                            <tr>
+                                <th>Authorization endpoint</th>
+                                <td><code th:text="${setupInstructions.authorizationEndpoint()}">authorize</code></td>
+                            </tr>
+                            <tr>
+                                <th>Token endpoint</th>
+                                <td><code th:text="${setupInstructions.tokenEndpoint()}">token</code></td>
+                            </tr>
+                            <tr>
+                                <th>Userinfo endpoint</th>
+                                <td><code th:text="${setupInstructions.userInfoEndpoint()}">userinfo</code></td>
+                            </tr>
+                            <tr>
+                                <th>JWKS endpoint</th>
+                                <td><code th:text="${setupInstructions.jwksEndpoint()}">jwks</code></td>
+                            </tr>
+                            <tr>
+                                <th>Logout endpoint</th>
+                                <td><code th:text="${setupInstructions.logoutEndpoint()}">logout</code></td>
+                            </tr>
+                            <tr>
+                                <th>Redirect URIs</th>
+                                <td>
+                                    <code th:each="uri : ${setupInstructions.redirectUris()}"
+                                          th:text="${uri}" style="display:block">redirect uri</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Scopes</th>
+                                <td th:text="${#strings.listJoin(setupInstructions.allowedScopes(), ', ')}">scopes</td>
+                            </tr>
+                            <tr>
+                                <th>Grant types</th>
+                                <td th:text="${#strings.listJoin(setupInstructions.allowedGrantTypes(), ', ')}">grant types</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(clients)}">
                     <p class="clavaris-empty-state">No OAuth Clients yet — register the first one below.</p>
                 </div>
