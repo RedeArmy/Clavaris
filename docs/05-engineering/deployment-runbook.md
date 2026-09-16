@@ -114,6 +114,24 @@ created against this instance again without a manual database intervention — s
 `incident-response-platform-client-compromise.md` for the related (but distinct) compromise
 scenario, not a loss scenario.
 
+**`GOOGLE_OAUTH_CLIENT_ID`/`SECRET`, `GITHUB_OAUTH_CLIENT_ID`/`SECRET` — live-found gap, 2026-09-16:**
+`docker-compose.prod.yml`'s own comment says any non-blank placeholder satisfies its `:?` check if
+this deployment won't enable social login yet — true for startup, but a real "Sign in with Google"
+attempt against a placeholder value fails at Google's own consent screen with `Error 401:
+invalid_client` / "The OAuth client was not found," not anywhere in this app's own logs. Confirmed
+live: exactly this error, against exactly a leftover placeholder. To make social login actually
+work on a given instance (ADR-0020 Decision 4 — one shared app per provider, every Organization's
+button goes through the same pair):
+- Google: [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services →
+  Credentials → Create Credentials → OAuth client ID → Application type: Web application.
+  Authorized redirect URI must be exactly `{CLAVARIS_BASE_URL}/login/oauth2/code/google` (Spring
+  Security's own default callback path — no override configured anywhere in this codebase).
+- GitHub: [github.com/settings/developers](https://github.com/settings/developers) → OAuth Apps →
+  New OAuth App. Authorization callback URL must be exactly
+  `{CLAVARIS_BASE_URL}/login/oauth2/code/github`.
+- Set the resulting four real values in `/opt/clavaris/.env`, then re-run `./deploy.sh` — these are
+  read once at container startup, not hot-reloaded.
+
 ## 4. Routine deploys (a new commit merged to `master`)
 
 ```bash
