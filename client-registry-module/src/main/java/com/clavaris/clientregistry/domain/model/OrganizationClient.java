@@ -20,30 +20,14 @@ import java.util.UUID;
  * OrganizationId} — same module-independence rule {@code OAuthClient}'s own identical field already
  * documents.
  *
- * <p>Same record-style-accessor PMD suppressions as {@link PlatformClient}, same rationale. {@code
- * PMD.TooManyMethods}: a value object whose method count grows with its field count, not organic
- * complexity — same reasoning {@code Organization}'s own identical suppression documents.
+ * <p>Shared state/validation lives on {@link AbstractClientCredential} (SonarCloud duplication
+ * review, 2026-09-15) — see its own Javadoc for why this pair shares a base; {@code organizationId}
+ * is this class's own field, added on top, the one thing that pair doesn't share.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods"
-})
-public final class OrganizationClient {
+@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortVariable"})
+public final class OrganizationClient extends AbstractClientCredential {
 
-  private final UUID id;
   private final UUID organizationId;
-  private final String clientId;
-  private final String clientSecretHash;
-  private final List<String> allowedScopes;
-  private final Instant createdAt;
-  private final boolean active;
-
-  // SDE-III review, 2026-09-15: same optimistic-lock version field as OAuthClient's own identical
-  // addition — see ConcurrentClientModificationException's own Javadoc for the lost-update race
-  // this closes.
-  private final int version;
 
   @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale as
   // PlatformClient's own identical constructor.
@@ -56,18 +40,8 @@ public final class OrganizationClient {
       final Instant createdAt,
       final boolean active,
       final int version) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
+    super(id, clientId, clientSecretHash, allowedScopes, createdAt, active, version);
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
-    // Same defensive rationale as PlatformClient's own identical guard — this credential grants
-    // real admin power over one Organization's own accounts/workspaces, a high-value target even
-    // if not the system-wide one PlatformClient is.
-    this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
-    this.clientSecretHash =
-        ClientCredentialFields.requireNonBlank(clientSecretHash, "clientSecretHash");
-    this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
-    this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
-    this.active = active;
-    this.version = version;
   }
 
   /**
@@ -128,51 +102,30 @@ public final class OrganizationClient {
   public OrganizationClient rotateSecret(
       @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
     return new OrganizationClient(
-        id,
+        id(),
         organizationId,
-        clientId,
+        clientId(),
         newClientSecretHash,
-        allowedScopes,
-        createdAt,
-        active,
-        version);
+        allowedScopes(),
+        createdAt(),
+        active(),
+        version());
   }
 
   /** Same rationale as {@code PlatformClient#deactivate}. */
   public OrganizationClient deactivate() {
     return new OrganizationClient(
-        id, organizationId, clientId, clientSecretHash, allowedScopes, createdAt, false, version);
-  }
-
-  public UUID id() {
-    return id;
+        id(),
+        organizationId,
+        clientId(),
+        clientSecretHash(),
+        allowedScopes(),
+        createdAt(),
+        false,
+        version());
   }
 
   public UUID organizationId() {
     return organizationId;
-  }
-
-  public String clientId() {
-    return clientId;
-  }
-
-  public String clientSecretHash() {
-    return clientSecretHash;
-  }
-
-  public List<String> allowedScopes() {
-    return allowedScopes;
-  }
-
-  public Instant createdAt() {
-    return createdAt;
-  }
-
-  public boolean active() {
-    return active;
-  }
-
-  public int version() {
-    return version;
   }
 }

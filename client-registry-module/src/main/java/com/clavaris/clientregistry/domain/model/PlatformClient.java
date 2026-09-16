@@ -2,7 +2,6 @@ package com.clavaris.clientregistry.domain.model;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -13,35 +12,14 @@ import java.util.UUID;
  * same module's tenant-scoped registrations) — belongs to no Organization at all, not a
  * nullable-{@code organizationId} row on the same table (data-model.md §2).
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason identity-module's {@code Account} suppresses them — the deliberate record-style
- * accessor convention used throughout this codebase's value objects, not an accidental data-holder
- * shape. DataClass itself is no longer flagged now that {@link #rotateSecret(String)}/{@link
- * #deactivate()} give this class real behavior beyond plain accessors. TooManyMethods: flagged
- * again as of the SDE-III review, 2026-09-15, optimistic-locking {@code version} field/accessor —
- * same "a value object whose method count grows with its field count" reasoning {@link
- * OAuthClient}/{@code OrganizationClient}'s own identical suppression already documents, not
- * organic complexity.
+ * <p>Shared state/validation lives on {@link AbstractClientCredential} (SonarCloud duplication
+ * review, 2026-09-15) — see its own Javadoc for why this pair shares a base and specifically why
+ * this class adds no owning-id field at all. {@code PMD.ShortVariable}: {@code id} names exactly
+ * what it is — same convention {@link AbstractClientCredential}'s own identical suppression already
+ * documents for this same constructor parameter.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods"
-})
-public final class PlatformClient {
-
-  private final UUID id;
-  private final String clientId;
-  private final String clientSecretHash;
-  private final List<String> allowedScopes;
-  private final Instant createdAt;
-  private final boolean active;
-
-  // SDE-III review, 2026-09-15: same optimistic-lock version field as OAuthClient's own identical
-  // addition — see ConcurrentClientModificationException's own Javadoc for the lost-update race
-  // this closes. The highest-value credential in the system is the one this race matters most for.
-  private final int version;
+@SuppressWarnings("PMD.ShortVariable")
+public final class PlatformClient extends AbstractClientCredential {
 
   private PlatformClient(
       final UUID id,
@@ -51,18 +29,7 @@ public final class PlatformClient {
       final Instant createdAt,
       final boolean active,
       final int version) {
-    this.id = Objects.requireNonNull(id, "id must not be null");
-    // Same defensive rationale as PasswordCredential's own blank-hash guard: a hasher bug
-    // producing an empty hash must fail loudly here, not silently reach persistence as a
-    // credential nothing (and everything) authenticates against — for THIS credential
-    // specifically, the highest-value target in the whole system.
-    this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
-    this.clientSecretHash =
-        ClientCredentialFields.requireNonBlank(clientSecretHash, "clientSecretHash");
-    this.allowedScopes = PlatformScopes.requireValidScopes(allowedScopes);
-    this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
-    this.active = active;
-    this.version = version;
+    super(id, clientId, clientSecretHash, allowedScopes, createdAt, active, version);
   }
 
   /**
@@ -106,7 +73,7 @@ public final class PlatformClient {
   public PlatformClient rotateSecret(
       @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
     return new PlatformClient(
-        id, clientId, newClientSecretHash, allowedScopes, createdAt, active, version);
+        id(), clientId(), newClientSecretHash, allowedScopes(), createdAt(), active(), version());
   }
 
   /**
@@ -119,34 +86,6 @@ public final class PlatformClient {
    */
   public PlatformClient deactivate() {
     return new PlatformClient(
-        id, clientId, clientSecretHash, allowedScopes, createdAt, false, version);
-  }
-
-  public UUID id() {
-    return id;
-  }
-
-  public String clientId() {
-    return clientId;
-  }
-
-  public String clientSecretHash() {
-    return clientSecretHash;
-  }
-
-  public List<String> allowedScopes() {
-    return allowedScopes;
-  }
-
-  public Instant createdAt() {
-    return createdAt;
-  }
-
-  public boolean active() {
-    return active;
-  }
-
-  public int version() {
-    return version;
+        id(), clientId(), clientSecretHash(), allowedScopes(), createdAt(), false, version());
   }
 }
