@@ -416,6 +416,29 @@ management:
 # of the codebase; this block is what backs the remaining Thymeleaf-rendered hosted-UI controllers,
 # which fall through to Spring Boot's own BasicErrorController, never this project's own code.
 server:
+  # SDE-III review, 2026-09-16 — real bug found live: RateLimitIdentifiers#sourceIp's own Javadoc
+  # already named the exact trigger for this ("revisit if/when a real reverse proxy is introduced")
+  # — docker-compose.prod.yml's own caddy service has been that reverse proxy since ADR-0018, but
+  # this setting was never actually added, so it never happened. Confirmed live two ways: Spring
+  # Security's own default OAuth2Login redirect-uri template ({baseUrl}/login/oauth2/code/{id})
+  # computed its base URL from the raw request Caddy's own reverse_proxy sees (the internal Docker
+  # hostname, never the real external one), so a real "Sign in with Google" attempt behind Caddy
+  # failed at Google's own consent screen with a redirect_uri_mismatch — and RateLimitIdentifiers#
+  # sourceIp read Caddy's own container IP as the caller's source IP for every single request behind
+  # it, silently defeating BR-ID-06's own per-IP layer for any deployment with Caddy in front (not
+  # only the pre-production host this was first found against — docker-compose.prod.yml's own real,
+  # eventual production deployment has carried the identical gap since the day Caddy was added).
+  # "framework" (Spring Boot's own ForwardedHeaderFilter) is what actually reads X-Forwarded-For/
+  # -Proto/-Host and makes both getRemoteAddr() and the request's own reconstructed URL reflect the
+  # real external caller instead of Caddy's own hop — safe to trust unconditionally here because
+  # docker-compose.prod.yml's own "app" service publishes no host port at all (confirmed in that
+  # file itself): every request that reaches this container structurally passed through Caddy first,
+  # there is no direct path for an external caller to reach this process and spoof these headers.
+  # docker-compose.yml (local dev) is a different topology — "app" is exposed directly on 8080
+  # there, with no reverse proxy in front of it at all — but this setting doing nothing meaningful
+  # in that case (no proxy ever sends these headers there to begin with) is a fine trade against a
+  # second, profile-gated copy of this setting to maintain for a threat model local dev doesn't have.
+  forward-headers-strategy: framework
   # SDE-III performance pass, 2026-09-13 (TD-PERF-023): previously unset anywhere — Spring Boot's
   # own default is compression OFF. Every dashboard HTML page (sidebar + head fragment repeated on
   # every one of the 11 /platform/dashboard/** pages) and clavaris.css (~700 lines) shipped fully
