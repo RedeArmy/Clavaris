@@ -13,6 +13,7 @@
         <!-- TD-FUT-017: the Argon2id concurrency gate rejected this request outright — never rendered
              alongside loginError above, since the password was never actually checked either way. -->
         <p class="clavaris-alert clavaris-alert--error" th:if="${serviceOverloadedError}">We're experiencing high sign-in demand right now — please try again in a moment.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${deviceTrustChallengeUnavailable}">We couldn't send your sign-in verification code right now — please try again in a moment.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

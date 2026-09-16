@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,8 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
@@ -291,6 +294,44 @@ class LoginControllerTest {
         .andExpect(view().name("identity/login"))
         .andExpect(model().attribute("emailNotVerifiedError", true))
         .andExpect(model().attributeHasNoErrors("form"));
+
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verifyNoInteractions(recordLoginDevice);
+  }
+
+  // Same class of gap the registration flow had (an unguarded mail send after the real work
+  // already succeeded) — except here the send is the device-trust step-up challenge itself
+  // (ADR-0024 §6), not a side notification, so this must be a distinct 503, never loginError's
+  // generic message, and the session must never be established either (that would silently bypass
+  // the policy this Organization turned on).
+  @Test
+  void aDeviceTrustChallengeThatCannotBeSentRerendersTheFormWithAServiceUnavailableError()
+      throws Exception {
+    Account account = newAccount();
+    when(useCase.handle(any())).thenReturn(account);
+    when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true));
+    when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
+    doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("email", "user@example.com")
+                .param("password", "correct-password"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(view().name("identity/login"))
+        .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
 
     verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
     verifyNoInteractions(recordLoginDevice);

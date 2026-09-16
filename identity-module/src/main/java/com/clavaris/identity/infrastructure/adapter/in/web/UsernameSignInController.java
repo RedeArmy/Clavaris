@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownD
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -124,14 +125,23 @@ public class UsernameSignInController {
 
     // TD-ARCH-016 (closed): used to be an identical, byte-for-byte-duplicated block against
     // LoginController's own equivalent — see PrimaryFactorLoginCompletion's own Javadoc.
-    return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
-        loginPorts,
-        request,
-        response,
-        organizationId,
-        account,
-        PendingAuthenticationFactor.PASSWORD,
-        clientId,
-        redirectUrl);
+    try {
+      return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
+          loginPorts,
+          request,
+          response,
+          organizationId,
+          account,
+          PendingAuthenticationFactor.PASSWORD,
+          clientId,
+          redirectUrl);
+    } catch (final MailDeliveryException _) {
+      // Same rationale as LoginController's own identical catch block — the device-trust step-up
+      // challenge code itself could not be sent, so this is a distinct 503, never loginError's
+      // generic message, and never silently let through either (that would bypass the policy).
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("deviceTrustChallengeUnavailable", true);
+      return FORM_VIEW;
+    }
   }
 }

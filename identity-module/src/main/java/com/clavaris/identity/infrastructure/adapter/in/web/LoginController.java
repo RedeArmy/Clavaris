@@ -11,6 +11,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -183,15 +184,28 @@ public class LoginController {
 
     // TD-ARCH-016 (closed): used to be an identical, byte-for-byte-duplicated block against
     // UsernameSignInController's own equivalent — see PrimaryFactorLoginCompletion's own Javadoc.
-    return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
-        loginPorts,
-        request,
-        response,
-        organizationId,
-        account,
-        PendingAuthenticationFactor.PASSWORD,
-        clientId,
-        redirectUrl);
+    try {
+      return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
+          loginPorts,
+          request,
+          response,
+          organizationId,
+          account,
+          PendingAuthenticationFactor.PASSWORD,
+          clientId,
+          redirectUrl);
+    } catch (final MailDeliveryException _) {
+      // Same class of gap the registration flow had (an unguarded mail send after the real work
+      // already succeeded) — except here the send IS the mechanism (ADR-0024 §6's device-trust
+      // step-up challenge code), not a side notification, so swallowing it and letting the login
+      // through would silently bypass the very policy this Organization turned on. The credentials
+      // were already genuinely valid, so this is a distinct 503, never loginError's generic
+      // message — same rationale as VerificationOverloadedException above, retry-safe either way.
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("deviceTrustChallengeUnavailable", true);
+      addSignInOptions(organizationId, model, clientId, redirectUrl, display);
+      return FORM_VIEW;
+    }
   }
 
   // Code review finding (TD-SEC-032, closed): one allowedProviders() call per render, not one

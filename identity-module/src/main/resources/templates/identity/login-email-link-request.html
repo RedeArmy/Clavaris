@@ -8,6 +8,7 @@
     <div class="clavaris-card">
         <h1>Sign in with an email link</h1>
         <p>Enter your email address and we'll send you a link to sign in.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${deviceTrustChallengeUnavailable}">Your previous link worked, but we couldn't send your device sign-in verification code right now — please request a new link and try again.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

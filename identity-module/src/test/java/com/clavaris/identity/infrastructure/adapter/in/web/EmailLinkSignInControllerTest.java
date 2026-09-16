@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,6 +25,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.domain.model.Account;
 import java.util.Optional;
 import java.util.UUID;
@@ -225,5 +227,32 @@ class EmailLinkSignInControllerTest {
 
     verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
     verify(requestDeviceTrustChallenge).handle(any());
+  }
+
+  // Same rationale as LoginControllerTest's own identical test, with one difference: the link
+  // this POST just authenticated with is already single-use-consumed, so retrying means requesting
+  // a fresh one — see EmailLinkSignInController's own comment on why this renders
+  // REQUEST_FORM_VIEW,
+  // not CONFIRM_FORM_VIEW.
+  @Test
+  void postConfirmRendersARequestANewLinkErrorWhenTheChallengeCodeCannotBeSent() throws Exception {
+    Account account = newAccount();
+    when(authenticateUseCase.handle(any())).thenReturn(account);
+    when(authenticationPolicyProvider.policyFor(any()))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, false, true, false, false, false, true, true));
+    when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
+    doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/email-link/confirm", ORGANIZATION_ID)
+                .param("token", "a-real-token"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(view().name("identity/login-email-link-request"))
+        .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
+
+    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
   }
 }

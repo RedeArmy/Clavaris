@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -163,17 +164,28 @@ public class EmailCodeSignInController {
       return CONFIRM_FORM_VIEW;
     }
 
-    final Optional<String> challenge =
-        DeviceTrustGate.intercept(
-            knownDevices,
-            requestDeviceTrustChallenge,
-            authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
-            request,
-            organizationId,
-            account.id(),
-            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
-            clientId,
-            redirectUrl);
+    final Optional<String> challenge;
+    try {
+      challenge =
+          DeviceTrustGate.intercept(
+              knownDevices,
+              requestDeviceTrustChallenge,
+              authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
+              request,
+              organizationId,
+              account.id(),
+              PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+              clientId,
+              redirectUrl);
+    } catch (final MailDeliveryException _) {
+      // Same rationale as LoginController's own identical catch block — the one-time code itself
+      // was already correct, so this must never collapse into codeError's message; the device-trust
+      // step-up challenge code could not be sent, so the login is paused here (retry-safe) rather
+      // than let through (would bypass the policy) or left as an uncaught 500.
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("deviceTrustChallengeUnavailable", true);
+      return CONFIRM_FORM_VIEW;
+    }
     if (challenge.isPresent()) {
       return REDIRECT_PREFIX + challenge.get();
     }
