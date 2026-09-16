@@ -20,6 +20,7 @@ import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -89,6 +90,7 @@ public class PlatformOAuthClientController {
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
+  private final String clavarisBaseUrl;
 
   // SDE-III review, 2026-09-15: ListOAuthClientsUseCase dropped — it existed on this controller
   // purely to back the former requireClientIdBelongsToOrganization workaround (see
@@ -96,19 +98,27 @@ public class PlatformOAuthClientController {
   // enforced by DeactivateOAuthClientService/RotateOAuthClientSecretService themselves. One
   // parameter per remaining collaborating port — same rationale as every other multi-collaborator
   // constructor in this codebase.
+  //
+  // clavarisBaseUrl (SDE-III review, 2026-09-16): same property, same default, ResendMailSender's
+  // own precedent for building a {@code {clavarisBaseUrl}/o/{organizationId}/...} URL from
+  // configuration rather than the current request — an operator viewing this page over Tailscale
+  // Funnel or any other proxy still needs the real externally-reachable issuer URL, not whatever
+  // Host header happened to arrive here.
   public PlatformOAuthClientController(
       final RegisterOAuthClientUseCase registerClient,
       final ListOAuthClientsPagedUseCase listClientsPaged,
       final DeactivateOAuthClientUseCase deactivateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
       final OrganizationForPlatformAccountResolver organizationResolver,
-      final CurrentPlatformAccountResolver currentPlatformAccount) {
+      final CurrentPlatformAccountResolver currentPlatformAccount,
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
     this.registerClient = registerClient;
     this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
     this.rotateClientSecret = rotateClientSecret;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
+    this.clavarisBaseUrl = clavarisBaseUrl;
   }
 
   // Shared by showList's own initial render and every mutation's HTMX-fragment re-render — see
@@ -212,6 +222,12 @@ public class PlatformOAuthClientController {
 
     model.addAttribute("justRegisteredRawSecret", result.rawClientSecret());
     model.addAttribute("justRegisteredClientId", result.client().clientId());
+    // Clerk-style "here's exactly what to put in your app" panel — see
+    // OidcClientSetupInstructions's own Javadoc for why every URL is built from configuration, not
+    // the current request.
+    model.addAttribute(
+        "setupInstructions",
+        OidcClientSetupInstructions.from(organizationId, clavarisBaseUrl, result.client()));
     renderOAuthClientsList(
         model, organizationId, resolved.owned().organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
