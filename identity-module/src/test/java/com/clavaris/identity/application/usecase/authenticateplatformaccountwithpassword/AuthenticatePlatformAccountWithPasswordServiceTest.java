@@ -2,7 +2,9 @@ package com.clavaris.identity.application.usecase.authenticateplatformaccountwit
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,6 +76,10 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
             "failure",
             "reason",
             "unknown_account");
+    // BR-ID-22: matches() itself is never called directly on this path, but the service must
+    // still pay the same Argon2id cost via the dummy-hash wrapper.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
   }
 
   @Test
@@ -99,6 +105,10 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
 
     assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    // BR-ID-22: still pays the same Argon2id cost via the dummy-hash wrapper.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
   }
 
   @Test
@@ -112,5 +122,9 @@ class AuthenticatePlatformAccountWithPasswordServiceTest {
 
     assertThatExceptionOfType(InvalidPlatformCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    // BR-ID-22: still pays the same Argon2id cost via the dummy-hash wrapper.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
   }
 }

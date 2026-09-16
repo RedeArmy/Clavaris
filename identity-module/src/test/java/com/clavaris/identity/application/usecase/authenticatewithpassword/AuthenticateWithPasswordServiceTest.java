@@ -105,7 +105,11 @@ class AuthenticateWithPasswordServiceTest {
     assertThatExceptionOfType(InvalidCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
 
+    // BR-ID-22: matches() itself is never called directly on this path, but the service must
+    // still pay the same Argon2id cost via the dummy-hash wrapper — see this class's own Javadoc
+    // addendum.
     verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
     assertThat(onlyLoggedMessage())
         .contains("event=login_failure")
         .contains("reason=unknown_account");
@@ -163,6 +167,8 @@ class AuthenticateWithPasswordServiceTest {
     // A suspended account must never even reach the password check — the account-status guard
     // runs first, deliberately, not as an afterthought once a credential match already succeeded.
     verify(verifier, never()).matches(any(), any());
+    // BR-ID-22: still pays the same Argon2id cost via the dummy-hash wrapper.
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
     assertThat(onlyLoggedMessage())
         .contains("event=login_failure")
         .contains("reason=inactive_account")
@@ -192,6 +198,9 @@ class AuthenticateWithPasswordServiceTest {
     assertThatExceptionOfType(InvalidCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
 
+    // BR-ID-22: still pays the same Argon2id cost via the dummy-hash wrapper.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
     assertThat(onlyLoggedMessage())
         .contains("event=login_failure")
         .contains("reason=no_password_credential")

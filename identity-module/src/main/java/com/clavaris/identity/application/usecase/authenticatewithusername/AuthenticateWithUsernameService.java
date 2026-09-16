@@ -19,6 +19,12 @@ import org.slf4j.LoggerFactory;
  * (username instead of email) and reusing the same {@link PasswordVerifier} port — the factor is
  * still "password," {@code amr=pwd} either way, which is why this calls the plain {@code
  * AuthenticatedSessionEstablisher#establish} method, not a new one.
+ *
+ * <p>BR-ID-22 (SDE-III review, 2026-09-15): shares {@code AuthenticateWithPasswordService}'s own
+ * timing-side-channel fix too — see that class's own Javadoc addendum and {@link
+ * PasswordVerifier#payVerificationCostRegardlessOfOutcome}. Being a "structural twin" meant this
+ * class carried the exact same gap: {@code unknown_username} and {@code inactive_account} returned
+ * without ever calling {@link PasswordVerifier#matches}.
  */
 public class AuthenticateWithUsernameService implements AuthenticateWithUsernameUseCase {
 
@@ -43,6 +49,8 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
     final Optional<Account> found =
         accounts.findByOrganizationIdAndUsername(command.organizationId(), command.username());
     if (found.isEmpty()) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=login_failure organizationId={} reason=unknown_username",
           command.organizationId());
@@ -51,6 +59,8 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
     final Account account = found.get();
 
     if (account.status() != AccountStatus.ACTIVE) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=login_failure organizationId={} accountId={} reason=inactive_account",
           command.organizationId(),
@@ -59,8 +69,18 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
     }
 
     final Optional<PasswordCredential> credential = account.passwordCredential();
-    if (credential.isEmpty()
-        || !verifier.matches(command.rawPassword(), credential.get().passwordHash())) {
+    // BR-ID-22: credential.isEmpty() must still pay the same Argon2id cost matches() below would —
+    // written as two explicit branches, not the original single "||" short-circuit, precisely so
+    // credential.isEmpty() can no longer skip that cost the way "||" always would.
+    if (credential.isEmpty()) {
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
+      LOG.info(
+          "event=login_failure organizationId={} accountId={} reason=invalid_password",
+          command.organizationId(),
+          account.id());
+      throw new InvalidCredentialsException();
+    }
+    if (!verifier.matches(command.rawPassword(), credential.get().passwordHash())) {
       LOG.info(
           "event=login_failure organizationId={} accountId={} reason=invalid_password",
           command.organizationId(),

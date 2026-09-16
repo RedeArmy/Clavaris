@@ -16,6 +16,13 @@ import org.slf4j.LoggerFactory;
  * authenticatewithpassword.AuthenticateWithPasswordService} exactly (same anti-enumeration
  * indistinguishable-failure shape, same {@code PasswordVerifier} port reused as-is), minus {@code
  * organizationId} scoping — a {@code PlatformAccount}'s email is globally unique.
+ *
+ * <p>BR-ID-22 (SDE-III review, 2026-09-15): shares that class's own timing-side-channel fix too —
+ * see its Javadoc addendum and {@link PasswordVerifier#payVerificationCostRegardlessOfOutcome}.
+ * Mirroring it "exactly" meant this class carried the exact same gap: {@code unknown_account},
+ * {@code inactive_account}, and {@code no_password_credential} all returned without ever calling
+ * {@link PasswordVerifier#matches} — arguably the higher-value target of the two, since a {@code
+ * PlatformAccount} is this system's own operator tier.
  */
 public class AuthenticatePlatformAccountWithPasswordService
     implements AuthenticatePlatformAccountWithPasswordUseCase {
@@ -45,6 +52,8 @@ public class AuthenticatePlatformAccountWithPasswordService
   public PlatformAccountId handle(final AuthenticatePlatformAccountWithPasswordCommand command) {
     final Optional<PlatformAccount> found = accounts.findByEmail(command.email());
     if (found.isEmpty()) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info("event=platform_login_failure reason=unknown_account");
       recordFailure("unknown_account");
       throw new InvalidPlatformCredentialsException();
@@ -52,6 +61,8 @@ public class AuthenticatePlatformAccountWithPasswordService
     final PlatformAccount account = found.get();
 
     if (account.status() != AccountStatus.ACTIVE) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=platform_login_failure platformAccountId={} reason=inactive_account",
           account.id());
@@ -61,6 +72,8 @@ public class AuthenticatePlatformAccountWithPasswordService
 
     final Optional<PlatformPasswordCredential> credential = account.passwordCredential();
     if (credential.isEmpty()) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=platform_login_failure platformAccountId={} reason=no_password_credential",
           account.id());

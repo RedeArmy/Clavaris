@@ -2,7 +2,10 @@ package com.clavaris.identity.application.usecase.authenticatewithusername;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
@@ -75,6 +78,12 @@ class AuthenticateWithUsernameServiceTest {
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    // BR-ID-22: matches() itself is never called directly on this path, but the service must
+    // still pay the same Argon2id cost via the dummy-hash wrapper — see this class's own Javadoc
+    // addendum.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
   }
 
   @Test
@@ -110,6 +119,41 @@ class AuthenticateWithUsernameServiceTest {
 
     assertThatExceptionOfType(InvalidCredentialsException.class)
         .isThrownBy(() -> service.handle(command));
+
+    // BR-ID-22: still pays the same Argon2id cost via the dummy-hash wrapper.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
+  }
+
+  @Test
+  void rejectsAnAccountWithNoPasswordCredentialAttached() {
+    // BR-ID-02 guarantees at least one auth method exists, just not necessarily this one — same
+    // "social-only account attempting a password login" case
+    // AuthenticateWithPasswordServiceTest's own identical test covers.
+    Account account =
+        Account.reconstitute(
+            new AccountId(UUID.randomUUID()),
+            organizationId,
+            new Email("user@example.com"),
+            Instant.now(),
+            null,
+            AccountStatus.ACTIVE,
+            null,
+            username,
+            null);
+    when(accounts.findByOrganizationIdAndUsername(organizationId, username))
+        .thenReturn(Optional.of(account));
+    AuthenticateWithUsernameCommand command =
+        new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);
+
+    assertThatExceptionOfType(InvalidCredentialsException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    // BR-ID-22: credential.isEmpty() must still pay the same Argon2id cost the wrong-password
+    // branch below it pays — see AuthenticateWithUsernameService's own handle() comment for why
+    // this had to become two explicit branches instead of one "||" short-circuit.
+    verify(verifier, never()).matches(any(), any());
+    verify(verifier).payVerificationCostRegardlessOfOutcome(RAW_PASSWORD);
   }
 
   @Test
