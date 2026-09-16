@@ -88,9 +88,13 @@ class GetClientBrandingServiceTest {
   void rejectsAClientThatBelongsToADifferentOrganization() {
     OAuthClient client = registeredClient(UUID.randomUUID());
     UUID unrelatedOrganizationId = UUID.randomUUID();
-    when(oauthClients.findById(client.id())).thenReturn(Optional.of(client));
+    UUID clientId = client.id();
+    when(oauthClients.findById(clientId)).thenReturn(Optional.of(client));
 
+    // java:S5778 (SDE-III review, 2026-09-16): clientId resolved above, outside the lambda, so
+    // exactly one invocation that could throw remains inside the assertion — the one actually under
+    // test.
     assertThatExceptionOfType(OAuthClientNotFoundException.class)
-        .isThrownBy(() -> service.handle(unrelatedOrganizationId, client.id()));
+        .isThrownBy(() -> service.handle(unrelatedOrganizationId, clientId));
   }
 }

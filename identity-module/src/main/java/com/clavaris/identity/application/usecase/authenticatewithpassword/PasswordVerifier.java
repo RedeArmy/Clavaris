@@ -17,8 +17,12 @@ public interface PasswordVerifier {
    * real credential in this system) of a fixed password no account will ever actually have. Never a
    * real credential, never compared against anything meaningful.
    */
-  @SuppressWarnings("PMD.LongVariable") // names exactly what it holds — same precedent
-  // MAX_ENDPOINTS_PER_ORGANIZATION's own identical suppression documents (webhook-module,
+  // java:S2068 false positive (SDE-III review, 2026-09-16): flagged purely on the "PASSWORD" +
+  // string-literal shape, same as any hard-coded-credential heuristic would — this Javadoc already
+  // explains why it is the opposite of a credential: a fixed, public, never-secret value that must
+  // never match a real password, existing solely to cost the same Argon2id cycles a real one would.
+  @SuppressWarnings({"java:S2068", "PMD.LongVariable"}) // names exactly what it holds — same
+  // precedent MAX_ENDPOINTS_PER_ORGANIZATION's own identical suppression documents (webhook-module,
   // RegisterWebhookEndpointService) for an equally self-explanatory constant name.
   String DUMMY_PASSWORD_HASH_FOR_TIMING_PARITY =
       "$argon2id$v=19$m=16384,t=2,p=1$dpXFtza1qHtma0EoXDpqcg$IWmvSHJVU73oWp/OB2crvi/ZyUqSREwIKg6YN8Tl9nY";

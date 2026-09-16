@@ -1,6 +1,7 @@
 package com.clavaris.identity.application.usecase.authenticatewithpassword;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,10 +39,15 @@ class PasswordVerifierTest {
                 + PasswordVerifier.DUMMY_PASSWORD_HASH_FOR_TIMING_PARITY);
   }
 
+  // java:S2699 (SDE-III review, 2026-09-16): the previous version of this test asserted nothing —
+  // "returns normally" was implicit in the absence of a thrown exception, invisible to a reader and
+  // to the rule alike. assertThatCode(...).doesNotThrowAnyException() makes that expectation an
+  // explicit, real assertion instead of a side effect nobody checks.
   @Test
   void neverThrowsWhenTheUnderlyingMatchesReturnsFalse() {
     PasswordVerifier alwaysFalse = (rawPassword, passwordHash) -> false;
 
-    alwaysFalse.payVerificationCostRegardlessOfOutcome("some-password");
+    assertThatCode(() -> alwaysFalse.payVerificationCostRegardlessOfOutcome("some-password"))
+        .doesNotThrowAnyException();
   }
 }
