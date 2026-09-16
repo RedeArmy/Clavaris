@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -159,7 +161,10 @@ class SessionTaskChallengeControllerTest {
                 .param("confirmPassword", "weak-Pass1!"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/session-task-password-reset"))
-        .andExpect(model().attributeHasFieldErrors("form", "newPassword"));
+        .andExpect(model().attributeHasFieldErrors("form", "newPassword"))
+        // Same rationale as RegisterAccountControllerTest's own identical assertion.
+        .andExpect(
+            content().string(containsString("Password must be between 8 and 128 characters")));
 
     verify(sessions, never()).establish(any(), any(), any(), any());
   }

@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordr
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.InvalidVerificationTokenException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -60,8 +61,15 @@ public class ResetPlatformAccountPasswordController {
     } catch (final InvalidVerificationTokenException _) {
       return "identity/platform/verification-link-invalid";
     } catch (final WeakPasswordException _) {
+      // Same rationale as ResetPasswordController's own identical fix.
       bindingResult.rejectValue(
-          "newPassword", "newPassword.tooWeak", "Password does not meet the minimum requirements");
+          "newPassword",
+          "newPassword.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       return FORM_VIEW;
     }
 

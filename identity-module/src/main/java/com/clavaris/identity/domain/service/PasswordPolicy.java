@@ -22,8 +22,15 @@ package com.clavaris.identity.domain.service;
  */
 public final class PasswordPolicy {
 
-  private static final int MIN_LENGTH = 8;
-  private static final int MAX_LENGTH = 128;
+  // SDE-III review, 2026-09-16: widened from private to public — every "password.tooWeak"
+  // rejection message across the 6 controllers that call isSatisfiedBy() indirectly (via
+  // WeakPasswordException) used to hardcode a vague "doesn't meet the minimum requirements" with
+  // no actual number, forcing a user to guess what's wrong. Referencing these two constants
+  // directly is what lets that message state the real, current rule instead of a second,
+  // independently-maintained copy of "8" and "128" that could silently drift from this class's own
+  // if the policy is ever tightened later.
+  public static final int MIN_LENGTH = 8;
+  public static final int MAX_LENGTH = 128;
 
   private PasswordPolicy() {}
 

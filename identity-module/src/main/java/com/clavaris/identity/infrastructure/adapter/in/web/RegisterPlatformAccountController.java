@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.requestplatformaccountemailveri
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.groups.Default;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,8 +100,15 @@ public class RegisterPlatformAccountController {
           "email", "email.alreadyRegistered", "This email is already registered");
       return FORM_VIEW;
     } catch (WeakPasswordException _) {
+      // Same rationale as ResetPasswordController's own identical fix.
       bindingResult.rejectValue(
-          "password", "password.tooWeak", "Password does not meet the minimum requirements");
+          "password",
+          "password.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       return FORM_VIEW;
     }
 

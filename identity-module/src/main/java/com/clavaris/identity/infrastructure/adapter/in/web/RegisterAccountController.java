@@ -20,6 +20,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
@@ -192,8 +193,16 @@ public class RegisterAccountController {
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (WeakPasswordException _) {
+      // SDE-III review, 2026-09-16: same rationale as ResetPasswordController's own identical
+      // fix — states the actual rule instead of a vague "doesn't meet the minimum requirements".
       bindingResult.rejectValue(
-          "password", "password.tooWeak", "Password does not meet the minimum requirements");
+          "password",
+          "password.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (UsernameRequiredException _) {
@@ -203,6 +212,20 @@ public class RegisterAccountController {
     } catch (UsernameAlreadyRegisteredException _) {
       bindingResult.rejectValue(
           "username", "username.alreadyRegistered", "This username is already taken");
+      addSignUpOptions(organizationId, model);
+      return FORM_VIEW;
+    } catch (final IllegalArgumentException _) {
+      // SDE-III review, 2026-09-16: real gap found live — Username's own domain constructor
+      // rejects a shape RegisterAccountForm's own @Size(max=32) alone doesn't catch (too short,
+      // uppercase, spaces, punctuation outside letters/digits/underscore/hyphen — see that form
+      // field's own comment for why the shape check is deliberately not duplicated there), and
+      // nothing here caught it: an uncaught IllegalArgumentException reaching this method meant an
+      // unhandled 500 on sign-up, not a field-level message — the exact registration-side gap
+      // UsernameSignInController's own identical catch already closes for sign-in.
+      bindingResult.rejectValue(
+          "username",
+          "username.invalid",
+          "Username must be 3-32 characters (letters, digits, underscore, hyphen only)");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     }

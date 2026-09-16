@@ -19,7 +19,10 @@
 
             <div class="clavaris-field">
                 <label for="password">Password</label>
-                <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
+                <!-- Same rationale as register.html's own identical fields. -->
+                <input id="password" type="password" th:field="*{password}" autocomplete="new-password"
+                       minlength="8" maxlength="128" required/>
+                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('password')}">8–128 characters</p>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
             </div>
 

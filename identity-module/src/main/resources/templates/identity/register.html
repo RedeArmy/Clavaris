@@ -19,8 +19,15 @@
                  "policy computed fresh on every render" posture as login.html's own conditionals. -->
             <div class="clavaris-field" th:if="${usernameSignUpEnabled}">
                 <label for="username">Username</label>
+                <!-- SDE-III review, 2026-09-16: pattern/minlength/maxlength mirror Username's own
+                     domain constructor rule (letters/digits/underscore/hyphen, 3-32 characters
+                     after it strips/lowercases) — case-insensitive here since uppercase input is
+                     valid too (the constructor lowercases before checking shape, it doesn't reject
+                     uppercase), so this only blocks what would actually fail server-side. -->
                 <input id="username" type="text" th:field="*{username}" autocomplete="username"
+                       pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="32"
                        th:required="${usernameRequired}"/>
+                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('username')}">3–32 characters: letters, digits, underscore, hyphen</p>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
             </div>
 
@@ -28,8 +35,14 @@
                  completes through a passwordless email method instead (see RegisterAccountController). -->
             <div class="clavaris-field" th:if="${passwordAtSignUpEnabled}">
                 <label for="password">Password</label>
+                <!-- SDE-III review, 2026-09-16: minlength/maxlength give the browser's own native
+                     validation immediate, no-round-trip feedback — matching PasswordPolicy's own
+                     bounds (identity-module's WeakPasswordException message states the same rule
+                     server-side, the real enforcement point; this is convenience, not a substitute
+                     for it). -->
                 <input id="password" type="password" th:field="*{password}" autocomplete="new-password"
-                       required/>
+                       minlength="8" maxlength="128" required/>
+                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('password')}">8–128 characters</p>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
             </div>
             <div class="clavaris-field" th:if="${passwordAtSignUpEnabled}">

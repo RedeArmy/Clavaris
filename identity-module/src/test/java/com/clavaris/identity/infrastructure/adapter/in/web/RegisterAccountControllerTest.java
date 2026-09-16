@@ -325,7 +325,11 @@ class RegisterAccountControllerTest {
                 .param("confirmPassword", "aaaaaaaa"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
-        .andExpect(model().attributeHasFieldErrors("form", "password"));
+        .andExpect(model().attributeHasFieldErrors("form", "password"))
+        // SDE-III review, 2026-09-16: the actual, actionable rule, not a vague "doesn't meet the
+        // minimum requirements" the user has to guess at.
+        .andExpect(
+            content().string(containsString("Password must be between 8 and 128 characters")));
 
     verifyNoInteractions(requestEmailVerification);
   }
@@ -362,6 +366,50 @@ class RegisterAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
         .andExpect(model().attributeHasFieldErrors("form", "username"));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  // SDE-III review, 2026-09-16 — real gap found live: Username's own domain constructor throws
+  // IllegalArgumentException for a shape RegisterAccountForm's own @Size(max=32) alone doesn't
+  // catch (too short, or containing anything besides letters/digits/underscore/hyphen), and
+  // nothing here used to catch it — an unhandled 500, not a field-level message, the exact
+  // registration-side gap UsernameSignInControllerTest's own equivalent already proves closed for
+  // sign-in.
+  @Test
+  void invalidUsernameShapeRerendersTheFormWithAFieldError() throws Exception {
+    when(useCase.handle(any())).thenThrow(new IllegalArgumentException("Not a valid username"));
+    // usernameSignUpEnabled=true — register.html's own username field (and this rejection's
+    // message) only renders at all when the Organization's policy actually offers it.
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                true,
+                false,
+                false,
+                true,
+                false));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password")
+                .param("username", "no spaces allowed"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "username"))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Username must be 3-32 characters (letters, digits, underscore, hyphen"
+                            + " only)")));
 
     verifyNoInteractions(requestEmailVerification);
   }

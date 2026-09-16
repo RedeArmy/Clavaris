@@ -1,11 +1,13 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -123,7 +125,10 @@ class ResetPlatformAccountPasswordControllerTest {
                 .param("confirmPassword", "aaaaaaaa"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/reset-password"))
-        .andExpect(model().attributeHasFieldErrors("form", "newPassword"));
+        .andExpect(model().attributeHasFieldErrors("form", "newPassword"))
+        // Same rationale as RegisterAccountControllerTest's own identical assertion.
+        .andExpect(
+            content().string(containsString("Password must be between 8 and 128 characters")));
   }
 
   @Test

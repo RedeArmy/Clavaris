@@ -196,7 +196,10 @@ class RegisterPlatformAccountControllerTest {
                 .param("confirmPassword", "aaaaaaaa"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/register"))
-        .andExpect(model().attributeHasFieldErrors("form", "password"));
+        .andExpect(model().attributeHasFieldErrors("form", "password"))
+        // Same rationale as RegisterAccountControllerTest's own identical assertion.
+        .andExpect(
+            content().string(containsString("Password must be between 8 and 128 characters")));
 
     verifyNoInteractions(requestEmailVerification);
   }
