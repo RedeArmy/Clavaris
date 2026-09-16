@@ -37,7 +37,8 @@ class ClientBrandingProviderBridgeTest {
     assertThat(snapshot.logoUrl()).isEmpty();
     assertThat(snapshot.primaryColor()).isEmpty();
     assertThat(snapshot.applicationDisplayName()).isEmpty();
-    verify(getClientBranding, never()).handle(org.mockito.ArgumentMatchers.any());
+    verify(getClientBranding, never())
+        .handle(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -47,7 +48,8 @@ class ClientBrandingProviderBridgeTest {
     ClientBrandingSnapshot snapshot = bridge.brandingFor(organizationId, "unknown-client");
 
     assertThat(snapshot.logoUrl()).isEmpty();
-    verify(getClientBranding, never()).handle(org.mockito.ArgumentMatchers.any());
+    verify(getClientBranding, never())
+        .handle(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -58,7 +60,8 @@ class ClientBrandingProviderBridgeTest {
     ClientBrandingSnapshot snapshot = bridge.brandingFor(organizationId, "cross-tenant-client");
 
     assertThat(snapshot.logoUrl()).isEmpty();
-    verify(getClientBranding, never()).handle(org.mockito.ArgumentMatchers.any());
+    verify(getClientBranding, never())
+        .handle(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -68,7 +71,7 @@ class ClientBrandingProviderBridgeTest {
     ClientBranding branding =
         ClientBranding.define(
             client.id(), "https://cdn.example.com/logo.png", "#336699", "Acme Corp");
-    when(getClientBranding.handle(client.id())).thenReturn(branding);
+    when(getClientBranding.handle(organizationId.value(), client.id())).thenReturn(branding);
 
     ClientBrandingSnapshot snapshot = bridge.brandingFor(organizationId, "branded-client");
 

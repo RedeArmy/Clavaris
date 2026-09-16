@@ -56,7 +56,7 @@ class RedirectUrlResolverBridge implements RedirectUrlResolver {
     }
     final OAuthClient client = maybeClient.get();
 
-    final RedirectPolicy policy = getRedirectPolicy.handle(client.id());
+    final RedirectPolicy policy = getRedirectPolicy.handle(organizationId.value(), client.id());
     final Optional<String> forceUrl =
         action == RedirectAction.SIGN_IN
             ? policy.forceSignInRedirectUrl()

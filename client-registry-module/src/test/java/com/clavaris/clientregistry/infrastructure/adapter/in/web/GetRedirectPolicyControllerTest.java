@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.OAuthClientNotFoundException;
 import com.clavaris.clientregistry.domain.model.RedirectPolicy;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +32,8 @@ class GetRedirectPolicyControllerTest {
   void returns200WithUnconfiguredDefaultsWhenNoPolicyHasEverBeenSet() throws Exception {
     UUID organizationId = UUID.randomUUID();
     UUID oauthClientId = UUID.randomUUID();
-    when(useCase.handle(oauthClientId)).thenReturn(RedirectPolicy.unconfigured(oauthClientId));
+    when(useCase.handle(organizationId, oauthClientId))
+        .thenReturn(RedirectPolicy.unconfigured(oauthClientId));
 
     mockMvc
         .perform(
@@ -43,5 +46,26 @@ class GetRedirectPolicyControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.oauthClientId").value(oauthClientId.toString()))
         .andExpect(jsonPath("$.fallbackSignInRedirectUrl").value(nullValue()));
+  }
+
+  // SDE-III review, 2026-09-15: same 404-on-cross-tenant-or-missing-client mapping as
+  // SetRedirectPolicyController's own identical test — see GetRedirectPolicyForClientService's own
+  // Javadoc for the ownership check this now enforces (this endpoint used to ignore organizationId
+  // entirely).
+  @Test
+  void returns404WhenTheOAuthClientDoesNotBelongToThisOrganization() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    UUID oauthClientId = UUID.randomUUID();
+    when(useCase.handle(any(), any())).thenThrow(new OAuthClientNotFoundException(oauthClientId));
+
+    mockMvc
+        .perform(
+            get(
+                "/api/v1/admin/organizations/"
+                    + organizationId
+                    + "/clients/"
+                    + oauthClientId
+                    + "/redirect-policy"))
+        .andExpect(status().isNotFound());
   }
 }
