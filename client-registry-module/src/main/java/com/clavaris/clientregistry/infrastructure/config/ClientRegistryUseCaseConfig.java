@@ -219,11 +219,12 @@ class ClientRegistryUseCaseConfig {
     return new SetRedirectPolicyForClientService(oauthClients, redirectPolicies, auditEvents);
   }
 
-  // Clerk "customize redirect URLs" parity
+  // Clerk "customize redirect URLs" parity. SDE-III review, 2026-09-15: oauthClients added for
+  // this class's own module-level ownership check — see its Javadoc.
   @Bean
   /* package */ GetRedirectPolicyForClientUseCase getRedirectPolicyForClientUseCase(
-      final RedirectPolicyRepository redirectPolicies) {
-    return new GetRedirectPolicyForClientService(redirectPolicies);
+      final OAuthClientRepository oauthClients, final RedirectPolicyRepository redirectPolicies) {
+    return new GetRedirectPolicyForClientService(oauthClients, redirectPolicies);
   }
 
   // ADR-0009 §3. PMD.LinguisticNaming: same false positive as setRedirectPolicyForClientUseCase's
@@ -237,11 +238,12 @@ class ClientRegistryUseCaseConfig {
     return new SetClientBrandingService(oauthClients, brandings, auditEvents);
   }
 
-  // ADR-0009 §3
+  // ADR-0009 §3. SDE-III review, 2026-09-15: oauthClients added for this class's own module-level
+  // ownership check — see its Javadoc.
   @Bean
   /* package */ GetClientBrandingUseCase getClientBrandingUseCase(
-      final ClientBrandingRepository brandings) {
-    return new GetClientBrandingService(brandings);
+      final OAuthClientRepository oauthClients, final ClientBrandingRepository brandings) {
+    return new GetClientBrandingService(oauthClients, brandings);
   }
 
   // ADR-0009 §2
@@ -264,10 +266,11 @@ class ClientRegistryUseCaseConfig {
         oauthClients, domainConfigs, dnsLookup, auditEvents);
   }
 
-  // ADR-0009 §2
+  // ADR-0009 §2. SDE-III review, 2026-09-15: oauthClients added for this class's own module-level
+  // ownership check — see its Javadoc.
   @Bean
   /* package */ GetClientDomainConfigUseCase getClientDomainConfigUseCase(
-      final ClientDomainConfigRepository domainConfigs) {
-    return new GetClientDomainConfigService(domainConfigs);
+      final OAuthClientRepository oauthClients, final ClientDomainConfigRepository domainConfigs) {
+    return new GetClientDomainConfigService(oauthClients, domainConfigs);
   }
 }
