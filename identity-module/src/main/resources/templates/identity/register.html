@@ -41,6 +41,22 @@
 
             <button class="clavaris-button" type="submit">Create account</button>
         </form>
+
+        <!-- ADR-0020 Decision 3, BR-ID-12: only ever the providers this Organization has actually
+             enabled — same "policy computed fresh on every render" posture as login.html's own
+             identical block. A first-time click here creates the Account and logs in immediately
+             (AuthenticateWithSocialProviderService's own "brand-new signup" branch) — this is the
+             same target login.html's own social buttons use, not a separate sign-up flow. -->
+        <div th:if="${not #lists.isEmpty(socialProviders)}">
+            <div class="clavaris-divider">Or</div>
+            <p th:each="provider : ${socialProviders}">
+                <a class="clavaris-button clavaris-button--secondary"
+                   th:href="@{'login/social/' + ${#strings.toLowerCase(provider.name())}}"
+                   th:text="${'Sign up with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign up with Provider</a>
+            </p>
+        </div>
+
+        <p class="clavaris-links"><a th:href="@{login}">Already have an account? Sign in</a></p>
     </div>
 </main>
 </body>

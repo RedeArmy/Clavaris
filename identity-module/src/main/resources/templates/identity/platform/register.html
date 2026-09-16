@@ -32,6 +32,16 @@
             <button class="clavaris-button" type="submit">Create account</button>
         </form>
 
+        <!-- ADR-0020 Decision 2: Clavaris's own Sign Up is Google/GitHub/email, all three permanently
+             available — same "always on, never tenant-configurable" shape login.html's own identical
+             block already establishes for this tier. A first-time click here creates the
+             PlatformAccount and logs in immediately (AuthenticatePlatformAccountWithSocialProviderService's
+             own "brand-new signup" branch) — this is the same target login.html's own social buttons
+             use, not a separate sign-up flow. -->
+        <div class="clavaris-divider">Or</div>
+        <p><a class="clavaris-button clavaris-button--secondary" th:href="@{login/social/google}">Sign up with Google</a></p>
+        <p><a class="clavaris-button clavaris-button--secondary" th:href="@{login/social/github}">Sign up with GitHub</a></p>
+
         <p class="clavaris-links"><a th:href="@{login}">Already have an account? Sign in</a></p>
     </div>
 </main>

@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -32,6 +33,9 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +63,7 @@ class RegisterAccountControllerTest {
   private AccountAuthenticationPolicyProvider policyProvider;
   private RequestEmailSignInCodeUseCase requestEmailSignInCode;
   private RequestEmailSignInLinkUseCase requestEmailSignInLink;
+  private OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -68,6 +73,7 @@ class RegisterAccountControllerTest {
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestEmailSignInCode = mock(RequestEmailSignInCodeUseCase.class);
     requestEmailSignInLink = mock(RequestEmailSignInLinkUseCase.class);
+    socialLoginPolicyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
@@ -99,7 +105,8 @@ class RegisterAccountControllerTest {
                     requestEmailVerification,
                     policyProvider,
                     requestEmailSignInCode,
-                    requestEmailSignInLink))
+                    requestEmailSignInLink,
+                    socialLoginPolicyProvider))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -110,7 +117,22 @@ class RegisterAccountControllerTest {
         .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
-        .andExpect(model().attributeExists("form"));
+        .andExpect(model().attributeExists("form"))
+        .andExpect(model().attribute("socialProviders", List.of()));
+  }
+
+  // SDE-III review, 2026-09-16 — sign-up-with-Google/GitHub: same "computed fresh on every
+  // render" contract LoginControllerTest's own identical test proves for the sign-in page — this
+  // page's own social buttons must reflect exactly the same allowed-providers set.
+  @Test
+  void getShowsOnlyTheSocialProvidersTheOrganizationHasEnabled() throws Exception {
+    when(socialLoginPolicyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(EnumSet.of(SocialProvider.GOOGLE));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("socialProviders", List.of(SocialProvider.GOOGLE)));
   }
 
   @Test

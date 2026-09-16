@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -18,7 +19,10 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,14 +63,33 @@ import org.springframework.web.bind.annotation.RequestParam;
  * identically-shaped failure. Deliberately NOT applied to {@link #completePasswordlessSignUp} below
  * — there, the email/link send is the entire completion mechanism, not a side notification, per
  * that class's own Javadoc; the caller genuinely needs to know whether it went through.
+ *
+ * <p>SDE-III review, 2026-09-16 — sign-up-with-Google/GitHub buttons added: {@code
+ * AuthenticateWithSocialProviderService}'s own three-way linking decision already treats a
+ * first-time social login as account creation ("a brand-new signup: create both atomically and log
+ * in immediately") — the exact "sign in with Google" pattern MAANG-style systems use to double as
+ * "sign up with Google" for a never-before-seen identity. That flow already existed and was already
+ * reachable from {@link LoginController}'s own hosted page; this page simply never linked to it.
+ * {@link #addSignUpOptions} now surfaces the same {@code socialProviders} model attribute {@code
+ * LoginController#addSignInOptions} does, read by {@code register.html}'s own new social-provider
+ * block (a straight copy of {@code login.html}'s own — same {@link
+ * SocialLoginRedirectController#forOrganization} target, same re-verification of {@link
+ * OrganizationSocialLoginPolicyProvider} there before any third-party redirect, same
+ * anti-enumeration posture). No new use case, no new controller — reuses the sign-in flow verbatim,
+ * since signing up and signing in via a social provider are structurally the same request here.
  */
 // PMD.LongVariable: requestEmailVerification/requestEmailSignInCode/requestEmailSignInLink each
 // name exactly which passwordless completion path they trigger — TD-SEC-004's own original
-// rationale, extended to its two new siblings. PMD.ExcessiveImports: this class's own SDE-III
-// review addendum above's MailDeliveryException/Logger/LoggerFactory pushed this past the default
-// threshold of 30 — every import here backs a real, distinct collaborator this controller
-// genuinely needs, same "wiring, not sprawl" reasoning this codebase applies elsewhere.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// rationale, extended to its two new siblings, now also socialLoginPolicyProvider.
+// PMD.ExcessiveImports:
+// this class's own SDE-III review addendum above's MailDeliveryException/Logger/LoggerFactory
+// pushed this past the default threshold of 30 — every import here backs a real, distinct
+// collaborator this controller genuinely needs, same "wiring, not sprawl" reasoning this codebase
+// applies elsewhere. PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself,
+// used on several descriptively-named fields/parameters — same rationale identity-module's own
+// IdentityUseCaseConfig class-level suppression documents for this exact
+// PMD-annotation-string-as-literal false positive.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
 @Controller
 @RequestMapping("/o/{organizationId}/register")
 public class RegisterAccountController {
@@ -85,18 +108,26 @@ public class RegisterAccountController {
   private final RequestEmailSignInCodeUseCase requestEmailSignInCode;
   private final RequestEmailSignInLinkUseCase requestEmailSignInLink;
 
+  // Same port LoginController's own identical field already uses — no new abstraction, this
+  // controller just now also reads it.
+  @SuppressWarnings("PMD.LongVariable")
+  private final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
+
   @SuppressWarnings({"java:S107", "PMD.LongVariable"})
   public RegisterAccountController(
       final RegisterAccountUseCase useCase,
       final RequestEmailVerificationUseCase requestEmailVerification,
       final AccountAuthenticationPolicyProvider policyProvider,
       final RequestEmailSignInCodeUseCase requestEmailSignInCode,
-      final RequestEmailSignInLinkUseCase requestEmailSignInLink) {
+      final RequestEmailSignInLinkUseCase requestEmailSignInLink,
+      @SuppressWarnings("PMD.LongVariable")
+          final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider) {
     this.useCase = useCase;
     this.requestEmailVerification = requestEmailVerification;
     this.policyProvider = policyProvider;
     this.requestEmailSignInCode = requestEmailSignInCode;
     this.requestEmailSignInLink = requestEmailSignInLink;
+    this.socialLoginPolicyProvider = socialLoginPolicyProvider;
   }
 
   @GetMapping
@@ -243,10 +274,18 @@ public class RegisterAccountController {
   }
 
   private void addSignUpOptions(final UUID organizationId, final Model model) {
-    final AccountAuthenticationPolicySnapshot policy =
-        policyProvider.policyFor(new OrganizationId(organizationId));
+    final OrganizationId orgId = new OrganizationId(organizationId);
+    final AccountAuthenticationPolicySnapshot policy = policyProvider.policyFor(orgId);
     model.addAttribute("usernameSignUpEnabled", policy.usernameSignUpEnabled());
     model.addAttribute("usernameRequired", policy.usernameRequired());
     model.addAttribute("passwordAtSignUpEnabled", policy.passwordAtSignUpEnabled());
+
+    // Same ADR-0020 Decision 3/BR-ID-12 "computed fresh on every render" posture as
+    // LoginController#addSignInOptions's own identical block — this page's own social-provider
+    // buttons must reflect exactly the same allowed-providers set the sign-in page does, since
+    // they resolve to the same underlying flow.
+    final List<SocialProvider> enabledSocialProviders =
+        new ArrayList<>(socialLoginPolicyProvider.allowedProviders(orgId));
+    model.addAttribute("socialProviders", enabledSocialProviders);
   }
 }
