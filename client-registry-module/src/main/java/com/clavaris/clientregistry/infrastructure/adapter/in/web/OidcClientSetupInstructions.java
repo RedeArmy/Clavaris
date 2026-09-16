@@ -33,7 +33,14 @@ record OidcClientSetupInstructions(
 
   /* package */ static OidcClientSetupInstructions from(
       final UUID organizationId, final String clavarisBaseUrl, final OAuthClient client) {
-    final String issuer = clavarisBaseUrl.replaceAll("/+$", "") + "/o/" + organizationId;
+    // SonarCloud S5852: no regex here on purpose — a "/+$" trailing-slash trim doesn't need one,
+    // and this avoids the superlinear-backtracking risk class of finding entirely rather than
+    // trying to prove this particular pattern safe.
+    String baseUrl = clavarisBaseUrl;
+    while (baseUrl.endsWith("/")) {
+      baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+    }
+    final String issuer = baseUrl + "/o/" + organizationId;
     return new OidcClientSetupInstructions(
         issuer,
         issuer + "/.well-known/openid-configuration",
