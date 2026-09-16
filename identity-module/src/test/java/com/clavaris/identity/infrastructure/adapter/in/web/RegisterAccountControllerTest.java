@@ -148,7 +148,11 @@ class RegisterAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/register/pending-verification"));
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/register/pending-verification?email=new-user%40example.com"));
 
     verify(useCase)
         .handle(
@@ -181,7 +185,11 @@ class RegisterAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/register/pending-verification"));
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/register/pending-verification?email=new-user%40example.com"));
   }
 
   @Test
@@ -462,6 +470,22 @@ class RegisterAccountControllerTest {
     mockMvc
         .perform(get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/register-pending-verification"));
+        .andExpect(view().name("identity/register-pending-verification"))
+        .andExpect(model().attribute("email", (Object) null));
+  }
+
+  // SDE-III review, 2026-09-16 — MAANG "check your email" parity: the address now rides the
+  // redirect (see the register() method's own comment) so this page can confirm which one, same
+  // "computed fresh on every render" contract every other optional query param in this package
+  // already has.
+  @Test
+  void pendingVerificationPageShowsTheAddressWhenCarriedOnTheRedirect() throws Exception {
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID)
+                .param("email", "new-user@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register-pending-verification"))
+        .andExpect(model().attribute("email", "new-user@example.com"));
   }
 }

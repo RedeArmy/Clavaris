@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * ADR-0012: the self-service signup entry point for a {@code PlatformAccount} — no {@code
@@ -111,11 +112,17 @@ public class RegisterPlatformAccountController {
       LOG.warn("event=platform_account_registered_verification_email_send_failed", e);
     }
 
-    return "redirect:/platform/register/pending-verification";
+    // MAANG "check your email" parity — same RedirectQueryParams-mediated email hop as
+    // RegisterAccountController's own identical redirect; see that method's own comment.
+    String target = "redirect:/platform/register/pending-verification";
+    target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
+    return target;
   }
 
   @GetMapping("/pending-verification")
-  public String pendingVerification() {
+  public String pendingVerification(
+      @RequestParam(required = false) final String email, final Model model) {
+    model.addAttribute("email", email);
     return "identity/platform/register-pending-verification";
   }
 }

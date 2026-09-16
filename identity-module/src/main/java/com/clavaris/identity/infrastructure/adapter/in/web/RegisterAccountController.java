@@ -225,7 +225,14 @@ public class RegisterAccountController {
       LOG.warn("event=account_registered_verification_email_send_failed", e);
     }
 
-    return REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
+    // MAANG "check your email" parity (Clerk/Auth0/Okta all confirm which address, not just that
+    // one was sent): same RedirectQueryParams-mediated hop as completePasswordlessSignUp's own
+    // email param below — never string-concatenated directly, same header/query-injection rationale
+    // RedirectQueryParams's own Javadoc documents.
+    String target =
+        REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
+    target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
+    return target;
   }
 
   // Two genuinely distinct exits (email-code vs. email-link completion) — same "one exit per
@@ -269,7 +276,12 @@ public class RegisterAccountController {
   }
 
   @GetMapping("/pending-verification")
-  public String pendingVerification() {
+  public String pendingVerification(
+      // Optional, never trusted for anything but display (see RedirectQueryParams's own Javadoc) —
+      // a direct GET with no query string still renders the page, just without the personalized
+      // "we sent it to X" line below.
+      @RequestParam(required = false) final String email, final Model model) {
+    model.addAttribute("email", email);
     return "identity/register-pending-verification";
   }
 

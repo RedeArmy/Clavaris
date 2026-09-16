@@ -277,6 +277,25 @@ input[type="radio"] {
   filter: brightness(0.88);
 }
 
+/* "Check your email" success state (register-pending-verification.html and its platform-tier
+   twin) — Clerk/Auth0/Okta all lead a post-signup confirmation with a circular status icon, not
+   plain text alone; the icon itself reuses --clavaris-success/--clavaris-success-bg, the same
+   pair .clavaris-alert--success already establishes, just as a circle instead of a banner. */
+.clavaris-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--space-5);
+  border-radius: 999px;
+}
+
+.clavaris-icon-circle--success {
+  color: var(--clavaris-success);
+  background: var(--clavaris-success-bg);
+}
+
 .clavaris-alert {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);

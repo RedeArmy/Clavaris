@@ -86,7 +86,8 @@ class RegisterPlatformAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/platform/register/pending-verification"));
+        .andExpect(
+            redirectedUrl("/platform/register/pending-verification?email=founder%40example.com"));
 
     verify(useCase)
         .handle(
@@ -116,7 +117,8 @@ class RegisterPlatformAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/platform/register/pending-verification"));
+        .andExpect(
+            redirectedUrl("/platform/register/pending-verification?email=founder%40example.com"));
   }
 
   @Test
@@ -190,6 +192,18 @@ class RegisterPlatformAccountControllerTest {
     mockMvc
         .perform(get("/platform/register/pending-verification"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/platform/register-pending-verification"));
+        .andExpect(view().name("identity/platform/register-pending-verification"))
+        .andExpect(model().attribute("email", (Object) null));
+  }
+
+  // Same rationale as RegisterAccountControllerTest's own identical test.
+  @Test
+  void pendingVerificationPageShowsTheAddressWhenCarriedOnTheRedirect() throws Exception {
+    mockMvc
+        .perform(
+            get("/platform/register/pending-verification").param("email", "founder@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/register-pending-verification"))
+        .andExpect(model().attribute("email", "founder@example.com"));
   }
 }
