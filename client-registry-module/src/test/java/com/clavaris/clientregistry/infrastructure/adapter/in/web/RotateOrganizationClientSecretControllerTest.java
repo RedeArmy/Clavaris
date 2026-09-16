@@ -22,8 +22,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 /**
  * SDE-III review, 2026-09-15: same rationale as {@code DeactivateOrganizationClientControllerTest}
  * — this platform-tier REST endpoint had no test coverage of its own before this session. Covers
- * both real gaps found the same day: the null-{@code organizationId} pass-through and the {@code
- * @Version}-backed conflict surfacing as a clean 409.
+ * both real gaps found the same day: the null-{@code organizationId} pass-through and the
+ * {@code @Version}-backed conflict surfacing as a clean 409.
  */
 class RotateOrganizationClientSecretControllerTest {
 

@@ -265,7 +265,6 @@ class PlatformOrganizationClientControllerTest {
   @Test
   void deactivateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
     OrganizationClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     doThrow(new ConcurrentClientModificationException(client.clientId()))
         .when(deactivateClient)
         .handle(any());
@@ -278,7 +277,6 @@ class PlatformOrganizationClientControllerTest {
   @Test
   void rotateSecretReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
     OrganizationClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     when(rotateClientSecret.handle(any()))
         .thenThrow(new ConcurrentClientModificationException(client.clientId()));
 

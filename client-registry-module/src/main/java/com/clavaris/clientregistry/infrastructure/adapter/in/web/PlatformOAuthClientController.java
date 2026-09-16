@@ -236,7 +236,9 @@ public class PlatformOAuthClientController {
     try {
       deactivateClient.handle(
           new DeactivateOAuthClientCommand(
-              clientId, organizationId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+              clientId,
+              organizationId,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
     } catch (final OAuthClientNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final ConcurrentClientModificationException _) {

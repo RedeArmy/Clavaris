@@ -283,7 +283,6 @@ class PlatformOAuthClientControllerTest {
   @Test
   void deactivateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
     OAuthClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     doThrow(new ConcurrentClientModificationException(client.clientId()))
         .when(deactivateClient)
         .handle(any());
@@ -296,7 +295,6 @@ class PlatformOAuthClientControllerTest {
   @Test
   void rotateSecretReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
     OAuthClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     when(rotateClientSecret.handle(any()))
         .thenThrow(new ConcurrentClientModificationException(client.clientId()));
 
