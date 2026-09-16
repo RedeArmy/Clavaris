@@ -376,7 +376,7 @@ class RegisterAccountControllerTest {
   // underscore, or hyphen. Nothing here used to catch this exception, so it reached the
   // controller as an unhandled server error instead of a field-level message.
   // UsernameSignInControllerTest's own equivalent test already proves the matching sign-in-side
-  // gap closed; this proves the sign-up side.
+  // gap closed. This proves the sign-up side.
   @Test
   void invalidUsernameShapeRerendersTheFormWithAFieldError() throws Exception {
     when(useCase.handle(any())).thenThrow(new IllegalArgumentException("Not a valid username"));

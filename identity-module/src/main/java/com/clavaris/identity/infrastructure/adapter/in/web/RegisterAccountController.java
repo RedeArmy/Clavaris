@@ -229,8 +229,8 @@ public class RegisterAccountController {
       // hyphen. That form field's own comment already explains why the shape check is
       // deliberately not duplicated there. Nothing here caught this exception, so it used to
       // reach this method as an unhandled server error on sign-up instead of a field-level
-      // message. UsernameSignInController already had the matching catch on the sign-in side;
-      // this closes the same gap on the sign-up side.
+      // message. UsernameSignInController already had the matching catch on the sign-in side.
+      // This closes the same gap on the sign-up side.
       bindingResult.rejectValue(
           USERNAME,
           "username.invalid",
