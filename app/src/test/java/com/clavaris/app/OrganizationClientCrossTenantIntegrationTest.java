@@ -58,6 +58,15 @@ class OrganizationClientCrossTenantIntegrationTest extends RedisBackedIntegratio
       HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  // SDE-III review, 2026-09-15: this test used to mint its Secret Key with
+  // platform:rate-limit-policy:write and exercise it against the rate-limit-policy endpoint. That
+  // scope is now PlatformScopes.OPERATOR_ONLY (see that constant's own Javadoc) — an
+  // OrganizationClient can no longer be minted with it at all, so createSecretKey itself now fails
+  // with 400 before this test ever reaches the ownership-filter behavior it exists to prove.
+  // Switched to platform:workspaces:write (ORGANIZATION_CLIENT_ALLOWED, POST .../workspaces) — a
+  // scope an OrganizationClient may legitimately hold, exercising the exact same
+  // OrganizationClientOwnershipFilter code path via a tenant-allowed scope instead of an
+  // operator-reserved one.
   @Test
   void anOrganizationClientsOwnTokenReachesItsOwnOrganizationButIsRejectedAgainstAnother()
       throws Exception {
@@ -66,21 +75,20 @@ class OrganizationClientCrossTenantIntegrationTest extends RedisBackedIntegratio
     UUID otherOrganizationId = createOrganization(platformToken, "Secret Key Victim Co");
 
     JsonNode secretKey =
-        createSecretKey(platformToken, ownOrganizationId, "platform:rate-limit-policy:write");
+        createSecretKey(platformToken, ownOrganizationId, "platform:workspaces:write");
     String secretKeyClientId = secretKey.get("clientId").asString();
     String secretKeyClientSecret = secretKey.get("clientSecret").asString();
     String secretKeyToken =
-        requestClientToken(
-            secretKeyClientId, secretKeyClientSecret, "platform:rate-limit-policy:write");
+        requestClientToken(secretKeyClientId, secretKeyClientSecret, "platform:workspaces:write");
 
     HttpResponse<String> ownOrgResponse =
-        setRateLimitPolicy(secretKeyToken, ownOrganizationId, 500);
+        createWorkspace(secretKeyToken, ownOrganizationId, "Own Org Workspace");
     assertThat(ownOrgResponse.statusCode())
         .as("an OrganizationClient's own token must reach its own Organization's resources")
-        .isEqualTo(200);
+        .isEqualTo(201);
 
     HttpResponse<String> crossTenantResponse =
-        setRateLimitPolicy(secretKeyToken, otherOrganizationId, 500);
+        createWorkspace(secretKeyToken, otherOrganizationId, "Cross Tenant Workspace");
     assertThat(crossTenantResponse.statusCode())
         .as("the exact cross-tenant attempt ADR-0023 exists to prevent")
         .isEqualTo(403);
@@ -153,6 +161,21 @@ class OrganizationClientCrossTenantIntegrationTest extends RedisBackedIntegratio
             .PUT(
                 HttpRequest.BodyPublishers.ofString(
                     "{\"requestsPerMinute\":" + requestsPerMinute + "}"))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  // ADR-0010 §3 addendum: POST .../workspaces, guarded by platform:workspaces:write —
+  // ORGANIZATION_CLIENT_ALLOWED, unlike rate-limit-policy's scope, so this is the endpoint the
+  // ownership-filter test above now exercises. See that test's own Javadoc for why.
+  private HttpResponse<String> createWorkspace(String bearerToken, UUID organizationId, String name)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                baseUri("/api/v1/admin/organizations/" + organizationId + "/workspaces"))
+            .header("Authorization", "Bearer " + bearerToken)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }

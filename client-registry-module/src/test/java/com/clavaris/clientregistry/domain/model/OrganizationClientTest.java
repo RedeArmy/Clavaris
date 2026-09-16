@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,62 @@ class OrganizationClientTest {
                     List.of("not-a-real-scope")));
   }
 
+  // SDE-III review, 2026-09-15: the real regression this guards — before this fix, register()
+  // validated allowedScopes via PlatformScopes.requireValidScopes alone, which only checks "is
+  // this a real, known scope," so a tenant-minted Secret Key could legally hold
+  // RATE_LIMIT_POLICY_WRITE/SIGNING_KEYS_ROTATE/SOCIAL_LOGIN_POLICY_WRITE — three scopes this
+  // codebase's own PlatformScopes.OPERATOR_ONLY documents as "operator-managed only in v1,"
+  // directly contradicting CLAUDE.md §6's locked rate-limit decision.
+  @Test
+  void registerRejectsEveryOperatorOnlyScope() {
+    for (final String operatorOnlyScope : PlatformScopes.OPERATOR_ONLY) {
+      assertThatIllegalArgumentException()
+          .as("register() must reject the operator-only scope %s", operatorOnlyScope)
+          .isThrownBy(
+              () ->
+                  OrganizationClient.register(
+                      UUID.randomUUID(),
+                      "sk_test_abc",
+                      "argon2id$hashed",
+                      List.of(operatorOnlyScope)));
+    }
+  }
+
+  @Test
+  void registerRejectsAnOperatorOnlyScopeEvenAlongsideOtherwiseValidScopes() {
+    // Not just "the whole list is operator-only" — one disallowed entry among several allowed
+    // ones must still fail closed, not silently drop just that entry.
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OrganizationClient.register(
+                    UUID.randomUUID(),
+                    "sk_test_abc",
+                    "argon2id$hashed",
+                    List.of(
+                        PlatformScopes.WORKSPACES_WRITE, PlatformScopes.RATE_LIMIT_POLICY_WRITE)));
+  }
+
+  // Deliberately asymmetric with registerRejectsEveryOperatorOnlyScope above: reconstitute()
+  // rehydrates a row that was already persisted, so it must never reject one an earlier, looser
+  // v1 policy allowed to be written — the fix is about closing the mint path, not about making an
+  // already-existing row impossible to read back. See OrganizationClient#register's own Javadoc.
+  @Test
+  void reconstituteStillAcceptsAnOperatorOnlyScopeUnlikeRegister() {
+    OrganizationClient rehydrated =
+        OrganizationClient.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "sk_test_legacy",
+            "argon2id$hashed",
+            List.of(PlatformScopes.RATE_LIMIT_POLICY_WRITE),
+            Instant.now(),
+            true,
+            0);
+
+    assertThat(rehydrated.allowedScopes()).containsExactly(PlatformScopes.RATE_LIMIT_POLICY_WRITE);
+  }
+
   @Test
   void rotateSecretReplacesTheHashKeepingEverythingElse() {
     OrganizationClient original =
@@ -82,5 +139,46 @@ class OrganizationClientTest {
     assertThat(deactivated.active()).isFalse();
     assertThat(deactivated.id()).isEqualTo(original.id());
     assertThat(deactivated.clientSecretHash()).isEqualTo(original.clientSecretHash());
+  }
+
+  // SDE-III review, 2026-09-15: version() semantics — see ConcurrentClientModificationException's
+  // own Javadoc for the lost-update race the whole field exists to close. Both mutators must
+  // preserve the current in-memory version unchanged (the real increment happens at the DB layer,
+  // via the JPA entity's own @Version field, at the next successful save()) — asserted here
+  // against a real, nonzero, reconstitute()-read version, not register()'s always-0 default.
+  @Test
+  void rotateSecretPreservesTheCurrentVersionRatherThanResettingIt() {
+    OrganizationClient rehydrated =
+        OrganizationClient.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "sk_test_abc",
+            "old-hash",
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OrganizationClient rotated = rehydrated.rotateSecret("new-hash");
+
+    assertThat(rotated.version()).isEqualTo(5);
+  }
+
+  @Test
+  void deactivatePreservesTheCurrentVersionRatherThanResettingIt() {
+    OrganizationClient rehydrated =
+        OrganizationClient.reconstitute(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "sk_test_abc",
+            "hash",
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OrganizationClient deactivated = rehydrated.deactivate();
+
+    assertThat(deactivated.version()).isEqualTo(5);
   }
 }

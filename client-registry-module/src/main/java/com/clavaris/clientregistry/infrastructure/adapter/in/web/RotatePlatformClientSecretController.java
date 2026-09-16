@@ -4,9 +4,11 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.P
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretCommand;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret.RotatePlatformClientSecretUseCase;
+import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.common.domain.model.AuditActor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,7 +30,7 @@ class RotatePlatformClientSecretController {
     this.useCase = useCase;
   }
 
-  // Two exits (404 on an unknown clientId, 200 on success) — same rationale as
+  // Three exits (404, 409 on a concurrent revoke/rotate race, 200) — same rationale as
   // SetRateLimitPolicyController's own suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Rotate a PlatformClient's secret (TD-SEC-018)")
@@ -38,6 +40,9 @@ class RotatePlatformClientSecretController {
   @ApiResponse(
       responseCode = "404",
       description = "No PlatformClient exists with the given clientId")
+  @ApiResponse(
+      responseCode = "409",
+      description = "This PlatformClient was modified concurrently by another request — retry")
   @PostMapping("/api/v1/admin/platform-clients/{clientId}/rotate-secret")
   /* package */ ResponseEntity<RotatePlatformClientSecretResponse> rotate(
       @PathVariable final String clientId, final Authentication authentication) {
@@ -49,6 +54,8 @@ class RotatePlatformClientSecretController {
                   clientId, AuditActor.platformClient(authentication.getName())));
     } catch (final PlatformClientNotFoundException _) {
       return ResponseEntity.notFound().build();
+    } catch (final ConcurrentClientModificationException _) {
+      return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
     return ResponseEntity.ok(RotatePlatformClientSecretResponse.from(result));
   }

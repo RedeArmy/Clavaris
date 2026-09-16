@@ -124,7 +124,7 @@ class EmailCodeSignInControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(
             redirectedUrl(
-                "/o/" + ORGANIZATION_ID + "/login/email-code/confirm?email=someone@example.com"));
+                "/o/" + ORGANIZATION_ID + "/login/email-code/confirm?email=someone%40example.com"));
 
     verify(requestUseCase).handle(any(RequestEmailSignInCodeCommand.class));
   }
@@ -145,8 +145,27 @@ class EmailCodeSignInControllerTest {
             redirectedUrl(
                 "/o/"
                     + ORGANIZATION_ID
-                    + "/login/email-code/confirm?email=someone@example.com"
+                    + "/login/email-code/confirm?email=someone%40example.com"
                     + "&clientId=test_client&redirectUrl=https%3A%2F%2Fapp.example.com%2Fcallback"));
+  }
+
+  // SDE-III review, 2026-09-15 — real regression test for the bug this fix closes: email used to
+  // be concatenated directly into the redirect target, so a value containing '&' (which Hibernate
+  // Validator's default @Email pattern permits in the local part) could inject an extra query
+  // parameter into this Location header. Routing email through RedirectQueryParams the same way
+  // clientId/redirectUrl already were means the '&' is percent-encoded, never a real delimiter.
+  @Test
+  void postWithAnEmailContainingAmpersandNeverInjectsAnExtraQueryParameter() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/email-code", ORGANIZATION_ID)
+                .param("email", "x&foo=bar@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/login/email-code/confirm?email=x%26foo%3Dbar%40example.com"));
   }
 
   @Test

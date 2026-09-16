@@ -2,6 +2,7 @@ package com.clavaris.clientregistry.application.usecase.createorganizationclient
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -96,6 +97,24 @@ class CreateOrganizationClientServiceTest {
 
     verify(organizationClients, never()).save(any());
     verifyNoInteractions(auditEvents, secretGenerator, hasher);
+  }
+
+  // SDE-III review, 2026-09-15: end-to-end proof (through the service, not just the domain model
+  // directly) that an operator-only scope never reaches a saved row or an audit event — the fix
+  // lives in OrganizationClient.register, but this confirms the service doesn't catch/swallow it
+  // partway through and save an incomplete/inconsistent state.
+  @Test
+  void rejectsAnOperatorOnlyScopeWithoutSavingOrAuditingAnything() {
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    CreateOrganizationClientCommand command =
+        new CreateOrganizationClientCommand(
+            organizationId, List.of(PlatformScopes.RATE_LIMIT_POLICY_WRITE), ACTOR);
+
+    assertThatIllegalArgumentException().isThrownBy(() -> service.handle(command));
+
+    verify(organizationClients, never()).save(any());
+    verifyNoInteractions(auditEvents);
   }
 
   @Test
