@@ -275,28 +275,70 @@ both ngrok (§8b) and the self-hosted Actions runner (§8c), neither of which ne
 port opened on the host's own router. NAT with manual port-forwarding works too if bridged isn't
 available on the network, but adds a step bridged doesn't need.
 
-### 7b. ngrok — exposing the app, not deploying to it
+### 7b. Exposing the app to the internet — not deploying to it
 
-ngrok's only job here is making the running app reachable from the internet for real end-to-end
-testing (an OAuth provider's own redirect callback, a webhook delivery target, JobSeeker's own dev
-environment reaching this instance) — it is deliberately **not** part of how a new build gets onto
-this host (see §8c for that). Install it on the VM itself (`snap install ngrok` or the tarball from
-ngrok's own downloads page), authenticate with `ngrok config add-authtoken <token>`, then:
+Something has to make the running app reachable from the internet for real end-to-end testing (an
+OAuth provider's own redirect callback, a webhook delivery target, JobSeeker's own dev environment
+reaching this instance) — this is deliberately **not** part of how a new build gets onto this host
+(see §8c for that). Two tools have filled this role; either is fine, but pick one per host and be
+explicit about it, since — as found live, §7b addendum below — they need different Caddy config on
+this end.
 
-```bash
-ngrok http 80
-```
+**ngrok** (the original choice here): install it on the VM itself (`snap install ngrok` or the
+tarball from ngrok's own downloads page), authenticate with `ngrok config add-authtoken <token>`,
+then `ngrok http 80`.
+
+**Tailscale Funnel** (this pre-production host's own current choice, replacing ngrok): once
+Tailscale itself is installed and the node is in the tailnet, `sudo tailscale funnel 80` exposes
+this host's own port 80 at `https://<node-name>.<tailnet-name>.ts.net`, with Tailscale's own edge
+terminating TLS — no ngrok account, no separate tunnel process to keep alive. Check what's
+currently configured with `sudo tailscale funnel status`.
 
 **Known, deliberate divergence from real production, named here rather than discovered later**: in
 real production (a real domain's DNS `A` record pointing at Oracle's own public IP), Caddy performs
 its own Let's Encrypt HTTP-01 challenge and terminates TLS itself (ADR-0018 Decision 1). Behind
-ngrok's free tier, ngrok's own edge terminates TLS instead — Caddy in this pre-production rehearsal
-serves plain HTTP behind the tunnel, not real Let's Encrypt-issued TLS. This is an accepted gap for
-rehearsing everything else (compose file, health checks, migrations, `.env` shape, the deploy/
-rollback mechanism itself) — it does not rehearse Caddy's own ACME flow. Closing that specific gap
-too would need ngrok's paid reserved-domain tier with a raw TCP tunnel to port 80/443 (letting
-Caddy's own ACME challenge reach it unmodified) — not done by default here; revisit if rehearsing
-the ACME flow itself becomes worth the added cost before the real Oracle cutover.
+either tool above, the tool's own edge terminates TLS instead — Caddy in this pre-production
+rehearsal serves plain HTTP behind the tunnel, not real Let's Encrypt-issued TLS. This is an
+accepted gap for rehearsing everything else (compose file, health checks, migrations, `.env` shape,
+the deploy/rollback mechanism itself) — it does not rehearse Caddy's own ACME flow. Closing that gap
+too would need a raw TCP tunnel to port 80/443 reaching Caddy unmodified (ngrok's paid reserved-
+domain tier, or Tailscale Serve/Funnel's own TCP-forward mode instead of HTTP) — not done by default
+here; revisit if rehearsing the ACME flow itself becomes worth the added setup before the real
+Oracle cutover.
+
+**Live-found, 2026-09-16 — Tailscale Funnel and Caddy both want port 443, and only one can have
+it:** `docker-compose.prod.yml`'s own `caddy` service publishes both 80 and 443, assuming Caddy
+itself owns TLS termination (production's own real shape) — it was never actually adjusted for
+"something else terminates TLS in front of it" the way the paragraph above already described in
+words. The first time Tailscale Funnel and this compose file's own `caddy` both tried to bind 443
+on the same host, `docker compose up` failed outright: `failed to set up container networking:
+driver failed programming external connectivity` — Funnel already held the port (`sudo ss -tlnp |
+grep :443` confirmed `tailscaled`, not a stale container, was the actual holder).
+
+Fixed with an **additive override file, not an edit to `docker-compose.prod.yml` itself** — that
+file must stay production's own real shape (its own domain, Caddy owns 443 directly) for the day
+production actually deploys:
+
+- `docker-compose.preprod.yml` — redeclares `caddy`'s own `ports` (`!override`, just `80:80` — see
+  that file's own comment for why the Compose Specification's plain merge behavior on a list-valued
+  property isn't enough here, confirmed live via `docker compose ... config`, not assumed) and
+  `volumes` (mounts `Caddyfile.preprod` in place of the base file's own `Caddyfile` — Compose
+  merges volumes by target path, so this one entry is enough on its own).
+- `Caddyfile.preprod` — plain `:80` site address (no domain, no automatic HTTPS attempt) reverse-
+  proxying to `app:8080`, otherwise identical to the base `Caddyfile`.
+
+`scripts/host/deploy.sh` includes this override automatically whenever the file is present next to
+it — nothing to pass on the command line, and a host that never has this file (production's own)
+behaves exactly as before this addendum. On this pre-production host specifically, both new files
+need fetching once, the same way every other file here does (§3's own "these three files aren't
+git-cloned" posture, now four):
+
+```bash
+cd /opt/clavaris
+curl -fsSL https://raw.githubusercontent.com/RedeArmy/Clavaris/master/docker-compose.preprod.yml -o docker-compose.preprod.yml
+curl -fsSL https://raw.githubusercontent.com/RedeArmy/Clavaris/master/Caddyfile.preprod -o Caddyfile.preprod
+./deploy.sh
+```
 
 ### 7c. Automatic deployment — self-hosted GitHub Actions runner
 

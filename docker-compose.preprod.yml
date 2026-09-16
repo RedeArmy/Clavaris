@@ -1,0 +1,37 @@
+# Pre-production-only override for docker-compose.prod.yml's own caddy service — Tailscale Funnel
+# (not Caddy/Let's Encrypt) is this one environment's real external HTTPS entry point
+# (https://<tailnet-name>.ts.net), terminating TLS itself and forwarding plain HTTP to this host's
+# own port 80 — this environment's own successor to ngrok (deployment-runbook.md §7b's "expose it,
+# don't deploy through it" role, now filled by Tailscale Funnel instead).
+#
+# Deliberately a second compose file, not an edit to docker-compose.prod.yml itself: that file is
+# production's own real deployment shape (its own domain, Caddy owns TLS/port 443 directly,
+# ADR-0018's original design) and must stay exactly that for the day production actually deploys —
+# this override only ever takes effect on a host that opts in by having this file present at all
+# (deploy.sh's own COMPOSE_ARGS, see that script's own comment) — production's own host never will.
+#
+# Confirmed live against this project's own real Compose version (v5.1.1): "ports" is a list
+# Compose *merges* by appending, not replaces, when redeclared in an override file with no special
+# marker - simply repeating "80:80" here left port 443 from the base file still mapped too,
+# defeating the entire point of this override (verified via `docker compose ... config`,
+# not assumed). "!override" is the Compose Specification's own explicit "replace this field
+# wholesale instead of merging it" tag - the actual fix, not a stylistic preference. "volumes" does
+# not need the same treatment: Compose already deduplicates bind/volume entries by their own target
+# path, so this override's own Caddyfile.preprod mount (same /etc/caddy/Caddyfile target as the
+# base file's own Caddyfile mount) already wins on its own - confirmed the same way.
+services:
+  caddy:
+    # No 443 — Tailscale Funnel already owns it on this host, outside Docker entirely; Caddy only
+    # needs 80, to receive what Funnel forwards after it terminates TLS itself.
+    ports: !override
+      - "80:80"
+    volumes:
+      # Caddyfile.preprod, not docker-compose.prod.yml's own Caddyfile: Funnel already terminated
+      # TLS before this request ever reaches Caddy, so Caddy must serve plain HTTP here instead of
+      # its own default "always redirect to HTTPS" behavior, which would send a caller back to a
+      # port (443) nothing is listening on from Caddy's own side on this host. Only this one entry
+      # needed - unlike "ports" above, Compose already replaces a volume mount whose own target
+      # path matches an existing one (both this file's and the base's own entry target
+      # /etc/caddy/Caddyfile) while still merging in the base's other, untouched mounts
+      # (clavaris-caddy-data/clavaris-caddy-config) - confirmed the same way as the "ports" finding.
+      - ./Caddyfile.preprod:/etc/caddy/Caddyfile:ro

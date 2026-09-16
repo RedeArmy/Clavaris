@@ -1,0 +1,21 @@
+# Pre-production only — see docker-compose.preprod.yml's own header comment for the full
+# reasoning. Tailscale Funnel already terminates TLS externally and forwards plain HTTP to this
+# host's own port 80, so Caddy serves plain HTTP here, deliberately with no automatic HTTPS
+# behavior — an explicit ":80" address (a bare port, not a domain name) is what tells Caddy not to
+# attempt one; the base Caddyfile's own "{$CLAVARIS_DOMAIN}" address would otherwise trigger
+# Caddy's own ACME/Let's Encrypt flow against a hostname nothing routes real HTTP-01 traffic to on
+# this host.
+
+:80 {
+	reverse_proxy app:8080
+
+	# Still correct here, not just carried over unchanged: the browser really is talking to this
+	# instance over HTTPS, terminated at Tailscale Funnel's own edge — this header is about what
+	# the browser saw, not about which hop inside the network actually decrypted it.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	log {
+		output stdout
+		format json
+	}
+}

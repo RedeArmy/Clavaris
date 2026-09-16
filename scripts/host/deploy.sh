@@ -10,6 +10,19 @@
 set -euo pipefail
 
 COMPOSE_FILE="docker-compose.prod.yml"
+# 2026-09-16: pre-production's own Caddy can't own port 443 there anymore — Tailscale Funnel
+# already does (this host's own real external HTTPS entry point, replacing ngrok, terminating TLS
+# itself and forwarding plain HTTP to this host's port 80). docker-compose.prod.yml itself is never
+# touched for this — that file stays production's own real shape (its own domain, Caddy owns TLS
+# directly, ADR-0018's original design). Instead, a host opts into the override purely by having
+# this second file sitting next to deploy.sh at all — production's own host never will, so this
+# array is just [docker-compose.prod.yml] there, unchanged from before this addendum.
+COMPOSE_ARGS=(-f "${COMPOSE_FILE}")
+PREPROD_OVERRIDE="docker-compose.preprod.yml"
+if [ -f "${PREPROD_OVERRIDE}" ]; then
+  COMPOSE_ARGS+=(-f "${PREPROD_OVERRIDE}")
+fi
+
 HEALTH_URL_INTERNAL="http://localhost:8080/actuator/health/readiness"
 HEALTH_TIMEOUT_SECONDS=90
 HEALTH_POLL_INTERVAL_SECONDS=3
@@ -30,10 +43,10 @@ fi
 # Captured before pulling anything — the actual rollback target if the new image turns out
 # unhealthy, not "whatever :latest happened to be a moment ago" (which could itself already be the
 # broken image, if this is a re-run after a failure).
-PREVIOUS_IMAGE_ID="$(docker compose -f "${COMPOSE_FILE}" images -q app 2>/dev/null || true)"
+PREVIOUS_IMAGE_ID="$(docker compose "${COMPOSE_ARGS[@]}" images -q app 2>/dev/null || true)"
 
 log "Pulling latest images"
-docker compose -f "${COMPOSE_FILE}" pull
+docker compose "${COMPOSE_ARGS[@]}" pull
 
 log "Starting the new version"
 # Live-found, 2026-09-16: "up -d" itself can fail here, not just the health-poll loop below —
@@ -45,7 +58,7 @@ log "Starting the new version"
 # rollback, no diagnostic hint, nothing but Compose's own generic dependency error surfaced to CI.
 # `|| true` keeps that from aborting the script; app (and its own postgres/redis dependencies) are
 # already started by the time only caddy's wait fails, so the poll loop below can still reach it.
-if ! docker compose -f "${COMPOSE_FILE}" up -d; then
+if ! docker compose "${COMPOSE_ARGS[@]}" up -d; then
   echo "'docker compose up -d' itself reported a failure — likely caddy's own dependency wait on" >&2
   echo "app's healthcheck timing out, not app having failed to start at all. Falling through to" >&2
   echo "this script's own health-poll loop instead of trusting that exit code alone." >&2
@@ -55,7 +68,7 @@ log "Waiting for the app to report healthy (up to ${HEALTH_TIMEOUT_SECONDS}s)"
 elapsed=0
 healthy=false
 while [ "${elapsed}" -lt "${HEALTH_TIMEOUT_SECONDS}" ]; do
-  if docker compose -f "${COMPOSE_FILE}" exec -T app curl -fsS "${HEALTH_URL_INTERNAL}" >/dev/null 2>&1; then
+  if docker compose "${COMPOSE_ARGS[@]}" exec -T app curl -fsS "${HEALTH_URL_INTERNAL}" >/dev/null 2>&1; then
     healthy=true
     break
   fi
@@ -68,9 +81,9 @@ if [ "${healthy}" = true ]; then
   # case above) — re-run it so caddy, which was blocked on app's own healthcheck, actually starts
   # too, instead of silently leaving this stack one container short of a working deploy.
   log "Healthy. Starting the remaining services (e.g. caddy, if its own dependency wait blocked it)"
-  docker compose -f "${COMPOSE_FILE}" up -d
+  docker compose "${COMPOSE_ARGS[@]}" up -d
   log "Deploy complete — now running:"
-  docker compose -f "${COMPOSE_FILE}" images app
+  docker compose "${COMPOSE_ARGS[@]}" images app
   exit 0
 fi
 
@@ -79,7 +92,7 @@ fi
 # app never came up is right here in this run's own output — CI has no other way to see it, and
 # even on a host, one less round trip than running this by hand after the fact.
 echo "App did not become healthy within ${HEALTH_TIMEOUT_SECONDS}s. Its own logs:" >&2
-docker compose -f "${COMPOSE_FILE}" logs app --tail=100 >&2 || true
+docker compose "${COMPOSE_ARGS[@]}" logs app --tail=100 >&2 || true
 
 # Only rolls back if there's a real previous image to roll back to (a first-ever deploy with no
 # prior version has nothing to fall back to, and should fail loudly instead of silently doing
@@ -89,7 +102,7 @@ if [ -z "${PREVIOUS_IMAGE_ID}" ]; then
 fi
 
 log "Rolling back to the previous image (${PREVIOUS_IMAGE_ID})"
-docker tag "${PREVIOUS_IMAGE_ID}" "$(docker compose -f "${COMPOSE_FILE}" config --images app | head -1)"
-docker compose -f "${COMPOSE_FILE}" up -d
+docker tag "${PREVIOUS_IMAGE_ID}" "$(docker compose "${COMPOSE_ARGS[@]}" config --images app | head -1)"
+docker compose "${COMPOSE_ARGS[@]}" up -d
 
 fail "Deploy failed and was rolled back to the previous image. See the logs above for why the new version didn't come up healthy before retrying."
