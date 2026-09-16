@@ -65,7 +65,7 @@ class RotateOAuthClientSecretServiceTest {
     when(hasher.hash("a-fresh-raw-secret")).thenReturn("argon2id$new-hash");
 
     RotateOAuthClientSecretResult result =
-        service.handle(new RotateOAuthClientSecretCommand("target-client", ACTOR));
+        service.handle(new RotateOAuthClientSecretCommand("target-client", organizationId, ACTOR));
 
     assertThat(result.rawSecret())
         .as("the caller must get back the raw secret exactly once")
@@ -82,7 +82,7 @@ class RotateOAuthClientSecretServiceTest {
     when(secretGenerator.generate()).thenReturn("a-fresh-raw-secret");
     when(hasher.hash("a-fresh-raw-secret")).thenReturn("argon2id$new-hash");
 
-    service.handle(new RotateOAuthClientSecretCommand("target-client", ACTOR));
+    service.handle(new RotateOAuthClientSecretCommand("target-client", organizationId, ACTOR));
 
     verify(oauthClients).save(argThat(saved -> !saved.active()));
   }
@@ -93,7 +93,7 @@ class RotateOAuthClientSecretServiceTest {
     when(secretGenerator.generate()).thenReturn("a-fresh-raw-secret");
     when(hasher.hash("a-fresh-raw-secret")).thenReturn("argon2id$new-hash");
 
-    service.handle(new RotateOAuthClientSecretCommand("target-client", ACTOR));
+    service.handle(new RotateOAuthClientSecretCommand("target-client", organizationId, ACTOR));
 
     verify(auditEvents)
         .write(
@@ -108,7 +108,26 @@ class RotateOAuthClientSecretServiceTest {
   void rejectsAnUnknownClientIdWithoutGeneratingOrPersistingAnything() {
     when(oauthClients.findByClientId("ghost-client")).thenReturn(Optional.empty());
     RotateOAuthClientSecretCommand command =
-        new RotateOAuthClientSecretCommand("ghost-client", ACTOR);
+        new RotateOAuthClientSecretCommand("ghost-client", organizationId, ACTOR);
+
+    assertThatExceptionOfType(OAuthClientNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(secretGenerator);
+    verifyNoInteractions(hasher);
+    verify(oauthClients, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  // SDE-III review, 2026-09-15 — real regression this guards: before this fix, this method never
+  // even accepted an organizationId, so a caller pairing a valid organizationId with a different
+  // Organization's own clientId would rotate that Organization's real secret.
+  @Test
+  void rejectsAClientThatBelongsToADifferentOrganizationWithoutGeneratingOrPersistingAnything() {
+    when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(sampleClient()));
+    UUID unrelatedOrganizationId = UUID.randomUUID();
+    RotateOAuthClientSecretCommand command =
+        new RotateOAuthClientSecretCommand("target-client", unrelatedOrganizationId, ACTOR);
 
     assertThatExceptionOfType(OAuthClientNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

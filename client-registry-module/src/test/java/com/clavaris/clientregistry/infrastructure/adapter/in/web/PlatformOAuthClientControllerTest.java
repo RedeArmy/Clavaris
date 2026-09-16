@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
-import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
@@ -47,7 +47,6 @@ class PlatformOAuthClientControllerTest {
   private static final UUID OWNER_ID = UUID.randomUUID();
 
   private RegisterOAuthClientUseCase registerClient;
-  private ListOAuthClientsUseCase listClients;
   private ListOAuthClientsPagedUseCase listClientsPaged;
   private DeactivateOAuthClientUseCase deactivateClient;
   private RotateOAuthClientSecretUseCase rotateClientSecret;
@@ -59,7 +58,6 @@ class PlatformOAuthClientControllerTest {
   @BeforeEach
   void setUp() {
     registerClient = mock(RegisterOAuthClientUseCase.class);
-    listClients = mock(ListOAuthClientsUseCase.class);
     listClientsPaged = mock(ListOAuthClientsPagedUseCase.class);
     deactivateClient = mock(DeactivateOAuthClientUseCase.class);
     rotateClientSecret = mock(RotateOAuthClientSecretUseCase.class);
@@ -70,7 +68,6 @@ class PlatformOAuthClientControllerTest {
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
-    when(listClients.handle(any())).thenReturn(List.of());
     when(listClientsPaged.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
@@ -91,7 +88,6 @@ class PlatformOAuthClientControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new PlatformOAuthClientController(
                     registerClient,
-                    listClients,
                     listClientsPaged,
                     deactivateClient,
                     rotateClientSecret,
@@ -227,7 +223,6 @@ class PlatformOAuthClientControllerTest {
   @Test
   void plainDeactivatePostRedirectsOnSuccess() throws Exception {
     OAuthClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
 
     mockMvc
         .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
@@ -237,22 +232,25 @@ class PlatformOAuthClientControllerTest {
     verify(deactivateClient).handle(any());
   }
 
+  // SDE-III review, 2026-09-15: ownership is now enforced by DeactivateOAuthClientService itself
+  // (via the organizationId this controller now passes through), not a web-layer list-then-check —
+  // simulated here the same way a real cross-tenant clientId would surface, via the exception the
+  // service throws.
   @Test
   void deactivateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
-    when(listClients.handle(organizationId)).thenReturn(List.of());
+    doThrow(new OAuthClientNotFoundException("test_someone_elses"))
+        .when(deactivateClient)
+        .handle(any());
 
     mockMvc
         .perform(post(basePath() + "/test_someone_elses/deactivate"))
         .andExpect(status().isNotFound());
-
-    verify(deactivateClient, never()).handle(any());
   }
 
   @Test
   void plainRotateSecretPostRendersThePageDirectlyWithTheNewSecretNeverARedirect()
       throws Exception {
     OAuthClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     when(rotateClientSecret.handle(any()))
         .thenReturn(new RotateOAuthClientSecretResult(client.clientId(), "new-raw-secret"));
 
@@ -263,15 +261,18 @@ class PlatformOAuthClientControllerTest {
         .andExpect(model().attribute("justRegisteredRawSecret", "new-raw-secret"));
   }
 
+  // Same rationale as deactivateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization.
   @Test
   void rotateSecretReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
-    when(listClients.handle(organizationId)).thenReturn(List.of());
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret
+                .OAuthClientNotFoundException("test_someone_elses"))
+        .when(rotateClientSecret)
+        .handle(any());
 
     mockMvc
         .perform(post(basePath() + "/test_someone_elses/rotate-secret"))
         .andExpect(status().isNotFound());
-
-    verify(rotateClientSecret, never()).handle(any());
   }
 
   // SDE-III review, 2026-09-15: the web-layer half of the optimistic-locking fix — OAuthClient's

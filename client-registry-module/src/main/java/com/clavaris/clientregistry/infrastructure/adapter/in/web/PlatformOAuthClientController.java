@@ -2,7 +2,7 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
-import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsUseCase;
+import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationNotFoundException;
@@ -19,7 +19,6 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -49,19 +48,17 @@ import org.springframework.web.server.ResponseStatusException;
  * deliberately left open — see {@code OAuthClient#deactivate}/{@code OAuthClient#rotateSecret}'s
  * own Javadoc). Every write here — create included — carries a second, session-authenticated {@link
  * AuditActor#platformAccount} caller, same widening {@code RegisterOAuthClientCommand}'s own
- * Javadoc documents. {@link ListOAuthClientsUseCase} and the {@code findAllByOrganizationId} method
- * it depends on are new — see that use case's own Javadoc.
+ * Javadoc documents.
  *
  * <p>{@code organizationId} resolves through the already-shared {@link
  * OrganizationForPlatformAccountResolver} (client-registry-module's own copy, bridged in {@code
- * app}) — same anti-enumeration posture as every other dashboard controller in this module. Neither
- * {@link DeactivateOAuthClientCommand} nor {@link RotateOAuthClientSecretCommand} carries an {@code
- * organizationId} of its own (both key off the client's own {@code clientId} string, same shape as
- * their {@code OrganizationClient} siblings) — this controller resolves the target {@link
- * OAuthClient} via the already-organizationId-scoped {@link ListOAuthClientsUseCase} first, so a
- * {@code clientId} belonging to a different Organization 404s before either mutating use case is
- * ever called, not after — same pattern {@code PlatformOrganizationClientController} already
- * established.
+ * app}) — same anti-enumeration posture as every other dashboard controller in this module. {@link
+ * DeactivateOAuthClientCommand}/{@link RotateOAuthClientSecretCommand} both carry that same {@code
+ * organizationId} through to the use case itself (SDE-III review, 2026-09-15) — a {@code clientId}
+ * belonging to a different Organization 404s from {@code DeactivateOAuthClientService}/{@code
+ * RotateOAuthClientSecretService}'s own thrown {@code OAuthClientNotFoundException}, not from a
+ * separate web-layer list-then-check this controller used to have to do itself — same pattern
+ * {@code PlatformOrganizationClientController} already established.
  *
  * <p>Unlike {@code PlatformOrganizationClientController}'s own deactivate, deactivation here still
  * keeps the usual redirect-on-success shape (no secret involved); create and rotate-secret never
@@ -87,25 +84,26 @@ public class PlatformOAuthClientController {
   private static final String GRANT_TYPE_OPTIONS_ATTRIBUTE = "grantTypeOptions";
 
   private final RegisterOAuthClientUseCase registerClient;
-  private final ListOAuthClientsUseCase listClients;
   private final ListOAuthClientsPagedUseCase listClientsPaged;
   private final DeactivateOAuthClientUseCase deactivateClient;
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other multi-collaborator constructor in this codebase.
+  // SDE-III review, 2026-09-15: ListOAuthClientsUseCase dropped — it existed on this controller
+  // purely to back the former requireClientIdBelongsToOrganization workaround (see
+  // DeactivateOAuthClientCommand's own Javadoc for the web-layer-only check it replaced), now
+  // enforced by DeactivateOAuthClientService/RotateOAuthClientSecretService themselves. One
+  // parameter per remaining collaborating port — same rationale as every other multi-collaborator
+  // constructor in this codebase.
   public PlatformOAuthClientController(
       final RegisterOAuthClientUseCase registerClient,
-      final ListOAuthClientsUseCase listClients,
       final ListOAuthClientsPagedUseCase listClientsPaged,
       final DeactivateOAuthClientUseCase deactivateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerClient = registerClient;
-    this.listClients = listClients;
     this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
     this.rotateClientSecret = rotateClientSecret;
@@ -169,16 +167,29 @@ public class PlatformOAuthClientController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final RegisterOAuthClientForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
-    final UUID ownerPlatformAccountId = owned.ownerPlatformAccountId();
-
-    final Optional<String> validationErrorView =
-        renderOAuthClientsValidationErrors(request, organizationId, owned, bindingResult, model);
-    if (validationErrorView.isPresent()) {
-      return validationErrorView.get();
+    // CPD-OFF: genuinely irreducible call-site wiring, not duplicated business logic — every real
+    // decision already lives on
+    // DashboardControllerSupport#requireOwnedOrganizationOrRenderValidationErrors
+    // itself (see its own Javadoc); what's left is this controller passing its own 7 collaborators
+    // to that one shared call and unpacking the result, the same shape
+    // PlatformOrganizationClientController#create's own identical preamble necessarily has too.
+    final DashboardControllerSupport.OwnershipOrValidationErrorView resolved =
+        DashboardControllerSupport.requireOwnedOrganizationOrRenderValidationErrors(
+            request,
+            organizationId,
+            currentPlatformAccount,
+            organizationResolver,
+            bindingResult,
+            owned -> {
+              populateHeaderModel(model, organizationId, owned.organizationName());
+              populateClientsModel(model, organizationId, KeysetPageRequest.first());
+            },
+            new DashboardControllerSupport.PaginatedViewNames(CLIENTS_FRAGMENT, LIST_VIEW));
+    if (resolved.validationErrorView().isPresent()) {
+      return resolved.validationErrorView().get();
     }
+    final UUID ownerPlatformAccountId = resolved.owned().ownerPlatformAccountId();
+    // CPD-ON
 
     final RegisterOAuthClientResult result;
     try {
@@ -202,7 +213,7 @@ public class PlatformOAuthClientController {
     model.addAttribute("justRegisteredRawSecret", result.rawClientSecret());
     model.addAttribute("justRegisteredClientId", result.client().clientId());
     renderOAuthClientsList(
-        model, organizationId, owned.organizationName(), KeysetPageRequest.first());
+        model, organizationId, resolved.owned().organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
@@ -216,12 +227,18 @@ public class PlatformOAuthClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        requireOwnedOAuthClient(request, organizationId, clientId);
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
 
+    // SDE-III review, 2026-09-15: organizationId now passed through and verified by
+    // DeactivateOAuthClientService itself — see that command's own Javadoc for the web-layer-only
+    // workaround this replaces.
     try {
       deactivateClient.handle(
           new DeactivateOAuthClientCommand(
-              clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+              clientId, organizationId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final OAuthClientNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final ConcurrentClientModificationException _) {
       // SDE-III review, 2026-09-15: OAuthClient's own @Version-backed conflict — see
       // ConcurrentClientModificationException's own Javadoc for the lost-update race this closes.
@@ -244,14 +261,23 @@ public class PlatformOAuthClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        requireOwnedOAuthClient(request, organizationId, clientId);
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
 
+    // SDE-III review, 2026-09-15: same organizationId pass-through as deactivate() above.
     final RotateOAuthClientSecretResult result;
     try {
       result =
           rotateClientSecret.handle(
               new RotateOAuthClientSecretCommand(
-                  clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+                  clientId,
+                  organizationId,
+                  AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final ConcurrentClientModificationException _) {
       throw new ResponseStatusException(HttpStatus.CONFLICT);
     }
@@ -261,42 +287,6 @@ public class PlatformOAuthClientController {
     renderOAuthClientsList(
         model, organizationId, owned.organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
-  }
-
-  // create()'s own preamble-plus-validation-error-branch matched
-  // PlatformOrganizationClientController#create's identical shape once every identifier involved
-  // (CLIENTS_FRAGMENT/LIST_VIEW/populateHeaderModel/populateClientsModel) crossed the 10-line
-  // SonarCloud threshold — same class-local, distinctly-named-per-controller fix as
-  // requireOwnedOAuthClient above. Optional<String>, not a plain early return, since the caller
-  // still owns the method's real early exit. PMD.OnlyOneReturn: the empty/present split is the
-  // point of the method, same rationale as every other multi-exit handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
-  private Optional<String> renderOAuthClientsValidationErrors(
-      final HttpServletRequest request,
-      final UUID organizationId,
-      final DashboardControllerSupport.OwnedOrganization owned,
-      final BindingResult bindingResult,
-      final Model model) {
-    if (!bindingResult.hasErrors()) {
-      return Optional.empty();
-    }
-    populateHeaderModel(model, organizationId, owned.organizationName());
-    populateClientsModel(model, organizationId, KeysetPageRequest.first());
-    return Optional.of(
-        DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW);
-  }
-
-  // deactivate()/rotateSecret() both need "who owns this Organization, and does clientId
-  // actually belong to it" before touching anything — SonarCloud-flagged intra-class
-  // duplication (2026-09-13) once both call sites landed with the identical 6-line preamble.
-  private DashboardControllerSupport.OwnedOrganization requireOwnedOAuthClient(
-      final HttpServletRequest request, final UUID organizationId, final String clientId) {
-    final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
-    DashboardControllerSupport.requireClientIdBelongsToOrganization(
-        listClients.handle(organizationId).stream().map(OAuthClient::clientId).toList(), clientId);
-    return owned;
   }
 
   private void populateHeaderModel(

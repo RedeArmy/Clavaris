@@ -35,6 +35,8 @@ public class RotateOAuthClientSecretService implements RotateOAuthClientSecretUs
     final OAuthClient existing =
         oauthClients
             .findByClientId(command.clientId())
+            // Same rationale as DeactivateOAuthClientService's own identical check.
+            .filter(found -> found.organizationId().equals(command.organizationId()))
             .orElseThrow(() -> new OAuthClientNotFoundException(command.clientId()));
 
     final String rawSecret = secretGenerator.generate();

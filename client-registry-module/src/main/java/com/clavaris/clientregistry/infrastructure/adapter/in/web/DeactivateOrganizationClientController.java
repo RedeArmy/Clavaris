@@ -43,9 +43,12 @@ class DeactivateOrganizationClientController {
   /* package */ ResponseEntity<Void> revoke(
       @PathVariable final String clientId, final Authentication authentication) {
     try {
+      // organizationId deliberately null — this is the platform-tier, unscoped endpoint; a
+      // PlatformClient caller is trusted across every Organization by design (BR-PLATFORM-02).
+      // See DeactivateOrganizationClientCommand's own Javadoc.
       useCase.handle(
           new DeactivateOrganizationClientCommand(
-              clientId, AuditActor.platformClient(authentication.getName())));
+              clientId, null, AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationClientNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final ConcurrentClientModificationException _) {

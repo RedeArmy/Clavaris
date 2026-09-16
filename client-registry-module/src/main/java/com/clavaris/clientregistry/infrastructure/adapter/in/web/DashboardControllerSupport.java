@@ -2,10 +2,12 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -21,16 +23,20 @@ import org.springframework.web.server.ResponseStatusException;
  * identical same-package duplication in a different module.
  *
  * <p>Deliberately NOT a shared base controller class: the two controllers' own use-case
- * dependencies, form types, and view names are genuinely unrelated beyond these four fragments, and
- * forcing a common superclass just to share them would be the exact "bigger, riskier refactor for a
- * marginal gain" trade-off {@code CurrentSessionSupport}'s own Javadoc already rejects for a
- * structurally similar case. {@link #requireClientIdBelongsToOrganization} takes an already-mapped
- * {@code List<String>} rather than being generic over {@code OrganizationClient}/{@code
- * OAuthClient} — the one-line {@code .stream().map(X::clientId).toList()} each caller still does
- * itself is a fair, small price for not needing a shared supertype or a functional-interface
- * parameter for a single call site. PMD.LongVariable: every parameter here names exactly what it is
- * — same "deliberate, descriptive name over an arbitrary shortening" convention this codebase
- * applies everywhere else this rule fires.
+ * dependencies, form types, and view names are genuinely unrelated beyond these shared fragments,
+ * and forcing a common superclass just to share them would be the exact "bigger, riskier refactor
+ * for a marginal gain" trade-off {@code CurrentSessionSupport}'s own Javadoc already rejects for a
+ * structurally similar case. PMD.LongVariable: every parameter here names exactly what it is — same
+ * "deliberate, descriptive name over an arbitrary shortening" convention this codebase applies
+ * everywhere else this rule fires.
+ *
+ * <p><b>SDE-III review, 2026-09-15:</b> the anti-enumeration "does this clientId belong to this
+ * Organization" check named above ({@code requireClientIdBelongsToOrganization}) is gone — it was a
+ * web-layer-only workaround for {@code DeactivateOrganizationClientCommand}/{@code
+ * RotateOrganizationClientSecretCommand}/their {@code OAuthClient} siblings carrying no {@code
+ * organizationId} of their own. All four now do, and their own services verify ownership directly
+ * (see {@code DeactivateOrganizationClientCommand}'s own Javadoc) — real defense-in-depth instead
+ * of a check only this package's two controllers happened to remember to run first.
  *
  * <p><b>SonarCloud duplication finding (CI, TD-PERF-020's own pagination pass), 2026-09-13:</b>
  * {@link #requireOwnedOrganization} is the further step this class's own 2026-09-11 Javadoc above
@@ -50,6 +56,17 @@ import org.springframework.web.server.ResponseStatusException;
  * parameterized by a {@link BiConsumer} for the one genuinely controller-specific step — populating
  * that controller's own model attributes via its own private {@code renderXList} method, which
  * {@link #showPaginatedList} itself has no business knowing about.
+ *
+ * <p><b>Local {@code pmd:cpd-check} finding (CI, 2026-09-15):</b> removing {@code
+ * requireClientIdBelongsToOrganization} (see this class's own addendum above) left each
+ * controller's own {@code renderXValidationErrors} as the last thing standing between two
+ * previously-separated duplicate blocks. {@link #renderValidationErrorsIfAny} is the same {@link
+ * Runnable}-parameterized extraction shape as {@link #showPaginatedList} — but unlike {@code
+ * showPaginatedList} (three call sites total across both controllers), each {@code
+ * renderXValidationErrors} it replaced had exactly one caller, {@code create()}; wrapping this call
+ * in its own private method would have re-created the identical duplicate one layer up (both
+ * wrappers took the same five parameters and did nothing else), so each controller's own {@code
+ * create()} calls this method directly instead.
  */
 @SuppressWarnings("PMD.LongVariable")
 final class DashboardControllerSupport {
@@ -133,15 +150,62 @@ final class DashboardControllerSupport {
     return isHtmxRequest(request) ? viewNames.fragmentView() : viewNames.fullView();
   }
 
-  // The anti-enumeration check neither DeactivateOrganizationClientCommand/
-  // RotateOrganizationClientSecretCommand nor their OAuthClient siblings can do themselves —
-  // none of the four carries an organizationId, all key off clientId alone. Callers pass the
-  // already-organizationId-scoped client ids (via their own ListXClientsUseCase), so a clientId
-  // belonging to a different Organization 404s before the mutating use case ever runs.
-  /* package */ static void requireClientIdBelongsToOrganization(
-      final List<String> organizationClientIds, final String clientId) {
-    if (organizationClientIds.stream().noneMatch(clientId::equals)) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+  // SDE-III review, 2026-09-15: removing this package's own former
+  // requireClientIdBelongsToOrganization (see this class's own addendum above) left
+  // PlatformOAuthClientController#renderOAuthClientsValidationErrors and
+  // PlatformOrganizationClientController#renderSecretKeysValidationErrors as the two controllers'
+  // only remaining near-identical bodies — provably duplicated (local pmd:cpd-check, CI) the
+  // moment nothing else stood between them and this class's own prior showPaginatedList
+  // extraction. Same "BiConsumer for the one genuinely controller-specific step" shape as that
+  // extraction: populateModel is each caller's own populateHeaderModel+populateClientsModel pair
+  // (its own private methods, genuinely different per controller — this method has no business
+  // knowing about either), only ever run when bindingResult actually has errors.
+  // Two genuinely distinct exits (no errors / errors) — same rationale every other multi-exit
+  // handler in this module documents for this exact suppression.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  /* package */ static Optional<String> renderValidationErrorsIfAny(
+      final HttpServletRequest request,
+      final BindingResult bindingResult,
+      final Runnable populateModel,
+      final PaginatedViewNames viewNames) {
+    if (!bindingResult.hasErrors()) {
+      return Optional.empty();
     }
+    populateModel.run();
+    return Optional.of(isHtmxRequest(request) ? viewNames.fragmentView() : viewNames.fullView());
+  }
+
+  /**
+   * {@code owned} — always resolved, whether or not {@code validationErrorView} is present, since a
+   * caller that gets past this call still needs it (e.g. for {@code ownerPlatformAccountId}) — see
+   * {@link #requireOwnedOrganizationOrRenderValidationErrors}.
+   */
+  /* package */ record OwnershipOrValidationErrorView(
+      OwnedOrganization owned, Optional<String> validationErrorView) {}
+
+  // SDE-III review, 2026-09-15 (second pass): extracting renderValidationErrorsIfAny alone still
+  // left each controller's own create() with an identical requireOwnedOrganization-then-
+  // renderValidationErrorsIfAny preamble — the same class of duplication one call site smaller,
+  // not gone. This combines both into the one call create() actually needs, Consumer<
+  // OwnedOrganization> rather than Runnable since populateModelOnError only has organizationName
+  // once this method itself has resolved owned — the caller can't close over it any earlier.
+  @SuppressWarnings("java:S107") // one parameter per collaborating port/value this genuinely
+  // needs — same rationale as every other multi-collaborator method in this codebase.
+  /* package */ static OwnershipOrValidationErrorView
+      requireOwnedOrganizationOrRenderValidationErrors(
+          final HttpServletRequest request,
+          final UUID organizationId,
+          final CurrentPlatformAccountResolver currentPlatformAccount,
+          final OrganizationForPlatformAccountResolver organizationResolver,
+          final BindingResult bindingResult,
+          final Consumer<OwnedOrganization> populateModelOnError,
+          final PaginatedViewNames viewNames) {
+    final OwnedOrganization owned =
+        requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    final Optional<String> validationErrorView =
+        renderValidationErrorsIfAny(
+            request, bindingResult, () -> populateModelOnError.accept(owned), viewNames);
+    return new OwnershipOrValidationErrorView(owned, validationErrorView);
   }
 }
