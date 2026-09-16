@@ -370,12 +370,12 @@ class RegisterAccountControllerTest {
     verifyNoInteractions(requestEmailVerification);
   }
 
-  // SDE-III review, 2026-09-16 — real gap found live: Username's own domain constructor throws
-  // IllegalArgumentException for a shape RegisterAccountForm's own @Size(max=32) alone doesn't
-  // catch (too short, or containing anything besides letters/digits/underscore/hyphen), and
-  // nothing here used to catch it — an unhandled 500, not a field-level message, the exact
-  // registration-side gap UsernameSignInControllerTest's own equivalent already proves closed for
-  // sign-in.
+  // SDE-III review, 2026-09-16 - real gap found live: Username's own domain constructor throws
+  // IllegalArgumentException for a shape RegisterAccountForm's own size bound (max 32 characters)
+  // alone doesn't catch (too short, or containing anything besides letters/digits/underscore/
+  // hyphen), and nothing here used to catch it - an unhandled 500, not a field-level message, the
+  // exact registration-side gap UsernameSignInControllerTest's own equivalent already proves
+  // closed for sign-in.
   @Test
   void invalidUsernameShapeRerendersTheFormWithAFieldError() throws Exception {
     when(useCase.handle(any())).thenThrow(new IllegalArgumentException("Not a valid username"));

@@ -103,6 +103,14 @@ public class RegisterAccountController {
   // constant, not three repeated literals.
   private static final String REDIRECT_ORGANIZATION_PREFIX = "redirect:/o/";
 
+  // SonarCloud S1192: not just a duplicate-literal fix — "email"/"username" name the same concept
+  // in every one of their uses below (the bindingResult field, the redirect query param, the model
+  // attribute), so one constant each is more honest about that than three/four independently-typed
+  // copies that could silently drift apart (a typo in one becoming a field error Thymeleaf can no
+  // longer match to the right input).
+  private static final String EMAIL = "email";
+  private static final String USERNAME = "username";
+
   private final RegisterAccountUseCase useCase;
   private final RequestEmailVerificationUseCase requestEmailVerification;
   private final AccountAuthenticationPolicyProvider policyProvider;
@@ -189,7 +197,7 @@ public class RegisterAccountController {
       // Never leaks the low-level exception message (which includes the raw organizationId
       // UUID) to the rendered page — a generic, field-scoped error only.
       bindingResult.rejectValue(
-          "email", "email.alreadyRegistered", "This email is already registered");
+          EMAIL, "email.alreadyRegistered", "This email is already registered");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (WeakPasswordException _) {
@@ -206,24 +214,25 @@ public class RegisterAccountController {
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (UsernameRequiredException _) {
-      bindingResult.rejectValue("username", "username.required", "Username is required");
+      bindingResult.rejectValue(USERNAME, "username.required", "Username is required");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (UsernameAlreadyRegisteredException _) {
       bindingResult.rejectValue(
-          "username", "username.alreadyRegistered", "This username is already taken");
+          USERNAME, "username.alreadyRegistered", "This username is already taken");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (final IllegalArgumentException _) {
-      // SDE-III review, 2026-09-16: real gap found live — Username's own domain constructor
-      // rejects a shape RegisterAccountForm's own @Size(max=32) alone doesn't catch (too short,
-      // uppercase, spaces, punctuation outside letters/digits/underscore/hyphen — see that form
-      // field's own comment for why the shape check is deliberately not duplicated there), and
-      // nothing here caught it: an uncaught IllegalArgumentException reaching this method meant an
-      // unhandled 500 on sign-up, not a field-level message — the exact registration-side gap
-      // UsernameSignInController's own identical catch already closes for sign-in.
+      // SDE-III review, 2026-09-16: real gap found live - Username's own domain constructor
+      // rejects a shape RegisterAccountForm's own size bound (max 32 characters) alone doesn't
+      // catch (too short, uppercase, spaces, punctuation outside letters/digits/underscore/hyphen
+      // - see that form field's own comment for why the shape check is deliberately not
+      // duplicated there), and nothing here caught it: an uncaught IllegalArgumentException
+      // reaching this method meant an unhandled 500 on sign-up, not a field-level message - the
+      // exact registration-side gap UsernameSignInController's own identical catch already closes
+      // for sign-in.
       bindingResult.rejectValue(
-          "username",
+          USERNAME,
           "username.invalid",
           "Username must be 3-32 characters (letters, digits, underscore, hyphen only)");
       addSignUpOptions(organizationId, model);
@@ -254,7 +263,7 @@ public class RegisterAccountController {
     // RedirectQueryParams's own Javadoc documents.
     String target =
         REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
-    target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
+    target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
     return target;
   }
 
@@ -283,7 +292,7 @@ public class RegisterAccountController {
       // RedirectQueryParams like every other param on this hop, not concatenated directly. See
       // RedirectQueryParams's own Javadoc for the header/query injection primitive this closes.
       String target = REDIRECT_ORGANIZATION_PREFIX + organizationId + "/login/email-code/confirm";
-      target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
+      target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
       target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
       target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
       return target;
@@ -304,7 +313,7 @@ public class RegisterAccountController {
       // a direct GET with no query string still renders the page, just without the personalized
       // "we sent it to X" line below.
       @RequestParam(required = false) final String email, final Model model) {
-    model.addAttribute("email", email);
+    model.addAttribute(EMAIL, email);
     return "identity/register-pending-verification";
   }
 

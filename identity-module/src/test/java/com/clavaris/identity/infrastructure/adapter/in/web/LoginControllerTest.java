@@ -157,10 +157,10 @@ class LoginControllerTest {
         .andExpect(model().attribute("socialProviders", List.of(SocialProvider.GOOGLE)));
   }
 
-  // SDE-III review, 2026-09-16 — social-provider brand icons: proves the actual icon markup
+  // SDE-III review, 2026-09-16 - social-provider brand icons: proves the actual icon markup
   // renders next to the button, not just that the page didn't throw (identity/fragments/
-  // social-icon-google.html's own dynamic selection, ${#strings.toLowerCase(provider.name())}
-  // built into the fragment name via Thymeleaf's preprocessing syntax).
+  // social-icon-google.html's own dynamic selection, the provider's own name lower-cased into
+  // the fragment path, built via Thymeleaf's preprocessing syntax).
   @Test
   void getRendersTheProviderIconNextToItsSignInButton() throws Exception {
     when(policyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))

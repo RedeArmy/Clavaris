@@ -50,6 +50,10 @@ public class RegisterPlatformAccountController {
 
   private static final String FORM_VIEW = "identity/platform/register";
 
+  // SonarCloud S1192: not a coincidence three copies matched — same rationale
+  // RegisterAccountController's own identical constant documents.
+  private static final String EMAIL = "email";
+
   private final RegisterPlatformAccountUseCase useCase;
 
   @SuppressWarnings("PMD.LongVariable")
@@ -97,7 +101,7 @@ public class RegisterPlatformAccountController {
               new RegisterPlatformAccountCommand(new Email(form.getEmail()), form.getPassword()));
     } catch (PlatformAccountEmailAlreadyRegisteredException _) {
       bindingResult.rejectValue(
-          "email", "email.alreadyRegistered", "This email is already registered");
+          EMAIL, "email.alreadyRegistered", "This email is already registered");
       return FORM_VIEW;
     } catch (WeakPasswordException _) {
       // Same rationale as ResetPasswordController's own identical fix.
@@ -123,14 +127,14 @@ public class RegisterPlatformAccountController {
     // MAANG "check your email" parity — same RedirectQueryParams-mediated email hop as
     // RegisterAccountController's own identical redirect; see that method's own comment.
     String target = "redirect:/platform/register/pending-verification";
-    target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
+    target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
     return target;
   }
 
   @GetMapping("/pending-verification")
   public String pendingVerification(
       @RequestParam(required = false) final String email, final Model model) {
-    model.addAttribute("email", email);
+    model.addAttribute(EMAIL, email);
     return "identity/platform/register-pending-verification";
   }
 }
