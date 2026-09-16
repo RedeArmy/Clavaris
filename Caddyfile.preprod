@@ -7,7 +7,25 @@
 # this host.
 
 :80 {
-	reverse_proxy app:8080
+	# SDE-III review, 2026-09-16 — real bug found live: Caddy's own reverse_proxy computes
+	# X-Forwarded-Proto from its own incoming connection's scheme by default, confirmed against a
+	# real caddy:2-alpine instance, not assumed - a plain HTTP request to Caddy always got
+	# X-Forwarded-Proto: http forwarded upstream, with no way to make Caddy instead honor an
+	# inbound header from a hop further upstream (there is none here to honor anyway - Tailscale
+	# Funnel's own forward to 127.0.0.1:80 is itself plain HTTP by design, matching this file's own
+	# ":80" address). The app's own server.forward-headers-strategy: framework then correctly, but
+	# unhelpfully, trusted that "http" and built a "redirect_uri=http://..." Google's own OAuth
+	# consent screen rejected outright (Error 400: redirect_uri_mismatch, decoded straight from the
+	# error page's own base64 payload - confirmed live, not guessed at). Caddy is only ever
+	# reachable through Tailscale Funnel here (docker-compose.preprod.yml's own "no 443" comment,
+	# it's the only thing forwarding traffic to this host's port 80 at all), so the real
+	# external scheme is always https regardless of what Caddy's own local connection looks like -
+	# header_up is what actually overrides the value Caddy would otherwise compute itself, not a
+	# style preference over the plain "header" directive below (which only ever affects the
+	# *response* back to the client, never what Caddy sends upstream to app).
+	reverse_proxy app:8080 {
+		header_up X-Forwarded-Proto https
+	}
 
 	# Still correct here, not just carried over unchanged: the browser really is talking to this
 	# instance over HTTPS, terminated at Tailscale Funnel's own edge — this header is about what
