@@ -15,6 +15,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Register
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretCommand;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretResult;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
@@ -188,17 +189,36 @@ public class PlatformWebhookEndpointController {
       // TD-SEC-053: surfaced as a form error, not a raw 400 — the REST API's own equivalent
       // caller (an operator scripting against the admin API) gets a bare status code; a human
       // filling out this form needs to see why their submission was rejected.
-      model.addAttribute("unsafeWebhookUrlError", true);
-      model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
-      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-      return WebhookDashboardControllerSupport.isHtmxRequest(request)
-          ? ENDPOINTS_FRAGMENT
-          : LIST_VIEW;
+      return renderCreateFormError(request, organizationId, form, model, "unsafeWebhookUrlError");
+    } catch (final WebhookEndpointLimitExceededException _) {
+      // BR-WEBHOOK-08: same "form error, not a bare status code" reasoning as the SSRF catch
+      // above.
+      return renderCreateFormError(
+          request, organizationId, form, model, "webhookEndpointLimitExceededError");
     }
 
     model.addAttribute("justRegisteredRawSecret", result.rawSigningSecret());
     model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
+    populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
+    return WebhookDashboardControllerSupport.isHtmxRequest(request)
+        ? ENDPOINTS_FRAGMENT
+        : LIST_VIEW;
+  }
+
+  // Shared by create()'s own two rejected-registration catch blocks (TD-SEC-053's unsafe-URL
+  // rejection, BR-WEBHOOK-08's cap rejection) — same shape, differing only in which single boolean
+  // model attribute names the reason. Extracted once a second catch block would otherwise have
+  // pushed create() over PMD's own CyclomaticComplexity threshold, and duplicating this same
+  // four-line body a second time was never the better fix.
+  private String renderCreateFormError(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final RegisterWebhookEndpointForm form,
+      final Model model,
+      final String errorAttributeName) {
+    model.addAttribute(errorAttributeName, true);
+    model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
     populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
     return WebhookDashboardControllerSupport.isHtmxRequest(request)
         ? ENDPOINTS_FRAGMENT

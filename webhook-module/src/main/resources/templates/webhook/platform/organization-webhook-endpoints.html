@@ -39,6 +39,11 @@
                     That URL isn't safe to deliver webhooks to (it resolves to a private, loopback,
                     or otherwise internal network address).
                 </p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${webhookEndpointLimitExceededError}">
+                    This Organization has already registered the maximum number of webhook
+                    endpoints. Deactivating one doesn't free up a slot — contact support if you
+                    need the limit raised.
+                </p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(endpoints)}">
                     <p class="clavaris-empty-state">No webhook endpoints yet — register the first one below.</p>

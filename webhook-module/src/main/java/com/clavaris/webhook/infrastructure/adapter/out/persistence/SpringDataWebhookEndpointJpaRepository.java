@@ -15,6 +15,11 @@ interface SpringDataWebhookEndpointJpaRepository
 
   List<WebhookEndpointEntity> findAllByOrganizationIdAndActiveTrue(UUID organizationId);
 
+  // WebhookEndpointRepository#countByOrganizationId's own Javadoc — a derived COUNT query, not
+  // findAllByOrganizationId(...).size(): counting must never pull every row's full column set just
+  // to measure how many there are.
+  long countByOrganizationId(UUID organizationId);
+
   void deleteAllByOrganizationId(UUID organizationId);
 
   // TD-PERF-020 (keyset revision, 2026-09-14): backs

@@ -6,6 +6,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Register
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -42,6 +43,11 @@ class RegisterWebhookEndpointController {
   @ApiResponse(
       responseCode = "400",
       description = "url resolves to a private/loopback/link-local network address (TD-SEC-053)")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "Organization has already registered the maximum number of endpoints "
+              + "(BR-WEBHOOK-08)")
   @PostMapping("/api/v1/admin/organizations/{organizationId}/webhook-endpoints")
   /* package */ ResponseEntity<RegisterWebhookEndpointResponse> register(
       @PathVariable final UUID organizationId,
@@ -63,6 +69,12 @@ class RegisterWebhookEndpointController {
       // TD-SEC-053: same "surface a validation failure as 400, not a generic 500" precedent as
       // SetClientBrandingController's own identical IllegalArgumentException catch.
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    } catch (final WebhookEndpointLimitExceededException _) {
+      // BR-WEBHOOK-08: 409 — the request conflicts with the Organization's current state (already
+      // at its registration cap), same status-code choice this codebase already uses for a
+      // different "your request is valid but the current state won't allow it" case
+      // (ConcurrentClientModificationException in client-registry-module).
+      return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(RegisterWebhookEndpointResponse.from(result));

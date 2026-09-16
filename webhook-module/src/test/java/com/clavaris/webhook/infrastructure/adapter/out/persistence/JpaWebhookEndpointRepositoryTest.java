@@ -93,6 +93,29 @@ class JpaWebhookEndpointRepositoryTest {
     assertThat(found).extracting(WebhookEndpoint::id).containsExactly(ownedByA.id());
   }
 
+  // BR-WEBHOOK-08 (SDE-III review, 2026-09-15): WebhookEndpointRepository#countByOrganizationId's
+  // own Javadoc — the count backing the registration cap must include a deactivated endpoint too,
+  // or the cap could be bypassed by deactivating and re-registering.
+  @Test
+  void countByOrganizationIdCountsDeactivatedEndpointsTooAndIgnoresOtherOrganizations() {
+    UUID organizationA = UUID.randomUUID();
+    UUID organizationB = UUID.randomUUID();
+    WebhookEndpoint active =
+        WebhookEndpoint.register(organizationA, "https://a1.example.com", null, List.of("x"), "s");
+    WebhookEndpoint deactivated =
+        WebhookEndpoint.register(organizationA, "https://a2.example.com", null, List.of("x"), "s")
+            .deactivate();
+    WebhookEndpoint ownedByB =
+        WebhookEndpoint.register(organizationB, "https://b.example.com", null, List.of("x"), "s");
+    repository.save(active);
+    repository.save(deactivated);
+    repository.save(ownedByB);
+
+    assertThat(repository.countByOrganizationId(organizationA)).isEqualTo(2L);
+    assertThat(repository.countByOrganizationId(organizationB)).isEqualTo(1L);
+    assertThat(repository.countByOrganizationId(UUID.randomUUID())).isZero();
+  }
+
   // SDE-III review, 2026-09-15 (TD-PERF-025): DeliverPendingWebhooksService's own batch-fetch —
   // one WHERE id IN (...) call for every distinct endpoint in a claimed delivery batch, replacing
   // what used to be findById once per delivery.

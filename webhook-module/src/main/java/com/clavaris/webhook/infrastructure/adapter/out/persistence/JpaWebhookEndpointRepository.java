@@ -86,6 +86,11 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
     return endpoints.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
   }
 
+  @Override
+  public long countByOrganizationId(final UUID organizationId) {
+    return endpoints.countByOrganizationId(organizationId);
+  }
+
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // organization-module's own JpaOrganizationRepository#findKeysetPageOwnedBy already documents.
   @Override

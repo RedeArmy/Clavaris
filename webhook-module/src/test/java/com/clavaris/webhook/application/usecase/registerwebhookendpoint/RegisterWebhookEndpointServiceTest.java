@@ -152,4 +152,57 @@ class RegisterWebhookEndpointServiceTest {
     verify(endpoints).insert(captor.capture());
     return captor.getValue();
   }
+
+  @Test
+  void rejectsRegistrationOnceTheOrganizationIsAtTheCapWithoutSavingAnything() {
+    // BR-WEBHOOK-08 (SDE-III review, 2026-09-15).
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    when(endpoints.countByOrganizationId(organizationId))
+        .thenReturn((long) RegisterWebhookEndpointService.MAX_ENDPOINTS_PER_ORGANIZATION);
+    RegisterWebhookEndpointCommand command =
+        new RegisterWebhookEndpointCommand(
+            organizationId, "https://example.com/hooks", null, List.of("x"), ACTOR);
+
+    assertThatExceptionOfType(WebhookEndpointLimitExceededException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(endpoints, never()).save(any());
+    verify(endpoints, never()).insert(any());
+    verifyNoInteractions(ssrfGuard);
+    verifyNoInteractions(auditEvents);
+  }
+
+  @Test
+  void allowsRegistrationOneEndpointBelowTheCap() {
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    when(endpoints.countByOrganizationId(organizationId))
+        .thenReturn((long) RegisterWebhookEndpointService.MAX_ENDPOINTS_PER_ORGANIZATION - 1);
+    when(cipher.encrypt(any())).thenReturn("encrypted-secret");
+
+    RegisterWebhookEndpointResult result =
+        service.handle(
+            new RegisterWebhookEndpointCommand(
+                organizationId, "https://example.com/hooks", null, List.of("x"), ACTOR));
+
+    assertThat(result.endpoint().organizationId()).isEqualTo(organizationId);
+    verify(endpoints).insert(result.endpoint());
+  }
+
+  @Test
+  void checksTheCapOnlyAfterConfirmingTheOrganizationExists() {
+    // Cheapest check first — same ordering rationale as
+    // checksTheSsrfGuardOnlyAfterConfirmingTheOrganizationExists above.
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(false);
+    RegisterWebhookEndpointCommand command =
+        new RegisterWebhookEndpointCommand(
+            organizationId, "https://example.com", null, List.of("x"), ACTOR);
+
+    assertThatExceptionOfType(OrganizationNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(endpoints, never()).countByOrganizationId(any());
+  }
 }

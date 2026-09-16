@@ -23,6 +23,7 @@ import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizat
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretResult;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
@@ -246,6 +247,24 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("webhook/platform/organization-webhook-endpoints"))
         .andExpect(model().attribute("unsafeWebhookUrlError", true));
+  }
+
+  // BR-WEBHOOK-08 (SDE-III review, 2026-09-15) — same "form error, not a bare status code"
+  // reasoning as createWithAnUnsafeUrlRendersAnErrorWithoutRegisteringAnything above.
+  @Test
+  void createAtTheEndpointCapRendersAnErrorWithoutRegisteringAnything() throws Exception {
+    when(registerEndpoint.handle(any()))
+        .thenThrow(new WebhookEndpointLimitExceededException(organizationId, 25));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("url", "https://example.com/webhooks/clavaris")
+                .param(
+                    "subscribedEventTypes", KnownWebhookEventTypeOptions.DASHBOARD_OPTIONS.get(0)))
+        .andExpect(status().isOk())
+        .andExpect(view().name("webhook/platform/organization-webhook-endpoints"))
+        .andExpect(model().attribute("webhookEndpointLimitExceededError", true));
   }
 
   @Test

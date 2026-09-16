@@ -14,6 +14,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.Register
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.security.Principal;
 import java.util.List;
@@ -130,6 +131,20 @@ class RegisterWebhookEndpointControllerTest {
                 .content(
                     "{\"url\":\"https://internal.example.com\",\"subscribedEventTypes\":[\"x\"]}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void returns409WhenTheOrganizationIsAlreadyAtItsEndpointCap() throws Exception {
+    when(useCase.handle(any()))
+        .thenThrow(new WebhookEndpointLimitExceededException(organizationId, 25));
+
+    mockMvc
+        .perform(
+            post(path())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"url\":\"https://example.com\",\"subscribedEventTypes\":[\"x\"]}"))
+        .andExpect(status().isConflict());
   }
 
   @Test

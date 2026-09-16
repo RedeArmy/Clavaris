@@ -61,6 +61,18 @@ public interface WebhookEndpointRepository {
   List<WebhookEndpoint> findAllByOrganizationId(UUID organizationId);
 
   /**
+   * BR-WEBHOOK-08 (SDE-III review, 2026-09-15): backs {@link RegisterWebhookEndpointService}'s own
+   * per-Organization registration cap — counts every endpoint ever registered for this
+   * Organization, active or deactivated, never just the active ones. A count that only counted
+   * active endpoints could be trivially bypassed: register up to the cap, deactivate them all,
+   * register a fresh batch, then reactivate everything via {@code ActivateWebhookEndpointService} —
+   * none of which re-checks this cap. There is no way to delete a single {@code WebhookEndpoint}
+   * (only deactivate — {@code deleteAllByOrganizationId} is Organization-deletion-only), so this
+   * count only ever grows for a live Organization, making it a stable, un-gameable bound.
+   */
+  long countByOrganizationId(UUID organizationId);
+
+  /**
    * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
    * #findAllByOrganizationId} — used only by {@code
    * ListWebhookEndpointsForOrganizationPagedService}'s own display query. {@link

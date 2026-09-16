@@ -10,12 +10,34 @@ import java.util.Base64;
  * server-side, never accepts one from the caller — same "a machine credential is stronger generated
  * here than accepted from an operator's own choice" reasoning client-registry-module's own {@code
  * RegisterOAuthClientService} already establishes for {@code client_secret}.
+ *
+ * <p>BR-WEBHOOK-08 (SDE-III review, 2026-09-15): enforces {@link #MAX_ENDPOINTS_PER_ORGANIZATION},
+ * a per-Organization cap this use case previously had no upper bound on at all. {@code
+ * com.clavaris.webhook.infrastructure.adapter.out.persistence.JpaWebhookEndpointRepository}'s own
+ * {@code findActiveByOrganizationIdAndEventType} Javadoc already assumed "every Organization's own
+ * endpoint count is small (a handful, not thousands)" — that assumption was never actually true by
+ * construction. {@code DispatchOutboxEventsService} fans out one {@code WebhookDelivery} row per
+ * active, subscribed endpoint for every event an Organization produces, inside one shared
+ * dispatcher every tenant's delivery latency depends on — an Organization with no registration
+ * limit could multiply its own event volume by an arbitrary factor, degrading the dispatcher for
+ * every other tenant, not just itself. A fixed system-wide constant, not yet a
+ * per-Organization-tunable ceiling (v1 scope, same "operator-managed only in v1" posture the
+ * rate-limit capacity ceiling already documents) — there is no self-service path to raise it.
  */
 public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUseCase {
 
   // 256 bits — same order of magnitude/encoding choice as RegisterOAuthClientService's own
   // identical secret generation.
   private static final int SECRET_LENGTH = 32;
+
+  // BR-WEBHOOK-08: see this class's own Javadoc for the dispatcher cost-multiplier this bounds.
+  // Generous for any real consumer (a handful of environments/event-type-specific handlers), tight
+  // enough to keep one Organization's worst-case per-event fan-out cost bounded and predictable.
+  // Package-private (not private): RegisterWebhookEndpointServiceTest asserts against it directly
+  // rather than duplicating the literal 25 as a magic number of its own.
+  @SuppressWarnings("PMD.LongVariable") // names exactly what it holds — same precedent
+  // MAX_DISPLAY_NAME_LENGTH's own class-level suppression documents for an identically-shaped name.
+  /* package */ static final int MAX_ENDPOINTS_PER_ORGANIZATION = 25;
 
   private final WebhookEndpointRepository endpoints;
   private final OrganizationExistsChecker orgExistsChecker;
@@ -45,6 +67,14 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
     // this across modules; cross-module migration ordering isn't guaranteed).
     if (!orgExistsChecker.exists(command.organizationId())) {
       throw new OrganizationNotFoundException(command.organizationId());
+    }
+    // BR-WEBHOOK-08: cheapest remaining check first, same "reject before doing real work" ordering
+    // as the Organization check above — no point consulting the SSRF guard (a DNS resolution) for a
+    // registration that's going to be rejected on count alone.
+    if (endpoints.countByOrganizationId(command.organizationId())
+        >= MAX_ENDPOINTS_PER_ORGANIZATION) {
+      throw new WebhookEndpointLimitExceededException(
+          command.organizationId(), MAX_ENDPOINTS_PER_ORGANIZATION);
     }
     // TD-SEC-053: before anything is persisted — WebhookEndpoint.requireValidUrl only ever checks
     // the scheme (BR-WEBHOOK-07), never where the host actually resolves to.
