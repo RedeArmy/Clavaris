@@ -206,6 +206,57 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(1);
   }
 
+  // SDE-III review, 2026-09-16 — real bug found live: behind docker-compose.prod.yml's own Caddy,
+  // Spring Security's default OAuth2Login redirect-uri template ({baseUrl}/login/oauth2/code/{id})
+  // computed its base URL from the raw request Caddy's own reverse_proxy sees (this test process's
+  // own address, never the real external one a caller actually used) - a real "Sign in with
+  // Google/GitHub" attempt behind Caddy failed at the provider's own consent screen with a
+  // redirect_uri_mismatch. application.yml's own server.forward-headers-strategy: framework is the
+  // fix (see that property's own comment for the full finding and why it's safe here); this proves
+  // it actually works, not just that it's the documented Spring Boot mechanism for this - the same
+  // "confirmed live, not assumed" bar every other real bug this session closed already met.
+  @Test
+  void theAuthorizationRedirectUriReflectsForwardedHeadersBehindAReverseProxy() throws Exception {
+    final String platformToken =
+        requestPlatformAccessToken(
+            "platform:organizations:write platform:social-login-policy:write");
+    final UUID organizationId = createOrganization(platformToken, "Behind A Proxy Co");
+    enableGitHubSocialLogin(platformToken, organizationId);
+
+    // Simulates exactly what Caddy's own reverse_proxy adds to every request it forwards - a real
+    // external caller's own scheme/host, never this test process's own loopback address.
+    final SessionClient client = new SessionClient();
+    final HttpResponse<String> entry =
+        client.getWithForwardedHeaders(
+            baseUri("/o/" + organizationId + "/login/social/github"),
+            "https",
+            "clavaris.example.test");
+    assertThat(entry.statusCode()).isEqualTo(302);
+    final String authorizationRedirect = entry.headers().firstValue("Location").orElseThrow();
+    // The fix already worked by this point - sendRedirect()'s own relative-to-absolute resolution
+    // used the forwarded host above, so this Location is already
+    // "https://clavaris.example.test/oauth2/authorization/github", not a real, connectable
+    // address. Only the path is real; reissue the next hop against this test server's own actual
+    // port, still carrying the same forwarded headers, exactly as Caddy would on every hop, not
+    // only the first.
+    final URI authorizationRedirectUri = URI.create(authorizationRedirect);
+    assertThat(authorizationRedirectUri.getPath()).isEqualTo("/oauth2/authorization/github");
+
+    final HttpResponse<String> toProvider =
+        client.getWithForwardedHeaders(
+            baseUri(authorizationRedirectUri.getPath()), "https", "clavaris.example.test");
+    assertThat(toProvider.statusCode()).isEqualTo(302);
+    final String providerUrl = toProvider.headers().firstValue("Location").orElseThrow();
+
+    final String redirectUri = queryParam(providerUrl, "redirect_uri");
+    assertThat(redirectUri)
+        .as(
+            "the redirect_uri Spring Security sends the provider must reflect the forwarded"
+                + " scheme/host a real caller behind Caddy actually used, never this test"
+                + " process's own loopback address")
+        .isEqualTo("https://clavaris.example.test/login/oauth2/code/github");
+  }
+
   @Test
   void aProviderTheOrganizationHasNotEnabledRedirectsWithAnErrorWithoutEverReachingTheProvider()
       throws Exception {
@@ -441,6 +492,22 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
 
     HttpResponse<String> get(final URI uri) throws IOException, InterruptedException {
       final HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
+      return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    // Simulates what Caddy's own reverse_proxy directive adds to every request it forwards, not
+    // just a one-off test convenience — see
+    // theAuthorizationRedirectUriReflectsForwardedHeadersBehindAReverseProxy's
+    // own comment for the real bug this exists to prove closed.
+    HttpResponse<String> getWithForwardedHeaders(
+        final URI uri, final String forwardedProto, final String forwardedHost)
+        throws IOException, InterruptedException {
+      final HttpRequest request =
+          HttpRequest.newBuilder(uri)
+              .header("X-Forwarded-Proto", forwardedProto)
+              .header("X-Forwarded-Host", forwardedHost)
+              .GET()
+              .build();
       return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
   }

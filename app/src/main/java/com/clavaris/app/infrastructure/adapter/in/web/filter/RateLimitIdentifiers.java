@@ -39,13 +39,14 @@ public final class RateLimitIdentifiers {
   }
 
   /**
-   * Source IP. {@code request.getRemoteAddr()} directly — no reverse proxy sits in front of
-   * Clavaris in the deployment this codebase actually ships today ({@code docker-compose.yml}
-   * exposes {@code app} on 8080 directly); honoring {@code X-Forwarded-For} un-guarded would let
-   * that same header be spoofed by any direct caller to fake a different source identifier
-   * entirely, defeating this layer rather than strengthening it. Revisit if/when a real reverse
-   * proxy is introduced (Spring's own {@code ForwardedHeaderFilter}, configured to trust only that
-   * proxy's own address, is the standard fix at that point — not before).
+   * Source IP. {@code request.getRemoteAddr()} directly — deliberately unaware of any proxy below
+   * this method's own call site, on purpose: {@code server.forward-headers-strategy: framework}
+   * (SDE-III review, 2026-09-16, {@code application.yml}'s own comment has the full finding and why
+   * it's safe) is what makes this value already correct behind {@code docker-compose.prod.yml}'s
+   * own Caddy, by rewriting what {@code getRemoteAddr()} itself returns before this method ever
+   * runs — this method needing to know about {@code X-Forwarded-For} itself would be the wrong
+   * layer for that decision, and would reintroduce exactly the un-guarded-header-spoofing risk this
+   * comment used to warn about, now solved once, centrally, for every caller instead of here.
    */
   public static String sourceIp(final HttpServletRequest request) {
     return request.getRemoteAddr();
