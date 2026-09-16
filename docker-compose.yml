@@ -80,6 +80,29 @@ services:
       # HMAC that keys every rate-limit identifier (email/IP/client_id) before it becomes part of a
       # Redis key.
       RATE_LIMIT_KEY_HASH_SECRET: "${RATE_LIMIT_KEY_HASH_SECRET:?RATE_LIMIT_KEY_HASH_SECRET must be set explicitly in .env (see .env.example)}"
+      # ADR-0020 Decision 4: optional here, unlike docker-compose.prod.yml's own required (:?)
+      # equivalent — application.yml's own dev-only placeholder default already lets the app start
+      # and every other endpoint work without these; a developer not testing social login shouldn't
+      # need real Google/GitHub OAuth credentials just to run the stack. Found live, 2026-09-16:
+      # this service never forwarded these four vars into the container at all — even a developer
+      # who *had* set real values in .env got the dev-only placeholder every time regardless,
+      # since a var docker-compose.yml never lists under environment: never reaches the container,
+      # full stop, whatever .env itself contains.
+      #
+      # Bare key (no "${VAR:-}"), deliberately: that interpolation form always produces a *present*
+      # environment variable, empty string when .env doesn't define it — confirmed live via `docker
+      # compose config`/`run ... env`, the exact same failure mode already documented for
+      # WEBHOOK_SECRET_ENCRYPTION_KEY/SOCIAL_CREDENTIAL_ENCRYPTION_KEY in docker-compose.prod.yml's
+      # own comment (Spring's ${VAR:default} placeholder only falls back when the property is
+      # genuinely *absent*, never when present-but-empty) — here that would mean an empty client-id
+      # reaching OAuth2ClientProperties.validate(), which rejects it outright at startup, breaking
+      # every endpoint in the app, not just social login. The bare form omits the key from the
+      # container's environment entirely when .env doesn't define it (confirmed live the same way),
+      # which is what actually lets the placeholder default apply.
+      GOOGLE_OAUTH_CLIENT_ID:
+      GOOGLE_OAUTH_CLIENT_SECRET:
+      GITHUB_OAUTH_CLIENT_ID:
+      GITHUB_OAUTH_CLIENT_SECRET:
     volumes:
       - clavaris-signing-keys-data:/app/data
     depends_on:
