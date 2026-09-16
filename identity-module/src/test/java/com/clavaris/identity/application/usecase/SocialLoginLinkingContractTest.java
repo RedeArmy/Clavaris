@@ -10,9 +10,16 @@ import org.junit.jupiter.api.Test;
  * authenticatewithsocialprovider.AuthenticateWithSocialProviderService}) and platform-tier ({@code
  * authenticateplatformaccountwithsocialprovider.AuthenticatePlatformAccountWithSocialProviderService})
  * social-login linking services implement the identical three-way decision (ADR-0020 Decision 1)
- * with no shared production code — a divergence between the two already happened once for real: the
- * platform tier shipped without the tenant tier's own TOCTOU-race guard, caught only by a later
- * code review pass, not by either service's own (previously entirely separate) test suite.
+ * with no shared production code — a divergence between the two has already happened twice for
+ * real, both times caught late rather than by either service's own (previously entirely separate)
+ * test suite: (1) the platform tier shipped without the tenant tier's own TOCTOU-race guard, caught
+ * only by a later code review pass — {@link
+ * #fallsBackToAPendingLinkWhenAConcurrentSignupWinsTheRaceForTheSameEmail} below now covers that;
+ * (2) TD-FUT-030, a brand-new social-only signup left with zero fallback authentication method — a
+ * real production risk (a provider outage was a genuine lockout, not just degraded service), found
+ * and fixed on both tiers the same day but never covered by this contract class until {@link
+ * #verifyANeverSurfacedPasswordCredentialWasAttachedToTheNewAccount} was added alongside it
+ * (SDE-III review, 2026-09-15).
  *
  * <p>Rather than force a risky inheritance/generics refactor onto security-critical auth code right
  * now (see TD-ARCH-009's own reasoning for why that's a separately-tracked, larger initiative),
@@ -27,8 +34,8 @@ import org.junit.jupiter.api.Test;
  *
  * @param <R> each tier's own sealed result type ({@code AuthenticateWithSocialProviderResult} /
  *     {@code AuthenticatePlatformAccountWithSocialProviderResult}) — deliberately not unified
- *     either; only the five scenario shapes below are asserted to be identical, never the concrete
- *     types themselves.
+ *     either; only the scenario shapes below are asserted to be identical, never the concrete types
+ *     themselves.
  */
 public abstract class SocialLoginLinkingContractTest<R> {
 
@@ -57,6 +64,18 @@ public abstract class SocialLoginLinkingContractTest<R> {
 
   protected abstract void verifyAPendingLinkWasSaved();
 
+  /**
+   * SDE-III review, 2026-09-15 — closes the second real divergence this contract test class didn't
+   * originally cover: TD-FUT-030 (a brand-new social-only signup left with zero authentication
+   * methods other than the one linked provider, so a provider outage was a genuine lockout, not
+   * just degraded service) was found and fixed on both tiers the same day — but neither service had
+   * its own test suite asserting the fix at the time, and this contract test class (which by then
+   * already existed, closing the earlier TOCTOU-race divergence) never grew a scenario for it
+   * either. A future change to one tier's own fallback-credential logic without the matching change
+   * on the other would still have passed this whole contract silently before this addition.
+   */
+  protected abstract void verifyANeverSurfacedPasswordCredentialWasAttachedToTheNewAccount();
+
   @Test
   void logsInDirectlyWhenAnIdentityIsAlreadyLinked() {
     givenAnExistingIdentityIsFound();
@@ -76,6 +95,7 @@ public abstract class SocialLoginLinkingContractTest<R> {
     assertThat(isLoggedIn(result))
         .as("a brand-new signup with nothing pre-existing logs in immediately")
         .isTrue();
+    verifyANeverSurfacedPasswordCredentialWasAttachedToTheNewAccount();
   }
 
   @Test
