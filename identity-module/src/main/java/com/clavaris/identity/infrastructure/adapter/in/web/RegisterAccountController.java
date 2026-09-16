@@ -12,6 +12,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.AccountId;
@@ -19,6 +20,8 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -46,14 +49,29 @@ import org.springframework.web.bind.annotation.RequestParam;
  * session directly (there's no password credential to have proven); it instead kicks off whichever
  * passwordless email method the policy has enabled (§3), reusing those use cases entirely rather
  * than a third, duplicated completion path.
+ *
+ * <p>SDE-III review, 2026-09-16 — real bug found live, same fix as {@code
+ * RegisterPlatformAccountController}'s own identical addendum: the password-submitted branch's
+ * {@code requestEmailVerification.handle(...)} call used to run unguarded. The account is already
+ * committed by the time it runs, so a Resend outage/misconfiguration threw {@link
+ * MailDeliveryException} straight through this handler — an unhandled 500 on a request that had
+ * already succeeded. Caught the same way {@code RecordAccountLoginDeviceService} already treats an
+ * identically-shaped failure. Deliberately NOT applied to {@link #completePasswordlessSignUp} below
+ * — there, the email/link send is the entire completion mechanism, not a side notification, per
+ * that class's own Javadoc; the caller genuinely needs to know whether it went through.
  */
 // PMD.LongVariable: requestEmailVerification/requestEmailSignInCode/requestEmailSignInLink each
 // name exactly which passwordless completion path they trigger — TD-SEC-004's own original
-// rationale, extended to its two new siblings.
-@SuppressWarnings("PMD.LongVariable")
+// rationale, extended to its two new siblings. PMD.ExcessiveImports: this class's own SDE-III
+// review addendum above's MailDeliveryException/Logger/LoggerFactory pushed this past the default
+// threshold of 30 — every import here backs a real, distinct collaborator this controller
+// genuinely needs, same "wiring, not sprawl" reasoning this codebase applies elsewhere.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/register")
 public class RegisterAccountController {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RegisterAccountController.class);
 
   private static final String FORM_VIEW = "identity/register";
 
@@ -168,8 +186,13 @@ public class RegisterAccountController {
     // TD-SEC-004: this is the fix — a real send, triggered directly from the request that just
     // created the account, not left to an outbox row nothing drains yet (AccountRegisteredEvent's
     // own Javadoc documents that this is a deliberate divergence from its "async via outbox"
-    // language, for exactly that reason).
-    requestEmailVerification.handle(new RequestEmailVerificationCommand(accountId));
+    // language, for exactly that reason). See this class's own Javadoc addendum for the real,
+    // live-found bug the surrounding try/catch guards.
+    try {
+      requestEmailVerification.handle(new RequestEmailVerificationCommand(accountId));
+    } catch (final MailDeliveryException e) {
+      LOG.warn("event=account_registered_verification_email_send_failed", e);
+    }
 
     return REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
   }
