@@ -15,8 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientResult;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientUseCase;
+import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
-import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretResult;
@@ -48,7 +48,6 @@ class PlatformOrganizationClientControllerTest {
   private static final UUID OWNER_ID = UUID.randomUUID();
 
   private CreateOrganizationClientUseCase createClient;
-  private ListOrganizationClientsUseCase listClients;
   private ListOrganizationClientsPagedUseCase listClientsPaged;
   private DeactivateOrganizationClientUseCase deactivateClient;
   private RotateOrganizationClientSecretUseCase rotateClientSecret;
@@ -60,7 +59,6 @@ class PlatformOrganizationClientControllerTest {
   @BeforeEach
   void setUp() {
     createClient = mock(CreateOrganizationClientUseCase.class);
-    listClients = mock(ListOrganizationClientsUseCase.class);
     listClientsPaged = mock(ListOrganizationClientsPagedUseCase.class);
     deactivateClient = mock(DeactivateOrganizationClientUseCase.class);
     rotateClientSecret = mock(RotateOrganizationClientSecretUseCase.class);
@@ -71,7 +69,6 @@ class PlatformOrganizationClientControllerTest {
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
-    when(listClients.handle(any())).thenReturn(List.of());
     when(listClientsPaged.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
@@ -92,7 +89,6 @@ class PlatformOrganizationClientControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new PlatformOrganizationClientController(
                     createClient,
-                    listClients,
                     listClientsPaged,
                     deactivateClient,
                     rotateClientSecret,
@@ -214,7 +210,6 @@ class PlatformOrganizationClientControllerTest {
   @Test
   void plainDeactivatePostRedirectsOnSuccess() throws Exception {
     OrganizationClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
 
     mockMvc
         .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
@@ -224,22 +219,25 @@ class PlatformOrganizationClientControllerTest {
     verify(deactivateClient).handle(any());
   }
 
+  // SDE-III review, 2026-09-15: ownership is now enforced by DeactivateOrganizationClientService
+  // itself (via the organizationId this controller now passes through), not a web-layer
+  // list-then-check — simulated here the same way a real cross-tenant clientId would surface, via
+  // the exception the service throws.
   @Test
   void deactivateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
-    when(listClients.handle(organizationId)).thenReturn(List.of());
+    doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
+        .when(deactivateClient)
+        .handle(any());
 
     mockMvc
         .perform(post(basePath() + "/sk_test_someone_elses/deactivate"))
         .andExpect(status().isNotFound());
-
-    verify(deactivateClient, never()).handle(any());
   }
 
   @Test
   void plainRotateSecretPostRendersThePageDirectlyWithTheNewSecretNeverARedirect()
       throws Exception {
     OrganizationClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     when(rotateClientSecret.handle(any()))
         .thenReturn(new RotateOrganizationClientSecretResult(client.clientId(), "new-raw-secret"));
 
@@ -250,15 +248,16 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(model().attribute("justCreatedRawSecret", "new-raw-secret"));
   }
 
+  // Same rationale as deactivateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization.
   @Test
   void rotateSecretReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
-    when(listClients.handle(organizationId)).thenReturn(List.of());
+    doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
+        .when(rotateClientSecret)
+        .handle(any());
 
     mockMvc
         .perform(post(basePath() + "/sk_test_someone_elses/rotate-secret"))
         .andExpect(status().isNotFound());
-
-    verify(rotateClientSecret, never()).handle(any());
   }
 
   // SDE-III review, 2026-09-15: the web-layer half of the optimistic-locking fix — see
@@ -266,7 +265,6 @@ class PlatformOrganizationClientControllerTest {
   @Test
   void deactivateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
     OrganizationClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     doThrow(new ConcurrentClientModificationException(client.clientId()))
         .when(deactivateClient)
         .handle(any());
@@ -279,7 +277,6 @@ class PlatformOrganizationClientControllerTest {
   @Test
   void rotateSecretReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
     OrganizationClient client = sampleClient();
-    when(listClients.handle(organizationId)).thenReturn(List.of(client));
     when(rotateClientSecret.handle(any()))
         .thenThrow(new ConcurrentClientModificationException(client.clientId()));
 

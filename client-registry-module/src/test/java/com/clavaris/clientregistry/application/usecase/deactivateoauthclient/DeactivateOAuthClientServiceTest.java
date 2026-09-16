@@ -55,7 +55,7 @@ class DeactivateOAuthClientServiceTest {
     assertThat(existing.active()).isTrue();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
 
-    service.handle(new DeactivateOAuthClientCommand("target-client", ACTOR));
+    service.handle(new DeactivateOAuthClientCommand("target-client", organizationId, ACTOR));
 
     verify(oauthClients).save(argThat(saved -> !saved.active()));
   }
@@ -65,7 +65,7 @@ class DeactivateOAuthClientServiceTest {
     OAuthClient existing = sampleClient();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
 
-    service.handle(new DeactivateOAuthClientCommand("target-client", ACTOR));
+    service.handle(new DeactivateOAuthClientCommand("target-client", organizationId, ACTOR));
 
     verify(auditEvents)
         .write(
@@ -79,7 +79,26 @@ class DeactivateOAuthClientServiceTest {
   @Test
   void rejectsAnUnknownClientIdWithoutPersistingOrRecordingAnything() {
     when(oauthClients.findByClientId("ghost-client")).thenReturn(Optional.empty());
-    DeactivateOAuthClientCommand command = new DeactivateOAuthClientCommand("ghost-client", ACTOR);
+    DeactivateOAuthClientCommand command =
+        new DeactivateOAuthClientCommand("ghost-client", organizationId, ACTOR);
+
+    assertThatExceptionOfType(OAuthClientNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(oauthClients, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
+  // SDE-III review, 2026-09-15 — real regression this guards: before this fix, this method never
+  // even accepted an organizationId, so a caller pairing a valid organizationId with a different
+  // Organization's own clientId would deactivate that Organization's real client.
+  @Test
+  void rejectsAClientThatBelongsToADifferentOrganizationWithoutPersistingOrRecordingAnything() {
+    OAuthClient existing = sampleClient();
+    when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
+    UUID unrelatedOrganizationId = UUID.randomUUID();
+    DeactivateOAuthClientCommand command =
+        new DeactivateOAuthClientCommand("target-client", unrelatedOrganizationId, ACTOR);
 
     assertThatExceptionOfType(OAuthClientNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

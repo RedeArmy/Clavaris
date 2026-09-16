@@ -43,7 +43,8 @@ class ClientBrandingProviderBridge implements ClientBrandingProvider {
         || !maybeClient.get().organizationId().equals(organizationId.value())) {
       return ClientBrandingSnapshot.unconfigured();
     }
-    final ClientBranding branding = getClientBranding.handle(maybeClient.get().id());
+    final ClientBranding branding =
+        getClientBranding.handle(organizationId.value(), maybeClient.get().id());
     return new ClientBrandingSnapshot(
         branding.logoUrl(), branding.primaryColor(), branding.applicationDisplayName());
   }

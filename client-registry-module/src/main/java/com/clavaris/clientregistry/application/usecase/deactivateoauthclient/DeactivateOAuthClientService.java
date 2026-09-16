@@ -21,6 +21,9 @@ public class DeactivateOAuthClientService implements DeactivateOAuthClientUseCas
     final OAuthClient existing =
         oauthClients
             .findByClientId(command.clientId())
+            // SDE-III review, 2026-09-15: collapses a cross-tenant mismatch into the same 404 a
+            // genuinely missing clientId already produces — see this command's own Javadoc.
+            .filter(found -> found.organizationId().equals(command.organizationId()))
             .orElseThrow(() -> new OAuthClientNotFoundException(command.clientId()));
 
     oauthClients.save(existing.deactivate());

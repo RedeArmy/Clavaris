@@ -11,5 +11,43 @@ package com.clavaris.identity.application.usecase.authenticatewithpassword;
 @FunctionalInterface
 public interface PasswordVerifier {
 
+  /**
+   * BR-ID-22 (SDE-III review, 2026-09-15): a real, valid-format Argon2id hash (same cost parameters
+   * {@code Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8()} — ADR-0005 — produces for every
+   * real credential in this system) of a fixed password no account will ever actually have. Never a
+   * real credential, never compared against anything meaningful.
+   */
+  // java:S2068 false positive (SDE-III review, 2026-09-16): flagged purely on the "PASSWORD" +
+  // string-literal shape, same as any hard-coded-credential heuristic would — this Javadoc already
+  // explains why it is the opposite of a credential: a fixed, public, never-secret value that must
+  // never match a real password, existing solely to cost the same Argon2id cycles a real one would.
+  @SuppressWarnings({"java:S2068", "PMD.LongVariable"}) // names exactly what it holds — same
+  // precedent MAX_ENDPOINTS_PER_ORGANIZATION's own identical suppression documents (webhook-module,
+  // RegisterWebhookEndpointService) for an equally self-explanatory constant name.
+  String DUMMY_PASSWORD_HASH_FOR_TIMING_PARITY =
+      "$argon2id$v=19$m=16384,t=2,p=1$dpXFtza1qHtma0EoXDpqcg$IWmvSHJVU73oWp/OB2crvi/ZyUqSREwIKg6YN8Tl9nY";
+
   boolean matches(String rawPassword, String passwordHash);
+
+  /**
+   * BR-ID-22: every {@code AuthenticateWith*Service}'s own uniform-{@code
+   * InvalidCredentialsException} response is only genuinely indistinguishable across rejection
+   * reasons if every rejection branch pays the identical Argon2id cost — an unknown account, an
+   * inactive account, or an account with no password credential must never return in the
+   * microseconds a bare lookup takes while a wrong-password rejection takes the tens of
+   * milliseconds a real {@link #matches} call costs by design. Callers with no real {@code
+   * passwordHash} to check against call this instead, right before logging/throwing, and discard
+   * the result — it can only ever be {@code false} ({@link #DUMMY_PASSWORD_HASH_FOR_TIMING_PARITY}
+   * matches no real password). A {@code default} method, not a per-caller copy of the same one-line
+   * body: three call sites (tenant email login, tenant username login, platform login) would
+   * otherwise duplicate both the dummy hash and this method verbatim.
+   *
+   * <p>Still goes through whatever concurrency gate a real implementation wraps {@link #matches} in
+   * (see {@code Argon2PasswordVerifier}'s own Javadoc) — deliberately: a saturated gate must reject
+   * this path exactly as loudly as it would reject a real, account-exists attempt, or gate
+   * saturation itself would become a second, cruder timing/availability side channel.
+   */
+  default void payVerificationCostRegardlessOfOutcome(final String rawPassword) {
+    matches(rawPassword, DUMMY_PASSWORD_HASH_FOR_TIMING_PARITY);
+  }
 }

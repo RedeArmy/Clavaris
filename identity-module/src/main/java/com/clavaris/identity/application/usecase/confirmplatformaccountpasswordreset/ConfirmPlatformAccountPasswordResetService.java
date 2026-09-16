@@ -9,6 +9,7 @@ import com.clavaris.identity.domain.model.PlatformVerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
  * BR-ID-04: a successful reset revokes every {@code HttpSession} Spring Security's {@code
  * SessionRegistry} knows about for this account (via {@link PlatformAccountSessionRevoker}), not a
  * refresh-token cascade — see that port's own Javadoc.
+ *
+ * <p>SDE-III review, 2026-09-15: token consumption goes through {@link
+ * PlatformVerificationTokenRepository#consumeIfActive}, closing the same TOCTOU {@code
+ * confirmpasswordreset.ConfirmPasswordResetService}'s own Javadoc documents for the tenant tier —
+ * same race, this tier's own reset flow.
  */
 public class ConfirmPlatformAccountPasswordResetService
     implements ConfirmPlatformAccountPasswordResetUseCase {
@@ -57,8 +63,10 @@ public class ConfirmPlatformAccountPasswordResetService
       throw new InvalidVerificationTokenException();
     }
 
-    token.consume();
-    tokens.save(token);
+    // The atomic, authoritative check — see this class's own Javadoc.
+    if (!tokens.consumeIfActive(token.id(), Instant.now())) {
+      throw new InvalidVerificationTokenException();
+    }
 
     final PlatformAccount account =
         accounts

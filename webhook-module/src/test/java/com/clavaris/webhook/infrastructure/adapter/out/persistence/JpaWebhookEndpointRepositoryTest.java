@@ -93,6 +93,75 @@ class JpaWebhookEndpointRepositoryTest {
     assertThat(found).extracting(WebhookEndpoint::id).containsExactly(ownedByA.id());
   }
 
+  // TD-PERF-026 (SDE-III review, 2026-09-16): the O(1) lookup that replaced the dashboard's own
+  // former O(n) "fetch every endpoint, scan in memory" ownership check — see
+  // WebhookEndpointRepository#findByIdAndOrganizationId's own Javadoc.
+  @Test
+  void findByIdAndOrganizationIdReturnsTheEndpointOnlyWhenBothMatch() {
+    UUID organizationA = UUID.randomUUID();
+    UUID organizationB = UUID.randomUUID();
+    WebhookEndpoint ownedByA =
+        WebhookEndpoint.register(organizationA, "https://a.example.com", null, List.of("x"), "s");
+    repository.save(ownedByA);
+
+    assertThat(repository.findByIdAndOrganizationId(ownedByA.id(), organizationA))
+        .map(WebhookEndpoint::id)
+        .contains(ownedByA.id());
+    assertThat(repository.findByIdAndOrganizationId(ownedByA.id(), organizationB))
+        .as("the exact same endpointId under a different organizationId must not match")
+        .isEmpty();
+    assertThat(repository.findByIdAndOrganizationId(UUID.randomUUID(), organizationA))
+        .as("an unknown endpointId must not match regardless of organizationId")
+        .isEmpty();
+  }
+
+  // BR-WEBHOOK-08 (SDE-III review, 2026-09-15): WebhookEndpointRepository#countByOrganizationId's
+  // own Javadoc — the count backing the registration cap must include a deactivated endpoint too,
+  // or the cap could be bypassed by deactivating and re-registering.
+  @Test
+  void countByOrganizationIdCountsDeactivatedEndpointsTooAndIgnoresOtherOrganizations() {
+    UUID organizationA = UUID.randomUUID();
+    UUID organizationB = UUID.randomUUID();
+    WebhookEndpoint active =
+        WebhookEndpoint.register(organizationA, "https://a1.example.com", null, List.of("x"), "s");
+    WebhookEndpoint deactivated =
+        WebhookEndpoint.register(organizationA, "https://a2.example.com", null, List.of("x"), "s")
+            .deactivate();
+    WebhookEndpoint ownedByB =
+        WebhookEndpoint.register(organizationB, "https://b.example.com", null, List.of("x"), "s");
+    repository.save(active);
+    repository.save(deactivated);
+    repository.save(ownedByB);
+
+    assertThat(repository.countByOrganizationId(organizationA)).isEqualTo(2L);
+    assertThat(repository.countByOrganizationId(organizationB)).isEqualTo(1L);
+    assertThat(repository.countByOrganizationId(UUID.randomUUID())).isZero();
+  }
+
+  // SDE-III review, 2026-09-15 (TD-PERF-025): DeliverPendingWebhooksService's own batch-fetch —
+  // one WHERE id IN (...) call for every distinct endpoint in a claimed delivery batch, replacing
+  // what used to be findById once per delivery.
+  @Test
+  void findAllByIdsReturnsOnlyTheRequestedEndpointsAndIgnoresUnknownIds() {
+    UUID organizationId = UUID.randomUUID();
+    WebhookEndpoint first =
+        WebhookEndpoint.register(organizationId, "https://a.example.com", null, List.of("x"), "s");
+    WebhookEndpoint second =
+        WebhookEndpoint.register(organizationId, "https://b.example.com", null, List.of("x"), "s");
+    WebhookEndpoint notRequested =
+        WebhookEndpoint.register(organizationId, "https://c.example.com", null, List.of("x"), "s");
+    repository.save(first);
+    repository.save(second);
+    repository.save(notRequested);
+
+    List<WebhookEndpoint> found =
+        repository.findAllByIds(List.of(first.id(), second.id(), UUID.randomUUID()));
+
+    assertThat(found)
+        .extracting(WebhookEndpoint::id)
+        .containsExactlyInAnyOrder(first.id(), second.id());
+  }
+
   @Test
   void findActiveByOrganizationIdAndEventTypeExcludesInactiveAndUnsubscribedEndpoints() {
     UUID organizationId = UUID.randomUUID();

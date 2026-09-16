@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,6 +26,7 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.AccountId;
@@ -136,6 +138,28 @@ class RegisterAccountControllerTest {
     // TD-SEC-004: registration must actually trigger the verification email it promises on the
     // page it redirects to, not just claim to have.
     verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(accountId));
+  }
+
+  // SDE-III review, 2026-09-16 — real bug found live, same fix/test shape as
+  // RegisterPlatformAccountControllerTest's own identical addition: before this fix, a
+  // MailDeliveryException here propagated unguarded, leaving the caller with an unhandled 500 even
+  // though the account was already created.
+  @Test
+  void stillRedirectsToPendingVerificationWhenTheVerificationEmailFailsToSend() throws Exception {
+    AccountId accountId = AccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+    doThrow(new MailDeliveryException("Resend responded with status 401"))
+        .when(requestEmailVerification)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/register/pending-verification"));
   }
 
   @Test

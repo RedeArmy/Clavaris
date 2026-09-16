@@ -29,6 +29,17 @@ import org.slf4j.LoggerFactory;
  * text for now, not yet the JSON format `nfr-quality-attributes.md` §5 ultimately calls for — that
  * depends on an observability stack (JSON encoder, log shipper) not chosen yet; these lines upgrade
  * to real structured JSON once that lands, without changing what they say.
+ *
+ * <p>BR-ID-22 (SDE-III review, 2026-09-15) — timing side channel closed: the uniform-response
+ * property above was only ever true of the response <em>body</em>. {@code unknown_account}, {@code
+ * inactive_account}, and {@code no_password_credential} all used to return without ever calling
+ * {@link PasswordVerifier#matches}, while {@code invalid_password} (and success) always pay a real
+ * Argon2id verification — tens of milliseconds by design (ADR-0005), against microseconds for the
+ * three early-exit branches. That gap is trivially measurable over the network and lets an attacker
+ * learn whether an email belongs to a real account purely from response latency, exactly what the
+ * collapsed-to-one-exception-type response was meant to hide. Every rejection branch below the
+ * lookup now calls {@link PasswordVerifier#payVerificationCostRegardlessOfOutcome} first — see that
+ * method's own Javadoc.
  */
 public class AuthenticateWithPasswordService implements AuthenticateWithPasswordUseCase {
 
@@ -74,6 +85,8 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
       // real signal: repeated unknown-account attempts against one Organization is exactly the
       // credential-stuffing/enumeration pattern BR-ID-06's rate limiting will need this log line
       // to detect once it exists.
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=login_failure organizationId={} reason=unknown_account", command.organizationId());
       recordFailure("unknown_account");
@@ -85,6 +98,8 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
     // password — checked before touching the password hash at all, not as an afterthought once a
     // credential match already succeeded.
     if (account.status() != AccountStatus.ACTIVE) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=login_failure organizationId={} accountId={} reason=inactive_account",
           command.organizationId(),
@@ -95,6 +110,8 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
 
     final Optional<PasswordCredential> credential = account.passwordCredential();
     if (credential.isEmpty()) {
+      // BR-ID-22: see this class's own Javadoc addendum.
+      verifier.payVerificationCostRegardlessOfOutcome(command.rawPassword());
       LOG.info(
           "event=login_failure organizationId={} accountId={} reason=no_password_credential",
           command.organizationId(),

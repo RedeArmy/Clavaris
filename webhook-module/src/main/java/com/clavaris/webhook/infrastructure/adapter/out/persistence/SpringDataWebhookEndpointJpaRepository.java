@@ -2,6 +2,7 @@ package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,7 +14,18 @@ interface SpringDataWebhookEndpointJpaRepository
 
   List<WebhookEndpointEntity> findAllByOrganizationId(UUID organizationId);
 
+  // WebhookEndpointRepository#findByIdAndOrganizationId's own Javadoc — id is already the primary
+  // key, so this is the same single-row lookup findById already is, plus the organizationId
+  // predicate as a second WHERE clause, not an additional index or query shape.
+  @SuppressWarnings("PMD.ShortVariable")
+  Optional<WebhookEndpointEntity> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
   List<WebhookEndpointEntity> findAllByOrganizationIdAndActiveTrue(UUID organizationId);
+
+  // WebhookEndpointRepository#countByOrganizationId's own Javadoc — a derived COUNT query, not
+  // findAllByOrganizationId(...).size(): counting must never pull every row's full column set just
+  // to measure how many there are.
+  long countByOrganizationId(UUID organizationId);
 
   void deleteAllByOrganizationId(UUID organizationId);
 

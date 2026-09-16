@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,6 +42,10 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
     service =
         new ConfirmPlatformAccountPasswordResetService(tokens, accounts, sessionRevoker, hasher);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
+    // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
+    // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
+    // this stub to prove the lost-race path itself.
+    when(tokens.consumeIfActive(any(), any())).thenReturn(true);
   }
 
   private PlatformAccount accountWithPassword() {
@@ -64,9 +69,10 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
 
     service.handle(new ConfirmPlatformAccountPasswordResetCommand(rawToken, "a-Str0ng-Password!"));
 
-    assertThat(token.consumedAt()).isPresent();
     assertThat(account.passwordCredential().orElseThrow().passwordHash())
         .isEqualTo("argon2id$new-hash");
+    verify(tokens).consumeIfActive(eq(token.id()), any()); // the atomic consume
+    verify(tokens, never()).save(any()); // no plain save — the conditional update did it
     verify(accounts).save(account);
     verify(sessionRevoker).revokeAllSessionsFor(account.id());
   }
@@ -113,5 +119,29 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
+  }
+
+  @Test
+  void losingTheConditionalConsumeRaceIsTreatedAsAnInvalidToken() {
+    // TOCTOU regression test (SDE-III review, 2026-09-15) — see
+    // ConfirmPasswordResetServiceTest's own identical test for the full rationale.
+    PlatformAccount account = accountWithPassword();
+    String rawToken = "raced-platform-reset-token";
+    PlatformVerificationToken token =
+        PlatformVerificationToken.issue(
+            account.id(),
+            VerificationTokenType.PASSWORD_RESET,
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(1800));
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any())).thenReturn(false);
+    ConfirmPlatformAccountPasswordResetCommand command =
+        new ConfirmPlatformAccountPasswordResetCommand(rawToken, "a-Str0ng-Password!");
+
+    assertThatExceptionOfType(InvalidVerificationTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).save(any());
+    verify(sessionRevoker, never()).revokeAllSessionsFor(any());
   }
 }

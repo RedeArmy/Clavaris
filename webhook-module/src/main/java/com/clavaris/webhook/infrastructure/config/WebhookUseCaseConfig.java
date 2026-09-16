@@ -12,6 +12,8 @@ import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookHt
 import com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsService;
 import com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsUseCase;
 import com.clavaris.webhook.application.usecase.dispatchoutboxevents.OutboxEventReader;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationService;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointService;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationService;
@@ -80,6 +82,14 @@ class WebhookUseCaseConfig {
   /* package */ ListWebhookEndpointsForOrganizationUseCase
       listWebhookEndpointsForOrganizationUseCase(final WebhookEndpointRepository endpoints) {
     return new ListWebhookEndpointsForOrganizationService(endpoints);
+  }
+
+  // TD-PERF-026: the dashboard's own O(1) ownership-check sibling — see that use case's own
+  // Javadoc.
+  @Bean
+  /* package */ GetWebhookEndpointForOrganizationUseCase getWebhookEndpointForOrganizationUseCase(
+      final WebhookEndpointRepository endpoints) {
+    return new GetWebhookEndpointForOrganizationService(endpoints);
   }
 
   // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.

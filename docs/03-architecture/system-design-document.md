@@ -6,7 +6,7 @@
 
 ## 1. Architecture overview
 
-Clavaris is a modular monolith (single deployable) exposing a standard OIDC/OAuth2 surface (ADR-0006) built on Spring Authorization Server (ADR-0003). Internally it follows the same DDD + Hexagonal + Vertical Slice model as JobSeeker, with three business modules plus a shared kernel, plus a proposed fourth module (`webhook-module`, ADR-0007, 🟡 not yet approved) for asynchronous event delivery to consumers.
+Clavaris is a modular monolith (single deployable) exposing a standard OIDC/OAuth2 surface (ADR-0006) built on Spring Authorization Server (ADR-0003). Internally it follows the same DDD + Hexagonal + Vertical Slice model as JobSeeker, with four business modules plus a shared kernel — `identity-module`, `organization-module`, `client-registry-module`, and `webhook-module` (ADR-0007, ✅ shipped 2026-09-02, its own full hexagonal split: `domain`/`application`/`infrastructure`) for asynchronous event delivery to consumers. This section previously described `webhook-module` as "a proposed fourth module, not yet approved" after it had already shipped — corrected here (SDE-III review, 2026-09-15); `prd-mvp.md` §2.3 and `domain-model.md` §5 already carried its accurate, shipped status, this document had simply drifted from them.
 
 ```mermaid
 graph TB
@@ -20,7 +20,7 @@ graph TB
         ID["identity-module"]
         ORG["organization-module"]
         CR["client-registry-module"]
-        WH["webhook-module (proposed, ADR-0007)"]
+        WH["webhook-module (ADR-0007)"]
         COMMON["common / shared-kernel"]
     end
 
@@ -51,7 +51,7 @@ graph TB
 - **`client-registry-module`** owns the `/authorize` and `/token` endpoints' client-facing validation (redirect URI matching, PKCE challenge verification) and hands off to Spring Authorization Server's token issuance machinery, which calls into `identity-module` to authenticate the resource owner. Since ADR-0010, both `/authorize` and `/token` are resolved under a per-`Organization` issuer path (`/o/{organizationId}/...`) — the tenant is known before authentication begins, not inferred afterward.
 - **`identity-module`** is the source of truth for "who is this account" — every other module references accounts by `accountId` only, never holding a live cross-module object reference (`domain-model.md` §6). Since ADR-0010, `identity-module` itself references `organization-module`'s `Organization` by ID (`Account.organizationId`, `SigningKey.organizationId`) — a new dependency direction not present before that ADR, still ID-only per the hexagonal dependency rule.
 - **`organization-module`** is consumed by the management API and by `identity-module`'s account-deletion cascade (BR-DATA-03) — it has no dependency back onto `client-registry-module`. Since ADR-0010, it is also the **tenant root**: `client-registry-module`'s `OAuthClient` and `identity-module`'s `Account`/`SigningKey` all reference an `organization-module` `Organization` by ID — `organization-module` is now upstream of both other business modules, not just a peer consumed by them.
-- **`webhook-module`** (🟡 proposed, ADR-0007) depends only on the shared `event_outbox` table written by `identity-module`/`organization-module` and on `client-registry-module`'s `OAuthClient` (by ID, through its own port) — neither producing module has any dependency on, or awareness of, `webhook-module`, preserving the hexagonal dependency rule even for this cross-cutting concern.
+- **`webhook-module`** (ADR-0007) depends only on the shared `event_outbox` table written by `identity-module`/`organization-module` and on `client-registry-module`'s `OAuthClient` (by ID, through its own port) — neither producing module has any dependency on, or awareness of, `webhook-module`, preserving the hexagonal dependency rule even for this cross-cutting concern.
 
 ## 3. Deployment shape (current state)
 
@@ -67,7 +67,7 @@ Single deployable in v1, consistent with the modular-monolith choice — no per-
 | Storage | PostgreSQL + Redis | Redis-only | 0004 |
 | Password hashing | Argon2id | BCrypt | 0005 |
 | Primary interface | Standard OIDC/OAuth2 | Bespoke API + per-language SDKs | 0006 |
-| Consumer event notification | Webhooks + transactional outbox | Direct DB write / polling / message broker | 0007 🟡 |
+| Consumer event notification | Webhooks + transactional outbox | Direct DB write / polling / message broker | 0007 |
 | API versioning | URI path (`/api/v{n}/admin/...`) + code-generated OpenAPI | Header/media-type versioning, hand-maintained spec | 0008 🟡 |
 | Embedded/branded login | iframe-modal + mandatory per-client custom domain (CNAME/proxy) | Embedded widget calling Clavaris's API directly (Clerk's default pattern) | 0009 🟡 |
 | Tenant isolation | `Organization`-scoped accounts, per-tenant issuer/JWKS/rate-limit budget | Global `Account` + pre-ADR-0010-style `Membership`-only gating; a new `Tenant` layer above `Organization` | 0010 🟡 |

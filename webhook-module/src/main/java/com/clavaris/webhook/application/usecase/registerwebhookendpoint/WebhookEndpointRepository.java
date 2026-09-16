@@ -3,6 +3,7 @@ package com.clavaris.webhook.application.usecase.registerwebhookendpoint;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,10 +13,14 @@ import java.util.UUID;
  * infrastructure/adapter/out/persistence/JpaWebhookEndpointRepository}. Parked under {@code
  * registerwebhookendpoint} because that's this module's first use case, not because every method
  * here is scoped to it — {@code listwebhookendpointsfororganization}, {@code
- * rotatewebhookendpointsecret}, {@code deactivatewebhookendpoint}, and the dispatcher itself are
- * the other consumers, same precedent organization-module's own {@code WorkspaceRepository} already
- * establishes.
+ * getwebhookendpointfororganization}, {@code rotatewebhookendpointsecret}, {@code
+ * deactivatewebhookendpoint}, and the dispatcher itself are the other consumers, same precedent
+ * organization-module's own {@code WorkspaceRepository} already establishes.
  */
+// PMD.TooManyMethods: every method here backs a real, distinct use case this module genuinely
+// needs — same "one port, several use cases" shape JpaWebhookEndpointRepository's own identical
+// suppression documents for this exact interface's implementation.
+@SuppressWarnings("PMD.TooManyMethods")
 public interface WebhookEndpointRepository {
 
   void save(WebhookEndpoint endpoint);
@@ -43,17 +48,59 @@ public interface WebhookEndpointRepository {
   @SuppressWarnings("PMD.ShortVariable")
   Optional<WebhookEndpoint> findById(UUID id);
 
+  /**
+   * TD-PERF-025 (SDE-III review, 2026-09-15): {@code
+   * com.clavaris.webhook.application.usecase.deliverpendingwebhooks.DeliverPendingWebhooksService}'s
+   * own batch-fetch — one query for every distinct {@code endpointId} in a claimed delivery batch
+   * (up to {@code batchSize}, 50 by default), instead of {@link #findById} once per claimed
+   * delivery. Same "fetch once per distinct key in the batch, not once per row" fix {@link
+   * com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsService}'s
+   * own {@code findActiveByOrganizationId} memoization (TD-PERF-005) already applies one layer up
+   * (by Organization, for fan-out); this is the delivery-side sibling of that same problem, keyed
+   * by endpoint instead. Duplicate ids in {@code ids} cost nothing extra — {@code
+   * JpaRepository#findAllById} already de-duplicates its own {@code WHERE id IN (...)} query.
+   */
+  List<WebhookEndpoint> findAllByIds(Collection<UUID> ids);
+
   List<WebhookEndpoint> findAllByOrganizationId(UUID organizationId);
+
+  /**
+   * SDE-III review, 2026-09-16 — TD-PERF-026: a single-row, indexed lookup (both columns are part
+   * of the entity's own primary-key/foreign-key pair) for exactly the "does this endpoint belong to
+   * this Organization" question every dashboard controller action needs before mutating or reading
+   * anything keyed by {@code endpointId} alone. Was previously answered by fetching every endpoint
+   * for the Organization via {@link #findAllByOrganizationId} and scanning it in memory for a match
+   * ({@code WebhookDashboardControllerSupport#requireEndpointBelongsToOrganization}'s own former
+   * body) — O(n) work, repeated on every admin click (deactivate/activate/rotate-secret/list-
+   * deliveries/replay), for a question a single {@code WHERE id = ? AND organization_id = ?}
+   * answers directly. Same class of fix {@code client-registry-module}'s own {@code
+   * DashboardControllerSupport#requireClientIdBelongsToOrganization} removal already established
+   * for an identical shape of workaround (SDE-III review, 2026-09-15).
+   */
+  @SuppressWarnings("PMD.ShortVariable")
+  Optional<WebhookEndpoint> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+  /**
+   * BR-WEBHOOK-08 (SDE-III review, 2026-09-15): backs {@link RegisterWebhookEndpointService}'s own
+   * per-Organization registration cap — counts every endpoint ever registered for this
+   * Organization, active or deactivated, never just the active ones. A count that only counted
+   * active endpoints could be trivially bypassed: register up to the cap, deactivate them all,
+   * register a fresh batch, then reactivate everything via {@code ActivateWebhookEndpointService} —
+   * none of which re-checks this cap. There is no way to delete a single {@code WebhookEndpoint}
+   * (only deactivate — {@code deleteAllByOrganizationId} is Organization-deletion-only), so this
+   * count only ever grows for a live Organization, making it a stable, un-gameable bound.
+   */
+  long countByOrganizationId(UUID organizationId);
 
   /**
    * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
    * #findAllByOrganizationId} — used only by {@code
    * ListWebhookEndpointsForOrganizationPagedService}'s own display query. {@link
-   * #findAllByOrganizationId} itself stays untouched — {@code PlatformWebhookEndpointController}'s
-   * own anti-enumeration ownership check ({@code
-   * WebhookDashboardControllerSupport#requireEndpointBelongsToOrganization}), {@code
-   * PlatformWebhookDeliveryController}, and the audit-log id provider all genuinely need the full,
-   * unbounded list.
+   * #findAllByOrganizationId} itself stays untouched — {@code ListWebhookEndpointsController} (the
+   * REST admin API's own list endpoint) and the audit-log id provider genuinely need the full,
+   * unbounded list. TD-PERF-026 (2026-09-16) closed the one caller that did not: the dashboard's
+   * own anti-enumeration ownership check now uses {@link #findByIdAndOrganizationId} instead — see
+   * that method's own Javadoc.
    */
   KeysetPage<WebhookEndpoint> findKeysetPageByOrganizationId(
       UUID organizationId, KeysetPageRequest pageRequest);

@@ -1,7 +1,9 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,8 +20,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
- * Standalone MockMvc setup — same pattern as RegisterOAuthClientControllerTest. See
- * DeactivateOrganizationClientControllerTest's own Javadoc for the 409 test's rationale.
+ * SDE-III review, 2026-09-15: same rationale as {@code DeactivateOrganizationClientControllerTest}
+ * — this platform-tier REST endpoint had no test coverage of its own before this session. Covers
+ * both real gaps found the same day: the null-{@code organizationId} pass-through and the
+ * {@code @Version}-backed conflict surfacing as a clean 409.
  */
 class RotateOrganizationClientSecretControllerTest {
 
@@ -38,36 +42,42 @@ class RotateOrganizationClientSecretControllerTest {
   }
 
   @Test
-  void returns200WithTheNewRawSecret() throws Exception {
+  void rotatePassesANullOrganizationIdAndReturnsTheNewSecret() throws Exception {
     when(useCase.handle(any()))
-        .thenReturn(new RotateOrganizationClientSecretResult("sk_live_abc", "new-raw-secret"));
+        .thenReturn(new RotateOrganizationClientSecretResult("sk_test_abc", "new-raw-secret"));
 
     mockMvc
         .perform(
-            post("/api/v1/admin/organization-clients/sk_live_abc/rotate-secret")
+            post("/api/v1/admin/organization-clients/sk_test_abc/rotate-secret")
                 .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.clientSecret").value("new-raw-secret"));
+
+    verify(useCase)
+        .handle(
+            argThat(
+                command ->
+                    "sk_test_abc".equals(command.clientId()) && command.organizationId() == null));
   }
 
   @Test
-  void returns404WhenTheClientDoesNotExist() throws Exception {
-    when(useCase.handle(any())).thenThrow(new OrganizationClientNotFoundException("sk_live_abc"));
+  void rotateReturns404WhenTheUseCaseThrowsNotFound() throws Exception {
+    when(useCase.handle(any())).thenThrow(new OrganizationClientNotFoundException("sk_test_ghost"));
 
     mockMvc
         .perform(
-            post("/api/v1/admin/organization-clients/sk_live_abc/rotate-secret")
+            post("/api/v1/admin/organization-clients/sk_test_ghost/rotate-secret")
                 .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isNotFound());
   }
 
   @Test
-  void returns409WhenTheClientWasModifiedConcurrently() throws Exception {
-    when(useCase.handle(any())).thenThrow(new ConcurrentClientModificationException("sk_live_abc"));
+  void rotateReturns409WhenTheClientWasModifiedConcurrently() throws Exception {
+    when(useCase.handle(any())).thenThrow(new ConcurrentClientModificationException("sk_test_abc"));
 
     mockMvc
         .perform(
-            post("/api/v1/admin/organization-clients/sk_live_abc/rotate-secret")
+            post("/api/v1/admin/organization-clients/sk_test_abc/rotate-secret")
                 .principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isConflict());
   }

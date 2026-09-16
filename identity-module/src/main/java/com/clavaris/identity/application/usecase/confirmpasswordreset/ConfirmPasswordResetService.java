@@ -15,6 +15,7 @@ import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,17 @@ import org.springframework.transaction.annotation.Transactional;
  * cascade — BR-ID-04's "assume prior sessions may be compromised" is only actually true once the
  * hosted-login-page's own {@code HttpSession} is revoked too, not just the SAS-managed token and
  * this module's own {@code Session}/{@code RefreshToken} rows.
+ *
+ * <p>SDE-III review, 2026-09-15 — TOCTOU closed: the token is now consumed via {@link
+ * VerificationTokenRepository#consumeIfActive}, a single conditional UPDATE, not {@code
+ * token.consume()} followed by a plain {@link VerificationTokenRepository#save}. The latter left a
+ * real race open — two concurrent confirm requests presenting the same still-active reset token (a
+ * double-submitted form, or an attacker racing the legitimate holder) could both pass {@link
+ * VerificationToken#isActive()} and both reset the password, each firing the full session/token
+ * revocation cascade. Same fix shape as {@code RotateRefreshTokenService}'s own {@code
+ * RefreshTokenRepository#revokeIfActive} (SDE-III review, 2026-09-14) — see that method's own
+ * Javadoc for why a conditional update, not optimistic locking, is the right primitive for a
+ * single-use resource under READ COMMITTED.
  */
 // Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
 // parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
@@ -101,8 +113,12 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       throw new InvalidVerificationTokenException();
     }
 
-    token.consume();
-    tokens.save(token);
+    // The atomic, authoritative check — the isActive() check above is only a fast-path rejection
+    // for the common case; this conditional update is what actually enforces single-use under
+    // concurrency. See this class's own Javadoc.
+    if (!tokens.consumeIfActive(token.id(), Instant.now())) {
+      throw new InvalidVerificationTokenException();
+    }
 
     final Account account =
         accounts.findById(token.accountId()).orElseThrow(InvalidVerificationTokenException::new);

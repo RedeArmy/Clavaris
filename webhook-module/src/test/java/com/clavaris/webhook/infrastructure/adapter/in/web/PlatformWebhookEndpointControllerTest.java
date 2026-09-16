@@ -17,12 +17,13 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointUseCase;
-import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
+import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedQuery;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointResult;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.RegisterWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.UnsafeWebhookUrlException;
+import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointLimitExceededException;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretResult;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
@@ -47,7 +48,7 @@ class PlatformWebhookEndpointControllerTest {
   private static final UUID OWNER_ID = UUID.randomUUID();
 
   private RegisterWebhookEndpointUseCase registerEndpoint;
-  private ListWebhookEndpointsForOrganizationUseCase listEndpoints;
+  private GetWebhookEndpointForOrganizationUseCase getEndpoint;
   private ListWebhookEndpointsForOrganizationPagedUseCase listEndpointsPaged;
   private DeactivateWebhookEndpointUseCase deactivateEndpoint;
   private ActivateWebhookEndpointUseCase activateEndpoint;
@@ -60,7 +61,7 @@ class PlatformWebhookEndpointControllerTest {
   @BeforeEach
   void setUp() {
     registerEndpoint = mock(RegisterWebhookEndpointUseCase.class);
-    listEndpoints = mock(ListWebhookEndpointsForOrganizationUseCase.class);
+    getEndpoint = mock(GetWebhookEndpointForOrganizationUseCase.class);
     listEndpointsPaged = mock(ListWebhookEndpointsForOrganizationPagedUseCase.class);
     deactivateEndpoint = mock(DeactivateWebhookEndpointUseCase.class);
     activateEndpoint = mock(ActivateWebhookEndpointUseCase.class);
@@ -72,7 +73,7 @@ class PlatformWebhookEndpointControllerTest {
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
-    when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(getEndpoint.handle(any())).thenReturn(Optional.empty());
     when(listEndpointsPaged.handle(any())).thenReturn(emptyPage());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
@@ -93,7 +94,7 @@ class PlatformWebhookEndpointControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new PlatformWebhookEndpointController(
                     registerEndpoint,
-                    listEndpoints,
+                    getEndpoint,
                     listEndpointsPaged,
                     deactivateEndpoint,
                     activateEndpoint,
@@ -248,10 +249,28 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(model().attribute("unsafeWebhookUrlError", true));
   }
 
+  // BR-WEBHOOK-08 (SDE-III review, 2026-09-15) — same "form error, not a bare status code"
+  // reasoning as createWithAnUnsafeUrlRendersAnErrorWithoutRegisteringAnything above.
+  @Test
+  void createAtTheEndpointCapRendersAnErrorWithoutRegisteringAnything() throws Exception {
+    when(registerEndpoint.handle(any()))
+        .thenThrow(new WebhookEndpointLimitExceededException(organizationId, 25));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("url", "https://example.com/webhooks/clavaris")
+                .param(
+                    "subscribedEventTypes", KnownWebhookEventTypeOptions.DASHBOARD_OPTIONS.get(0)))
+        .andExpect(status().isOk())
+        .andExpect(view().name("webhook/platform/organization-webhook-endpoints"))
+        .andExpect(model().attribute("webhookEndpointLimitExceededError", true));
+  }
+
   @Test
   void plainDeactivatePostRedirectsOnSuccess() throws Exception {
     WebhookEndpoint endpoint = sampleEndpoint();
-    when(listEndpoints.handle(any())).thenReturn(List.of(endpoint));
+    when(getEndpoint.handle(any())).thenReturn(Optional.of(endpoint));
 
     mockMvc
         .perform(post(basePath() + "/" + endpoint.id() + "/deactivate"))
@@ -263,7 +282,7 @@ class PlatformWebhookEndpointControllerTest {
 
   @Test
   void deactivateReturnsNotFoundWhenTheEndpointBelongsToADifferentOrganization() throws Exception {
-    when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(getEndpoint.handle(any())).thenReturn(Optional.empty());
 
     mockMvc
         .perform(post(basePath() + "/" + UUID.randomUUID() + "/deactivate"))
@@ -275,7 +294,7 @@ class PlatformWebhookEndpointControllerTest {
   @Test
   void plainActivatePostRedirectsOnSuccess() throws Exception {
     WebhookEndpoint endpoint = sampleEndpoint();
-    when(listEndpoints.handle(any())).thenReturn(List.of(endpoint));
+    when(getEndpoint.handle(any())).thenReturn(Optional.of(endpoint));
 
     mockMvc
         .perform(post(basePath() + "/" + endpoint.id() + "/activate"))
@@ -287,7 +306,7 @@ class PlatformWebhookEndpointControllerTest {
 
   @Test
   void activateReturnsNotFoundWhenTheEndpointBelongsToADifferentOrganization() throws Exception {
-    when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(getEndpoint.handle(any())).thenReturn(Optional.empty());
 
     mockMvc
         .perform(post(basePath() + "/" + UUID.randomUUID() + "/activate"))
@@ -300,7 +319,7 @@ class PlatformWebhookEndpointControllerTest {
   void plainRotateSecretPostRendersThePageDirectlyWithTheNewSecretNeverARedirect()
       throws Exception {
     WebhookEndpoint endpoint = sampleEndpoint();
-    when(listEndpoints.handle(any())).thenReturn(List.of(endpoint));
+    when(getEndpoint.handle(any())).thenReturn(Optional.of(endpoint));
     when(rotateEndpointSecret.handle(any()))
         .thenReturn(new RotateWebhookEndpointSecretResult(endpoint, "new-raw-secret"));
 
@@ -314,7 +333,7 @@ class PlatformWebhookEndpointControllerTest {
   @Test
   void rotateSecretReturnsNotFoundWhenTheEndpointBelongsToADifferentOrganization()
       throws Exception {
-    when(listEndpoints.handle(any())).thenReturn(List.of());
+    when(getEndpoint.handle(any())).thenReturn(Optional.empty());
 
     mockMvc
         .perform(post(basePath() + "/" + UUID.randomUUID() + "/rotate-secret"))

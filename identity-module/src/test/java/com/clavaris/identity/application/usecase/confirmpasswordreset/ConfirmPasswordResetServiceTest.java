@@ -67,6 +67,10 @@ class ConfirmPasswordResetServiceTest {
             hasher,
             outbox);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
+    // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
+    // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
+    // this stub to prove the lost-race path itself.
+    when(tokens.consumeIfActive(any(), any())).thenReturn(true);
   }
 
   private Account accountWithPassword() {
@@ -90,10 +94,10 @@ class ConfirmPasswordResetServiceTest {
 
     service.handle(new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!"));
 
-    assertThat(token.consumedAt()).isPresent();
     assertThat(account.passwordCredential().orElseThrow().passwordHash())
         .isEqualTo("argon2id$new-hash");
-    verify(tokens).save(token);
+    verify(tokens).consumeIfActive(eq(token.id()), any()); // the atomic consume
+    verify(tokens, never()).save(any()); // no plain save — the conditional update did it
     verify(accounts).save(account);
     verify(sessions).revokeAllActiveForAccount(account.id());
     verify(refreshTokens).revokeAllActiveForAccount(account.id());
@@ -160,5 +164,33 @@ class ConfirmPasswordResetServiceTest {
 
     assertThatExceptionOfType(InvalidVerificationTokenException.class)
         .isThrownBy(() -> service.handle(command));
+  }
+
+  @Test
+  void losingTheConditionalConsumeRaceIsTreatedAsAnInvalidToken() {
+    // TOCTOU regression test (SDE-III review, 2026-09-15): the read above sees an active token
+    // (unlike rejectsAnExpiredToken, where it's already inactive at read time) — the race is only
+    // observable at the conditional-update step, when a concurrent confirm request won it first.
+    // consumeIfActive returning false here is exactly that: a genuinely-concurrent winner already
+    // reset the password with this token by the time this call's UPDATE ran.
+    Account account = accountWithPassword();
+    String rawToken = "raced-reset-token";
+    VerificationToken token =
+        VerificationToken.issue(
+            account.id(),
+            VerificationTokenType.PASSWORD_RESET,
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(1800));
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any())).thenReturn(false);
+    ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand(rawToken, "a-Str0ng-Password!");
+
+    assertThatExceptionOfType(InvalidVerificationTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).save(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
   }
 }

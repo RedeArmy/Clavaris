@@ -48,10 +48,12 @@ class RotateOrganizationClientSecretController {
       @PathVariable final String clientId, final Authentication authentication) {
     final RotateOrganizationClientSecretResult result;
     try {
+      // organizationId deliberately null — same rationale as
+      // DeactivateOrganizationClientController's own identical call.
       result =
           useCase.handle(
               new RotateOrganizationClientSecretCommand(
-                  clientId, AuditActor.platformClient(authentication.getName())));
+                  clientId, null, AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationClientNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final ConcurrentClientModificationException _) {

@@ -37,6 +37,11 @@ public class RotateOrganizationClientSecretService
     final OrganizationClient existing =
         organizationClients
             .findByClientId(command.clientId())
+            // Same rationale as DeactivateOrganizationClientService's own identical check.
+            .filter(
+                found ->
+                    command.organizationId() == null
+                        || found.organizationId().equals(command.organizationId()))
             .orElseThrow(() -> new OrganizationClientNotFoundException(command.clientId()));
 
     final String rawSecret = secretGenerator.generate();

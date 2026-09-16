@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -19,6 +20,7 @@ import com.clavaris.identity.domain.model.PlatformSocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -141,5 +143,14 @@ class AuthenticatePlatformAccountWithSocialProviderServiceContractTest
   @Override
   protected void verifyAPendingLinkWasSaved() {
     verify(pendingLinks).save(any());
+  }
+
+  @Override
+  protected void verifyANeverSurfacedPasswordCredentialWasAttachedToTheNewAccount() {
+    ArgumentCaptor<PlatformAccount> savedAccount = ArgumentCaptor.forClass(PlatformAccount.class);
+    verify(accounts).insert(savedAccount.capture());
+    assertThat(savedAccount.getValue().passwordCredential())
+        .as("TD-FUT-030: same guarantee as the tenant-tier sibling")
+        .isPresent();
   }
 }

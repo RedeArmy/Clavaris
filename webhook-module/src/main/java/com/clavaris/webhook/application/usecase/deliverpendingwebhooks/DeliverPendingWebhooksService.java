@@ -11,10 +11,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +61,17 @@ import org.slf4j.LoggerFactory;
  * com.clavaris.webhook.infrastructure.config.WebhookDispatchScheduler} relies on nothing changing
  * here), but a slow endpoint's own cost is now bounded by the pool size, not multiplied across the
  * whole batch.
+ *
+ * <p><b>SDE-III review, 2026-09-15 — real N+1 found and closed:</b> {@link #deliverDueDeliveries}
+ * used to call {@code endpoints.findById(delivery.endpointId())} once per claimed delivery — up to
+ * {@code batchSize} (50 by default) individual {@code SELECT}s every tick, even though several
+ * deliveries in the same batch commonly target the same endpoint (a burst of events fanned out to
+ * one subscriber, or several retries queued together). Now fetches every distinct endpoint in the
+ * batch with one {@link WebhookEndpointRepository#findAllByIds} call before the per-delivery work
+ * starts, the same "batch-fetch once per distinct key, not once per row" fix {@code
+ * DispatchOutboxEventsService}'s own {@code findActiveByOrganizationId} memoization (TD-PERF-005)
+ * already applies to this module's other N+1-shaped loop, one layer up (by Organization instead of
+ * by endpoint).
  */
 public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseCase {
 
@@ -98,17 +112,36 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   // throw ExecutionException in practice, only defensively handled.
   @Override
   public void deliverDueDeliveries() {
+    final List<WebhookDelivery> claimed = deliveries.claimDueBatch(batchSize);
+    final Map<UUID, WebhookEndpoint> endpointsById = fetchEndpointsById(claimed);
+    // <Future<?>> explicit type witness: a lambda body (unlike the plain method reference this
+    // replaced) triggers javac's own wildcard-capture inference on submitDelivery's return type,
+    // narrowing it to Future<capture-of-?> — incompatible with the List<Future<?>> this class's
+    // own field/method signatures use. The witness forces the type this method already declares.
     final List<Future<?>> tasks =
-        deliveries.claimDueBatch(batchSize).stream().map(this::submitDelivery).toList();
+        claimed.stream()
+            .<Future<?>>map(delivery -> submitDelivery(delivery, endpointsById))
+            .toList();
     awaitAll(tasks);
   }
 
-  // Explicit Future<?> return type, not inlined into deliverDueDeliveries' own stream pipeline —
-  // javac's own wildcard-capture inference otherwise narrows a lambda-returned
-  // ExecutorService#submit(Runnable) result to Future<capture-of-?>, incompatible with the
-  // List<Future<?>> this class's own field/method signatures use.
-  private Future<?> submitDelivery(final WebhookDelivery delivery) {
-    return deliveryExecutor.submit(() -> attemptOneDeliveryIsolated(delivery));
+  // SDE-III review, 2026-09-15: one query for every distinct endpointId in the claimed batch — see
+  // this class's own Javadoc for the N+1 this closes. An empty claimed batch never reaches here
+  // (deliverDueDeliveries' own stream would just map over nothing), but findAllByIds handles an
+  // empty id set fine regardless — no special-casing needed.
+  private Map<UUID, WebhookEndpoint> fetchEndpointsById(final List<WebhookDelivery> claimed) {
+    final List<UUID> endpointIds =
+        claimed.stream().map(WebhookDelivery::endpointId).distinct().toList();
+    return endpoints.findAllByIds(endpointIds).stream()
+        .collect(Collectors.toMap(WebhookEndpoint::id, Function.identity()));
+  }
+
+  // Explicit Future<?> return type — same wildcard-capture reasoning deliverDueDeliveries' own
+  // type witness above already documents, one layer down: ExecutorService#submit(Runnable)'s own
+  // inferred return type needs this method to pin it down explicitly.
+  private Future<?> submitDelivery(
+      final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
+    return deliveryExecutor.submit(() -> attemptOneDeliveryIsolated(delivery, endpointsById));
   }
 
   // PMD.AvoidCatchingGenericException: deliberate — see this class's own Javadoc ("SDE-III
@@ -117,9 +150,10 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   // PMD.GuardLogStatement: same false-positive rationale as attemptOneDelivery's own identical
   // suppression.
   @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.GuardLogStatement"})
-  private void attemptOneDeliveryIsolated(final WebhookDelivery delivery) {
+  private void attemptOneDeliveryIsolated(
+      final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
     try {
-      attemptOneDelivery(delivery);
+      attemptOneDelivery(delivery, endpointsById);
     } catch (final RuntimeException e) {
       // Left exactly where claimDueBatch's own lease already put it — see this class's own
       // Javadoc for why that's the correct, already-established recovery path, not a gap this
@@ -164,8 +198,10 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   // ActiveSecretsEncrypted's own identical suppression documents. PMD.LongVariable:
   // attemptCountAfterThisFailure names exactly what it is, not arbitrarily long.
   @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn", "PMD.LongVariable"})
-  private void attemptOneDelivery(final WebhookDelivery delivery) {
-    final Optional<WebhookEndpoint> endpoint = endpoints.findById(delivery.endpointId());
+  private void attemptOneDelivery(
+      final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
+    final Optional<WebhookEndpoint> endpoint =
+        Optional.ofNullable(endpointsById.get(delivery.endpointId()));
     if (endpoint.isEmpty()) {
       // No hard-delete use case exists for WebhookEndpoint (deactivate/reactivate only) — this
       // should never happen in practice, but a delivery whose endpoint has vanished has nowhere

@@ -3,10 +3,10 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientCommand;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientResult;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientUseCase;
+import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationNotFoundException;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
-import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretCommand;
@@ -20,7 +20,6 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -39,9 +38,8 @@ import org.springframework.web.server.ResponseStatusException;
  * minting, listing, deactivating, and rotating the secret of an Organization's own {@code
  * OrganizationClient}s. Every write here goes through the exact same use cases {@code
  * /api/v1/admin/**} already exposes ({@link CreateOrganizationClientUseCase}, {@link
- * DeactivateOrganizationClientUseCase}, {@link RotateOrganizationClientSecretUseCase}) plus the
- * already-scoped {@link ListOrganizationClientsUseCase} — this controller adds a second,
- * session-authenticated caller, not a second implementation. See {@code
+ * DeactivateOrganizationClientUseCase}, {@link RotateOrganizationClientSecretUseCase}) — this
+ * controller adds a second, session-authenticated caller, not a second implementation. See {@code
  * CreateOrganizationClientCommand}'s own Javadoc for why an {@link AuditActor#platformAccount}
  * actor on this path is a deliberate widening of an established precedent ({@code
  * CreateWorkspaceCommand}'s own), not an oversight.
@@ -49,12 +47,12 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver} — never
  * a bare repository call — so an organizationId this {@code PlatformAccount} doesn't own resolves
  * identically to "doesn't exist" (a 404), same anti-enumeration posture as organization-module's
- * own dashboard controllers. Neither {@link DeactivateOrganizationClientCommand} nor {@link
- * RotateOrganizationClientSecretCommand} carries an {@code organizationId} of its own (both key off
- * the client's own {@code clientId} string) — this controller resolves the target {@link
- * OrganizationClient} via the already-organizationId-scoped {@link ListOrganizationClientsUseCase}
- * first, so a {@code clientId} belonging to a different Organization 404s before either mutating
- * use case is ever called, not after.
+ * own dashboard controllers. {@link DeactivateOrganizationClientCommand}/{@link
+ * RotateOrganizationClientSecretCommand} both now carry that same {@code organizationId} through to
+ * the use case itself (SDE-III review, 2026-09-15) — a {@code clientId} belonging to a different
+ * Organization 404s from {@code DeactivateOrganizationClientService}/{@code
+ * RotateOrganizationClientSecretService}'s own thrown {@link OrganizationClientNotFoundException},
+ * not from a separate web-layer list-then-check this controller used to have to do itself.
  *
  * <p>Unlike every other dashboard controller in this codebase, a successful create/rotate never
  * redirects, even for a plain (non-HTMX) form submit: {@link
@@ -83,25 +81,26 @@ public class PlatformOrganizationClientController {
   private static final String ALL_SCOPES_ATTRIBUTE = "allScopes";
 
   private final CreateOrganizationClientUseCase createClient;
-  private final ListOrganizationClientsUseCase listClients;
   private final ListOrganizationClientsPagedUseCase listClientsPaged;
   private final DeactivateOrganizationClientUseCase deactivateClient;
   private final RotateOrganizationClientSecretUseCase rotateClientSecret;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other multi-collaborator constructor in this codebase.
+  // SDE-III review, 2026-09-15: ListOrganizationClientsUseCase dropped — it existed on this
+  // controller purely to back the former requireClientIdBelongsToOrganization workaround (see
+  // DeactivateOrganizationClientCommand's own Javadoc for the web-layer-only check it replaced),
+  // now enforced by DeactivateOrganizationClientService/RotateOrganizationClientSecretService
+  // themselves. One parameter per remaining collaborating port — same rationale as every other
+  // multi-collaborator constructor in this codebase.
   public PlatformOrganizationClientController(
       final CreateOrganizationClientUseCase createClient,
-      final ListOrganizationClientsUseCase listClients,
       final ListOrganizationClientsPagedUseCase listClientsPaged,
       final DeactivateOrganizationClientUseCase deactivateClient,
       final RotateOrganizationClientSecretUseCase rotateClientSecret,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.createClient = createClient;
-    this.listClients = listClients;
     this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
     this.rotateClientSecret = rotateClientSecret;
@@ -165,16 +164,25 @@ public class PlatformOrganizationClientController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final CreateOrganizationClientForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
-    final UUID ownerPlatformAccountId = owned.ownerPlatformAccountId();
-
-    final Optional<String> validationErrorView =
-        renderSecretKeysValidationErrors(request, organizationId, owned, bindingResult, model);
-    if (validationErrorView.isPresent()) {
-      return validationErrorView.get();
+    // CPD-OFF: genuinely irreducible call-site wiring, not duplicated business logic — same
+    // rationale as PlatformOAuthClientController#create's own identical marker.
+    final DashboardControllerSupport.OwnershipOrValidationErrorView resolved =
+        DashboardControllerSupport.requireOwnedOrganizationOrRenderValidationErrors(
+            request,
+            organizationId,
+            currentPlatformAccount,
+            organizationResolver,
+            bindingResult,
+            owned -> {
+              populateHeaderModel(model, organizationId, owned.organizationName());
+              populateClientsModel(model, organizationId, KeysetPageRequest.first());
+            },
+            new DashboardControllerSupport.PaginatedViewNames(CLIENTS_FRAGMENT, LIST_VIEW));
+    if (resolved.validationErrorView().isPresent()) {
+      return resolved.validationErrorView().get();
     }
+    final UUID ownerPlatformAccountId = resolved.owned().ownerPlatformAccountId();
+    // CPD-ON
 
     final CreateOrganizationClientResult result;
     try {
@@ -201,7 +209,7 @@ public class PlatformOrganizationClientController {
     model.addAttribute("justCreatedRawSecret", result.rawClientSecret());
     model.addAttribute("justCreatedClientId", result.organizationClient().clientId());
     renderSecretKeysList(
-        model, organizationId, owned.organizationName(), KeysetPageRequest.first());
+        model, organizationId, resolved.owned().organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
   }
 
@@ -215,12 +223,22 @@ public class PlatformOrganizationClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        requireOwnedSecretKey(request, organizationId, clientId);
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
 
+    // SDE-III review, 2026-09-15: organizationId now passed through and verified by
+    // DeactivateOrganizationClientService itself, replacing the former web-layer-only
+    // requireClientIdBelongsToOrganization workaround (see that command's own Javadoc) — a bogus
+    // or cross-tenant clientId now 404s from the service's own thrown exception instead of a
+    // pre-check here.
     try {
       deactivateClient.handle(
           new DeactivateOrganizationClientCommand(
-              clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+              clientId,
+              organizationId,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final OrganizationClientNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final ConcurrentClientModificationException _) {
       // SDE-III review, 2026-09-15: OrganizationClient's own @Version-backed conflict — see
       // ConcurrentClientModificationException's own Javadoc for the lost-update race this closes.
@@ -243,14 +261,20 @@ public class PlatformOrganizationClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        requireOwnedSecretKey(request, organizationId, clientId);
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
 
+    // SDE-III review, 2026-09-15: same organizationId pass-through as deactivate() above.
     final RotateOrganizationClientSecretResult result;
     try {
       result =
           rotateClientSecret.handle(
               new RotateOrganizationClientSecretCommand(
-                  clientId, AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+                  clientId,
+                  organizationId,
+                  AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (final OrganizationClientNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final ConcurrentClientModificationException _) {
       throw new ResponseStatusException(HttpStatus.CONFLICT);
     }
@@ -260,43 +284,6 @@ public class PlatformOrganizationClientController {
     renderSecretKeysList(
         model, organizationId, owned.organizationName(), KeysetPageRequest.first());
     return DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW;
-  }
-
-  // create()'s own preamble-plus-validation-error-branch matched
-  // PlatformOAuthClientController#create's identical shape once every identifier involved
-  // (CLIENTS_FRAGMENT/LIST_VIEW/populateHeaderModel/populateClientsModel) crossed the 10-line
-  // SonarCloud threshold — same class-local, distinctly-named-per-controller fix as
-  // requireOwnedSecretKey above. Optional<String>, not a plain early return, since the caller
-  // still owns the method's real early exit. PMD.OnlyOneReturn: the empty/present split is the
-  // point of the method, same rationale as every other multi-exit handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
-  private Optional<String> renderSecretKeysValidationErrors(
-      final HttpServletRequest request,
-      final UUID organizationId,
-      final DashboardControllerSupport.OwnedOrganization owned,
-      final BindingResult bindingResult,
-      final Model model) {
-    if (!bindingResult.hasErrors()) {
-      return Optional.empty();
-    }
-    populateHeaderModel(model, organizationId, owned.organizationName());
-    populateClientsModel(model, organizationId, KeysetPageRequest.first());
-    return Optional.of(
-        DashboardControllerSupport.isHtmxRequest(request) ? CLIENTS_FRAGMENT : LIST_VIEW);
-  }
-
-  // deactivate()/rotateSecret() both need "who owns this Organization, and does clientId
-  // actually belong to it" before touching anything — SonarCloud-flagged intra-class
-  // duplication (2026-09-13) once both call sites landed with the identical 6-line preamble.
-  private DashboardControllerSupport.OwnedOrganization requireOwnedSecretKey(
-      final HttpServletRequest request, final UUID organizationId, final String clientId) {
-    final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
-    DashboardControllerSupport.requireClientIdBelongsToOrganization(
-        listClients.handle(organizationId).stream().map(OrganizationClient::clientId).toList(),
-        clientId);
-    return owned;
   }
 
   private void populateHeaderModel(

@@ -208,7 +208,7 @@ class ImpersonateAccountIntegrationTest extends RedisBackedIntegrationTest {
         registerAccount(organizationId, "deactivated-client@example.com", "a-correct-password");
     deactivateOAuthClient.handle(
         new DeactivateOAuthClientCommand(
-            client.clientId(), AuditActor.platformClient("test-platform-client")));
+            client.clientId(), organizationId, AuditActor.platformClient("test-platform-client")));
 
     HttpResponse<String> response = impersonate(platformToken, accountId, client.clientId(), "[]");
 

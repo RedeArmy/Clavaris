@@ -8,6 +8,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.persistence.EntityManager;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -76,8 +77,24 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   }
 
   @Override
+  public List<WebhookEndpoint> findAllByIds(final Collection<UUID> ids) {
+    return endpoints.findAllById(ids).stream().map(this::toDomain).toList();
+  }
+
+  @Override
   public List<WebhookEndpoint> findAllByOrganizationId(final UUID organizationId) {
     return endpoints.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
+  }
+
+  @Override
+  public Optional<WebhookEndpoint> findByIdAndOrganizationId(
+      final UUID id, final UUID organizationId) {
+    return endpoints.findByIdAndOrganizationId(id, organizationId).map(this::toDomain);
+  }
+
+  @Override
+  public long countByOrganizationId(final UUID organizationId) {
+    return endpoints.countByOrganizationId(organizationId);
   }
 
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning

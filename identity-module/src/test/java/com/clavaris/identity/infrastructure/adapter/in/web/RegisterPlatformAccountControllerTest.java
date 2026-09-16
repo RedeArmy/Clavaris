@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -16,6 +17,7 @@ import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordExc
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountEmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountCommand;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.Email;
@@ -92,6 +94,29 @@ class RegisterPlatformAccountControllerTest {
                 new Email("founder@example.com"), "a-valid-password"));
     verify(requestEmailVerification)
         .handle(new RequestPlatformAccountEmailVerificationCommand(accountId));
+  }
+
+  // SDE-III review, 2026-09-16 — real bug found live: before this fix, a MailDeliveryException
+  // here (e.g. an unset/invalid RESEND_API_KEY) propagated unguarded, leaving the caller with an
+  // unhandled 500 even though the account was already created — the exact "nothing happens, then
+  // 'already registered' on retry" symptom reported against a running instance. This proves the
+  // account still reaches its own success redirect regardless.
+  @Test
+  void stillRedirectsToPendingVerificationWhenTheVerificationEmailFailsToSend() throws Exception {
+    PlatformAccountId accountId = PlatformAccountId.newId();
+    when(useCase.handle(any())).thenReturn(accountId);
+    doThrow(new MailDeliveryException("Resend responded with status 401"))
+        .when(requestEmailVerification)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post("/platform/register")
+                .param("email", "founder@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/platform/register/pending-verification"));
   }
 
   @Test
