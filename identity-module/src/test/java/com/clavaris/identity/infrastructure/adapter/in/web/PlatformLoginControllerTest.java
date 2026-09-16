@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -74,6 +76,21 @@ class PlatformLoginControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/login"))
         .andExpect(model().attributeExists("form"));
+  }
+
+  // SDE-III review, 2026-09-16 — social-provider brand icons: this tier's own pair is always
+  // Google+GitHub (ADR-0020 Decision 2), never tenant-configurable, so both icons are expected on
+  // every render, not gated behind a mocked policy the way LoginControllerTest's own identical
+  // test needs to be.
+  @Test
+  void getRendersBothProviderIconsNextToTheirSignInButtons() throws Exception {
+    mockMvc
+        .perform(get("/platform/login"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("viewBox=\"0 0 48 48\"")))
+        .andExpect(content().string(containsString("Sign in with Google")))
+        .andExpect(content().string(containsString("viewBox=\"0 0 16 16\"")))
+        .andExpect(content().string(containsString("Sign in with GitHub")));
   }
 
   @Test

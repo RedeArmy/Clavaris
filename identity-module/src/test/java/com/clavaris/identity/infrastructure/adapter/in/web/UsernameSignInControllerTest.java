@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,6 +25,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -218,5 +220,30 @@ class UsernameSignInControllerTest {
 
     verify(sessions, never()).establish(any(), any(), any(), any());
     verify(requestDeviceTrustChallenge).handle(any());
+  }
+
+  // Same rationale as LoginControllerTest's own identical test.
+  @Test
+  void aDeviceTrustChallengeThatCannotBeSentRerendersTheFormWithAServiceUnavailableError()
+      throws Exception {
+    Account account = newAccount();
+    when(useCase.handle(any())).thenReturn(account);
+    when(authenticationPolicyProvider.policyFor(any()))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false, EmailVerificationMethod.LINK, false, false, true, false, true, true, true));
+    when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
+    doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/username", ORGANIZATION_ID)
+                .param("username", "flowuser")
+                .param("password", "correct-password"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(view().name("identity/login-username"))
+        .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
+
+    verify(sessions, never()).establish(any(), any(), any(), any());
   }
 }

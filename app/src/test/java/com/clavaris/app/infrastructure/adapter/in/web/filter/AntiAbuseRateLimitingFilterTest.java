@@ -220,4 +220,73 @@ class AntiAbuseRateLimitingFilterTest {
         .doesNotContain("login:account", "user@example.com")
         .contains("Too many requests");
   }
+
+  @Test
+  void respondsWithPlainTextByDefaultForANonBrowserCaller() throws Exception {
+    RateLimiter rateLimiter = mock(RateLimiter.class);
+    when(rateLimiter.tryConsume(any(), anyInt(), any()))
+        .thenReturn(new RateLimitDecision(false, 99, Duration.ofSeconds(5)));
+    AntiAbuseRateLimitingFilter filter =
+        new AntiAbuseRateLimitingFilter(
+            rateLimiter,
+            KEY_HASHER,
+            List.of(
+                new RateLimitRule(
+                    "login:account",
+                    HttpMethod.POST,
+                    "/o/*/login",
+                    RateLimitRule.always(),
+                    RateLimitIdentifiers::emailFormField,
+                    10,
+                    Duration.ofMinutes(5))));
+    // No Accept header at all — the real shape of an API/service-to-service caller (/oauth2/token
+    // is this filter's other real caller), same default a fresh MockHttpServletRequest already
+    // has unless a test sets one explicitly.
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/o/some-org/login");
+    request.setParameter("email", "user@example.com");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, new MockFilterChain());
+
+    assertThat(response.getContentType()).isEqualTo("text/plain;charset=UTF-8");
+    assertThat(response.getContentAsString()).doesNotContain("<html", "clavaris-card");
+  }
+
+  // SDE-III review, 2026-09-16: this filter also protects /o/*/login — a real browser hitting it
+  // mid sign-in used to get a bare, unstyled text/plain body instead of a page matching every
+  // other page on this same origin (see AntiAbuseRateLimitingFilter's own comment on
+  // respondTooManyRequests for the full rationale).
+  @Test
+  void respondsWithAStyledHtmlPageForABrowserRequest() throws Exception {
+    RateLimiter rateLimiter = mock(RateLimiter.class);
+    when(rateLimiter.tryConsume(any(), anyInt(), any()))
+        .thenReturn(new RateLimitDecision(false, 99, Duration.ofSeconds(5)));
+    AntiAbuseRateLimitingFilter filter =
+        new AntiAbuseRateLimitingFilter(
+            rateLimiter,
+            KEY_HASHER,
+            List.of(
+                new RateLimitRule(
+                    "login:account",
+                    HttpMethod.POST,
+                    "/o/*/login",
+                    RateLimitRule.always(),
+                    RateLimitIdentifiers::emailFormField,
+                    10,
+                    Duration.ofMinutes(5))));
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/o/some-org/login");
+    request.setParameter("email", "user@example.com");
+    request.addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, new MockFilterChain());
+
+    assertThat(response.getStatus()).isEqualTo(429);
+    assertThat(response.getContentType()).isEqualTo("text/html;charset=UTF-8");
+    assertThat(response.getContentAsString())
+        .contains("clavaris-card")
+        .contains("/css/clavaris.css")
+        .contains("Too many requests")
+        .doesNotContain("login:account", "user@example.com");
+  }
 }

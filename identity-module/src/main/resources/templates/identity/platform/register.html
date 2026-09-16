@@ -19,7 +19,10 @@
 
             <div class="clavaris-field">
                 <label for="password">Password</label>
-                <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required/>
+                <!-- Same rationale as register.html's own identical fields. -->
+                <input id="password" type="password" th:field="*{password}" autocomplete="new-password"
+                       minlength="8" maxlength="128" required/>
+                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('password')}">8–128 characters</p>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Password error</p>
             </div>
 
@@ -31,6 +34,22 @@
 
             <button class="clavaris-button" type="submit">Create account</button>
         </form>
+
+        <!-- ADR-0020 Decision 2: Clavaris's own Sign Up is Google/GitHub/email, all three permanently
+             available — same "always on, never tenant-configurable" shape login.html's own identical
+             block already establishes for this tier. A first-time click here creates the
+             PlatformAccount and logs in immediately (AuthenticatePlatformAccountWithSocialProviderService's
+             own "brand-new signup" branch) — this is the same target login.html's own social buttons
+             use, not a separate sign-up flow. -->
+        <div class="clavaris-divider">Or</div>
+        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
+            <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
+            <span>Sign up with Google</span>
+        </a></p>
+        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
+            <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
+            <span>Sign up with GitHub</span>
+        </a></p>
 
         <p class="clavaris-links"><a th:href="@{login}">Already have an account? Sign in</a></p>
     </div>

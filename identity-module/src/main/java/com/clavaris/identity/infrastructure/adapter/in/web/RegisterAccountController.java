@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -18,7 +19,11 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,14 +64,33 @@ import org.springframework.web.bind.annotation.RequestParam;
  * identically-shaped failure. Deliberately NOT applied to {@link #completePasswordlessSignUp} below
  * — there, the email/link send is the entire completion mechanism, not a side notification, per
  * that class's own Javadoc; the caller genuinely needs to know whether it went through.
+ *
+ * <p>SDE-III review, 2026-09-16 — sign-up-with-Google/GitHub buttons added: {@code
+ * AuthenticateWithSocialProviderService}'s own three-way linking decision already treats a
+ * first-time social login as account creation ("a brand-new signup: create both atomically and log
+ * in immediately") — the exact "sign in with Google" pattern MAANG-style systems use to double as
+ * "sign up with Google" for a never-before-seen identity. That flow already existed and was already
+ * reachable from {@link LoginController}'s own hosted page; this page simply never linked to it.
+ * {@link #addSignUpOptions} now surfaces the same {@code socialProviders} model attribute {@code
+ * LoginController#addSignInOptions} does, read by {@code register.html}'s own new social-provider
+ * block (a straight copy of {@code login.html}'s own — same {@link
+ * SocialLoginRedirectController#forOrganization} target, same re-verification of {@link
+ * OrganizationSocialLoginPolicyProvider} there before any third-party redirect, same
+ * anti-enumeration posture). No new use case, no new controller — reuses the sign-in flow verbatim,
+ * since signing up and signing in via a social provider are structurally the same request here.
  */
 // PMD.LongVariable: requestEmailVerification/requestEmailSignInCode/requestEmailSignInLink each
 // name exactly which passwordless completion path they trigger — TD-SEC-004's own original
-// rationale, extended to its two new siblings. PMD.ExcessiveImports: this class's own SDE-III
-// review addendum above's MailDeliveryException/Logger/LoggerFactory pushed this past the default
-// threshold of 30 — every import here backs a real, distinct collaborator this controller
-// genuinely needs, same "wiring, not sprawl" reasoning this codebase applies elsewhere.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// rationale, extended to its two new siblings, now also socialLoginPolicyProvider.
+// PMD.ExcessiveImports:
+// this class's own SDE-III review addendum above's MailDeliveryException/Logger/LoggerFactory
+// pushed this past the default threshold of 30 — every import here backs a real, distinct
+// collaborator this controller genuinely needs, same "wiring, not sprawl" reasoning this codebase
+// applies elsewhere. PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself,
+// used on several descriptively-named fields/parameters — same rationale identity-module's own
+// IdentityUseCaseConfig class-level suppression documents for this exact
+// PMD-annotation-string-as-literal false positive.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
 @Controller
 @RequestMapping("/o/{organizationId}/register")
 public class RegisterAccountController {
@@ -79,11 +103,24 @@ public class RegisterAccountController {
   // constant, not three repeated literals.
   private static final String REDIRECT_ORGANIZATION_PREFIX = "redirect:/o/";
 
+  // SonarCloud S1192: not just a duplicate-literal fix — "email"/"username" name the same concept
+  // in every one of their uses below (the bindingResult field, the redirect query param, the model
+  // attribute), so one constant each is more honest about that than three/four independently-typed
+  // copies that could silently drift apart (a typo in one becoming a field error Thymeleaf can no
+  // longer match to the right input).
+  private static final String EMAIL = "email";
+  private static final String USERNAME = "username";
+
   private final RegisterAccountUseCase useCase;
   private final RequestEmailVerificationUseCase requestEmailVerification;
   private final AccountAuthenticationPolicyProvider policyProvider;
   private final RequestEmailSignInCodeUseCase requestEmailSignInCode;
   private final RequestEmailSignInLinkUseCase requestEmailSignInLink;
+
+  // Same port LoginController's own identical field already uses — no new abstraction, this
+  // controller just now also reads it.
+  @SuppressWarnings("PMD.LongVariable")
+  private final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
 
   @SuppressWarnings({"java:S107", "PMD.LongVariable"})
   public RegisterAccountController(
@@ -91,12 +128,15 @@ public class RegisterAccountController {
       final RequestEmailVerificationUseCase requestEmailVerification,
       final AccountAuthenticationPolicyProvider policyProvider,
       final RequestEmailSignInCodeUseCase requestEmailSignInCode,
-      final RequestEmailSignInLinkUseCase requestEmailSignInLink) {
+      final RequestEmailSignInLinkUseCase requestEmailSignInLink,
+      @SuppressWarnings("PMD.LongVariable")
+          final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider) {
     this.useCase = useCase;
     this.requestEmailVerification = requestEmailVerification;
     this.policyProvider = policyProvider;
     this.requestEmailSignInCode = requestEmailSignInCode;
     this.requestEmailSignInLink = requestEmailSignInLink;
+    this.socialLoginPolicyProvider = socialLoginPolicyProvider;
   }
 
   @GetMapping
@@ -157,21 +197,44 @@ public class RegisterAccountController {
       // Never leaks the low-level exception message (which includes the raw organizationId
       // UUID) to the rendered page — a generic, field-scoped error only.
       bindingResult.rejectValue(
-          "email", "email.alreadyRegistered", "This email is already registered");
+          EMAIL, "email.alreadyRegistered", "This email is already registered");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (WeakPasswordException _) {
+      // SDE-III review, 2026-09-16: same rationale as ResetPasswordController's own identical
+      // fix — states the actual rule instead of a vague "doesn't meet the minimum requirements".
       bindingResult.rejectValue(
-          "password", "password.tooWeak", "Password does not meet the minimum requirements");
+          "password",
+          "password.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (UsernameRequiredException _) {
-      bindingResult.rejectValue("username", "username.required", "Username is required");
+      bindingResult.rejectValue(USERNAME, "username.required", "Username is required");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (UsernameAlreadyRegisteredException _) {
       bindingResult.rejectValue(
-          "username", "username.alreadyRegistered", "This username is already taken");
+          USERNAME, "username.alreadyRegistered", "This username is already taken");
+      addSignUpOptions(organizationId, model);
+      return FORM_VIEW;
+    } catch (final IllegalArgumentException _) {
+      // SDE-III review, 2026-09-16: real gap found live. Username's own domain constructor
+      // rejects a shape the form's own maximum-length check alone does not catch, such as a
+      // too-short value or one containing anything besides letters, digits, underscore, or
+      // hyphen. That form field's own comment already explains why the shape check is
+      // deliberately not duplicated there. Nothing here caught this exception, so it used to
+      // reach this method as an unhandled server error on sign-up instead of a field-level
+      // message. UsernameSignInController already had the matching catch on the sign-in side.
+      // This closes the same gap on the sign-up side.
+      bindingResult.rejectValue(
+          USERNAME,
+          "username.invalid",
+          "Username must be 3-32 characters (letters, digits, underscore, hyphen only)");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     }
@@ -194,7 +257,14 @@ public class RegisterAccountController {
       LOG.warn("event=account_registered_verification_email_send_failed", e);
     }
 
-    return REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
+    // MAANG "check your email" parity (Clerk/Auth0/Okta all confirm which address, not just that
+    // one was sent): same RedirectQueryParams-mediated hop as completePasswordlessSignUp's own
+    // email param below — never string-concatenated directly, same header/query-injection rationale
+    // RedirectQueryParams's own Javadoc documents.
+    String target =
+        REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
+    target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
+    return target;
   }
 
   // Two genuinely distinct exits (email-code vs. email-link completion) — same "one exit per
@@ -222,7 +292,7 @@ public class RegisterAccountController {
       // RedirectQueryParams like every other param on this hop, not concatenated directly. See
       // RedirectQueryParams's own Javadoc for the header/query injection primitive this closes.
       String target = REDIRECT_ORGANIZATION_PREFIX + organizationId + "/login/email-code/confirm";
-      target = RedirectQueryParams.appendIfPresent(target, "email", form.getEmail());
+      target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
       target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
       target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
       return target;
@@ -238,15 +308,28 @@ public class RegisterAccountController {
   }
 
   @GetMapping("/pending-verification")
-  public String pendingVerification() {
+  public String pendingVerification(
+      // Optional, never trusted for anything but display (see RedirectQueryParams's own Javadoc) —
+      // a direct GET with no query string still renders the page, just without the personalized
+      // "we sent it to X" line below.
+      @RequestParam(required = false) final String email, final Model model) {
+    model.addAttribute(EMAIL, email);
     return "identity/register-pending-verification";
   }
 
   private void addSignUpOptions(final UUID organizationId, final Model model) {
-    final AccountAuthenticationPolicySnapshot policy =
-        policyProvider.policyFor(new OrganizationId(organizationId));
+    final OrganizationId orgId = new OrganizationId(organizationId);
+    final AccountAuthenticationPolicySnapshot policy = policyProvider.policyFor(orgId);
     model.addAttribute("usernameSignUpEnabled", policy.usernameSignUpEnabled());
     model.addAttribute("usernameRequired", policy.usernameRequired());
     model.addAttribute("passwordAtSignUpEnabled", policy.passwordAtSignUpEnabled());
+
+    // Same ADR-0020 Decision 3/BR-ID-12 "computed fresh on every render" posture as
+    // LoginController#addSignInOptions's own identical block — this page's own social-provider
+    // buttons must reflect exactly the same allowed-providers set the sign-in page does, since
+    // they resolve to the same underlying flow.
+    final List<SocialProvider> enabledSocialProviders =
+        new ArrayList<>(socialLoginPolicyProvider.allowedProviders(orgId));
+    model.addAttribute("socialProviders", enabledSocialProviders);
   }
 }

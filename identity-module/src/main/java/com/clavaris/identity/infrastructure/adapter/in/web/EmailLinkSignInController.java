@@ -10,6 +10,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -125,7 +126,8 @@ public class EmailLinkSignInController {
       @Valid @ModelAttribute("form") final AuthenticateWithEmailLinkForm form,
       final BindingResult bindingResult,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final HttpServletResponse response,
+      final Model model) {
     if (bindingResult.hasErrors()) {
       return "identity/verification-link-invalid";
     }
@@ -140,23 +142,36 @@ public class EmailLinkSignInController {
       return "identity/verification-link-invalid";
     }
 
-    final Optional<String> challenge =
-        DeviceTrustGate.intercept(
-            knownDevices,
-            requestDeviceTrustChallenge,
-            authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
-            request,
-            organizationId,
-            account.id(),
-            PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
-            // Clerk "customize redirect URLs" parity: deliberately not wired for this controller
-            // yet — the confirm step here is reached via an emailed link, potentially on a
-            // different device/session than the original request, so clientId/redirectUrl can't
-            // simply ride the query string the way every same-session flow does; carrying them
-            // would require persisting them onto the VerificationToken itself. Scoped out of this
-            // pass, not silently dropped — see RequestEmailSignInLinkService's own package.
-            null,
-            null);
+    final Optional<String> challenge;
+    try {
+      challenge =
+          DeviceTrustGate.intercept(
+              knownDevices,
+              requestDeviceTrustChallenge,
+              authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
+              request,
+              organizationId,
+              account.id(),
+              PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+              // Clerk "customize redirect URLs" parity: deliberately not wired for this controller
+              // yet — the confirm step here is reached via an emailed link, potentially on a
+              // different device/session than the original request, so clientId/redirectUrl can't
+              // simply ride the query string the way every same-session flow does; carrying them
+              // would require persisting them onto the VerificationToken itself. Scoped out of this
+              // pass, not silently dropped — see RequestEmailSignInLinkService's own package.
+              null,
+              null);
+    } catch (final MailDeliveryException _) {
+      // Same rationale as LoginController's own identical catch block, with one difference: the
+      // link this POST just authenticated with is already single-use-consumed (see
+      // AuthenticateWithEmailLinkUseCase), so re-rendering CONFIRM_FORM_VIEW for a retry would only
+      // fail again with InvalidSignInLinkException — the only genuine way forward is a fresh link,
+      // so this re-renders REQUEST_FORM_VIEW instead, same view showRequestForm renders.
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      model.addAttribute("form", new RequestEmailSignInLinkForm());
+      model.addAttribute("deviceTrustChallengeUnavailable", true);
+      return REQUEST_FORM_VIEW;
+    }
     if (challenge.isPresent()) {
       return REDIRECT_PREFIX + challenge.get();
     }

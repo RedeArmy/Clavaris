@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -73,6 +75,18 @@ class RegisterPlatformAccountControllerTest {
         .andExpect(model().attributeExists("form"));
   }
 
+  // Same rationale as PlatformLoginControllerTest's own identical test.
+  @Test
+  void getRendersBothProviderIconsNextToTheirSignUpButtons() throws Exception {
+    mockMvc
+        .perform(get("/platform/register"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("viewBox=\"0 0 48 48\"")))
+        .andExpect(content().string(containsString("Sign up with Google")))
+        .andExpect(content().string(containsString("viewBox=\"0 0 16 16\"")))
+        .andExpect(content().string(containsString("Sign up with GitHub")));
+  }
+
   @Test
   void validSubmissionRegistersTriggersVerificationEmailAndRedirectsToPendingVerification()
       throws Exception {
@@ -86,7 +100,8 @@ class RegisterPlatformAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/platform/register/pending-verification"));
+        .andExpect(
+            redirectedUrl("/platform/register/pending-verification?email=founder%40example.com"));
 
     verify(useCase)
         .handle(
@@ -116,7 +131,8 @@ class RegisterPlatformAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/platform/register/pending-verification"));
+        .andExpect(
+            redirectedUrl("/platform/register/pending-verification?email=founder%40example.com"));
   }
 
   @Test
@@ -180,7 +196,10 @@ class RegisterPlatformAccountControllerTest {
                 .param("confirmPassword", "aaaaaaaa"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/register"))
-        .andExpect(model().attributeHasFieldErrors("form", "password"));
+        .andExpect(model().attributeHasFieldErrors("form", "password"))
+        // Same rationale as RegisterAccountControllerTest's own identical assertion.
+        .andExpect(
+            content().string(containsString("Password must be between 8 and 128 characters")));
 
     verifyNoInteractions(requestEmailVerification);
   }
@@ -190,6 +209,18 @@ class RegisterPlatformAccountControllerTest {
     mockMvc
         .perform(get("/platform/register/pending-verification"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/platform/register-pending-verification"));
+        .andExpect(view().name("identity/platform/register-pending-verification"))
+        .andExpect(model().attribute("email", (Object) null));
+  }
+
+  // Same rationale as RegisterAccountControllerTest's own identical test.
+  @Test
+  void pendingVerificationPageShowsTheAddressWhenCarriedOnTheRedirect() throws Exception {
+    mockMvc
+        .perform(
+            get("/platform/register/pending-verification").param("email", "founder@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/register-pending-verification"))
+        .andExpect(model().attribute("email", "founder@example.com"));
   }
 }

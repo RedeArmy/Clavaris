@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPas
 import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmpasswordreset.InvalidVerificationTokenException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
@@ -69,8 +70,17 @@ public class ResetPasswordController {
     } catch (final InvalidVerificationTokenException _) {
       return "identity/verification-link-invalid";
     } catch (final WeakPasswordException _) {
+      // SDE-III review, 2026-09-16: the actual rule (PasswordPolicy) is just a length bound —
+      // stating it here instead of a vague "doesn't meet the minimum requirements" lets the user
+      // actually fix it on the first retry instead of guessing.
       bindingResult.rejectValue(
-          "newPassword", "newPassword.tooWeak", "Password does not meet the minimum requirements");
+          "newPassword",
+          "newPassword.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       return FORM_VIEW;
     }
 

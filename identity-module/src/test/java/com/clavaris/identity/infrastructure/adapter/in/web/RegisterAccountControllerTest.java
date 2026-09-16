@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -8,11 +9,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -32,6 +35,9 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +65,7 @@ class RegisterAccountControllerTest {
   private AccountAuthenticationPolicyProvider policyProvider;
   private RequestEmailSignInCodeUseCase requestEmailSignInCode;
   private RequestEmailSignInLinkUseCase requestEmailSignInLink;
+  private OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -68,6 +75,7 @@ class RegisterAccountControllerTest {
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestEmailSignInCode = mock(RequestEmailSignInCodeUseCase.class);
     requestEmailSignInLink = mock(RequestEmailSignInLinkUseCase.class);
+    socialLoginPolicyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
@@ -99,7 +107,8 @@ class RegisterAccountControllerTest {
                     requestEmailVerification,
                     policyProvider,
                     requestEmailSignInCode,
-                    requestEmailSignInLink))
+                    requestEmailSignInLink,
+                    socialLoginPolicyProvider))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -110,7 +119,35 @@ class RegisterAccountControllerTest {
         .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
-        .andExpect(model().attributeExists("form"));
+        .andExpect(model().attributeExists("form"))
+        .andExpect(model().attribute("socialProviders", List.of()));
+  }
+
+  // SDE-III review, 2026-09-16 — sign-up-with-Google/GitHub: same "computed fresh on every
+  // render" contract LoginControllerTest's own identical test proves for the sign-in page — this
+  // page's own social buttons must reflect exactly the same allowed-providers set.
+  @Test
+  void getShowsOnlyTheSocialProvidersTheOrganizationHasEnabled() throws Exception {
+    when(socialLoginPolicyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(EnumSet.of(SocialProvider.GOOGLE));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("socialProviders", List.of(SocialProvider.GOOGLE)));
+  }
+
+  // Same rationale as LoginControllerTest's own identical test.
+  @Test
+  void getRendersTheProviderIconNextToItsSignUpButton() throws Exception {
+    when(socialLoginPolicyProvider.allowedProviders(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(EnumSet.of(SocialProvider.GOOGLE));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("viewBox=\"0 0 48 48\"")))
+        .andExpect(content().string(containsString("Sign up with Google")));
   }
 
   @Test
@@ -126,7 +163,11 @@ class RegisterAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/register/pending-verification"));
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/register/pending-verification?email=new-user%40example.com"));
 
     verify(useCase)
         .handle(
@@ -159,7 +200,11 @@ class RegisterAccountControllerTest {
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/register/pending-verification"));
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/register/pending-verification?email=new-user%40example.com"));
   }
 
   @Test
@@ -280,7 +325,11 @@ class RegisterAccountControllerTest {
                 .param("confirmPassword", "aaaaaaaa"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
-        .andExpect(model().attributeHasFieldErrors("form", "password"));
+        .andExpect(model().attributeHasFieldErrors("form", "password"))
+        // SDE-III review, 2026-09-16: the actual, actionable rule, not a vague "doesn't meet the
+        // minimum requirements" the user has to guess at.
+        .andExpect(
+            content().string(containsString("Password must be between 8 and 128 characters")));
 
     verifyNoInteractions(requestEmailVerification);
   }
@@ -317,6 +366,51 @@ class RegisterAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register"))
         .andExpect(model().attributeHasFieldErrors("form", "username"));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  // SDE-III review, 2026-09-16: real gap found live. Username's own domain constructor throws
+  // IllegalArgumentException for a shape the form's own maximum-length check alone does not
+  // catch, such as a too-short value or one containing anything besides letters, digits,
+  // underscore, or hyphen. Nothing here used to catch this exception, so it reached the
+  // controller as an unhandled server error instead of a field-level message.
+  // UsernameSignInControllerTest's own equivalent test already proves the matching sign-in-side
+  // gap closed. This proves the sign-up side.
+  @Test
+  void invalidUsernameShapeRerendersTheFormWithAFieldError() throws Exception {
+    when(useCase.handle(any())).thenThrow(new IllegalArgumentException("Not a valid username"));
+    // usernameSignUpEnabled=true — register.html's own username field (and this rejection's
+    // message) only renders at all when the Organization's policy actually offers it.
+    when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                true,
+                false,
+                false,
+                true,
+                false));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password")
+                .param("username", "no spaces allowed"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "username"))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Username must be 3-32 characters (letters, digits, underscore, hyphen"
+                            + " only)")));
 
     verifyNoInteractions(requestEmailVerification);
   }
@@ -440,6 +534,22 @@ class RegisterAccountControllerTest {
     mockMvc
         .perform(get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/register-pending-verification"));
+        .andExpect(view().name("identity/register-pending-verification"))
+        .andExpect(model().attribute("email", (Object) null));
+  }
+
+  // SDE-III review, 2026-09-16 — MAANG "check your email" parity: the address now rides the
+  // redirect (see the register() method's own comment) so this page can confirm which one, same
+  // "computed fresh on every render" contract every other optional query param in this package
+  // already has.
+  @Test
+  void pendingVerificationPageShowsTheAddressWhenCarriedOnTheRedirect() throws Exception {
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID)
+                .param("email", "new-user@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register-pending-verification"))
+        .andExpect(model().attribute("email", "new-user@example.com"));
   }
 }

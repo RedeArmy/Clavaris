@@ -37,9 +37,33 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * see {@link RateLimitKeyHasher}'s own Javadoc for the full reasoning, including why this uses a
  * dedicated secret rather than reusing {@code BearerTokenHasher}'s.
  */
+// PMD.LongVariable: TOO_MANY_REQUESTS_MESSAGE/TOO_MANY_REQUESTS_HTML each name exactly what they
+// hold — same "descriptive over short" rationale identity-module's own IdentityUseCaseConfig
+// class-level suppression already documents for this project.
+@SuppressWarnings("PMD.LongVariable")
 public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
+
+  // BR-DATA-01/anti-enumeration: the one message every blocked request gets, regardless of which
+  // rule/endpoint actually tripped — see respondTooManyRequests's own comment for the two
+  // representations (plain text for an API caller, this same text inside a styled page for a
+  // browser) this backs.
+  private static final String TOO_MANY_REQUESTS_MESSAGE =
+      "Too many requests. Please try again later.";
+
+  // Standalone (no Thymeleaf/MVC context available inside a raw Servlet filter) but reuses
+  // clavaris.css's own class names — see respondTooManyRequests's own comment for why that link
+  // resolves correctly regardless of which handler served this particular response.
+  private static final String TOO_MANY_REQUESTS_HTML =
+      "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"/>"
+          + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>"
+          + "<title>Too many requests — Clavaris</title>"
+          + "<link rel=\"stylesheet\" href=\"/css/clavaris.css\"/></head><body><main>"
+          + "<div class=\"clavaris-card\"><h1>Too many requests</h1>"
+          + "<p class=\"clavaris-alert clavaris-alert--error\">"
+          + TOO_MANY_REQUESTS_MESSAGE
+          + "</p></div></main></body></html>";
 
   private final RateLimiter rateLimiter;
   private final RateLimitKeyHasher keyHasher;
@@ -72,7 +96,7 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
     }
 
     if (longestRetryAfter != null) {
-      respondTooManyRequests(response, longestRetryAfter);
+      respondTooManyRequests(request, response, longestRetryAfter);
       return;
     }
     filterChain.doFilter(request, response);
@@ -107,16 +131,39 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
         && rule.extraCondition().test(request);
   }
 
+  // SDE-III review, 2026-09-16: this filter also protects /o/*/login (see this class's own
+  // Javadoc "Runs every matching rule" note referencing BR-ID-06) — a real browser hitting it mid
+  // sign-in used to get a bare, unstyled text/plain body, jarring next to every other page on this
+  // same origin (login.html's own serviceOverloadedError alert already establishes the "distinct,
+  // on-brand message, never a raw error" bar for the structurally identical TD-FUT-017 concurrency
+  // gate). A raw Servlet filter has no Thymeleaf/MVC context to render through, but it doesn't need
+  // one: /css/clavaris.css is a static resource the browser fetches independently regardless of
+  // which handler served the HTML that references it, so a small standalone page reusing the same
+  // class names renders identically to every MVC-rendered page. Content-negotiated on the request's
+  // own Accept header, not the response's path — a browser navigation sends "text/html" there; an
+  // API/fetch client (including /oauth2/token, this filter's other real caller) typically doesn't,
+  // and keeps the original plain-text body unchanged.
+  //
   // PMD.LawOfDemeter: response.getWriter() is the standard Servlet API shape for writing a body
   // directly from a filter — there is no other way to reach it.
   @SuppressWarnings("PMD.LawOfDemeter")
-  private void respondTooManyRequests(final HttpServletResponse response, final Duration retryAfter)
+  private void respondTooManyRequests(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Duration retryAfter)
       throws IOException {
     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setHeader("Retry-After", String.valueOf(Math.max(1, retryAfter.toSeconds())));
+
+    final String accept = request.getHeader("Accept");
+    if (accept != null && accept.contains("text/html")) {
+      response.setContentType("text/html;charset=UTF-8");
+      response.getWriter().write(TOO_MANY_REQUESTS_HTML);
+      return;
+    }
     response.setContentType("text/plain;charset=UTF-8");
     // BR-DATA-01/anti-enumeration: identical for every rule this could have been — never reveals
     // which specific limit (account vs. IP, or which endpoint) was hit.
-    response.getWriter().write("Too many requests. Please try again later.");
+    response.getWriter().write(TOO_MANY_REQUESTS_MESSAGE);
   }
 }

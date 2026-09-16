@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -97,8 +98,15 @@ public class SessionTaskChallengeController {
       completeUseCase.handle(
           new CompleteForcedPasswordResetCommand(accountId, form.getNewPassword()));
     } catch (final WeakPasswordException _) {
+      // Same rationale as ResetPasswordController's own identical fix.
       bindingResult.rejectValue(
-          "newPassword", "newPassword.tooWeak", "Password does not meet the minimum requirements");
+          "newPassword",
+          "newPassword.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       return FORM_VIEW;
     }
 

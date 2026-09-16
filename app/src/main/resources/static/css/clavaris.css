@@ -265,6 +265,23 @@ input[type="radio"] {
   background: var(--clavaris-bg);
 }
 
+/* SDE-III review, 2026-09-16: the four social-login buttons (login.html/register.html/platform
+   variants) gained an icon next to their text label — .clavaris-button's own default block layout
+   centers *text* fine but has no way to sit an icon beside it. A dedicated modifier, applied
+   alongside --secondary, not folded into it: every other --secondary button (consent.html's Deny,
+   sessions.html's Revoke, ...) has no icon and must keep its own plain centered-text block layout
+   unchanged. */
+.clavaris-button--social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.clavaris-button--social svg {
+  flex-shrink: 0;
+}
+
 /* Delete-Organization's own confirm button (TD-FUT-032) — the one destructive-action button in
    this codebase that isn't a plain inline secondary form action, so it gets its own explicit
    danger color rather than reusing --secondary and relying on the surrounding alert text alone. */
@@ -275,6 +292,25 @@ input[type="radio"] {
 
 .clavaris-button--danger:hover {
   filter: brightness(0.88);
+}
+
+/* "Check your email" success state (register-pending-verification.html and its platform-tier
+   twin) — Clerk/Auth0/Okta all lead a post-signup confirmation with a circular status icon, not
+   plain text alone; the icon itself reuses --clavaris-success/--clavaris-success-bg, the same
+   pair .clavaris-alert--success already establishes, just as a circle instead of a banner. */
+.clavaris-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--space-5);
+  border-radius: 999px;
+}
+
+.clavaris-icon-circle--success {
+  color: var(--clavaris-success);
+  background: var(--clavaris-success-bg);
 }
 
 .clavaris-alert {

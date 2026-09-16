@@ -10,6 +10,7 @@
         <p>We sent a 6-digit code to your email address. It expires in 10 minutes.</p>
 
         <p class="clavaris-alert clavaris-alert--error" th:if="${codeError}">That code is invalid or has expired.</p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${deviceTrustChallengeUnavailable}">We couldn't send your device sign-in verification code right now — please try again in a moment.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

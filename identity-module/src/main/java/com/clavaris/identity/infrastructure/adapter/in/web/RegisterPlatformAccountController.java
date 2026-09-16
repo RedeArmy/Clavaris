@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.requestplatformaccountemailveri
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.groups.Default;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * ADR-0012: the self-service signup entry point for a {@code PlatformAccount} — no {@code
@@ -47,6 +49,10 @@ public class RegisterPlatformAccountController {
       LoggerFactory.getLogger(RegisterPlatformAccountController.class);
 
   private static final String FORM_VIEW = "identity/platform/register";
+
+  // SonarCloud S1192: not a coincidence three copies matched — same rationale
+  // RegisterAccountController's own identical constant documents.
+  private static final String EMAIL = "email";
 
   private final RegisterPlatformAccountUseCase useCase;
 
@@ -95,11 +101,18 @@ public class RegisterPlatformAccountController {
               new RegisterPlatformAccountCommand(new Email(form.getEmail()), form.getPassword()));
     } catch (PlatformAccountEmailAlreadyRegisteredException _) {
       bindingResult.rejectValue(
-          "email", "email.alreadyRegistered", "This email is already registered");
+          EMAIL, "email.alreadyRegistered", "This email is already registered");
       return FORM_VIEW;
     } catch (WeakPasswordException _) {
+      // Same rationale as ResetPasswordController's own identical fix.
       bindingResult.rejectValue(
-          "password", "password.tooWeak", "Password does not meet the minimum requirements");
+          "password",
+          "password.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
       return FORM_VIEW;
     }
 
@@ -111,11 +124,17 @@ public class RegisterPlatformAccountController {
       LOG.warn("event=platform_account_registered_verification_email_send_failed", e);
     }
 
-    return "redirect:/platform/register/pending-verification";
+    // MAANG "check your email" parity — same RedirectQueryParams-mediated email hop as
+    // RegisterAccountController's own identical redirect; see that method's own comment.
+    String target = "redirect:/platform/register/pending-verification";
+    target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
+    return target;
   }
 
   @GetMapping("/pending-verification")
-  public String pendingVerification() {
+  public String pendingVerification(
+      @RequestParam(required = false) final String email, final Model model) {
+    model.addAttribute(EMAIL, email);
     return "identity/platform/register-pending-verification";
   }
 }
