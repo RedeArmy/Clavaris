@@ -1159,3 +1159,47 @@ body {
   .clavaris-social-options { grid-template-columns: 1fr; }
   .clavaris-card--auth .clavaris-links--split { width: calc(100% + 40px); margin: 24px -20px -20px; }
 }
+
+/* Dashboard control-plane refinement: contextual navigation and dense resources follow the same
+   calm card rhythm as the authentication surface. */
+.clavaris-sidebar__brand > span { display: grid; gap: 1px; }
+.clavaris-sidebar__brand small { color: var(--clavaris-text-muted); font-size: .65rem; font-weight: 500; letter-spacing: .04em; }
+.clavaris-sidebar__nav { align-self: stretch; }
+.clavaris-sidebar__nav a { position: relative; min-height: 38px; }
+.clavaris-sidebar__nav a.active::after { position: absolute; right: 12px; bottom: 4px; left: 12px; height: 2px; content: ""; background: var(--clavaris-brand-color); border-radius: 999px; }
+
+.clavaris-profile { position: relative; margin: 0; }
+.clavaris-profile > summary { list-style: none; }
+.clavaris-profile > summary::-webkit-details-marker { display: none; }
+.clavaris-account-menu { display: inline-flex; align-items: center; gap: 8px; padding: 5px 8px 5px 5px; color: var(--clavaris-text-muted); font: inherit; font-size: .8125rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; border-radius: 999px; }
+.clavaris-profile[open] > .clavaris-account-menu,
+.clavaris-account-menu:hover { color: var(--clavaris-text-primary); background: var(--clavaris-bg); border-color: var(--clavaris-border); }
+.clavaris-profile__chevron { font-size: 1rem; transition: transform 160ms ease; }
+.clavaris-profile[open] .clavaris-profile__chevron { transform: rotate(180deg); }
+.clavaris-profile__panel { position: absolute; top: calc(100% + 12px); right: 0; z-index: 30; width: 330px; overflow: hidden; background: color-mix(in srgb, var(--clavaris-surface) 96%, transparent); border: 1px solid var(--clavaris-border); border-radius: 16px; box-shadow: var(--shadow-overlay); backdrop-filter: blur(18px); }
+.clavaris-profile__identity { display: flex; align-items: center; gap: 12px; padding: 18px; }
+.clavaris-profile__identity > span:last-child { display: grid; gap: 2px; }
+.clavaris-profile__identity strong { color: var(--clavaris-text-primary); font-size: .9rem; }
+.clavaris-profile__identity small { color: var(--clavaris-text-muted); font-size: .75rem; }
+.clavaris-profile__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px 18px; background: color-mix(in srgb, var(--clavaris-bg) 72%, transparent); border-top: 1px solid var(--clavaris-border); }
+.clavaris-profile__actions form { margin: 0; }
+.clavaris-profile__actions .clavaris-button { width: 100%; padding: 8px; font-size: .78rem; white-space: nowrap; }
+
+.clavaris-empty-state-card { padding: 0; overflow: hidden; }
+.clavaris-create-tile { display: flex; align-items: center; justify-content: center; min-height: 230px; gap: 14px; padding: 28px; color: var(--clavaris-text-muted); text-decoration: none; background: linear-gradient(135deg, color-mix(in srgb, var(--clavaris-bg) 62%, transparent), var(--clavaris-surface)); border: 1px dashed color-mix(in srgb, var(--clavaris-border-strong) 65%, transparent); border-radius: inherit; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.clavaris-create-tile:hover { color: var(--clavaris-text-primary); background: color-mix(in srgb, var(--clavaris-brand-color) 7%, var(--clavaris-surface)); border-color: var(--clavaris-brand-color); transform: translateY(-2px); }
+.clavaris-create-tile__icon { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; color: var(--clavaris-brand-color); font-size: 1.5rem; line-height: 1; border: 1px solid color-mix(in srgb, var(--clavaris-brand-color) 28%, transparent); border-radius: 12px; }
+.clavaris-create-tile > span:last-child { display: grid; gap: 4px; }
+.clavaris-create-tile strong { color: inherit; font-size: .95rem; }
+.clavaris-create-tile small { font-size: .8rem; }
+
+.clavaris-session-list { margin-top: 0; }
+.clavaris-session-list .clavaris-table td:first-child { font-weight: 600; }
+.clavaris-session-list .clavaris-table td:first-child span:last-child { color: var(--clavaris-brand-color); font-size: .78rem; font-weight: 500; }
+
+@media (max-width: 640px) {
+  .clavaris-sidebar__brand small,
+  .clavaris-profile__chevron { display: none; }
+  .clavaris-profile__panel { position: fixed; top: 68px; right: 12px; left: 12px; width: auto; }
+  .clavaris-create-tile { justify-content: flex-start; min-height: 150px; }
+}
