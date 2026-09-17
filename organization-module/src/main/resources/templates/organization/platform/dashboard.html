@@ -71,7 +71,7 @@
                 </nav>
             </div>
 
-            <dialog id="create-organization-dialog" class="clavaris-dialog" th:attr="data-open-on-load=${#fields.hasErrors('name')} ? 'true' : null">
+            <dialog id="create-organization-dialog" class="clavaris-dialog">
                 <div class="clavaris-dialog__header">
                     <div>
                         <span class="clavaris-dialog__eyebrow">Organization</span>
@@ -86,7 +86,7 @@
                         <div class="clavaris-field">
                             <label for="name">Name</label>
                             <input id="name" type="text" th:field="*{name}" required/>
-                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}" data-dialog-open-on-load>Name error</p>
                         </div>
 
                     <div class="clavaris-dialog__actions">

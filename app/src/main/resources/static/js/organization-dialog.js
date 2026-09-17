@@ -20,7 +20,7 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    const dialog = document.querySelector("dialog[data-open-on-load='true']");
+    const dialog = document.querySelector("[data-dialog-open-on-load]")?.closest("dialog");
     if (dialog?.showModal) {
       dialog.showModal();
     }
