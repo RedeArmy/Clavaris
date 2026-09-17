@@ -7,14 +7,9 @@
 <div class="clavaris-dashboard">
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
-        <!-- ADR-0025: the one real HTMX interaction in this first dashboard increment — the create
-             form below posts here via hx-post, and PlatformOrganizationDashboardController#create
-             returns just this whole fragment (re-rendering both the updated table and a fresh,
-             blank form) when the request carries HTMX's own HX-Request header, instead of a full
-             redirect. Works identically with JavaScript disabled — hx-post degrades to nothing,
-             but the form's own plain method="post"/th:action submit (a real, unconditional
-             fallback, not emulated) still redirects normally; HTMX only intercepts the submit when
-             it's actually loaded and active. -->
+        <!-- The modal uses the dashboard's existing plain POST endpoint. A successful creation
+             follows the controller's normal redirect; server-side validation re-renders this page
+             and reopens the dialog so the field error remains in context. -->
         <div id="dashboard-content" th:fragment="content" class="clavaris-dashboard__inner">
             <div class="clavaris-page-header">
                 <div>
@@ -25,48 +20,41 @@
             </div>
 
             <div class="clavaris-section">
-                <div class="clavaris-section-card clavaris-empty-state-card" th:if="${#lists.isEmpty(organizations)}">
-                    <a class="clavaris-create-tile" href="#create-organization">
-                        <span class="clavaris-create-tile__icon" aria-hidden="true">+</span>
-                        <span><strong>Create your first organization</strong><small>You don't have any organizations yet — create your first one below.</small></span>
-                    </a>
-                </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(organizations)}">
-                <table class="clavaris-table">
-                    <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Environment</th>
-                        <th>Created</th>
-                        <th><span class="clavaris-visually-hidden">Actions</span></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="organization : ${organizations}">
-                        <td th:text="${organization.name()}">Organization name</td>
-                        <td>
+                <div class="clavaris-organization-grid">
+                    <article class="clavaris-organization-card" th:each="organization : ${organizations}">
+                        <div class="clavaris-organization-card__header">
+                            <span class="clavaris-organization-card__mark" aria-hidden="true">◈</span>
                             <span class="clavaris-badge"
                                   th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${organization.environment()}">DEVELOPMENT</span>
-                        </td>
-                        <td th:text="${organization.createdAt()}">Created at</td>
-                        <td>
-                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                               th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">View</a>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+                        </div>
+                        <h2 th:text="${organization.name()}">Organization name</h2>
+                        <p>Isolated tenant with its own accounts, clients, and signing keys.</p>
+                        <div class="clavaris-organization-card__footer">
+                            <small>Created <time th:text="${organization.createdAt()}">Created at</time></small>
+                            <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Open <span aria-hidden="true">→</span></a>
+                        </div>
+                    </article>
+
+                    <button class="clavaris-create-tile" type="button" data-dialog-open="create-organization-dialog">
+                        <span class="clavaris-create-tile__icon" aria-hidden="true">+</span>
+                        <span th:if="${#lists.isEmpty(organizations)}">
+                            <strong>Create your first organization</strong>
+                            <small>You don't have any organizations yet — choose a name to create your first one.</small>
+                        </span>
+                        <span th:unless="${#lists.isEmpty(organizations)}">
+                            <strong>Create your organization</strong>
+                            <small>Add another isolated tenant to your control plane.</small>
+                        </span>
+                    </button>
                 </div>
 
                 <!-- TD-PERF-020 (keyset revision, 2026-09-14): KeysetPageRequest/KeysetPage (common
                      module) — see PlatformOrganizationDashboardController's own Javadoc. No "Page X
                      of Y": a keyset page deliberately never computes a total (that COUNT(*) is
                      exactly what this pagination shape exists to avoid). ?before=/?after= each carry
-                     the opaque cursor of the row already at that edge of this page, never a page
-                     number. hx-get keeps this consistent with the create form's own hx-post above
-                     (same #dashboard-content fragment target); the plain th:href is the real,
-                     unconditional fallback with JavaScript disabled, not an emulation. -->
+                     the opaque cursor of the card already at that edge of this page, never a page
+                     number. -->
                 <nav class="clavaris-pagination"
                      th:if="${organizationsPage.hasPrevious() or organizationsPage.hasNext()}"
                      aria-label="Organizations pages">
@@ -83,11 +71,16 @@
                 </nav>
             </div>
 
-            <div id="create-organization" class="clavaris-section">
-                <h2>Create a new organization</h2>
-                <div class="clavaris-section-card">
-                    <form th:action="@{''}" th:object="${form}" method="post"
-                          th:attr="hx-post=@{''}" hx-target="#dashboard-content" hx-swap="outerHTML">
+            <dialog id="create-organization-dialog" class="clavaris-dialog" th:attr="data-open-on-load=${#fields.hasErrors('name')} ? 'true' : null">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Organization</span>
+                        <h2>Create your organization</h2>
+                        <p>Choose a name for your new isolated tenant.</p>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create organization dialog">×</button>
+                </div>
+                <form th:action="@{''}" th:object="${form}" method="post">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                         <div class="clavaris-field">
@@ -96,13 +89,16 @@
                             <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
                         </div>
 
+                    <div class="clavaris-dialog__actions">
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                         <button class="clavaris-button clavaris-button--inline" type="submit">Create organization</button>
-                    </form>
-                </div>
-            </div>
+                    </div>
+                </form>
+            </dialog>
         </div>
     </main>
 </div>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
 </body>
 </html>

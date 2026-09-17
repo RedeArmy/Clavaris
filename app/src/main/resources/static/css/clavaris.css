@@ -767,9 +767,18 @@ code {
   padding: var(--space-2) var(--space-4);
 }
 
+/* The shared main shell centres form cards with flexbox. The landing page is a vertical story,
+   so it explicitly resets that shell and keeps the hero and its supporting cards on separate rows. */
+.clavaris-page > main {
+  display: block;
+  min-height: auto;
+}
+
 .clavaris-hero {
   position: relative;
-  padding: clamp(56px, 10vw, 110px) 0 72px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: clamp(72px, 11vw, 136px) 0 clamp(44px, 6vw, 76px);
   text-align: center;
 }
 
@@ -820,9 +829,11 @@ code {
 
 .clavaris-features {
   display: grid;
+  max-width: 1080px;
+  margin: 0 auto;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  padding: var(--space-8) 0 var(--space-12);
+  padding: clamp(36px, 5vw, 64px) 0 clamp(64px, 9vw, 112px);
 }
 
 @media (max-width: 900px) {
@@ -845,6 +856,7 @@ code {
   padding: var(--space-6);
   background: var(--clavaris-surface);
   min-height: 220px;
+  text-align: center;
   border: 1px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent);
   border-radius: var(--radius-lg);
   box-shadow: 0 14px 35px rgba(20, 22, 29, .045);
@@ -911,7 +923,7 @@ code {
 .clavaris-status-dot { width: 7px; height: 7px; background: var(--clavaris-brand-color); border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, var(--clavaris-brand-color) 16%, transparent); }
 .clavaris-hero__trust { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; margin-top: 28px; color: var(--clavaris-text-muted); font-size: .78rem; font-weight: 600; }
 .clavaris-hero__trust span::before { content: "✓"; margin-right: 6px; color: var(--clavaris-brand-color); }
-.clavaris-feature__icon { display: grid; width: 36px; height: 36px; place-items: center; margin-bottom: 24px; color: var(--clavaris-accent-contrast); font-weight: 700; background: var(--clavaris-brand-color); border-radius: 11px; }
+.clavaris-feature__icon { display: grid; width: 36px; height: 36px; place-items: center; margin: 0 auto 24px; color: var(--clavaris-accent-contrast); font-weight: 700; background: var(--clavaris-brand-color); border-radius: 11px; }
 
 @media (max-width: 640px) {
   .clavaris-sidebar { gap: 10px; min-height: 60px; padding: 10px 16px; }
@@ -935,7 +947,9 @@ code {
   min-height: 100vh;
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  /* Keep decorative geometry within the viewport without trapping a registration form that is
+     taller than the available screen. The document remains vertically scrollable on short views. */
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 12% 10%, rgba(251, 191, 36, .16), transparent 29rem),
     radial-gradient(circle at 88% 88%, rgba(217, 119, 6, .12), transparent 31rem),
@@ -1106,7 +1120,20 @@ code {
 .clavaris-profile__actions .clavaris-button { width: 100%; padding: 8px; font-size: .78rem; white-space: nowrap; }
 
 .clavaris-empty-state-card { padding: 0; overflow: hidden; }
-.clavaris-create-tile { display: flex; align-items: center; justify-content: center; min-height: 230px; gap: 14px; padding: 28px; color: var(--clavaris-text-muted); text-decoration: none; background: linear-gradient(135deg, color-mix(in srgb, var(--clavaris-bg) 62%, transparent), var(--clavaris-surface)); border: 1px dashed color-mix(in srgb, var(--clavaris-border-strong) 65%, transparent); border-radius: inherit; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.clavaris-organization-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.clavaris-organization-card,
+.clavaris-create-tile { min-height: 242px; border-radius: var(--radius-lg); }
+.clavaris-organization-card { display: flex; flex-direction: column; padding: 24px; background: var(--clavaris-surface); border: 1px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent); box-shadow: 0 14px 35px rgba(20, 22, 29, .045); transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }
+.clavaris-organization-card:hover { border-color: color-mix(in srgb, var(--clavaris-brand-color) 38%, var(--clavaris-border)); box-shadow: 0 20px 42px rgba(20, 22, 29, .09); transform: translateY(-3px); }
+.clavaris-organization-card__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.clavaris-organization-card__mark { display: grid; width: 36px; height: 36px; place-items: center; color: var(--clavaris-accent-contrast); font-size: 1rem; background: var(--clavaris-brand-color); border-radius: 11px; }
+.clavaris-organization-card h2 { margin: 24px 0 8px; color: var(--clavaris-text-primary); font-size: 1.05rem; letter-spacing: -.025em; }
+.clavaris-organization-card > p { margin: 0; color: var(--clavaris-text-muted); font-size: .82rem; line-height: 1.55; }
+.clavaris-organization-card__footer { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 24px; }
+.clavaris-organization-card__footer small { max-width: 58%; overflow: hidden; color: var(--clavaris-text-muted); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.clavaris-organization-card__footer a { color: var(--clavaris-text-primary); font-size: .8rem; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.clavaris-organization-card__footer a:hover { color: var(--clavaris-brand-color); }
+.clavaris-create-tile { display: flex; align-items: center; justify-content: center; width: 100%; gap: 14px; padding: 28px; color: var(--clavaris-text-muted); font: inherit; text-align: left; cursor: pointer; background: linear-gradient(135deg, color-mix(in srgb, var(--clavaris-bg) 62%, transparent), var(--clavaris-surface)); border: 1px dashed color-mix(in srgb, var(--clavaris-border-strong) 65%, transparent); transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
 .clavaris-create-tile:hover { color: var(--clavaris-text-primary); background: color-mix(in srgb, var(--clavaris-brand-color) 7%, var(--clavaris-surface)); border-color: var(--clavaris-brand-color); transform: translateY(-2px); }
 .clavaris-create-tile__icon { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; color: var(--clavaris-brand-color); font-size: 1.5rem; line-height: 1; border: 1px solid color-mix(in srgb, var(--clavaris-brand-color) 28%, transparent); border-radius: 12px; }
 .clavaris-create-tile > span:last-child { display: grid; gap: 4px; }
@@ -1117,9 +1144,29 @@ code {
 .clavaris-session-list .clavaris-table td:first-child { font-weight: 600; }
 .clavaris-session-list .clavaris-table td:first-child span:last-child { color: var(--clavaris-brand-color); font-size: .78rem; font-weight: 500; }
 
+.clavaris-dialog { width: min(100% - 32px, 460px); padding: 0; color: var(--clavaris-text-primary); background: var(--clavaris-surface); border: 1px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent); border-radius: 18px; box-shadow: 0 26px 72px rgba(19, 19, 22, .22); }
+.clavaris-dialog::backdrop { background: rgba(19, 19, 22, .38); backdrop-filter: blur(4px); }
+.clavaris-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 28px 28px 20px; }
+.clavaris-dialog__eyebrow { display: block; margin-bottom: 7px; color: var(--clavaris-brand-color); font-size: .7rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.clavaris-dialog h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.04em; }
+.clavaris-dialog__header p { margin: 7px 0 0; color: var(--clavaris-text-muted); font-size: .85rem; }
+.clavaris-dialog__close { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; padding: 0; color: var(--clavaris-text-muted); font: inherit; font-size: 1.35rem; line-height: 1; cursor: pointer; background: var(--clavaris-bg); border: 1px solid var(--clavaris-border); border-radius: 50%; }
+.clavaris-dialog__close:hover { color: var(--clavaris-text-primary); }
+.clavaris-dialog form { padding: 0 28px 28px; }
+.clavaris-dialog__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
 @media (max-width: 640px) {
   .clavaris-sidebar__brand small,
   .clavaris-profile__chevron { display: none; }
   .clavaris-profile__panel { position: fixed; top: 68px; right: 12px; left: 12px; width: auto; }
   .clavaris-create-tile { justify-content: flex-start; min-height: 150px; }
+  .clavaris-organization-grid { grid-template-columns: 1fr; }
+  .clavaris-dialog__header { padding: 24px 20px 18px; }
+  .clavaris-dialog form { padding: 0 20px 20px; }
+  .clavaris-dialog__actions { flex-direction: column-reverse; }
+  .clavaris-dialog__actions .clavaris-button { width: 100%; }
+}
+
+@media (min-width: 641px) and (max-width: 920px) {
+  .clavaris-organization-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
