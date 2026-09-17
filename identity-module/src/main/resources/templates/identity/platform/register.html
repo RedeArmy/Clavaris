@@ -49,14 +49,16 @@
              own "brand-new signup" branch) — this is the same target login.html's own social buttons
              use, not a separate sign-up flow. -->
         <div class="clavaris-divider">Or</div>
-        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
-            <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
-            <span>Sign up with Google</span>
-        </a></p>
-        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
-            <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
-            <span>Sign up with GitHub</span>
-        </a></p>
+        <div class="clavaris-social-options">
+            <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
+                <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
+                <span>Google</span>
+            </a></p>
+            <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
+                <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
+                <span>GitHub</span>
+            </a></p>
+        </div>
 
         <p class="clavaris-links clavaris-links--split"><span>Already have an account?</span> <a th:href="@{login}">Sign in</a></p>
     </div>
