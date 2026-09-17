@@ -3,10 +3,17 @@
 <head th:replace="~{identity/fragments/head :: head('Sign in — Clavaris')}">
     <title>Sign in — Clavaris</title>
 </head>
-<body>
+<body class="clavaris-auth-page">
 <main>
-    <div class="clavaris-card">
-        <h1>Sign in to Clavaris</h1>
+    <div class="clavaris-card clavaris-card--auth">
+        <a class="clavaris-auth-brand" th:href="@{/}" aria-label="Clavaris home">
+            <img th:src="${#resourceUrl != null ? #resourceUrl.url('/brand/clavaris-logo-polished.svg') : '/brand/clavaris-logo-polished.svg'}" alt="Clavaris" width="198" height="42"/>
+        </a>
+        <div class="clavaris-auth-heading">
+            <span class="clavaris-auth-heading__eyebrow">Platform console</span>
+            <h1>Welcome back</h1>
+            <p>Sign in to manage your identity infrastructure.</p>
+        </div>
 
         <p class="clavaris-alert clavaris-alert--error" th:if="${loginError}">Invalid email or password.</p>
         <p class="clavaris-alert clavaris-alert--error" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
@@ -22,17 +29,19 @@
         <!-- ADR-0020 Decision 2: Clavaris's own Sign In is Google/GitHub/email, all three permanently
              available — unlike the tenant-tier login page, nothing here is ever tenant-configurable. -->
         <div class="clavaris-divider">Or</div>
-        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
-            <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
-            <span>Sign in with Google</span>
-        </a></p>
-        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
-            <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
-            <span>Sign in with GitHub</span>
-        </a></p>
+        <div class="clavaris-social-options">
+            <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
+                <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
+                <span>Sign in with Google</span>
+            </a></p>
+            <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
+                <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
+                <span>Sign in with GitHub</span>
+            </a></p>
+        </div>
 
         <p class="clavaris-links"><a th:href="@{forgot-password}">Forgot your password?</a></p>
-        <p class="clavaris-links"><a th:href="@{register}">Create an account</a></p>
+        <p class="clavaris-links clavaris-links--split"><span>New to Clavaris?</span> <a th:href="@{register}">Create an account</a></p>
     </div>
 </main>
 </body>

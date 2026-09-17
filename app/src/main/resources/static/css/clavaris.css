@@ -78,6 +78,9 @@
 
   --font-sans: "Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", monospace;
+  --clavaris-ink: #15171d;
+  --clavaris-canvas: #f5f5f2;
+  --clavaris-highlight: #fff4d8;
 
   color-scheme: light;
 }
@@ -104,7 +107,9 @@
 
 body {
   margin: 0;
-  background: var(--clavaris-bg);
+  background:
+    radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--clavaris-brand-color) 12%, transparent), transparent 28rem),
+    var(--clavaris-bg);
   color: var(--clavaris-text-primary);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -238,8 +243,9 @@ input[type="radio"] {
   color: var(--clavaris-accent-contrast);
   background: var(--clavaris-brand-color);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: 9px;
   cursor: pointer;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .08);
   transition: filter 150ms ease-out;
 }
 
@@ -388,11 +394,12 @@ input[type="radio"] {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--clavaris-text-muted);
+  background: color-mix(in srgb, var(--clavaris-bg) 62%, transparent);
   border-bottom: 1px solid var(--clavaris-border);
 }
 
 .clavaris-table td {
-  padding: var(--space-3);
+  padding: 15px 12px;
   border-bottom: 1px solid var(--clavaris-border);
   vertical-align: top;
 }
@@ -402,7 +409,7 @@ input[type="radio"] {
 }
 
 .clavaris-table tbody tr:hover {
-  background: var(--clavaris-bg);
+  background: color-mix(in srgb, var(--clavaris-brand-color) 5%, var(--clavaris-surface));
 }
 
 /* SDE-III UI audit, 2026-09-13: --font-mono was defined at the top of this file but never actually
@@ -491,45 +498,64 @@ code {
  */
 
 .clavaris-dashboard {
-  display: flex;
+  display: block;
   min-height: 100vh;
-  align-items: stretch;
 }
 
 .clavaris-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
-  flex-direction: column;
-  width: 240px;
-  flex-shrink: 0;
-  padding: var(--space-6) var(--space-4);
-  background: var(--clavaris-surface);
-  border-right: 1px solid var(--clavaris-border);
+  width: 100%;
+  min-height: 68px;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-3) clamp(16px, 4vw, 48px);
+  background: color-mix(in srgb, var(--clavaris-surface) 92%, transparent);
+  border-bottom: 1px solid var(--clavaris-border);
+  backdrop-filter: blur(16px);
 }
 
-.clavaris-sidebar__brand {
-  display: block;
-  margin-bottom: var(--space-8);
-  padding: 0 var(--space-2);
-  font-size: 1.0625rem;
-  font-weight: 600;
+.clavaris-sidebar__brand,
+.clavaris-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
   color: var(--clavaris-text-primary);
   text-decoration: none;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.04em;
 }
+
+.clavaris-sidebar__brand img,
+.clavaris-nav__brand img { border-radius: 10px; }
 
 .clavaris-sidebar__nav {
   display: flex;
-  flex-direction: column;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
   gap: var(--space-1);
+  align-self: stretch;
 }
 
 .clavaris-sidebar__nav a {
-  padding: var(--space-2) var(--space-3);
+  position: relative;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
   color: var(--clavaris-text-muted);
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   transition: background 150ms ease-out, color 150ms ease-out;
 }
 
@@ -540,33 +566,32 @@ code {
 
 .clavaris-sidebar__nav a.active {
   color: var(--clavaris-text-primary);
-  background: color-mix(in srgb, var(--clavaris-brand-color) 12%, transparent);
+  background: color-mix(in srgb, var(--clavaris-brand-color) 14%, var(--clavaris-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--clavaris-brand-color) 18%, transparent);
   font-weight: 600;
 }
 
 .clavaris-dashboard__content {
   flex: 1;
   min-width: 0;
-  padding: var(--space-8) var(--space-8);
+  padding: clamp(28px, 5vw, 64px) clamp(16px, 5vw, 72px);
 }
 
-.clavaris-dashboard__inner {
-  max-width: 960px;
-}
+.clavaris-dashboard__inner { max-width: 1120px; }
 
 .clavaris-page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  margin-bottom: 32px;
 }
 
 .clavaris-page-header h1 {
   margin: 0;
-  font-size: 1.375rem;
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -.045em;
 }
 
 .clavaris-page-header p {
@@ -575,22 +600,21 @@ code {
   color: var(--clavaris-text-muted);
 }
 
-.clavaris-section {
-  margin-bottom: var(--space-8);
-}
+.clavaris-section { margin-bottom: 32px; }
 
 .clavaris-section h2 {
   margin: 0 0 var(--space-4);
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 600;
+  letter-spacing: -.02em;
 }
 
 .clavaris-section-card {
   background: var(--clavaris-surface);
-  border: 1px solid var(--clavaris-border);
+  border: 1px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  padding: var(--space-6);
+  box-shadow: 0 14px 35px rgba(20, 22, 29, .045);
+  padding: clamp(20px, 3vw, 28px);
 }
 
 /* Two or more cards in the same section (e.g. Danger Zone's own promote/delete split, SDE-III UI
@@ -628,8 +652,10 @@ code {
   align-items: center;
   padding: var(--space-1) var(--space-3);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 650;
   border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  letter-spacing: .02em;
 }
 
 .clavaris-badge--muted {
@@ -648,9 +674,14 @@ code {
 }
 
 .clavaris-breadcrumb {
+  display: inline-flex;
+  gap: 7px;
   margin-bottom: var(--space-4);
+  padding: 6px 10px;
   font-size: 0.8125rem;
   color: var(--clavaris-text-muted);
+  background: color-mix(in srgb, var(--clavaris-bg) 72%, transparent);
+  border-radius: 999px;
 }
 
 .clavaris-breadcrumb a {
@@ -701,7 +732,7 @@ code {
  */
 
 .clavaris-page {
-  max-width: 1120px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 var(--space-6);
 }
@@ -710,15 +741,7 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-6) 0;
-}
-
-.clavaris-nav__brand {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  color: var(--clavaris-text-primary);
-  text-decoration: none;
-  letter-spacing: -0.01em;
+  padding: 22px 0;
 }
 
 .clavaris-nav__actions {
@@ -745,12 +768,15 @@ code {
 }
 
 .clavaris-hero {
-  padding: var(--space-12) 0 var(--space-8);
+  position: relative;
+  padding: clamp(56px, 10vw, 110px) 0 72px;
   text-align: center;
 }
 
 .clavaris-hero__eyebrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: var(--space-4);
   padding: var(--space-1) var(--space-3);
   font-size: 0.8125rem;
@@ -762,16 +788,19 @@ code {
 
 .clavaris-hero h1 {
   margin: 0 0 var(--space-5);
-  font-size: clamp(2.25rem, 4vw, 3.25rem);
+  max-width: 820px;
+  margin-right: auto;
+  margin-left: auto;
+  font-size: clamp(2.7rem, 7vw, 5.6rem);
   font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: .98;
+  letter-spacing: -.065em;
 }
 
 .clavaris-hero p {
-  max-width: 640px;
+  max-width: 600px;
   margin: 0 auto var(--space-8);
-  font-size: 1.125rem;
+  font-size: 1.12rem;
   line-height: 1.6;
   color: var(--clavaris-text-muted);
 }
@@ -792,7 +821,7 @@ code {
 .clavaris-features {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
+  gap: 16px;
   padding: var(--space-8) 0 var(--space-12);
 }
 
@@ -815,9 +844,14 @@ code {
 .clavaris-feature {
   padding: var(--space-6);
   background: var(--clavaris-surface);
-  border: 1px solid var(--clavaris-border);
+  min-height: 220px;
+  border: 1px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent);
   border-radius: var(--radius-lg);
+  box-shadow: 0 14px 35px rgba(20, 22, 29, .045);
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
+
+.clavaris-feature:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(20, 22, 29, .09); }
 
 .clavaris-feature h3 {
   margin: 0 0 var(--space-2);
@@ -844,4 +878,248 @@ code {
 
 .clavaris-footer a {
   color: inherit;
+}
+
+/* Compact dashboard primitives shared by every bounded context. */
+.clavaris-nav-icon {
+  color: var(--clavaris-brand-color);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.clavaris-account-menu__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 5px;
+  color: var(--clavaris-text-muted);
+  font: inherit;
+  font-size: .8125rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.clavaris-account-menu__button:hover { color: var(--clavaris-text-primary); background: var(--clavaris-bg); border-color: var(--clavaris-border); }
+.clavaris-account-menu__button:focus-visible { outline: 3px solid color-mix(in srgb, var(--clavaris-brand-color) 28%, transparent); }
+.clavaris-avatar { display: grid; width: 30px; height: 30px; place-items: center; color: var(--clavaris-accent-contrast); line-height: 1; background: var(--clavaris-brand-color); border-radius: 50%; }
+.clavaris-avatar svg { width: 18px; height: 18px; }
+
+.clavaris-table th:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.clavaris-table th:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.clavaris-status-dot { width: 7px; height: 7px; background: var(--clavaris-brand-color); border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, var(--clavaris-brand-color) 16%, transparent); }
+.clavaris-hero__trust { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; margin-top: 28px; color: var(--clavaris-text-muted); font-size: .78rem; font-weight: 600; }
+.clavaris-hero__trust span::before { content: "✓"; margin-right: 6px; color: var(--clavaris-brand-color); }
+.clavaris-feature__icon { display: grid; width: 36px; height: 36px; place-items: center; margin-bottom: 24px; color: var(--clavaris-accent-contrast); font-weight: 700; background: var(--clavaris-brand-color); border-radius: 11px; }
+
+@media (max-width: 640px) {
+  .clavaris-sidebar { gap: 10px; min-height: 60px; padding: 10px 16px; }
+  .clavaris-sidebar__brand span,
+  .clavaris-account-menu__label { display: none; }
+  .clavaris-sidebar__nav { overflow-x: auto; scrollbar-width: none; }
+  .clavaris-sidebar__nav::-webkit-scrollbar { display: none; }
+  .clavaris-sidebar__nav a { flex: 0 0 auto; padding: 8px 10px; font-size: .78rem; }
+  .clavaris-account-menu__button { padding: 3px; }
+  .clavaris-dashboard__content { padding-top: 28px; }
+  .clavaris-page-header { align-items: flex-start; flex-direction: column; }
+  .clavaris-hero { padding-top: 52px; }
+  .clavaris-hero h1 { font-size: clamp(2.55rem, 14vw, 4.2rem); }
+  .clavaris-hero__actions { flex-direction: column; }
+  .clavaris-hero__actions .clavaris-button { width: 100%; }
+}
+
+/* Auth surface — deliberately separate from tenant branding: platform access establishes the
+   Clavaris product identity while tenant forms retain their configured brand colour. */
+.clavaris-auth-page {
+  min-height: 100vh;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(251, 191, 36, .16), transparent 29rem),
+    radial-gradient(circle at 88% 88%, rgba(217, 119, 6, .12), transparent 31rem),
+    linear-gradient(135deg, #fafafa 0%, #f2f2f4 52%, #f8f6f2 100%);
+}
+
+.clavaris-auth-page main {
+  min-height: 100vh;
+  padding: 48px 24px;
+}
+
+.clavaris-card--auth {
+  max-width: 448px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .85);
+  border-radius: 18px;
+  box-shadow:
+    0 28px 60px rgba(19, 19, 22, .16),
+    0 3px 9px rgba(19, 19, 22, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .96);
+}
+
+.clavaris-auth-brand {
+  display: inline-flex;
+  margin-bottom: 32px;
+  text-decoration: none;
+}
+
+.clavaris-auth-brand img,
+.clavaris-brand-lockup {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  border-radius: 0;
+}
+
+.clavaris-auth-heading { margin-bottom: 28px; }
+.clavaris-auth-heading__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  color: var(--clavaris-brand-color);
+  font-size: .72rem;
+  font-weight: 650;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.clavaris-auth-heading__eyebrow::before { width: 7px; height: 7px; content: ""; background: var(--clavaris-brand-color); border-radius: 50%; }
+.clavaris-auth-heading h1 { margin: 0; color: var(--clavaris-text-primary); font-size: 1.75rem; letter-spacing: -.045em; text-align: left; }
+.clavaris-auth-heading p { margin: 8px 0 0; color: var(--clavaris-text-muted); font-size: .93rem; text-align: left; }
+.clavaris-card--auth .clavaris-field input {
+  min-height: 46px;
+  padding: 12px 13px;
+  background: color-mix(in srgb, var(--clavaris-bg) 46%, var(--clavaris-surface));
+  border-color: color-mix(in srgb, var(--clavaris-border) 85%, transparent);
+  box-shadow: inset 0 1px 2px rgba(19, 19, 22, .035);
+}
+.clavaris-card--auth .clavaris-button { min-height: 46px; }
+.clavaris-card--auth .clavaris-button--secondary { box-shadow: none; }
+.clavaris-card--auth .clavaris-divider { margin: 26px 0 18px; }
+.clavaris-card--auth .clavaris-divider + p { margin-top: 10px; }
+.clavaris-links--split { display: flex; justify-content: center; gap: 5px; margin-top: 18px; }
+
+/* Product-wide polish for data dense pages: each table becomes a contained card, headers stay
+   legible, and long content can be scanned without the page feeling like a settings form. */
+.clavaris-section > .clavaris-table-wrapper {
+  overflow: hidden;
+  background: var(--clavaris-surface);
+  border: 1px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 14px 35px rgba(20, 22, 29, .045);
+}
+
+.clavaris-section > .clavaris-table-wrapper > .clavaris-table-wrapper,
+.clavaris-section > .clavaris-table-wrapper { overflow-x: auto; }
+
+.clavaris-table tbody tr { transition: background 150ms ease; }
+
+@media (max-width: 640px) {
+  .clavaris-card--auth { padding: 26px 20px; }
+  .clavaris-auth-page main { padding: 24px 16px; }
+  .clavaris-auth-brand { margin-bottom: 26px; }
+  .clavaris-auth-brand img { width: 178px; height: auto; }
+  .clavaris-links--split { flex-wrap: wrap; }
+  .clavaris-nav__brand .clavaris-brand-lockup { width: 165px; height: auto; }
+}
+
+/* Raised access experience: original Clavaris geometry, with light catching the card edges to
+   make a trustworthy, tactile entry point without borrowing another product's visual identity. */
+
+.clavaris-auth-page::before,
+.clavaris-auth-page::after {
+  position: fixed;
+  z-index: -1;
+  width: min(38vw, 520px);
+  height: min(38vw, 520px);
+  content: "";
+  background: linear-gradient(135deg, rgba(255, 255, 255, .72), rgba(255, 255, 255, 0));
+  border: 1px solid rgba(19, 19, 22, .045);
+  clip-path: polygon(50% 0, 100% 36%, 81% 100%, 19% 100%, 0 36%);
+  transform: rotate(16deg);
+}
+
+.clavaris-auth-page::before { top: 10%; left: -13%; }
+.clavaris-auth-page::after { right: -16%; bottom: 7%; transform: rotate(-23deg); }
+
+.clavaris-card--auth::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  content: "";
+  background: linear-gradient(90deg, transparent, var(--clavaris-brand-color), transparent);
+  opacity: .8;
+}
+
+.clavaris-card--auth .clavaris-auth-heading { padding-bottom: 4px; }
+.clavaris-card--auth .clavaris-field label { color: var(--clavaris-text-primary); font-weight: 600; }
+.clavaris-card--auth .clavaris-field input:focus { background: var(--clavaris-surface); }
+.clavaris-card--auth .clavaris-button:not(.clavaris-button--secondary) {
+  box-shadow: 0 7px 15px color-mix(in srgb, var(--clavaris-brand-color) 27%, transparent), inset 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+.clavaris-social-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.clavaris-social-options p { margin: 0; }
+.clavaris-social-options .clavaris-button { min-width: 0; padding-right: 8px; padding-left: 8px; }
+.clavaris-card--auth .clavaris-links--split {
+  width: calc(100% + 64px);
+  min-height: 62px;
+  margin: 26px -32px -32px;
+  padding: 20px 24px;
+  background: linear-gradient(180deg, rgba(19, 19, 22, .018), rgba(19, 19, 22, .045));
+  border-top: 1px solid color-mix(in srgb, var(--clavaris-border) 72%, transparent);
+}
+
+@media (max-width: 640px) {
+  .clavaris-auth-page::before,
+  .clavaris-auth-page::after { width: 300px; height: 300px; }
+  .clavaris-social-options { grid-template-columns: 1fr; }
+  .clavaris-card--auth .clavaris-links--split { width: calc(100% + 40px); margin: 24px -20px -20px; }
+}
+
+/* Dashboard control-plane refinement: contextual navigation and dense resources follow the same
+   calm card rhythm as the authentication surface. */
+.clavaris-sidebar__brand > span { display: grid; gap: 1px; }
+.clavaris-sidebar__brand small { color: var(--clavaris-text-muted); font-size: .65rem; font-weight: 500; letter-spacing: .04em; }
+.clavaris-sidebar__nav a.active::after { position: absolute; right: 12px; bottom: 4px; left: 12px; height: 2px; content: ""; background: var(--clavaris-brand-color); border-radius: 999px; }
+
+.clavaris-profile { position: relative; margin: 0; }
+.clavaris-profile > summary { list-style: none; }
+.clavaris-profile > summary::-webkit-details-marker { display: none; }
+.clavaris-account-menu { display: inline-flex; align-items: center; gap: 8px; padding: 5px 8px 5px 5px; color: var(--clavaris-text-muted); font: inherit; font-size: .8125rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; border-radius: 999px; }
+.clavaris-profile[open] > .clavaris-account-menu,
+.clavaris-account-menu:hover { color: var(--clavaris-text-primary); background: var(--clavaris-bg); border-color: var(--clavaris-border); }
+.clavaris-profile__chevron { font-size: 1rem; transition: transform 160ms ease; }
+.clavaris-profile[open] .clavaris-profile__chevron { transform: rotate(180deg); }
+.clavaris-profile__panel { position: absolute; top: calc(100% + 12px); right: 0; z-index: 30; width: 330px; overflow: hidden; background: color-mix(in srgb, var(--clavaris-surface) 96%, transparent); border: 1px solid var(--clavaris-border); border-radius: 16px; box-shadow: var(--shadow-overlay); backdrop-filter: blur(18px); }
+.clavaris-profile__identity { display: flex; align-items: center; gap: 12px; padding: 18px; }
+.clavaris-profile__identity > span:last-child { display: grid; gap: 2px; }
+.clavaris-profile__identity strong { color: var(--clavaris-text-primary); font-size: .9rem; }
+.clavaris-profile__identity small { color: var(--clavaris-text-muted); font-size: .75rem; }
+.clavaris-profile__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px 18px; background: color-mix(in srgb, var(--clavaris-bg) 72%, transparent); border-top: 1px solid var(--clavaris-border); }
+.clavaris-profile__actions form { margin: 0; }
+.clavaris-profile__actions .clavaris-button { width: 100%; padding: 8px; font-size: .78rem; white-space: nowrap; }
+
+.clavaris-empty-state-card { padding: 0; overflow: hidden; }
+.clavaris-create-tile { display: flex; align-items: center; justify-content: center; min-height: 230px; gap: 14px; padding: 28px; color: var(--clavaris-text-muted); text-decoration: none; background: linear-gradient(135deg, color-mix(in srgb, var(--clavaris-bg) 62%, transparent), var(--clavaris-surface)); border: 1px dashed color-mix(in srgb, var(--clavaris-border-strong) 65%, transparent); border-radius: inherit; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.clavaris-create-tile:hover { color: var(--clavaris-text-primary); background: color-mix(in srgb, var(--clavaris-brand-color) 7%, var(--clavaris-surface)); border-color: var(--clavaris-brand-color); transform: translateY(-2px); }
+.clavaris-create-tile__icon { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; color: var(--clavaris-brand-color); font-size: 1.5rem; line-height: 1; border: 1px solid color-mix(in srgb, var(--clavaris-brand-color) 28%, transparent); border-radius: 12px; }
+.clavaris-create-tile > span:last-child { display: grid; gap: 4px; }
+.clavaris-create-tile strong { color: inherit; font-size: .95rem; }
+.clavaris-create-tile small { font-size: .8rem; }
+
+.clavaris-session-list { margin-top: 0; }
+.clavaris-session-list .clavaris-table td:first-child { font-weight: 600; }
+.clavaris-session-list .clavaris-table td:first-child span:last-child { color: var(--clavaris-brand-color); font-size: .78rem; font-weight: 500; }
+
+@media (max-width: 640px) {
+  .clavaris-sidebar__brand small,
+  .clavaris-profile__chevron { display: none; }
+  .clavaris-profile__panel { position: fixed; top: 68px; right: 12px; left: 12px; width: auto; }
+  .clavaris-create-tile { justify-content: flex-start; min-height: 150px; }
 }

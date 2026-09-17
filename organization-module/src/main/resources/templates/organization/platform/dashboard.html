@@ -25,8 +25,11 @@
             </div>
 
             <div class="clavaris-section">
-                <div class="clavaris-section-card" th:if="${#lists.isEmpty(organizations)}">
-                    <p class="clavaris-empty-state">You don't have any organizations yet — create your first one below.</p>
+                <div class="clavaris-section-card clavaris-empty-state-card" th:if="${#lists.isEmpty(organizations)}">
+                    <a class="clavaris-create-tile" href="#create-organization">
+                        <span class="clavaris-create-tile__icon" aria-hidden="true">+</span>
+                        <span><strong>Create your first organization</strong><small>You don't have any organizations yet — create your first one below.</small></span>
+                    </a>
                 </div>
                 <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(organizations)}">
                 <table class="clavaris-table">
@@ -80,7 +83,7 @@
                 </nav>
             </div>
 
-            <div class="clavaris-section">
+            <div id="create-organization" class="clavaris-section">
                 <h2>Create a new organization</h2>
                 <div class="clavaris-section-card">
                     <form th:action="@{''}" th:object="${form}" method="post"

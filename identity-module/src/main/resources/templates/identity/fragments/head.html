@@ -21,6 +21,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title th:text="${pageTitle}">Clavaris</title>
     <link rel="stylesheet" th:href="${#resourceUrl != null ? #resourceUrl.url('/css/clavaris.css') : '/css/clavaris.css'}"/>
+    <link rel="icon" type="image/svg+xml" th:href="${#resourceUrl != null ? #resourceUrl.url('/brand/clavaris-mark-polished.svg') : '/brand/clavaris-mark-polished.svg'}"/>
     <style th:if="${branding != null and branding.primaryColor != null and branding.primaryColor.isPresent()}"
            th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see ADR-0009 §3 */</style>
 </head>

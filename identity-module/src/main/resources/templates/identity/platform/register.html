@@ -3,10 +3,17 @@
 <head th:replace="~{identity/fragments/head :: head('Create your Clavaris account')}">
     <title>Create your Clavaris account</title>
 </head>
-<body>
+<body class="clavaris-auth-page">
 <main>
-    <div class="clavaris-card">
-        <h1>Create your Clavaris account</h1>
+    <div class="clavaris-card clavaris-card--auth">
+        <a class="clavaris-auth-brand" th:href="@{/}" aria-label="Clavaris home">
+            <img th:src="${#resourceUrl != null ? #resourceUrl.url('/brand/clavaris-logo-polished.svg') : '/brand/clavaris-logo-polished.svg'}" alt="Clavaris" width="198" height="42"/>
+        </a>
+        <div class="clavaris-auth-heading">
+            <span class="clavaris-auth-heading__eyebrow">Platform console</span>
+            <h1>Create your account</h1>
+            <p>Start with identity infrastructure you control.</p>
+        </div>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -42,16 +49,18 @@
              own "brand-new signup" branch) — this is the same target login.html's own social buttons
              use, not a separate sign-up flow. -->
         <div class="clavaris-divider">Or</div>
-        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
-            <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
-            <span>Sign up with Google</span>
-        </a></p>
-        <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
-            <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
-            <span>Sign up with GitHub</span>
-        </a></p>
+        <div class="clavaris-social-options">
+            <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/google}">
+                <span th:replace="~{identity/fragments/social-icon-google :: icon}"></span>
+                <span>Sign up with Google</span>
+            </a></p>
+            <p><a class="clavaris-button clavaris-button--secondary clavaris-button--social" th:href="@{login/social/github}">
+                <span th:replace="~{identity/fragments/social-icon-github :: icon}"></span>
+                <span>Sign up with GitHub</span>
+            </a></p>
+        </div>
 
-        <p class="clavaris-links"><a th:href="@{login}">Already have an account? Sign in</a></p>
+        <p class="clavaris-links clavaris-links--split"><span>Already have an account?</span> <a th:href="@{login}">Sign in</a></p>
     </div>
 </main>
 </body>

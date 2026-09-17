@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 530 112" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">Clavaris</title>
+  <desc id="description">An original medieval key and C monogram for trusted access.</desc>
+  <defs>
+    <linearGradient id="bronze" x1="17" y1="15" x2="93" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7D77A"/><stop offset=".48" stop-color="#C89031"/><stop offset="1" stop-color="#7A431B"/>
+    </linearGradient>
+  </defs>
+  <rect x="1.5" y="1.5" width="109" height="109" rx="29" fill="#171A19" stroke="#C89031" stroke-opacity=".4" stroke-width="3"/>
+  <path d="M56 13 89 29v25c0 21.4-13.7 36.9-33 45-19.3-8.1-33-23.6-33-45V29l33-16Z" fill="#222825" stroke="url(#bronze)" stroke-width="3"/>
+  <path d="M56 27 68.5 34.2v14.5L56 56l-12.5-7.3V34.2L56 27Z" fill="url(#bronze)"/>
+  <path d="M56 35.2a6.1 6.1 0 1 0 0 12.2 6.1 6.1 0 0 0 0-12.2Z" fill="#1D2421" stroke="#FFF0B0" stroke-opacity=".7" stroke-width="1.3"/>
+  <path d="M53 56h6v19h7v8H59v5H47v-8h6V56Z" fill="url(#bronze)"/>
+  <path d="M66 63h7v7h-7M59 71h7v7h-7" stroke="#FFF0B0" stroke-opacity=".45" stroke-width="1.4"/>
+  <path d="M49.5 75.5c-5.3 0-9.5 4.2-9.5 9.5s4.2 9.5 9.5 9.5c2.9 0 5.6-1.3 7.4-3.4l-4-3.6a4.4 4.4 0 1 1 0-5l4-3.6a9.5 9.5 0 0 0-7.4-3.4Z" fill="url(#bronze)"/>
+  <text x="137" y="73" fill="#202522" font-family="Georgia, Times New Roman, serif" font-size="57" font-weight="bold" letter-spacing="-2">Clavaris</text>
+  <path d="M140 84h349" stroke="#C89031" stroke-opacity=".7" stroke-width="2"/>
+</svg>

@@ -124,6 +124,11 @@
              nothing to look for instead of a path that can never resolve. Implemented, not yet
              live-verified against a real SonarCloud run — confirm the warning is actually gone on
              the next CI pass before treating this as closed. -->
+        <!-- Each bounded-context module owns a local dashboard-nav.html so its standalone
+             Thymeleaf tests can render without a cross-module runtime dependency. This is
+             intentional resource duplication, not duplicated product logic; keep CPD enabled for
+             every other source file and exclude only these four module-local adapters. -->
+        <sonar.cpd.exclusions>**/platform/fragments/dashboard-nav.html</sonar.cpd.exclusions>
     </properties>
 
     <!--
