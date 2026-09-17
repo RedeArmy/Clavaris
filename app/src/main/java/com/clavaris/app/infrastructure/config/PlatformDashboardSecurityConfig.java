@@ -159,6 +159,10 @@ public class PlatformDashboardSecurityConfig {
                     .accessDeniedHandler(
                         (request, response, _) ->
                             response.sendRedirect(request.getContextPath() + PLATFORM_LOGIN_PATH)))
+        // Dashboard users need an explicit, CSRF-protected way to end their platform session.
+        // Keeping it inside this chain ensures the logout handler sees the same session and
+        // SecurityContext repository used by the authenticated dashboard.
+        .logout(logout -> logout.logoutUrl("/platform/logout").logoutSuccessUrl(PLATFORM_LOGIN_PATH))
         // ADR-0010 §6.1/BR-ID-06 widened (TD-SEC-001, SDE-III review, 2026-08-22): ADR-0010 itself
         // predates ADR-0012, so its "login (/oauth2/token, password login)" wording never
         // literally named this tier's own equivalents — the same anti-abuse reasoning obviously

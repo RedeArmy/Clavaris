@@ -3,10 +3,17 @@
 <head th:replace="~{identity/fragments/head :: head('Sign in — Clavaris')}">
     <title>Sign in — Clavaris</title>
 </head>
-<body>
+<body class="clavaris-auth-page">
 <main>
-    <div class="clavaris-card">
-        <h1>Sign in to Clavaris</h1>
+    <div class="clavaris-card clavaris-card--auth">
+        <a class="clavaris-auth-brand" th:href="@{/}" aria-label="Clavaris home">
+            <img th:src="${#resourceUrl != null ? #resourceUrl.url('/brand/clavaris-logo-polished.svg') : '/brand/clavaris-logo-polished.svg'}" alt="Clavaris" width="198" height="42"/>
+        </a>
+        <div class="clavaris-auth-heading">
+            <span class="clavaris-auth-heading__eyebrow">Platform console</span>
+            <h1>Welcome back</h1>
+            <p>Sign in to manage your identity infrastructure.</p>
+        </div>
 
         <p class="clavaris-alert clavaris-alert--error" th:if="${loginError}">Invalid email or password.</p>
         <p class="clavaris-alert clavaris-alert--error" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
@@ -32,7 +39,7 @@
         </a></p>
 
         <p class="clavaris-links"><a th:href="@{forgot-password}">Forgot your password?</a></p>
-        <p class="clavaris-links"><a th:href="@{register}">Create an account</a></p>
+        <p class="clavaris-links clavaris-links--split"><span>New to Clavaris?</span> <a th:href="@{register}">Create an account</a></p>
     </div>
 </main>
 </body>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 112" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">Clavaris</title>
+  <desc id="description">A minimal key shaped like the letter C, representing trusted access.</desc>
+  <defs>
+    <linearGradient id="clavaris-gold" x1="15" y1="12" x2="91" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC52B"/>
+      <stop offset="1" stop-color="#F0642F"/>
+    </linearGradient>
+  </defs>
+  <!-- Clavis: Latin for key. The open C is a protected access boundary; the cut-out centre is
+       deliberately shaped as a keyhole, so the mark reads as identity and authorization together. -->
+  <path d="M56 10C30.6 10 10 30.6 10 56s20.6 46 46 46c14.5 0 27.5-6.7 35.9-17.2L78.7 72.4A25.8 25.8 0 0 1 56 85.8C39.5 85.8 26.2 72.5 26.2 56S39.5 26.2 56 26.2c9.1 0 17.3 4 22.8 10.4L91.9 24.1A45.7 45.7 0 0 0 56 10Z" fill="url(#clavaris-gold)"/>
+  <path d="M82.8 40.5a15.5 15.5 0 1 1 0 31H70.2v11.7H58.7V71.5H47V59.8h11.7V48h11.5v11.8h12.6a3.8 3.8 0 1 0 0-7.6H70.2V40.5h12.6Z" fill="#191A20"/>
+  <circle cx="82.8" cy="56" r="4.1" fill="#fff8e8"/>
+  <text x="122" y="73" fill="#191A20" font-family="Geist, Arial, sans-serif" font-size="55" font-weight="600" letter-spacing="-2.8">Clavaris</text>
+</svg>

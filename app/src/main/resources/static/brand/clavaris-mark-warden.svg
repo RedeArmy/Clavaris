@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">Clavaris Warden mark</title>
+  <desc id="description">An original medieval key and C monogram for trusted access.</desc>
+  <defs>
+    <linearGradient id="bronze" x1="17" y1="15" x2="93" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7D77A"/><stop offset=".48" stop-color="#C89031"/><stop offset="1" stop-color="#7A431B"/>
+    </linearGradient>
+    <filter id="shadow" x="8" y="8" width="96" height="96" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#080909" flood-opacity=".55"/>
+    </filter>
+  </defs>
+  <rect width="112" height="112" rx="30" fill="#171A19"/>
+  <path d="M56 13 89 29v25c0 21.4-13.7 36.9-33 45-19.3-8.1-33-23.6-33-45V29l33-16Z" fill="#222825" stroke="url(#bronze)" stroke-width="3"/>
+  <!-- A ceremonial access key. The C is no longer a monogram: it is a subtle forged ward at the
+       key's final tooth, a reference to Clavaris that only reveals itself on closer inspection. -->
+  <path d="M56 27 68.5 34.2v14.5L56 56l-12.5-7.3V34.2L56 27Z" fill="url(#bronze)" filter="url(#shadow)"/>
+  <path d="M56 35.2a6.1 6.1 0 1 0 0 12.2 6.1 6.1 0 0 0 0-12.2Z" fill="#1D2421" stroke="#FFF0B0" stroke-opacity=".7" stroke-width="1.3"/>
+  <path d="M53 56h6v19h7v8H59v5H47v-8h6V56Z" fill="url(#bronze)"/>
+  <path d="M66 63h7v7h-7M59 71h7v7h-7" stroke="#FFF0B0" stroke-opacity=".45" stroke-width="1.4"/>
+  <path d="M49.5 75.5c-5.3 0-9.5 4.2-9.5 9.5s4.2 9.5 9.5 9.5c2.9 0 5.6-1.3 7.4-3.4l-4-3.6a4.4 4.4 0 1 1 0-5l4-3.6a9.5 9.5 0 0 0-7.4-3.4Z" fill="url(#bronze)"/>
+  <path d="M25 29 56 16l31 13" stroke="#FFF0B0" stroke-opacity=".35" stroke-width="1"/>
+</svg>

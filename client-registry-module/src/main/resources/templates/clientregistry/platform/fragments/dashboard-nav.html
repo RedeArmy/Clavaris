@@ -11,9 +11,18 @@
   copies by hand if a nav item is added, removed, or reordered.
 -->
 <aside th:fragment="sidebar(active)" class="clavaris-sidebar">
-    <a class="clavaris-sidebar__brand" th:href="@{/platform/dashboard}">Clavaris</a>
+    <a class="clavaris-sidebar__brand" th:href="@{/platform/dashboard}" aria-label="Clavaris dashboard">
+        <img th:src="${#resourceUrl != null ? #resourceUrl.url('/brand/clavaris-mark-polished.svg') : '/brand/clavaris-mark-polished.svg'}" alt="" width="32" height="32"/>
+        <span>Clavaris</span>
+    </a>
     <nav class="clavaris-sidebar__nav">
-        <a th:href="@{/platform/dashboard}" th:classappend="${active == 'organizations'} ? 'active'">Organizations</a>
-        <a th:href="@{/platform/account/sessions}" th:classappend="${active == 'sessions'} ? 'active'">Your sessions</a>
+        <a th:href="@{/platform/dashboard}" th:classappend="${active == 'organizations'} ? 'active'"><span class="clavaris-nav-icon">▦</span> Organizations</a>
+        <a th:href="@{/platform/account/sessions}" th:classappend="${active == 'sessions'} ? 'active'"><span class="clavaris-nav-icon">◷</span> Sessions</a>
     </nav>
+    <form class="clavaris-account-menu" th:action="@{/platform/logout}" method="post">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <button type="submit" class="clavaris-account-menu__button" aria-label="Sign out" title="Sign out">
+            <span class="clavaris-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.25" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20c.65-3.35 3.05-5 6.5-5s5.85 1.65 6.5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="clavaris-account-menu__label">Sign out</span>
+        </button>
+    </form>
 </aside>

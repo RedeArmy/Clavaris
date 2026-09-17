@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">Clavaris mark</title>
+  <desc id="description">A C shaped key representing trusted access.</desc>
+  <defs>
+    <linearGradient id="gold" x1="15" y1="12" x2="91" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC52B"/><stop offset="1" stop-color="#F0642F"/>
+    </linearGradient>
+  </defs>
+  <rect width="112" height="112" rx="30" fill="#191A20"/>
+  <path d="M56 19C35.6 19 19 35.6 19 56s16.6 37 37 37c11.7 0 22.1-5.4 28.9-13.9L74.3 69A20.7 20.7 0 0 1 56 79.7c-13.1 0-23.7-10.6-23.7-23.7S42.9 32.3 56 32.3c7.2 0 13.9 3.2 18.3 8.4L84.8 30.8A36.8 36.8 0 0 0 56 19Z" fill="url(#gold)"/>
+  <path d="M76.4 44.2a11.8 11.8 0 1 1 0 23.6H66.8v8.9H58V67.8h-8.9V59H58v-8.9h8.8V59h9.6a3 3 0 1 0 0-6H66.8v-8.8h9.6Z" fill="#191A20"/>
+  <circle cx="76.4" cy="56" r="3.1" fill="#fff8e8"/>
+</svg>
