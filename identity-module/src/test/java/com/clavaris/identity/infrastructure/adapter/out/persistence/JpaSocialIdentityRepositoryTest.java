@@ -132,6 +132,36 @@ class JpaSocialIdentityRepositoryTest {
         .isEqualTo(otherAccountId);
   }
 
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab / View Profile parity.
+  @Test
+  void findAllByAccountIdReturnsEveryLinkedProviderForThisAccountOnly() {
+    AccountId otherAccountId = new AccountId(UUID.randomUUID());
+    jdbcTemplate.update(
+        "insert into accounts (id, organization_id, email, status, created_at) "
+            + "values (?, ?, ?, 'ACTIVE', now())",
+        otherAccountId.value(),
+        organizationId.value(),
+        "other-social-owner-" + otherAccountId.value() + "@example.com");
+    SocialIdentity google =
+        SocialIdentity.link(accountId, organizationId, SocialProvider.GOOGLE, "google-sub-2");
+    SocialIdentity github =
+        SocialIdentity.link(accountId, organizationId, SocialProvider.GITHUB, "github-sub-2");
+    SocialIdentity someoneElses =
+        SocialIdentity.link(otherAccountId, organizationId, SocialProvider.GOOGLE, "not-mine");
+    repository.save(google);
+    repository.save(github);
+    repository.save(someoneElses);
+
+    assertThat(repository.findAllByAccountId(accountId))
+        .extracting(SocialIdentity::id)
+        .containsExactlyInAnyOrder(google.id(), github.id());
+  }
+
+  @Test
+  void findAllByAccountIdReturnsEmptyForAnAccountWithNoLinkedProviders() {
+    assertThat(repository.findAllByAccountId(accountId)).isEmpty();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(

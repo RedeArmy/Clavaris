@@ -1,5 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -8,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -220,5 +223,38 @@ class PlatformAccountsControllerTest {
     mockMvc.perform(get(basePath()).param("after", cursor.encode()));
 
     verify(listAccounts).handle(any());
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab 3-dot row menu: proves the template's
+  // own Lock/Unlock and Ban/Unban toggle-by-status branching renders without error for every real
+  // AccountStatus this menu has to handle, not just the ACTIVE default every other test here uses.
+  @Test
+  void rowMenuOffersUnlockInsteadOfLockForASuspendedAccount() throws Exception {
+    Account suspended = sampleAccount();
+    suspended.suspend();
+    KeysetCursor cursor = cursorOf(suspended);
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(suspended), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Unlock account")))
+        .andExpect(content().string(not(containsString("Lock account"))));
+  }
+
+  @Test
+  void rowMenuOffersUnbanInsteadOfBanForABannedAccount() throws Exception {
+    Account banned = sampleAccount();
+    banned.ban();
+    KeysetCursor cursor = cursorOf(banned);
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(banned), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Unban account")))
+        .andExpect(content().string(not(containsString("Ban account"))));
   }
 }

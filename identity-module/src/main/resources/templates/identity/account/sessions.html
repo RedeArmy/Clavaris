@@ -28,8 +28,8 @@
                     <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
                 </td>
                 <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                <td th:text="${userSession.createdAt()}">Created at</td>
-                <td th:text="${userSession.lastAccessedAt()}">Last active</td>
+                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">Created at</td>
+                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                 <td>
                     <form method="post"
                           th:action="@{/o/{organizationId}/account/sessions/{sessionId}/revoke(organizationId=${organizationId},sessionId=${userSession.sessionId()})}">

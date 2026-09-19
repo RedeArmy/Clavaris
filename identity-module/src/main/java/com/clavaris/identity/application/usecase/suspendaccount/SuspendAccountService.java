@@ -31,24 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
  * revocation cascade racing a concurrent rotation is exactly the class of gap a status check alone
  * can't close and vice versa.
  */
-// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
-// parameters — same rationale as identity-module's own IdentityUseCaseConfig/DeleteAccountService
-// class-level suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class SuspendAccountService implements SuspendAccountUseCase {
 
   private final AccountRepository accounts;
-  private final SessionRepository sessions;
-  private final RefreshTokenRepository refreshTokens;
-
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as every
-  // other caller of this port (DeleteAccountService, RotateRefreshTokenService).
-  private final AccountTokenRevoker accountTokenRevoker;
-
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
-  // accountTokenRevoker above.
-  private final AccountSessionRevoker accountSessionRevoker;
-
+  private final AccountRevocationCascade revocationCascade;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
@@ -63,10 +49,9 @@ public class SuspendAccountService implements SuspendAccountUseCase {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.accounts = accounts;
-    this.sessions = sessions;
-    this.refreshTokens = refreshTokens;
-    this.accountTokenRevoker = accountTokenRevoker;
-    this.accountSessionRevoker = accountSessionRevoker;
+    this.revocationCascade =
+        new AccountRevocationCascade(
+            sessions, refreshTokens, accountTokenRevoker, accountSessionRevoker);
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -84,10 +69,7 @@ public class SuspendAccountService implements SuspendAccountUseCase {
 
     // BR-ID-04-shaped cascade (see this class's own Javadoc, SDE-III review 2026-09-03) — identical
     // call order to ConfirmPasswordResetService's own reset-response cascade.
-    sessions.revokeAllActiveForAccount(account.id());
-    refreshTokens.revokeAllActiveForAccount(account.id());
-    accountTokenRevoker.revokeAllTokensFor(account.id());
-    accountSessionRevoker.revokeAllSessionsFor(account.id());
+    revocationCascade.revokeEverythingFor(account.id());
 
     auditEvents.write(
         command.actor(), "account.suspended", "Account", account.id().value().toString(), null);

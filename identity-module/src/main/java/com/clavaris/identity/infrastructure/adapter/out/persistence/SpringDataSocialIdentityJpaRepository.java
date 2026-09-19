@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,4 +9,6 @@ interface SpringDataSocialIdentityJpaRepository extends JpaRepository<SocialIden
 
   Optional<SocialIdentityEntity> findByOrganizationIdAndProviderAndProviderUserId(
       UUID organizationId, String provider, String providerUserId);
+
+  List<SocialIdentityEntity> findAllByAccountId(UUID accountId);
 }

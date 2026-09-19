@@ -70,7 +70,7 @@
                                   th:classappend="${endpoint.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
                         </td>
-                        <td th:text="${endpoint.createdAt()}">Created at</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(endpoint.createdAt())}">Created at</td>
                         <td>
                             <div class="clavaris-row-actions">
                                 <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"

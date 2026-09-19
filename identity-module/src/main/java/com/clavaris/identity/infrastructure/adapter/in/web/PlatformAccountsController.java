@@ -17,7 +17,6 @@ import com.clavaris.identity.domain.model.PlatformAccountId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -27,7 +26,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: lists every {@code Account} in
@@ -60,8 +58,7 @@ public class PlatformAccountsController {
 
   private final ListAccountsForOrganizationUseCase listAccounts;
   private final AdminCreateAccountForOrganizationUseCase createAccount;
-  private final OrganizationForPlatformAccountResolver organizationResolver;
-  private final CurrentPlatformAccountResolver currentPlatformAccount;
+  private final PlatformAccountOrganizationAccess organizationAccess;
 
   public PlatformAccountsController(
       final ListAccountsForOrganizationUseCase listAccounts,
@@ -70,8 +67,8 @@ public class PlatformAccountsController {
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.listAccounts = listAccounts;
     this.createAccount = createAccount;
-    this.organizationResolver = organizationResolver;
-    this.currentPlatformAccount = currentPlatformAccount;
+    this.organizationAccess =
+        new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
 
   @GetMapping
@@ -81,9 +78,11 @@ public class PlatformAccountsController {
       @RequestParam(required = false) final String after,
       @RequestParam(required = false) final String before,
       final Model model) {
-    final PlatformAccountId ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final PlatformAccountId ownerPlatformAccountId =
+        organizationAccess.requireCurrentPlatformAccount(request);
     final OrganizationId orgId = new OrganizationId(organizationId);
-    final String organizationName = requireOwnedOrganizationName(orgId, ownerPlatformAccountId);
+    final String organizationName =
+        organizationAccess.requireOwnedOrganizationName(orgId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new AdminCreateAccountForm());
     populateUsersModel(model, orgId, KeysetPageRequest.fromCursors(after, before));
@@ -102,9 +101,11 @@ public class PlatformAccountsController {
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final AdminCreateAccountForm form,
       final BindingResult bindingResult,
       final Model model) {
-    final PlatformAccountId ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final PlatformAccountId ownerPlatformAccountId =
+        organizationAccess.requireCurrentPlatformAccount(request);
     final OrganizationId orgId = new OrganizationId(organizationId);
-    final String organizationName = requireOwnedOrganizationName(orgId, ownerPlatformAccountId);
+    final String organizationName =
+        organizationAccess.requireOwnedOrganizationName(orgId, ownerPlatformAccountId);
 
     if (!bindingResult.hasErrors()) {
       try {
@@ -159,20 +160,8 @@ public class PlatformAccountsController {
     model.addAttribute("usersPage", usersPage);
   }
 
-  private String requireOwnedOrganizationName(
-      final OrganizationId organizationId, final PlatformAccountId ownerPlatformAccountId) {
-    return organizationResolver
-        .resolveName(organizationId, ownerPlatformAccountId)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-  }
-
   private static boolean isHtmxRequest(final HttpServletRequest request) {
     return "true".equals(request.getHeader(HX_REQUEST_HEADER));
-  }
-
-  private PlatformAccountId requireCurrentPlatformAccount(final HttpServletRequest request) {
-    return CurrentSessionSupport.requireResolved(
-        currentPlatformAccount.resolve(request), "PlatformAccount");
   }
 
   private static String blankToNull(final String value) {

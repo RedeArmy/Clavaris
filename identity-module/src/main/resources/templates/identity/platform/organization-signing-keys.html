@@ -60,8 +60,8 @@
                                   th:classappend="${key.retiredAt().isEmpty()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${key.retiredAt().isEmpty()} ? 'Active' : 'Retired (in overlap)'">Active</span>
                         </td>
-                        <td th:text="${key.activeFrom()}">Active from</td>
-                        <td th:text="${key.retiredAt().orElse(null)}">—</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(key.activeFrom())}">Active from</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(key.retiredAt().orElse(null))}">—</td>
                     </tr>
                     </tbody>
                 </table>

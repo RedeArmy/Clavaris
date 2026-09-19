@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownD
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.KnownDevice;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,13 @@ class JpaKnownDeviceRepository implements KnownDeviceRepository {
   @Override
   public boolean existsByAccountId(final AccountId accountId) {
     return devices.existsByAccountId(accountId.value());
+  }
+
+  @Override
+  public List<KnownDevice> findAllByAccountId(final AccountId accountId) {
+    return devices.findAllByAccountIdOrderByLastSeenAtDesc(accountId.value()).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   @Override

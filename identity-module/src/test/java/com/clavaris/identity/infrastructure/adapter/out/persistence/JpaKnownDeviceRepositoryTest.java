@@ -167,6 +167,35 @@ class JpaKnownDeviceRepositoryTest {
         .isThrownBy(() -> repository.insert(reusesTheSameId));
   }
 
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab / View Profile parity.
+  @Test
+  void findAllByAccountIdReturnsOnlyThisAccountsOwnDevices() {
+    AccountId otherAccountId = new AccountId(UUID.randomUUID());
+    jdbcTemplate.update(
+        "insert into accounts (id, organization_id, email, status, created_at) "
+            + "values (?, ?, ?, 'ACTIVE', now())",
+        otherAccountId.value(),
+        UUID.randomUUID(),
+        "other-owner-" + otherAccountId.value() + "@example.com");
+    KnownDevice mine = KnownDevice.recognize(accountId, "Mozilla/5.0 Mine", "hash-mine");
+    KnownDevice alsoMine =
+        KnownDevice.recognize(accountId, "Mozilla/5.0 Also Mine", "hash-also-mine");
+    KnownDevice someoneElses =
+        KnownDevice.recognize(otherAccountId, "Mozilla/5.0 Not Mine", "hash-other");
+    repository.insert(mine);
+    repository.insert(alsoMine);
+    repository.insert(someoneElses);
+
+    assertThat(repository.findAllByAccountId(accountId))
+        .extracting(KnownDevice::id)
+        .containsExactlyInAnyOrder(mine.id(), alsoMine.id());
+  }
+
+  @Test
+  void findAllByAccountIdReturnsEmptyForAnAccountWithNoKnownDevices() {
+    assertThat(repository.findAllByAccountId(accountId)).isEmpty();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(

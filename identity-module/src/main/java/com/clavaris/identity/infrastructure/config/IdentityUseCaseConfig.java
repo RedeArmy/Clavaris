@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyService;
@@ -24,6 +25,8 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameService;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
+import com.clavaris.identity.application.usecase.banaccount.BanAccountService;
+import com.clavaris.identity.application.usecase.banaccount.BanAccountUseCase;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetService;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeService;
@@ -41,6 +44,10 @@ import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseC
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountService;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
+import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationService;
+import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountService;
+import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountService;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
@@ -92,6 +99,8 @@ import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountService;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
+import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountService;
+import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountUseCase;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
@@ -172,6 +181,13 @@ class IdentityUseCaseConfig {
   /* package */ ListAccountsForOrganizationUseCase listAccountsForOrganizationUseCase(
       final AccountRepository accountRepository) {
     return new ListAccountsForOrganizationService(accountRepository);
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item.
+  @Bean
+  /* package */ GetAccountForOrganizationUseCase getAccountForOrganizationUseCase(
+      final AccountRepository accountRepository) {
+    return new GetAccountForOrganizationService(accountRepository);
   }
 
   @Bean
@@ -415,6 +431,13 @@ class IdentityUseCaseConfig {
         eventOutboxWriter);
   }
 
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View log" menu item.
+  @Bean
+  /* package */ GetAuditLogForAccountUseCase getAuditLogForAccountUseCase(
+      final AuditEventReader auditEvents) {
+    return new GetAuditLogForAccountService(auditEvents);
+  }
+
   // Clerk "session tasks" parity
   @Bean
   /* package */ ForcePasswordResetForAccountUseCase forcePasswordResetForAccountUseCase(
@@ -450,6 +473,35 @@ class IdentityUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new ReactivateAccountService(accounts, auditEvents, eventOutboxWriter);
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" parity: same shape as
+  // suspendAccountUseCase above, a deliberately separate bean/use case, not a reuse.
+  @Bean
+  /* package */ BanAccountUseCase banAccountUseCase(
+      final AccountRepository accounts,
+      final SessionRepository sessions,
+      final RefreshTokenRepository refreshTokens,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new BanAccountService(
+        accounts,
+        sessions,
+        refreshTokens,
+        accountTokenRevoker,
+        accountSessionRevoker,
+        auditEvents,
+        eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ UnbanAccountUseCase unbanAccountUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new UnbanAccountService(accounts, auditEvents, eventOutboxWriter);
   }
 
   // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for

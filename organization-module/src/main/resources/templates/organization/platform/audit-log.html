@@ -45,7 +45,7 @@
                     </thead>
                     <tbody>
                     <tr th:each="event : ${auditEvents}">
-                        <td th:text="${event.occurredAt()}">timestamp</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(event.occurredAt())}">timestamp</td>
                         <td><code th:text="${event.actor().type()} + ':' + ${event.actor().id()}">actor</code></td>
                         <td><code th:text="${event.action()}">action</code></td>
                         <td><code th:text="${event.targetType()} + ':' + ${event.targetId().orElse('—')}">target</code></td>

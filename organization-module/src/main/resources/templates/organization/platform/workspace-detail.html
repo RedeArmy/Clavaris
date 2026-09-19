@@ -17,7 +17,7 @@
             <div class="clavaris-page-header">
                 <div>
                     <h1 th:text="${workspace.name()}">Workspace name</h1>
-                    <p>Created <span th:text="${workspace.createdAt()}">date</span></p>
+                    <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
                 </div>
             </div>
 
@@ -54,7 +54,7 @@
                                   th:classappend="${member.role().name() == 'ADMIN'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${member.role()}">MEMBER</span>
                         </td>
-                        <td th:text="${member.createdAt()}">Joined at</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(member.createdAt())}">Joined at</td>
                         <td>
                             <div class="clavaris-row-actions">
                                 <form method="post"

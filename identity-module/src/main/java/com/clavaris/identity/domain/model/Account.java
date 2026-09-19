@@ -316,4 +316,24 @@ public final class Account {
       this.status = AccountStatus.ACTIVE;
     }
   }
+
+  /**
+   * SDE-III review, 2026-09-19 — Clerk dashboard "Users" parity: a deliberately separate action
+   * from {@link #suspend()}, not an alias — see {@link AccountStatus}'s own Javadoc for why. Same
+   * idempotent/terminal-status handling; only transitions out of {@code ACTIVE}, never out of
+   * {@code SUSPENDED} (an account already suspended must be explicitly reactivated first — the two
+   * states don't silently convert into one another).
+   */
+  public void ban() {
+    if (this.status == AccountStatus.ACTIVE) {
+      this.status = AccountStatus.BANNED;
+    }
+  }
+
+  /** Reverses {@link #ban()} — same idempotent and terminal-status handling. */
+  public void unban() {
+    if (this.status == AccountStatus.BANNED) {
+      this.status = AccountStatus.ACTIVE;
+    }
+  }
 }

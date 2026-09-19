@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Profile — Clavaris')}">
+    <title>Profile — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> /
+                <span>Profile</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}">
+                    <h1 th:text="${#strings.isEmpty(fullName)} ? ${account.email().value()} : ${fullName}">Account</h1>
+                    <p th:text="${account.email().value()}">email</p>
+                </div>
+                <div class="clavaris-row-actions">
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log(organizationId=${organizationId},accountId=${account.id()})}">View log</a>
+                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                            type="button" data-dialog-open="impersonate-dialog"
+                            th:disabled="${#lists.isEmpty(oauthClients)}">Impersonate user</button>
+                </div>
+            </div>
+
+            <!-- SDE-III review, 2026-09-19: impersonationToken/impersonationError are one-time
+                 flash attributes from PlatformAccountImpersonationController's own POST — shown
+                 exactly once, gone on the next page load, same "raw secret shown once" posture as
+                 every OAuth Client secret reveal elsewhere in this dashboard. -->
+            <div class="clavaris-section-card" th:if="${impersonationError != null}">
+                <p class="clavaris-field-error" th:text="${impersonationError}">error</p>
+            </div>
+            <div class="clavaris-section-card" th:if="${impersonationToken != null}">
+                <h2>Impersonation token</h2>
+                <p>This token will not be shown again — copy it now.</p>
+                <p>Access token: <code th:text="${impersonationToken.accessToken()}">token</code></p>
+                <p>Type: <span th:text="${impersonationToken.tokenType()}">Bearer</span></p>
+                <p>Expires: <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(impersonationToken.expiresAt())}">expires</span></p>
+                <p>Scope: <span th:text="${#strings.arrayJoin(impersonationToken.scope().toArray(), ' ')}">scope</span></p>
+            </div>
+
+            <!-- SDE-III review, 2026-09-19 — Clerk dashboard "View Profile" parity, read-only. -->
+            <div class="clavaris-section">
+                <div class="clavaris-section-card">
+                    <h2>Identity</h2>
+                    <p>Status:
+                        <span class="clavaris-badge"
+                              th:classappend="${account.status().name() == 'ACTIVE'} ? 'clavaris-badge--success' : (${account.status().name() == 'DELETED'} ? 'clavaris-badge--muted' : 'clavaris-badge--error')"
+                              th:text="${account.status()}">ACTIVE</span>
+                    </p>
+                    <p>Account ID: <code th:text="${account.id()}">account id</code></p>
+                    <p>Username: <span th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</span></p>
+                    <p>Phone number: <span th:text="${account.phoneNumber().orElse('—')}">phone</span></p>
+                    <p>Joined: <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</span></p>
+                    <p>Last signed in: <span th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</span></p>
+                </div>
+
+                <div class="clavaris-section-card">
+                    <h2>Devices</h2>
+                    <p th:if="${#lists.isEmpty(devices)}" class="clavaris-empty-state">No known devices yet.</p>
+                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(devices)}">
+                        <table class="clavaris-table">
+                            <thead>
+                            <tr>
+                                <th>Browser / OS</th>
+                                <th>First seen</th>
+                                <th>Last seen</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="device : ${devices}">
+                                <td th:text="${device.userAgent()}">user agent</td>
+                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.firstSeenAt())}">first seen</td>
+                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.lastSeenAt())}">last seen</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="clavaris-section-card">
+                    <h2>Social accounts</h2>
+                    <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>
+                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(socialIdentities)}">
+                        <table class="clavaris-table">
+                            <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Provider user ID</th>
+                                <th>Linked</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="identity : ${socialIdentities}">
+                                <td th:text="${identity.provider()}">provider</td>
+                                <td th:text="${identity.providerUserId()}">provider user id</td>
+                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(identity.linkedAt())}">linked</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <dialog id="impersonate-dialog" class="clavaris-dialog">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Account</span>
+                        <h2>Impersonate user</h2>
+                        <p>Mints a raw Bearer access token for this Account, scoped to one OAuth
+                            Client — no ID token, no refresh token. The token is shown once.</p>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog">×</button>
+                </div>
+                <form th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate(organizationId=${organizationId},accountId=${account.id()})}" method="post">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="clavaris-field">
+                        <label for="impersonate-client-id">OAuth Client</label>
+                        <select id="impersonate-client-id" name="clientId" required>
+                            <option th:each="client : ${oauthClients}" th:value="${client.clientId()}" th:text="${client.clientId()}">client_id</option>
+                        </select>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="impersonate-scopes">Scopes</label>
+                        <input id="impersonate-scopes" type="text" name="scopes" placeholder="Leave blank for every scope this Client is allowed"/>
+                        <p>Space-separated. Leave blank to use every scope this Client is allowed.</p>
+                    </div>
+
+                    <div class="clavaris-dialog__actions">
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Impersonate user</button>
+                    </div>
+                </form>
+            </dialog>
+        </div>
+    </main>
+</div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
+</body>
+</html>

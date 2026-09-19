@@ -5,6 +5,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -49,6 +50,11 @@ class JpaSocialIdentityRepository implements SocialIdentityRepository {
             identity.provider().name(),
             identity.providerUserId(),
             identity.linkedAt()));
+  }
+
+  @Override
+  public List<SocialIdentity> findAllByAccountId(final AccountId accountId) {
+    return identities.findAllByAccountId(accountId.value()).stream().map(this::toDomain).toList();
   }
 
   private SocialIdentity toDomain(final SocialIdentityEntity entity) {

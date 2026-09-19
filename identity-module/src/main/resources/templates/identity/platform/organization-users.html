@@ -39,6 +39,7 @@
                             <th>Phone number</th>
                             <th>Last signed In</th>
                             <th>Joined</th>
+                            <th><span class="clavaris-visually-hidden">Actions</span></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -48,8 +49,76 @@
                             <td th:text="${account.email().value()}">email</td>
                             <td th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</td>
                             <td th:text="${account.phoneNumber().orElse('—')}">phone</td>
-                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${account.lastSignedInAt().get()} : 'Never'">last signed in</td>
-                            <td th:text="${account.createdAt()}">joined</td>
+                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</td>
+                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</td>
+                            <td>
+                                <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab 3-dot
+                                     row menu. A native <details>/<summary> disclosure, same
+                                     zero-JS-by-default pattern the sidebar's own account menu
+                                     (.clavaris-profile) already establishes — positioned via
+                                     row-menu.js's own small "position: fixed under the trigger"
+                                     fix-up (this table's own .clavaris-table-wrapper needs
+                                     overflow: hidden for its rounded corners, which would
+                                     otherwise clip an absolutely-positioned panel). Delete is the
+                                     only item behind a confirmation <dialog> — the other actions
+                                     are all reversible or already state-labeled (Lock/Unlock,
+                                     Ban/Unban). -->
+                                <details class="clavaris-menu">
+                                    <summary class="clavaris-menu__trigger" aria-label="Open actions menu for this user">⋮</summary>
+                                    <div class="clavaris-menu__panel">
+                                        <p class="clavaris-menu__id">ID: <code th:text="${account.id().value()}">account id</code></p>
+                                        <hr class="clavaris-menu__divider"/>
+                                        <a class="clavaris-menu__item"
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id()})}">View profile</a>
+                                        <a class="clavaris-menu__item"
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log(organizationId=${organizationId},accountId=${account.id()})}">View log</a>
+                                        <a class="clavaris-menu__item"
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id()})}">Impersonate user</a>
+                                        <hr class="clavaris-menu__divider"/>
+                                        <form method="post" th:if="${account.status().name() == 'ACTIVE'}"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/suspend(organizationId=${organizationId},accountId=${account.id()})}">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Lock account</button>
+                                        </form>
+                                        <form method="post" th:if="${account.status().name() == 'SUSPENDED'}"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/reactivate(organizationId=${organizationId},accountId=${account.id()})}">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button type="submit" class="clavaris-menu__item">Unlock account</button>
+                                        </form>
+                                        <form method="post" th:unless="${account.status().name() == 'BANNED'}"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/ban(organizationId=${organizationId},accountId=${account.id()})}">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Ban account</button>
+                                        </form>
+                                        <form method="post" th:if="${account.status().name() == 'BANNED'}"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/unban(organizationId=${organizationId},accountId=${account.id()})}">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button type="submit" class="clavaris-menu__item">Unban account</button>
+                                        </form>
+                                        <button type="button" class="clavaris-menu__item clavaris-menu__item--danger"
+                                                th:attr="data-dialog-open=|delete-user-dialog-${account.id().value()}|">Delete user</button>
+                                    </div>
+                                </details>
+                                <dialog th:id="|delete-user-dialog-${account.id().value()}|" class="clavaris-dialog">
+                                    <div class="clavaris-dialog__header">
+                                        <div>
+                                            <span class="clavaris-dialog__eyebrow">Account</span>
+                                            <h2>Delete user</h2>
+                                            <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> —
+                                                a hard delete, not reversible. Every session and token is revoked immediately.</p>
+                                        </div>
+                                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete user dialog">×</button>
+                                    </div>
+                                    <form method="post"
+                                          th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/delete(organizationId=${organizationId},accountId=${account.id()})}">
+                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <div class="clavaris-dialog__actions">
+                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                            <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete user</button>
+                                        </div>
+                                    </form>
+                                </dialog>
+                            </td>
                         </tr>
                         </tbody>
                     </table>
@@ -150,5 +219,6 @@
 </div>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/row-menu.js') : '/js/row-menu.js'}" defer></script>
 </body>
 </html>
