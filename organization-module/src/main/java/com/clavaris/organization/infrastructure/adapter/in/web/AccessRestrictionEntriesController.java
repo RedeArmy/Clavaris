@@ -9,6 +9,8 @@ import com.clavaris.organization.application.usecase.removeaccessrestrictionentr
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryCommand;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
 import com.clavaris.organization.domain.model.AccessRestrictionEntry;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -46,6 +48,9 @@ class AccessRestrictionEntriesController {
     this.listEntries = listEntries;
   }
 
+  @Operation(
+      summary = "List an Organization's own access-restriction entries (blocklist/allowlist)")
+  @ApiResponse(responseCode = "200", description = "Possibly empty list")
   @GetMapping
   /* package */ List<AccessRestrictionEntryResponse> list(@PathVariable final UUID organizationId) {
     return listEntries
@@ -58,6 +63,10 @@ class AccessRestrictionEntriesController {
   // Two exits (409 duplicate, 201 success) — same rationale as every other admin-mutation
   // controller in this codebase.
   @SuppressWarnings("PMD.OnlyOneReturn")
+  @Operation(
+      summary = "Add an access-restriction entry (blocklist or allowlist) to an Organization")
+  @ApiResponse(responseCode = "201", description = "Entry created")
+  @ApiResponse(responseCode = "409", description = "An entry with this identifier already exists")
   @PostMapping
   /* package */ ResponseEntity<AccessRestrictionEntryResponse> add(
       @PathVariable final UUID organizationId,
@@ -75,6 +84,9 @@ class AccessRestrictionEntriesController {
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
+  @Operation(summary = "Remove an access-restriction entry from an Organization")
+  @ApiResponse(responseCode = "204", description = "Removed")
+  @ApiResponse(responseCode = "404", description = "No entry exists with the given id")
   @DeleteMapping("/{entryId}")
   /* package */ ResponseEntity<Void> remove(
       @PathVariable final UUID organizationId, @PathVariable final UUID entryId) {
