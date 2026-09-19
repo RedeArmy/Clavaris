@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -301,6 +302,25 @@ class RegisterAccountControllerTest {
         .perform(
             post("/o/{organizationId}/register", ORGANIZATION_ID)
                 .param("email", "taken@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "email"));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: same anti-enumeration posture as
+  // the already-registered-email case above, never states which list/entry matched.
+  @Test
+  void accessRestrictedEmailRerendersTheFormWithAFieldError() throws Exception {
+    when(useCase.handle(any())).thenThrow(new AccessRestrictedException());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "blocked@example.com")
                 .param("password", "a-valid-password")
                 .param("confirmPassword", "a-valid-password"))
         .andExpect(status().isOk())
