@@ -7,30 +7,21 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import com.clavaris.identity.application.usecase.suspendaccount.AccountRevocationCascade;
 import com.clavaris.identity.domain.event.AccountBannedEvent;
 import com.clavaris.identity.domain.model.Account;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link BanAccountUseCase}. SDE-III review, 2026-09-19 — Clerk dashboard "Users"
- * parity: byte-for-byte the same revocation cascade {@code suspendaccount.SuspendAccountService}
- * already established (see that class's own Javadoc for why each of these four calls exists),
- * applied to the {@code ban()} transition instead of {@code suspend()} — a deliberately separate
- * use case, not a reuse, per {@code AccountStatus}'s own Javadoc.
+ * parity: the same {@link AccountRevocationCascade} {@code suspendaccount.SuspendAccountService}
+ * already established, applied to the {@code ban()} transition instead of {@code suspend()} — a
+ * deliberately separate use case, not a reuse, per {@code AccountStatus}'s own Javadoc.
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class BanAccountService implements BanAccountUseCase {
 
   private final AccountRepository accounts;
-  private final SessionRepository sessions;
-  private final RefreshTokenRepository refreshTokens;
-
-  @SuppressWarnings("PMD.LongVariable")
-  private final AccountTokenRevoker accountTokenRevoker;
-
-  @SuppressWarnings("PMD.LongVariable")
-  private final AccountSessionRevoker accountSessionRevoker;
-
+  private final AccountRevocationCascade revocationCascade;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
@@ -44,10 +35,9 @@ public class BanAccountService implements BanAccountUseCase {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.accounts = accounts;
-    this.sessions = sessions;
-    this.refreshTokens = refreshTokens;
-    this.accountTokenRevoker = accountTokenRevoker;
-    this.accountSessionRevoker = accountSessionRevoker;
+    this.revocationCascade =
+        new AccountRevocationCascade(
+            sessions, refreshTokens, accountTokenRevoker, accountSessionRevoker);
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -63,10 +53,7 @@ public class BanAccountService implements BanAccountUseCase {
     account.ban();
     accounts.save(account);
 
-    sessions.revokeAllActiveForAccount(account.id());
-    refreshTokens.revokeAllActiveForAccount(account.id());
-    accountTokenRevoker.revokeAllTokensFor(account.id());
-    accountSessionRevoker.revokeAllSessionsFor(account.id());
+    revocationCascade.revokeEverythingFor(account.id());
 
     auditEvents.write(
         command.actor(), "account.banned", "Account", account.id().value().toString(), null);

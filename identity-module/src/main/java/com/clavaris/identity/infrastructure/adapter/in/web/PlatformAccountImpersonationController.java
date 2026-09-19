@@ -45,6 +45,8 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate")
 public class PlatformAccountImpersonationController {
 
+  private static final String IMPERSONATION_ERROR_ATTRIBUTE = "impersonationError";
+
   private final GetAccountForOrganizationUseCase getAccount;
   private final ImpersonateAccountUseCase impersonateAccount;
   private final ImpersonationTokenMinter tokenMinter;
@@ -108,13 +110,14 @@ public class PlatformAccountImpersonationController {
       redirectAttributes.addFlashAttribute("impersonationToken", token);
     } catch (final AccountNotActiveException _) {
       redirectAttributes.addFlashAttribute(
-          "impersonationError", "This Account is not ACTIVE and cannot be impersonated.");
+          IMPERSONATION_ERROR_ATTRIBUTE, "This Account is not ACTIVE and cannot be impersonated.");
     } catch (final ImpersonationClientNotFoundException _) {
       redirectAttributes.addFlashAttribute(
-          "impersonationError", "That OAuth Client isn't registered for this Organization.");
+          IMPERSONATION_ERROR_ATTRIBUTE,
+          "That OAuth Client isn't registered for this Organization.");
     } catch (final ImpersonationScopeNotAllowedException _) {
       redirectAttributes.addFlashAttribute(
-          "impersonationError",
+          IMPERSONATION_ERROR_ATTRIBUTE,
           "One or more requested scopes aren't allowed for that OAuth Client.");
     }
   }

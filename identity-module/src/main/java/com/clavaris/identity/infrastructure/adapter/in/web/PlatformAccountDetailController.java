@@ -17,13 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item: a read-only
- * Account detail page (identity fields, known devices, linked social providers).
- *
- * <p>TODO(SDE-III, tracked — not scheduled): Clerk's own "View Profile" also shows per-Account
- * Metadata (public/private/unsafe key-value pairs), biometric/WebAuthn credentials, and an activity
- * heatmap. Clavaris has no equivalent concepts yet (no Metadata store on {@code Account}, no
- * WebAuthn credential model, no per-day login aggregation) — deliberately omitted from this page
- * rather than faked, per explicit product decision (2026-09-19).
+ * Account detail page (identity fields, known devices, linked social providers). Metadata,
+ * biometric/WebAuthn credentials, and an activity heatmap are deliberately out of scope — see
+ * TD-FUT-034 (`technical-debt-register.md`).
  *
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver}, same
  * anti-enumeration posture as {@link PlatformAccountsController}; a mismatched {@code accountId}

@@ -1,7 +1,6 @@
 package com.clavaris.identity.application.usecase.getauditlogforaccount;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,7 +45,7 @@ class GetAuditLogForAccountServiceTest {
     AuditEventReader auditEvents = mock(AuditEventReader.class);
     UUID accountId = UUID.randomUUID();
     when(auditEvents.findRecentForTargets(
-            eq(List.of(new AuditEventTargetRef("Account", accountId.toString()))), eq(100)))
+            List.of(new AuditEventTargetRef("Account", accountId.toString())), 100))
         .thenReturn(List.of());
 
     GetAuditLogForAccountService service = new GetAuditLogForAccountService(auditEvents);
