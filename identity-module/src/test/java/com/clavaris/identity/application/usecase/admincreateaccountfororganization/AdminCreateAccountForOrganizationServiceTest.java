@@ -128,9 +128,10 @@ class AdminCreateAccountForOrganizationServiceTest {
   @Test
   void rejectsAnAlreadyRegisteredEmail() {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(true);
+    AdminCreateAccountForOrganizationCommand command = command();
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
-        .isThrownBy(() -> service.handle(command()));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).insert(any());
   }
@@ -138,9 +139,10 @@ class AdminCreateAccountForOrganizationServiceTest {
   @Test
   void rejectsRegistrationWhenTheAccessRestrictionPolicyDisallowsTheEmailByDefault() {
     when(accessRestrictions.isAllowed(organizationId, email)).thenReturn(false);
+    AdminCreateAccountForOrganizationCommand command = command();
 
     assertThatExceptionOfType(AccessRestrictedException.class)
-        .isThrownBy(() -> service.handle(command()));
+        .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).insert(any());
   }
