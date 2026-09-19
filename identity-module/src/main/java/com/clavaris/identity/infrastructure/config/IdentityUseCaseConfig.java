@@ -8,6 +8,8 @@ import com.clavaris.identity.application.usecase.activateplatformsigningkey.Plat
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationService;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
+import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationService;
+import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeService;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkService;
@@ -45,6 +47,8 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshT
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationService;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountService;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
@@ -57,6 +61,7 @@ import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAcc
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceService;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
@@ -141,9 +146,32 @@ class IdentityUseCaseConfig {
       final AccountRepository accountRepository,
       final PasswordHasher passwordHasher,
       final EventOutboxWriter eventOutboxWriter,
-      final AccountAuthenticationPolicyProvider policyProvider) {
+      final AccountAuthenticationPolicyProvider policyProvider,
+      @SuppressWarnings("PMD.LongVariable")
+          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider) {
     return new RegisterAccountService(
-        accountRepository, passwordHasher, eventOutboxWriter, policyProvider);
+        accountRepository,
+        passwordHasher,
+        eventOutboxWriter,
+        policyProvider,
+        accessRestrictionPolicyProvider);
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity.
+  @Bean
+  /* package */ AdminCreateAccountForOrganizationUseCase adminCreateAccountForOrganizationUseCase(
+      final AccountRepository accountRepository,
+      final PasswordHasher passwordHasher,
+      @SuppressWarnings("PMD.LongVariable")
+          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider) {
+    return new AdminCreateAccountForOrganizationService(
+        accountRepository, passwordHasher, accessRestrictionPolicyProvider);
+  }
+
+  @Bean
+  /* package */ ListAccountsForOrganizationUseCase listAccountsForOrganizationUseCase(
+      final AccountRepository accountRepository) {
+    return new ListAccountsForOrganizationService(accountRepository);
   }
 
   @Bean

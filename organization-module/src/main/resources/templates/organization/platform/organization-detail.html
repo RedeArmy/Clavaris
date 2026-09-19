@@ -19,6 +19,14 @@
                               th:text="${organization.environment()}">DEVELOPMENT</span>
                         &#183; Created <span th:text="${organization.createdAt()}">date</span>
                     </p>
+                    <!-- SDE-III review, 2026-09-18: previously shown nowhere as text on this whole
+                         dashboard — only ever implicit in every sub-page's own URL — despite every
+                         REST admin API call and OAuth Client setup instructions needing it typed in
+                         by hand. Plain selectable <code>, same convention this page's own OAuth
+                         Client/Secret Key/Signing Key screens already use for copyable values;
+                         no clipboard JS added (none exists anywhere in this codebase today, and one
+                         value doesn't earn introducing that infrastructure). -->
+                    <p>Organization ID: <code th:text="${organization.id()}">organization id</code></p>
                 </div>
             </div>
 
@@ -86,6 +94,19 @@
 
                         <button class="clavaris-button clavaris-button--inline" type="submit">Create workspace</button>
                     </form>
+                </div>
+            </div>
+
+            <!-- Owned by identity-module (SDE-III review, 2026-09-19, Clerk dashboard "Users" tab
+                 parity) — same "link out, don't embed across a module boundary" reasoning as every
+                 sibling section below. -->
+            <div class="clavaris-section">
+                <h2>Users</h2>
+                <div class="clavaris-section-card">
+                    <p>Every Account registered for this Organization — create one directly with a
+                        password set immediately, or let end users self-register.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organization.id()})}">Manage Users</a>
                 </div>
             </div>
 

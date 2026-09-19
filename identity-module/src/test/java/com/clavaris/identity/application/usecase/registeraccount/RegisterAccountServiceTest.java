@@ -34,6 +34,7 @@ class RegisterAccountServiceTest {
   private PasswordHasher hasher;
   private EventOutboxWriter outbox;
   private AccountAuthenticationPolicyProvider policyProvider;
+  private AccessRestrictionPolicyProvider accessRestrictions;
   private RegisterAccountService service;
 
   @BeforeEach
@@ -45,7 +46,13 @@ class RegisterAccountServiceTest {
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(policyProvider.policyFor(organizationId))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
-    service = new RegisterAccountService(accounts, hasher, outbox, policyProvider);
+    accessRestrictions = mock(AccessRestrictionPolicyProvider.class);
+    // SDE-III review, 2026-09-19: matches today's real default (no restriction entries anywhere
+    // yet) — every existing test below predates this policy, same precedent policyProvider's own
+    // default-stubbing comment above already establishes.
+    when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
+    service =
+        new RegisterAccountService(accounts, hasher, outbox, policyProvider, accessRestrictions);
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }
@@ -184,6 +191,19 @@ class RegisterAccountServiceTest {
     RegisterAccountCommand command = new RegisterAccountCommand(organizationId, email, null, null);
 
     assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).insert(any());
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity.
+  @Test
+  void rejectsRegistrationWhenTheAccessRestrictionPolicyDisallowsTheEmail() {
+    when(accessRestrictions.isAllowed(organizationId, email)).thenReturn(false);
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
+
+    assertThatExceptionOfType(AccessRestrictedException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).insert(any());

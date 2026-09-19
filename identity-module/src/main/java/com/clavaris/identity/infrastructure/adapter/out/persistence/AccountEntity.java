@@ -50,10 +50,24 @@ public class AccountEntity {
   @Column(name = "password_reset_required_at")
   private Instant passwordResetRequiredAt;
 
+  // Clerk dashboard "Users" tab parity (SDE-III review, 2026-09-19) — all four nullable, same
+  // "just add the scalar column" precedent as every field above.
+  @Column(name = "first_name")
+  private String firstName;
+
+  @Column(name = "last_name")
+  private String lastName;
+
+  @Column(name = "phone_number")
+  private String phoneNumber;
+
+  @Column(name = "last_signed_in_at")
+  private Instant lastSignedInAt;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
-  @SuppressWarnings("java:S107")
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public AccountEntity(
       final UUID id,
       final UUID organizationId,
@@ -62,7 +76,11 @@ public class AccountEntity {
       final String status,
       final Instant createdAt,
       final String username,
-      final Instant passwordResetRequiredAt) {
+      final Instant passwordResetRequiredAt,
+      final String firstName,
+      final String lastName,
+      final String phoneNumber,
+      final Instant lastSignedInAt) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
@@ -71,6 +89,10 @@ public class AccountEntity {
     this.createdAt = createdAt;
     this.username = username;
     this.passwordResetRequiredAt = passwordResetRequiredAt;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.phoneNumber = phoneNumber;
+    this.lastSignedInAt = lastSignedInAt;
   }
 
   public UUID getId() {
@@ -103,5 +125,21 @@ public class AccountEntity {
 
   public Instant getPasswordResetRequiredAt() {
     return passwordResetRequiredAt;
+  }
+
+  public String getFirstName() {
+    return firstName;
+  }
+
+  public String getLastName() {
+    return lastName;
+  }
+
+  public String getPhoneNumber() {
+    return phoneNumber;
+  }
+
+  public Instant getLastSignedInAt() {
+    return lastSignedInAt;
   }
 }

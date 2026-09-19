@@ -36,21 +36,29 @@ public class RegisterAccountService implements RegisterAccountUseCase {
   private final PasswordHasher hasher;
   private final EventOutboxWriter outbox;
   private final AccountAuthenticationPolicyProvider policyProvider;
+  private final AccessRestrictionPolicyProvider accessRestrictions;
 
   public RegisterAccountService(
       final AccountRepository accounts,
       final PasswordHasher hasher,
       final EventOutboxWriter outbox,
-      final AccountAuthenticationPolicyProvider policyProvider) {
+      final AccountAuthenticationPolicyProvider policyProvider,
+      final AccessRestrictionPolicyProvider accessRestrictions) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.outbox = outbox;
     this.policyProvider = policyProvider;
+    this.accessRestrictions = accessRestrictions;
   }
 
   @Override
   @Transactional
   public AccountId handle(final RegisterAccountCommand command) {
+    // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: checked before anything else,
+    // same "reject before doing any real work" posture as every other precondition below.
+    if (!accessRestrictions.isAllowed(command.organizationId(), command.email())) {
+      throw new AccessRestrictedException();
+    }
     final AccountAuthenticationPolicySnapshot policy =
         policyProvider.policyFor(command.organizationId());
     final Username username = validateUsername(command, policy);

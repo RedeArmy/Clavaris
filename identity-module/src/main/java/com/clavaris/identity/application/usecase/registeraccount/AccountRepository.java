@@ -1,5 +1,7 @@
 package com.clavaris.identity.application.usecase.registeraccount;
 
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -106,4 +108,12 @@ public interface AccountRepository {
    * Organization's own hard-delete cascade, scaling with that Organization's total account count.
    */
   List<AccountId> findAllAccountIdsByOrganizationId(OrganizationId organizationId);
+
+  /**
+   * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: same TD-PERF-020 keyset
+   * pagination shape as {@code client-registry-module}'s own {@code
+   * OAuthClientRepository#findKeysetPageByOrganizationId}.
+   */
+  KeysetPage<Account> findKeysetPageByOrganizationId(
+      OrganizationId organizationId, KeysetPageRequest pageRequest);
 }

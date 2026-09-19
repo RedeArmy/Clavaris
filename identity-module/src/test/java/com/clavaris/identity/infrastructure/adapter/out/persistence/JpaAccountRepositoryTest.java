@@ -3,6 +3,8 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -378,6 +380,66 @@ class JpaAccountRepositoryTest {
                 .orElseThrow()
                 .id())
         .isEqualTo(second.id());
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: real-Postgres proof of the
+  // paginated sibling, newest-first, forward and backward navigation — same test shape
+  // client-registry-module's own JpaOAuthClientRepositoryTest already establishes for its
+  // identical TD-PERF-020 pattern.
+  @Test
+  void findKeysetPageByOrganizationIdReturnsNewestFirstAndSupportsForwardAndBackwardNavigation() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    Account first = reconstituteAt(organizationId, "first@example.com", now.minusSeconds(20));
+    Account second = reconstituteAt(organizationId, "second@example.com", now.minusSeconds(10));
+    Account third = reconstituteAt(organizationId, "third@example.com", now);
+    repository.insert(first);
+    repository.insert(second);
+    repository.insert(third);
+    repository.insert(
+        reconstituteAt(new OrganizationId(UUID.randomUUID()), "other-org@example.com", now));
+
+    KeysetPage<Account> firstPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 2));
+
+    assertThat(firstPage.content())
+        .extracting(Account::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(firstPage.hasNext()).isTrue();
+    assertThat(firstPage.hasPrevious()).isFalse();
+
+    KeysetPage<Account> secondPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(firstPage.endCursor(), null, 2));
+
+    assertThat(secondPage.content()).extracting(Account::id).containsExactly(first.id());
+    assertThat(secondPage.hasNext()).isFalse();
+    assertThat(secondPage.hasPrevious()).isTrue();
+
+    KeysetPage<Account> backToFirstPage =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, secondPage.startCursor(), 2));
+
+    assertThat(backToFirstPage.content())
+        .extracting(Account::id)
+        .containsExactly(third.id(), second.id());
+    assertThat(backToFirstPage.hasNext()).isTrue();
+    assertThat(backToFirstPage.hasPrevious()).isFalse();
+  }
+
+  private static Account reconstituteAt(
+      final OrganizationId organizationId, final String email, final Instant createdAt) {
+    return Account.reconstitute(
+        new AccountId(UUID.randomUUID()),
+        organizationId,
+        new Email(email),
+        createdAt,
+        null,
+        AccountStatus.ACTIVE,
+        null,
+        null,
+        null);
   }
 
   // Same @Import + narrowly-filtered @EnableJpaRepositories rationale as

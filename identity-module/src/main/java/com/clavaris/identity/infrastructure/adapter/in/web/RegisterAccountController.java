@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
+import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
@@ -198,6 +199,12 @@ public class RegisterAccountController {
       // UUID) to the rendered page — a generic, field-scoped error only.
       bindingResult.rejectValue(
           EMAIL, "email.alreadyRegistered", "This email is already registered");
+      addSignUpOptions(organizationId, model);
+      return FORM_VIEW;
+    } catch (AccessRestrictedException _) {
+      // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: same anti-enumeration posture
+      // as EmailAlreadyRegisteredException above, never states which list/entry matched.
+      bindingResult.rejectValue(EMAIL, "email.restricted", "This email is not allowed to register");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (WeakPasswordException _) {

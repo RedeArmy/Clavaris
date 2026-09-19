@@ -1,8 +1,10 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +13,13 @@ import org.springframework.data.repository.query.Param;
  * Spring Data's own repository interface — kept separate from the outbound port ({@code
  * AccountRepository}) so the port stays framework-free.
  */
+// PMD.TooManyMethods: TD-PERF-020's own three keyset-pagination query methods pushed this past
+// the default threshold — every method here is a genuinely distinct, cohesive query this port's
+// several consumers actually need, same "wiring, not sprawl" reasoning AccountRepository's own
+// class-level suppression already documents. PMD.AvoidDuplicateLiterals: the repeated string is
+// "organizationId" itself, the join column every one of these queries scopes by — same false
+// positive SpringDataOrganizationJpaRepository's own identical suppression documents.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidDuplicateLiterals"})
 interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
   boolean existsByOrganizationIdAndEmail(UUID organizationId, String email);
@@ -60,4 +69,44 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
               + "AND NOT EXISTS (SELECT 1 FROM social_identities si WHERE si.account_id = a.id)",
       nativeQuery = true)
   long countAccountsWithNoAuthMethod();
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: backs
+  // AccountRepository#findKeysetPageByOrganizationId, same three-@Query keyset-pagination shape
+  // TD-PERF-020 already established for OAuthClient/Workspace lists.
+  @Query(
+      """
+      SELECT a FROM AccountEntity a
+      WHERE a.organizationId = :organizationId
+      ORDER BY a.createdAt DESC, a.id DESC
+      """)
+  List<AccountEntity> findFirstPageByOrganizationId(
+      @Param("organizationId") UUID organizationId, Pageable pageable);
+
+  @Query(
+      """
+      SELECT a FROM AccountEntity a
+      WHERE a.organizationId = :organizationId
+        AND (a.createdAt < :cursorCreatedAt
+             OR (a.createdAt = :cursorCreatedAt AND a.id < :cursorId))
+      ORDER BY a.createdAt DESC, a.id DESC
+      """)
+  List<AccountEntity> findPageByOrganizationIdAfter(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      Pageable pageable);
+
+  @Query(
+      """
+      SELECT a FROM AccountEntity a
+      WHERE a.organizationId = :organizationId
+        AND (a.createdAt > :cursorCreatedAt
+             OR (a.createdAt = :cursorCreatedAt AND a.id > :cursorId))
+      ORDER BY a.createdAt ASC, a.id ASC
+      """)
+  List<AccountEntity> findPageByOrganizationIdBefore(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      Pageable pageable);
 }

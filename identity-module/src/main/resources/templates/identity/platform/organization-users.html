@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Users — Clavaris')}">
+    <title>Users — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Users</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Users</h1>
+                    <p>Every Account registered for this Organization.</p>
+                </div>
+            </div>
+
+            <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity. Pagination stays
+                 HTMX (same TD-PERF-020 convention as every sibling list); create is a plain form
+                 POST inside a &lt;dialog&gt;, not HTMX — see PlatformAccountsController's own
+                 Javadoc for why. -->
+            <div id="users-content" th:fragment="users" class="clavaris-section">
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(users)}">
+                    <p class="clavaris-empty-state">No users yet — create the first one below.</p>
+                </div>
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(users)}">
+                    <table class="clavaris-table">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Username</th>
+                            <th>Phone number</th>
+                            <th>Last signed In</th>
+                            <th>Joined</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="account : ${users}">
+                            <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}"
+                                th:text="${#strings.isEmpty(fullName)} ? '—' : ${fullName}">Name</td>
+                            <td th:text="${account.email().value()}">email</td>
+                            <td th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</td>
+                            <td th:text="${account.phoneNumber().orElse('—')}">phone</td>
+                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${account.lastSignedInAt().get()} : 'Never'">last signed in</td>
+                            <td th:text="${account.createdAt()}">joined</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <nav class="clavaris-pagination"
+                     th:if="${usersPage.hasPrevious() or usersPage.hasNext()}"
+                     aria-label="Users pages">
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${usersPage.hasPrevious()}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},before=${usersPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},before=${usersPage.startCursor().encode()})}"
+                       hx-target="#users-content" hx-swap="outerHTML">Previous</a>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${usersPage.hasNext()}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()})}"
+                       hx-target="#users-content" hx-swap="outerHTML">Next</a>
+                </nav>
+
+                <button class="clavaris-create-tile" type="button" data-dialog-open="create-user-dialog">
+                    <span class="clavaris-create-tile__icon" aria-hidden="true">+</span>
+                    <strong>Create user</strong>
+                </button>
+            </div>
+
+            <dialog id="create-user-dialog" class="clavaris-dialog">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">User</span>
+                        <h2>Create user</h2>
+                        <p>Creates an Account directly for this Organization, with the password
+                            set immediately — no invitation email is sent.</p>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create user dialog">×</button>
+                </div>
+                <form th:action="@{''}" th:object="${createForm}" method="post">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="clavaris-field">
+                        <label for="firstName">First name</label>
+                        <input id="firstName" type="text" th:field="*{firstName}"/>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="lastName">Last name</label>
+                        <input id="lastName" type="text" th:field="*{lastName}"/>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="email">Email</label>
+                        <input id="email" type="email" th:field="*{email}" required/>
+                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}" data-dialog-open-on-load>Email error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="username">Username</label>
+                        <input id="username" type="text" th:field="*{username}"/>
+                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}" data-dialog-open-on-load>Username error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="password">Password</label>
+                        <input id="password" type="password" th:field="*{password}" required/>
+                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}" data-dialog-open-on-load>Password error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="phoneNumber">Phone number</label>
+                        <input id="phoneNumber" type="tel" th:field="*{phoneNumber}"/>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label>
+                            <input type="checkbox" th:field="*{ignorePasswordPolicy}"/>
+                            Ignore password policies
+                        </label>
+                        <p>If checked, password policies will not be enforced on this password.</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label>
+                            <input type="checkbox" th:field="*{ignoreAccessRestrictions}"/>
+                            Ignore access restrictions
+                        </label>
+                        <p>If checked, this user can be created even when their identifier is on
+                            the blocklist, is outside the allowlist, or uses a blocked domain.</p>
+                    </div>
+
+                    <div class="clavaris-dialog__actions">
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Create user</button>
+                    </div>
+                </form>
+            </dialog>
+        </div>
+    </main>
+</div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
+</body>
+</html>
