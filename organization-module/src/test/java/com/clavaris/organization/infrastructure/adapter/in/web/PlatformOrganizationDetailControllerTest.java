@@ -1,10 +1,12 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -103,6 +105,22 @@ class PlatformOrganizationDetailControllerTest {
         .andExpect(view().name("organization/platform/organization-detail"))
         .andExpect(model().attribute("organization", organization))
         .andExpect(model().attribute("workspaces", List.of(workspace)));
+  }
+
+  // SDE-III review, 2026-09-18: real gap, found live — the organizationId was previously never
+  // rendered as text anywhere on this dashboard, only ever implicit in each page's own URL, despite
+  // every REST admin API call and the OAuth Client setup instructions panel needing it typed in by
+  // hand. Asserts against the actually-rendered HTML (real Thymeleaf, not a mocked view resolver),
+  // not just the model attribute already covered above.
+  @Test
+  void rendersTheOrganizationIdAsVisibleTextForCopying() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
+
+    mockMvc
+        .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(organization.id().toString())));
   }
 
   @Test

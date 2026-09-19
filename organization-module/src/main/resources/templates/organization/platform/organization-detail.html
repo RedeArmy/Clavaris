@@ -19,6 +19,14 @@
                               th:text="${organization.environment()}">DEVELOPMENT</span>
                         &#183; Created <span th:text="${organization.createdAt()}">date</span>
                     </p>
+                    <!-- SDE-III review, 2026-09-18: previously shown nowhere as text on this whole
+                         dashboard — only ever implicit in every sub-page's own URL — despite every
+                         REST admin API call and OAuth Client setup instructions needing it typed in
+                         by hand. Plain selectable <code>, same convention this page's own OAuth
+                         Client/Secret Key/Signing Key screens already use for copyable values;
+                         no clipboard JS added (none exists anywhere in this codebase today, and one
+                         value doesn't earn introducing that infrastructure). -->
+                    <p>Organization ID: <code th:text="${organization.id()}">organization id</code></p>
                 </div>
             </div>
 
