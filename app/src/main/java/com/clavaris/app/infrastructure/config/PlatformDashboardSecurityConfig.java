@@ -95,6 +95,8 @@ public class PlatformDashboardSecurityConfig {
           final int forgotPasswordPerIpLimit,
       @Value("${clavaris.rate-limit.platform-create-organization.per-account-limit:10}")
           final int createOrganizationPerAccountLimit,
+      @Value("${clavaris.rate-limit.platform-impersonate.per-account-limit:10}")
+          final int impersonatePerAccountLimit,
       final EmbeddingEligibilityChecker embeddingChecker) {
     http.securityMatcher("/platform/**")
         .sessionManagement(
@@ -223,6 +225,21 @@ public class PlatformDashboardSecurityConfig {
                         RateLimitRule.always(),
                         RateLimitIdentifiers::authenticatedPlatformAccountId,
                         createOrganizationPerAccountLimit,
+                        Duration.ofMinutes(5)),
+                    // SDE-III review, 2026-09-19: mints a live Bearer access token for a target
+                    // Account (PlatformAccountImpersonationController) — the REST admin API's own
+                    // "admin-api-accounts-impersonate:client" limiter (AdminApiSecurityConfig) is
+                    // scoped to /api/v1/admin/** and a PlatformClient bearer token, neither of
+                    // which this session-authenticated dashboard POST carries, so without this
+                    // rule the dashboard path would be entirely unthrottled. Same tight ceiling as
+                    // that limiter, keyed by the operator's own PlatformAccountId instead.
+                    new RateLimitRule(
+                        "platform-impersonate:account",
+                        HttpMethod.POST,
+                        "/platform/dashboard/organizations/*/users/*/impersonate",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformAccountId,
+                        impersonatePerAccountLimit,
                         Duration.ofMinutes(5)))),
             SecurityContextHolderFilter.class)
         // TD-SEC-009: platform login/register/forgot-/reset-password/verify-email templates and

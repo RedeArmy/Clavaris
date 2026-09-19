@@ -140,7 +140,7 @@
                                   th:classappend="${client.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${client.active()} ? 'Active' : 'Inactive'">Active</span>
                         </td>
-                        <td th:text="${client.createdAt()}">Created at</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(client.createdAt())}">Created at</td>
                         <td>
                             <div class="clavaris-row-actions" th:if="${client.active()}">
                                 <form method="post"

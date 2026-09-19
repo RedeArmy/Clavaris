@@ -1119,6 +1119,24 @@ code {
 .clavaris-profile__actions form { margin: 0; }
 .clavaris-profile__actions .clavaris-button { width: 100%; padding: 8px; font-size: .78rem; white-space: nowrap; }
 
+/* SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab 3-dot row menu (row-menu.js's own
+   Javadoc explains why the panel is position: fixed, not position: absolute like .clavaris-profile
+   above, despite the otherwise-identical <details>/<summary> shape). */
+.clavaris-menu { position: relative; margin: 0; }
+.clavaris-menu > summary { list-style: none; cursor: pointer; }
+.clavaris-menu > summary::-webkit-details-marker { display: none; }
+.clavaris-menu__trigger { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--clavaris-text-muted); font-size: 1.15rem; line-height: 1; border: 1px solid transparent; border-radius: 999px; }
+.clavaris-menu[open] > .clavaris-menu__trigger,
+.clavaris-menu__trigger:hover { color: var(--clavaris-text-primary); background: var(--clavaris-bg); border-color: var(--clavaris-border); }
+.clavaris-menu__panel { position: fixed; z-index: 40; display: grid; gap: 2px; min-width: 200px; padding: 6px; overflow: hidden; background: color-mix(in srgb, var(--clavaris-surface) 96%, transparent); border: 1px solid var(--clavaris-border); border-radius: 12px; box-shadow: var(--shadow-overlay); backdrop-filter: blur(18px); }
+.clavaris-menu__panel form { margin: 0; }
+.clavaris-menu__item { display: block; width: 100%; padding: 8px 10px; color: var(--clavaris-text-primary); font: inherit; font-size: .8125rem; text-align: left; text-decoration: none; background: none; border: none; border-radius: 8px; cursor: pointer; }
+.clavaris-menu__item:hover { background: var(--clavaris-bg); }
+.clavaris-menu__item--danger { color: var(--clavaris-danger); }
+.clavaris-menu__item--danger:hover { background: var(--clavaris-danger-bg); }
+.clavaris-menu__id { margin: 0; padding: 6px 10px; color: var(--clavaris-text-muted); font-size: .7rem; word-break: break-all; }
+.clavaris-menu__divider { margin: 4px 0; border: none; border-top: 1px solid var(--clavaris-border); }
+
 .clavaris-empty-state-card { padding: 0; overflow: hidden; }
 .clavaris-organization-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .clavaris-organization-card,

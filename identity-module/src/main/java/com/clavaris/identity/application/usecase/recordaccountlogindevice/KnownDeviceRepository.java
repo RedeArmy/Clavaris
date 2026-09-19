@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.recordaccountlogindevice;
 
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.KnownDevice;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -44,4 +45,13 @@ public interface KnownDeviceRepository {
    * catch this same call site wraps around it depends on that.
    */
   void insert(KnownDevice device);
+
+  /**
+   * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab / View Profile parity: every device
+   * this Account has ever logged in from, newest-first. No pagination — same "operator-curated,
+   * bounded, real-world-small list" rationale {@code AccessRestrictionEntryRepository}'s own
+   * identical no-pagination choice documents; a device list is bounded by how many distinct
+   * browsers/machines a real user actually uses, not by user-generated content volume.
+   */
+  List<KnownDevice> findAllByAccountId(AccountId accountId);
 }

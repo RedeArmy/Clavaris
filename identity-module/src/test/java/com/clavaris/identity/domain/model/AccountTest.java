@@ -274,4 +274,84 @@ class AccountTest {
 
     assertThat(account.status()).isEqualTo(AccountStatus.DELETED);
   }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" parity: ban()/unban() mirror
+  // suspend()/reactivate()'s own tests exactly, plus one proving the two states never silently
+  // convert into one another (AccountStatus's own Javadoc).
+  @Test
+  void banTransitionsAnActiveAccountToBanned() {
+    Account account = Account.register(organizationId, email);
+
+    account.ban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.BANNED);
+  }
+
+  @Test
+  void banIsIdempotent_reBanningAnAlreadyBannedAccountIsANoOp() {
+    Account account = Account.register(organizationId, email);
+    account.ban();
+
+    account.ban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.BANNED);
+  }
+
+  @Test
+  void banDoesNothingToADeletedAccount_terminalStatusNeverReversed() {
+    Account account =
+        Account.reconstitute(
+            new AccountId(UUID.randomUUID()),
+            organizationId,
+            email,
+            Instant.now(),
+            null,
+            AccountStatus.DELETED,
+            null,
+            null,
+            null);
+
+    account.ban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.DELETED);
+  }
+
+  @Test
+  void banDoesNothingToASuspendedAccount_theTwoStatesNeverSilentlyConvert() {
+    Account account = Account.register(organizationId, email);
+    account.suspend();
+
+    account.ban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
+  }
+
+  @Test
+  void unbanTransitionsABannedAccountBackToActive() {
+    Account account = Account.register(organizationId, email);
+    account.ban();
+
+    account.unban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.ACTIVE);
+  }
+
+  @Test
+  void unbanIsIdempotent_unbanningAnAlreadyActiveAccountIsANoOp() {
+    Account account = Account.register(organizationId, email);
+
+    account.unban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.ACTIVE);
+  }
+
+  @Test
+  void unbanDoesNothingToASuspendedAccount_theTwoStatesNeverSilentlyConvert() {
+    Account account = Account.register(organizationId, email);
+    account.suspend();
+
+    account.unban();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
+  }
 }

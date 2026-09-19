@@ -61,10 +61,10 @@
                                   th:text="${delivery.status().name()}">status</span>
                         </td>
                         <td th:text="${delivery.attemptCount()}">attempts</td>
-                        <td th:text="${delivery.lastAttemptAt()} ?: '—'">last attempt</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(delivery.lastAttemptAt())} ?: '—'">last attempt</td>
                         <td th:text="${delivery.lastResponseStatus()} ?: '—'">last response</td>
                         <td th:text="${delivery.lastError()} ?: '—'">last error</td>
-                        <td th:text="${delivery.createdAt()}">created</td>
+                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(delivery.createdAt())}">created</td>
                         <td>
                             <div class="clavaris-row-actions" th:if="${delivery.status().isReplayable()}">
                                 <form method="post"

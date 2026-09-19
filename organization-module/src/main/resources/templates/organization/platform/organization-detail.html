@@ -17,7 +17,7 @@
                         <span class="clavaris-badge"
                               th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                               th:text="${organization.environment()}">DEVELOPMENT</span>
-                        &#183; Created <span th:text="${organization.createdAt()}">date</span>
+                        &#183; Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organization.createdAt())}">date</span>
                     </p>
                     <!-- SDE-III review, 2026-09-18: previously shown nowhere as text on this whole
                          dashboard — only ever implicit in every sub-page's own URL — despite every
@@ -51,7 +51,7 @@
                         <tbody>
                         <tr th:each="workspace : ${workspaces}">
                             <td th:text="${workspace.name()}">Workspace name</td>
-                            <td th:text="${workspace.createdAt()}">Created at</td>
+                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">Created at</td>
                             <td>
                                 <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                                    th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()})}">View</a>
@@ -182,7 +182,7 @@
                         <span class="clavaris-badge clavaris-badge--muted" th:unless="${rateLimitPolicy.customized()}">System default</span>
                         <span class="clavaris-badge clavaris-badge--success" th:if="${rateLimitPolicy.customized()}">Custom</span>
                     </p>
-                    <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${rateLimitPolicy.updatedAt()}">date</span>.</p>
+                    <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(rateLimitPolicy.updatedAt())}">date</span>.</p>
                     <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — using the system default below.</p>
 
                     <form th:action="@{/platform/dashboard/organizations/{organizationId}/rate-limit-policy(organizationId=${organization.id()})}"

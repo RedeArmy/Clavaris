@@ -1,8 +1,10 @@
 package com.clavaris.identity.application.usecase.authenticatewithsocialprovider;
 
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,4 +26,11 @@ public interface SocialIdentityRepository {
       OrganizationId organizationId, SocialProvider provider, String providerUserId);
 
   void save(SocialIdentity identity);
+
+  /**
+   * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab / View Profile parity: every social
+   * identity linked to this Account. No pagination — same rationale {@code
+   * KnownDeviceRepository#findAllByAccountId}'s own identical addition documents.
+   */
+  List<SocialIdentity> findAllByAccountId(AccountId accountId);
 }

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Audit Log — Clavaris')}">
+    <title>Audit Log — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id()})}" th:text="${account.email().value()}">Account</a> /
+                <span>Audit Log</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Audit Log</h1>
+                    <p th:text="'The most recent administrative changes to this Account: ' + ${account.email().value()} + '.'">Account audit log</p>
+                </div>
+            </div>
+
+            <!-- SDE-III review, 2026-09-19 — same read-only, plain-bounded-list shape as
+                 PlatformAuditLogController's own Organization-wide view (ADR-0025); the complement
+                 to that view's own explicitly documented "Account events out of scope" limitation,
+                 see GetAuditLogForAccountUseCase's own Javadoc. -->
+            <div class="clavaris-section">
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
+                    <p class="clavaris-empty-state">No audit events recorded yet for this Account.</p>
+                </div>
+                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(auditEvents)}">
+                    <table class="clavaris-table">
+                        <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>Detail</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="event : ${auditEvents}">
+                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(event.occurredAt())}">timestamp</td>
+                            <td><code th:text="${event.actor().type()} + ':' + ${event.actor().id()}">actor</code></td>
+                            <td><code th:text="${event.action()}">action</code></td>
+                            <td th:text="${event.detail().orElse('—')}">detail</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

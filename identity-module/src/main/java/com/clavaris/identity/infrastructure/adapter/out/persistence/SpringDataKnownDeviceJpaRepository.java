@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,6 +15,8 @@ interface SpringDataKnownDeviceJpaRepository extends JpaRepository<KnownDeviceEn
       UUID accountId, String deviceTokenHash);
 
   boolean existsByAccountId(UUID accountId);
+
+  List<KnownDeviceEntity> findAllByAccountIdOrderByLastSeenAtDesc(UUID accountId);
 
   // TD-PERF-002 (KnownDeviceRetentionJob): a bulk JPQL DELETE, not Spring Data's derived
   // deleteBy...(...) convention — same "one round trip against the database, not one row at a
