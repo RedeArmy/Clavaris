@@ -142,6 +142,11 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
       throw new EmailNotVerifiedException();
     }
 
+    // Clerk dashboard "Users" tab parity (SDE-III review, 2026-09-19) — the one write this
+    // otherwise read-only use case makes, and only on the success path.
+    account.recordSignIn();
+    accounts.save(account);
+
     LOG.info(
         "event=login_success organizationId={} accountId={}",
         command.organizationId(),

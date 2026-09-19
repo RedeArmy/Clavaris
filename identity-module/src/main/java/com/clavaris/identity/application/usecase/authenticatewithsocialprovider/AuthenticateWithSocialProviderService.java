@@ -148,6 +148,17 @@ public class AuthenticateWithSocialProviderService
             command.organizationId(), command.provider(), command.providerUserId());
     if (existingIdentity.isPresent()) {
       final SocialIdentity identity = existingIdentity.get();
+      // Clerk dashboard "Users" tab parity (SDE-III review, 2026-09-19) — same recordSignIn()
+      // write AuthenticateWithPasswordService's own success path makes. A returning social login
+      // only ever resolved an accountId until now, never the full aggregate — this is the one
+      // path here that needs it loaded at all.
+      accounts
+          .findById(identity.accountId())
+          .ifPresent(
+              account -> {
+                account.recordSignIn();
+                accounts.save(account);
+              });
       LOG.info(
           "event=social_login_success organizationId={} accountId={} provider={} outcome=returning",
           command.organizationId(),
@@ -184,6 +195,9 @@ public class AuthenticateWithSocialProviderService
             // all, so a password-reset attempt would have failed outright (Account.
             // resetPasswordCredential requires one to already exist).
             account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
+            // Clerk dashboard "Users" tab parity — a brand-new social signup is also its own
+            // first sign-in.
+            account.recordSignIn();
             // TD-PERF-019: insert, not save — Account.register two lines above guarantees this is
             // a brand-new aggregate, never persisted before. See AccountRepository#insert's own
             // Javadoc for why that matters.

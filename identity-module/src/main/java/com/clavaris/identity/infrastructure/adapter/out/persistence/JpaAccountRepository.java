@@ -1,5 +1,9 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -12,6 +16,7 @@ import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -104,7 +109,11 @@ class JpaAccountRepository implements AccountRepository {
         AccountStatus.valueOf(entity.getStatus()),
         credential,
         username,
-        entity.getPasswordResetRequiredAt());
+        entity.getPasswordResetRequiredAt(),
+        entity.getFirstName(),
+        entity.getLastName(),
+        entity.getPhoneNumber(),
+        entity.getLastSignedInAt());
   }
 
   // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
@@ -161,7 +170,11 @@ class JpaAccountRepository implements AccountRepository {
         account.status().name(),
         account.createdAt(),
         account.username().map(Username::value).orElse(null),
-        account.passwordResetRequiredAt().orElse(null));
+        account.passwordResetRequiredAt().orElse(null),
+        account.firstName().orElse(null),
+        account.lastName().orElse(null),
+        account.phoneNumber().orElse(null),
+        account.lastSignedInAt().orElse(null));
   }
 
   // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider
@@ -227,5 +240,43 @@ class JpaAccountRepository implements AccountRepository {
     return accounts.findIdsByOrganizationId(organizationId.value()).stream()
         .map(AccountId::new)
         .toList();
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: same TD-PERF-020 keyset
+  // pagination shape client-registry-module's own JpaOAuthClientRepository already establishes.
+  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
+  @Override
+  public KeysetPage<Account> findKeysetPageByOrganizationId(
+      final OrganizationId organizationId, final KeysetPageRequest pageRequest) {
+    final PageRequest limit = PageRequest.of(0, pageRequest.size() + 1);
+    if (pageRequest.after() != null) {
+      final KeysetCursor cursor = pageRequest.after();
+      return SpringDataKeysetPageMapper.forward(
+          accounts.findPageByOrganizationIdAfter(
+              organizationId.value(), cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          true,
+          this::toDomain,
+          this::cursorOf);
+    }
+    if (pageRequest.before() != null) {
+      final KeysetCursor cursor = pageRequest.before();
+      return SpringDataKeysetPageMapper.backward(
+          accounts.findPageByOrganizationIdBefore(
+              organizationId.value(), cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          this::toDomain,
+          this::cursorOf);
+    }
+    return SpringDataKeysetPageMapper.forward(
+        accounts.findFirstPageByOrganizationId(organizationId.value(), limit),
+        pageRequest.size(),
+        false,
+        this::toDomain,
+        this::cursorOf);
+  }
+
+  private KeysetCursor cursorOf(final AccountEntity entity) {
+    return new KeysetCursor(entity.getCreatedAt(), entity.getId());
   }
 }

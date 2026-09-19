@@ -2,12 +2,17 @@ package com.clavaris.organization.infrastructure.config;
 
 import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionEntryRepository;
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryService;
+import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleService;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
+import com.clavaris.organization.application.usecase.checkaccessrestrictionfororganization.CheckAccessRestrictionForOrganizationService;
+import com.clavaris.organization.application.usecase.checkaccessrestrictionfororganization.CheckAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationService;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
@@ -42,6 +47,8 @@ import com.clavaris.organization.application.usecase.getratelimitpolicyfororgani
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationService;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationService;
+import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedService;
@@ -56,6 +63,8 @@ import com.clavaris.organization.application.usecase.listworkspacesfororganizati
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedService;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
+import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryService;
+import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberRefreshTokenRevoker;
@@ -395,5 +404,31 @@ class OrganizationUseCaseConfig {
       getAccountAuthenticationPolicyForOrganizationUseCase(
           final AccountAuthenticationPolicyRepository policies) {
     return new GetAccountAuthenticationPolicyForOrganizationService(policies);
+  }
+
+  // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity, minimal.
+  @Bean
+  /* package */ AddAccessRestrictionEntryUseCase addAccessRestrictionEntryUseCase(
+      final AccessRestrictionEntryRepository entries) {
+    return new AddAccessRestrictionEntryService(entries);
+  }
+
+  @Bean
+  /* package */ RemoveAccessRestrictionEntryUseCase removeAccessRestrictionEntryUseCase(
+      final AccessRestrictionEntryRepository entries) {
+    return new RemoveAccessRestrictionEntryService(entries);
+  }
+
+  @Bean
+  /* package */ ListAccessRestrictionEntriesForOrganizationUseCase
+      listAccessRestrictionEntriesForOrganizationUseCase(
+          final AccessRestrictionEntryRepository entries) {
+    return new ListAccessRestrictionEntriesForOrganizationService(entries);
+  }
+
+  @Bean
+  /* package */ CheckAccessRestrictionForOrganizationUseCase
+      checkAccessRestrictionForOrganizationUseCase(final AccessRestrictionEntryRepository entries) {
+    return new CheckAccessRestrictionForOrganizationService(entries);
   }
 }

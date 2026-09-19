@@ -41,6 +41,23 @@ public final class Account {
   // timestamp, not a boolean, for its audit value (same reasoning as emailVerifiedAt).
   private Instant passwordResetRequiredAt;
 
+  // Clerk dashboard "Users" parity (SDE-III review, 2026-09-19): all four nullable, optional
+  // profile attributes — email remains the one mandatory identity field (BR-ID-01), same posture
+  // as username's own "optional secondary identifier" precedent (ADR-0024 §4). No dedicated value
+  // types (unlike Email/Username): none of the four carries a real domain invariant beyond
+  // "arbitrary display/contact text" — a validated PhoneNumber type would need real phone-number
+  // parsing this codebase has no other reason to own yet.
+  private String firstName;
+  private String lastName;
+  private String phoneNumber;
+
+  // Updated by recordSignIn() on every successful password/social authentication — the "Last
+  // signed In" column the dashboard Users tab shows, mirroring Clerk's own. Deliberately a plain
+  // field mutated post-construction (like passwordResetRequiredAt), not folded into the
+  // authentication use cases' own return value — every caller that authenticates an Account
+  // already holds the aggregate and saves it back, the natural place for this side effect to live.
+  private Instant lastSignedInAt;
+
   private Account(
       final AccountId id,
       final OrganizationId organizationId,
@@ -62,6 +79,26 @@ public final class Account {
   public static Account register(final OrganizationId organizationId, final Email email) {
     return new Account(
         AccountId.newId(), organizationId, email, Instant.now(), AccountStatus.ACTIVE);
+  }
+
+  /**
+   * Admin-initiated creation (dashboard "Users" tab, Clerk parity) — same aggregate, same
+   * invariants as {@link #register(OrganizationId, Email)}, with the optional profile fields an
+   * operator can fill in on the create-user form. {@code firstName}/{@code lastName}/{@code
+   * phoneNumber} may each be {@code null} — every field on that form except email and password is
+   * optional.
+   */
+  public static Account register(
+      final OrganizationId organizationId,
+      final Email email,
+      final String firstName,
+      final String lastName,
+      final String phoneNumber) {
+    final Account account = register(organizationId, email);
+    account.firstName = firstName;
+    account.lastName = lastName;
+    account.phoneNumber = phoneNumber;
+    return account;
   }
 
   /**
@@ -110,11 +147,52 @@ public final class Account {
       final PasswordCredential passwordCredential,
       final Username username,
       final Instant passwordResetRequiredAt) {
+    return reconstitute(
+        id,
+        organizationId,
+        email,
+        createdAt,
+        emailVerifiedAt,
+        status,
+        passwordCredential,
+        username,
+        passwordResetRequiredAt,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /**
+   * Full reconstitution including the Clerk-parity profile/last-sign-in fields (SDE-III review,
+   * 2026-09-19) — the persistence adapter's own rehydration path. The 9-arg overload above is kept,
+   * not replaced, so every existing caller that never touches these four fields (the overwhelming
+   * majority — see this class's own commit history) stays unchanged.
+   */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  public static Account reconstitute(
+      final AccountId id,
+      final OrganizationId organizationId,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PasswordCredential passwordCredential,
+      final Username username,
+      final Instant passwordResetRequiredAt,
+      final String firstName,
+      final String lastName,
+      final String phoneNumber,
+      final Instant lastSignedInAt) {
     final Account account = new Account(id, organizationId, email, createdAt, status);
     account.emailVerifiedAt = emailVerifiedAt;
     account.passwordCredential = passwordCredential;
     account.username = username;
     account.passwordResetRequiredAt = passwordResetRequiredAt;
+    account.firstName = firstName;
+    account.lastName = lastName;
+    account.phoneNumber = phoneNumber;
+    account.lastSignedInAt = lastSignedInAt;
     return account;
   }
 
@@ -152,6 +230,32 @@ public final class Account {
 
   public Optional<Instant> passwordResetRequiredAt() {
     return Optional.ofNullable(passwordResetRequiredAt);
+  }
+
+  public Optional<String> firstName() {
+    return Optional.ofNullable(firstName);
+  }
+
+  public Optional<String> lastName() {
+    return Optional.ofNullable(lastName);
+  }
+
+  public Optional<String> phoneNumber() {
+    return Optional.ofNullable(phoneNumber);
+  }
+
+  public Optional<Instant> lastSignedInAt() {
+    return Optional.ofNullable(lastSignedInAt);
+  }
+
+  /**
+   * Called by every successful authentication path (password, social) right before the account is
+   * saved back — the dashboard Users tab's "Last signed In" column (Clerk parity). Unconditional,
+   * not idempotent-guarded like {@link #verifyEmail()}: unlike a one-time confirmation, this is
+   * meant to move forward on every single sign-in, not just the first.
+   */
+  public void recordSignIn() {
+    this.lastSignedInAt = Instant.now();
   }
 
   /**

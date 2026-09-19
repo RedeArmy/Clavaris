@@ -97,6 +97,19 @@
                 </div>
             </div>
 
+            <!-- Owned by identity-module (SDE-III review, 2026-09-19, Clerk dashboard "Users" tab
+                 parity) — same "link out, don't embed across a module boundary" reasoning as every
+                 sibling section below. -->
+            <div class="clavaris-section">
+                <h2>Users</h2>
+                <div class="clavaris-section-card">
+                    <p>Every Account registered for this Organization — create one directly with a
+                        password set immediately, or let end users self-register.</p>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organization.id()})}">Manage Users</a>
+                </div>
+            </div>
+
             <!-- Owned by client-registry-module (ADR-0023/ADR-0025) — a plain link, not an
                  embedded fragment: that page's own controller lives in a different module, and
                  this page stays organization-module's own read, unmodified by that module's
