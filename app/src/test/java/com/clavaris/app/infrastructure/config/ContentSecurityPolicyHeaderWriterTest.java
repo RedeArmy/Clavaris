@@ -31,6 +31,8 @@ class ContentSecurityPolicyHeaderWriterTest {
   // TD-SEC-011: flat, org-agnostic — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
   // this is no longer "/o/{organizationId}/oauth2/authorize".
   private static final String ORG_CONSENT_PATH = "/oauth2/consent";
+  private static final String DASHBOARD_PATH =
+      "/platform/dashboard/organizations/11111111-1111-1111-1111-111111111111/oauth-clients";
 
   private final ContentSecurityPolicyHeaderWriter writer =
       new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class));
@@ -47,6 +49,26 @@ class ContentSecurityPolicyHeaderWriterTest {
             HEADER_NAME,
             "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
                 + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // SDE-III review, 2026-09-16 — real bug, found live: this path previously had zero test
+  // coverage at all, which is exactly how a connect-src 'none' on an HTMX-driven page (every
+  // dashboard mutation/pagination link) shipped unnoticed — a real browser blocks the request
+  // outright with no visible error unless the operator opens the console. See
+  // ContentSecurityPolicyHeaderWriter's own DASHBOARD_PAGE_POLICY comment for the fix.
+  @Test
+  void setsTheDashboardPolicyWithConnectSrcSelfSoHtmxRequestsAreNotBlocked() {
+    HttpServletRequest request = requestWithUri(DASHBOARD_PATH);
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+                + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 

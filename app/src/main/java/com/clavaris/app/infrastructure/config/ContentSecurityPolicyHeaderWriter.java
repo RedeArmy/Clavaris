@@ -170,10 +170,20 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private static final Pattern LOGIN_PAGE_PATH = Pattern.compile("^/o/[^/]+/login$");
 
   // ADR-0025: same relaxation, own named policy — see this class's own Javadoc for why not reused.
+  //
+  // connect-src 'self', not 'none' (SDE-III review, 2026-09-16 — real bug, found live): every
+  // mutation and every paginated list on this whole dashboard (register/deactivate/rotate-secret,
+  // Organizations, Workspaces, OAuth Clients, Secret Keys, ...) is an HTMX hx-post/hx-get, which
+  // issues its request via fetch()/XHR — governed by CSP's connect-src, never script-src.
+  // script-src 'self' only permits loading /js/htmx.min.js itself, not the requests that script
+  // makes. With connect-src 'none' (copied from STRICT_POLICY/LOGIN_PAGE_POLICY, neither of which
+  // makes any fetch call at all), the browser silently blocks every single HTMX request on this
+  // chain — no network entry, no visible error unless the operator opens the console — confirmed
+  // live against a real browser's own CSP violation report on this exact directive.
   @SuppressWarnings("PMD.LongVariable")
   private static final String DASHBOARD_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
   // Matches every page under the dashboard app shell — PlatformDashboardSecurityConfig's own
