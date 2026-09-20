@@ -67,9 +67,10 @@ class DeleteOwnAccountServiceTest {
   @Test
   void throwsSelfDeleteNotAllowedWhenAccountHasNotOptedIn() {
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    AccountId id = account.id();
 
     assertThatExceptionOfType(SelfDeleteNotAllowedException.class)
-        .isThrownBy(() -> service.handle(account.id()));
+        .isThrownBy(() -> service.handle(id));
 
     verify(deleteAccount, never()).handle(any());
   }

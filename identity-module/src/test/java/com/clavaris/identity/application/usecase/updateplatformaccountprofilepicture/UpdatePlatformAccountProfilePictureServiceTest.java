@@ -94,8 +94,11 @@ class UpdatePlatformAccountProfilePictureServiceTest {
 
   @Test
   void rejectsAnUnsupportedContentType() {
+    UpdatePlatformAccountProfilePictureCommand unsupported =
+        command(new byte[] {1}, "image/svg+xml");
+
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> service.handle(command(new byte[] {1}, "image/svg+xml")));
+        .isThrownBy(() -> service.handle(unsupported));
 
     verifyNoInteractions(storage);
     verify(accounts, never()).save(any());
@@ -104,9 +107,10 @@ class UpdatePlatformAccountProfilePictureServiceTest {
   @Test
   void rejectsContentOverTheTenMegabyteCap() {
     byte[] tooLarge = new byte[(int) ProfilePictureValidator.MAX_BYTES + 1];
+    UpdatePlatformAccountProfilePictureCommand oversized = command(tooLarge, "image/png");
 
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> service.handle(command(tooLarge, "image/png")));
+        .isThrownBy(() -> service.handle(oversized));
 
     verifyNoInteractions(storage);
   }
@@ -114,8 +118,9 @@ class UpdatePlatformAccountProfilePictureServiceTest {
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     when(accounts.findById(any())).thenReturn(Optional.empty());
+    UpdatePlatformAccountProfilePictureCommand upload = command(new byte[] {1}, "image/png");
 
     assertThatExceptionOfType(PlatformAccountNotFoundException.class)
-        .isThrownBy(() -> service.handle(command(new byte[] {1}, "image/png")));
+        .isThrownBy(() -> service.handle(upload));
   }
 }

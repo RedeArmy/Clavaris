@@ -86,7 +86,7 @@ class OAuthGrantsRepositoryBridge implements OAuthGrantsRepository {
           .findById(UUID.fromString(registeredClientId))
           .map(OAuthClient::clientId)
           .orElse(null);
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
   }

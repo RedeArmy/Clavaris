@@ -95,8 +95,9 @@ class RemovePlatformAccountProfilePictureServiceTest {
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     when(accounts.findById(any())).thenReturn(Optional.empty());
+    PlatformAccountId missing = PlatformAccountId.newId();
 
     assertThatExceptionOfType(PlatformAccountNotFoundException.class)
-        .isThrownBy(() -> service.handle(PlatformAccountId.newId()));
+        .isThrownBy(() -> service.handle(missing));
   }
 }

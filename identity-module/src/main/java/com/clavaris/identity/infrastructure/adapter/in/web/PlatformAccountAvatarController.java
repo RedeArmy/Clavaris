@@ -21,8 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
  * platform-tier sibling, same unauthenticated/cacheable shape, no Organization to scope by.
  *
  * <p>{@code @Controller} + {@code @ResponseBody}, not {@code @RestController} — same OIDC/
- * hosted-UI-surface rationale {@link AccountAvatarController}'s own Javadoc documents.
+ * hosted-UI-surface rationale {@link AccountAvatarController}'s own Javadoc documents, including
+ * its own identical java:S6833 suppression.
  */
+@SuppressWarnings("java:S6833")
 @Controller
 public class PlatformAccountAvatarController {
 

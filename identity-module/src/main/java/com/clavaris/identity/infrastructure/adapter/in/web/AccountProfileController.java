@@ -116,7 +116,7 @@ public class AccountProfileController {
     final AccountId accountId = requireCurrentAccount(request);
     try {
       deleteOwnAccount.handle(accountId);
-    } catch (final SelfDeleteNotAllowedException e) {
+    } catch (final SelfDeleteNotAllowedException _) {
       populateModel(model, organizationId, accountId);
       model.addAttribute("deleteError", true);
       return PROFILE_VIEW;

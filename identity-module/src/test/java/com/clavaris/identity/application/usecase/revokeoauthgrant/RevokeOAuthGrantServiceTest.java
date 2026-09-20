@@ -49,9 +49,10 @@ class RevokeOAuthGrantServiceTest {
   @Test
   void throwsAndNeverAuditsWhenNoMatchingGrantExists() {
     when(grants.revokeById(accountId, "auth-id")).thenReturn(false);
+    RevokeOAuthGrantCommand command = new RevokeOAuthGrantCommand(accountId, "auth-id", ACTOR);
 
     assertThatExceptionOfType(OAuthGrantNotFoundException.class)
-        .isThrownBy(() -> service.handle(new RevokeOAuthGrantCommand(accountId, "auth-id", ACTOR)));
+        .isThrownBy(() -> service.handle(command));
 
     verifyNoInteractions(auditEvents);
   }

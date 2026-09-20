@@ -103,9 +103,10 @@ class RemoveAccountProfilePictureServiceTest {
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     when(accounts.findById(any())).thenReturn(Optional.empty());
+    RemoveAccountProfilePictureCommand command =
+        new RemoveAccountProfilePictureCommand(AccountId.newId());
 
     assertThatExceptionOfType(AccountNotFoundException.class)
-        .isThrownBy(
-            () -> service.handle(new RemoveAccountProfilePictureCommand(AccountId.newId())));
+        .isThrownBy(() -> service.handle(command));
   }
 }

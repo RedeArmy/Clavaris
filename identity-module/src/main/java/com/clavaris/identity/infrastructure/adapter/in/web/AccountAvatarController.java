@@ -38,8 +38,13 @@ import org.springframework.web.server.ResponseStatusException;
  * part of the OIDC/hosted-UI surface (same category as {@code RegisterAccountController}), never
  * the {@code client_credentials}-gated management API — {@code OpenApiDocumentationTest}'s own
  * Javadoc documents this exact distinction, and only scopes its {@code @Operation} requirement to
- * {@code @RestController}.
+ * {@code @RestController}. java:S6833 (SonarCloud) disagrees on generic Spring-style grounds
+ * ("a @Controller whose only method uses @ResponseBody should just be @RestController") — that
+ * generic default doesn't know this codebase's own project-specific meaning of
+ * {@code @RestController} (management API, ADR-0008 §3), so it's suppressed here rather than
+ * followed.
  */
+@SuppressWarnings("java:S6833")
 @Controller
 public class AccountAvatarController {
 

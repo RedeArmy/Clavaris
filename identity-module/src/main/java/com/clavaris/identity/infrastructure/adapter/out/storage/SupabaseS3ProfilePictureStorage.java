@@ -98,7 +98,7 @@ public class SupabaseS3ProfilePictureStorage implements ProfilePictureStorage {
   public void delete(final String storageKey) {
     try {
       s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(storageKey).build());
-    } catch (final NoSuchKeyException e) {
+    } catch (final NoSuchKeyException _) {
       // Already gone — a no-op, not an error (this class's own Javadoc / ProfilePictureStorage's
       // own contract).
     } catch (final SdkException e) {

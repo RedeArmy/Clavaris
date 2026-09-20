@@ -89,8 +89,10 @@ class UpdateAccountProfilePictureServiceTest {
 
   @Test
   void rejectsAnUnsupportedContentType() {
+    UpdateAccountProfilePictureCommand unsupported = command(new byte[] {1}, "image/svg+xml");
+
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> service.handle(command(new byte[] {1}, "image/svg+xml")));
+        .isThrownBy(() -> service.handle(unsupported));
 
     verifyNoInteractions(storage);
     verify(accounts, never()).save(any());
@@ -98,8 +100,10 @@ class UpdateAccountProfilePictureServiceTest {
 
   @Test
   void rejectsEmptyContent() {
+    UpdateAccountProfilePictureCommand empty = command(new byte[0], "image/png");
+
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> service.handle(command(new byte[0], "image/png")));
+        .isThrownBy(() -> service.handle(empty));
 
     verifyNoInteractions(storage);
   }
@@ -107,9 +111,10 @@ class UpdateAccountProfilePictureServiceTest {
   @Test
   void rejectsContentOverTheTenMegabyteCap() {
     byte[] tooLarge = new byte[(int) ProfilePictureValidator.MAX_BYTES + 1];
+    UpdateAccountProfilePictureCommand oversized = command(tooLarge, "image/png");
 
     assertThatExceptionOfType(InvalidProfilePictureException.class)
-        .isThrownBy(() -> service.handle(command(tooLarge, "image/png")));
+        .isThrownBy(() -> service.handle(oversized));
 
     verifyNoInteractions(storage);
   }
@@ -117,8 +122,9 @@ class UpdateAccountProfilePictureServiceTest {
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     when(accounts.findById(any())).thenReturn(Optional.empty());
+    UpdateAccountProfilePictureCommand upload = command(new byte[] {1}, "image/png");
 
     assertThatExceptionOfType(AccountNotFoundException.class)
-        .isThrownBy(() -> service.handle(command(new byte[] {1}, "image/png")));
+        .isThrownBy(() -> service.handle(upload));
   }
 }
