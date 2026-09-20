@@ -1,13 +1,19 @@
 <!--
-SDE-III review, 2026-09-19 — Clerk-style "Configure" sub-navigation, this module's own copy.
-Hand-duplicated across organization-module/client-registry-module/identity-module/webhook-module,
-same rationale as this module's own org-tabs.html/dashboard-nav.html fragments — no cross-module
-template resolution path exists today, so every module needing this sidebar carries its own copy.
+SDE-III review, 2026-09-19 (SonarCloud duplication fix, follow-up) — Clerk-style "Configure"
+sub-navigation, one real shared copy in common/ rather than four hand-duplicated per-module
+copies. Pure markup, no business logic (BR-agnostic navigation links only), so it fits common's
+own "shared code only" scope the same way LongEnglishDateFormatter does — every module that
+renders a dashboard page already depends on common, and Spring's classpath-based Thymeleaf
+resolution doesn't care which module's JAR a classpath:/templates/... resource actually lives in,
+so this single file resolves identically from every one of the four consuming modules'
+th:replace calls without any of them depending on each other (the dependency rule this whole
+architecture is built around, §7.2, stays intact).
+
 Every link is a real page navigation to a real, already-existing URL (Secret Keys/OAuth Clients/
 Signing Keys/Webhook Endpoints each owned by their own module's own controller); Rate Limit and
-Danger Zone are the two items this same pass promoted from organization-detail.html's own inline
-sections into standalone pages of their own (organization-module), so every Configure destination
-now has the same shape — a real page, not an inline fragment swap.
+Danger Zone are the two items promoted from organization-detail.html's own inline sections into
+standalone pages of their own (organization-module), so every Configure destination now has the
+same shape — a real page, not an inline fragment swap.
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
