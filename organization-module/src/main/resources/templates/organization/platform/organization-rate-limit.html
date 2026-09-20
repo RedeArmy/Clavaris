@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organizationName} + ' — Rate Limit — Clavaris')}">
+    <title>Rate Limit — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Rate Limit</span>
+            </p>
+
+            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <!-- SDE-III review, 2026-09-19 — Clerk-style "Configure" navigation: this page replaces
+                 the Rate Limit section that used to be inlined on organization-detail.html —
+                 promoted to a standalone page (same shape as Secret Keys/OAuth Clients/Signing
+                 Keys/Webhook Endpoints) so every Configure destination is a real page. Still owned
+                 by this module itself (ADR-0010 §6.2) and still posts to the same
+                 PlatformRateLimitPolicyController#set this fragment always has. -->
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{organization/platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'rate-limit')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Rate Limit</h1>
+                            <p>The per-minute request ceiling this Organization's own tenant issuer
+                                enforces (ADR-0010 §6.2) — a noisy-neighbor guard, separate from the
+                                fixed, system-wide anti-abuse limits every tenant shares.</p>
+                        </div>
+                    </div>
+
+                    <div id="rate-limit-content" th:fragment="rateLimit" class="clavaris-section">
+                        <div class="clavaris-section-card">
+                            <p>
+                                <strong th:text="${rateLimitPolicy.requestsPerMinute()} + ' requests/minute'">600 requests/minute</strong>
+                                <span class="clavaris-badge clavaris-badge--muted" th:unless="${rateLimitPolicy.customized()}">System default</span>
+                                <span class="clavaris-badge clavaris-badge--success" th:if="${rateLimitPolicy.customized()}">Custom</span>
+                            </p>
+                            <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(rateLimitPolicy.updatedAt())}">date</span>.</p>
+                            <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — using the system default below.</p>
+
+                            <form th:action="@{/platform/dashboard/organizations/{organizationId}/rate-limit-policy(organizationId=${organizationId})}"
+                                  th:object="${rateLimitForm}" method="post"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/rate-limit-policy(organizationId=${organizationId})}"
+                                  hx-target="#rate-limit-content" hx-swap="outerHTML">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                                <div class="clavaris-field">
+                                    <label for="rate-limit-requests-per-minute">New ceiling (requests/minute)</label>
+                                    <input id="rate-limit-requests-per-minute" type="number" min="1"
+                                           th:max="${rateLimitPolicy.hardCapRequestsPerMinute()}"
+                                           th:field="*{requestsPerMinute}" required/>
+                                    <p class="clavaris-field-hint">Up to <span th:text="${rateLimitPolicy.hardCapRequestsPerMinute()}">6000</span> requests/minute (the system-wide maximum).</p>
+                                    <p class="clavaris-field-error" th:if="${#fields.hasErrors('requestsPerMinute')}" th:errors="*{requestsPerMinute}">Requests-per-minute error</p>
+                                    <p class="clavaris-field-error" th:if="${hardCapExceededError}">That value exceeds the system-wide maximum of <span th:text="${rateLimitPolicy.hardCapRequestsPerMinute()}">6000</span> requests/minute.</p>
+                                </div>
+
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Update ceiling</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
+</body>
+</html>

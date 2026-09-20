@@ -1,13 +1,9 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.common.domain.model.KeysetPage;
-import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
-import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.OrganizationNotFoundException;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationCommand;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
@@ -19,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,8 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * TD-FUT-002 (self-service tuning, shipped): the dashboard's own write path for an Organization's
- * capacity ceiling — {@code POST
+ * TD-FUT-002 (self-service tuning, shipped): the dashboard's own read+write path for an
+ * Organization's capacity ceiling — {@code GET}/{@code POST
  * /platform/dashboard/organizations/{organizationId}/rate-limit-policy}. Every write here goes
  * through the exact same {@link SetRateLimitPolicyForOrganizationUseCase} the REST admin API
  * ({@code SetRateLimitPolicyController}, still {@code PlatformClient}-gated, unchanged) already
@@ -45,23 +42,24 @@ import org.springframework.web.server.ResponseStatusException;
  * tenant) — an organizationId belonging to someone else's Organization resolves identically to
  * "doesn't exist," same anti-enumeration posture as every other dashboard controller.
  *
- * <p>This page's Rate Limit section stays inline on {@code PlatformOrganizationDetailController}'s
- * own organization-detail page rather than a separate linked-out page (unlike Secret Keys/OAuth
- * Clients/Signing Keys/Webhook Endpoints) — a single-value settings form, not a list, the same
- * "inlined, not linked out" shape that page's own Rate Limit section already had before this
- * revision made it writable. Same HTMX-fragment-vs-redirect convention as every other dashboard
- * mutation: an {@code HX-Request} gets back just the {@code rateLimit} fragment, re-rendered in
- * place; a plain form submit gets a full redirect.
+ * <p>SDE-III review, 2026-09-19 — Clerk-style "Configure" navigation: this used to be an inline
+ * section/write-only controller for {@code PlatformOrganizationDetailController}'s own page; now a
+ * standalone page of its own ({@code organization-rate-limit.html}), same shape as Secret
+ * Keys/OAuth Clients/Signing Keys/Webhook Endpoints — this class gained the {@code GetMapping} that
+ * page needed (previously the display-only read lived on {@code
+ * PlatformOrganizationDetailController}'s own GET). Same HTMX-fragment-vs-redirect convention as
+ * every other dashboard mutation: an {@code HX-Request} gets back just the {@code rateLimit}
+ * fragment, re-rendered in place; a plain form submit redirects back to this same page.
  */
 @SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/rate-limit-policy")
 public class PlatformRateLimitPolicyController {
 
-  private static final String ORGANIZATION_DETAIL_VIEW =
-      "organization/platform/organization-detail";
-  private static final String RATE_LIMIT_FRAGMENT = ORGANIZATION_DETAIL_VIEW + " :: rateLimit";
-  private static final String ORGANIZATION_ATTRIBUTE = "organization";
+  private static final String RATE_LIMIT_VIEW = "organization/platform/organization-rate-limit";
+  private static final String RATE_LIMIT_FRAGMENT = RATE_LIMIT_VIEW + " :: rateLimit";
+  private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
+  private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String RATE_LIMIT_POLICY_ATTRIBUTE = "rateLimitPolicy";
   private static final String RATE_LIMIT_FORM_ATTRIBUTE = "rateLimitForm";
 
@@ -72,24 +70,37 @@ public class PlatformRateLimitPolicyController {
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final SetRateLimitPolicyForOrganizationUseCase setRateLimitPolicy;
   private final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
-  private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformRateLimitPolicyController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final SetRateLimitPolicyForOrganizationUseCase setRateLimitPolicy,
       final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy,
-      final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.setRateLimitPolicy = setRateLimitPolicy;
     this.getRateLimitPolicy = getRateLimitPolicy;
-    this.listWorkspaces = listWorkspaces;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // Four exits (validation error, hard-cap-exceeded error, HTMX fragment, plain redirect) — same
-  // rationale as every other dashboard mutation's own identical suppression.
+  @GetMapping
+  public String show(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+
+    model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
+    model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organization.name());
+    model.addAttribute(RATE_LIMIT_POLICY_ATTRIBUTE, getRateLimitPolicy.handle(organizationId));
+    model.addAttribute(RATE_LIMIT_FORM_ATTRIBUTE, new SetRateLimitPolicyForm());
+    return RATE_LIMIT_VIEW;
+  }
+
+  // Three exits (validation error, hard-cap-exceeded error, HTMX fragment vs. plain redirect) —
+  // same rationale as every other dashboard mutation's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String set(
@@ -130,43 +141,24 @@ public class PlatformRateLimitPolicyController {
     }
 
     if (isHtmxRequest(request)) {
-      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
+      model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organization.name());
       model.addAttribute(RATE_LIMIT_POLICY_ATTRIBUTE, getRateLimitPolicy.handle(organizationId));
       model.addAttribute(RATE_LIMIT_FORM_ATTRIBUTE, new SetRateLimitPolicyForm());
       return RATE_LIMIT_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/" + organizationId;
+    return "redirect:/platform/dashboard/organizations/" + organizationId + "/rate-limit-policy";
   }
 
-  // A validation/hard-cap error re-renders the WHOLE organization-detail page on a plain
-  // (non-HTMX) submit — same "the page's own other sections must all still be populated" gap
-  // PlatformWorkspaceController#create's own identical branch already documents (and was itself
-  // once a real NPE this codebase already fixed once, 2026-09-12, for the same underlying page).
-  // Two exits (HTMX fragment vs. full page) — same rationale as every other dashboard mutation's
-  // own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private String rerenderWithError(
       final HttpServletRequest request,
       final Model model,
       final Organization organization,
       final UUID organizationId) {
+    model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
+    model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organization.name());
     model.addAttribute(RATE_LIMIT_POLICY_ATTRIBUTE, getRateLimitPolicy.handle(organizationId));
-    if (isHtmxRequest(request)) {
-      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-      return RATE_LIMIT_FRAGMENT;
-    }
-    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-    addWorkspacesToModel(model, organizationId);
-    model.addAttribute("workspaceForm", new CreateWorkspaceForm());
-    return ORGANIZATION_DETAIL_VIEW;
-  }
-
-  private void addWorkspacesToModel(final Model model, final UUID organizationId) {
-    final KeysetPage<com.clavaris.organization.domain.model.Workspace> workspacesPage =
-        listWorkspaces.handle(
-            new ListWorkspacesForOrganizationPagedQuery(organizationId, KeysetPageRequest.first()));
-    model.addAttribute("workspaces", workspacesPage.content());
-    model.addAttribute("workspacesPage", workspacesPage);
+    return isHtmxRequest(request) ? RATE_LIMIT_FRAGMENT : RATE_LIMIT_VIEW;
   }
 
   private Organization requireOwnedOrganization(

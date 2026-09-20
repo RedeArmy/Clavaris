@@ -1137,6 +1137,32 @@ code {
 .clavaris-menu__id { margin: 0; padding: 6px 10px; color: var(--clavaris-text-muted); font-size: .7rem; word-break: break-all; }
 .clavaris-menu__divider { margin: 4px 0; border: none; border-top: 1px solid var(--clavaris-border); }
 
+/* SDE-III review, 2026-09-19 — Clerk-style Organization detail navigation: a top-level tab bar
+   (Workspaces/Users/Logs/Configure, org-tabs.html) and, inside Configure specifically, a second
+   left sub-sidebar (Secret Keys/OAuth Clients/Signing Keys/Webhook Endpoints/Rate Limit/Danger
+   Zone, configure-sidebar.html) — same real-page-navigation-with-persistent-chrome shape the main
+   dashboard-nav sidebar already establishes, not a client-side SPA. */
+.clavaris-org-tabs { display: flex; gap: 22px; margin: 22px 0 4px; border-bottom: 1px solid var(--clavaris-border); }
+.clavaris-org-tabs a { padding: 10px 2px; color: var(--clavaris-text-muted); font-size: .85rem; font-weight: 600; text-decoration: none; border-bottom: 2px solid transparent; }
+.clavaris-org-tabs a:hover { color: var(--clavaris-text-primary); }
+.clavaris-org-tabs a.active { color: var(--clavaris-text-primary); border-bottom-color: var(--clavaris-brand-color); }
+
+.clavaris-configure-layout { display: grid; grid-template-columns: 216px 1fr; align-items: start; gap: 36px; margin-top: 22px; }
+.clavaris-configure-sidebar { position: sticky; top: 22px; display: grid; gap: 2px; }
+.clavaris-configure-sidebar__label { margin: 0 0 8px; padding: 0 10px; color: var(--clavaris-text-muted); font-size: .7rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.clavaris-configure-sidebar a { padding: 8px 10px; color: var(--clavaris-text-primary); font-size: .8125rem; font-weight: 500; text-decoration: none; border-radius: 8px; }
+.clavaris-configure-sidebar a:hover { background: var(--clavaris-bg); }
+.clavaris-configure-sidebar a.active { background: var(--clavaris-bg); color: var(--clavaris-brand-color); font-weight: 650; }
+.clavaris-configure-sidebar a.clavaris-configure-sidebar-danger { color: var(--clavaris-danger); }
+.clavaris-configure-sidebar a.clavaris-configure-sidebar-danger:hover,
+.clavaris-configure-sidebar a.clavaris-configure-sidebar-danger.active { background: var(--clavaris-danger-bg); color: var(--clavaris-danger); }
+.clavaris-configure-content { min-width: 0; }
+
+@media (max-width: 800px) {
+  .clavaris-configure-layout { grid-template-columns: 1fr; }
+  .clavaris-configure-sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
+}
+
 .clavaris-empty-state-card { padding: 0; overflow: hidden; }
 .clavaris-organization-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .clavaris-organization-card,

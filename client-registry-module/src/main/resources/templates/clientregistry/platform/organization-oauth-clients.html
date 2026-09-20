@@ -14,24 +14,30 @@
                 <span>OAuth Clients</span>
             </p>
 
-            <div class="clavaris-page-header">
-                <div>
-                    <h1>OAuth Clients</h1>
-                    <p>The end-user OIDC login client registrations this Organization's own consuming
-                        application(s) use to authenticate real end users against — distinct from
-                        Secret Keys (ADR-0010's <code>OAuthClient</code>, not ADR-0023's
-                        <code>OrganizationClient</code>). Each secret is shown exactly once, at
-                        registration — Clavaris never stores or displays it again.</p>
-                </div>
-            </div>
+            <div th:replace="~{clientregistry/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
 
-            <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
-                 PlatformOrganizationClientController's own Javadoc for the general shape this page
-                 mirrors. Create/rotate-secret never redirect even on a plain form submit — the raw
-                 client secret can't safely travel through one; deactivate keeps the usual
-                 redirect-on-success shape since it carries no secret (see
-                 PlatformOAuthClientController's own Javadoc). -->
-            <div id="clients-content" th:fragment="clients" class="clavaris-section">
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{clientregistry/platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'oauth-clients')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>OAuth Clients</h1>
+                            <p>The end-user OIDC login client registrations this Organization's own consuming
+                                application(s) use to authenticate real end users against — distinct from
+                                Secret Keys (ADR-0010's <code>OAuthClient</code>, not ADR-0023's
+                                <code>OrganizationClient</code>). Each secret is shown exactly once, at
+                                registration — Clavaris never stores or displays it again.</p>
+                        </div>
+                    </div>
+
+                    <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
+                         PlatformOrganizationClientController's own Javadoc for the general shape this page
+                         mirrors. Create/rotate-secret never redirect even on a plain form submit — the raw
+                         client secret can't safely travel through one; deactivate keeps the usual
+                         redirect-on-success shape since it carries no secret (see
+                         PlatformOAuthClientController's own Javadoc). -->
+                    <div id="clients-content" th:fragment="clients" class="clavaris-section">
                 <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                     <strong>New client secret for <code th:text="${justRegisteredClientId}">clientId</code>:</strong>
                     <code th:text="${justRegisteredRawSecret}">secret</code><br/>
@@ -224,6 +230,8 @@
 
                         <button class="clavaris-button clavaris-button--inline" type="submit">Register OAuth Client</button>
                     </form>
+                </div>
+                    </div>
                 </div>
             </div>
         </div>

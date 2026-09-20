@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Danger Zone — Clavaris')}">
+    <title>Danger Zone — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span>Danger Zone</span>
+            </p>
+
+            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
+
+            <!-- SDE-III review, 2026-09-19 — Clerk-style "Configure" navigation: this page replaces
+                 the Danger Zone card shells that used to sit at the bottom of
+                 organization-detail.html — promoted to a standalone page (same shape as Secret
+                 Keys/OAuth Clients/Signing Keys/Webhook Endpoints/Rate Limit) so every Configure
+                 destination is a real page. TD-FUT-032: still the only genuinely destructive/
+                 irreversible section anywhere on this dashboard — both actions below are still
+                 their own separate page with their own confirmation flow, never a single-click
+                 inline form. -->
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{organization/platform/fragments/configure-sidebar :: sidebar(${organization.id()}, 'danger-zone')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Danger Zone</h1>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section clavaris-section--danger">
+                        <div class="clavaris-section-card clavaris-section-card--danger"
+                             th:if="${organization.environment().name() == 'DEVELOPMENT' and organization.linkedEnvironmentOrganizationId().isEmpty()}">
+                            <p>Promote this DEVELOPMENT Organization by creating its paired PRODUCTION
+                                sibling.</p>
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/promote-to-production(organizationId=${organization.id()})}">Promote to Production</a>
+                        </div>
+                        <div class="clavaris-section-card clavaris-section-card--danger"
+                             th:unless="${organization.environment().name() == 'DEVELOPMENT' and organization.linkedEnvironmentOrganizationId().isEmpty()}">
+                            <p>This Organization can't be promoted to production — it's either already a
+                                PRODUCTION environment, or it already has a linked one.</p>
+                        </div>
+                        <div class="clavaris-section-card clavaris-section-card--danger">
+                            <p>Permanently delete this Organization and its entire owned account pool.
+                                This cannot be undone.</p>
+                            <a class="clavaris-button clavaris-button--danger clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/delete(organizationId=${organization.id()})}">Delete Organization</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

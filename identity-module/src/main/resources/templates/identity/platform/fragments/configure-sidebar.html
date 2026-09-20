@@ -1,0 +1,26 @@
+<!--
+SDE-III review, 2026-09-19 — Clerk-style "Configure" sub-navigation, this module's own copy.
+Hand-duplicated across organization-module/client-registry-module/identity-module/webhook-module,
+same rationale as this module's own org-tabs.html/dashboard-nav.html fragments — no cross-module
+template resolution path exists today, so every module needing this sidebar carries its own copy.
+Every link is a real page navigation to a real, already-existing URL (Secret Keys/OAuth Clients/
+Signing Keys/Webhook Endpoints each owned by their own module's own controller); Rate Limit and
+Danger Zone are the two items this same pass promoted from organization-detail.html's own inline
+sections into standalone pages of their own (organization-module), so every Configure destination
+now has the same shape — a real page, not an inline fragment swap.
+-->
+<aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
+    <p class="clavaris-configure-sidebar__label">Configure</p>
+    <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
+       th:classappend="${active == 'secret-keys'} ? 'active'">Secret Keys</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
+       th:classappend="${active == 'oauth-clients'} ? 'active'">OAuth Clients</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/signing-keys(id=${organizationId})}"
+       th:classappend="${active == 'signing-keys'} ? 'active'">Signing Keys</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
+       th:classappend="${active == 'webhook-endpoints'} ? 'active'">Webhook Endpoints</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
+       th:classappend="${active == 'rate-limit'} ? 'active'">Rate Limit</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/danger-zone(id=${organizationId})}"
+       th:classappend="${active == 'danger-zone'} ? 'clavaris-configure-sidebar-danger active' : 'clavaris-configure-sidebar-danger'">Danger Zone</a>
+</aside>

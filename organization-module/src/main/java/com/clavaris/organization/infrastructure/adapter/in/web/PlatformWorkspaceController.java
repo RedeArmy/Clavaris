@@ -15,7 +15,6 @@ import com.clavaris.organization.application.usecase.createworkspace.CreateWorks
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
-import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationQuery;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
@@ -68,7 +67,7 @@ import org.springframework.web.server.ResponseStatusException;
  * keeps a full {@code redirect:} on success and a full re-render on a validation/business error —
  * HTMX is progressive enhancement, every action here works identically with JavaScript disabled.
  */
-// PMD.ExcessiveImports: nine collaborators (five use cases plus their commands/exceptions) is what
+// PMD.ExcessiveImports: eight collaborators (four use cases plus their commands/exceptions) is what
 // wiring one controller to four distinct Workspace-mutating use cases actually costs — same
 // "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own class-level Javadoc documents for
 // an identical situation.
@@ -114,12 +113,10 @@ public class PlatformWorkspaceController {
   private final AddWorkspaceMemberUseCase addMemberUseCase;
   private final ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private final RemoveWorkspaceMemberUseCase removeMemberUseCase;
-  private final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"}) // one parameter per collaborating
-  // port — same rationale as every other multi-collaborator constructor in this codebase; the
-  // 10th (getRateLimitPolicy) tipped PMD's own threshold, not Sonar's, hence both suppressions now.
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
+  // other multi-collaborator constructor in this codebase.
   public PlatformWorkspaceController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final GetWorkspaceForOrganizationUseCase getWorkspace,
@@ -129,7 +126,6 @@ public class PlatformWorkspaceController {
       final AddWorkspaceMemberUseCase addMemberUseCase,
       final ChangeWorkspaceMemberRoleUseCase changeMemberRole,
       final RemoveWorkspaceMemberUseCase removeMemberUseCase,
-      final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
@@ -139,7 +135,6 @@ public class PlatformWorkspaceController {
     this.addMemberUseCase = addMemberUseCase;
     this.changeMemberRole = changeMemberRole;
     this.removeMemberUseCase = removeMemberUseCase;
-    this.getRateLimitPolicy = getRateLimitPolicy;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
@@ -155,18 +150,13 @@ public class PlatformWorkspaceController {
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     if (bindingResult.hasErrors()) {
+      // A plain (non-HTMX) validation error re-renders the WHOLE organization-detail page — same
+      // reason "organization"/"workspaces" are populated here too, not just on
+      // PlatformOrganizationDetailController's own GET. SDE-III review, 2026-09-19: this page no
+      // longer has a Rate Limit section of its own (moved to its own Configure sub-page), so
+      // rateLimitPolicy/rateLimitForm no longer need populating here either.
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
-      // A plain (non-HTMX) validation error re-renders the WHOLE organization-detail page, Rate
-      // Limit section included — same reason "organization"/"workspaces" are populated here too,
-      // not just on PlatformOrganizationDetailController's own GET. Real bug this exact gap caused
-      // once already (SDE-III review, 2026-09-12): the template referenced this attribute
-      // unconditionally before this fix, NPE-ing on this one re-render path.
-      model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
-      // TD-FUT-002 (self-service tuning, shipped): same reasoning as rateLimitPolicy just above —
-      // the Rate Limit section's own form now needs rateLimitForm bound on every full-page render
-      // of this template, this one included, not just PlatformRateLimitPolicyController's own.
-      model.addAttribute("rateLimitForm", new SetRateLimitPolicyForm());
       return isHtmxRequest(request) ? WORKSPACES_FRAGMENT : ORGANIZATION_DETAIL_VIEW;
     }
 
