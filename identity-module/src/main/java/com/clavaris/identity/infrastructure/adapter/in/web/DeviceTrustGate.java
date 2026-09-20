@@ -47,7 +47,7 @@ final class DeviceTrustGate {
   // one parameter per collaborating port/request value, same rationale as
   // AuthenticatedSessionCompletion's own identical suppression — the two extra params
   // (clientId/redirectUrl) are what pushed this over Sonar's own lower (7) threshold.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
+  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107", "PMD.ExcessiveParameterList"})
   /* package */ static Optional<String> intercept(
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestChallenge,
@@ -59,8 +59,15 @@ final class DeviceTrustGate {
       // Clerk "customize redirect URLs" parity — both nullable, see DeviceTrustPendingState's own
       // Javadoc for why they're carried across this pause at all.
       final String clientId,
-      final String redirectUrl) {
+      final String redirectUrl,
+      // SDE-III review, 2026-09-21 — Clerk "User permissions" parity (Account.bypassesDeviceTrust,
+      // ADR-0026): an operator-controlled per-Account override, checked alongside the
+      // Organization-level policy.deviceTrustEnabled() rather than replacing it — a legitimate
+      // known-safe operator/service-style Account skips the challenge even while every other
+      // Account in the same Organization still gets it.
+      final boolean bypassDeviceTrust) {
     if (!policy.deviceTrustEnabled()
+        || bypassDeviceTrust
         || isRecognized(knownDevices, request, organizationId, accountId)) {
       return Optional.empty();
     }

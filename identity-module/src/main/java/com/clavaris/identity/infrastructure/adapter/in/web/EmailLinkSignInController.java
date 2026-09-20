@@ -160,7 +160,8 @@ public class EmailLinkSignInController {
               // would require persisting them onto the VerificationToken itself. Scoped out of this
               // pass, not silently dropped — see RequestEmailSignInLinkService's own package.
               null,
-              null);
+              null,
+              account.bypassesDeviceTrust());
     } catch (final MailDeliveryException _) {
       // Same rationale as LoginController's own identical catch block, with one difference: the
       // link this POST just authenticated with is already single-use-consumed (see

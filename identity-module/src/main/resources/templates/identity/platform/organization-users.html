@@ -14,6 +14,8 @@
                 <span>Users</span>
             </p>
 
+            <div th:replace="~{identity/platform/fragments/org-tabs :: tabs(${organizationId}, 'users')}"></div>
+
             <div class="clavaris-page-header">
                 <div>
                     <h1>Users</h1>
@@ -44,8 +46,14 @@
                         </thead>
                         <tbody>
                         <tr th:each="account : ${users}">
-                            <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}"
-                                th:text="${#strings.isEmpty(fullName)} ? '—' : ${fullName}">Name</td>
+                            <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}">
+                                <div class="clavaris-row-identity">
+                                    <img class="clavaris-row-avatar"
+                                         th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
+                                         alt=""/>
+                                    <span th:text="${#strings.isEmpty(fullName)} ? '—' : ${fullName}">Name</span>
+                                </div>
+                            </td>
                             <td th:text="${account.email().value()}">email</td>
                             <td th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</td>
                             <td th:text="${account.phoneNumber().orElse('—')}">phone</td>

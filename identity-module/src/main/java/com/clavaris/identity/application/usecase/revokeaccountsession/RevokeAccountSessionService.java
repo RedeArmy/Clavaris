@@ -19,8 +19,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>TD-SEC-034: audits every real revocation, same as {@code SuspendAccountService}/{@code
  * ReactivateAccountService}/{@code DeleteAccountService} do for their own security-relevant
- * mutations. Always {@link AuditActor#account} — genuine self-service, never an operator acting on
- * someone else's behalf.
+ * mutations. SDE-III review, 2026-09-21: the actor attributed is {@link
+ * RevokeAccountSessionCommand#actor()}, caller-supplied — previously hardcoded to {@link
+ * AuditActor#account}, correct only while self-service was this use case's one caller; {@code
+ * PlatformAccountSessionsAdminController} is now a second, legitimate one.
  *
  * <p><b>TD-SEC-036: deliberately NOT {@code @Transactional}.</b> {@link
  * AccountActiveSessionsRepository#revoke} is a Redis call, already irreversible before any Postgres
@@ -63,21 +65,17 @@ public class RevokeAccountSessionService implements RevokeAccountSessionUseCase 
     // The real, irreversible action, first and unconditionally — never gated on Postgres health.
     activeSessions.revoke(session.sessionId());
 
-    recordRevocation(command.accountId(), session.sessionId());
+    recordRevocation(command.accountId(), session.sessionId(), command.actor());
   }
 
   // Audit and outbox are isolated independently (TD-SEC-036) — neither may propagate, and a
   // failure in one must never suppress the other's own attempt.
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // AuditEventRecorder/AccountRepository
   // can each throw a Spring DataAccessException like any other DB call.
-  private void recordRevocation(final AccountId accountId, final String sessionId) {
+  private void recordRevocation(
+      final AccountId accountId, final String sessionId, final AuditActor actor) {
     try {
-      auditEvents.write(
-          AuditActor.account(accountId.value()),
-          "account.session_revoked",
-          "Session",
-          sessionId,
-          null);
+      auditEvents.write(actor, "account.session_revoked", "Session", sessionId, null);
     } catch (final RuntimeException e) {
       LOG.warn("event=account_session_revoked_audit_write_failed", e);
     }

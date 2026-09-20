@@ -918,6 +918,19 @@ code {
 .clavaris-avatar { display: grid; width: 30px; height: 30px; place-items: center; color: var(--clavaris-accent-contrast); line-height: 1; background: var(--clavaris-brand-color); border-radius: 50%; }
 .clavaris-avatar svg { width: 18px; height: 18px; }
 
+/* ADR-0026: the self-service "Update profile" page's own large avatar preview — deliberately
+   separate from .clavaris-avatar above (a 30px nav-icon-scale badge), this is the page's own
+   primary visual, sized for a real photo or a generated-initials SVG alike. */
+.clavaris-profile-picture-section { display: flex; align-items: center; gap: 20px; margin: 20px 0; }
+.clavaris-profile-picture { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background: var(--clavaris-bg); border: 1px solid var(--clavaris-border); }
+.clavaris-profile-picture-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+/* SDE-III review, 2026-09-21 — Clerk "Users" tab parity: a small row-scale avatar next to each
+   user's name in the Users list table, same generated-initials-or-real-photo endpoint every other
+   avatar on this dashboard already points at. */
+.clavaris-row-identity { display: flex; align-items: center; gap: 10px; }
+.clavaris-row-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; background: var(--clavaris-bg); }
+
 .clavaris-table th:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
 .clavaris-table th:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .clavaris-status-dot { width: 7px; height: 7px; background: var(--clavaris-brand-color); border-radius: 50%; box-shadow: 0 0 0 4px color-mix(in srgb, var(--clavaris-brand-color) 16%, transparent); }
@@ -1198,6 +1211,36 @@ code {
 .clavaris-dialog__close:hover { color: var(--clavaris-text-primary); }
 .clavaris-dialog form { padding: 0 28px 28px; }
 .clavaris-dialog__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+/* ADR-0026: the Clerk-style "Manage account" dialog — wider than the base .clavaris-dialog (a
+   two-pane tab layout needs more room than a plain form), and its own zero-JS radio-button-driven
+   tab switching (no JS needed to toggle between Profile/Security, consistent with this
+   codebase's own <details>/<summary> "zero JS by default" convention elsewhere). The same
+   .clavaris-manage-account family (SDE-III review, 2026-09-21) also drives the admin "View
+   Profile" page's own Profile/Settings/OAuth tabs — the tab-input/panel id pairs below are shared
+   across both pages, never loaded together, so no id collision risk exists. */
+.clavaris-dialog--wide { width: min(100% - 32px, 760px); }
+.clavaris-manage-account__tab-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.clavaris-manage-account { display: grid; grid-template-columns: 180px 1fr; gap: 0; min-height: 420px; }
+.clavaris-manage-account__nav { display: flex; flex-direction: column; gap: 2px; padding: 28px 12px; border-right: 1px solid var(--clavaris-border); }
+.clavaris-manage-account__nav label { padding: 9px 14px; color: var(--clavaris-text-muted); font-size: .88rem; font-weight: 550; cursor: pointer; border-radius: var(--radius-sm); }
+.clavaris-manage-account__nav label:hover { color: var(--clavaris-text-primary); background: var(--clavaris-bg); }
+.clavaris-manage-account__panel { display: none; padding: 28px; }
+#clavaris-tab-profile:checked ~ .clavaris-manage-account__body #clavaris-panel-profile,
+#clavaris-tab-security:checked ~ .clavaris-manage-account__body #clavaris-panel-security,
+#clavaris-tab-settings:checked ~ .clavaris-manage-account__body #clavaris-panel-settings,
+#clavaris-tab-oauth:checked ~ .clavaris-manage-account__body #clavaris-panel-oauth { display: block; }
+#clavaris-tab-profile:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-profile"],
+#clavaris-tab-security:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-security"],
+#clavaris-tab-settings:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-settings"],
+#clavaris-tab-oauth:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-oauth"] { color: var(--clavaris-text-primary); background: var(--clavaris-bg); }
+.clavaris-manage-account__body { min-width: 0; }
+.clavaris-connected-account { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: .88rem; }
+
+@media (max-width: 640px) {
+  .clavaris-manage-account { grid-template-columns: 1fr; }
+  .clavaris-manage-account__nav { flex-direction: row; border-right: none; border-bottom: 1px solid var(--clavaris-border); padding: 12px; }
+}
 
 @media (max-width: 640px) {
   .clavaris-sidebar__brand small,
