@@ -172,14 +172,16 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
           providerUserId,
           verifiedEmail,
           clientId,
-          redirectUrl);
+          redirectUrl,
+          resolveSocialProfile(provider, principal));
     } else {
       onPlatformLogin(request, response, provider, providerUserId, verifiedEmail);
     }
   }
 
   @SuppressWarnings("java:S107") // two more parameters for Clerk "customize redirect URLs"
-  // parity — same rationale as this class's own constructor suppression.
+  // parity, plus ADR-0026's own socialProfile — same rationale as this class's own constructor
+  // suppression.
   private void onTenantLogin(
       final HttpServletRequest request,
       final HttpServletResponse response,
@@ -188,7 +190,8 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
       final String providerUserId,
       final String verifiedEmail,
       final String clientId,
-      final String redirectUrl)
+      final String redirectUrl,
+      final SocialProfile socialProfile)
       throws IOException {
     final AuthenticateWithSocialProviderResult result;
     try {
@@ -199,7 +202,11 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
                   provider,
                   providerUserId,
                   new Email(verifiedEmail),
-                  true));
+                  true,
+                  socialProfile.firstName(),
+                  socialProfile.lastName(),
+                  socialProfile.username(),
+                  socialProfile.pictureUrl()));
     } catch (final SocialLoginNotAllowedException | UnverifiedProviderEmailException _) {
       // ADR-0020 Decision 3/BR-ID-12: re-verified by the use case itself — a narrow TOCTOU window
       // between SocialLoginRedirectController's own pre-check and this point (an operator disabling
@@ -312,4 +319,57 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
         principal.getAttributes().get(GitHubVerifiedEmailUserService.VERIFIED_EMAIL_ATTRIBUTE);
     return verifiedEmail == null ? null : verifiedEmail.toString();
   }
+
+  // ADR-0026: captured for AuthenticateWithSocialProviderCommand's own use — applied only on a
+  // brand-new-account signup (AuthenticateWithSocialProviderService's own
+  // applySocialProviderProfile/applySocialProviderUsernameIfAvailable), never on a returning
+  // login, regardless of what this method returns on every call. Google offers no natural
+  // "username" equivalent (unlike GitHub's own stable, already-unique login) — deliberately never
+  // fabricated from an email local-part or similar guess, left null instead.
+  private SocialProfile resolveSocialProfile(
+      final SocialProvider provider, final OAuth2User principal) {
+    if (provider == SocialProvider.GOOGLE) {
+      final OidcUser oidcUser = (OidcUser) principal;
+      return new SocialProfile(
+          oidcUser.getClaimAsString(StandardClaimNames.GIVEN_NAME),
+          oidcUser.getClaimAsString(StandardClaimNames.FAMILY_NAME),
+          null,
+          oidcUser.getClaimAsString(StandardClaimNames.PICTURE));
+    }
+    final Object name = principal.getAttributes().get("name");
+    final Object login = principal.getAttributes().get("login");
+    final Object avatarUrl = principal.getAttributes().get("avatar_url");
+    final String[] splitName = splitGitHubDisplayName(name == null ? null : name.toString());
+    return new SocialProfile(
+        splitName[0],
+        splitName[1],
+        login == null ? null : login.toString(),
+        avatarUrl == null ? null : avatarUrl.toString());
+  }
+
+  // GitHub's base /user response carries a single free-text "name" field (often absent entirely —
+  // it's an optional profile field on GitHub's own side), never separate given/family name claims
+  // the way Google's OIDC profile scope does — a best-effort split on the first space is the only
+  // option available, not a real name-parsing guarantee (a one-word name becomes firstName only,
+  // lastName stays null).
+  private String[] splitGitHubDisplayName(final String name) {
+    if (name == null || name.isBlank()) {
+      return new String[] {null, null};
+    }
+    final String trimmed = name.strip();
+    final int firstSpace = trimmed.indexOf(' ');
+    if (firstSpace < 0) {
+      return new String[] {trimmed, null};
+    }
+    return new String[] {
+      trimmed.substring(0, firstSpace), trimmed.substring(firstSpace + 1).strip()
+    };
+  }
+
+  /**
+   * ADR-0026: the four provider-sourced profile fields {@code
+   * AuthenticateWithSocialProviderCommand} carries.
+   */
+  private record SocialProfile(
+      String firstName, String lastName, String username, String pictureUrl) {}
 }

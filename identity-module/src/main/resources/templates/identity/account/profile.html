@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head('Update profile — Clavaris')}">
+    <title>Update profile — Clavaris</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card clavaris-card--wide">
+        <p class="clavaris-breadcrumb">
+            <a th:href="@{/o/{organizationId}/account/sessions(organizationId=${organizationId})}">Your sessions</a>
+        </p>
+        <h1>Update profile</h1>
+
+        <p class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">
+            Your profile picture was updated.
+        </p>
+        <p class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">
+            Your profile picture was removed.
+        </p>
+        <p class="clavaris-alert clavaris-alert--error" th:if="${uploadError}" th:text="${uploadError}">
+            Upload error
+        </p>
+
+        <div class="clavaris-profile-picture-section">
+            <img class="clavaris-profile-picture"
+                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
+                 alt="Current profile picture"/>
+
+            <div class="clavaris-profile-picture-actions">
+                <form method="post" enctype="multipart/form-data"
+                      th:action="@{/o/{organizationId}/account/profile/picture(organizationId=${organizationId})}">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <label for="profile-picture-file">Update profile</label>
+                    <input id="profile-picture-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required/>
+                    <p class="clavaris-field-hint">Recommended size 1:1, up to 10MB.</p>
+                    <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
+                </form>
+
+                <form method="post"
+                      th:action="@{/o/{organizationId}/account/profile/picture/remove(organizationId=${organizationId})}">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove photo</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="clavaris-section">
+            <table class="clavaris-table">
+                <tbody>
+                <tr>
+                    <th>Email</th>
+                    <td th:text="${account.email().value()}">email</td>
+                </tr>
+                <tr th:if="${account.firstName().isPresent() or account.lastName().isPresent()}">
+                    <th>Name</th>
+                    <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}"
+                        th:text="${fullName}">name</td>
+                </tr>
+                <tr th:if="${account.username().isPresent()}">
+                    <th>Username</th>
+                    <td th:text="${account.username().get().value()}">username</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Clerk "Allow user to delete their account" parity (ADR-0026): only rendered at all
+             when an operator has opted this Account into self-delete via the admin Settings tab. -->
+        <div class="clavaris-section" th:if="${account.canDeleteOwnAccount()}">
+            <h2>Delete account</h2>
+            <p class="clavaris-field-hint">Permanently deletes your account — a hard delete, not reversible.
+                Every session and token is revoked immediately.</p>
+            <p class="clavaris-alert clavaris-alert--error" th:if="${deleteError}">
+                Your account is not allowed to delete itself.
+            </p>
+            <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="button"
+                    data-dialog-open="delete-account-dialog">Delete account</button>
+        </div>
+
+        <dialog th:if="${account.canDeleteOwnAccount()}" id="delete-account-dialog" class="clavaris-dialog">
+            <div class="clavaris-dialog__header">
+                <div>
+                    <span class="clavaris-dialog__eyebrow">Account</span>
+                    <h2>Delete account</h2>
+                    <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> —
+                        a hard delete, not reversible. Every session and token is revoked immediately.</p>
+                </div>
+                <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete account dialog">×</button>
+            </div>
+            <form method="post"
+                  th:action="@{/o/{organizationId}/account/profile/delete(organizationId=${organizationId})}">
+                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="clavaris-dialog__actions">
+                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                    <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete account</button>
+                </div>
+            </form>
+        </dialog>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
+</body>
+</html>

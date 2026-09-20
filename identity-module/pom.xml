@@ -110,6 +110,15 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- ADR-0026: SupabaseS3ProfilePictureStorage's own S3Client — Supabase Storage exposes an
+             S3-compatible endpoint, so the standard, well-vetted AWS SDK v2 client talks to it
+             directly, no proprietary Supabase SDK needed. Version managed by the root pom's own
+             software.amazon.awssdk:bom import. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
