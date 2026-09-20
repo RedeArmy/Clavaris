@@ -18,8 +18,7 @@ class UpdatePlatformAccountProfilePictureCommandTest {
         new UpdatePlatformAccountProfilePictureCommand(
             PLATFORM_ACCOUNT_ID, new byte[] {1, 2, 3}, "image/png");
 
-    assertThat(first).isEqualTo(second);
-    assertThat(first).hasSameHashCodeAs(second);
+    assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
   }
 
   @Test

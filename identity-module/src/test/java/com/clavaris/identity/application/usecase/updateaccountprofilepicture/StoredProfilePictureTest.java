@@ -11,8 +11,7 @@ class StoredProfilePictureTest {
     StoredProfilePicture first = new StoredProfilePicture(new byte[] {1, 2, 3}, "image/png");
     StoredProfilePicture second = new StoredProfilePicture(new byte[] {1, 2, 3}, "image/png");
 
-    assertThat(first).isEqualTo(second);
-    assertThat(first).hasSameHashCodeAs(second);
+    assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
   }
 
   @Test
