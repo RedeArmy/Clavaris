@@ -32,7 +32,8 @@ public final class OrganizationRateLimitRules {
       final int tokenPerClientLimit,
       final int tokenRefreshPerClientLimit,
       final int accountSessionsListPerAccountLimit,
-      final int accountSessionsRevokePerAccountLimit) {
+      final int accountSessionsRevokePerAccountLimit,
+      final int accountPictureUploadPerAccountLimit) {
     return List.of(
         new RateLimitRule(
             "login:account",
@@ -95,6 +96,19 @@ public final class OrganizationRateLimitRules {
             RateLimitRule.always(),
             RateLimitIdentifiers::authenticatedAccountId,
             accountSessionsRevokePerAccountLimit,
+            Duration.ofMinutes(5)),
+        // SDE-III review, 2026-09-21 — SonarCloud multipart-size hotspot follow-up
+        // (application.yml's own spring.servlet.multipart.max-file-size: 11MB): that framework
+        // ceiling alone let an authenticated Account fire unlimited ~11MB uploads with no
+        // backoff, a real resource-exhaustion vector the ceiling itself doesn't close — same
+        // TD-SEC-035 gap class as account-sessions above, closed the same way.
+        new RateLimitRule(
+            "account-picture:upload",
+            HttpMethod.POST,
+            "/o/*/account/profile/picture",
+            RateLimitRule.always(),
+            RateLimitIdentifiers::authenticatedAccountId,
+            accountPictureUploadPerAccountLimit,
             Duration.ofMinutes(5)));
   }
 }

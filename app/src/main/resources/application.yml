@@ -7,10 +7,24 @@ spring:
   application:
     name: clavaris
   # ADR-0026: Spring Boot's own default (1MB) rejects any real profile picture upload before
-  # UpdateAccountProfilePictureService ever gets a chance to run its own validation — raised past
-  # that service's own 10MB cap (UpdateAccountProfilePictureService.MAX_BYTES) with a small margin
-  # for multipart form overhead, so a request just under the real limit isn't rejected one layer
-  # too early by a mismatched framework-level ceiling.
+  # ProfilePictureValidator ever gets a chance to run its own validation — raised past that
+  # validator's own 10MB cap (ProfilePictureValidator.MAX_BYTES) with a small margin for multipart
+  # form overhead, so a request just under the real limit isn't rejected one layer too early by a
+  # mismatched framework-level ceiling.
+  #
+  # SonarCloud Security Hotspot (java:S5693, "content length limit greater than 8MB"): 11MB is a
+  # deliberate business requirement, not an oversight — see this same comment's own first
+  # paragraph. This ceiling was never the actual anti-abuse control it looks like on its own: it
+  # only bounds one request's size, not how many a client can send, which is a distinct concern
+  # this codebase already solves for every other sensitive endpoint via AntiAbuseRateLimitingFilter
+  # (ADR-0010 §6.1/BR-ID-06). SDE-III review, 2026-09-21, closed the real gap this hotspot pointed
+  # at: all three picture-upload endpoints (POST /o/*/account/profile/picture, POST
+  # /platform/account/picture, POST /platform/dashboard/organizations/*/users/*/picture) previously
+  # had no per-account rate-limit rule of their own — see OrganizationRateLimitRules's own
+  # account-picture:upload rule and PlatformDashboardSecurityConfig's own
+  # platform-account-picture:upload/platform-admin-picture:upload rules. A Security Hotspot (unlike
+  # a regular Issue) requires a human reviewer to mark it Safe in the SonarCloud dashboard with a
+  # review comment — no code-level annotation silences it — reference this comment when doing so.
   servlet:
     multipart:
       max-file-size: 11MB

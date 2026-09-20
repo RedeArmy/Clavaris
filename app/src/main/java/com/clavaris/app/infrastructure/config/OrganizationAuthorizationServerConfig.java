@@ -331,6 +331,10 @@ public class OrganizationAuthorizationServerConfig {
           final int accountSessionsListPerAccountLimit,
       @Value("${clavaris.rate-limit.account-sessions.revoke-per-account-limit:20}")
           final int accountSessionsRevokePerAccountLimit,
+      // SDE-III review, 2026-09-21 — SonarCloud multipart-size hotspot follow-up: see
+      // OrganizationRateLimitRules's own account-picture:upload rule for the full rationale.
+      @Value("${clavaris.rate-limit.account-picture.upload-per-account-limit:10}")
+          final int accountPictureUploadPerAccountLimit,
       // TD-SEC-008/ADR-0010 §5.2: how long a retired key keeps being published in JWKS after
       // rotation — generous relative to SAS's own default access-token TTL (5 minutes, per
       // incident-response-signing-key-compromise.md's own decompiled-jar finding) to cover
@@ -575,7 +579,8 @@ public class OrganizationAuthorizationServerConfig {
                     tokenPerClientLimit,
                     tokenRefreshPerClientLimit,
                     accountSessionsListPerAccountLimit,
-                    accountSessionsRevokePerAccountLimit)),
+                    accountSessionsRevokePerAccountLimit,
+                    accountPictureUploadPerAccountLimit)),
             // Anchored after TenantAccountOnlySecurityContextFilter, not SecurityContextHolder
             // Filter directly — real bug, confirmed live: three separate addFilterAfter calls all
             // anchored at the same filter class silently only kept the last-registered one, so the
