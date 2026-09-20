@@ -31,7 +31,16 @@
         </summary>
         <div class="clavaris-profile__panel">
             <div class="clavaris-profile__identity"><span class="clavaris-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.25" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20c.65-3.35 3.05-5 6.5-5s5.85 1.65 6.5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span><strong>Platform account</strong><small>Identity control plane</small></span></div>
-            <div class="clavaris-profile__actions"><a class="clavaris-button clavaris-button--secondary clavaris-button--inline" th:href="@{/platform/account/sessions}">Manage account</a><form th:action="@{/platform/logout}" method="post"><input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/><button type="submit" class="clavaris-button clavaris-button--secondary clavaris-button--inline">Sign out</button></form></div>
+            <div class="clavaris-profile__actions"><button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-dialog-open="manage-account-dialog" th:attr="hx-get=@{/platform/account}" hx-target="#manage-account-dialog-body" hx-trigger="click once" hx-swap="innerHTML">Manage account</button><form th:action="@{/platform/logout}" method="post"><input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/><button type="submit" class="clavaris-button clavaris-button--secondary clavaris-button--inline">Sign out</button></form></div>
         </div>
     </details>
+    <!-- ADR-0026: empty shell — real content is HTMX-loaded on first open (see the trigger button's
+         own hx-get above) from PlatformAccountProfileController's own dual-mode GET /platform/account. -->
+    <dialog id="manage-account-dialog" class="clavaris-dialog clavaris-dialog--wide">
+        <div class="clavaris-dialog__header">
+            <div><h2>Account</h2></div>
+            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close manage account dialog">&times;</button>
+        </div>
+        <div id="manage-account-dialog-body">Loading&hellip;</div>
+    </dialog>
 </aside>

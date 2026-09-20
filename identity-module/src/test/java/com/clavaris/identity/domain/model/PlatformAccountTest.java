@@ -102,4 +102,40 @@ class PlatformAccountTest {
     assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
     assertThat(account.passwordCredential()).contains(credential);
   }
+
+  @Test
+  void updateProfileSetsFirstAndLastName() {
+    PlatformAccount account = PlatformAccount.register(email);
+
+    account.updateProfile("Ada", "Lovelace");
+
+    assertThat(account.firstName()).contains("Ada");
+    assertThat(account.lastName()).contains("Lovelace");
+  }
+
+  @Test
+  void newAccountHasNoPictureUrl() {
+    PlatformAccount account = PlatformAccount.register(email);
+
+    assertThat(account.pictureUrl()).isEmpty();
+  }
+
+  @Test
+  void updateProfilePictureSetsThePictureUrl() {
+    PlatformAccount account = PlatformAccount.register(email);
+
+    account.updateProfilePicture("https://example.com/avatar.png");
+
+    assertThat(account.pictureUrl()).contains("https://example.com/avatar.png");
+  }
+
+  @Test
+  void removeProfilePictureRevertsToTheGeneratedInitialsDefault() {
+    PlatformAccount account = PlatformAccount.register(email);
+    account.updateProfilePicture("https://example.com/avatar.png");
+
+    account.removeProfilePicture();
+
+    assertThat(account.pictureUrl()).isEmpty();
+  }
 }

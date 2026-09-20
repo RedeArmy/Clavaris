@@ -130,7 +130,13 @@ public class PlatformDashboardSecurityConfig {
                         // a ROLE_PLATFORM_ACCOUNT session for this same account (the whole point is
                         // locking a session/device this browser may never have authenticated as).
                         "/platform/account-alert/lock",
-                        "/platform/account-alert/lock/success")
+                        "/platform/account-alert/lock/success",
+                        // ADR-0026: the stable avatar-serving endpoint every OIDC picture claim
+                        // and every dashboard page's own <img src> points at — same "no
+                        // authentication at all, a browser's own <img src> can never carry a
+                        // bearer token" reasoning AccountAvatarController's own Javadoc documents
+                        // for its tenant-tier sibling.
+                        "/platform/avatars/**")
                     .permitAll()
                     .anyRequest()
                     // Security finding (SDE-III review, 2026-08-22): this was `.authenticated()`,

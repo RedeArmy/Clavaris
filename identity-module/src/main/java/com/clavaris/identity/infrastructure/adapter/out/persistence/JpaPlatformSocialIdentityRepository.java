@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.authenticateplatformaccountwith
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformSocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -44,6 +45,14 @@ class JpaPlatformSocialIdentityRepository implements PlatformSocialIdentityRepos
             identity.provider().name(),
             identity.providerUserId(),
             identity.linkedAt()));
+  }
+
+  @Override
+  public List<PlatformSocialIdentity> findAllByPlatformAccountId(
+      final PlatformAccountId platformAccountId) {
+    return identities.findAllByPlatformAccountId(platformAccountId.value()).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   private PlatformSocialIdentity toDomain(final PlatformSocialIdentityEntity entity) {

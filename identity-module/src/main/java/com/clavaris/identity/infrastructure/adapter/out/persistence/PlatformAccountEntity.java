@@ -30,19 +30,37 @@ public class PlatformAccountEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  // ADR-0026: same "just add the scalar column" precedent AccountEntity's own identical fields
+  // already establish.
+  @Column(name = "first_name")
+  private String firstName;
+
+  @Column(name = "last_name")
+  private String lastName;
+
+  @Column(name = "picture_url")
+  private String pictureUrl;
+
   protected PlatformAccountEntity() {}
 
+  @SuppressWarnings("java:S107")
   public PlatformAccountEntity(
       final UUID id,
       final String email,
       final Instant emailVerifiedAt,
       final String status,
-      final Instant createdAt) {
+      final Instant createdAt,
+      final String firstName,
+      final String lastName,
+      final String pictureUrl) {
     this.id = id;
     this.email = email;
     this.emailVerifiedAt = emailVerifiedAt;
     this.status = status;
     this.createdAt = createdAt;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.pictureUrl = pictureUrl;
   }
 
   public UUID getId() {
@@ -63,5 +81,17 @@ public class PlatformAccountEntity {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public String getFirstName() {
+    return firstName;
+  }
+
+  public String getLastName() {
+    return lastName;
+  }
+
+  public String getPictureUrl() {
+    return pictureUrl;
   }
 }
