@@ -1,8 +1,8 @@
 package com.clavaris.identity.application.usecase.updateaccountprofilepicture;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.common.domain.model.BinaryContentEquality;
 import com.clavaris.identity.domain.model.AccountId;
-import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -33,9 +33,9 @@ public record UpdateAccountProfilePictureCommand(
   }
 
   // SonarCloud: a record's auto-generated equals/hashCode/toString use byte[] content's own
-  // identity, not its bytes — overridden here so two commands with the same upload actually
-  // compare equal, same convention StoredProfilePicture's own identical override establishes.
-  // toString prints the array's length, not Arrays.toString(byte[])'s own raw byte dump.
+  // identity, not its bytes — overridden here via BinaryContentEquality so two commands with the
+  // same upload actually compare equal, same shared helper every other byte[]-content record
+  // across this module uses.
   @Override
   public boolean equals(final Object other) {
     if (this == other) {
@@ -51,23 +51,23 @@ public record UpdateAccountProfilePictureCommand(
       return false;
     }
     return accountId.equals(otherAccountId)
-        && Arrays.equals(content, otherContent)
-        && contentType.equals(otherContentType)
+        && BinaryContentEquality.contentEquals(content, contentType, otherContent, otherContentType)
         && actor.equals(otherActor);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(accountId, Arrays.hashCode(content), contentType, actor);
+    return Objects.hash(
+        accountId, BinaryContentEquality.contentHashCode(content, contentType), actor);
   }
 
   @Override
   public String toString() {
     return "UpdateAccountProfilePictureCommand[accountId="
         + accountId
-        + ", content=byte["
-        + content.length
-        + "], contentType="
+        + ", content="
+        + BinaryContentEquality.describeContentLength(content)
+        + ", contentType="
         + contentType
         + ", actor="
         + actor

@@ -1,6 +1,6 @@
 package com.clavaris.identity.application.usecase.getaccountavatar;
 
-import java.util.Arrays;
+import com.clavaris.common.domain.model.BinaryContentEquality;
 
 /**
  * {@link GetAccountAvatarUseCase}'s own two real shapes (ADR-0026): {@link Redirect} for a social
@@ -17,39 +17,34 @@ public sealed interface AccountAvatarResult {
 
   /**
    * SonarCloud: a record's auto-generated {@code equals}/{@code hashCode}/{@code toString} use
-   * {@code byte[] content}'s own identity, not its bytes — overridden here so two {@code Content}
-   * values with the same bytes actually compare equal, same convention {@link
-   * com.clavaris.identity.application.usecase.updateaccountprofilepicture.StoredProfilePicture}'s
-   * own identical override already establishes. {@code toString} deliberately prints the array's
-   * length, not {@link Arrays#toString(byte[])}'s own raw byte dump — an image's own pixel data has
-   * no debugging value spelled out as a list of numbers, and could be sizable.
+   * {@code byte[] content}'s own identity, not its bytes — overridden here via {@link
+   * BinaryContentEquality} so two {@code Content} values with the same bytes actually compare
+   * equal, same shared helper {@code PlatformAccountAvatarResult.Content}'s own identical override
+   * uses (a SonarCloud "Duplicated Lines" finding on this exact hand-rolled block, previously only
+   * silenced locally via a PMD CPD marker that SonarCloud's own duplication engine never honored).
    */
   record Content(byte[] content, String contentType) implements AccountAvatarResult {
 
-    // CPD-OFF: genuinely irreducible duplication with PlatformAccountAvatarResult.Content's own
-    // identical block — same (byte[], String) shape, but the two sealed interfaces belong to
-    // deliberately separate bounded contexts (Account vs PlatformAccount, ADR-0010) that must
-    // never share a domain type, so extracting a common helper would be the wrong fix here.
     @Override
     public boolean equals(final Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other instanceof Content(byte[] otherContent, String otherContentType))) {
-        return false;
-      }
-      return Arrays.equals(content, otherContent) && contentType.equals(otherContentType);
+      return this == other
+          || (other instanceof Content(byte[] otherContent, String otherContentType)
+              && BinaryContentEquality.contentEquals(
+                  content, contentType, otherContent, otherContentType));
     }
 
     @Override
     public int hashCode() {
-      return Arrays.hashCode(content) * 31 + contentType.hashCode();
+      return BinaryContentEquality.contentHashCode(content, contentType);
     }
 
     @Override
     public String toString() {
-      return "Content[content=byte[" + content.length + "], contentType=" + contentType + "]";
+      return "Content[content="
+          + BinaryContentEquality.describeContentLength(content)
+          + ", contentType="
+          + contentType
+          + "]";
     }
-    // CPD-ON
   }
 }
