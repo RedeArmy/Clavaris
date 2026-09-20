@@ -16,8 +16,6 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
-import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.RateLimitPolicySnapshot;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.domain.model.Organization;
@@ -45,7 +43,6 @@ class PlatformOrganizationDetailControllerTest {
 
   private GetOrganizationForPlatformAccountUseCase getOrganization;
   private ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
-  private GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
 
@@ -53,12 +50,9 @@ class PlatformOrganizationDetailControllerTest {
   void setUp() {
     getOrganization = mock(GetOrganizationForPlatformAccountUseCase.class);
     listWorkspaces = mock(ListWorkspacesForOrganizationPagedUseCase.class);
-    getRateLimitPolicy = mock(GetRateLimitPolicyForOrganizationUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(listWorkspaces.handle(any())).thenReturn(emptyPage());
-    when(getRateLimitPolicy.handle(any()))
-        .thenReturn(new RateLimitPolicySnapshot(600, false, null, 6000));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -77,7 +71,7 @@ class PlatformOrganizationDetailControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformOrganizationDetailController(
-                    getOrganization, listWorkspaces, getRateLimitPolicy, currentPlatformAccount))
+                    getOrganization, listWorkspaces, currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -121,20 +115,6 @@ class PlatformOrganizationDetailControllerTest {
         .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString(organization.id().toString())));
-  }
-
-  @Test
-  void showsTheOrganizationsEffectiveRateLimitPolicy() throws Exception {
-    Organization organization = Organization.register("Acme Co", OWNER_ID);
-    RateLimitPolicySnapshot customized =
-        new RateLimitPolicySnapshot(1200, true, java.time.Instant.now(), 6000);
-    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
-    when(getRateLimitPolicy.handle(any())).thenReturn(customized);
-
-    mockMvc
-        .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
-        .andExpect(status().isOk())
-        .andExpect(model().attribute("rateLimitPolicy", customized));
   }
 
   @Test

@@ -1,0 +1,21 @@
+<!--
+SDE-III review, 2026-09-19 — Clerk-style Organization detail navigation, this module's own copy.
+Hand-duplicated across organization-module/client-registry-module/identity-module/webhook-module,
+same convention this module's own dashboard-nav.html fragment already establishes: no module here
+declares a Maven dependency on another, so a single shared fragment would only be reachable from
+the app module's aggregated runtime classpath, not from any one module's own standalone-MockMvc
+controller tests. "Users" is a plain link to the already-existing, separate
+/platform/dashboard/organizations/{organizationId}/users page (identity-module) — not embedded
+here. "Configure" links to Secret Keys, the same default landing item Clerk's own equivalent tab
+uses (its screenshot's own "API keys" is the closest Clerk concept to a Secret Key here).
+-->
+<div th:fragment="tabs(organizationId, active)" class="clavaris-org-tabs">
+    <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}"
+       th:classappend="${active == 'workspaces'} ? 'active'">Workspaces</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
+       th:classappend="${active == 'users'} ? 'active'">Users</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organizationId})}"
+       th:classappend="${active == 'logs'} ? 'active'">Logs</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
+       th:classappend="${active == 'configure'} ? 'active'">Configure</a>
+</div>

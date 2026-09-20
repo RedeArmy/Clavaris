@@ -4,7 +4,6 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
-import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.domain.model.Organization;
@@ -35,14 +34,11 @@ import org.springframework.web.server.ResponseStatusException;
  * 403, for an Organization that exists but belongs to someone else — same anti-enumeration posture
  * that use case's own Javadoc documents.
  *
- * <p>The {@code rateLimitPolicy} attribute (backed by {@link
- * GetRateLimitPolicyForOrganizationUseCase}) is a read, same as every other section's own model
- * attribute here — this controller itself stays read-only. TD-FUT-002 (self-service tuning,
- * shipped): the Rate Limit section's own form now posts to a separate controller, {@code
- * PlatformRateLimitPolicyController}, same read/write split every other section on this page
- * already has (compare the create-workspace form above, which posts to {@code
- * PlatformWorkspaceController}, not a method here) — {@code rateLimitForm} (a fresh, blank {@link
- * SetRateLimitPolicyForm}) is added to the model below for exactly that form to bind to.
+ * <p>SDE-III review, 2026-09-19 — Clerk-style navigation: this page now shows only the Workspaces
+ * section; Users/Logs/Configure are separate pages reached via the top-level {@code org-tabs}
+ * fragment, and Rate Limit/Danger Zone (both formerly inlined/link-shelled here) are now their own
+ * standalone pages under Configure ({@code PlatformRateLimitPolicyController}'s own new {@code
+ * GET}, {@code PlatformDangerZoneController}) — this controller no longer populates either.
  */
 // PMD.LongVariable: currentPlatformAccount/ownerPlatformAccountId (field/constructor param/local
 // each) are long by design, not accidentally — same class-level-suppression precedent
@@ -61,17 +57,14 @@ public class PlatformOrganizationDetailController {
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
-  private final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformOrganizationDetailController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
-      final GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicy,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.listWorkspaces = listWorkspaces;
-    this.getRateLimitPolicy = getRateLimitPolicy;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
@@ -111,10 +104,6 @@ public class PlatformOrganizationDetailController {
     if (isHtmxRequest(request)) {
       return WORKSPACES_FRAGMENT;
     }
-    model.addAttribute("rateLimitPolicy", getRateLimitPolicy.handle(organizationId));
-    // TD-FUT-002 (self-service tuning, shipped): a fresh, blank form each GET — same convention
-    // as workspaceForm above, bound by PlatformRateLimitPolicyController#set, not this controller.
-    model.addAttribute("rateLimitForm", new SetRateLimitPolicyForm());
     return DETAIL_VIEW;
   }
 

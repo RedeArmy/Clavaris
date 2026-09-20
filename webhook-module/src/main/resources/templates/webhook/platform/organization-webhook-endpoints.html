@@ -14,22 +14,28 @@
                 <span>Webhook Endpoints</span>
             </p>
 
-            <div class="clavaris-page-header">
-                <div>
-                    <h1>Webhook Endpoints</h1>
-                    <p>URLs this Organization's own consuming application(s) receive event
-                        deliveries at (ADR-0007). Each delivery is signed with this endpoint's own
-                        secret — shown exactly once, at registration or rotation.</p>
-                </div>
-            </div>
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
 
-            <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
-                 PlatformOrganizationClientController's own Javadoc for the general shape this page
-                 mirrors. Register/rotate-secret never redirect even on a plain form submit — the
-                 raw signing secret can't safely travel through one. Unlike Secret Keys/OAuth
-                 Clients, this endpoint supports both deactivate AND reactivate, so both actions
-                 appear per row (see PlatformWebhookEndpointController's own Javadoc). -->
-            <div id="endpoints-content" th:fragment="endpoints" class="clavaris-section">
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Webhook Endpoints</h1>
+                            <p>URLs this Organization's own consuming application(s) receive event
+                                deliveries at (ADR-0007). Each delivery is signed with this endpoint's own
+                                secret — shown exactly once, at registration or rotation.</p>
+                        </div>
+                    </div>
+
+                    <!-- ADR-0025: same HTMX-fragment shape as every other dashboard section — see
+                         PlatformOrganizationClientController's own Javadoc for the general shape this page
+                         mirrors. Register/rotate-secret never redirect even on a plain form submit — the
+                         raw signing secret can't safely travel through one. Unlike Secret Keys/OAuth
+                         Clients, this endpoint supports both deactivate AND reactivate, so both actions
+                         appear per row (see PlatformWebhookEndpointController's own Javadoc). -->
+                    <div id="endpoints-content" th:fragment="endpoints" class="clavaris-section">
                 <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                     <strong>New signing secret for endpoint <code th:text="${justRegisteredEndpointId}">endpointId</code>:</strong>
                     <code th:text="${justRegisteredRawSecret}">secret</code><br/>
@@ -151,6 +157,8 @@
 
                         <button class="clavaris-button clavaris-button--inline" type="submit">Register endpoint</button>
                     </form>
+                </div>
+                    </div>
                 </div>
             </div>
         </div>
