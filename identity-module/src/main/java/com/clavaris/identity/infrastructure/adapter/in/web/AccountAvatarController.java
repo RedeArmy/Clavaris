@@ -12,9 +12,10 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -32,8 +33,14 @@ import org.springframework.web.server.ResponseStatusException;
  * upload, or {@code GetAccountAvatarService}'s own generated-initials default) is streamed back
  * with a real {@code Cache-Control}, since this endpoint's own content genuinely doesn't change on
  * every request the way a login page's own HTML does.
+ *
+ * <p>{@code @Controller} + {@code @ResponseBody}, not {@code @RestController}: this endpoint is
+ * part of the OIDC/hosted-UI surface (same category as {@code RegisterAccountController}), never
+ * the {@code client_credentials}-gated management API — {@code OpenApiDocumentationTest}'s own
+ * Javadoc documents this exact distinction, and only scopes its {@code @Operation} requirement to
+ * {@code @RestController}.
  */
-@RestController
+@Controller
 public class AccountAvatarController {
 
   // A real cache lifetime, not zero/no-store like every other hosted page on this codebase's own
@@ -53,6 +60,7 @@ public class AccountAvatarController {
   // documents.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping("/o/{organizationId}/avatars/{accountId}")
+  @ResponseBody
   public ResponseEntity<byte[]> show(
       @PathVariable final UUID organizationId, @PathVariable final UUID accountId) {
     final AccountAvatarResult result =
