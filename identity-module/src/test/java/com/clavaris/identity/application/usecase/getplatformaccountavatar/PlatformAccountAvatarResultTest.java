@@ -14,7 +14,7 @@ class PlatformAccountAvatarResultTest {
         new PlatformAccountAvatarResult.Content(new byte[] {1, 2, 3}, "image/png");
 
     assertThat(first).isEqualTo(second);
-    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(first).hasSameHashCodeAs(second);
   }
 
   @Test
