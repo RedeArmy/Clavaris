@@ -72,7 +72,7 @@
                         <div class="clavaris-profile-picture-section">
                             <img class="clavaris-profile-picture"
                                  th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
-                                 alt="Current profile picture"/>
+                                 alt="Current profile"/>
                             <div class="clavaris-profile-picture-actions">
                                 <form method="post" enctype="multipart/form-data"
                                       th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture(organizationId=${organizationId},accountId=${account.id()})}">

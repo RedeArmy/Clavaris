@@ -44,6 +44,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class AccountProfileController {
 
   private static final String PROFILE_VIEW = "identity/account/profile";
+  private static final String REDIRECT_PREFIX = "redirect:/o/";
 
   private final GetAccountForOrganizationUseCase getAccount;
   private final UpdateAccountProfilePictureUseCase updatePicture;
@@ -94,14 +95,14 @@ public class AccountProfileController {
       model.addAttribute("uploadError", e.getMessage());
       return PROFILE_VIEW;
     }
-    return "redirect:/o/" + organizationId + "/account/profile?updated";
+    return REDIRECT_PREFIX + organizationId + "/account/profile?updated";
   }
 
   @PostMapping("/picture/remove")
   public String removePicture(
       @PathVariable final UUID organizationId, final HttpServletRequest request) {
     removePicture.handle(new RemoveAccountProfilePictureCommand(requireCurrentAccount(request)));
-    return "redirect:/o/" + organizationId + "/account/profile?removed";
+    return REDIRECT_PREFIX + organizationId + "/account/profile?removed";
   }
 
   // PMD.OnlyOneReturn: two real, distinct outcomes — not allowed re-renders with an error, success
@@ -129,7 +130,7 @@ public class AccountProfileController {
     if (session != null) {
       session.invalidate();
     }
-    return "redirect:/o/" + organizationId + "/login?accountDeleted";
+    return REDIRECT_PREFIX + organizationId + "/login?accountDeleted";
   }
 
   private void populateModel(
