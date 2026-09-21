@@ -22,9 +22,14 @@
                 </div>
                 <div class="clavaris-row-actions">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log(organizationId=${organizationId},accountId=${account.id()})}">View log</a>
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log(organizationId=${organizationId},accountId=${account.id().value()})}">View log</a>
+                    <!-- ?openImpersonate=true (organization-users.html's own row-menu link, resolved by
+                         PlatformAccountDetailController into this openImpersonate model attribute) auto-opens
+                         this dialog on load, same data-dialog-open-on-load mechanism already used elsewhere in
+                         this dashboard for a validation-error re-render — see that file's own comment for why. -->
                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                             type="button" data-dialog-open="impersonate-dialog"
+                            th:attr="data-dialog-open-on-load=${openImpersonate} ? 'true' : null"
                             th:disabled="${#lists.isEmpty(oauthClients)}">Impersonate user</button>
                 </div>
             </div>
@@ -71,11 +76,11 @@
                     <section id="clavaris-panel-profile" class="clavaris-manage-account__panel">
                         <div class="clavaris-profile-picture-section">
                             <img class="clavaris-profile-picture"
-                                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
+                                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}"
                                  alt="Current profile"/>
                             <div class="clavaris-profile-picture-actions">
                                 <form method="post" enctype="multipart/form-data"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture(organizationId=${organizationId},accountId=${account.id()})}">
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture(organizationId=${organizationId},accountId=${account.id().value()})}">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <label for="account-picture-file">Replace</label>
                                     <input id="account-picture-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required/>
@@ -83,7 +88,7 @@
                                     <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
                                 </form>
                                 <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture/remove(organizationId=${organizationId},accountId=${account.id()})}">
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture/remove(organizationId=${organizationId},accountId=${account.id().value()})}">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
                                 </form>
@@ -93,7 +98,7 @@
                         <div class="clavaris-section-card">
                             <h2>Personal information</h2>
                             <form method="post"
-                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/profile(organizationId=${organizationId},accountId=${account.id()})}">
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/profile(organizationId=${organizationId},accountId=${account.id().value()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label for="account-first-name">First name</label>
@@ -127,7 +132,7 @@
                             <p>The account holder resets their own password — an operator never sets
                                 one directly.</p>
                             <form method="post"
-                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/force-password-reset(organizationId=${organizationId},accountId=${account.id()})}">
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/force-password-reset(organizationId=${organizationId},accountId=${account.id().value()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Send password reset email</button>
                             </form>
@@ -158,7 +163,7 @@
                                         <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                                         <td>
                                             <form method="post"
-                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/sessions/{sessionId}/revoke(organizationId=${organizationId},accountId=${account.id()},sessionId=${userSession.sessionId()})}">
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/sessions/{sessionId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},sessionId=${userSession.sessionId()})}">
                                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
                                             </form>
@@ -218,7 +223,7 @@
                         <div class="clavaris-section-card">
                             <h2>User permissions</h2>
                             <form method="post"
-                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/settings(organizationId=${organizationId},accountId=${account.id()})}">
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/settings(organizationId=${organizationId},accountId=${account.id().value()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
                                     <label>
@@ -244,7 +249,7 @@
                             <div class="clavaris-row-actions" style="justify-content: space-between;">
                                 <h2>Grants</h2>
                                 <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/revoke-all(organizationId=${organizationId},accountId=${account.id()})}">
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/revoke-all(organizationId=${organizationId},accountId=${account.id().value()})}">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit"
                                             th:disabled="${#lists.isEmpty(oauthGrants)}">Revoke all</button>
@@ -274,7 +279,7 @@
                                         <td th:text="${grant.expiresAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.expiresAt())} : '—'">expires at</td>
                                         <td>
                                             <form method="post"
-                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/{authorizationId}/revoke(organizationId=${organizationId},accountId=${account.id()},authorizationId=${grant.authorizationId()})}">
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/{authorizationId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},authorizationId=${grant.authorizationId()})}">
                                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
                                             </form>
@@ -298,7 +303,7 @@
                     </div>
                     <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog">×</button>
                 </div>
-                <form th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate(organizationId=${organizationId},accountId=${account.id()})}" method="post">
+                <form th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate(organizationId=${organizationId},accountId=${account.id().value()})}" method="post">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                     <div class="clavaris-field">

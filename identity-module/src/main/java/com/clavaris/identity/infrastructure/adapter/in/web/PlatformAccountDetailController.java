@@ -21,6 +21,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item: a read-only
@@ -78,6 +79,7 @@ public class PlatformAccountDetailController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID accountId,
+      @RequestParam(required = false) final String openImpersonate,
       final Model model) {
     final PlatformAccountOrganizationAccess.ResolvedAccountAccess access =
         organizationAccess.requireOwnedAccount(request, organizationId, accountId, getAccount);
@@ -88,6 +90,9 @@ public class PlatformAccountDetailController {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, access.organizationName());
     model.addAttribute("account", account);
+    // organization-users.html's own row-menu "Impersonate user" link — see that file's own
+    // comment for why this deep-links here instead of duplicating the impersonate flow.
+    model.addAttribute("openImpersonate", openImpersonate != null);
     model.addAttribute("devices", knownDevices.findAllByAccountId(targetAccountId));
     model.addAttribute("socialIdentities", socialIdentities.findAllByAccountId(targetAccountId));
     model.addAttribute("oauthClients", oauthClientsProvider.forOrganization(orgId));

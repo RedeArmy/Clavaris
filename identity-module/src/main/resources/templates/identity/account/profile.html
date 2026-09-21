@@ -23,7 +23,7 @@
 
         <div class="clavaris-profile-picture-section">
             <img class="clavaris-profile-picture"
-                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
+                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}"
                  alt="Current profile"/>
 
             <div class="clavaris-profile-picture-actions">

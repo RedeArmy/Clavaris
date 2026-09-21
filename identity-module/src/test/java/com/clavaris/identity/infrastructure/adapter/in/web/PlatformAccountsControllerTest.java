@@ -121,6 +121,34 @@ class PlatformAccountsControllerTest {
         .andExpect(model().attribute("users", List.of(account)));
   }
 
+  // Live-found bug, 2026-09-20: every row-menu action (View profile, View log, Impersonate,
+  // Lock/Ban/Delete) built its URL from ${account.id()} instead of ${account.id().value()} —
+  // AccountId's own record toString (no override) renders as "AccountId[value=...]", which
+  // Thymeleaf then URL-encodes into the path segment verbatim. No prior test caught this because
+  // Thymeleaf renders that malformed URL without error; only a real click (a real UUID path
+  // segment, not this) tells the two apart. Asserting the rendered href/action content directly,
+  // not just status/view/model, so this class of bug fails a test instead of only surfacing live.
+  @Test
+  void rowMenuActionsLinkToTheRawAccountIdNotItsRecordToString() throws Exception {
+    Account account = sampleAccount();
+    KeysetCursor cursor = cursorOf(account);
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(account), cursor, cursor, false, false));
+
+    String rawId = account.id().value().toString();
+    String usersPath = basePath() + "/" + rawId;
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("AccountId[value="))))
+        .andExpect(content().string(containsString(usersPath)))
+        .andExpect(content().string(containsString(usersPath + "/audit-log")))
+        .andExpect(content().string(containsString(usersPath + "/suspend")))
+        .andExpect(content().string(containsString(usersPath + "/ban")))
+        .andExpect(content().string(containsString(usersPath + "/delete")));
+  }
+
   @Test
   void htmxGetReturnsTheUsersFragmentInsteadOfTheFullPage() throws Exception {
     mockMvc
