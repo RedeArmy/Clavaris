@@ -38,7 +38,7 @@
                         <section id="clavaris-panel-profile" class="clavaris-manage-account__panel">
                             <div class="clavaris-profile-picture-section">
                                 <img class="clavaris-profile-picture"
-                                     th:src="@{/platform/avatars/{id}(id=${account.id()})}"
+                                     th:src="@{/platform/avatars/{id}(id=${account.id().value()})}"
                                      alt="Current profile"/>
                                 <div class="clavaris-profile-picture-actions">
                                     <form method="post" enctype="multipart/form-data" th:action="@{/platform/account/picture}">

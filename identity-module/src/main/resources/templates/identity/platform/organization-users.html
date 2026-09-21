@@ -49,7 +49,7 @@
                             <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}">
                                 <div class="clavaris-row-identity">
                                     <img class="clavaris-row-avatar"
-                                         th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
+                                         th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}"
                                          alt=""/>
                                     <span th:text="${#strings.isEmpty(fullName)} ? '—' : ${fullName}">Name</span>
                                 </div>
@@ -77,29 +77,36 @@
                                         <p class="clavaris-menu__id">ID: <code th:text="${account.id().value()}">account id</code></p>
                                         <hr class="clavaris-menu__divider"/>
                                         <a class="clavaris-menu__item"
-                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id()})}">View profile</a>
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}">View profile</a>
                                         <a class="clavaris-menu__item"
-                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log(organizationId=${organizationId},accountId=${account.id()})}">View log</a>
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log(organizationId=${organizationId},accountId=${account.id().value()})}">View log</a>
+                                        <!-- Live-found bug, 2026-09-20: this used to link to the exact same URL as
+                                             "View profile" above with no way to reach the real impersonate flow, which
+                                             only lives on that profile page's own dialog (account-profile.html) — a
+                                             dead-end click, not a Whitelabel cause. openImpersonate=true tells that
+                                             page to auto-open its own impersonate-dialog on load, same
+                                             data-dialog-open-on-load mechanism this file's own create-user dialog
+                                             already uses for a validation-error re-render. -->
                                         <a class="clavaris-menu__item"
-                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id()})}">Impersonate user</a>
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()},openImpersonate=true)}">Impersonate user</a>
                                         <hr class="clavaris-menu__divider"/>
                                         <form method="post" th:if="${account.status().name() == 'ACTIVE'}"
-                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/suspend(organizationId=${organizationId},accountId=${account.id()})}">
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/suspend(organizationId=${organizationId},accountId=${account.id().value()})}">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Lock account</button>
                                         </form>
                                         <form method="post" th:if="${account.status().name() == 'SUSPENDED'}"
-                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/reactivate(organizationId=${organizationId},accountId=${account.id()})}">
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/reactivate(organizationId=${organizationId},accountId=${account.id().value()})}">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item">Unlock account</button>
                                         </form>
                                         <form method="post" th:unless="${account.status().name() == 'BANNED'}"
-                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/ban(organizationId=${organizationId},accountId=${account.id()})}">
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/ban(organizationId=${organizationId},accountId=${account.id().value()})}">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Ban account</button>
                                         </form>
                                         <form method="post" th:if="${account.status().name() == 'BANNED'}"
-                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/unban(organizationId=${organizationId},accountId=${account.id()})}">
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/unban(organizationId=${organizationId},accountId=${account.id().value()})}">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item">Unban account</button>
                                         </form>
@@ -118,7 +125,7 @@
                                         <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete user dialog">×</button>
                                     </div>
                                     <form method="post"
-                                          th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/delete(organizationId=${organizationId},accountId=${account.id()})}">
+                                          th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/delete(organizationId=${organizationId},accountId=${account.id().value()})}">
                                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <div class="clavaris-dialog__actions">
                                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>

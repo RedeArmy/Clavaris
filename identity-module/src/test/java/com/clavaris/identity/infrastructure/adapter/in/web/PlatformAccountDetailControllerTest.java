@@ -1,9 +1,12 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -123,6 +126,33 @@ class PlatformAccountDetailControllerTest {
     when(getAccount.handle(any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(path())).andExpect(status().isNotFound());
+  }
+
+  // organization-users.html's own row-menu "Impersonate user" link (?openImpersonate=true) must
+  // resolve to this page auto-opening its own impersonate dialog — see that file's own comment
+  // for the bug this replaced (a dead-end link to this same page with no way to reach the dialog).
+  // The template's own explanatory comment above the button also contains the literal string
+  // "data-dialog-open-on-load" (plain HTML comments render as-is, same codebase-wide convention
+  // as this template's own SDE-III review comments) — asserting the real attribute-with-value
+  // form so that comment can't produce a false positive here.
+  private static final String IMPERSONATE_AUTO_OPEN_ATTRIBUTE = "data-dialog-open-on-load=\"true\"";
+
+  @Test
+  void openImpersonateQueryParamAutoOpensTheImpersonateDialog() throws Exception {
+    mockMvc
+        .perform(get(path()).param("openImpersonate", "true"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("openImpersonate", true))
+        .andExpect(content().string(containsString(IMPERSONATE_AUTO_OPEN_ATTRIBUTE)));
+  }
+
+  @Test
+  void withoutTheQueryParamTheImpersonateDialogDoesNotAutoOpen() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("openImpersonate", false))
+        .andExpect(content().string(not(containsString(IMPERSONATE_AUTO_OPEN_ATTRIBUTE))));
   }
 
   @Test
