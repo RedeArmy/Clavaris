@@ -232,6 +232,69 @@ input[type="radio"] {
   color: var(--clavaris-text-muted);
 }
 
+/* SDE-III UI audit, 2026-09-20 — the dashboard's own true on/off settings (permission flags like
+   canDeleteOwnAccount/bypassesDeviceTrust, "Require consent screen") rendered as a plain browser
+   checkbox, visually indistinguishable from the multi-select scope/grant-type/event-type lists
+   elsewhere in this same dashboard that mean something different (pick N of many, not toggle one
+   thing) — deliberately applied only to the former, not those lists or the end-user OAuth consent
+   screen (identity/consent.html), which keeps plain checkboxes, the standard pattern for that
+   specific flow. The underlying <input type="checkbox"> is unchanged — still submits normally,
+   still works with th:field/th:checked/name/value exactly as before — only visually replaced by
+   the track/thumb next to it, so no controller or use-case code needed to change. label.clavaris-
+   toggle (not just .clavaris-toggle) to out-specificity .clavaris-field label's own `display:
+   block` above, which would otherwise stack the track and text on separate lines. */
+label.clavaris-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.clavaris-toggle input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.clavaris-toggle__track {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--clavaris-border-strong);
+  transition: background-color 150ms ease-out;
+}
+
+.clavaris-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--clavaris-surface);
+  transition: transform 150ms ease-out;
+}
+
+.clavaris-toggle input[type="checkbox"]:checked + .clavaris-toggle__track {
+  background: var(--clavaris-brand-color);
+}
+
+.clavaris-toggle input[type="checkbox"]:checked + .clavaris-toggle__track .clavaris-toggle__thumb {
+  transform: translateX(16px);
+}
+
+.clavaris-toggle input[type="checkbox"]:focus-visible + .clavaris-toggle__track {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
+}
+
 .clavaris-button {
   display: block;
   width: 100%;
@@ -690,6 +753,25 @@ code {
 }
 
 .clavaris-breadcrumb a:hover {
+  color: var(--clavaris-text-primary);
+  text-decoration: underline;
+}
+
+/* SDE-III review, 2026-09-20 — the Account admin flow (Users -> Profile -> Audit Log) nests four
+   breadcrumb levels deep with no faster way back than re-reading that trail or the browser's own
+   back button. A separate, one-hop-up link above the breadcrumb, not folded into it, so it reads
+   as "go back" rather than one more trail segment. */
+.clavaris-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--clavaris-text-muted);
+  text-decoration: none;
+}
+
+.clavaris-back-link:hover {
   color: var(--clavaris-text-primary);
   text-decoration: underline;
 }

@@ -1,0 +1,13 @@
+<!--
+SDE-III review, 2026-09-20 — a single "one hop up" link, separate from the breadcrumb trail
+(org-tabs.html above), for the Account admin flow (Users -> Profile -> Audit Log) specifically:
+that flow nests four breadcrumb levels deep, deeper than any other page in this module, with no
+faster way back than re-reading the full trail. Shared here (not hand-duplicated per
+org-tabs.html's own comment) because every page that uses it lives in this same module, so a
+single fragment is reachable from this module's own standalone-MockMvc controller tests — the
+cross-module constraint that comment documents doesn't apply to a fragment only ever referenced
+from within identity-module itself.
+-->
+<a th:fragment="back(href, label)" class="clavaris-back-link" th:href="${href}">
+    <span aria-hidden="true">&larr;</span> <span th:text="${label}">Back</span>
+</a>

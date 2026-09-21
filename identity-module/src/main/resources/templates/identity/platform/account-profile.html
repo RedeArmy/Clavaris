@@ -8,6 +8,7 @@
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
+            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
@@ -226,15 +227,17 @@
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/settings(organizationId=${organizationId},accountId=${account.id().value()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-field">
-                                    <label>
+                                    <label class="clavaris-toggle">
                                         <input type="checkbox" name="canDeleteOwnAccount" value="true" th:checked="${account.canDeleteOwnAccount()}"/>
-                                        Allow user to delete their own account
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">Allow user to delete their own account</span>
                                     </label>
                                 </div>
                                 <div class="clavaris-field">
-                                    <label>
+                                    <label class="clavaris-toggle">
                                         <input type="checkbox" name="bypassesDeviceTrust" value="true" th:checked="${account.bypassesDeviceTrust()}"/>
-                                        Bypass Device Trust
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">Bypass Device Trust</span>
                                     </label>
                                     <p class="clavaris-field-hint">Allows this Account to sign in from a new device without a
                                         Device Trust challenge — protects against credential-stuffing attacks when off.</p>

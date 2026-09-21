@@ -150,6 +150,19 @@ class PlatformAccountsControllerTest {
   }
 
   @Test
+  void showsABackLinkToTheOrganization() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("clavaris-back-link")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "href=\"/platform/dashboard/organizations/" + organizationId + "\"")));
+  }
+
+  @Test
   void htmxGetReturnsTheUsersFragmentInsteadOfTheFullPage() throws Exception {
     mockMvc
         .perform(get(basePath()).header("HX-Request", "true"))

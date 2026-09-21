@@ -122,6 +122,21 @@ class PlatformAccountDetailControllerTest {
   }
 
   @Test
+  void showsABackLinkToTheUsersList() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("clavaris-back-link")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "href=\"/platform/dashboard/organizations/"
+                            + organizationId
+                            + "/users\"")));
+  }
+
+  @Test
   void returnsNotFoundWhenTheAccountIsUnknownOrBelongsToAnotherOrganization() throws Exception {
     when(getAccount.handle(any())).thenReturn(Optional.empty());
 

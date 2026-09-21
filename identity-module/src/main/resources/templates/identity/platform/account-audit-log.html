@@ -7,19 +7,21 @@
 <div class="clavaris-dashboard">
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
-        <div class="clavaris-dashboard__inner">
+        <div class="clavaris-dashboard__inner"
+             th:with="accountLabel=${account.username().isPresent()} ? ${account.username().get().value()} : ${account.email().value()}">
+            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}, 'Back to Profile')}"></div>
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id()})}" th:text="${account.email().value()}">Account</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}" th:text="${accountLabel}">Account</a> /
                 <span>Audit Log</span>
             </p>
 
             <div class="clavaris-page-header">
                 <div>
                     <h1>Audit Log</h1>
-                    <p th:text="'The most recent administrative changes to this Account: ' + ${account.email().value()} + '.'">Account audit log</p>
+                    <p th:text="'The most recent administrative changes to this Account: ' + ${accountLabel} + '.'">Account audit log</p>
                 </div>
             </div>
 
