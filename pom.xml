@@ -100,6 +100,11 @@
              (11.0.26 is not, as of this writing) — this is the latest
              available patch release, not an arbitrary bump. -->
         <tomcat.version>11.0.25</tomcat.version>
+        <!-- ADR-0026: identity-module's own SupabaseS3ProfilePictureStorage adapter talks to
+             Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
+             Supabase SDK dependency needed, same "build on vetted foundations" posture as every
+             other external integration in this codebase. -->
+        <aws-sdk.version>2.35.7</aws-sdk.version>
         <!-- SonarCloud analysis warning, "No coverage report can be found with
              sonar.coverage.jacoco.xmlReportPaths=...": this module (clavaris-parent, packaging=pom)
              has no src/main/java of its own. DO NOT "fix" this with sonar.skip on this pom, even
@@ -205,6 +210,16 @@
                 <groupId>org.apache.tomcat.embed</groupId>
                 <artifactId>tomcat-embed-websocket</artifactId>
                 <version>${tomcat.version}</version>
+            </dependency>
+            <!-- ADR-0026: pins every software.amazon.awssdk:* artifact's version in one place —
+                 identity-module only actually depends on the "s3" artifact itself (see its own
+                 pom.xml), the rest of this BOM's entries are simply not pulled in. -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

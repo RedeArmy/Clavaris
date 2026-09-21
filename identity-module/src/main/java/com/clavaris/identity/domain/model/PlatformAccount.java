@@ -39,6 +39,13 @@ public final class PlatformAccount {
 
   private PlatformPasswordCredential passwordCredential;
 
+  // ADR-0026: same "Clerk manage-account parity" profile fields Account already has, extended to
+  // this aggregate too — see PlatformAccountProfileController's own Javadoc for the self-service
+  // page these back.
+  private String firstName;
+  private String lastName;
+  private String pictureUrl;
+
   private PlatformAccount(
       final PlatformAccountId id,
       final Email email,
@@ -75,9 +82,33 @@ public final class PlatformAccount {
       final Instant emailVerifiedAt,
       final AccountStatus status,
       final PlatformPasswordCredential passwordCredential) {
+    return reconstitute(
+        id, email, createdAt, emailVerifiedAt, status, passwordCredential, null, null, null);
+  }
+
+  /**
+   * Full reconstitution including {@code firstName}/{@code lastName}/{@code pictureUrl} (ADR-0026)
+   * — the persistence adapter's own rehydration path. The 6-arg overload above is kept, not
+   * replaced, same "every existing caller that never touches the new fields stays unchanged"
+   * precedent {@code Account.reconstitute}'s own multi-overload shape already establishes.
+   */
+  @SuppressWarnings("java:S107")
+  public static PlatformAccount reconstitute(
+      final PlatformAccountId id,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PlatformPasswordCredential passwordCredential,
+      final String firstName,
+      final String lastName,
+      final String pictureUrl) {
     final PlatformAccount account = new PlatformAccount(id, email, createdAt, status);
     account.emailVerifiedAt = emailVerifiedAt;
     account.passwordCredential = passwordCredential;
+    account.firstName = firstName;
+    account.lastName = lastName;
+    account.pictureUrl = pictureUrl;
     return account;
   }
 
@@ -146,5 +177,38 @@ public final class PlatformAccount {
 
   public Optional<PlatformPasswordCredential> passwordCredential() {
     return Optional.ofNullable(passwordCredential);
+  }
+
+  public Optional<String> firstName() {
+    return Optional.ofNullable(firstName);
+  }
+
+  public Optional<String> lastName() {
+    return Optional.ofNullable(lastName);
+  }
+
+  public Optional<String> pictureUrl() {
+    return Optional.ofNullable(pictureUrl);
+  }
+
+  /**
+   * ADR-0026: self-service "Update profile" name edit — always overwrites, unlike social capture.
+   */
+  public void updateProfile(final String firstName, final String lastName) {
+    this.firstName = firstName;
+    this.lastName = lastName;
+  }
+
+  /** Same rationale/shape as {@link Account#updateProfilePicture}. */
+  public void updateProfilePicture(final String pictureUrl) {
+    this.pictureUrl = Objects.requireNonNull(pictureUrl, "pictureUrl must not be null");
+  }
+
+  /** Same rationale/shape as {@link Account#removeProfilePicture}. */
+  // PMD.NullAssignment: deliberately clears pictureUrl, same convention as
+  // Account#removeProfilePicture's own identical suppression.
+  @SuppressWarnings("PMD.NullAssignment")
+  public void removeProfilePicture() {
+    this.pictureUrl = null;
   }
 }

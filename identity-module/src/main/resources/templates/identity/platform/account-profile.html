@@ -45,66 +45,246 @@
                 <p>Scope: <span th:text="${#strings.arrayJoin(impersonationToken.scope().toArray(), ' ')}">scope</span></p>
             </div>
 
-            <!-- SDE-III review, 2026-09-19 — Clerk dashboard "View Profile" parity, read-only. -->
-            <div class="clavaris-section">
-                <div class="clavaris-section-card">
-                    <h2>Identity</h2>
-                    <p>Status:
-                        <span class="clavaris-badge"
-                              th:classappend="${account.status().name() == 'ACTIVE'} ? 'clavaris-badge--success' : (${account.status().name() == 'DELETED'} ? 'clavaris-badge--muted' : 'clavaris-badge--error')"
-                              th:text="${account.status()}">ACTIVE</span>
-                    </p>
-                    <p>Account ID: <code th:text="${account.id()}">account id</code></p>
-                    <p>Username: <span th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</span></p>
-                    <p>Phone number: <span th:text="${account.phoneNumber().orElse('—')}">phone</span></p>
-                    <p>Joined: <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</span></p>
-                    <p>Last signed in: <span th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</span></p>
-                </div>
+            <p class="clavaris-alert clavaris-alert--success" th:if="${param.profileUpdated}">Profile was updated.</p>
+            <p class="clavaris-alert clavaris-alert--success" th:if="${param.pictureUpdated}">Profile picture was updated.</p>
+            <p class="clavaris-alert clavaris-alert--success" th:if="${param.pictureRemoved}">Profile picture was removed.</p>
+            <p class="clavaris-alert clavaris-alert--success" th:if="${param.passwordResetSent}">A password reset link was sent to this Account's email.</p>
+            <p class="clavaris-alert clavaris-alert--success" th:if="${param.settingsUpdated}">Settings were updated.</p>
+            <p class="clavaris-alert clavaris-alert--error" th:if="${param.pictureError}" th:text="${param.pictureError}">Upload error</p>
 
-                <div class="clavaris-section-card">
-                    <h2>Devices</h2>
-                    <p th:if="${#lists.isEmpty(devices)}" class="clavaris-empty-state">No known devices yet.</p>
-                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(devices)}">
-                        <table class="clavaris-table">
-                            <thead>
-                            <tr>
-                                <th>Browser / OS</th>
-                                <th>First seen</th>
-                                <th>Last seen</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="device : ${devices}">
-                                <td th:text="${device.userAgent()}">user agent</td>
-                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.firstSeenAt())}">first seen</td>
-                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.lastSeenAt())}">last seen</td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <!-- SDE-III review, 2026-09-21 — Clerk dashboard "View Profile" parity: three tabs
+                 (Profile/Settings/OAuth), zero-JS radio-button switching — see clavaris.css's own
+                 .clavaris-manage-account rules (shared with the operator's own "Manage account"
+                 dialog, never loaded on the same page at once). -->
+            <div class="clavaris-manage-account">
+                <input type="radio" id="clavaris-tab-profile" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input" checked="checked"/>
+                <input type="radio" id="clavaris-tab-settings" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
+                <input type="radio" id="clavaris-tab-oauth" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
 
-                <div class="clavaris-section-card">
-                    <h2>Social accounts</h2>
-                    <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>
-                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(socialIdentities)}">
-                        <table class="clavaris-table">
-                            <thead>
-                            <tr>
-                                <th>Provider</th>
-                                <th>Provider user ID</th>
-                                <th>Linked</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="identity : ${socialIdentities}">
-                                <td th:text="${identity.provider()}">provider</td>
-                                <td th:text="${identity.providerUserId()}">provider user id</td>
-                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(identity.linkedAt())}">linked</td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <nav class="clavaris-manage-account__nav">
+                    <label for="clavaris-tab-profile">Profile</label>
+                    <label for="clavaris-tab-settings">Settings</label>
+                    <label for="clavaris-tab-oauth">OAuth</label>
+                </nav>
+
+                <div class="clavaris-manage-account__body">
+                    <section id="clavaris-panel-profile" class="clavaris-manage-account__panel">
+                        <div class="clavaris-profile-picture-section">
+                            <img class="clavaris-profile-picture"
+                                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id()})}"
+                                 alt="Current profile"/>
+                            <div class="clavaris-profile-picture-actions">
+                                <form method="post" enctype="multipart/form-data"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture(organizationId=${organizationId},accountId=${account.id()})}">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <label for="account-picture-file">Replace</label>
+                                    <input id="account-picture-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required/>
+                                    <p class="clavaris-field-hint">Recommended size 1:1, up to 10MB.</p>
+                                    <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
+                                </form>
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture/remove(organizationId=${organizationId},accountId=${account.id()})}">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Personal information</h2>
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/profile(organizationId=${organizationId},accountId=${account.id()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <div class="clavaris-field">
+                                    <label for="account-first-name">First name</label>
+                                    <input id="account-first-name" type="text" name="firstName" th:value="${account.firstName().orElse('')}"/>
+                                </div>
+                                <div class="clavaris-field">
+                                    <label for="account-last-name">Last name</label>
+                                    <input id="account-last-name" type="text" name="lastName" th:value="${account.lastName().orElse('')}"/>
+                                </div>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
+                            </form>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Identity</h2>
+                            <p>Status:
+                                <span class="clavaris-badge"
+                                      th:classappend="${account.status().name() == 'ACTIVE'} ? 'clavaris-badge--success' : (${account.status().name() == 'DELETED'} ? 'clavaris-badge--muted' : 'clavaris-badge--error')"
+                                      th:text="${account.status()}">ACTIVE</span>
+                            </p>
+                            <p>Account ID: <code th:text="${account.id()}">account id</code></p>
+                            <p>Email: <span th:text="${account.email().value()}">email</span> <span class="clavaris-badge">Primary</span></p>
+                            <p>Username: <span th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</span></p>
+                            <p>Phone number: <span th:text="${account.phoneNumber().orElse('—')}">phone</span></p>
+                            <p>Joined: <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</span></p>
+                            <p>Last signed in: <span th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</span></p>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Password</h2>
+                            <p>The account holder resets their own password — an operator never sets
+                                one directly.</p>
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/force-password-reset(organizationId=${organizationId},accountId=${account.id()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Send password reset email</button>
+                            </form>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Devices</h2>
+                            <p class="clavaris-field-hint">Live sessions currently signed in to this Account.</p>
+                            <p th:if="${#lists.isEmpty(sessions)}" class="clavaris-empty-state">No active sessions.</p>
+                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
+                                <table class="clavaris-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Device</th>
+                                        <th>IP address</th>
+                                        <th>First seen</th>
+                                        <th>Last active</th>
+                                        <th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="userSession : ${sessions}">
+                                        <td>
+                                            <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}" th:title="${userSession.userAgent()} ?: ''">Chrome on macOS</span>
+                                        </td>
+                                        <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
+                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">First seen</td>
+                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
+                                        <td>
+                                            <form method="post"
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/sessions/{sessionId}/revoke(organizationId=${organizationId},accountId=${account.id()},sessionId=${userSession.sessionId()})}">
+                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <p class="clavaris-field-hint" style="margin-top: 16px;">Recognized devices (Device Trust history).</p>
+                            <p th:if="${#lists.isEmpty(devices)}" class="clavaris-empty-state">No known devices yet.</p>
+                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(devices)}">
+                                <table class="clavaris-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Browser / OS</th>
+                                        <th>First seen</th>
+                                        <th>Last seen</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="device : ${devices}">
+                                        <td th:text="${device.userAgent()}">user agent</td>
+                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.firstSeenAt())}">first seen</td>
+                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.lastSeenAt())}">last seen</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Social accounts</h2>
+                            <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>
+                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(socialIdentities)}">
+                                <table class="clavaris-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Provider</th>
+                                        <th>Provider user ID</th>
+                                        <th>Linked</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="identity : ${socialIdentities}">
+                                        <td th:text="${identity.provider()}">provider</td>
+                                        <td th:text="${identity.providerUserId()}">provider user id</td>
+                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(identity.linkedAt())}">linked</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="clavaris-panel-settings" class="clavaris-manage-account__panel">
+                        <div class="clavaris-section-card">
+                            <h2>User permissions</h2>
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/settings(organizationId=${organizationId},accountId=${account.id()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <div class="clavaris-field">
+                                    <label>
+                                        <input type="checkbox" name="canDeleteOwnAccount" value="true" th:checked="${account.canDeleteOwnAccount()}"/>
+                                        Allow user to delete their own account
+                                    </label>
+                                </div>
+                                <div class="clavaris-field">
+                                    <label>
+                                        <input type="checkbox" name="bypassesDeviceTrust" value="true" th:checked="${account.bypassesDeviceTrust()}"/>
+                                        Bypass Device Trust
+                                    </label>
+                                    <p class="clavaris-field-hint">Allows this Account to sign in from a new device without a
+                                        Device Trust challenge — protects against credential-stuffing attacks when off.</p>
+                                </div>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section id="clavaris-panel-oauth" class="clavaris-manage-account__panel">
+                        <div class="clavaris-section-card">
+                            <div class="clavaris-row-actions" style="justify-content: space-between;">
+                                <h2>Grants</h2>
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/revoke-all(organizationId=${organizationId},accountId=${account.id()})}">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit"
+                                            th:disabled="${#lists.isEmpty(oauthGrants)}">Revoke all</button>
+                                </form>
+                            </div>
+                            <p th:if="${#lists.isEmpty(oauthGrants)}" class="clavaris-empty-state">No active OAuth grants.</p>
+                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(oauthGrants)}">
+                                <table class="clavaris-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Application</th>
+                                        <th>Grant type</th>
+                                        <th>Format</th>
+                                        <th>Scopes</th>
+                                        <th>Last issued</th>
+                                        <th>Expires at</th>
+                                        <th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="grant : ${oauthGrants}">
+                                        <td th:text="${grant.clientId()} ?: 'Unknown application'">Application</td>
+                                        <td th:text="${grant.grantType()}">grant type</td>
+                                        <td>JWT (RS256)</td>
+                                        <td th:text="${grant.scopes()} ?: '—'">scopes</td>
+                                        <td th:text="${grant.lastIssuedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.lastIssuedAt())} : '—'">last issued</td>
+                                        <td th:text="${grant.expiresAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.expiresAt())} : '—'">expires at</td>
+                                        <td>
+                                            <form method="post"
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/{authorizationId}/revoke(organizationId=${organizationId},accountId=${account.id()},authorizationId=${grant.authorizationId()})}">
+                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
 

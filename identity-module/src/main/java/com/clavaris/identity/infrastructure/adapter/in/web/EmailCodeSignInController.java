@@ -176,7 +176,8 @@ public class EmailCodeSignInController {
               account.id(),
               PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
               clientId,
-              redirectUrl);
+              redirectUrl,
+              account.bypassesDeviceTrust());
     } catch (final MailDeliveryException _) {
       // Same rationale as LoginController's own identical catch block — the one-time code itself
       // was already correct, so this must never collapse into codeError's message; the device-trust

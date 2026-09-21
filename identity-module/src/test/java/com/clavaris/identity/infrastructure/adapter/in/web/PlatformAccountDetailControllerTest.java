@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -37,6 +39,8 @@ class PlatformAccountDetailControllerTest {
   private KnownDeviceRepository knownDevices;
   private SocialIdentityRepository socialIdentities;
   private OAuthClientsForOrganizationProvider oauthClientsProvider;
+  private ListActiveSessionsForAccountUseCase listSessions;
+  private ListOAuthGrantsForAccountUseCase listOAuthGrants;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -49,6 +53,8 @@ class PlatformAccountDetailControllerTest {
     knownDevices = mock(KnownDeviceRepository.class);
     socialIdentities = mock(SocialIdentityRepository.class);
     oauthClientsProvider = mock(OAuthClientsForOrganizationProvider.class);
+    listSessions = mock(ListActiveSessionsForAccountUseCase.class);
+    listOAuthGrants = mock(ListOAuthGrantsForAccountUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -67,6 +73,8 @@ class PlatformAccountDetailControllerTest {
     when(knownDevices.findAllByAccountId(any())).thenReturn(List.of());
     when(socialIdentities.findAllByAccountId(any())).thenReturn(List.of());
     when(oauthClientsProvider.forOrganization(any())).thenReturn(List.of());
+    when(listSessions.handle(any())).thenReturn(List.of());
+    when(listOAuthGrants.handle(any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -89,6 +97,8 @@ class PlatformAccountDetailControllerTest {
                     knownDevices,
                     socialIdentities,
                     oauthClientsProvider,
+                    listSessions,
+                    listOAuthGrants,
                     organizationResolver,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)

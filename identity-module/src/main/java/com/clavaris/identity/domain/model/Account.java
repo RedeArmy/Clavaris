@@ -13,12 +13,16 @@ import java.util.Optional;
  * mutator per use case that touches this aggregate (BR-ID-02, BR-ID-04, BR-ID-05) is growth in the
  * right place, not a signal to split the class.
  */
+// PMD.AvoidDuplicateLiterals: the repeated string is "java:S107" itself, reused across every
+// multi-field reconstitute() overload's own suppression — same rationale AccountRevocationCascade's
+// own class-level suppression documents for its own literal-as-annotation-value case.
 @SuppressWarnings({
   "PMD.TooManyMethods",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
-  "PMD.LongVariable"
+  "PMD.LongVariable",
+  "PMD.AvoidDuplicateLiterals"
 })
 public final class Account {
 
@@ -57,6 +61,20 @@ public final class Account {
   // authentication use cases' own return value — every caller that authenticates an Account
   // already holds the aggregate and saves it back, the natural place for this side effect to live.
   private Instant lastSignedInAt;
+
+  // ADR-0026: the Clavaris-owned avatar endpoint's own storage key/external reference for this
+  // Account's uploaded or social-provider-sourced picture — null means "no picture set", not an
+  // error; GetAccountAvatarService's own default-avatar fallback (initials + deterministic color)
+  // covers that case, so this field is never required to be non-null anywhere downstream.
+  private String pictureUrl;
+
+  // Clerk "User permissions" parity (ADR-0026): both admin-controlled, both default false —
+  // neither is a self-toggle, only PlatformAccountSettingsController (dashboard "Settings" tab)
+  // ever mutates either. Plain booleans, not Optional-wrapped like the nullable fields above:
+  // there is no "unset" state to represent, every Account genuinely has one of exactly two values
+  // for each from the moment it's constructed.
+  private boolean canDeleteOwnAccount;
+  private boolean bypassesDeviceTrust;
 
   private Account(
       final AccountId id,
@@ -160,6 +178,7 @@ public final class Account {
         null,
         null,
         null,
+        null,
         null);
   }
 
@@ -184,6 +203,89 @@ public final class Account {
       final String lastName,
       final String phoneNumber,
       final Instant lastSignedInAt) {
+    return reconstitute(
+        id,
+        organizationId,
+        email,
+        createdAt,
+        emailVerifiedAt,
+        status,
+        passwordCredential,
+        username,
+        passwordResetRequiredAt,
+        firstName,
+        lastName,
+        phoneNumber,
+        lastSignedInAt,
+        null);
+  }
+
+  /**
+   * Full reconstitution including {@code pictureUrl} (ADR-0026) — the persistence adapter's own
+   * rehydration path. The 13-arg overload above is kept, not replaced, same "every existing caller
+   * that never touches the new field stays unchanged" precedent that overload's own Javadoc already
+   * documents for the 9-arg one below it.
+   */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  public static Account reconstitute(
+      final AccountId id,
+      final OrganizationId organizationId,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PasswordCredential passwordCredential,
+      final Username username,
+      final Instant passwordResetRequiredAt,
+      final String firstName,
+      final String lastName,
+      final String phoneNumber,
+      final Instant lastSignedInAt,
+      final String pictureUrl) {
+    return reconstitute(
+        id,
+        organizationId,
+        email,
+        createdAt,
+        emailVerifiedAt,
+        status,
+        passwordCredential,
+        username,
+        passwordResetRequiredAt,
+        firstName,
+        lastName,
+        phoneNumber,
+        lastSignedInAt,
+        pictureUrl,
+        false,
+        false);
+  }
+
+  /**
+   * Full reconstitution including {@code canDeleteOwnAccount}/{@code bypassesDeviceTrust}
+   * (ADR-0026, Clerk "User permissions" parity) — the persistence adapter's own rehydration path.
+   * The 14-arg overload above is kept, not replaced, same "every existing caller that never touches
+   * the new fields stays unchanged" precedent that overload's own Javadoc already documents for the
+   * 13-arg one below it.
+   */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  public static Account reconstitute(
+      final AccountId id,
+      final OrganizationId organizationId,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PasswordCredential passwordCredential,
+      final Username username,
+      final Instant passwordResetRequiredAt,
+      final String firstName,
+      final String lastName,
+      final String phoneNumber,
+      final Instant lastSignedInAt,
+      final String pictureUrl,
+      final boolean canDeleteOwnAccount,
+      final boolean bypassesDeviceTrust) {
     final Account account = new Account(id, organizationId, email, createdAt, status);
     account.emailVerifiedAt = emailVerifiedAt;
     account.passwordCredential = passwordCredential;
@@ -193,6 +295,9 @@ public final class Account {
     account.lastName = lastName;
     account.phoneNumber = phoneNumber;
     account.lastSignedInAt = lastSignedInAt;
+    account.pictureUrl = pictureUrl;
+    account.canDeleteOwnAccount = canDeleteOwnAccount;
+    account.bypassesDeviceTrust = bypassesDeviceTrust;
     return account;
   }
 
@@ -246,6 +351,18 @@ public final class Account {
 
   public Optional<Instant> lastSignedInAt() {
     return Optional.ofNullable(lastSignedInAt);
+  }
+
+  public Optional<String> pictureUrl() {
+    return Optional.ofNullable(pictureUrl);
+  }
+
+  public boolean canDeleteOwnAccount() {
+    return canDeleteOwnAccount;
+  }
+
+  public boolean bypassesDeviceTrust() {
+    return bypassesDeviceTrust;
   }
 
   /**
@@ -335,5 +452,90 @@ public final class Account {
     if (this.status == AccountStatus.BANNED) {
       this.status = AccountStatus.ACTIVE;
     }
+  }
+
+  /**
+   * ADR-0026: self-service picture upload (also used by an operator-initiated change) — always
+   * overwrites, unlike {@link #applySocialProviderProfile}, since a deliberate replace is exactly
+   * what this method is for.
+   */
+  public void updateProfilePicture(final String pictureUrl) {
+    this.pictureUrl = Objects.requireNonNull(pictureUrl, "pictureUrl must not be null");
+  }
+
+  /** Reverts to the generated-initials default avatar (ADR-0026) — idempotent. */
+  // PMD.NullAssignment: deliberately clears pictureUrl, same convention as
+  // attachPasswordCredential's own identical suppression.
+  @SuppressWarnings("PMD.NullAssignment")
+  public void removeProfilePicture() {
+    this.pictureUrl = null;
+  }
+
+  /**
+   * ADR-0026 / BR-ID-09 sibling decision: captures {@code firstName}/{@code lastName}/{@code
+   * pictureUrl} from a social provider's own profile claims — called exactly once, immediately
+   * after {@link #register(OrganizationId, Email)} in {@code
+   * AuthenticateWithSocialProviderService}'s brand-new-signup branch, never on a returning social
+   * login. Deliberately non-destructive (only fills a field that's still {@code null}) rather than
+   * an unconditional overwrite — at the one real call site every field is already null (a brand-new
+   * aggregate), but a non-destructive guard is the correct contract to publish regardless of that
+   * call site's own current behavior, not an incidental effect of it.
+   */
+  public void applySocialProviderProfile(
+      final String firstName, final String lastName, final String pictureUrl) {
+    if (this.firstName == null) {
+      this.firstName = firstName;
+    }
+    if (this.lastName == null) {
+      this.lastName = lastName;
+    }
+    if (this.pictureUrl == null) {
+      this.pictureUrl = pictureUrl;
+    }
+  }
+
+  /**
+   * ADR-0026: self-service (via the "Update profile" page) or operator-initiated name edit — always
+   * overwrites, same "deliberate replace" posture as {@link #updateProfilePicture}. Not {@code
+   * Optional}-typed parameters: a blank submitted value is this method's own caller's job to
+   * normalize to {@code null} before calling (the same convention every controller in this codebase
+   * already follows for optional text fields), not something the domain method itself should
+   * special-case.
+   */
+  public void updateProfile(final String firstName, final String lastName) {
+    this.firstName = firstName;
+    this.lastName = lastName;
+  }
+
+  /**
+   * Clerk "User permissions" parity — operator-controlled (dashboard "Settings" tab), gates {@code
+   * DeleteOwnAccountUseCase}'s own self-service "Delete account" action. Defaults to {@code false}
+   * (see the field's own comment) — an Organization opts a specific Account into this, it is never
+   * on by default.
+   */
+  public void allowSelfDelete() {
+    this.canDeleteOwnAccount = true;
+  }
+
+  /** Reverses {@link #allowSelfDelete()}. */
+  public void disallowSelfDelete() {
+    this.canDeleteOwnAccount = false;
+  }
+
+  /**
+   * Clerk "User permissions" parity — operator-controlled, checked by {@link
+   * com.clavaris.identity.infrastructure.adapter.in.web.DeviceTrustGate} (via {@code
+   * PrimaryFactorLoginCompletion}/its own two direct callers) before pausing a login for a
+   * device-trust challenge. Legitimate use: a known-safe operator or service-style Account that
+   * should never be paused, even while the owning Organization's own {@code deviceTrustEnabled}
+   * policy stays on for every other Account.
+   */
+  public void enableDeviceTrustBypass() {
+    this.bypassesDeviceTrust = true;
+  }
+
+  /** Reverses {@link #enableDeviceTrustBypass()}. */
+  public void disableDeviceTrustBypass() {
+    this.bypassesDeviceTrust = false;
   }
 }

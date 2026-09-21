@@ -1,7 +1,9 @@
 package com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider;
 
+import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformSocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -17,4 +19,7 @@ public interface PlatformSocialIdentityRepository {
       SocialProvider provider, String providerUserId);
 
   void save(PlatformSocialIdentity identity);
+
+  /** ADR-0026: backs the self-service "Connected accounts" list. */
+  List<PlatformSocialIdentity> findAllByPlatformAccountId(PlatformAccountId platformAccountId);
 }

@@ -27,7 +27,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * test-strategy.md §2: a real-Postgres integration test for the {@code PlatformSocialIdentity}
- * adapter — mirrors {@code JpaSocialIdentityRepositoryTest} exactly.
+ * adapter — {@link JpaSocialIdentityRepositoryTest}'s own platform-tier sibling, same rationale:
+ * proves {@code toDomain()} really calls {@code PlatformSocialIdentity.reconstitute(...)} and that
+ * {@code provider} survives the {@code String}↔enum conversion this entity deliberately does.
  */
 @SpringBootTest(classes = JpaPlatformSocialIdentityRepositoryTest.TestConfig.class)
 @Testcontainers
@@ -68,9 +70,46 @@ class JpaPlatformSocialIdentityRepositoryTest {
   }
 
   @Test
-  void findByProviderAndProviderUserIdIsEmptyForAnUnknownPair() {
+  void findIsEmptyForAnUnknownPair() {
     assertThat(repository.findByProviderAndProviderUserId(SocialProvider.GITHUB, "never-linked"))
         .isEmpty();
+  }
+
+  @Test
+  void doesNotConfuseTheSameProviderUserIdAcrossDifferentProviders() {
+    repository.save(
+        PlatformSocialIdentity.link(platformAccountId, SocialProvider.GOOGLE, "shared-id"));
+
+    assertThat(repository.findByProviderAndProviderUserId(SocialProvider.GITHUB, "shared-id"))
+        .as("provider is part of the lookup key, not just providerUserId")
+        .isEmpty();
+  }
+
+  @Test
+  void findAllByPlatformAccountIdReturnsEveryLinkedProviderForThisAccountOnly() {
+    PlatformAccountId otherPlatformAccountId = new PlatformAccountId(UUID.randomUUID());
+    jdbcTemplate.update(
+        "insert into platform_accounts (id, email, status, created_at) values (?, ?, 'ACTIVE', now())",
+        otherPlatformAccountId.value(),
+        "other-owner-" + otherPlatformAccountId.value() + "@example.com");
+    PlatformSocialIdentity google =
+        PlatformSocialIdentity.link(platformAccountId, SocialProvider.GOOGLE, "google-sub-2");
+    PlatformSocialIdentity github =
+        PlatformSocialIdentity.link(platformAccountId, SocialProvider.GITHUB, "github-sub-2");
+    PlatformSocialIdentity someoneElses =
+        PlatformSocialIdentity.link(otherPlatformAccountId, SocialProvider.GOOGLE, "not-mine");
+    repository.save(google);
+    repository.save(github);
+    repository.save(someoneElses);
+
+    assertThat(repository.findAllByPlatformAccountId(platformAccountId))
+        .extracting(PlatformSocialIdentity::id)
+        .containsExactlyInAnyOrder(google.id(), github.id());
+  }
+
+  @Test
+  void findAllByPlatformAccountIdReturnsEmptyForAnAccountWithNoLinkedProviders() {
+    assertThat(repository.findAllByPlatformAccountId(platformAccountId)).isEmpty();
   }
 
   @Configuration

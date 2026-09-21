@@ -138,6 +138,100 @@ class AuthenticateWithSocialProviderServiceTest {
     assertThat(savedAccount.getValue().passwordCredential()).isPresent();
   }
 
+  // ADR-0026.
+  @Test
+  void appliesTheProvidersFirstNameLastNameUsernameAndPictureOnABrandNewSignup() {
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
+        .thenReturn(Optional.empty());
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
+        .thenReturn(Optional.empty());
+    when(accounts.existsByOrganizationIdAndUsername(eq(ORGANIZATION_ID), any())).thenReturn(false);
+
+    AuthenticateWithSocialProviderCommand command =
+        new AuthenticateWithSocialProviderCommand(
+            ORGANIZATION_ID,
+            SocialProvider.GOOGLE,
+            "google-sub-123",
+            EMAIL,
+            true,
+            "Ada",
+            "Lovelace",
+            "ada-lovelace",
+            "https://example.com/avatar.png");
+
+    service.handle(command);
+
+    org.mockito.ArgumentCaptor<Account> savedAccount =
+        org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).insert(savedAccount.capture());
+    Account account = savedAccount.getValue();
+    assertThat(account.firstName()).contains("Ada");
+    assertThat(account.lastName()).contains("Lovelace");
+    assertThat(account.pictureUrl()).contains("https://example.com/avatar.png");
+    assertThat(account.username()).isPresent();
+    assertThat(account.username().orElseThrow().value()).isEqualTo("ada-lovelace");
+  }
+
+  // ADR-0026: a username already taken by a different Account in this Organization must not block
+  // the signup itself — the field is simply left unset.
+  @Test
+  void skipsAssigningTheUsernameWhenItsAlreadyTakenInThisOrganization() {
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
+        .thenReturn(Optional.empty());
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
+        .thenReturn(Optional.empty());
+    when(accounts.existsByOrganizationIdAndUsername(eq(ORGANIZATION_ID), any())).thenReturn(true);
+
+    AuthenticateWithSocialProviderCommand command =
+        new AuthenticateWithSocialProviderCommand(
+            ORGANIZATION_ID,
+            SocialProvider.GOOGLE,
+            "google-sub-123",
+            EMAIL,
+            true,
+            null,
+            null,
+            "already-taken",
+            null);
+
+    service.handle(command);
+
+    org.mockito.ArgumentCaptor<Account> savedAccount =
+        org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).insert(savedAccount.capture());
+    assertThat(savedAccount.getValue().username()).isEmpty();
+  }
+
+  // ADR-0026: a returning login (an identity already linked) must never re-apply or re-sync
+  // profile fields, regardless of what the command carries.
+  @Test
+  void neverAppliesProfileFieldsOnAReturningLogin() {
+    AccountId accountId = AccountId.newId();
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(
+            ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123"))
+        .thenReturn(
+            Optional.of(
+                SocialIdentity.link(
+                    accountId, ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123")));
+
+    AuthenticateWithSocialProviderCommand command =
+        new AuthenticateWithSocialProviderCommand(
+            ORGANIZATION_ID,
+            SocialProvider.GOOGLE,
+            "google-sub-123",
+            EMAIL,
+            true,
+            "Different",
+            "Name",
+            "different-username",
+            "https://example.com/different.png");
+
+    service.handle(command);
+
+    verify(accounts, never()).insert(any());
+    verify(accounts, never()).save(any());
+  }
+
   @Test
   void fallsBackToPendingLinkWhenAConcurrentSignupWinsTheRaceForTheSameEmail() {
     // Code review finding, TOCTOU: handle()'s own existingAccount check and linkBrandNewAccount's

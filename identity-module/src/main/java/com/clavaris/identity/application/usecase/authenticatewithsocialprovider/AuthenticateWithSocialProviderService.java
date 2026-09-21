@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.event.SocialIdentityLinkedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
+import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.service.RandomPasswordGenerator;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.SocialLinkingPolicy;
@@ -186,6 +187,13 @@ public class AuthenticateWithSocialProviderService
             // The provider already proved control of this email (guarded above) — no reason to
             // make a brand-new social signup go through email verification a second time.
             account.verifyEmail();
+            // ADR-0026: captured once, right here — never re-synced on a later returning login
+            // (this method only ever runs for a brand-new signup). applySocialProviderProfile is
+            // non-destructive by contract, but every field is null on this just-constructed
+            // aggregate regardless.
+            account.applySocialProviderProfile(
+                command.firstName(), command.lastName(), command.pictureUrl());
+            applySocialProviderUsernameIfAvailable(account, command);
             // TD-FUT-030: a real, cryptographically random, never-surfaced password credential —
             // same RandomPasswordGenerator/BR-ID-02 pattern RegisterAccountService's own
             // password-optional path already establishes. Never this account's actual sign-in
@@ -247,6 +255,32 @@ public class AuthenticateWithSocialProviderService
               .findByOrganizationIdAndEmail(command.organizationId(), command.email())
               .orElseThrow(() -> e);
       return raisePendingLinkForExistingAccount(command, winningAccount);
+    }
+  }
+
+  // ADR-0026: best-effort, never blocks the signup this method is called from. Two independent
+  // ways this can legitimately not assign a username, both silently skipped rather than failing
+  // the whole social signup over a cosmetic field: (1) command.username() itself fails Username's
+  // own shape/length validation (GitHub allows a 1-39 char login; Username requires 3-32) — a
+  // malformed input surfaces as absent, never an exception, same convention
+  // WorkspaceRoleClaimsCustomizer's own malformed-principal-name guard already documents; (2) the
+  // exact same username string is already taken by a different Account in this Organization — a
+  // pre-check, not a race-proof guarantee (a concurrent registration could still win the
+  // uniqueness constraint first), but good enough for a field nothing else in this flow depends on
+  // being set.
+  private void applySocialProviderUsernameIfAvailable(
+      final Account account, final AuthenticateWithSocialProviderCommand command) {
+    if (command.username() == null) {
+      return;
+    }
+    final Username username;
+    try {
+      username = new Username(command.username());
+    } catch (final IllegalArgumentException _) {
+      return;
+    }
+    if (!accounts.existsByOrganizationIdAndUsername(command.organizationId(), username)) {
+      account.assignUsername(username);
     }
   }
 

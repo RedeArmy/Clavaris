@@ -3,12 +3,19 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountQuery;
+import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountQuery;
+import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +46,8 @@ public class PlatformAccountDetailController {
   private final KnownDeviceRepository knownDevices;
   private final SocialIdentityRepository socialIdentities;
   private final OAuthClientsForOrganizationProvider oauthClientsProvider;
+  private final ListActiveSessionsForAccountUseCase listSessions;
+  private final ListOAuthGrantsForAccountUseCase listOAuthGrants;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
   @SuppressWarnings("java:S107")
@@ -47,12 +56,16 @@ public class PlatformAccountDetailController {
       final KnownDeviceRepository knownDevices,
       final SocialIdentityRepository socialIdentities,
       final OAuthClientsForOrganizationProvider oauthClientsProvider,
+      final ListActiveSessionsForAccountUseCase listSessions,
+      final ListOAuthGrantsForAccountUseCase listOAuthGrants,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getAccount = getAccount;
     this.knownDevices = knownDevices;
     this.socialIdentities = socialIdentities;
     this.oauthClientsProvider = oauthClientsProvider;
+    this.listSessions = listSessions;
+    this.listOAuthGrants = listOAuthGrants;
     this.organizationAccess =
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
@@ -78,6 +91,25 @@ public class PlatformAccountDetailController {
     model.addAttribute("devices", knownDevices.findAllByAccountId(targetAccountId));
     model.addAttribute("socialIdentities", socialIdentities.findAllByAccountId(targetAccountId));
     model.addAttribute("oauthClients", oauthClientsProvider.forOrganization(orgId));
+
+    // Clerk "View Profile" > Profile tab "Devices" parity (SDE-III review, 2026-09-21) — live
+    // active sessions, not the known-device recognition history above (a different concept:
+    // Device Trust recognition vs. "currently logged in right now"). Same friendly-label treatment
+    // AccountSessionsController's own self-service page already establishes.
+    final List<ActiveAccountSession> sessions =
+        listSessions.handle(new ListActiveSessionsForAccountQuery(targetAccountId));
+    model.addAttribute("sessions", sessions);
+    model.addAttribute(
+        "friendlyDeviceLabels",
+        sessions.stream()
+            .collect(
+                Collectors.toMap(
+                    ActiveAccountSession::sessionId,
+                    session -> UserAgentLabel.friendly(session.userAgent()))));
+
+    // Clerk "View Profile" > OAuth tab parity (ADR-0026).
+    model.addAttribute(
+        "oauthGrants", listOAuthGrants.handle(new ListOAuthGrantsForAccountQuery(targetAccountId)));
     return PROFILE_VIEW;
   }
 }

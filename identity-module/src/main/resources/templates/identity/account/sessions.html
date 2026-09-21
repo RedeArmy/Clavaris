@@ -6,6 +6,9 @@
 <body>
 <main>
     <div class="clavaris-card clavaris-card--wide">
+        <p class="clavaris-breadcrumb">
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
+        </p>
         <h1>Your active sessions</h1>
         <p>These are the devices/browsers currently signed in to your account. If you don't recognize
             one, close it.</p>

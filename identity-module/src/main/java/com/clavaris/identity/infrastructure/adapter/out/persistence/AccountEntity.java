@@ -64,6 +64,19 @@ public class AccountEntity {
   @Column(name = "last_signed_in_at")
   private Instant lastSignedInAt;
 
+  // ADR-0026: the Clavaris-owned avatar endpoint's own storage key/external reference — nullable,
+  // same "just add the scalar column" precedent as every field above.
+  @Column(name = "picture_url")
+  private String pictureUrl;
+
+  // ADR-0026, Clerk "User permissions" parity — both NOT NULL with a database-side default
+  // (unlike every nullable column above), same rationale the migration's own comment documents.
+  @Column(name = "can_delete_own_account", nullable = false)
+  private boolean canDeleteOwnAccount;
+
+  @Column(name = "bypasses_device_trust", nullable = false)
+  private boolean bypassesDeviceTrust;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
@@ -80,7 +93,10 @@ public class AccountEntity {
       final String firstName,
       final String lastName,
       final String phoneNumber,
-      final Instant lastSignedInAt) {
+      final Instant lastSignedInAt,
+      final String pictureUrl,
+      final boolean canDeleteOwnAccount,
+      final boolean bypassesDeviceTrust) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
@@ -93,6 +109,9 @@ public class AccountEntity {
     this.lastName = lastName;
     this.phoneNumber = phoneNumber;
     this.lastSignedInAt = lastSignedInAt;
+    this.pictureUrl = pictureUrl;
+    this.canDeleteOwnAccount = canDeleteOwnAccount;
+    this.bypassesDeviceTrust = bypassesDeviceTrust;
   }
 
   public UUID getId() {
@@ -141,5 +160,17 @@ public class AccountEntity {
 
   public Instant getLastSignedInAt() {
     return lastSignedInAt;
+  }
+
+  public String getPictureUrl() {
+    return pictureUrl;
+  }
+
+  public boolean isCanDeleteOwnAccount() {
+    return canDeleteOwnAccount;
+  }
+
+  public boolean isBypassesDeviceTrust() {
+    return bypassesDeviceTrust;
   }
 }

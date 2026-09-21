@@ -113,7 +113,10 @@ class JpaAccountRepository implements AccountRepository {
         entity.getFirstName(),
         entity.getLastName(),
         entity.getPhoneNumber(),
-        entity.getLastSignedInAt());
+        entity.getLastSignedInAt(),
+        entity.getPictureUrl(),
+        entity.isCanDeleteOwnAccount(),
+        entity.isBypassesDeviceTrust());
   }
 
   // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
@@ -174,7 +177,10 @@ class JpaAccountRepository implements AccountRepository {
         account.firstName().orElse(null),
         account.lastName().orElse(null),
         account.phoneNumber().orElse(null),
-        account.lastSignedInAt().orElse(null));
+        account.lastSignedInAt().orElse(null),
+        account.pictureUrl().orElse(null),
+        account.canDeleteOwnAccount(),
+        account.bypassesDeviceTrust());
   }
 
   // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider

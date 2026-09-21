@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.AuthenticatePlatformAccountWithSocialProviderResult;
 import com.clavaris.identity.application.usecase.authenticateplatformaccountwithsocialprovider.AuthenticatePlatformAccountWithSocialProviderUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderCommand;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderResult;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -295,5 +297,120 @@ class SocialLoginAuthenticationSuccessHandlerTest {
 
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/platform/login/social/confirmation-required");
+  }
+
+  // ADR-0026: a tenant Google login captures given_name/family_name/picture into the command —
+  // username stays null, Google has no equivalent field.
+  @Test
+  void aTenantGoogleLoginCapturesTheProviderSourcedNameAndPicture() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    OidcIdToken idToken =
+        OidcIdToken.withTokenValue("id-token-value")
+            .subject("google-sub-123")
+            .claim("email", "user@example.com")
+            .claim("email_verified", true)
+            .claim("given_name", "Ada")
+            .claim("family_name", "Lovelace")
+            .claim("picture", "https://google.example.com/photo.png")
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+    DefaultOidcUser principal =
+        new DefaultOidcUser(List.of(new SimpleGrantedAuthority("ROLE_USER")), idToken);
+    OAuth2AuthenticationToken token =
+        new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "google");
+
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(AccountId.newId()));
+
+    handler.onAuthenticationSuccess(request, response, token);
+
+    ArgumentCaptor<AuthenticateWithSocialProviderCommand> command =
+        ArgumentCaptor.forClass(AuthenticateWithSocialProviderCommand.class);
+    verify(tenantUseCase).handle(command.capture());
+    assertThat(command.getValue().firstName()).isEqualTo("Ada");
+    assertThat(command.getValue().lastName()).isEqualTo("Lovelace");
+    assertThat(command.getValue().username()).isNull();
+    assertThat(command.getValue().pictureUrl()).isEqualTo("https://google.example.com/photo.png");
+  }
+
+  // A GitHub display name with two words splits on the first space into firstName/lastName.
+  @Test
+  void aTenantGitHubLoginSplitsATwoWordDisplayNameAndCapturesLoginAndAvatar() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    Map<String, Object> attributes = new HashMap<>();
+    attributes.put("id", 987654);
+    attributes.put("name", "Grace Hopper");
+    attributes.put("login", "ghopper");
+    attributes.put("avatar_url", "https://github.example.com/avatar.png");
+    attributes.put(GitHubVerifiedEmailUserService.VERIFIED_EMAIL_ATTRIBUTE, "grace@example.com");
+    DefaultOAuth2User principal =
+        new DefaultOAuth2User(List.of(new SimpleGrantedAuthority("ROLE_USER")), attributes, "id");
+    OAuth2AuthenticationToken token =
+        new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "github");
+
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(AccountId.newId()));
+
+    handler.onAuthenticationSuccess(request, response, token);
+
+    ArgumentCaptor<AuthenticateWithSocialProviderCommand> command =
+        ArgumentCaptor.forClass(AuthenticateWithSocialProviderCommand.class);
+    verify(tenantUseCase).handle(command.capture());
+    assertThat(command.getValue().firstName()).isEqualTo("Grace");
+    assertThat(command.getValue().lastName()).isEqualTo("Hopper");
+    assertThat(command.getValue().username()).isEqualTo("ghopper");
+    assertThat(command.getValue().pictureUrl()).isEqualTo("https://github.example.com/avatar.png");
+  }
+
+  // A single-word GitHub display name becomes firstName only, lastName stays null — no name at
+  // all leaves both null rather than fabricating one.
+  @Test
+  void aTenantGitHubLoginWithASingleWordOrMissingDisplayNameLeavesLastNameNull() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    Map<String, Object> attributes = new HashMap<>();
+    attributes.put("id", 987654);
+    attributes.put("login", "cher");
+    attributes.put(GitHubVerifiedEmailUserService.VERIFIED_EMAIL_ATTRIBUTE, "cher@example.com");
+    DefaultOAuth2User principal =
+        new DefaultOAuth2User(List.of(new SimpleGrantedAuthority("ROLE_USER")), attributes, "id");
+    OAuth2AuthenticationToken token =
+        new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "github");
+
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(AccountId.newId()));
+
+    handler.onAuthenticationSuccess(request, response, token);
+
+    ArgumentCaptor<AuthenticateWithSocialProviderCommand> command =
+        ArgumentCaptor.forClass(AuthenticateWithSocialProviderCommand.class);
+    verify(tenantUseCase).handle(command.capture());
+    assertThat(command.getValue().firstName()).isNull();
+    assertThat(command.getValue().lastName()).isNull();
+    assertThat(command.getValue().username()).isEqualTo("cher");
   }
 }

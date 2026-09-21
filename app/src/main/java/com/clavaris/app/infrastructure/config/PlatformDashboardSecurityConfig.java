@@ -97,6 +97,15 @@ public class PlatformDashboardSecurityConfig {
           final int createOrganizationPerAccountLimit,
       @Value("${clavaris.rate-limit.platform-impersonate.per-account-limit:10}")
           final int impersonatePerAccountLimit,
+      // SDE-III review, 2026-09-21 — SonarCloud multipart-size hotspot follow-up (application.yml's
+      // own spring.servlet.multipart.max-file-size: 11MB): that framework ceiling alone let an
+      // authenticated PlatformAccount fire unlimited ~11MB uploads with no backoff, on both its own
+      // profile picture and any Account's it operates — same TD-SEC-035/account-sessions gap class,
+      // closed the same way, split per-endpoint since each is a distinct rule below.
+      @Value("${clavaris.rate-limit.platform-account-picture.upload-per-account-limit:10}")
+          final int platformAccountPictureUploadPerAccountLimit,
+      @Value("${clavaris.rate-limit.platform-admin-picture.upload-per-account-limit:10}")
+          final int platformAdminPictureUploadPerAccountLimit,
       final EmbeddingEligibilityChecker embeddingChecker) {
     http.securityMatcher("/platform/**")
         .sessionManagement(
@@ -130,7 +139,13 @@ public class PlatformDashboardSecurityConfig {
                         // a ROLE_PLATFORM_ACCOUNT session for this same account (the whole point is
                         // locking a session/device this browser may never have authenticated as).
                         "/platform/account-alert/lock",
-                        "/platform/account-alert/lock/success")
+                        "/platform/account-alert/lock/success",
+                        // ADR-0026: the stable avatar-serving endpoint every OIDC picture claim
+                        // and every dashboard page's own <img src> points at — same "no
+                        // authentication at all, a browser's own <img src> can never carry a
+                        // bearer token" reasoning AccountAvatarController's own Javadoc documents
+                        // for its tenant-tier sibling.
+                        "/platform/avatars/**")
                     .permitAll()
                     .anyRequest()
                     // Security finding (SDE-III review, 2026-08-22): this was `.authenticated()`,
@@ -240,6 +255,28 @@ public class PlatformDashboardSecurityConfig {
                         RateLimitRule.always(),
                         RateLimitIdentifiers::authenticatedPlatformAccountId,
                         impersonatePerAccountLimit,
+                        Duration.ofMinutes(5)),
+                    // See this method's own platformAccountPictureUploadPerAccountLimit param
+                    // Javadoc for the full rationale.
+                    new RateLimitRule(
+                        "platform-account-picture:upload",
+                        HttpMethod.POST,
+                        "/platform/account/picture",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformAccountId,
+                        platformAccountPictureUploadPerAccountLimit,
+                        Duration.ofMinutes(5)),
+                    // Keyed by the operating PlatformAccount, not the target Account being
+                    // uploaded for — the operator's own session is what's authenticated on this
+                    // chain, same "the authenticated principal is the abuser, not the target"
+                    // reasoning platform-impersonate:account above already establishes.
+                    new RateLimitRule(
+                        "platform-admin-picture:upload",
+                        HttpMethod.POST,
+                        "/platform/dashboard/organizations/*/users/*/picture",
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformAccountId,
+                        platformAdminPictureUploadPerAccountLimit,
                         Duration.ofMinutes(5)))),
             SecurityContextHolderFilter.class)
         // TD-SEC-009: platform login/register/forgot-/reset-password/verify-email templates and

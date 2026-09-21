@@ -354,4 +354,119 @@ class AccountTest {
 
     assertThat(account.status()).isEqualTo(AccountStatus.SUSPENDED);
   }
+
+  @Test
+  void newAccountHasNoPictureUrl() {
+    Account account = Account.register(organizationId, email);
+
+    assertThat(account.pictureUrl()).isEmpty();
+  }
+
+  @Test
+  void updateProfilePictureSetsThePictureUrl() {
+    Account account = Account.register(organizationId, email);
+
+    account.updateProfilePicture("https://example.com/avatar.png");
+
+    assertThat(account.pictureUrl()).contains("https://example.com/avatar.png");
+  }
+
+  @Test
+  void updateProfilePictureOverwritesAnExistingOne_deliberateReplace() {
+    Account account = Account.register(organizationId, email);
+    account.updateProfilePicture("https://example.com/old.png");
+
+    account.updateProfilePicture("https://example.com/new.png");
+
+    assertThat(account.pictureUrl()).contains("https://example.com/new.png");
+  }
+
+  @Test
+  void removeProfilePictureRevertsToTheGeneratedInitialsDefault() {
+    Account account = Account.register(organizationId, email);
+    account.updateProfilePicture("https://example.com/avatar.png");
+
+    account.removeProfilePicture();
+
+    assertThat(account.pictureUrl()).isEmpty();
+  }
+
+  @Test
+  void removeProfilePictureIsIdempotent() {
+    Account account = Account.register(organizationId, email);
+
+    account.removeProfilePicture();
+
+    assertThat(account.pictureUrl()).isEmpty();
+  }
+
+  @Test
+  void applySocialProviderProfileFillsNameAndPictureOnABrandNewAccount() {
+    Account account = Account.register(organizationId, email);
+
+    account.applySocialProviderProfile("Ada", "Lovelace", "https://example.com/avatar.png");
+
+    assertThat(account.firstName()).contains("Ada");
+    assertThat(account.lastName()).contains("Lovelace");
+    assertThat(account.pictureUrl()).contains("https://example.com/avatar.png");
+  }
+
+  @Test
+  void updateProfileOverwritesFirstAndLastName() {
+    Account account = Account.register(organizationId, email, "Old", "Name", null);
+
+    account.updateProfile("New", "Name2");
+
+    assertThat(account.firstName()).contains("New");
+    assertThat(account.lastName()).contains("Name2");
+  }
+
+  @Test
+  void newAccountCannotDeleteItsOwnAccountByDefault() {
+    Account account = Account.register(organizationId, email);
+
+    assertThat(account.canDeleteOwnAccount()).isFalse();
+  }
+
+  @Test
+  void allowSelfDeleteAndDisallowSelfDeleteToggleTheFlag() {
+    Account account = Account.register(organizationId, email);
+
+    account.allowSelfDelete();
+    assertThat(account.canDeleteOwnAccount()).isTrue();
+
+    account.disallowSelfDelete();
+    assertThat(account.canDeleteOwnAccount()).isFalse();
+  }
+
+  @Test
+  void newAccountDoesNotBypassDeviceTrustByDefault() {
+    Account account = Account.register(organizationId, email);
+
+    assertThat(account.bypassesDeviceTrust()).isFalse();
+  }
+
+  @Test
+  void enableDeviceTrustBypassAndDisableDeviceTrustBypassToggleTheFlag() {
+    Account account = Account.register(organizationId, email);
+
+    account.enableDeviceTrustBypass();
+    assertThat(account.bypassesDeviceTrust()).isTrue();
+
+    account.disableDeviceTrustBypass();
+    assertThat(account.bypassesDeviceTrust()).isFalse();
+  }
+
+  @Test
+  void applySocialProviderProfileNeverOverwritesAnAlreadySetField_neverResyncsAfterRegistration() {
+    Account account = Account.register(organizationId, email, "Grace", "Hopper", null);
+    account.updateProfilePicture("https://example.com/manual-upload.png");
+
+    account.applySocialProviderProfile(
+        "Different", "Name", "https://example.com/social-provider.png");
+
+    assertThat(account.firstName()).contains("Grace");
+    assertThat(account.lastName()).contains("Hopper");
+    assertThat(account.pictureUrl()).contains("https://example.com/manual-upload.png");
+  }
 }

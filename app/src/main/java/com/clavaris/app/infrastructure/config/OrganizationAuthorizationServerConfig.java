@@ -16,6 +16,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPubl
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJwkSource;
+import com.clavaris.app.infrastructure.adapter.out.security.ProfilePictureClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
 import com.clavaris.app.infrastructure.adapter.out.security.SessionBackedRefreshTokenGenerator;
@@ -28,6 +29,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuth
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
@@ -221,18 +223,23 @@ public class OrganizationAuthorizationServerConfig {
       final JWKSource<SecurityContext> signingJwkSource,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final WorkspaceMembershipRepository workspaceMemberships,
-      final IssueRefreshTokenUseCase issueRefreshToken) {
+      final IssueRefreshTokenUseCase issueRefreshToken,
+      final AccountRepository accounts,
+      final String clavarisBaseUrl) {
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     final AuthenticationContextClaimsCustomizer authenticationContextClaims =
         new AuthenticationContextClaimsCustomizer();
     final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
         new WorkspaceRoleClaimsCustomizer(workspaceMemberships);
+    final ProfilePictureClaimsCustomizer profilePictureClaims =
+        new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
           authenticationContextClaims.customize(context);
           workspaceRoleClaims.customize(context);
+          profilePictureClaims.customize(context);
         });
     return new DelegatingOAuth2TokenGenerator(
         jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
@@ -324,6 +331,10 @@ public class OrganizationAuthorizationServerConfig {
           final int accountSessionsListPerAccountLimit,
       @Value("${clavaris.rate-limit.account-sessions.revoke-per-account-limit:20}")
           final int accountSessionsRevokePerAccountLimit,
+      // SDE-III review, 2026-09-21 — SonarCloud multipart-size hotspot follow-up: see
+      // OrganizationRateLimitRules's own account-picture:upload rule for the full rationale.
+      @Value("${clavaris.rate-limit.account-picture.upload-per-account-limit:10}")
+          final int accountPictureUploadPerAccountLimit,
       // TD-SEC-008/ADR-0010 §5.2: how long a retired key keeps being published in JWKS after
       // rotation — generous relative to SAS's own default access-token TTL (5 minutes, per
       // incident-response-signing-key-compromise.md's own decompiled-jar finding) to cover
@@ -333,7 +344,13 @@ public class OrganizationAuthorizationServerConfig {
       final EmbeddingEligibilityChecker embeddingChecker,
       // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
       // bulkheads its own password checks through — both compete for the same limited CPU budget.
-      final CpuBoundVerificationGate argon2BulkheadGate) {
+      final CpuBoundVerificationGate argon2BulkheadGate,
+      // ADR-0026: ProfilePictureClaimsCustomizer's own two collaborators — see
+      // buildTokenGenerator's
+      // own Javadoc for the full per-claim rationale this method's own header comment already
+      // references.
+      final AccountRepository accounts,
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
     // multipleIssuersAllowed requires issuer() to stay unset — SAS's own AuthorizationServerContext
     // Filter then resolves the issuer per-request from whatever prefix precedes these relative
     // endpoint paths in the actual request URI (spike Appendix C addendum, decompiled and confirmed
@@ -384,7 +401,9 @@ public class OrganizationAuthorizationServerConfig {
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,
             workspaceMemberships,
-            issueRefreshToken);
+            issueRefreshToken,
+            accounts,
+            clavarisBaseUrl);
 
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
@@ -560,7 +579,8 @@ public class OrganizationAuthorizationServerConfig {
                     tokenPerClientLimit,
                     tokenRefreshPerClientLimit,
                     accountSessionsListPerAccountLimit,
-                    accountSessionsRevokePerAccountLimit)),
+                    accountSessionsRevokePerAccountLimit,
+                    accountPictureUploadPerAccountLimit)),
             // Anchored after TenantAccountOnlySecurityContextFilter, not SecurityContextHolder
             // Filter directly — real bug, confirmed live: three separate addFilterAfter calls all
             // anchored at the same filter class silently only kept the last-registered one, so the

@@ -63,7 +63,10 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
         entity.getCreatedAt(),
         entity.getEmailVerifiedAt(),
         AccountStatus.valueOf(entity.getStatus()),
-        credential);
+        credential,
+        entity.getFirstName(),
+        entity.getLastName(),
+        entity.getPictureUrl());
   }
 
   /**
@@ -113,7 +116,10 @@ class JpaPlatformAccountRepository implements PlatformAccountRepository {
         account.email().value(),
         account.emailVerifiedAt().orElse(null),
         account.status().name(),
-        account.createdAt());
+        account.createdAt(),
+        account.firstName().orElse(null),
+        account.lastName().orElse(null),
+        account.pictureUrl().orElse(null));
   }
 
   private void saveCredentialIfPresent(

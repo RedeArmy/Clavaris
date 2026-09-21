@@ -42,8 +42,12 @@ import com.clavaris.identity.application.usecase.confirmpendingsociallink.Confir
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
+import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountService;
+import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountService;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
+import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarService;
+import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarUseCase;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationService;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountService;
@@ -59,6 +63,9 @@ import com.clavaris.identity.application.usecase.listaccountsfororganization.Lis
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountService;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountService;
+import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.OAuthGrantsRepository;
 import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationService;
 import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationService;
@@ -74,6 +81,8 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureService;
+import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeService;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeService;
@@ -90,6 +99,10 @@ import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPas
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionService;
 import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionUseCase;
+import com.clavaris.identity.application.usecase.revokealloauthgrantsforaccount.RevokeAllOAuthGrantsForAccountService;
+import com.clavaris.identity.application.usecase.revokealloauthgrantsforaccount.RevokeAllOAuthGrantsForAccountUseCase;
+import com.clavaris.identity.application.usecase.revokeoauthgrant.RevokeOAuthGrantService;
+import com.clavaris.identity.application.usecase.revokeoauthgrant.RevokeOAuthGrantUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
@@ -101,6 +114,13 @@ import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountSe
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountService;
 import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountUseCase;
+import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsService;
+import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsUseCase;
+import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileService;
+import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorage;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureService;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureUseCase;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
@@ -413,6 +433,12 @@ class IdentityUseCaseConfig {
   }
 
   @Bean
+  /* package */ DeleteOwnAccountUseCase deleteOwnAccountUseCase(
+      final AccountRepository accounts, final DeleteAccountUseCase deleteAccount) {
+    return new DeleteOwnAccountService(accounts, deleteAccount);
+  }
+
+  @Bean
   /* package */ SuspendAccountUseCase suspendAccountUseCase(
       final AccountRepository accounts,
       final SessionRepository sessions,
@@ -502,6 +528,68 @@ class IdentityUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new UnbanAccountService(accounts, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ UpdateAccountProfileUseCase updateAccountProfileUseCase(
+      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
+    return new UpdateAccountProfileService(accounts, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateAccountPermissionsUseCase updateAccountPermissionsUseCase(
+      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
+    return new UpdateAccountPermissionsService(accounts, auditEvents);
+  }
+
+  // Clerk "OAuth" tab parity (ADR-0026).
+  @Bean
+  /* package */ ListOAuthGrantsForAccountUseCase listOAuthGrantsForAccountUseCase(
+      final OAuthGrantsRepository oauthGrants) {
+    return new ListOAuthGrantsForAccountService(oauthGrants);
+  }
+
+  @Bean
+  /* package */ RevokeOAuthGrantUseCase revokeOAuthGrantUseCase(
+      final OAuthGrantsRepository oauthGrants, final AuditEventRecorder auditEvents) {
+    return new RevokeOAuthGrantService(oauthGrants, auditEvents);
+  }
+
+  @Bean
+  /* package */ RevokeAllOAuthGrantsForAccountUseCase revokeAllOAuthGrantsForAccountUseCase(
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      final AuditEventRecorder auditEvents) {
+    return new RevokeAllOAuthGrantsForAccountService(accountTokenRevoker, auditEvents);
+  }
+
+  // ADR-0026: needs its own TransactionTemplate (not @Transactional on handle()) — same "the
+  // network call to the storage backend must never run inside an open database transaction"
+  // reasoning AuthenticateWithSocialProviderUseCase's own @Bean method above already documents.
+  @Bean
+  /* package */ UpdateAccountProfilePictureUseCase updateAccountProfilePictureUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
+      final AuditEventRecorder auditEvents,
+      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
+    return new UpdateAccountProfilePictureService(
+        accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  /* package */ RemoveAccountProfilePictureUseCase removeAccountProfilePictureUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
+      final AuditEventRecorder auditEvents,
+      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
+    return new RemoveAccountProfilePictureService(
+        accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  /* package */ GetAccountAvatarUseCase getAccountAvatarUseCase(
+      final AccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage) {
+    return new GetAccountAvatarService(accounts, profilePictureStorage);
   }
 
   // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for

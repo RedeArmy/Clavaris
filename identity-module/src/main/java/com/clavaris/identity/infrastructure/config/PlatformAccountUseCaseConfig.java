@@ -18,9 +18,13 @@ import com.clavaris.identity.application.usecase.confirmplatformaccountemailveri
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetService;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.PlatformAccountSessionRevoker;
+import com.clavaris.identity.application.usecase.getplatformaccountavatar.GetPlatformAccountAvatarService;
+import com.clavaris.identity.application.usecase.getplatformaccountavatar.GetPlatformAccountAvatarUseCase;
 import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.ListActiveSessionsForPlatformAccountService;
 import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.ListActiveSessionsForPlatformAccountUseCase;
 import com.clavaris.identity.application.usecase.listactivesessionsforplatformaccount.PlatformAccountActiveSessionsRepository;
+import com.clavaris.identity.application.usecase.listconnectedaccountsforplatformaccount.ListConnectedAccountsForPlatformAccountService;
+import com.clavaris.identity.application.usecase.listconnectedaccountsforplatformaccount.ListConnectedAccountsForPlatformAccountUseCase;
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.PlatformKnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceService;
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceUseCase;
@@ -28,6 +32,8 @@ import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountService;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountUseCase;
+import com.clavaris.identity.application.usecase.removeplatformaccountprofilepicture.RemovePlatformAccountProfilePictureService;
+import com.clavaris.identity.application.usecase.removeplatformaccountprofilepicture.RemovePlatformAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformVerificationTokenRepository;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationService;
@@ -38,6 +44,9 @@ import com.clavaris.identity.application.usecase.revokeplatformaccountsession.Re
 import com.clavaris.identity.application.usecase.revokeplatformaccountsession.RevokePlatformAccountSessionUseCase;
 import com.clavaris.identity.application.usecase.suspendplatformaccount.SuspendPlatformAccountService;
 import com.clavaris.identity.application.usecase.suspendplatformaccount.SuspendPlatformAccountUseCase;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorage;
+import com.clavaris.identity.application.usecase.updateplatformaccountprofilepicture.UpdatePlatformAccountProfilePictureService;
+import com.clavaris.identity.application.usecase.updateplatformaccountprofilepicture.UpdatePlatformAccountProfilePictureUseCase;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -222,5 +231,47 @@ class PlatformAccountUseCaseConfig {
           final SuspendPlatformAccountUseCase suspendPlatformAccountUseCase) {
     return new ConfirmNewPlatformDeviceLoginAlertService(
         verificationTokens, suspendPlatformAccountUseCase);
+  }
+
+  // ADR-0026: needs its own TransactionTemplate (not @Transactional on handle()) — same "the
+  // network call to the storage backend must never run inside an open database transaction"
+  // reasoning IdentityUseCaseConfig's own updateAccountProfilePictureUseCase bean documents for
+  // its tenant-tier sibling.
+  @Bean
+  /* package */ UpdatePlatformAccountProfilePictureUseCase
+      updatePlatformAccountProfilePictureUseCase(
+          final PlatformAccountRepository accounts,
+          @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
+          final AuditEventRecorder auditEvents,
+          @SuppressWarnings("PMD.LongVariable")
+              final PlatformTransactionManager transactionManager) {
+    return new UpdatePlatformAccountProfilePictureService(
+        accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  /* package */ RemovePlatformAccountProfilePictureUseCase
+      removePlatformAccountProfilePictureUseCase(
+          final PlatformAccountRepository accounts,
+          @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
+          final AuditEventRecorder auditEvents,
+          @SuppressWarnings("PMD.LongVariable")
+              final PlatformTransactionManager transactionManager) {
+    return new RemovePlatformAccountProfilePictureService(
+        accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
+  }
+
+  @Bean
+  /* package */ GetPlatformAccountAvatarUseCase getPlatformAccountAvatarUseCase(
+      final PlatformAccountRepository accounts,
+      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage) {
+    return new GetPlatformAccountAvatarService(accounts, profilePictureStorage);
+  }
+
+  @Bean
+  /* package */ ListConnectedAccountsForPlatformAccountUseCase
+      listConnectedAccountsForPlatformAccountUseCase(
+          final PlatformSocialIdentityRepository socialIdentities) {
+    return new ListConnectedAccountsForPlatformAccountService(socialIdentities);
   }
 }

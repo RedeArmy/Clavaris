@@ -64,7 +64,8 @@ import java.util.UUID;
             account.id(),
             factor,
             clientId,
-            redirectUrl);
+            redirectUrl,
+            account.bypassesDeviceTrust());
     if (challenge.isPresent()) {
       return REDIRECT_PREFIX + challenge.get();
     }
