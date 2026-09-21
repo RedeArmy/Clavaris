@@ -1,0 +1,48 @@
+<!--
+SonarCloud "Duplicated Lines on New Code": account-sessions.html (platform-tier "Your active
+sessions") and account/sessions.html (tenant-tier self-service equivalent) render the exact same
+table — same columns, same empty-state, same per-row rendering logic — differing only in the base
+URL the per-row "revoke" form posts to (platform has no {organizationId} segment, tenant does).
+Extracted here rather than left duplicated: both callers already live in this same module, so this
+fragment is reachable from both without the cross-module fragment-reachability constraint
+org-tabs.html's own comment documents for fragments shared across module boundaries.
+
+revokeUrlBase is the caller's own already-built @{...} base path (context-path-resolved, no
+{sessionId} segment) — this fragment appends "/<sessionId>/revoke" as a plain string suffix, not a
+second @{...} expression, since the per-row sessionId is only known inside this fragment's own
+th:each, after the caller's own link-building expression has already run.
+-->
+<th:block th:fragment="sessionsTable(sessions, friendlyDeviceLabels, currentSessionId, revokeUrlBase)">
+    <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
+    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
+        <table class="clavaris-table">
+            <thead>
+            <tr>
+                <th scope="col">Device</th>
+                <th scope="col">IP address</th>
+                <th scope="col">First seen</th>
+                <th scope="col">Last active</th>
+                <th scope="col"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="userSession : ${sessions}">
+                <td>
+                    <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}"
+                          th:title="${userSession.userAgent()} ?: ''">Chrome on macOS</span>
+                    <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
+                </td>
+                <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
+                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">Created at</td>
+                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
+                <td>
+                    <form method="post" th:action="${revokeUrlBase} + '/' + ${userSession.sessionId()} + '/revoke'">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Cerrar sesión</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</th:block>

@@ -10,7 +10,7 @@
         <div class="clavaris-dashboard__inner">
             <div class="clavaris-page-header">
                 <div>
-                    <h1>Manage account</h1>
+                    <h1>Manage Account</h1>
                     <p>Manage your account info.</p>
                 </div>
             </div>
@@ -97,12 +97,13 @@
                             <div class="clavaris-section">
                                 <h2>Active devices</h2>
                                 <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
-                                <table class="clavaris-table" th:unless="${#lists.isEmpty(sessions)}">
+                                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
+                                <table class="clavaris-table">
                                     <thead>
                                     <tr>
-                                        <th>Device</th>
-                                        <th>IP address</th>
-                                        <th>Last active</th>
+                                        <th scope="col">Device</th>
+                                        <th scope="col">IP address</th>
+                                        <th scope="col">Last active</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -116,6 +117,7 @@
                                     </tr>
                                     </tbody>
                                 </table>
+                                </div>
                                 <a class="clavaris-button clavaris-button--secondary clavaris-button--inline" th:href="@{/platform/account/sessions}">Manage sessions</a>
                             </div>
                         </section>

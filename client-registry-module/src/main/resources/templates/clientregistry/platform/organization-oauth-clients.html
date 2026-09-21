@@ -58,54 +58,54 @@
                         <table class="clavaris-table">
                             <tbody>
                             <tr>
-                                <th>Client ID</th>
+                                <th scope="row">Client ID</th>
                                 <td><code th:text="${justRegisteredClientId}">client id</code></td>
                             </tr>
                             <tr>
-                                <th>Client secret</th>
+                                <th scope="row">Client secret</th>
                                 <td><code th:text="${justRegisteredRawSecret}">secret</code></td>
                             </tr>
                             <tr>
-                                <th>Issuer</th>
+                                <th scope="row">Issuer</th>
                                 <td><code th:text="${setupInstructions.issuer()}">issuer</code></td>
                             </tr>
                             <tr>
-                                <th>Discovery URL</th>
+                                <th scope="row">Discovery URL</th>
                                 <td><code th:text="${setupInstructions.discoveryUrl()}">discovery url</code></td>
                             </tr>
                             <tr>
-                                <th>Authorization endpoint</th>
+                                <th scope="row">Authorization endpoint</th>
                                 <td><code th:text="${setupInstructions.authorizationEndpoint()}">authorize</code></td>
                             </tr>
                             <tr>
-                                <th>Token endpoint</th>
+                                <th scope="row">Token endpoint</th>
                                 <td><code th:text="${setupInstructions.tokenEndpoint()}">token</code></td>
                             </tr>
                             <tr>
-                                <th>Userinfo endpoint</th>
+                                <th scope="row">Userinfo endpoint</th>
                                 <td><code th:text="${setupInstructions.userInfoEndpoint()}">userinfo</code></td>
                             </tr>
                             <tr>
-                                <th>JWKS endpoint</th>
+                                <th scope="row">JWKS endpoint</th>
                                 <td><code th:text="${setupInstructions.jwksEndpoint()}">jwks</code></td>
                             </tr>
                             <tr>
-                                <th>Logout endpoint</th>
+                                <th scope="row">Logout endpoint</th>
                                 <td><code th:text="${setupInstructions.logoutEndpoint()}">logout</code></td>
                             </tr>
                             <tr>
-                                <th>Redirect URIs</th>
+                                <th scope="row">Redirect URIs</th>
                                 <td>
                                     <code th:each="uri : ${setupInstructions.redirectUris()}"
                                           th:text="${uri}" style="display:block">redirect uri</code>
                                 </td>
                             </tr>
                             <tr>
-                                <th>Scopes</th>
+                                <th scope="row">Scopes</th>
                                 <td th:text="${#strings.listJoin(setupInstructions.allowedScopes(), ', ')}">scopes</td>
                             </tr>
                             <tr>
-                                <th>Grant types</th>
+                                <th scope="row">Grant types</th>
                                 <td th:text="${#strings.listJoin(setupInstructions.allowedGrantTypes(), ', ')}">grant types</td>
                             </tr>
                             </tbody>
@@ -120,14 +120,14 @@
                 <table class="clavaris-table">
                     <thead>
                     <tr>
-                        <th>Client ID</th>
-                        <th>Redirect URIs</th>
-                        <th>Grant Types</th>
-                        <th>Scopes</th>
-                        <th>Consent</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th><span class="clavaris-visually-hidden">Actions</span></th>
+                        <th scope="col">Client ID</th>
+                        <th scope="col">Redirect URIs</th>
+                        <th scope="col">Grant types</th>
+                        <th scope="col">Scopes</th>
+                        <th scope="col">Consent</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Created</th>
+                        <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
                     </tr>
                     </thead>
                     <tbody>

@@ -89,6 +89,25 @@ class PlatformAccountSessionsControllerTest {
         .andExpect(model().attribute("sessions", List.of(session)));
   }
 
+  // SonarCloud "Duplicated Lines" follow-up (2026-09-20): same shared
+  // identity/fragments/sessions-table.html fragment as AccountSessionsControllerTest's own
+  // identical assertion — see that test's own comment for why the exact URL, not just a
+  // successful render, is what's being verified here.
+  @Test
+  void revokeFormPostsToThePlatformScopedRevokeUrl() throws Exception {
+    ActivePlatformAccountSession session =
+        new ActivePlatformAccountSession(
+            "session-1", "Mozilla/5.0", "1.2.3.4", Instant.now(), Instant.now());
+    when(listSessions.handle(any())).thenReturn(List.of(session));
+
+    mockMvc
+        .perform(get("/platform/account/sessions"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("action=\"/platform/account/sessions/session-1/revoke\"")));
+  }
+
   @Test
   void getRendersAFriendlyDeviceLabelNotTheRawUserAgent() throws Exception {
     String chromeOnWindows =

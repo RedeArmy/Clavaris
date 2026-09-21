@@ -947,7 +947,7 @@ code {
 
 .clavaris-feature:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(20, 22, 29, .09); }
 
-.clavaris-feature h3 {
+.clavaris-feature h2 {
   margin: 0 0 var(--space-2);
   font-size: 1rem;
   font-weight: 600;
