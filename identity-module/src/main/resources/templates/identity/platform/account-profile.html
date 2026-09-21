@@ -147,11 +147,11 @@
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
-                                        <th>Device</th>
-                                        <th>IP address</th>
-                                        <th>First seen</th>
-                                        <th>Last active</th>
-                                        <th></th>
+                                        <th scope="col">Device</th>
+                                        <th scope="col">IP address</th>
+                                        <th scope="col">First seen</th>
+                                        <th scope="col">Last active</th>
+                                        <th scope="col"></th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -174,15 +174,15 @@
                                 </table>
                             </div>
 
-                            <p class="clavaris-field-hint" style="margin-top: 16px;">Recognized devices (Device Trust history).</p>
+                            <p class="clavaris-field-hint" style="margin-top: var(--space-4);">Recognized devices (Device Trust history).</p>
                             <p th:if="${#lists.isEmpty(devices)}" class="clavaris-empty-state">No known devices yet.</p>
                             <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(devices)}">
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
-                                        <th>Browser / OS</th>
-                                        <th>First seen</th>
-                                        <th>Last seen</th>
+                                        <th scope="col">Browser / OS</th>
+                                        <th scope="col">First seen</th>
+                                        <th scope="col">Last seen</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -203,9 +203,9 @@
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
-                                        <th>Provider</th>
-                                        <th>Provider user ID</th>
-                                        <th>Linked</th>
+                                        <th scope="col">Provider</th>
+                                        <th scope="col">Provider user ID</th>
+                                        <th scope="col">Linked</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -263,13 +263,13 @@
                                 <table class="clavaris-table">
                                     <thead>
                                     <tr>
-                                        <th>Application</th>
-                                        <th>Grant type</th>
-                                        <th>Format</th>
-                                        <th>Scopes</th>
-                                        <th>Last issued</th>
-                                        <th>Expires at</th>
-                                        <th></th>
+                                        <th scope="col">Application</th>
+                                        <th scope="col">Grant type</th>
+                                        <th scope="col">Format</th>
+                                        <th scope="col">Scopes</th>
+                                        <th scope="col">Last issued</th>
+                                        <th scope="col">Expires at</th>
+                                        <th scope="col"></th>
                                     </tr>
                                     </thead>
                                     <tbody>

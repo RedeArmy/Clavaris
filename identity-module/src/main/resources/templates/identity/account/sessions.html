@@ -9,18 +9,20 @@
         <p class="clavaris-breadcrumb">
             <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
         </p>
-        <h1>Your active sessions</h1>
+        <h1>Your Active Sessions</h1>
         <p>These are the devices/browsers currently signed in to your account. If you don't recognize
             one, close it.</p>
 
+        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
+        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
         <table class="clavaris-table">
             <thead>
             <tr>
-                <th>Device</th>
-                <th>IP address</th>
-                <th>First seen</th>
-                <th>Last active</th>
-                <th></th>
+                <th scope="col">Device</th>
+                <th scope="col">IP address</th>
+                <th scope="col">First seen</th>
+                <th scope="col">Last active</th>
+                <th scope="col"></th>
             </tr>
             </thead>
             <tbody>
@@ -41,11 +43,9 @@
                     </form>
                 </td>
             </tr>
-            <tr th:if="${#lists.isEmpty(sessions)}">
-                <td colspan="5">No active sessions.</td>
-            </tr>
             </tbody>
         </table>
+        </div>
     </div>
 </main>
 </body>

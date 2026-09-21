@@ -9,7 +9,7 @@
         <p class="clavaris-breadcrumb">
             <a th:href="@{/o/{organizationId}/account/sessions(organizationId=${organizationId})}">Your sessions</a>
         </p>
-        <h1>Update profile</h1>
+        <h1>Update Profile</h1>
 
         <p class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">
             Your profile picture was updated.
@@ -45,23 +45,25 @@
         </div>
 
         <div class="clavaris-section">
+            <div class="clavaris-table-wrapper">
             <table class="clavaris-table">
                 <tbody>
                 <tr>
-                    <th>Email</th>
+                    <th scope="row">Email</th>
                     <td th:text="${account.email().value()}">email</td>
                 </tr>
                 <tr th:if="${account.firstName().isPresent() or account.lastName().isPresent()}">
-                    <th>Name</th>
+                    <th scope="row">Name</th>
                     <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}"
                         th:text="${fullName}">name</td>
                 </tr>
                 <tr th:if="${account.username().isPresent()}">
-                    <th>Username</th>
+                    <th scope="row">Username</th>
                     <td th:text="${account.username().get().value()}">username</td>
                 </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <!-- Clerk "Allow user to delete their account" parity (ADR-0026): only rendered at all
