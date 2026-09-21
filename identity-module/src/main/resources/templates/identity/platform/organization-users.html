@@ -208,17 +208,19 @@
                     </div>
 
                     <div class="clavaris-field">
-                        <label>
+                        <label class="clavaris-toggle">
                             <input type="checkbox" th:field="*{ignorePasswordPolicy}"/>
-                            Ignore password policies
+                            <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                            <span class="clavaris-toggle__label">Ignore password policies</span>
                         </label>
                         <p>If checked, password policies will not be enforced on this password.</p>
                     </div>
 
                     <div class="clavaris-field">
-                        <label>
+                        <label class="clavaris-toggle">
                             <input type="checkbox" th:field="*{ignoreAccessRestrictions}"/>
-                            Ignore access restrictions
+                            <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                            <span class="clavaris-toggle__label">Ignore access restrictions</span>
                         </label>
                         <p>If checked, this user can be created even when their identifier is on
                             the blocklist, is outside the allowlist, or uses a blocked domain.</p>
