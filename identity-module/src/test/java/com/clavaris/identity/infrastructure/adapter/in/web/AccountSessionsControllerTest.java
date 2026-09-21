@@ -91,6 +91,31 @@ class AccountSessionsControllerTest {
         .andExpect(model().attribute("sessions", List.of(session)));
   }
 
+  // SonarCloud "Duplicated Lines" follow-up (2026-09-20): the sessions table itself now renders
+  // via a shared fragment (identity/fragments/sessions-table.html, also used by
+  // PlatformAccountSessionsController's own equivalent page) that builds each row's revoke form
+  // action by string-concatenating this org-scoped base onto a plain-String sessionId — asserting
+  // the real rendered URL, not just that the page renders at all, since a wrong base/suffix
+  // wouldn't fail to render, only silently 404 on submit.
+  @Test
+  void revokeFormPostsToTheOrganizationScopedRevokeUrl() throws Exception {
+    ActiveAccountSession session =
+        new ActiveAccountSession(
+            "session-1", "Mozilla/5.0", "1.2.3.4", Instant.now(), Instant.now());
+    when(listSessions.handle(any())).thenReturn(List.of(session));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/account/sessions", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "action=\"/o/"
+                            + ORGANIZATION_ID
+                            + "/account/sessions/session-1/revoke\"")));
+  }
+
   // TD-FUT-024: proves the friendly label actually reaches the rendered page, not just that
   // UserAgentLabel's own unit tests pass in isolation — a real Thymeleaf render (see this class's
   // own Javadoc), not a mocked view.

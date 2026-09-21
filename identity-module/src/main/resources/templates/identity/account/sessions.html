@@ -13,39 +13,7 @@
         <p>These are the devices/browsers currently signed in to your account. If you don't recognize
             one, close it.</p>
 
-        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
-        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
-        <table class="clavaris-table">
-            <thead>
-            <tr>
-                <th scope="col">Device</th>
-                <th scope="col">IP address</th>
-                <th scope="col">First seen</th>
-                <th scope="col">Last active</th>
-                <th scope="col"></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="userSession : ${sessions}">
-                <td>
-                    <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}"
-                          th:title="${userSession.userAgent()} ?: ''">Chrome on macOS</span>
-                    <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
-                </td>
-                <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">Created at</td>
-                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
-                <td>
-                    <form method="post"
-                          th:action="@{/o/{organizationId}/account/sessions/{sessionId}/revoke(organizationId=${organizationId},sessionId=${userSession.sessionId()})}">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Cerrar sesión</button>
-                    </form>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
+        <div th:replace="~{identity/fragments/sessions-table :: sessionsTable(${sessions}, ${friendlyDeviceLabels}, ${currentSessionId}, @{/o/{organizationId}/account/sessions(organizationId=${organizationId})})}"></div>
     </div>
 </main>
 </body>

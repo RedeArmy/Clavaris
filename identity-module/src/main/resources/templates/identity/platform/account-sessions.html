@@ -16,41 +16,11 @@
                 </div>
             </div>
 
-            <section class="clavaris-section clavaris-session-list">
-            <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
-            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
-            <table class="clavaris-table">
-                <thead>
-                <tr>
-                    <th scope="col">Device</th>
-                    <th scope="col">IP address</th>
-                    <th scope="col">First seen</th>
-                    <th scope="col">Last active</th>
-                    <th scope="col"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="userSession : ${sessions}">
-                    <td>
-                        <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}"
-                              th:title="${userSession.userAgent()} ?: ''">Chrome on macOS</span>
-                        <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
-                    </td>
-                    <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">Created at</td>
-                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
-                    <td>
-                        <form method="post"
-                              th:action="@{/platform/account/sessions/{sessionId}/revoke(sessionId=${userSession.sessionId()})}">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Cerrar sesión</button>
-                        </form>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-            </div>
-            </section>
+            <!-- th:insert (not th:replace): this section's own class="clavaris-section
+                 clavaris-session-list" styling must survive — th:replace would discard this tag
+                 entirely and substitute the fragment's own bare <th:block> content in its place. -->
+            <section class="clavaris-section clavaris-session-list"
+                     th:insert="~{identity/fragments/sessions-table :: sessionsTable(${sessions}, ${friendlyDeviceLabels}, ${currentSessionId}, @{/platform/account/sessions})}"></section>
         </div>
     </main>
 </div>
