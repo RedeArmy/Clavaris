@@ -8,6 +8,7 @@
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
+            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organizationId})}, 'Back to ' + ${organizationName})}"></div>
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
