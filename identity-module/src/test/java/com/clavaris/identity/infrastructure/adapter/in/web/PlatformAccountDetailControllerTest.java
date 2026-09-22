@@ -112,6 +112,21 @@ class PlatformAccountDetailControllerTest {
     return "/platform/dashboard/organizations/" + organizationId + "/users/" + account.id().value();
   }
 
+  // Live bug, 2026-09-22: this exact page (the "View Profile" destination reached from the Users
+  // tab 3-dot menu) previously loaded neither htmx.min.js nor organization-dialog.js — the
+  // shared sidebar's own "Manage account" trigger opened its dialog (native <dialog> markup,
+  // JS-independent) but stuck on "Loading..." forever, since htmx was never loaded to actually
+  // fetch the content. Both scripts now load from inside dashboard-nav.html itself — asserting
+  // they're present here locks that fix in, not just documents it.
+  @Test
+  void sidebarLoadsBothScriptsManageAccountNeeds() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/js/htmx.min.js")))
+        .andExpect(content().string(containsString("/js/organization-dialog.js")));
+  }
+
   @Test
   void showsTheAccountsProfile() throws Exception {
     mockMvc

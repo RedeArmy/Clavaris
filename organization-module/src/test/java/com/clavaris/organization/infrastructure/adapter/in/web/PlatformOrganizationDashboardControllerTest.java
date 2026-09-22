@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -84,6 +85,22 @@ class PlatformOrganizationDashboardControllerTest {
 
   private static KeysetCursor cursorOf(final Organization organization) {
     return new KeysetCursor(organization.createdAt(), organization.id());
+  }
+
+  // Live bug, 2026-09-22: the shared sidebar's own "Manage account" trigger needs htmx.min.js
+  // and organization-dialog.js unconditionally, but every page used to opt into loading them
+  // independently based only on its own content's needs — sibling pages missing one or both
+  // (account-profile.html, account-sessions.html, account-audit-log.html,
+  // organization-danger-zone.html) silently broke "Manage account" there. Both scripts now load
+  // from inside dashboard-nav.html itself (organization-module's own copy) — asserting they're
+  // present here locks that fix in, not just documents it.
+  @Test
+  void sidebarLoadsBothScriptsManageAccountNeeds() throws Exception {
+    mockMvc
+        .perform(get("/platform/dashboard"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/js/htmx.min.js")))
+        .andExpect(content().string(containsString("/js/organization-dialog.js")));
   }
 
   @Test
