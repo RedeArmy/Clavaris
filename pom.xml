@@ -104,7 +104,7 @@
              Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
              Supabase SDK dependency needed, same "build on vetted foundations" posture as every
              other external integration in this codebase. -->
-        <aws-sdk.version>2.35.7</aws-sdk.version>
+        <aws-sdk.version>2.55.1</aws-sdk.version>
         <!-- SonarCloud analysis warning, "No coverage report can be found with
              sonar.coverage.jacoco.xmlReportPaths=...": this module (clavaris-parent, packaging=pom)
              has no src/main/java of its own. DO NOT "fix" this with sonar.skip on this pom, even
