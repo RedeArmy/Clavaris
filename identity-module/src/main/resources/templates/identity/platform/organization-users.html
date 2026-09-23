@@ -17,11 +17,17 @@
 
             <div th:replace="~{identity/platform/fragments/org-tabs :: tabs(${organizationId}, 'users')}"></div>
 
+            <!-- Live UX request, 2026-09-22: "Create user" moved here from its own dashed-border
+                 .clavaris-create-tile that used to sit below the table/pagination — a plain button
+                 opposite the page title, the standard "list title left, primary action right" shape
+                 .clavaris-page-header's own flex/space-between layout already supports (see every
+                 other page-header on this dashboard that already places a button here). -->
             <div class="clavaris-page-header">
                 <div>
                     <h1>Users</h1>
                     <p>Every Account registered for this Organization.</p>
                 </div>
+                <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-user-dialog">Create user</button>
             </div>
 
             <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity. Pagination stays
@@ -30,7 +36,7 @@
                  Javadoc for why. -->
             <div id="users-content" th:fragment="users" class="clavaris-section">
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(users)}">
-                    <p class="clavaris-empty-state">No users yet — create the first one below.</p>
+                    <p class="clavaris-empty-state">No users yet — create the first one above.</p>
                 </div>
                 <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(users)}">
                     <table class="clavaris-table">
@@ -154,11 +160,6 @@
                        th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()})}"
                        hx-target="#users-content" hx-swap="outerHTML">Next</a>
                 </nav>
-
-                <button class="clavaris-create-tile" type="button" data-dialog-open="create-user-dialog">
-                    <span class="clavaris-create-tile__icon" aria-hidden="true">+</span>
-                    <strong>Create user</strong>
-                </button>
             </div>
 
             <dialog id="create-user-dialog" class="clavaris-dialog">
