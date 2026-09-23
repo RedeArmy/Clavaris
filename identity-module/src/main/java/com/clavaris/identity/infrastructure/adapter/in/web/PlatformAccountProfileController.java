@@ -93,7 +93,7 @@ public class PlatformAccountProfileController {
 
   @GetMapping
   public String show(final HttpServletRequest request, final Model model) {
-    populateModel(model, requireCurrentPlatformAccount(request));
+    populateModel(model, requireCurrentPlatformAccount(request), request);
     return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
   }
 
@@ -111,7 +111,7 @@ public class PlatformAccountProfileController {
     account.updateProfile(blankToNull(firstName), blankToNull(lastName));
     accounts.save(account);
     if (isHtmxRequest(request)) {
-      populateModel(model, platformAccountId);
+      populateModel(model, platformAccountId, request);
       model.addAttribute("updated", true);
       return PROFILE_FRAGMENT;
     }
@@ -132,12 +132,12 @@ public class PlatformAccountProfileController {
           new UpdatePlatformAccountProfilePictureCommand(
               platformAccountId, readBytes(file), file.getContentType()));
     } catch (final InvalidProfilePictureException e) {
-      populateModel(model, platformAccountId);
+      populateModel(model, platformAccountId, request);
       model.addAttribute("uploadError", e.getMessage());
       return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
     }
     if (isHtmxRequest(request)) {
-      populateModel(model, platformAccountId);
+      populateModel(model, platformAccountId, request);
       model.addAttribute("updated", true);
       return PROFILE_FRAGMENT;
     }
@@ -152,15 +152,23 @@ public class PlatformAccountProfileController {
     final PlatformAccountId platformAccountId = requireCurrentPlatformAccount(request);
     removePicture.handle(platformAccountId);
     if (isHtmxRequest(request)) {
-      populateModel(model, platformAccountId);
+      populateModel(model, platformAccountId, request);
       model.addAttribute("removed", true);
       return PROFILE_FRAGMENT;
     }
     return "redirect:/platform/account?removed";
   }
 
-  private void populateModel(final Model model, final PlatformAccountId platformAccountId) {
+  private void populateModel(
+      final Model model,
+      final PlatformAccountId platformAccountId,
+      final HttpServletRequest request) {
     model.addAttribute("account", requireAccount(platformAccountId));
+    // Live UX bug, 2026-09-22: manage-account.html's own "Change password" link needs to know
+    // whether this render is happening inside the dialog (swap in place, htmx) or as a real
+    // standalone page (a plain navigation, unchanged) — always exactly isHtmxRequest(request) at
+    // every one of this method's own call sites, so set once here rather than repeated at each.
+    model.addAttribute("insideDialog", isHtmxRequest(request));
     model.addAttribute("connectedAccounts", listConnectedAccounts.handle(platformAccountId));
 
     final List<ActivePlatformAccountSession> sessions =

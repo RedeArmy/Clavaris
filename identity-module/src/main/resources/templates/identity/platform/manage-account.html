@@ -100,7 +100,16 @@
                         <section id="clavaris-panel-security" class="clavaris-manage-account__panel">
                             <div class="clavaris-section">
                                 <h2>Password</h2>
-                                <a class="clavaris-button clavaris-button--secondary clavaris-button--inline" th:href="@{/platform/forgot-password}">Change password</a>
+                                <!-- Live UX bug, 2026-09-22: a plain navigation here always kicked the user out of
+                                     this dialog, even when the dialog was the one thing that opened it — see
+                                     ForgotPlatformAccountPasswordController's own Javadoc for the full dual-mode
+                                     fix. href stays a real link either way (works with JS/htmx disabled); the extra
+                                     hx-* attributes only render when this content is actually rendered inside the
+                                     dialog (insideDialog, set once in populateModel). -->
+                                <a class="clavaris-button clavaris-button--secondary clavaris-button--inline" th:href="@{/platform/forgot-password}"
+                                   th:attr="hx-get=${insideDialog} ? @{/platform/forgot-password} : null,
+                                            hx-target=${insideDialog} ? '#manage-account-dialog-body' : null,
+                                            hx-swap=${insideDialog} ? 'innerHTML' : null">Change password</a>
                             </div>
 
                             <div class="clavaris-section">

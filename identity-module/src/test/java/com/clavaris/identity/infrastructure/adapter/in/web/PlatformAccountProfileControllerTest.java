@@ -112,6 +112,43 @@ class PlatformAccountProfileControllerTest {
         .andExpect(view().name("identity/platform/manage-account :: content"));
   }
 
+  // Live UX bug, 2026-09-22: "Change password" used to always be a plain link, kicking the user
+  // out of this dialog even when the dialog was the one thing that opened it — see
+  // ForgotPlatformAccountPasswordController's own Javadoc for the full fix this button's own
+  // hx-get/hx-target/hx-swap attributes (rendered only when insideDialog) are the other half of.
+  @Test
+  void changePasswordLinkIsHtmxEnhancedOnlyWhenInsideTheDialog() throws Exception {
+    mockMvc
+        .perform(get("/platform/account").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString("hx-get=\"/platform/forgot-password\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "hx-target=\"#manage-account-dialog-body\"")));
+  }
+
+  // Not a blanket "no hx-get anywhere" check: the sidebar's own "Manage account" trigger
+  // (dashboard-nav.html) always carries its own hx-get="/platform/account" to lazy-load the
+  // dialog in the first place — present on every page, including this standalone one. Checking
+  // specifically for the absence of "Change password"'s own hx-get="/platform/forgot-password".
+  @Test
+  void changePasswordLinkIsAPlainLinkOnTheStandalonePage() throws Exception {
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(
+                            "hx-get=\"/platform/forgot-password\""))));
+  }
+
   @Test
   void postProfileUpdatesNameAndRedirects() throws Exception {
     mockMvc
