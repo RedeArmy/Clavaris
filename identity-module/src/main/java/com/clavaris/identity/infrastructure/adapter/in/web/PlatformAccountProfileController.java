@@ -36,12 +36,22 @@ import org.springframework.web.server.ResponseStatusException;
  * account" trigger lazy-loads into a {@code <dialog>} shell — same dual-mode shape {@code
  * PlatformRateLimitPolicyController}'s own Javadoc documents for an identical split.
  *
- * <p>Every mutating form here (name update, picture upload/remove) is a plain POST with a real
- * redirect, deliberately not HTMX-intercepted — a submit from inside the dialog does a normal full
- * page navigation to this same controller's own standalone page, which is a simple, safe fallback
- * that needs no extra "keep the dialog open across a redirect" machinery. "Active devices" is
- * read-only here; revoking a session stays on {@link PlatformAccountSessionsController}'s own
- * already-working standalone page, linked from the Security tab, not duplicated.
+ * <p><b>Live UX bug, 2026-09-22:</b> every mutating form here (name update, picture upload/remove)
+ * used to be a plain POST with a real redirect, deliberately not HTMX-intercepted, on the reasoning
+ * that a submit from inside the dialog doing a normal full page navigation to this same
+ * controller's own standalone page was a simple, safe fallback needing no extra "keep the dialog
+ * open across a redirect" machinery. Confirmed live that this reasoning was wrong in practice: a
+ * real user expects "Save" inside a dialog to stay inside that dialog, not silently kick them out
+ * to a full-page view they never asked to navigate to. Each mutating handler below now checks
+ * {@link #isHtmxRequest(HttpServletRequest)} the same way {@link #show} already did — an htmx
+ * submit re-renders {@link #PROFILE_FRAGMENT} directly (success/error state carried as ordinary
+ * model attributes, since there is no fresh GET/query-string to carry it on {@code ?updated} the
+ * old redirect-based flow relied on); a real, direct POST to this controller's own standalone page
+ * (no {@code HX-Request} header — reachable if a caller submits this form with JavaScript disabled,
+ * or scripts it directly) keeps the exact old redirect-then-GET behavior, unchanged. "Active
+ * devices" is read-only here; revoking a session stays on {@link
+ * PlatformAccountSessionsController}'s own already-working standalone page, linked from the
+ * Security tab, not duplicated.
  */
 // PMD.LongVariable: currentPlatformAccount names exactly what it is — same convention every other
 // controller in this codebase using CurrentPlatformAccountResolver already establishes.
@@ -87,21 +97,29 @@ public class PlatformAccountProfileController {
     return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
   }
 
+  // PMD.OnlyOneReturn: two real, distinct exit paths (htmx re-render vs. classic redirect) — same
+  // rationale uploadPicture's own identical suppression below documents.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/profile")
   public String updateProfile(
       @RequestParam(required = false) final String firstName,
       @RequestParam(required = false) final String lastName,
-      final HttpServletRequest request) {
+      final HttpServletRequest request,
+      final Model model) {
     final PlatformAccountId platformAccountId = requireCurrentPlatformAccount(request);
     final PlatformAccount account = requireAccount(platformAccountId);
     account.updateProfile(blankToNull(firstName), blankToNull(lastName));
     accounts.save(account);
+    if (isHtmxRequest(request)) {
+      populateModel(model, platformAccountId);
+      model.addAttribute("updated", true);
+      return PROFILE_FRAGMENT;
+    }
     return "redirect:/platform/account?updated";
   }
 
-  // PMD.OnlyOneReturn: two real, distinct outcomes — a validation error re-renders the form,
-  // success redirects — same rationale AccountProfileController's own identical suppression
-  // documents.
+  // PMD.OnlyOneReturn: three real, distinct exit paths (validation error, htmx re-render, classic
+  // redirect) — same rationale AccountProfileController's own identical suppression documents.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/picture")
   public String uploadPicture(
@@ -116,14 +134,28 @@ public class PlatformAccountProfileController {
     } catch (final InvalidProfilePictureException e) {
       populateModel(model, platformAccountId);
       model.addAttribute("uploadError", e.getMessage());
-      return PROFILE_VIEW;
+      return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
+    }
+    if (isHtmxRequest(request)) {
+      populateModel(model, platformAccountId);
+      model.addAttribute("updated", true);
+      return PROFILE_FRAGMENT;
     }
     return "redirect:/platform/account?updated";
   }
 
+  // PMD.OnlyOneReturn: two real, distinct exit paths (htmx re-render vs. classic redirect) — same
+  // rationale updateProfile's own identical suppression above documents.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/picture/remove")
-  public String removePicture(final HttpServletRequest request) {
-    removePicture.handle(requireCurrentPlatformAccount(request));
+  public String removePicture(final HttpServletRequest request, final Model model) {
+    final PlatformAccountId platformAccountId = requireCurrentPlatformAccount(request);
+    removePicture.handle(platformAccountId);
+    if (isHtmxRequest(request)) {
+      populateModel(model, platformAccountId);
+      model.addAttribute("removed", true);
+      return PROFILE_FRAGMENT;
+    }
     return "redirect:/platform/account?removed";
   }
 

@@ -165,4 +165,70 @@ class PlatformAccountProfileControllerTest {
 
     verify(removePicture).handle(account.id());
   }
+
+  // Live UX bug, 2026-09-22: submitting any of this dialog's own forms used to do a full browser
+  // navigation to this controller's own standalone page — the exact opposite of what a "Save"
+  // click inside a dialog should do. An htmx-originated POST (HX-Request present, exactly what
+  // manage-account.html's own forms now send) must re-render the fragment in place instead of
+  // redirecting — see PlatformAccountProfileController's own Javadoc for the full fix.
+  @Test
+  void postProfileWithHxRequestHeaderReRendersTheFragmentInsteadOfRedirecting() throws Exception {
+    mockMvc
+        .perform(
+            post("/platform/account/profile")
+                .header("HX-Request", "true")
+                .param("firstName", "Ada")
+                .param("lastName", "Lovelace"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Your profile was updated.")));
+
+    org.assertj.core.api.Assertions.assertThat(account.firstName()).contains("Ada");
+    verify(accounts).save(account);
+  }
+
+  @Test
+  void postPictureWithHxRequestHeaderReRendersTheFragmentInsteadOfRedirecting() throws Exception {
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.png", "image/png", new byte[] {1, 2, 3});
+
+    mockMvc
+        .perform(multipart("/platform/account/picture").file(file).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Your profile was updated.")));
+
+    verify(updatePicture).handle(any());
+  }
+
+  @Test
+  void postPictureWithHxRequestHeaderStillReRendersTheFragmentOnAnInvalidUpload() throws Exception {
+    doThrow(new InvalidProfilePictureException("Unsupported image type: image/svg+xml"))
+        .when(updatePicture)
+        .handle(any());
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.svg", "image/svg+xml", new byte[] {1});
+
+    mockMvc
+        .perform(multipart("/platform/account/picture").file(file).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Unsupported image type")));
+  }
+
+  @Test
+  void postRemoveWithHxRequestHeaderReRendersTheFragmentInsteadOfRedirecting() throws Exception {
+    mockMvc
+        .perform(post("/platform/account/picture/remove").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.containsString("Your profile picture was removed.")));
+
+    verify(removePicture).handle(account.id());
+  }
 }

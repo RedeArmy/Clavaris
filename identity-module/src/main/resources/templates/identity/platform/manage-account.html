@@ -21,8 +21,8 @@
                  dual-mode/full-page-vs-fragment rationale). Zero-JS tab switching via the two
                  hidden radio inputs + CSS below — no JS needed to switch between Profile/Security. -->
             <div id="manage-account-content" th:fragment="content">
-                <p class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">Your profile was updated.</p>
-                <p class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">Your profile picture was removed.</p>
+                <p class="clavaris-alert clavaris-alert--success" th:if="${param.updated} or ${updated}">Your profile was updated.</p>
+                <p class="clavaris-alert clavaris-alert--success" th:if="${param.removed} or ${removed}">Your profile picture was removed.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${uploadError}" th:text="${uploadError}">Upload error</p>
 
                 <div class="clavaris-manage-account">
@@ -41,7 +41,14 @@
                                      th:src="@{/platform/avatars/{id}(id=${account.id().value()})}"
                                      alt="Current profile"/>
                                 <div class="clavaris-profile-picture-actions">
-                                    <form method="post" enctype="multipart/form-data" th:action="@{/platform/account/picture}">
+                                    <!-- Live UX bug, 2026-09-22: a plain (non-htmx) form submit here did a full
+                                         browser navigation to this controller's own standalone page, kicking the
+                                         user out of the dialog they were editing inside — see
+                                         PlatformAccountProfileController's own Javadoc for the full fix. hx-target/
+                                         hx-swap re-render this whole fragment in place, same #manage-account-content
+                                         id every entry point into this markup already shares. -->
+                                    <form method="post" enctype="multipart/form-data" th:action="@{/platform/account/picture}"
+                                          th:attr="hx-post=@{/platform/account/picture}" hx-target="#manage-account-content" hx-swap="outerHTML">
                                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <label for="platform-profile-picture-file">Update profile</label>
                                         <input id="platform-profile-picture-file" type="file" name="file"
@@ -49,7 +56,8 @@
                                         <p class="clavaris-field-hint">Recommended size 1:1, up to 10MB.</p>
                                         <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
                                     </form>
-                                    <form method="post" th:action="@{/platform/account/picture/remove}">
+                                    <form method="post" th:action="@{/platform/account/picture/remove}"
+                                          th:attr="hx-post=@{/platform/account/picture/remove}" hx-target="#manage-account-content" hx-swap="outerHTML">
                                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove photo</button>
                                     </form>
@@ -58,7 +66,8 @@
 
                             <div class="clavaris-section">
                                 <h2>Profile details</h2>
-                                <form method="post" th:action="@{/platform/account/profile}">
+                                <form method="post" th:action="@{/platform/account/profile}"
+                                      th:attr="hx-post=@{/platform/account/profile}" hx-target="#manage-account-content" hx-swap="outerHTML">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <div class="clavaris-field">
                                         <label for="platform-first-name">First name</label>
