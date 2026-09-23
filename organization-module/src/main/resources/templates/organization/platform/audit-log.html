@@ -29,8 +29,13 @@
 
             <!-- ADR-0025: the first fully read-only dashboard page in this codebase — no form, no
                  HTMX target, plain bounded list (see GetAuditLogForOrganizationUseCase's own
-                 Javadoc for the MAX_RESULTS=100 cap and the deliberate scope this page covers). -->
-            <div class="clavaris-section">
+                 Javadoc for the MAX_RESULTS=100 cap and the deliberate scope this page covers).
+
+                 SDE-III refactor, 2026-09-22: clavaris-org-tab-content shares one fixed min-height
+                 with Workspaces/Users/Configure's own content regions (clavaris.css's own comment)
+                 so navigating between org-tabs.html's four tabs no longer resizes the page to match
+                 whichever tab's data happens to be shorter or taller. -->
+            <div class="clavaris-section clavaris-org-tab-content">
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
                     <p class="clavaris-empty-state">No audit events recorded yet for this Organization.</p>
                 </div>
