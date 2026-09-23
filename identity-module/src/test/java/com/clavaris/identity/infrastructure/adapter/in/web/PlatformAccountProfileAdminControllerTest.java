@@ -15,6 +15,7 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountCommand;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
@@ -101,7 +102,55 @@ class PlatformAccountProfileAdminControllerTest {
         .andExpect(redirectedUrl(profileUrl() + "?profileUpdated"));
 
     verify(updateProfile)
-        .handle(new UpdateAccountProfileCommand(account.id(), "Ada", "Lovelace", ACTOR));
+        .handle(
+            new UpdateAccountProfileCommand(account.id(), "Ada", "Lovelace", null, null, ACTOR));
+  }
+
+  // Live feature request, 2026-09-22 — "/Users/Profile" gained editable Username/Phone number
+  // fields (account-profile.html's own "Personal information" card). Username's own conflict path
+  // (real, unlike firstName/lastName/phoneNumber which never fail) needs its own redirect-with-
+  // error handling, same pattern uploadPictureRedirectsWithAnEncodedErrorOnInvalidUpload already
+  // establishes for this same controller's own picture-upload failure path. Phone number arrives
+  // as two form fields (country code + local number, account-profile.html's own dropdown) — this
+  // controller's own combinePhoneNumber joins them into the one string
+  // UpdateAccountProfileCommand actually carries.
+  @Test
+  void updateProfileDelegatesUsernameAndPhoneNumberToo() throws Exception {
+    mockMvc
+        .perform(
+            post(path("profile"))
+                .param("username", "ada-lovelace")
+                .param("phoneCountryCode", "+502")
+                .param("phoneNumberLocal", "5555-0100"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(profileUrl() + "?profileUpdated"));
+
+    verify(updateProfile)
+        .handle(
+            new UpdateAccountProfileCommand(
+                account.id(), null, null, "ada-lovelace", "+502 5555-0100", ACTOR));
+  }
+
+  @Test
+  void updateProfileTreatsALocalNumberWithNoCountryCodeAsNoPhoneNumberAtAll() throws Exception {
+    mockMvc
+        .perform(post(path("profile")).param("phoneNumberLocal", "5555-0100"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(updateProfile)
+        .handle(new UpdateAccountProfileCommand(account.id(), null, null, null, null, ACTOR));
+  }
+
+  @Test
+  void updateProfileRedirectsWithAnEncodedErrorOnAUsernameConflict() throws Exception {
+    doThrow(new UsernameAlreadyRegisteredException(new OrganizationId(organizationId)))
+        .when(updateProfile)
+        .handle(any());
+
+    mockMvc
+        .perform(post(path("profile")).param("username", "taken"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrlPattern(profileUrl() + "?usernameError=*"));
   }
 
   @Test

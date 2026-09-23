@@ -4,6 +4,7 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountCommand;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
@@ -75,21 +76,36 @@ public class PlatformAccountProfileAdminController {
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
 
+  // PMD.OnlyOneReturn: two real, distinct outcomes — a username conflict redirects with an error
+  // message, success redirects plainly — same rationale uploadPicture's own identical suppression
+  // documents.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/profile")
   public String updateProfile(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID accountId,
       @RequestParam(required = false) final String firstName,
-      @RequestParam(required = false) final String lastName) {
+      @RequestParam(required = false) final String lastName,
+      @RequestParam(required = false) final String username,
+      @RequestParam(required = false) final String phoneCountryCode,
+      @RequestParam(required = false) final String phoneNumberLocal) {
     final PlatformAccountOrganizationAccess.ResolvedAccountAccess access =
         organizationAccess.requireOwnedAccount(request, organizationId, accountId, getAccount);
-    updateProfile.handle(
-        new UpdateAccountProfileCommand(
-            access.account().id(),
-            blankToNull(firstName),
-            blankToNull(lastName),
-            actorFor(access)));
+    try {
+      updateProfile.handle(
+          new UpdateAccountProfileCommand(
+              access.account().id(),
+              blankToNull(firstName),
+              blankToNull(lastName),
+              blankToNull(username),
+              combinePhoneNumber(phoneCountryCode, phoneNumberLocal),
+              actorFor(access)));
+    } catch (final UsernameAlreadyRegisteredException _) {
+      return redirectToProfile(organizationId, accountId)
+          + "?usernameError="
+          + encode("This username is already taken");
+    }
     return redirectToProfile(organizationId, accountId) + "?profileUpdated";
   }
 
@@ -152,6 +168,19 @@ public class PlatformAccountProfileAdminController {
 
   private static String blankToNull(final String value) {
     return value == null || value.isBlank() ? null : value.strip();
+  }
+
+  // Live feature request, 2026-09-22 — account-profile.html's own phone number field is two
+  // <input>s (a country-code <select>, a local-number text field), not one — Account.phoneNumber
+  // stays a plain display string (its own Javadoc: "no validated PhoneNumber type"), so this
+  // combines them into that one string rather than teaching the domain/command layer a new
+  // "country code" concept. A local number with no country code selected is treated as blank (the
+  // <select>'s own first option is a blank placeholder) — never a phone number missing its code.
+  private static String combinePhoneNumber(
+      final String phoneCountryCode, final String phoneNumberLocal) {
+    final String local = blankToNull(phoneNumberLocal);
+    final String code = blankToNull(phoneCountryCode);
+    return local == null || code == null ? null : code + " " + local;
   }
 
   private static String encode(final String value) {

@@ -508,6 +508,19 @@ public final class Account {
   }
 
   /**
+   * SDE-III review, 2026-09-22 — operator-driven edit (dashboard "View Profile" > Profile tab,
+   * {@code PlatformAccountProfileAdminController}); unlike {@link #assignUsername}, phone number
+   * carries no uniqueness constraint of its own — this method itself always overwrites, same
+   * "deliberate replace" posture as {@link #updateProfile}/{@link #updateProfilePicture}. Its own
+   * caller ({@code UpdateAccountProfileService}) chooses to only ever invoke this once, mirroring
+   * username's own "view-only once set" UX at the caller's explicit request — a use-case-level
+   * policy, not a domain invariant this method itself enforces.
+   */
+  public void updatePhoneNumber(final String phoneNumber) {
+    this.phoneNumber = phoneNumber;
+  }
+
+  /**
    * Clerk "User permissions" parity — operator-controlled (dashboard "Settings" tab), gates {@code
    * DeleteOwnAccountUseCase}'s own self-service "Delete account" action. Defaults to {@code false}
    * (see the field's own comment) — an Organization opts a specific Account into this, it is never
