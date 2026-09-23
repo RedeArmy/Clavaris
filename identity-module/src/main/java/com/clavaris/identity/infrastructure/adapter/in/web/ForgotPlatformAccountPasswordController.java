@@ -31,6 +31,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * assumed), so {@link #pending}'s own dual-mode check still sees it correctly without this
  * controller needing a separate non-redirect success branch.
  */
+// PMD.LongVariable: INSIDE_DIALOG_ATTRIBUTE names exactly what it is — same convention every other
+// descriptively-named constant in this codebase already establishes (e.g.
+// PlatformAccountProfileController's
+// own class-level suppression for the same rule).
+@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/forgot-password")
 public class ForgotPlatformAccountPasswordController {
@@ -40,6 +45,7 @@ public class ForgotPlatformAccountPasswordController {
   private static final String FORM_FRAGMENT = FORM_VIEW + " :: content";
   private static final String PENDING_VIEW = "identity/platform/forgot-password-pending";
   private static final String PENDING_FRAGMENT = PENDING_VIEW + " :: content";
+  private static final String INSIDE_DIALOG_ATTRIBUTE = "insideDialog";
 
   private final RequestPlatformAccountPasswordResetUseCase useCase;
 
@@ -51,7 +57,7 @@ public class ForgotPlatformAccountPasswordController {
   @GetMapping
   public String showForm(final HttpServletRequest request, final Model model) {
     model.addAttribute("form", new RequestPasswordResetForm());
-    model.addAttribute("insideDialog", isHtmxRequest(request));
+    model.addAttribute(INSIDE_DIALOG_ATTRIBUTE, isHtmxRequest(request));
     return isHtmxRequest(request) ? FORM_FRAGMENT : FORM_VIEW;
   }
 
@@ -63,7 +69,7 @@ public class ForgotPlatformAccountPasswordController {
       final HttpServletRequest request,
       final Model model) {
     if (bindingResult.hasErrors()) {
-      model.addAttribute("insideDialog", isHtmxRequest(request));
+      model.addAttribute(INSIDE_DIALOG_ATTRIBUTE, isHtmxRequest(request));
       return isHtmxRequest(request) ? FORM_FRAGMENT : FORM_VIEW;
     }
 
@@ -74,7 +80,7 @@ public class ForgotPlatformAccountPasswordController {
 
   @GetMapping("/pending")
   public String pending(final HttpServletRequest request, final Model model) {
-    model.addAttribute("insideDialog", isHtmxRequest(request));
+    model.addAttribute(INSIDE_DIALOG_ATTRIBUTE, isHtmxRequest(request));
     return isHtmxRequest(request) ? PENDING_FRAGMENT : PENDING_VIEW;
   }
 
