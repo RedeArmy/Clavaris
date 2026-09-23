@@ -232,6 +232,27 @@ input[type="radio"] {
   color: var(--clavaris-text-muted);
 }
 
+/* Refactor, 2026-09-22 — the Users/Profile "Phone number" field: the area-code <select> and the
+   local-number <input> used to stack vertically, so once the dropdown closed there was no visual
+   cue of which flag/code had been picked next to the number itself. Puts them side by side in one
+   row instead, code select narrow (flag + area code is all it needs to show closed), number input
+   taking the remaining width — both class-qualified under .clavaris-field to out-specificity that
+   selector's own width: 100% default (.clavaris-field select/input above) rather than reaching for
+   !important. */
+.clavaris-phone-input {
+  display: flex;
+  gap: var(--space-2);
+}
+.clavaris-field .clavaris-phone-input__code {
+  flex: 0 0 auto;
+  width: 128px;
+}
+.clavaris-field .clavaris-phone-input__number {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
 /* SDE-III UI audit, 2026-09-20 — the dashboard's own true on/off settings (permission flags like
    canDeleteOwnAccount/bypassesDeviceTrust, "Require consent screen") rendered as a plain browser
    checkbox, visually indistinguishable from the multi-select scope/grant-type/event-type lists
@@ -1344,6 +1365,7 @@ code {
 @media (max-width: 640px) {
   .clavaris-manage-account { grid-template-columns: 1fr; }
   .clavaris-manage-account__nav { flex-direction: row; border-right: none; border-bottom: 1px solid var(--clavaris-border); padding: 12px; }
+  .clavaris-field .clavaris-phone-input__code { width: 104px; }
 }
 
 @media (max-width: 640px) {
