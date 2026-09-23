@@ -1290,14 +1290,24 @@ code {
    between its own six sub-pages (Secret Keys/OAuth Clients/Signing Keys/Webhook Endpoints/Rate
    Limit/Danger Zone) either, since they all already share this one class. --clavaris-org-tab-min-
    height itself lives in the single shared :root block at the top of this file, not redeclared
-   here, to avoid a second :root selector SonarCloud flags as a duplicate. */
-.clavaris-org-tab-content { min-height: var(--clavaris-org-tab-min-height); }
+   here, to avoid a second :root selector SonarCloud flags as a duplicate.
+
+   Re-validation, 2026-09-23: min-height alone still left a real, reported gap — Configure is the
+   only one of the four tabs with a two-column .clavaris-configure-layout (216px sidebar + 36px gap
+   + content), so .clavaris-configure-content's own WIDTH is narrower than Workspaces/Users/Logs'
+   own full-width single column, even once all four share the same height floor. Content visibly
+   changed width switching tabs, not just height. .clavaris-org-tab-content now also caps its own
+   max-width at the exact same calc() Configure's own grid track already produces, so its content
+   area is never wider than Configure's — resets to the full width under the same 800px breakpoint
+   .clavaris-configure-layout itself already collapses to a single column at, so mobile isn't left
+   with unnecessary empty space on the side. */
+.clavaris-org-tab-content { min-height: var(--clavaris-org-tab-min-height); max-width: calc(100% - 216px - 36px); }
 .clavaris-configure-content { min-width: 0; min-height: var(--clavaris-org-tab-min-height); }
 
 @media (max-width: 800px) {
   .clavaris-configure-layout { grid-template-columns: 1fr; }
   .clavaris-configure-sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
-  .clavaris-org-tab-content,
+  .clavaris-org-tab-content { min-height: auto; max-width: none; }
   .clavaris-configure-content { min-height: auto; }
 }
 
