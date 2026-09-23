@@ -1315,22 +1315,24 @@ code {
    height itself lives in the single shared :root block at the top of this file, not redeclared
    here, to avoid a second :root selector SonarCloud flags as a duplicate.
 
-   Re-validation, 2026-09-23: min-height alone still left a real, reported gap — Configure is the
-   only one of the four tabs with a two-column .clavaris-configure-layout (216px sidebar + 36px gap
-   + content), so .clavaris-configure-content's own WIDTH is narrower than Workspaces/Users/Logs'
-   own full-width single column, even once all four share the same height floor. Content visibly
-   changed width switching tabs, not just height. .clavaris-org-tab-content now also caps its own
-   max-width at the exact same calc() Configure's own grid track already produces, so its content
-   area is never wider than Configure's — resets to the full width under the same 800px breakpoint
-   .clavaris-configure-layout itself already collapses to a single column at, so mobile isn't left
-   with unnecessary empty space on the side. */
-.clavaris-org-tab-content { min-height: var(--clavaris-org-tab-min-height); max-width: calc(100% - 216px - 36px); }
+   Corrected, 2026-09-23 — the calc(100% - 216px - 36px) max-width tried in between (capping
+   .clavaris-org-tab-content to Configure's own narrower INNER content column) was wrong and has
+   been reverted: it only capped #workspaces-content/#users-content/Logs' own content section,
+   never .clavaris-page-header (Users'/Logs' own title+action row, a SIBLING of
+   .clavaris-org-tab-content, not a descendant — see organization-users.html's own DOM) — so the
+   header stayed full .clavaris-dashboard__inner width while the table/cards below it were
+   artificially narrowed, a real, reported "title wider than the table" regression this max-width
+   itself introduced. "Same width as Configure" actually means Configure's own OUTER box (header +
+   its two-column layout together), which every tab's own .clavaris-dashboard__inner ALREADY shares
+   with no CSS needed — min-height is the only real per-tab override required; width parity comes
+   free from that one shared container. */
+.clavaris-org-tab-content { min-height: var(--clavaris-org-tab-min-height); }
 .clavaris-configure-content { min-width: 0; min-height: var(--clavaris-org-tab-min-height); }
 
 @media (max-width: 800px) {
   .clavaris-configure-layout { grid-template-columns: 1fr; }
   .clavaris-configure-sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
-  .clavaris-org-tab-content { min-height: auto; max-width: none; }
+  .clavaris-org-tab-content,
   .clavaris-configure-content { min-height: auto; }
 }
 
