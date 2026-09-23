@@ -8,7 +8,12 @@
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organizationId})}, 'Back to ' + ${organizationName})}"></div>
+            <!-- SDE-III refactor, 2026-09-22: the old "Back to {organizationName}" link here (identity/
+                 platform/fragments/back-link.html) pointed at the Workspaces tab — redundant with, and
+                 easily confused for, the tab row two lines below (org-tabs.html), since Workspaces is
+                 already one click away via the tabs themselves. See org-tabs.html's own fragment for
+                 the general "Back to Your Organizations" link that replaces it, shared by every tab
+                 instead of re-added here on its own. -->
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /

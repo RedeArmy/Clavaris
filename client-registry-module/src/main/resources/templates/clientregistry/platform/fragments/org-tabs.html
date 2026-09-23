@@ -8,14 +8,28 @@ controller tests. "Users" is a plain link to the already-existing, separate
 /platform/dashboard/organizations/{organizationId}/users page (identity-module) — not embedded
 here. "Configure" links to Secret Keys, the same default landing item Clerk's own equivalent tab
 uses (its screenshot's own "API keys" is the closest Clerk concept to a Secret Key here).
+
+SDE-III refactor, 2026-09-22: organization-users.html used to carry its own one-off "Back to
+{organizationName}" link (identity/platform/fragments/back-link.html) pointing at the Workspaces
+tab — redundant with, and easily confused for, the tab row immediately below it, since Workspaces
+is already one click away via the tabs themselves. Replaced with one generic "Back to Your
+Organizations" link, defined once here (every one of this fragment's callers gets it — the four
+top-level tabs and Configure's own five sub-pages alike) rather than re-added by hand per page, so
+it never drifts out of sync with itself across tabs the way a per-page, per-organization-name link
+could.
 -->
-<div th:fragment="tabs(organizationId, active)" class="clavaris-org-tabs">
-    <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}"
-       th:classappend="${active == 'workspaces'} ? 'active'">Workspaces</a>
-    <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
-       th:classappend="${active == 'users'} ? 'active'">Users</a>
-    <a th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organizationId})}"
-       th:classappend="${active == 'logs'} ? 'active'">Logs</a>
-    <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
-       th:classappend="${active == 'configure'} ? 'active'">Configure</a>
+<div th:fragment="tabs(organizationId, active)">
+    <a class="clavaris-back-link" th:href="@{/platform/dashboard}">
+        <span aria-hidden="true">&larr;</span> <span>Back to Your Organizations</span>
+    </a>
+    <div class="clavaris-org-tabs">
+        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}"
+           th:classappend="${active == 'workspaces'} ? 'active'">Workspaces</a>
+        <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
+           th:classappend="${active == 'users'} ? 'active'">Users</a>
+        <a th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organizationId})}"
+           th:classappend="${active == 'logs'} ? 'active'">Logs</a>
+        <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
+           th:classappend="${active == 'configure'} ? 'active'">Configure</a>
+    </div>
 </div>
