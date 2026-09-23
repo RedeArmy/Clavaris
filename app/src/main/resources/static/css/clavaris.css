@@ -1319,6 +1319,18 @@ code {
 .clavaris-manage-account__body { min-width: 0; }
 .clavaris-connected-account { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: .88rem; }
 
+/* Live UX bug, 2026-09-22: identity/fragments/forgot-password-form.html's own .clavaris-card
+   (max-width: 400px) relies on <main>'s flex centering for its standalone page. Swapped into
+   #manage-account-dialog-body instead (ForgotPlatformAccountPasswordController's own dual-mode
+   fix), there is no such flex parent and no padding, so the card sat flush against the dialog's
+   left edge instead of centered like every other panel. Scoped to the dialog body specifically —
+   the standalone page's own <main> centering is untouched. */
+#manage-account-dialog-body #forgot-password-content,
+#manage-account-dialog-body #forgot-password-pending-content {
+  padding: 28px;
+}
+#manage-account-dialog-body .clavaris-card { margin: 0 auto; }
+
 @media (max-width: 640px) {
   .clavaris-manage-account { grid-template-columns: 1fr; }
   .clavaris-manage-account__nav { flex-direction: row; border-right: none; border-bottom: 1px solid var(--clavaris-border); padding: 12px; }
