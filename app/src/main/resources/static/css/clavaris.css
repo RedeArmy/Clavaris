@@ -1267,6 +1267,29 @@ code {
 .clavaris-org-tabs a:hover { color: var(--clavaris-text-primary); }
 .clavaris-org-tabs a.active { color: var(--clavaris-text-primary); border-bottom-color: var(--clavaris-brand-color); }
 
+/* Live UX request, 2026-09-23: org-tabs.html's own "Back to Your Organizations" link read as
+   plain muted text (.clavaris-back-link, the same styling account-profile.html/account-audit-
+   log.html's own deep-flow back link uses) — asked for an actual button instead. A dedicated
+   class, not .clavaris-button itself (that one defaults to a full-width brand-colored block, the
+   wrong weight for a secondary "go back" action) and not .clavaris-back-link (kept exactly as-is
+   for its own other callers). */
+.clavaris-org-tabs__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--clavaris-text-primary);
+  text-decoration: none;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  transition: background 150ms ease-out;
+}
+.clavaris-org-tabs__back:hover { background: var(--clavaris-bg); }
+
 .clavaris-configure-layout { display: grid; grid-template-columns: 216px 1fr; align-items: start; gap: 36px; margin-top: 22px; }
 .clavaris-configure-sidebar { position: sticky; top: 22px; display: grid; gap: 2px; }
 .clavaris-configure-sidebar__label { margin: 0 0 8px; padding: 0 10px; color: var(--clavaris-text-muted); font-size: .7rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }

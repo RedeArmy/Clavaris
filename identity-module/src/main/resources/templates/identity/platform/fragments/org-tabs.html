@@ -17,9 +17,12 @@ Organizations" link, defined once here (every one of this fragment's callers get
 top-level tabs and Configure's own five sub-pages alike) rather than re-added by hand per page, so
 it never drifts out of sync with itself across tabs the way a per-page, per-organization-name link
 could.
+
+Live UX request, 2026-09-23: restyled as an actual button (clavaris-org-tabs__back) instead of
+plain muted text (clavaris-back-link's own styling) — see that class's own comment in clavaris.css.
 -->
 <div th:fragment="tabs(organizationId, active)">
-    <a class="clavaris-back-link" th:href="@{/platform/dashboard}">
+    <a class="clavaris-org-tabs__back" th:href="@{/platform/dashboard}">
         <span aria-hidden="true">&larr;</span> <span>Back to Your Organizations</span>
     </a>
     <div class="clavaris-org-tabs">
