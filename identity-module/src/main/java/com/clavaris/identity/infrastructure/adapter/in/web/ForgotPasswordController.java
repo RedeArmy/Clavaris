@@ -38,6 +38,12 @@ public class ForgotPasswordController {
   @GetMapping
   public String showForm(@PathVariable final UUID organizationId, final Model model) {
     model.addAttribute("form", new RequestPasswordResetForm());
+    // Live UX bug fix, 2026-09-22: forgot-password-form.html's own shared "card" fragment now
+    // builds its own explicit submit URL instead of self-submitting via an empty th:action — see
+    // that fragment's own Javadoc for why. This page never runs inside any dialog (unlike the
+    // platform tier's own equivalent), so organizationId is the only new thing this page needs to
+    // expose.
+    model.addAttribute("organizationId", organizationId);
     return FORM_VIEW;
   }
 
@@ -48,8 +54,10 @@ public class ForgotPasswordController {
   public String requestReset(
       @PathVariable final UUID organizationId,
       @Valid @ModelAttribute("form") final RequestPasswordResetForm form,
-      final BindingResult bindingResult) {
+      final BindingResult bindingResult,
+      final Model model) {
     if (bindingResult.hasErrors()) {
+      model.addAttribute("organizationId", organizationId);
       return FORM_VIEW;
     }
 

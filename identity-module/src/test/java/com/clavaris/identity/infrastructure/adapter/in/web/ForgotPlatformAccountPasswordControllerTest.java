@@ -90,4 +90,51 @@ class ForgotPlatformAccountPasswordControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/forgot-password-pending"));
   }
+
+  // Live UX bug, 2026-09-22: "Change password" inside the "Manage account" dialog used to always
+  // do a full browser navigation to this same standalone page — this controller's own dual-mode
+  // fix (see its own Javadoc) is what "Manage account" now relies on. Every htmx-originated
+  // request across this small flow must re-render its own :: content fragment, never the full
+  // page, and must know it's rendering inside the dialog (insideDialog) so its own back link
+  // targets the dialog instead of /platform/login.
+  @Test
+  void getWithHxRequestHeaderRendersJustTheFragmentInsideDialogMode() throws Exception {
+    mockMvc
+        .perform(get("/platform/forgot-password").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/forgot-password :: content"))
+        .andExpect(model().attribute("insideDialog", true));
+  }
+
+  @Test
+  void getWithoutHxRequestHeaderIsNotInsideDialogMode() throws Exception {
+    mockMvc
+        .perform(get("/platform/forgot-password"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("insideDialog", false));
+  }
+
+  @Test
+  void invalidEmailWithHxRequestHeaderRerendersTheFragmentInsteadOfTheFullPage() throws Exception {
+    mockMvc
+        .perform(
+            post("/platform/forgot-password")
+                .header("HX-Request", "true")
+                .param("email", "not-an-email"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/forgot-password :: content"))
+        .andExpect(model().attribute("insideDialog", true))
+        .andExpect(model().attributeHasFieldErrors("form", "email"));
+
+    verifyNoInteractions(useCase);
+  }
+
+  @Test
+  void pendingPageWithHxRequestHeaderRendersJustTheFragmentInsideDialogMode() throws Exception {
+    mockMvc
+        .perform(get("/platform/forgot-password/pending").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/forgot-password-pending :: content"))
+        .andExpect(model().attribute("insideDialog", true));
+  }
 }

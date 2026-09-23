@@ -112,6 +112,43 @@ class PlatformAccountProfileControllerTest {
         .andExpect(view().name("identity/platform/manage-account :: content"));
   }
 
+  // Live UX bug, 2026-09-22: "Change password" used to always be a plain link, kicking the user
+  // out of this dialog even when the dialog was the one thing that opened it — see
+  // ForgotPlatformAccountPasswordController's own Javadoc for the full fix this button's own
+  // hx-get/hx-target/hx-swap attributes (rendered only when insideDialog) are the other half of.
+  @Test
+  void changePasswordLinkIsHtmxEnhancedOnlyWhenInsideTheDialog() throws Exception {
+    mockMvc
+        .perform(get("/platform/account").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString("hx-get=\"/platform/forgot-password\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "hx-target=\"#manage-account-dialog-body\"")));
+  }
+
+  // Not a blanket "no hx-get anywhere" check: the sidebar's own "Manage account" trigger
+  // (dashboard-nav.html) always carries its own hx-get="/platform/account" to lazy-load the
+  // dialog in the first place — present on every page, including this standalone one. Checking
+  // specifically for the absence of "Change password"'s own hx-get="/platform/forgot-password".
+  @Test
+  void changePasswordLinkIsAPlainLinkOnTheStandalonePage() throws Exception {
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(
+                            "hx-get=\"/platform/forgot-password\""))));
+  }
+
   @Test
   void postProfileUpdatesNameAndRedirects() throws Exception {
     mockMvc
@@ -162,6 +199,72 @@ class PlatformAccountProfileControllerTest {
         .perform(post("/platform/account/picture/remove"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/platform/account?removed"));
+
+    verify(removePicture).handle(account.id());
+  }
+
+  // Live UX bug, 2026-09-22: submitting any of this dialog's own forms used to do a full browser
+  // navigation to this controller's own standalone page — the exact opposite of what a "Save"
+  // click inside a dialog should do. An htmx-originated POST (HX-Request present, exactly what
+  // manage-account.html's own forms now send) must re-render the fragment in place instead of
+  // redirecting — see PlatformAccountProfileController's own Javadoc for the full fix.
+  @Test
+  void postProfileWithHxRequestHeaderReRendersTheFragmentInsteadOfRedirecting() throws Exception {
+    mockMvc
+        .perform(
+            post("/platform/account/profile")
+                .header("HX-Request", "true")
+                .param("firstName", "Ada")
+                .param("lastName", "Lovelace"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Your profile was updated.")));
+
+    org.assertj.core.api.Assertions.assertThat(account.firstName()).contains("Ada");
+    verify(accounts).save(account);
+  }
+
+  @Test
+  void postPictureWithHxRequestHeaderReRendersTheFragmentInsteadOfRedirecting() throws Exception {
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.png", "image/png", new byte[] {1, 2, 3});
+
+    mockMvc
+        .perform(multipart("/platform/account/picture").file(file).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Your profile was updated.")));
+
+    verify(updatePicture).handle(any());
+  }
+
+  @Test
+  void postPictureWithHxRequestHeaderStillReRendersTheFragmentOnAnInvalidUpload() throws Exception {
+    doThrow(new InvalidProfilePictureException("Unsupported image type: image/svg+xml"))
+        .when(updatePicture)
+        .handle(any());
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.svg", "image/svg+xml", new byte[] {1});
+
+    mockMvc
+        .perform(multipart("/platform/account/picture").file(file).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Unsupported image type")));
+  }
+
+  @Test
+  void postRemoveWithHxRequestHeaderReRendersTheFragmentInsteadOfRedirecting() throws Exception {
+    mockMvc
+        .perform(post("/platform/account/picture/remove").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.containsString("Your profile picture was removed.")));
 
     verify(removePicture).handle(account.id());
   }
