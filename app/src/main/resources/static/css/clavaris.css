@@ -82,6 +82,10 @@
   --clavaris-canvas: #f5f5f2;
   --clavaris-highlight: #fff4d8;
 
+  /* SDE-III refactor, 2026-09-22 — Workspaces/Users/Logs/Configure's own shared content min-height
+     (clavaris-org-tab-content's own comment below has the full rationale). */
+  --clavaris-org-tab-min-height: 480px;
+
   color-scheme: light;
 }
 
@@ -1284,8 +1288,9 @@ code {
    .clavaris-configure-content and the other three tabs' own content section share this exact same
    value, so none of the four ever renders shorter than Configure, and Configure itself never jumps
    between its own six sub-pages (Secret Keys/OAuth Clients/Signing Keys/Webhook Endpoints/Rate
-   Limit/Danger Zone) either, since they all already share this one class. */
-:root { --clavaris-org-tab-min-height: 480px; }
+   Limit/Danger Zone) either, since they all already share this one class. --clavaris-org-tab-min-
+   height itself lives in the single shared :root block at the top of this file, not redeclared
+   here, to avoid a second :root selector SonarCloud flags as a duplicate. */
 .clavaris-org-tab-content { min-height: var(--clavaris-org-tab-min-height); }
 .clavaris-configure-content { min-width: 0; min-height: var(--clavaris-org-tab-min-height); }
 
