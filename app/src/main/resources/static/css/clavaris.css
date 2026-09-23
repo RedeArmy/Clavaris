@@ -1307,16 +1307,26 @@ code {
 .clavaris-manage-account__nav { display: flex; flex-direction: column; gap: 2px; padding: 28px 12px; border-right: 1px solid var(--clavaris-border); }
 .clavaris-manage-account__nav label { padding: 9px 14px; color: var(--clavaris-text-muted); font-size: .88rem; font-weight: 550; cursor: pointer; border-radius: var(--radius-sm); }
 .clavaris-manage-account__nav label:hover { color: var(--clavaris-text-primary); background: var(--clavaris-bg); }
-.clavaris-manage-account__panel { display: none; padding: 28px; }
+/* Live UX bug, 2026-09-22: panels used to toggle display:none/block per active tab — since
+   display:none removes a panel from layout entirely, the grid row's height (and, via the grid's
+   own default align-items: stretch, the nav column's stretched height right along with it) tracked
+   only the ACTIVE panel's own content height, visibly growing or shrinking the whole two-pane box
+   — nav included — on every tab switch (most visible once the Profile panel grew past Settings/
+   OAuth's own height, adding the Username/Phone number fields). Stacking every panel in the same
+   grid cell (shared grid-area) keeps every panel — active or not — counted toward the row's auto
+   height even while hidden via visibility instead of display, so the row (and the nav's own
+   stretched height) is always sized to the TALLEST panel and never changes as the active tab
+   changes. */
+.clavaris-manage-account__body { display: grid; min-width: 0; }
+.clavaris-manage-account__panel { grid-area: 1 / 1; visibility: hidden; padding: 28px; }
 #clavaris-tab-profile:checked ~ .clavaris-manage-account__body #clavaris-panel-profile,
 #clavaris-tab-security:checked ~ .clavaris-manage-account__body #clavaris-panel-security,
 #clavaris-tab-settings:checked ~ .clavaris-manage-account__body #clavaris-panel-settings,
-#clavaris-tab-oauth:checked ~ .clavaris-manage-account__body #clavaris-panel-oauth { display: block; }
+#clavaris-tab-oauth:checked ~ .clavaris-manage-account__body #clavaris-panel-oauth { visibility: visible; }
 #clavaris-tab-profile:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-profile"],
 #clavaris-tab-security:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-security"],
 #clavaris-tab-settings:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-settings"],
 #clavaris-tab-oauth:checked ~ .clavaris-manage-account__nav label[for="clavaris-tab-oauth"] { color: var(--clavaris-text-primary); background: var(--clavaris-bg); }
-.clavaris-manage-account__body { min-width: 0; }
 .clavaris-connected-account { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: .88rem; }
 
 /* Live UX bug, 2026-09-22: identity/fragments/forgot-password-form.html's own .clavaris-card
