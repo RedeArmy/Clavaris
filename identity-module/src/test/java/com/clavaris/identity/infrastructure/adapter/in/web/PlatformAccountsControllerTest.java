@@ -169,13 +169,14 @@ class PlatformAccountsControllerTest {
   // (pointing at this Organization's own Workspaces tab) was redundant with the org-tabs row
   // immediately below it — replaced by the general "Back to Your Organizations" link that
   // org-tabs.html's own fragment now renders on every tab, asserted here via the same markup this
-  // page actually emits.
+  // page actually emits. Restyled as a real button (clavaris-org-tabs__back, 2026-09-23 live UX
+  // request) instead of clavaris-back-link's own plain-text styling.
   @Test
   void showsAGeneralBackLinkToTheOrganizationsList() throws Exception {
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("clavaris-back-link")))
+        .andExpect(content().string(containsString("clavaris-org-tabs__back")))
         .andExpect(content().string(containsString("Back to Your Organizations")))
         .andExpect(content().string(containsString("href=\"/platform/dashboard\"")));
   }
