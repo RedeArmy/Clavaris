@@ -165,17 +165,19 @@ class PlatformAccountsControllerTest {
         .andExpect(content().string(containsString(usersPath + "/delete")));
   }
 
+  // SDE-III refactor, 2026-09-22: the old per-organization "Back to {organizationName}" link
+  // (pointing at this Organization's own Workspaces tab) was redundant with the org-tabs row
+  // immediately below it — replaced by the general "Back to Your Organizations" link that
+  // org-tabs.html's own fragment now renders on every tab, asserted here via the same markup this
+  // page actually emits.
   @Test
-  void showsABackLinkToTheOrganization() throws Exception {
+  void showsAGeneralBackLinkToTheOrganizationsList() throws Exception {
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("clavaris-back-link")))
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "href=\"/platform/dashboard/organizations/" + organizationId + "\"")));
+        .andExpect(content().string(containsString("Back to Your Organizations")))
+        .andExpect(content().string(containsString("href=\"/platform/dashboard\"")));
   }
 
   @Test

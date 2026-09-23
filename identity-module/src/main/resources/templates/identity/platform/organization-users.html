@@ -8,7 +8,12 @@
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organizationId})}, 'Back to ' + ${organizationName})}"></div>
+            <!-- SDE-III refactor, 2026-09-22: the old "Back to {organizationName}" link here (identity/
+                 platform/fragments/back-link.html) pointed at the Workspaces tab — redundant with, and
+                 easily confused for, the tab row two lines below (org-tabs.html), since Workspaces is
+                 already one click away via the tabs themselves. See org-tabs.html's own fragment for
+                 the general "Back to Your Organizations" link that replaces it, shared by every tab
+                 instead of re-added here on its own. -->
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
@@ -33,8 +38,13 @@
             <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity. Pagination stays
                  HTMX (same TD-PERF-020 convention as every sibling list); create is a plain form
                  POST inside a &lt;dialog&gt;, not HTMX — see PlatformAccountsController's own
-                 Javadoc for why. -->
-            <div id="users-content" th:fragment="users" class="clavaris-section">
+                 Javadoc for why.
+
+                 SDE-III refactor, 2026-09-22: clavaris-org-tab-content shares one fixed min-height
+                 with Workspaces/Logs/Configure's own content regions (clavaris.css's own comment)
+                 so navigating between org-tabs.html's four tabs no longer resizes the page to match
+                 whichever tab's data happens to be shorter or taller. -->
+            <div id="users-content" th:fragment="users" class="clavaris-section clavaris-org-tab-content">
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(users)}">
                     <p class="clavaris-empty-state">No users yet — create the first one above.</p>
                 </div>

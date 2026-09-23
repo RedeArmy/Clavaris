@@ -82,6 +82,10 @@
   --clavaris-canvas: #f5f5f2;
   --clavaris-highlight: #fff4d8;
 
+  /* SDE-III refactor, 2026-09-22 — Workspaces/Users/Logs/Configure's own shared content min-height
+     (clavaris-org-tab-content's own comment below has the full rationale). */
+  --clavaris-org-tab-min-height: 480px;
+
   color-scheme: light;
 }
 
@@ -1272,11 +1276,29 @@ code {
 .clavaris-configure-sidebar a.clavaris-configure-sidebar-danger { color: var(--clavaris-danger); }
 .clavaris-configure-sidebar a.clavaris-configure-sidebar-danger:hover,
 .clavaris-configure-sidebar a.clavaris-configure-sidebar-danger.active { background: var(--clavaris-danger-bg); color: var(--clavaris-danger); }
-.clavaris-configure-content { min-width: 0; }
+/* SDE-III refactor, 2026-09-22 — Workspaces/Users/Logs/Configure (org-tabs.html) are four separate
+   full-page navigations, not an in-page tab toggle, so the .clavaris-manage-account "stack every
+   panel in one grid cell" trick (which needs every panel present in the same DOM at once) doesn't
+   apply — each tab's own markup never coexists with another's. Switching tabs was visibly growing
+   or shrinking the whole page to match whichever tab's own data happened to be shorter or taller
+   (an empty Workspaces list vs. a long paginated Users table, for instance).
+   --clavaris-org-tab-min-height gives every tab's own content region the same explicit min-height
+   floor instead, calibrated to Configure's own typical rendered height (its "Create a new Secret
+   Key" card is the tallest of Configure's own sub-pages with no data yet) — Configure's own
+   .clavaris-configure-content and the other three tabs' own content section share this exact same
+   value, so none of the four ever renders shorter than Configure, and Configure itself never jumps
+   between its own six sub-pages (Secret Keys/OAuth Clients/Signing Keys/Webhook Endpoints/Rate
+   Limit/Danger Zone) either, since they all already share this one class. --clavaris-org-tab-min-
+   height itself lives in the single shared :root block at the top of this file, not redeclared
+   here, to avoid a second :root selector SonarCloud flags as a duplicate. */
+.clavaris-org-tab-content { min-height: var(--clavaris-org-tab-min-height); }
+.clavaris-configure-content { min-width: 0; min-height: var(--clavaris-org-tab-min-height); }
 
 @media (max-width: 800px) {
   .clavaris-configure-layout { grid-template-columns: 1fr; }
   .clavaris-configure-sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
+  .clavaris-org-tab-content,
+  .clavaris-configure-content { min-height: auto; }
 }
 
 .clavaris-empty-state-card { padding: 0; overflow: hidden; }

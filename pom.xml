@@ -132,8 +132,18 @@
         <!-- Each bounded-context module owns a local dashboard-nav.html so its standalone
              Thymeleaf tests can render without a cross-module runtime dependency. This is
              intentional resource duplication, not duplicated product logic; keep CPD enabled for
-             every other source file and exclude only these four module-local adapters. -->
-        <sonar.cpd.exclusions>**/platform/fragments/dashboard-nav.html</sonar.cpd.exclusions>
+             every other source file and exclude only these module-local adapters.
+
+             org-tabs.html joined this exclusion 2026-09-22 (SonarCloud: 21.2% New Code duplication,
+             40.0%/6 lines flagged identically across all four module copies) — same rationale, same
+             "no module here declares a Maven dependency on another" constraint org-tabs.html's own
+             header comment documents; the fragment's own general "Back to Your Organizations" link,
+             hand-duplicated across identical copies that same day, is what pushed it over
+             SonarCloud's threshold this time. -->
+        <sonar.cpd.exclusions>
+            **/platform/fragments/dashboard-nav.html,
+            **/platform/fragments/org-tabs.html
+        </sonar.cpd.exclusions>
     </properties>
 
     <!--
