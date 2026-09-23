@@ -99,7 +99,7 @@
              fails the gate). 11.0.25 confirmed present on Maven Central
              (11.0.26 is not, as of this writing) — this is the latest
              available patch release, not an arbitrary bump. -->
-        <tomcat.version>11.0.25</tomcat.version>
+        <tomcat.version>11.0.26</tomcat.version>
         <!-- ADR-0026: identity-module's own SupabaseS3ProfilePictureStorage adapter talks to
              Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
              Supabase SDK dependency needed, same "build on vetted foundations" posture as every
