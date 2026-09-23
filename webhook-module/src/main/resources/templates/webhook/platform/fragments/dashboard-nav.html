@@ -35,4 +35,16 @@
         </div>
         <div id="manage-account-dialog-body">Loading&hellip;</div>
     </dialog>
+    <!-- Live bug, 2026-09-22: this sidebar's own "Manage account" trigger needs both
+         scripts below unconditionally (htmx for its own hx-get, organization-dialog.js for
+         data-dialog-open/-close on its own dialog) — previously each page decided whether to
+         load them based only on its own content's needs, blind to this shared fragment's own
+         requirements. Result: on every page whose own author had no other reason to load
+         either script, "Manage account" silently failed — the dialog either opened (native
+         <dialog> markup, JS-independent) and stuck on "Loading..." forever (htmx missing), or
+         never opened at all (organization-dialog.js missing too). Loading both here, once,
+         guarantees every page that includes this fragment gets them — the now-redundant
+         standalone tags these replace have been removed from every page that had them. -->
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
 </aside>

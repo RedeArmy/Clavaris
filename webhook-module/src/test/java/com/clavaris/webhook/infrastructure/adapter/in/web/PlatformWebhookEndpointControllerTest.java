@@ -1,5 +1,6 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -7,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -124,6 +126,22 @@ class PlatformWebhookEndpointControllerTest {
 
   private static KeysetCursor cursorOf(final WebhookEndpoint endpoint) {
     return new KeysetCursor(endpoint.createdAt(), endpoint.id());
+  }
+
+  // Live bug, 2026-09-22: the shared sidebar's own "Manage account" trigger needs htmx.min.js
+  // and organization-dialog.js unconditionally, but every page used to opt into loading them
+  // independently based only on its own content's needs — sibling pages missing one or both
+  // (account-profile.html, account-sessions.html, account-audit-log.html,
+  // organization-danger-zone.html) silently broke "Manage account" there. Both scripts now load
+  // from inside dashboard-nav.html itself (webhook-module's own copy) — asserting they're
+  // present here locks that fix in, not just documents it.
+  @Test
+  void sidebarLoadsBothScriptsManageAccountNeeds() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/js/htmx.min.js")))
+        .andExpect(content().string(containsString("/js/organization-dialog.js")));
   }
 
   @Test

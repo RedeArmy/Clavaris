@@ -106,6 +106,22 @@ class PlatformAccountsControllerTest {
     return new KeysetCursor(account.createdAt(), account.id().value());
   }
 
+  // Live bug, 2026-09-22: the shared sidebar's own "Manage account" trigger needs htmx.min.js
+  // and organization-dialog.js unconditionally, but every page used to opt into loading them
+  // independently based only on its own content's needs — this page happened to have neither
+  // missing, but sibling pages did (account-profile.html, account-sessions.html,
+  // account-audit-log.html, organization-danger-zone.html), silently breaking "Manage account"
+  // there. Both scripts now load from inside dashboard-nav.html itself (identity-module's own
+  // copy) — asserting they're present here locks that fix in, not just documents it.
+  @Test
+  void sidebarLoadsBothScriptsManageAccountNeeds() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/js/htmx.min.js")))
+        .andExpect(content().string(containsString("/js/organization-dialog.js")));
+  }
+
   @Test
   void showsTheOrganizationsUsers() throws Exception {
     Account account = sampleAccount();
