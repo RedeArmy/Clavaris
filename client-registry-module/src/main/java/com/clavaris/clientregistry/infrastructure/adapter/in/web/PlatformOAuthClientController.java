@@ -85,6 +85,7 @@ public class PlatformOAuthClientController {
       "clientregistry/platform/organization-oauth-client-detail";
   private static final String DETAIL_FRAGMENT = DETAIL_VIEW + " :: detail";
   private static final String REDIRECT_SETTINGS_FORM_ATTRIBUTE = "redirectSettingsForm";
+  private static final String REDIRECT_URIS_ERROR_ATTRIBUTE = "redirectUrisError";
   private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
 
@@ -346,6 +347,26 @@ public class PlatformOAuthClientController {
     final DashboardControllerSupport.OwnedOrganization owned =
         DashboardControllerSupport.requireOwnedOrganization(
             request, organizationId, currentPlatformAccount, organizationResolver);
+
+    // Live UX request, 2026-09-24: at least one real redirect URI is required to actually SAVE —
+    // without one, /authorize has nothing to match against for this client's own
+    // authorization_code grant (BR-CLIENT-01), the primary reason an OAuthClient exists at all.
+    // Web-layer-only, not a domain rule: OAuthClient itself still allows zero (the auto-
+    // provisioned client's own genuine "not configured yet" state, BR-ORG-06) — this only gates
+    // the owner's own deliberate Save action, not every state a client can transiently be in.
+    // postLogoutRedirectUris carries no equivalent requirement — SAS's own bare default already
+    // covers "not configured" for RP-Initiated Logout (OAuthClient's own constructor comment).
+    if (form.parseRedirectUris().isEmpty()) {
+      populateDetailModel(
+          model,
+          organizationId,
+          owned.organizationName(),
+          requireOwnedClient(organizationId, clientId),
+          form);
+      model.addAttribute(
+          REDIRECT_URIS_ERROR_ATTRIBUTE, "At least one redirect URI is required to save.");
+      return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
+    }
 
     try {
       updateRedirectSettings.handle(

@@ -402,9 +402,12 @@ class PlatformOAuthClientControllerTest {
     mockMvc
         .perform(
             post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris", "https://example.com/callback")
                 .header("HX-Request", "true"))
         .andExpect(status().isOk())
         .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+
+    verify(updateRedirectSettings).handle(any());
   }
 
   @Test
@@ -417,7 +420,13 @@ class PlatformOAuthClientControllerTest {
         .handle(any());
 
     mockMvc
-        .perform(post(basePath() + "/test_someone_elses/redirect-settings"))
+        .perform(
+            post(basePath() + "/test_someone_elses/redirect-settings")
+                // A real redirect URI, so this genuinely reaches the use case below — the
+                // at-least-one-required check added 2026-09-24 would otherwise 200/render an
+                // error before ever calling it, and this test would stop proving what it claims
+                // to.
+                .param("redirectUris", "https://example.com/callback"))
         .andExpect(status().isNotFound());
   }
 
@@ -432,6 +441,57 @@ class PlatformOAuthClientControllerTest {
             post(basePath() + "/test_abc/redirect-settings")
                 .param("redirectUris", "not a uri at all ::"))
         .andExpect(status().isBadRequest());
+  }
+
+  // Live UX request, 2026-09-24: at least one real redirect URI is required to save — without
+  // one, /authorize has nothing to match against for this client's own authorization_code grant
+  // (BR-CLIENT-01). Web-layer-only (the domain itself still allows zero — the auto-provisioned
+  // client's own genuine "not configured yet" state); confirmed by never calling the use case.
+  @Test
+  void updateRedirectSettingsRejectsAnEmptyRedirectUriListWithoutCallingTheUseCase()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/redirect-settings"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW))
+        .andExpect(
+            content().string(containsString("At least one redirect URI is required to save.")));
+
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void updateRedirectSettingsRejectsAllBlankRedirectUriRowsTheSameAsTrulyEmpty() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris[0]", "   "))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW));
+
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  // postLogoutRedirectUris carries no equivalent requirement — SAS's own bare default already
+  // covers "not configured" for RP-Initiated Logout.
+  @Test
+  void updateRedirectSettingsSucceedsWithAnEmptyPostLogoutRedirectUriList() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris", "https://example.com/callback"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(updateRedirectSettings).handle(any());
   }
 
   // Live UX request, 2026-09-24 — real add/remove-row list UI, not a one-entry-per-line textarea.

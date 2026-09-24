@@ -183,6 +183,11 @@
 
                             <div class="clavaris-field">
                                 <span id="redirect-uris-label">Redirect URIs</span>
+                                <!-- Live UX request, 2026-09-24: at least one real redirect URI is
+                                     required to save (web-layer-only — see
+                                     PlatformOAuthClientController#updateRedirectSettings's own
+                                     comment for why the domain itself still allows zero). -->
+                                <p class="clavaris-field-error" th:if="${redirectUrisError}" th:text="${redirectUrisError}">Redirect URIs error</p>
                                 <div role="group" aria-labelledby="redirect-uris-label">
                                     <div class="clavaris-uri-row" th:each="uri, rowStat : *{redirectUris}">
                                         <label th:for="${'redirectUri' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Redirect URI ' + (rowStat.index + 1)">Redirect URI</label>
