@@ -24,17 +24,17 @@ import org.springframework.stereotype.Component;
 @Component
 class CreateOrganizationOAuthClientBridge implements OAuthClientProvisioner {
 
-  private final RegisterOAuthClientUseCase registerOAuthClient;
+  private final RegisterOAuthClientUseCase registerClient;
 
   /* package */ CreateOrganizationOAuthClientBridge(
-      final RegisterOAuthClientUseCase registerOAuthClient) {
-    this.registerOAuthClient = registerOAuthClient;
+      final RegisterOAuthClientUseCase registerClient) {
+    this.registerClient = registerClient;
   }
 
   @Override
   public ProvisionedOAuthClient provisionFor(final UUID organizationId, final AuditActor actor) {
     final RegisterOAuthClientResult result =
-        registerOAuthClient.handle(
+        registerClient.handle(
             new RegisterOAuthClientCommand(
                 organizationId,
                 List.of(),
