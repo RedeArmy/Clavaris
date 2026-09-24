@@ -69,6 +69,13 @@
                             <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}(organizationId=${organizationId},clientId=${client.clientId()})}">
                                 <code th:text="${client.clientId()}">client id</code>
                             </a>
+                            <!-- Live UX request, 2026-09-24: scoped to end-user login specifically —
+                                 a client with no redirect URI is a genuinely valid state
+                                 (client_credentials works fine without one, BR-ORG-06), so this
+                                 never reads as "this client is broken." See the detail page's own
+                                 identical warning for the full reasoning. -->
+                            <span class="clavaris-badge clavaris-badge--warning" th:if="${#lists.isEmpty(client.redirectUris())}"
+                                  title="End-user login (authorization_code) won't work until a redirect URI is added">No redirect URI</span>
                         </td>
                         <td>
                             <span class="clavaris-badge"

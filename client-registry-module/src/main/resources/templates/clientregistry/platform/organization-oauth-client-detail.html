@@ -23,8 +23,8 @@
                 <!-- SDE-III refactor, 2026-09-23 (BR-ORG-06, Clerk-parity master-detail redesign): one
                      client's own settings page — the Clerk "API keys"-style single-app view this whole
                      redesign is modeled on. Every OAuthClient now registers with fixed, non-user-chosen
-                     grant types/scopes/consent (OAuthClientDefaults); the "Redirect settings" card below
-                     is the only editable section on this page — everything above it is read-only, by
+                     grant types/scopes/consent (OAuthClientDefaults); the redirect-URI card further down
+                     is the only editable section on this page — everything else is read-only, by
                      design, not because a control was forgotten. -->
                 <div id="client-detail-content" th:fragment="detail" class="clavaris-configure-content">
                     <div class="clavaris-page-header">
@@ -82,6 +82,95 @@
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
                             </form>
                         </div>
+                    </div>
+
+                    <!-- BR-ORG-06: the one section on this page an Organization owner may actually
+                         edit — redirectUris/postLogoutRedirectUris stay unbounded lists (Clerk-parity
+                         check against its own multi-entry "Redirect URIs" field).
+
+                         Live UX request, 2026-09-24: a real add/remove-row list, not a one-entry-
+                         per-line textarea — one input per URI, matching Clerk's own list UI. HTML
+                         forbids nesting form elements, so each row's own "Remove" button (and the
+                         "Add" button below each list) targets its own URL via formaction/hx-post
+                         instead of a second form — clicking it still submits every OTHER row's own
+                         already-typed value alongside it (a plain form submit always includes every
+                         field inside it, not just the button clicked), so nothing typed elsewhere is
+                         lost. None of these buttons touch the domain — see
+                         PlatformOAuthClientController's own addRedirectUriRow/removeRedirectUriRow
+                         (and their post-logout siblings) Javadoc: only the form's own default action
+                         ("Save redirect settings" below) actually persists. formnovalidate on every
+                         add/remove button: an in-progress blank row elsewhere in the list must never
+                         block Add/Remove the way it correctly blocks the real Save.
+
+                         Live UX request, 2026-09-24 (card reordered, second position): this is the
+                         one thing an owner is likely to actually DO right after creating a client —
+                         moved up from below "Configuration" so it's the first actionable card after
+                         the credentials themselves, not buried under two read-only/reference ones. A
+                         scoped warning (not an error — a client with zero redirect URIs is a
+                         genuinely valid state, client_credentials works fine) appears only when the
+                         list is empty, naming exactly what's affected (end-user login) rather than
+                         implying the whole client or Organization is broken — see the chat's own
+                         "webhooks vs. redirect URIs" analysis for why this can't be worded more
+                         broadly: a webhook-only consumer has nothing to fix here at all. -->
+                    <div class="clavaris-section-card">
+                        <h2>Redirect settings</h2>
+                        <p class="clavaris-alert clavaris-alert--warning" th:if="${#lists.isEmpty(client.redirectUris())}">
+                            No redirect URI configured yet — end-user login (authorization_code) won't
+                            work for this client until you add one below. Machine-to-machine calls
+                            (client_credentials) already work without one.
+                        </p>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              th:object="${redirectSettingsForm}" method="post"
+                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              hx-target="#client-detail-content" hx-swap="outerHTML">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                            <div class="clavaris-field">
+                                <span id="redirect-uris-label">Redirect URIs</span>
+                                <!-- Live UX request, 2026-09-24: at least one real redirect URI is
+                                     required to save (web-layer-only — see
+                                     PlatformOAuthClientController#updateRedirectSettings's own
+                                     comment for why the domain itself still allows zero). -->
+                                <p class="clavaris-field-error" th:if="${redirectUrisError}" th:text="${redirectUrisError}">Redirect URIs error</p>
+                                <div role="group" aria-labelledby="redirect-uris-label">
+                                    <div class="clavaris-uri-row" th:each="uri, rowStat : *{redirectUris}">
+                                        <label th:for="${'redirectUri' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Redirect URI ' + (rowStat.index + 1)">Redirect URI</label>
+                                        <input type="text" th:id="${'redirectUri' + rowStat.index}"
+                                               th:field="*{redirectUris[__${rowStat.index}__]}"
+                                               placeholder="https://jobseeker.example.com/callback"/>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
+                                                th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
+                                                th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
+                                                hx-target="#client-detail-content" hx-swap="outerHTML">Remove</button>
+                                    </div>
+                                </div>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
+                                        th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                        th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                        hx-target="#client-detail-content" hx-swap="outerHTML">+ Add redirect URI</button>
+                            </div>
+
+                            <div class="clavaris-field">
+                                <span id="post-logout-uris-label">Post-logout redirect URIs (optional)</span>
+                                <div role="group" aria-labelledby="post-logout-uris-label">
+                                    <div class="clavaris-uri-row" th:each="uri, rowStat : *{postLogoutRedirectUris}">
+                                        <label th:for="${'postLogoutUri' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Post-logout redirect URI ' + (rowStat.index + 1)">Post-logout redirect URI</label>
+                                        <input type="text" th:id="${'postLogoutUri' + rowStat.index}"
+                                               th:field="*{postLogoutRedirectUris[__${rowStat.index}__]}"/>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
+                                                th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
+                                                th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
+                                                hx-target="#client-detail-content" hx-swap="outerHTML">Remove</button>
+                                    </div>
+                                </div>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
+                                        th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                        th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                        hx-target="#client-detail-content" hx-swap="outerHTML">+ Add post-logout redirect URI</button>
+                            </div>
+
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Save redirect settings</button>
+                        </form>
                     </div>
 
                     <!-- Clerk-style "here's exactly what to put in your app" panel — permanent on this
@@ -154,79 +243,6 @@
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-
-                    <!-- BR-ORG-06: the one section on this page an Organization owner may actually
-                         edit — redirectUris/postLogoutRedirectUris stay unbounded lists (Clerk-parity
-                         check against its own multi-entry "Redirect URIs" field).
-
-                         Live UX request, 2026-09-24: a real add/remove-row list, not a one-entry-
-                         per-line textarea — one input per URI, matching Clerk's own list UI. HTML
-                         forbids nesting form elements, so each row's own "Remove" button (and the
-                         "Add" button below each list) targets its own URL via formaction/hx-post
-                         instead of a second form — clicking it still submits every OTHER row's own
-                         already-typed value alongside it (a plain form submit always includes every
-                         field inside it, not just the button clicked), so nothing typed elsewhere is
-                         lost. None of these buttons touch the domain — see
-                         PlatformOAuthClientController's own addRedirectUriRow/removeRedirectUriRow
-                         (and their post-logout siblings) Javadoc: only the form's own default action
-                         ("Save redirect settings" below) actually persists. formnovalidate on every
-                         add/remove button: an in-progress blank row elsewhere in the list must never
-                         block Add/Remove the way it correctly blocks the real Save. -->
-                    <div class="clavaris-section-card">
-                        <h2>Redirect settings</h2>
-                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
-                              th:object="${redirectSettingsForm}" method="post"
-                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
-                              hx-target="#client-detail-content" hx-swap="outerHTML">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-
-                            <div class="clavaris-field">
-                                <span id="redirect-uris-label">Redirect URIs</span>
-                                <!-- Live UX request, 2026-09-24: at least one real redirect URI is
-                                     required to save (web-layer-only — see
-                                     PlatformOAuthClientController#updateRedirectSettings's own
-                                     comment for why the domain itself still allows zero). -->
-                                <p class="clavaris-field-error" th:if="${redirectUrisError}" th:text="${redirectUrisError}">Redirect URIs error</p>
-                                <div role="group" aria-labelledby="redirect-uris-label">
-                                    <div class="clavaris-uri-row" th:each="uri, rowStat : *{redirectUris}">
-                                        <label th:for="${'redirectUri' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Redirect URI ' + (rowStat.index + 1)">Redirect URI</label>
-                                        <input type="text" th:id="${'redirectUri' + rowStat.index}"
-                                               th:field="*{redirectUris[__${rowStat.index}__]}"
-                                               placeholder="https://jobseeker.example.com/callback"/>
-                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
-                                                th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
-                                                th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
-                                                hx-target="#client-detail-content" hx-swap="outerHTML">Remove</button>
-                                    </div>
-                                </div>
-                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
-                                        th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
-                                        th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
-                                        hx-target="#client-detail-content" hx-swap="outerHTML">+ Add redirect URI</button>
-                            </div>
-
-                            <div class="clavaris-field">
-                                <span id="post-logout-uris-label">Post-logout redirect URIs (optional)</span>
-                                <div role="group" aria-labelledby="post-logout-uris-label">
-                                    <div class="clavaris-uri-row" th:each="uri, rowStat : *{postLogoutRedirectUris}">
-                                        <label th:for="${'postLogoutUri' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Post-logout redirect URI ' + (rowStat.index + 1)">Post-logout redirect URI</label>
-                                        <input type="text" th:id="${'postLogoutUri' + rowStat.index}"
-                                               th:field="*{postLogoutRedirectUris[__${rowStat.index}__]}"/>
-                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
-                                                th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
-                                                th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/remove/{index}(organizationId=${organizationId},clientId=${client.clientId()},index=${rowStat.index})}"
-                                                hx-target="#client-detail-content" hx-swap="outerHTML">Remove</button>
-                                    </div>
-                                </div>
-                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit" formnovalidate
-                                        th:formaction="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
-                                        th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings/post-logout-redirect-uris/add(organizationId=${organizationId},clientId=${client.clientId()})}"
-                                        hx-target="#client-detail-content" hx-swap="outerHTML">+ Add post-logout redirect URI</button>
-                            </div>
-
-                            <button class="clavaris-button clavaris-button--inline" type="submit">Save redirect settings</button>
-                        </form>
                     </div>
                 </div>
             </div>

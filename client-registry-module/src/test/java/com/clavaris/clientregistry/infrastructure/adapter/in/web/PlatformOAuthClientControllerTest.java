@@ -160,6 +160,45 @@ class PlatformOAuthClientControllerTest {
         .andExpect(model().attribute("clients", List.of(client)));
   }
 
+  // Live UX request, 2026-09-24 — scoped warning: a client with no redirect URI is a genuinely
+  // valid state (client_credentials still works), so the list only flags it, never implies the
+  // client itself is broken.
+  @Test
+  void showsANoRedirectUriBadgeForAClientThatHasNoneConfiguredYet() throws Exception {
+    OAuthClient clientWithNoRedirectUri =
+        OAuthClient.register(
+            organizationId,
+            "test_no_redirect",
+            "hashed-secret",
+            List.of(),
+            OAuthClientDefaults.GRANT_TYPES,
+            OAuthClientDefaults.SCOPES,
+            true,
+            List.of());
+    KeysetCursor cursor = cursorOf(clientWithNoRedirectUri);
+    when(listClientsPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(List.of(clientWithNoRedirectUri), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("No redirect URI")));
+  }
+
+  @Test
+  void doesNotShowTheNoRedirectUriBadgeForAClientThatAlreadyHasOne() throws Exception {
+    OAuthClient client = sampleClient();
+    KeysetCursor cursor = cursorOf(client);
+    when(listClientsPaged.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(client), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("No redirect URI"))));
+  }
+
   // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
   // query.
   @Test
@@ -201,6 +240,56 @@ class PlatformOAuthClientControllerTest {
         .andExpect(view().name(DETAIL_VIEW))
         .andExpect(model().attribute("client", client))
         .andExpect(model().attribute("organizationName", "Acme Co"));
+  }
+
+  // Live UX request, 2026-09-24 — reordering: "Redirect settings" moved up to right after
+  // "Client credentials" (the one actionable card, not buried under two read-only ones), and a
+  // scoped warning appears only when the client genuinely has no redirect URI yet.
+  @Test
+  void showsTheNoRedirectUriWarningAndPutsRedirectSettingsRightAfterCredentials() throws Exception {
+    OAuthClient clientWithNoRedirectUri =
+        OAuthClient.register(
+            organizationId,
+            "test_no_redirect",
+            "hashed-secret",
+            List.of(),
+            OAuthClientDefaults.GRANT_TYPES,
+            OAuthClientDefaults.SCOPES,
+            true,
+            List.of());
+    when(getClient.handle(any())).thenReturn(Optional.of(clientWithNoRedirectUri));
+
+    // Stops short of the banner's own em dash — this standalone MockMvc harness (no
+    // CharacterEncodingFilter wired, unlike the real app) doesn't decode getContentAsString() as
+    // UTF-8 by default, garbling non-ASCII characters; not a real rendering bug (the full app does
+    // set UTF-8), just this assertion staying within what the harness renders correctly.
+    MvcResult result =
+        mockMvc
+            .perform(get(basePath() + "/test_no_redirect"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("No redirect URI configured yet")))
+            .andReturn();
+
+    String body = result.getResponse().getContentAsString();
+    int credentialsIndex = body.indexOf("Client credentials");
+    int redirectSettingsIndex = body.indexOf("Redirect settings");
+    int setupInstructionsIndex = body.indexOf("Add these to your application");
+    int configurationIndex = body.indexOf("<h2>Configuration</h2>");
+    assertThat(credentialsIndex).isPositive();
+    assertThat(redirectSettingsIndex).isGreaterThan(credentialsIndex);
+    assertThat(setupInstructionsIndex).isGreaterThan(redirectSettingsIndex);
+    assertThat(configurationIndex).isGreaterThan(setupInstructionsIndex);
+  }
+
+  @Test
+  void doesNotShowTheNoRedirectUriWarningForAClientThatAlreadyHasOne() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/test_abc"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("No redirect URI configured yet"))));
   }
 
   @Test

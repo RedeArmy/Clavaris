@@ -443,6 +443,16 @@ label.clavaris-toggle {
   background: var(--clavaris-success-bg);
 }
 
+/* Live UX request, 2026-09-24 — OAuth Client detail page's own "no redirect URI configured yet"
+   notice: neither success nor error (a client with zero redirect URIs is a genuinely valid state,
+   BR-ORG-06 — client_credentials works fine; only authorization_code login is affected), so
+   reuses --clavaris-highlight (defined, unused until now) rather than stretching --error's own
+   red into a "heads up" tone it was never meant to carry. */
+.clavaris-alert--warning {
+  color: var(--clavaris-accent-hover);
+  background: var(--clavaris-highlight);
+}
+
 .clavaris-links {
   margin-top: var(--space-6);
   text-align: center;
@@ -786,6 +796,14 @@ code {
 .clavaris-badge--error {
   color: var(--clavaris-danger);
   background: var(--clavaris-danger-bg);
+}
+
+/* Live UX request, 2026-09-24 — OAuth Clients list's own "no redirect URI yet" marker, same
+   color pair as .clavaris-alert--warning's own identical reasoning (a genuinely valid state,
+   not an error). */
+.clavaris-badge--warning {
+  color: var(--clavaris-accent-hover);
+  background: var(--clavaris-highlight);
 }
 
 .clavaris-breadcrumb {
