@@ -15,6 +15,7 @@ import com.clavaris.organization.application.usecase.checkaccessrestrictionforor
 import com.clavaris.organization.application.usecase.checkaccessrestrictionfororganization.CheckAccessRestrictionForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationService;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
+import com.clavaris.organization.application.usecase.createorganization.OAuthClientProvisioner;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createorganization.PlatformAccountExistsChecker;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
@@ -123,11 +124,14 @@ class OrganizationUseCaseConfig {
   // operator has deliberately promoted it (createProductionEnvironmentUseCase below). Reuses the
   // exact same hardSystemWideCap value setRateLimitPolicyForOrganizationUseCase already injects
   // below — one config source of truth for the one invariant RateLimitPolicy itself enforces.
-  @SuppressWarnings("PMD.LongVariable")
+  // java:S107 — one parameter per collaborating port/config value, same rationale as
+  // CreateOrganizationService's own identical suppression.
+  @SuppressWarnings({"PMD.LongVariable", "java:S107"})
   @Bean
   /* package */ CreateOrganizationUseCase createOrganizationUseCase(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
+      final OAuthClientProvisioner oauthClientProvisioner,
       final PlatformAccountExistsChecker platformAccountExistsChecker,
       final AuditEventRecorder auditEvents,
       final RateLimitPolicyRepository policies,
@@ -138,6 +142,7 @@ class OrganizationUseCaseConfig {
     return new CreateOrganizationService(
         organizations,
         keyProvisioner,
+        oauthClientProvisioner,
         platformAccountExistsChecker,
         auditEvents,
         policies,

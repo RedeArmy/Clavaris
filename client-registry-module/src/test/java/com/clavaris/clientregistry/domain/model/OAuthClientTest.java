@@ -141,21 +141,23 @@ class OAuthClientTest {
                     List.of()));
   }
 
+  // SDE-III refactor, 2026-09-23: no longer rejected — an Organization's default OAuthClient is
+  // auto-provisioned before its owner has typed any redirect URI at all (BR-ORG-06). Empty is the
+  // genuine "not configured yet" state, same as postLogoutRedirectUris already allowed.
   @Test
-  void rejectsNoRedirectUrisAtAll() {
-    // BR-CLIENT-01's exact-match guarantee is meaningless with nothing to match against.
-    assertThatIllegalArgumentException()
-        .isThrownBy(
-            () ->
-                OAuthClient.register(
-                    organizationId,
-                    "a-client",
-                    "argon2id$hashed",
-                    List.of(),
-                    List.of("authorization_code"),
-                    List.of(),
-                    true,
-                    List.of()));
+  void acceptsNoRedirectUrisAtAllAsTheNotYetConfiguredState() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of(),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThat(client.redirectUris()).isEmpty();
   }
 
   @Test
@@ -462,6 +464,96 @@ class OAuthClientTest {
     assertThat(rotated.clientId()).isEqualTo(client.clientId());
     assertThat(rotated.active()).isEqualTo(client.active());
     assertThat(rotated.createdAt()).isEqualTo(client.createdAt());
+  }
+
+  // SDE-III refactor, 2026-09-23: updateRedirectSettings is the one post-creation mutation the
+  // dashboard exposes (BR-ORG-06) — replaces both lists wholesale, leaves everything else
+  // (allowedGrantTypes/allowedScopes/requireConsent/version/active) untouched.
+  @Test
+  void updateRedirectSettingsReplacesBothListsKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of(),
+            List.of("authorization_code", "client_credentials"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    OAuthClient updated =
+        client.updateRedirectSettings(
+            List.of("https://example.com/callback", "https://example.com/mobile-callback"),
+            List.of("https://example.com/logged-out"));
+
+    assertThat(updated.redirectUris())
+        .containsExactly("https://example.com/callback", "https://example.com/mobile-callback");
+    assertThat(updated.postLogoutRedirectUris()).containsExactly("https://example.com/logged-out");
+    assertThat(updated.allowedGrantTypes()).isEqualTo(client.allowedGrantTypes());
+    assertThat(updated.allowedScopes()).isEqualTo(client.allowedScopes());
+    assertThat(updated.requireConsent()).isEqualTo(client.requireConsent());
+    assertThat(updated.id()).isEqualTo(client.id());
+    assertThat(updated.active()).isEqualTo(client.active());
+  }
+
+  @Test
+  void updateRedirectSettingsCanClearBothListsBackToNotConfigured() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of("https://example.com/logged-out"));
+
+    OAuthClient updated = client.updateRedirectSettings(List.of(), List.of());
+
+    assertThat(updated.redirectUris()).isEmpty();
+    assertThat(updated.postLogoutRedirectUris()).isEmpty();
+  }
+
+  @Test
+  void updateRedirectSettingsRejectsAMalformedRedirectUri() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of(),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> client.updateRedirectSettings(List.of("not a uri at all ::"), List.of()));
+  }
+
+  @Test
+  void updateRedirectSettingsPreservesTheCurrentVersionRatherThanResettingIt() {
+    OAuthClient rehydrated =
+        OAuthClient.reconstitute(
+            UUID.randomUUID(),
+            organizationId,
+            "a-client",
+            "hash",
+            List.of(),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of(),
+            Instant.now(),
+            true,
+            5);
+
+    OAuthClient updated =
+        rehydrated.updateRedirectSettings(List.of("https://example.com/callback"), List.of());
+
+    assertThat(updated.version()).isEqualTo(5);
   }
 
   @Test

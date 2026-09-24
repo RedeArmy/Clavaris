@@ -110,7 +110,11 @@ class DeleteOrganizationIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(countOrganizations(organizationId)).isEqualTo(1);
     assertThat(countAccounts(organizationId)).isEqualTo(1);
     assertThat(countPasswordCredentials(accountId)).isEqualTo(1);
-    assertThat(countOAuthClients(organizationId)).isEqualTo(1);
+    // BR-ORG-06 (SDE-III refactor, 2026-09-23): CreateOrganizationService now also auto-provisions
+    // one default OAuthClient synchronously — 2, not 1: that one plus this test's own
+    // registerOAuthClient(...) call above, same "auto-provisioned + one more" shape
+    // countSigningKeys' own isGreaterThanOrEqualTo already anticipates for the signing key.
+    assertThat(countOAuthClients(organizationId)).isEqualTo(2);
     assertThat(countSigningKeys(organizationId))
         .as("CreateOrganizationService auto-provisions one active key")
         .isGreaterThanOrEqualTo(1);

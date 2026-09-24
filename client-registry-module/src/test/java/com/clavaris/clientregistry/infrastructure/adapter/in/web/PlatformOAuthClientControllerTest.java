@@ -1,13 +1,17 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,12 +19,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
+import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationQuery;
+import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listoauthclientspaged.ListOAuthClientsPagedUseCase;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientDefaults;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.KeysetCursor;
@@ -31,8 +40,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
@@ -40,16 +51,24 @@ import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 
 /**
  * Same standalone MockMvc + real Thymeleaf setup as {@code
- * PlatformOrganizationClientControllerTest}.
+ * PlatformOrganizationClientControllerTest}. Rewritten alongside the controller's own SDE-III
+ * refactor, 2026-09-23 (BR-ORG-06, Clerk-parity master-detail redesign) — "Add client" no longer
+ * takes a request body, and rotate-secret/deactivate/redirect-settings now all live on the new
+ * per-client detail page, not the list.
  */
 class PlatformOAuthClientControllerTest {
 
   private static final UUID OWNER_ID = UUID.randomUUID();
+  private static final String LIST_VIEW = "clientregistry/platform/organization-oauth-clients";
+  private static final String DETAIL_VIEW =
+      "clientregistry/platform/organization-oauth-client-detail";
 
   private RegisterOAuthClientUseCase registerClient;
   private ListOAuthClientsPagedUseCase listClientsPaged;
+  private GetOAuthClientForOrganizationUseCase getClient;
   private DeactivateOAuthClientUseCase deactivateClient;
   private RotateOAuthClientSecretUseCase rotateClientSecret;
+  private UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -59,8 +78,10 @@ class PlatformOAuthClientControllerTest {
   void setUp() {
     registerClient = mock(RegisterOAuthClientUseCase.class);
     listClientsPaged = mock(ListOAuthClientsPagedUseCase.class);
+    getClient = mock(GetOAuthClientForOrganizationUseCase.class);
     deactivateClient = mock(DeactivateOAuthClientUseCase.class);
     rotateClientSecret = mock(RotateOAuthClientSecretUseCase.class);
+    updateRedirectSettings = mock(UpdateOAuthClientRedirectSettingsUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -89,8 +110,10 @@ class PlatformOAuthClientControllerTest {
                 new PlatformOAuthClientController(
                     registerClient,
                     listClientsPaged,
+                    getClient,
                     deactivateClient,
                     rotateClientSecret,
+                    updateRedirectSettings,
                     organizationResolver,
                     currentPlatformAccount,
                     "https://clavaris.example.test"))
@@ -108,8 +131,8 @@ class PlatformOAuthClientControllerTest {
         "test_abc",
         "hashed-secret",
         List.of("https://jobseeker.example.com/callback"),
-        List.of(OAuthGrantTypeOptions.AUTHORIZATION_CODE),
-        List.of("openid"),
+        OAuthClientDefaults.GRANT_TYPES,
+        OAuthClientDefaults.SCOPES,
         true,
         List.of());
   }
@@ -132,9 +155,48 @@ class PlatformOAuthClientControllerTest {
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients"))
+        .andExpect(view().name(LIST_VIEW))
         .andExpect(model().attribute("organizationName", "Acme Co"))
         .andExpect(model().attribute("clients", List.of(client)));
+  }
+
+  // Live UX request, 2026-09-24 — scoped warning: a client with no redirect URI is a genuinely
+  // valid state (client_credentials still works), so the list only flags it, never implies the
+  // client itself is broken.
+  @Test
+  void showsANoRedirectUriBadgeForAClientThatHasNoneConfiguredYet() throws Exception {
+    OAuthClient clientWithNoRedirectUri =
+        OAuthClient.register(
+            organizationId,
+            "test_no_redirect",
+            "hashed-secret",
+            List.of(),
+            OAuthClientDefaults.GRANT_TYPES,
+            OAuthClientDefaults.SCOPES,
+            true,
+            List.of());
+    KeysetCursor cursor = cursorOf(clientWithNoRedirectUri);
+    when(listClientsPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(List.of(clientWithNoRedirectUri), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("No redirect URI")));
+  }
+
+  @Test
+  void doesNotShowTheNoRedirectUriBadgeForAClientThatAlreadyHasOne() throws Exception {
+    OAuthClient client = sampleClient();
+    KeysetCursor cursor = cursorOf(client);
+    when(listClientsPaged.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(client), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("No redirect URI"))));
   }
 
   // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
@@ -156,7 +218,7 @@ class PlatformOAuthClientControllerTest {
     mockMvc
         .perform(get(basePath()).header("HX-Request", "true"))
         .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients :: clients"));
+        .andExpect(view().name(LIST_VIEW + " :: clients"));
   }
 
   @Test
@@ -167,36 +229,138 @@ class PlatformOAuthClientControllerTest {
   }
 
   @Test
-  void plainCreatePostRendersThePageDirectlyWithTheOneTimeSecretNeverARedirect() throws Exception {
+  void showsTheClientDetailPage() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(new GetOAuthClientForOrganizationQuery("test_abc", organizationId)))
+        .thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/test_abc"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW))
+        .andExpect(model().attribute("client", client))
+        .andExpect(model().attribute("organizationName", "Acme Co"));
+  }
+
+  // Live UX request, 2026-09-24 — reordering: "Redirect settings" moved up to right after
+  // "Client credentials" (the one actionable card, not buried under two read-only ones), and a
+  // scoped warning appears only when the client genuinely has no redirect URI yet.
+  @Test
+  void showsTheNoRedirectUriWarningAndPutsRedirectSettingsRightAfterCredentials() throws Exception {
+    OAuthClient clientWithNoRedirectUri =
+        OAuthClient.register(
+            organizationId,
+            "test_no_redirect",
+            "hashed-secret",
+            List.of(),
+            OAuthClientDefaults.GRANT_TYPES,
+            OAuthClientDefaults.SCOPES,
+            true,
+            List.of());
+    when(getClient.handle(any())).thenReturn(Optional.of(clientWithNoRedirectUri));
+
+    // Stops short of the banner's own em dash — this standalone MockMvc harness (no
+    // CharacterEncodingFilter wired, unlike the real app) doesn't decode getContentAsString() as
+    // UTF-8 by default, garbling non-ASCII characters; not a real rendering bug (the full app does
+    // set UTF-8), just this assertion staying within what the harness renders correctly.
+    MvcResult result =
+        mockMvc
+            .perform(get(basePath() + "/test_no_redirect"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("No redirect URI configured yet")))
+            .andReturn();
+
+    String body = result.getResponse().getContentAsString();
+    int credentialsIndex = body.indexOf("Client credentials");
+    int redirectSettingsIndex = body.indexOf("Redirect settings");
+    int setupInstructionsIndex = body.indexOf("Add these to your application");
+    int configurationIndex = body.indexOf("<h2>Configuration</h2>");
+    assertThat(credentialsIndex).isPositive();
+    assertThat(redirectSettingsIndex).isGreaterThan(credentialsIndex);
+    assertThat(setupInstructionsIndex).isGreaterThan(redirectSettingsIndex);
+    assertThat(configurationIndex).isGreaterThan(setupInstructionsIndex);
+  }
+
+  @Test
+  void doesNotShowTheNoRedirectUriWarningForAClientThatAlreadyHasOne() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/test_abc"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("No redirect URI configured yet"))));
+  }
+
+  @Test
+  void htmxGetDetailReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/test_abc").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  @Test
+  void showDetailReturnsNotFoundForAnUnknownOrCrossTenantClientId() throws Exception {
+    when(getClient.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc.perform(get(basePath() + "/ghost-client")).andExpect(status().isNotFound());
+  }
+
+  // BR-ORG-06: no request body at all — every field is fixed by OAuthClientDefaults.
+  @Test
+  void createRegistersWithOAuthClientDefaultsAndNoRedirectUrisYet() throws Exception {
     OAuthClient created = sampleClient();
     when(registerClient.handle(any()))
         .thenReturn(new RegisterOAuthClientResult(created, "raw-secret-shown-once"));
 
     mockMvc
-        .perform(
-            post(basePath())
-                .param("redirectUris", "https://jobseeker.example.com/callback")
-                .param("allowedGrantTypes", OAuthGrantTypeOptions.AUTHORIZATION_CODE))
+        .perform(post(basePath()))
         .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients"))
-        .andExpect(model().attribute("justRegisteredRawSecret", "raw-secret-shown-once"));
+        .andExpect(view().name(DETAIL_VIEW))
+        .andExpect(model().attribute("justRegisteredRawSecret", "raw-secret-shown-once"))
+        .andExpect(model().attribute("justRegisteredClientId", created.clientId()));
 
-    verify(registerClient).handle(any());
+    ArgumentCaptor<RegisterOAuthClientCommand> captor =
+        ArgumentCaptor.forClass(RegisterOAuthClientCommand.class);
+    verify(registerClient).handle(captor.capture());
+    RegisterOAuthClientCommand command = captor.getValue();
+    assertThat(command.organizationId()).isEqualTo(organizationId);
+    assertThat(command.redirectUris()).isEmpty();
+    assertThat(command.postLogoutRedirectUris()).isEmpty();
+    assertThat(command.allowedGrantTypes()).isEqualTo(OAuthClientDefaults.GRANT_TYPES);
+    assertThat(command.allowedScopes()).isEqualTo(OAuthClientDefaults.SCOPES);
+    assertThat(command.requireConsent()).isEqualTo(OAuthClientDefaults.REQUIRE_CONSENT);
+  }
+
+  // Even an HTMX-originated "Add client" click still lands on the full detail page — see
+  // PlatformOAuthClientController's own Javadoc for why (a one-time secret has nowhere safe to
+  // go through a fragment scoped to the list's own #clients-content).
+  @Test
+  void createAlwaysRendersTheFullDetailViewEvenOnAnHtmxRequest() throws Exception {
+    OAuthClient created = sampleClient();
+    when(registerClient.handle(any()))
+        .thenReturn(new RegisterOAuthClientResult(created, "raw-secret-shown-once"));
+
+    mockMvc
+        .perform(post(basePath()).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW));
   }
 
   // Clerk-style "add these to your app" panel — proves the model carries every endpoint a real
   // OIDC client library needs, built from CLAVARIS_BASE_URL, not guessed at.
   @Test
-  void plainCreatePostRendersSetupInstructionsForTheConsumerApp() throws Exception {
+  void createRendersSetupInstructionsForTheConsumerApp() throws Exception {
     OAuthClient created = sampleClient();
     when(registerClient.handle(any()))
         .thenReturn(new RegisterOAuthClientResult(created, "raw-secret-shown-once"));
 
     mockMvc
-        .perform(
-            post(basePath())
-                .param("redirectUris", "https://jobseeker.example.com/callback")
-                .param("allowedGrantTypes", OAuthGrantTypeOptions.AUTHORIZATION_CODE))
+        .perform(post(basePath()))
         .andExpect(status().isOk())
         .andExpect(
             model()
@@ -207,56 +371,31 @@ class PlatformOAuthClientControllerTest {
   }
 
   @Test
-  void htmxCreatePostReturnsTheClientsFragment() throws Exception {
-    OAuthClient created = sampleClient();
-    when(registerClient.handle(any()))
-        .thenReturn(new RegisterOAuthClientResult(created, "raw-secret-shown-once"));
-
-    mockMvc
-        .perform(
-            post(basePath())
-                .param("redirectUris", "https://jobseeker.example.com/callback")
-                .param("allowedGrantTypes", OAuthGrantTypeOptions.AUTHORIZATION_CODE)
-                .header("HX-Request", "true"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients :: clients"));
-  }
-
-  @Test
-  void createWithNoRedirectUrisRendersAnErrorWithoutCreatingAnything() throws Exception {
-    mockMvc
-        .perform(
-            post(basePath()).param("allowedGrantTypes", OAuthGrantTypeOptions.AUTHORIZATION_CODE))
-        .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients"));
-
-    verify(registerClient, never()).handle(any());
-  }
-
-  @Test
-  void createWithNoGrantTypesSelectedRendersAnErrorWithoutCreatingAnything() throws Exception {
-    mockMvc
-        .perform(post(basePath()).param("redirectUris", "https://jobseeker.example.com/callback"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients"));
-
-    verify(registerClient, never()).handle(any());
-  }
-
-  @Test
-  void plainDeactivatePostRedirectsOnSuccess() throws Exception {
+  void plainDeactivatePostRedirectsToTheDetailPageOnSuccess() throws Exception {
     OAuthClient client = sampleClient();
 
     mockMvc
         .perform(post(basePath() + "/" + client.clientId() + "/deactivate"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl(basePath()));
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
 
     verify(deactivateClient).handle(any());
   }
 
-  // SDE-III review, 2026-09-15: ownership is now enforced by DeactivateOAuthClientService itself
-  // (via the organizationId this controller now passes through), not a web-layer list-then-check —
+  @Test
+  void htmxDeactivatePostReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient().deactivate();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/deactivate").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  // SDE-III review, 2026-09-15: ownership is enforced by DeactivateOAuthClientService itself (via
+  // the organizationId this controller passes through), not a web-layer list-then-check —
   // simulated here the same way a real cross-tenant clientId would surface, via the exception the
   // service throws.
   @Test
@@ -271,16 +410,17 @@ class PlatformOAuthClientControllerTest {
   }
 
   @Test
-  void plainRotateSecretPostRendersThePageDirectlyWithTheNewSecretNeverARedirect()
+  void plainRotateSecretPostRendersTheDetailPageDirectlyWithTheNewSecretNeverARedirect()
       throws Exception {
     OAuthClient client = sampleClient();
     when(rotateClientSecret.handle(any()))
         .thenReturn(new RotateOAuthClientSecretResult(client.clientId(), "new-raw-secret"));
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
 
     mockMvc
         .perform(post(basePath() + "/" + client.clientId() + "/rotate-secret"))
         .andExpect(status().isOk())
-        .andExpect(view().name("clientregistry/platform/organization-oauth-clients"))
+        .andExpect(view().name(DETAIL_VIEW))
         .andExpect(model().attribute("justRegisteredRawSecret", "new-raw-secret"));
   }
 
@@ -324,5 +464,276 @@ class PlatformOAuthClientControllerTest {
     mockMvc
         .perform(post(basePath() + "/" + client.clientId() + "/rotate-secret"))
         .andExpect(status().isConflict());
+  }
+
+  // BR-ORG-06: the one editable section — proves the form fields actually reach the use case.
+  @Test
+  void updateRedirectSettingsPassesTheParsedListsThroughToTheUseCase() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris", "https://jobseeker.example.com/callback")
+                .param("postLogoutRedirectUris", "https://jobseeker.example.com/logged-out"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(updateRedirectSettings).handle(any());
+  }
+
+  @Test
+  void htmxUpdateRedirectSettingsReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris", "https://example.com/callback")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+
+    verify(updateRedirectSettings).handle(any());
+  }
+
+  @Test
+  void updateRedirectSettingsReturnsNotFoundWhenTheClientBelongsToADifferentOrganization()
+      throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings
+                .OAuthClientNotFoundException("test_someone_elses"))
+        .when(updateRedirectSettings)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(basePath() + "/test_someone_elses/redirect-settings")
+                // A real redirect URI, so this genuinely reaches the use case below — the
+                // at-least-one-required check added 2026-09-24 would otherwise 200/render an
+                // error before ever calling it, and this test would stop proving what it claims
+                // to.
+                .param("redirectUris", "https://example.com/callback"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void updateRedirectSettingsReturnsBadRequestForAMalformedRedirectUri() throws Exception {
+    doThrow(new IllegalArgumentException("redirectUris must contain only well-formed URIs"))
+        .when(updateRedirectSettings)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(basePath() + "/test_abc/redirect-settings")
+                .param("redirectUris", "not a uri at all ::"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // Live UX request, 2026-09-24: at least one real redirect URI is required to save — without
+  // one, /authorize has nothing to match against for this client's own authorization_code grant
+  // (BR-CLIENT-01). Web-layer-only (the domain itself still allows zero — the auto-provisioned
+  // client's own genuine "not configured yet" state); confirmed by never calling the use case.
+  @Test
+  void updateRedirectSettingsRejectsAnEmptyRedirectUriListWithoutCallingTheUseCase()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/redirect-settings"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW))
+        .andExpect(
+            content().string(containsString("At least one redirect URI is required to save.")));
+
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void updateRedirectSettingsRejectsAllBlankRedirectUriRowsTheSameAsTrulyEmpty() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris[0]", "   "))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW));
+
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  // postLogoutRedirectUris carries no equivalent requirement — SAS's own bare default already
+  // covers "not configured" for RP-Initiated Logout.
+  @Test
+  void updateRedirectSettingsSucceedsWithAnEmptyPostLogoutRedirectUriList() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings")
+                .param("redirectUris", "https://example.com/callback"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(updateRedirectSettings).handle(any());
+  }
+
+  // Live UX request, 2026-09-24 — real add/remove-row list UI, not a one-entry-per-line textarea.
+  // These four endpoints never touch the domain (verifyNoInteractions(updateRedirectSettings)) —
+  // only the form's own real "Save redirect settings" submit does.
+  @Test
+  void addRedirectUriRowAppendsABlankRowKeepingWhatWasAlreadyThereWithoutPersistingAnything()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath() + "/" + client.clientId() + "/redirect-settings/redirect-uris/add")
+                    .param("redirectUris[0]", "https://jobseeker.example.com/callback"))
+            .andExpect(status().isOk())
+            .andExpect(view().name(DETAIL_VIEW))
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getRedirectUris())
+        .containsExactly("https://jobseeker.example.com/callback", "");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void removeRedirectUriRowRemovesOnlyTheGivenIndexKeepingTheOthersWithoutPersistingAnything()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/redirect-uris/remove/1")
+                    .param("redirectUris[0]", "https://jobseeker.example.com/callback")
+                    .param("redirectUris[1]", "https://jobseeker.example.com/mobile-callback")
+                    .param("redirectUris[2]", "https://jobseeker.example.com/staging-callback"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getRedirectUris())
+        .containsExactly(
+            "https://jobseeker.example.com/callback",
+            "https://jobseeker.example.com/staging-callback");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  // An owner removing the only row still has one blank input to type into — the same UX
+  // UpdateOAuthClientRedirectSettingsForm#from already gives a freshly-loaded, zero-URI client.
+  @Test
+  void removeRedirectUriRowLeavesOneBlankRowWhenRemovingTheOnlyOne() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/redirect-uris/remove/0")
+                    .param("redirectUris[0]", "https://jobseeker.example.com/callback"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getRedirectUris()).containsExactly("");
+  }
+
+  @Test
+  void addPostLogoutRedirectUriRowAppendsABlankRowWithoutPersistingAnything() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/post-logout-redirect-uris/add")
+                    .param("postLogoutRedirectUris[0]", "https://jobseeker.example.com/logged-out"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getPostLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/logged-out", "");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void removePostLogoutRedirectUriRowRemovesOnlyTheGivenIndexWithoutPersistingAnything()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/post-logout-redirect-uris/remove/0")
+                    .param("postLogoutRedirectUris[0]", "https://jobseeker.example.com/logged-out")
+                    .param(
+                        "postLogoutRedirectUris[1]", "https://jobseeker.example.com/marketing-bye"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getPostLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/marketing-bye");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void htmxAddRedirectUriRowReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings/redirect-uris/add")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  // Content-level proof the list page no longer offers a create form at all — a regression this
+  // module's own pmd:cpd-check can't catch, unlike the removed RegisterOAuthClientForm class
+  // itself.
+  @Test
+  void listPageNoLongerRendersACreateForm() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("Register a new OAuth Client"))));
   }
 }

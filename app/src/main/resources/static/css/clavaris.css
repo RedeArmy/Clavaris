@@ -227,6 +227,26 @@ input[type="radio"] {
   color: var(--clavaris-danger);
 }
 
+/* SDE-III, 2026-09-24 (SonarCloud accessibility fix): the redirect-URI/post-logout-URI row lists
+   (organization-oauth-client-detail.html) use a real <fieldset>/<legend> instead of a
+   role="group" div — browsers give both strong default styling (fieldset: border + padding;
+   legend: bold, larger text) that would visibly change this field's look without this reset;
+   .clavaris-field label's own font-size/weight/color are reused on legend so the two stay
+   visually identical. */
+.clavaris-uri-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.clavaris-uri-fieldset legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--clavaris-text-muted);
+}
+
 /* TD-FUT-002 (self-service rate-limit tuning): a non-error helper line under a field — e.g. "up
    to N requests/minute" telling an Organization owner the bound before they submit, not just
    after a rejected value. Same size as .clavaris-field-error, muted color instead of danger. */
@@ -255,6 +275,25 @@ input[type="radio"] {
   flex: 1 1 0;
   width: auto;
   min-width: 0;
+}
+
+/* Live UX request, 2026-09-24 — OAuth Client "Redirect settings": a real add/remove-row list UI
+   (one input per URI, its own "Remove" button) replaces the original one-entry-per-line textarea,
+   matching Clerk's own multi-entry "Redirect URIs" field. Same "out-specificity .clavaris-field
+   input's own width: 100% default" reasoning as .clavaris-phone-input above. */
+.clavaris-uri-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+.clavaris-field .clavaris-uri-row input {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+.clavaris-uri-row .clavaris-button {
+  flex: 0 0 auto;
 }
 
 /* SDE-III UI audit, 2026-09-20 — the dashboard's own true on/off settings (permission flags like
@@ -424,6 +463,16 @@ label.clavaris-toggle {
   background: var(--clavaris-success-bg);
 }
 
+/* Live UX request, 2026-09-24 — OAuth Client detail page's own "no redirect URI configured yet"
+   notice: neither success nor error (a client with zero redirect URIs is a genuinely valid state,
+   BR-ORG-06 — client_credentials works fine; only authorization_code login is affected), so
+   reuses --clavaris-highlight (defined, unused until now) rather than stretching --error's own
+   red into a "heads up" tone it was never meant to carry. */
+.clavaris-alert--warning {
+  color: var(--clavaris-accent-hover);
+  background: var(--clavaris-highlight);
+}
+
 .clavaris-links {
   margin-top: var(--space-6);
   text-align: center;
@@ -543,6 +592,14 @@ code {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* SDE-III refactor, 2026-09-23 — the OAuth Client detail page's own "shown once, at creation or
+   rotation" placeholder (client-secret table cell, no secret in the current response) needed a
+   plain muted-text utility; --clavaris-text-muted itself was only ever used inline inside other
+   rules' own declarations before this, never exposed as a standalone class. */
+.clavaris-text-muted {
+  color: var(--clavaris-text-muted);
 }
 
 /* .clavaris-button defaults to a full-width block (the one-action-per-form shape every other
@@ -712,6 +769,23 @@ code {
   margin-top: var(--space-4);
 }
 
+/* SDE-III, 2026-09-24 (Clerk-parity API Keys page): a multi-line value (the JWKS public key,
+   PEM-encoded) needs a block-level, wrapping monospace container — the plain <code> rule above
+   only covers single-line values. */
+.clavaris-code-block {
+  display: block;
+  overflow-x: auto;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: color-mix(in srgb, var(--clavaris-border) 15%, transparent);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+
 /* Danger Zone (TD-FUT-032, promote-to-production/delete-Organization) — a visibly distinct
    border, not just alert text, so the one genuinely destructive section on organization-detail.html
    reads as different from every read-only/reversible one above it at a glance. */
@@ -759,6 +833,14 @@ code {
 .clavaris-badge--error {
   color: var(--clavaris-danger);
   background: var(--clavaris-danger-bg);
+}
+
+/* Live UX request, 2026-09-24 — OAuth Clients list's own "no redirect URI yet" marker, same
+   color pair as .clavaris-alert--warning's own identical reasoning (a genuinely valid state,
+   not an error). */
+.clavaris-badge--warning {
+  color: var(--clavaris-accent-hover);
+  background: var(--clavaris-highlight);
 }
 
 .clavaris-breadcrumb {

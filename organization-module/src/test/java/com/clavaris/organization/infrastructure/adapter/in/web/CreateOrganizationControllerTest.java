@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
+import com.clavaris.organization.application.usecase.createorganization.OAuthClientProvisioner.ProvisionedOAuthClient;
 import com.clavaris.organization.application.usecase.createorganization.PlatformAccountNotFoundException;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
 import com.clavaris.organization.domain.model.Organization;
@@ -51,7 +52,10 @@ class CreateOrganizationControllerTest {
     Organization organization = Organization.register("JobSeeker", ownerPlatformAccountId);
     ProvisionedSigningKey signingKey =
         new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256");
-    when(useCase.handle(any())).thenReturn(new CreateOrganizationResult(organization, signingKey));
+    ProvisionedOAuthClient oauthClient =
+        new ProvisionedOAuthClient(UUID.randomUUID(), "test_a-client-id");
+    when(useCase.handle(any()))
+        .thenReturn(new CreateOrganizationResult(organization, signingKey, oauthClient));
 
     mockMvc
         .perform(

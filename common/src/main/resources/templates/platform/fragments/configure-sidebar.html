@@ -14,9 +14,16 @@ Signing Keys/Webhook Endpoints each owned by their own module's own controller);
 Danger Zone are the two items promoted from organization-detail.html's own inline sections into
 standalone pages of their own (organization-module), so every Configure destination now has the
 same shape — a real page, not an inline fragment swap.
+
+API Keys added 2026-09-24 (Clerk-parity read-only overview, PlatformOrganizationApiKeysController,
+organization-module) — placed first, same position Clerk's own left nav gives it: the one page an
+owner opens first when wiring up a new consumer, ahead of the individual credential-management
+pages below it.
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
+    <a th:href="@{/platform/dashboard/organizations/{id}/api-keys(id=${organizationId})}"
+       th:classappend="${active == 'api-keys'} ? 'active'">API Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
        th:classappend="${active == 'secret-keys'} ? 'active'">Secret Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
