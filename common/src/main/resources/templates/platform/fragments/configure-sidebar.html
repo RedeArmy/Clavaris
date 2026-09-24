@@ -19,15 +19,19 @@ API Keys added 2026-09-24 (Clerk-parity read-only overview, PlatformOrganization
 organization-module) — placed first, same position Clerk's own left nav gives it: the one page an
 owner opens first when wiring up a new consumer, ahead of the individual credential-management
 pages below it.
+
+OAuth Clients moved to second (2026-09-24, live UX request) — the end-user login client is what
+most owners configure right after checking their API Keys/issuer, ahead of Secret Keys (the
+management-API credential, a less common first step for a brand-new Organization).
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
     <a th:href="@{/platform/dashboard/organizations/{id}/api-keys(id=${organizationId})}"
        th:classappend="${active == 'api-keys'} ? 'active'">API Keys</a>
-    <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
-       th:classappend="${active == 'secret-keys'} ? 'active'">Secret Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
        th:classappend="${active == 'oauth-clients'} ? 'active'">OAuth Clients</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
+       th:classappend="${active == 'secret-keys'} ? 'active'">Secret Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/signing-keys(id=${organizationId})}"
        th:classappend="${active == 'signing-keys'} ? 'active'">Signing Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
