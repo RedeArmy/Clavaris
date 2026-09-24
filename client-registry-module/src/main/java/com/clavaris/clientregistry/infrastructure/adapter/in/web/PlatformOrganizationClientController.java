@@ -113,11 +113,12 @@ public class PlatformOrganizationClientController {
   // page of clients) always travels together. Placed directly after the constructor (ahead of
   // showList, unlike this method's usual position) — local pmd:cpd-check's own 75-token window
   // (pom.xml) otherwise bridges the constructor's field assignments straight into showList's own
-  // near-identical delegation to DashboardControllerSupport#showPaginatedList, since both are
-  // now short enough that nothing between them differs across this file and
-  // PlatformOAuthClientController's own mirror. This form-type reference
-  // (CreateOrganizationClientForm, not RegisterOAuthClientForm) breaks that contiguous run at a
-  // real, meaningful difference instead of an arbitrary one.
+  // near-identical delegation to DashboardControllerSupport#showPaginatedList. This form-type
+  // reference (CreateOrganizationClientForm) breaks that contiguous run at a real, meaningful
+  // difference instead of an arbitrary one — PlatformOAuthClientController's own sibling method
+  // no longer references any form type at all since its own SDE-III refactor, 2026-09-23
+  // (RegisterOAuthClientForm removed — every OAuthClient now registers with fixed, non-user-
+  // chosen defaults, OAuthClientDefaults), so the two bodies have diverged further still.
   private void renderSecretKeysList(
       final Model model,
       final UUID organizationId,

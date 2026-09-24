@@ -545,6 +545,14 @@ code {
   border: 0;
 }
 
+/* SDE-III refactor, 2026-09-23 — the OAuth Client detail page's own "shown once, at creation or
+   rotation" placeholder (client-secret table cell, no secret in the current response) needed a
+   plain muted-text utility; --clavaris-text-muted itself was only ever used inline inside other
+   rules' own declarations before this, never exposed as a standalone class. */
+.clavaris-text-muted {
+  color: var(--clavaris-text-muted);
+}
+
 /* .clavaris-button defaults to a full-width block (the one-action-per-form shape every other
    hosted page has) — this is the one modifier that un-does that for a button sitting inline
    inside a table cell or alongside other content. */

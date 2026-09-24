@@ -18,6 +18,8 @@ import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClie
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigService;
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigUseCase;
+import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationService;
+import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationUseCase;
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.getredirectpolicyforclient.GetRedirectPolicyForClientUseCase;
 import com.clavaris.clientregistry.application.usecase.listoauthclients.ListOAuthClientsService;
@@ -134,6 +136,14 @@ class ClientRegistryUseCaseConfig {
   /* package */ UpdateOAuthClientRedirectSettingsUseCase updateOAuthClientRedirectSettingsUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new UpdateOAuthClientRedirectSettingsService(oauthClients, auditEvents);
+  }
+
+  // SDE-III refactor, 2026-09-23 (Clerk-style master-detail OAuth Clients page): backs the new
+  // per-client detail page — no equivalent single-client read existed before this.
+  @Bean
+  /* package */ GetOAuthClientForOrganizationUseCase getOAuthClientForOrganizationUseCase(
+      final OAuthClientRepository oauthClients) {
+    return new GetOAuthClientForOrganizationService(oauthClients);
   }
 
   // SDE-III review, 2026-09-11: same gap-closing as deactivateOAuthClientUseCase above — see
