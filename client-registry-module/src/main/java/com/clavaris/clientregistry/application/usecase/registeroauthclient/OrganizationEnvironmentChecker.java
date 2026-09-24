@@ -10,9 +10,13 @@ import java.util.UUID;
  * the one module allowed to depend on both, by delegating to organization-module's own {@code
  * OrganizationRepository.findById(...).environment()}.
  *
- * <p>{@link RegisterOAuthClientService} uses this to decide the {@code test_}/{@code live_} prefix
- * on a newly-generated {@code clientId} — same "prove which environment a credential belongs to
- * from the credential itself" mechanic Clerk's own {@code pk_test_}/{@code pk_live_} keys use.
+ * <p><b>SDE-III correction, 2026-09-24:</b> {@link RegisterOAuthClientService} no longer uses this
+ * port — {@code OAuthClient.clientId} is now a fixed {@code client_} prefix regardless of
+ * environment (that class's own Javadoc has the full reasoning). The one remaining consumer is
+ * {@code createorganizationclient.CreateOrganizationClientService}, which still uses this to decide
+ * the {@code sk_test_}/{@code sk_live_} prefix on a newly-generated {@code OrganizationClient}
+ * secret key — env-on-credential-pair is the correct half of Stripe's own convention, unlike a
+ * plain resource id.
  */
 @FunctionalInterface
 public interface OrganizationEnvironmentChecker {

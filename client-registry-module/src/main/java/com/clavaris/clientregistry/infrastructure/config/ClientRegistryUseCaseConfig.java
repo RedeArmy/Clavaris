@@ -98,12 +98,11 @@ class ClientRegistryUseCaseConfig {
   /* package */ RegisterOAuthClientUseCase registerOAuthClientUseCase(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final ClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new RegisterOAuthClientService(
-        oauthClients, orgExistsChecker, environmentChecker, hasher, secretGenerator, auditEvents);
+        oauthClients, orgExistsChecker, hasher, secretGenerator, auditEvents);
   }
 
   // SDE-III review, 2026-09-11: the dashboard's own real OAuthClient listing page — see
