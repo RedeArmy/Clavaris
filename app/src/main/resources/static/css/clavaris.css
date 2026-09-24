@@ -227,6 +227,26 @@ input[type="radio"] {
   color: var(--clavaris-danger);
 }
 
+/* SDE-III, 2026-09-24 (SonarCloud accessibility fix): the redirect-URI/post-logout-URI row lists
+   (organization-oauth-client-detail.html) use a real <fieldset>/<legend> instead of a
+   role="group" div — browsers give both strong default styling (fieldset: border + padding;
+   legend: bold, larger text) that would visibly change this field's look without this reset;
+   .clavaris-field label's own font-size/weight/color are reused on legend so the two stay
+   visually identical. */
+.clavaris-uri-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.clavaris-uri-fieldset legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--clavaris-text-muted);
+}
+
 /* TD-FUT-002 (self-service rate-limit tuning): a non-error helper line under a field — e.g. "up
    to N requests/minute" telling an Organization owner the bound before they submit, not just
    after a rejected value. Same size as .clavaris-field-error, muted color instead of danger. */
