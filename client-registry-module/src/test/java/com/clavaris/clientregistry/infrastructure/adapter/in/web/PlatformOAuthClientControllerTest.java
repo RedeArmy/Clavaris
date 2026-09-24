@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
@@ -430,6 +432,149 @@ class PlatformOAuthClientControllerTest {
             post(basePath() + "/test_abc/redirect-settings")
                 .param("redirectUris", "not a uri at all ::"))
         .andExpect(status().isBadRequest());
+  }
+
+  // Live UX request, 2026-09-24 — real add/remove-row list UI, not a one-entry-per-line textarea.
+  // These four endpoints never touch the domain (verifyNoInteractions(updateRedirectSettings)) —
+  // only the form's own real "Save redirect settings" submit does.
+  @Test
+  void addRedirectUriRowAppendsABlankRowKeepingWhatWasAlreadyThereWithoutPersistingAnything()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath() + "/" + client.clientId() + "/redirect-settings/redirect-uris/add")
+                    .param("redirectUris[0]", "https://jobseeker.example.com/callback"))
+            .andExpect(status().isOk())
+            .andExpect(view().name(DETAIL_VIEW))
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getRedirectUris())
+        .containsExactly("https://jobseeker.example.com/callback", "");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void removeRedirectUriRowRemovesOnlyTheGivenIndexKeepingTheOthersWithoutPersistingAnything()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/redirect-uris/remove/1")
+                    .param("redirectUris[0]", "https://jobseeker.example.com/callback")
+                    .param("redirectUris[1]", "https://jobseeker.example.com/mobile-callback")
+                    .param("redirectUris[2]", "https://jobseeker.example.com/staging-callback"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getRedirectUris())
+        .containsExactly(
+            "https://jobseeker.example.com/callback",
+            "https://jobseeker.example.com/staging-callback");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  // An owner removing the only row still has one blank input to type into — the same UX
+  // UpdateOAuthClientRedirectSettingsForm#from already gives a freshly-loaded, zero-URI client.
+  @Test
+  void removeRedirectUriRowLeavesOneBlankRowWhenRemovingTheOnlyOne() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/redirect-uris/remove/0")
+                    .param("redirectUris[0]", "https://jobseeker.example.com/callback"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getRedirectUris()).containsExactly("");
+  }
+
+  @Test
+  void addPostLogoutRedirectUriRowAppendsABlankRowWithoutPersistingAnything() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/post-logout-redirect-uris/add")
+                    .param("postLogoutRedirectUris[0]", "https://jobseeker.example.com/logged-out"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getPostLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/logged-out", "");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void removePostLogoutRedirectUriRowRemovesOnlyTheGivenIndexWithoutPersistingAnything()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                post(basePath()
+                        + "/"
+                        + client.clientId()
+                        + "/redirect-settings/post-logout-redirect-uris/remove/0")
+                    .param("postLogoutRedirectUris[0]", "https://jobseeker.example.com/logged-out")
+                    .param(
+                        "postLogoutRedirectUris[1]", "https://jobseeker.example.com/marketing-bye"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    UpdateOAuthClientRedirectSettingsForm form =
+        (UpdateOAuthClientRedirectSettingsForm)
+            result.getModelAndView().getModel().get("redirectSettingsForm");
+    assertThat(form.getPostLogoutRedirectUris())
+        .containsExactly("https://jobseeker.example.com/marketing-bye");
+    verifyNoInteractions(updateRedirectSettings);
+  }
+
+  @Test
+  void htmxAddRedirectUriRowReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/redirect-settings/redirect-uris/add")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
   }
 
   // Content-level proof the list page no longer offers a create form at all — a regression this

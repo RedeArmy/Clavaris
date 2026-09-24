@@ -65,11 +65,15 @@ import org.springframework.web.server.ResponseStatusException;
 // @PostMapping handler method name the same real concept — same "the field is the collaborator,
 // the method is the endpoint that calls it" shape every other controller in this codebase already
 // has for its own use-case fields (e.g. PlatformAccountProfileAdminController's own identical
-// suppression).
+// suppression). PMD.TooManyMethods: the four add/remove-row endpoints (live UX request,
+// 2026-09-24 — a real list UI, not a textarea) are each a genuinely distinct HTTP mapping, not
+// sprawl — same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own class-level
+// suppression documents for an identical situation.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
-  "PMD.AvoidFieldNameMatchingMethodName"
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.TooManyMethods"
 })
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
@@ -142,13 +146,29 @@ public class PlatformOAuthClientController {
       final UUID organizationId,
       final String organizationName,
       final OAuthClient client) {
+    populateDetailModel(
+        model,
+        organizationId,
+        organizationName,
+        client,
+        UpdateOAuthClientRedirectSettingsForm.from(
+            client.redirectUris(), client.postLogoutRedirectUris()));
+  }
+
+  // Live UX request, 2026-09-24: the add/remove-row endpoints below need to re-render this same
+  // model but with a caller-supplied, still-unsaved form (the in-progress row list) instead of
+  // one freshly rebuilt from the persisted client — this overload is what makes that possible
+  // without duplicating the other four attributes here too.
+  private void populateDetailModel(
+      final Model model,
+      final UUID organizationId,
+      final String organizationName,
+      final OAuthClient client,
+      final UpdateOAuthClientRedirectSettingsForm redirectSettingsForm) {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
     model.addAttribute("client", client);
-    model.addAttribute(
-        REDIRECT_SETTINGS_FORM_ATTRIBUTE,
-        UpdateOAuthClientRedirectSettingsForm.from(
-            client.redirectUris(), client.postLogoutRedirectUris()));
+    model.addAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE, redirectSettingsForm);
     // Clerk-style "here's exactly what to put in your app" panel — see
     // OidcClientSetupInstructions's own Javadoc for where each value comes from. Shown
     // permanently on the detail page now, not just right after registration.
@@ -360,5 +380,94 @@ public class PlatformOAuthClientController {
         + organizationId
         + "/oauth-clients/"
         + clientId;
+  }
+
+  // Live UX request, 2026-09-24: a real add/remove-row list UI, not a one-entry-per-line
+  // textarea — matching how Clerk's own multi-entry "Redirect URIs" field actually works. None of
+  // the four endpoints below ever calls updateRedirectSettings (the real, persisting use case) —
+  // each only mutates this one request's own in-memory form state (one more blank row, or one
+  // fewer) and re-renders; nothing is saved until the form's own real "Save redirect settings"
+  // submit (updateRedirectSettings above) runs. formaction, not a separate nested <form> (HTML
+  // forbids nesting them), is what lets each row's own button target its own URL while still
+  // submitting every other row's own already-typed value alongside it — see
+  // organization-oauth-client-detail.html's own comment on the row markup itself.
+  private String renderAfterRowMutation(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final String clientId,
+      final UpdateOAuthClientRedirectSettingsForm form,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    populateDetailModel(
+        model,
+        organizationId,
+        owned.organizationName(),
+        requireOwnedClient(organizationId, clientId),
+        form);
+    return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
+  }
+
+  // Always leaves at least one row — an owner who removes the only row still has one blank input
+  // to type into, the same "always at least one visible input" convenience
+  // UpdateOAuthClientRedirectSettingsForm#from already gives a freshly-loaded (zero-URI) client.
+  private static void removeRow(final List<String> rows, final int index) {
+    if (index >= 0 && index < rows.size()) {
+      rows.remove(index);
+    }
+    if (rows.isEmpty()) {
+      rows.add("");
+    }
+  }
+
+  @PostMapping("/{clientId}/redirect-settings/redirect-uris/add")
+  public String addRedirectUriRow(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @ModelAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE)
+          final UpdateOAuthClientRedirectSettingsForm form,
+      final Model model) {
+    form.getRedirectUris().add("");
+    return renderAfterRowMutation(request, organizationId, clientId, form, model);
+  }
+
+  @PostMapping("/{clientId}/redirect-settings/redirect-uris/remove/{index}")
+  public String removeRedirectUriRow(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @PathVariable final int index,
+      @ModelAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE)
+          final UpdateOAuthClientRedirectSettingsForm form,
+      final Model model) {
+    removeRow(form.getRedirectUris(), index);
+    return renderAfterRowMutation(request, organizationId, clientId, form, model);
+  }
+
+  @PostMapping("/{clientId}/redirect-settings/post-logout-redirect-uris/add")
+  public String addPostLogoutRedirectUriRow(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @ModelAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE)
+          final UpdateOAuthClientRedirectSettingsForm form,
+      final Model model) {
+    form.getPostLogoutRedirectUris().add("");
+    return renderAfterRowMutation(request, organizationId, clientId, form, model);
+  }
+
+  @PostMapping("/{clientId}/redirect-settings/post-logout-redirect-uris/remove/{index}")
+  public String removePostLogoutRedirectUriRow(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @PathVariable final int index,
+      @ModelAttribute(REDIRECT_SETTINGS_FORM_ATTRIBUTE)
+          final UpdateOAuthClientRedirectSettingsForm form,
+      final Model model) {
+    removeRow(form.getPostLogoutRedirectUris(), index);
+    return renderAfterRowMutation(request, organizationId, clientId, form, model);
   }
 }
