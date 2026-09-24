@@ -100,7 +100,9 @@ class PlatformOrganizationApiKeysControllerTest {
         .andExpect(model().attribute("apiKeys", apiKeys))
         .andExpect(model().attribute("organizationName", "Acme Co"))
         .andExpect(content().string(Matchers.containsString("pk_test_abc123")))
-        .andExpect(content().string(Matchers.containsString("-----BEGIN PUBLIC KEY-----")));
+        .andExpect(content().string(Matchers.containsString("-----BEGIN PUBLIC KEY-----")))
+        .andExpect(
+            content().string(Matchers.containsString("rotating the signing key will break")));
   }
 
   @Test
@@ -141,6 +143,10 @@ class PlatformOrganizationApiKeysControllerTest {
             content()
                 .string(
                     Matchers.containsString("No active signing key found for this Organization")))
-        .andExpect(content().string(Matchers.not(Matchers.containsString("BEGIN PUBLIC KEY"))));
+        .andExpect(content().string(Matchers.not(Matchers.containsString("BEGIN PUBLIC KEY"))))
+        .andExpect(
+            content()
+                .string(
+                    Matchers.not(Matchers.containsString("rotating the signing key will break"))));
   }
 }

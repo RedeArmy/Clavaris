@@ -70,9 +70,25 @@
                             <p>This Organization's own active signing key (ADR-0010 §5.2), PEM-
                                 encoded — paste it directly into a backend or edge environment for
                                 networkless JWT verification, without fetching the JWKS URL at
-                                runtime. Rotating loses this exact value: see the
+                                runtime. See the
                                 <a th:href="@{/platform/dashboard/organizations/{id}/signing-keys(id=${organizationId})}">Signing Keys</a>
                                 page for rotation.</p>
+                            <!-- Live UX follow-up, 2026-09-24: rotation-with-overlap (ADR-0010 §5.2)
+                                 protects a consumer that fetches the JWKS URL at runtime — the
+                                 retired key keeps publishing for the overlap window. It does NOT
+                                 protect a copy of this exact PEM value: the moment a rotation
+                                 happens, tokens signed under the new key stop verifying against a
+                                 hardcoded old one immediately, with no grace period. Scoped to this
+                                 card specifically (not the JWKS URL above it, which stays safe to
+                                 rely on) — same "warn, don't gate" posture as the OAuth Client
+                                 redirect-URI banner. -->
+                            <p class="clavaris-alert clavaris-alert--warning" th:if="${apiKeys.jwksPublicKey()}">
+                                If you hardcode this value, rotating the signing key will break
+                                verification of newly issued tokens immediately — there is no grace
+                                period for a static copy the way there is for the JWKS URL above.
+                                Prefer fetching the JWKS URL at runtime unless you have a specific
+                                reason not to.
+                            </p>
                             <pre class="clavaris-code-block" th:if="${apiKeys.jwksPublicKey()}"><code th:text="${apiKeys.jwksPublicKey()}">-----BEGIN PUBLIC KEY-----</code></pre>
                             <p class="clavaris-empty-state" th:unless="${apiKeys.jwksPublicKey()}">
                                 No active signing key found for this Organization yet.
