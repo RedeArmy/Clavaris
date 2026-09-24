@@ -10,13 +10,21 @@ import java.util.UUID;
  * secret server-side, never accepts either from the caller — a machine credential is stronger
  * generated here than accepted from an operator's own (potentially weak or reused) choice.
  *
- * <p><b>SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis):</b>
- * {@code clientId} is now prefixed {@code test_}/{@code live_} depending on the owning
- * Organization's own environment — same mechanic as Clerk's own {@code pk_test_}/{@code pk_live_}
- * key prefixes: the credential itself, not just a side-channel dashboard label, tells you which
- * environment it belongs to. Purely a visual/structural convention, same as Clerk's own — nothing
- * in {@code OrganizationRegisteredClientRepository}'s own lookup logic branches on this prefix; the
- * real isolation is Organization-scoped issuer/JWKS (ADR-0010 §5), not the prefix string.
+ * <p><b>SDE-III correction, 2026-09-24 (dashboard UX finding — live "API Keys" page review):</b>
+ * {@code clientId} was previously prefixed {@code test_}/{@code live_} depending on the owning
+ * Organization's own environment (2026-09-04 change, now superseded). In practice this collided
+ * visually with the Organization's own {@code pk_test_}/{@code pk_live_} publishable key
+ * (organization-module's {@code OrganizationApiKeys}) — two differently-scoped identifiers (one
+ * per-Organization, one per-OAuthClient) that looked like the same family and were easy to
+ * transpose by mistake. Corrected to a fixed {@code client_} prefix with no environment encoded,
+ * matching Stripe's own actual convention: environment lives on the credential PAIR ({@code
+ * pk_}/{@code sk_}), never on a plain resource id — {@link
+ * com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientService}'s
+ * {@code sk_test_}/{@code sk_live_} secret-key prefix is the correct half of that pair and is
+ * deliberately left unchanged by this correction. Purely a visual/structural convention, same as
+ * before — nothing in {@code OrganizationRegisteredClientRepository}'s own lookup logic ever
+ * branched on this prefix; the real isolation is Organization-scoped issuer/JWKS (ADR-0010 §5), not
+ * the prefix string, so removing the environment encoding changes no security-relevant behaviour.
  *
  * <p>SDE-III review, 2026-09-11: raw-secret generation moved to {@link OAuthClientSecretGenerator}
  * (was this class's own private {@code SecureRandom} logic) so {@code
@@ -24,34 +32,24 @@ import java.util.UUID;
  * credential type, shared between create and rotate" shape {@code
  * OrganizationClientSecretGenerator} already established for the sibling credential type.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
 
-  private static final String DEVELOPMENT_CLIENT_ID_PREFIX = "test_";
-  private static final String PRODUCTION_CLIENT_ID_PREFIX = "live_";
+  private static final String CLIENT_ID_PREFIX = "client_";
 
   private final OAuthClientRepository oauthClients;
   private final OrganizationExistsChecker orgExistsChecker;
-
-  @SuppressWarnings("PMD.LongVariable")
-  private final OrganizationEnvironmentChecker environmentChecker;
-
   private final ClientSecretHasher hasher;
   private final OAuthClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other multi-collaborator constructor in this codebase.
   public RegisterOAuthClientService(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final ClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.oauthClients = oauthClients;
     this.orgExistsChecker = orgExistsChecker;
-    this.environmentChecker = environmentChecker;
     this.hasher = hasher;
     this.secretGenerator = secretGenerator;
     this.auditEvents = auditEvents;
@@ -67,11 +65,7 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
       throw new OrganizationNotFoundException(command.organizationId());
     }
 
-    final String clientIdPrefix =
-        environmentChecker.isDevelopment(command.organizationId())
-            ? DEVELOPMENT_CLIENT_ID_PREFIX
-            : PRODUCTION_CLIENT_ID_PREFIX;
-    final String clientId = clientIdPrefix + UUID.randomUUID();
+    final String clientId = CLIENT_ID_PREFIX + UUID.randomUUID();
     final String rawClientSecret = secretGenerator.generate();
     final OAuthClient client =
         OAuthClient.register(

@@ -36,15 +36,20 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis) — the four
+ * SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis) — the three
  * phases end to end, against real Postgres and real HTTP, not assumed from the unit tests alone:
  * (1) a brand-new Organization is DEVELOPMENT by default, with a real, explicit, low-capacity
- * {@code RateLimitPolicy} row; (2) a real {@code OAuthClient} registered under it gets a {@code
- * test_}-prefixed {@code clientId}; (3) registering an Account under it never triggers a real
- * outbound verification email, while the {@code VerificationToken} itself is still genuinely
- * created; (4) {@code :create-production-environment} promotes it to a linked {@code PRODUCTION}
- * sibling — no {@code RateLimitPolicy} row (system default applies), and a client registered under
- * *that* Organization gets a {@code live_}-prefixed {@code clientId}.
+ * {@code RateLimitPolicy} row; (2) registering an Account under it never triggers a real outbound
+ * verification email, while the {@code VerificationToken} itself is still genuinely created; (3)
+ * {@code :create-production-environment} promotes it to a linked {@code PRODUCTION} sibling — no
+ * {@code RateLimitPolicy} row (system default applies).
+ *
+ * <p>SDE-III correction, 2026-09-24: this test previously also asserted that a client registered
+ * under each Organization got a {@code test_}/{@code live_}-prefixed {@code clientId} — that
+ * environment-encoded prefix is gone ({@code RegisterOAuthClientService}'s own Javadoc has the full
+ * reasoning); {@code OAuthClient.clientId} is now a fixed {@code client_} prefix regardless of the
+ * owning Organization's environment, so there is nothing environment-specific left to assert about
+ * it here.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)
@@ -57,7 +62,6 @@ import tools.jackson.databind.ObjectMapper;
 class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
     extends RedisBackedIntegrationTest {
 
-  private static final String REDIRECT_URI = "https://client.example.test/callback";
   private static final Pattern CSRF_TOKEN_PATTERN =
       Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"");
   private static final String FULL_SCOPE = "platform:organizations:write";
@@ -86,7 +90,7 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
     String platformToken = requestPlatformAccessToken();
     UUID developmentOrganizationId = createOrganization(platformToken, "JobSeeker");
 
-    // Phase 3: a real, explicit, low-capacity RateLimitPolicy row exists for the new DEVELOPMENT
+    // Phase 1: a real, explicit, low-capacity RateLimitPolicy row exists for the new DEVELOPMENT
     // Organization — not "no row means the system default", the normal state for every other
     // Organization before this feature existed.
     Integer developmentRequestsPerMinute =
@@ -96,13 +100,7 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
             developmentOrganizationId);
     assertThat(developmentRequestsPerMinute).isEqualTo(300);
 
-    // Phase 1 (client prefix): a client registered under a DEVELOPMENT Organization gets a
-    // test_-prefixed clientId.
-    ClientCredentials developmentClient =
-        registerOAuthClient(platformToken, developmentOrganizationId);
-    assertThat(developmentClient.clientId()).startsWith("test_");
-
-    // Phase 4: registering an Account under this DEVELOPMENT Organization never triggers a real
+    // Phase 2: registering an Account under this DEVELOPMENT Organization never triggers a real
     // outbound verification email, but the VerificationToken itself is still genuinely created —
     // the flow completes, it just never leaves this process.
     UUID accountId = registerAccount(developmentOrganizationId, "sandbox-user@example.com");
@@ -115,7 +113,7 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
             "EMAIL_VERIFICATION");
     assertThat(verificationTokenRows).isEqualTo(1);
 
-    // Phase 2: promote the DEVELOPMENT Organization to a linked PRODUCTION sibling.
+    // Phase 3: promote the DEVELOPMENT Organization to a linked PRODUCTION sibling.
     HttpResponse<String> promoteResponse =
         createProductionEnvironment(
             platformToken, developmentOrganizationId, "JobSeeker (production)");
@@ -147,11 +145,6 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
             Integer.class,
             productionOrganizationId);
     assertThat(productionPolicyRows).isZero();
-
-    // A client registered under the new PRODUCTION Organization gets a live_-prefixed clientId.
-    ClientCredentials productionClient =
-        registerOAuthClient(platformToken, productionOrganizationId);
-    assertThat(productionClient.clientId()).startsWith("live_");
   }
 
   @Test
@@ -257,31 +250,6 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
     return account.id().value();
   }
 
-  private ClientCredentials registerOAuthClient(String platformToken, UUID organizationId)
-      throws IOException, InterruptedException {
-    String requestBody =
-        """
-        {
-          "redirectUris": ["%s"],
-          "allowedGrantTypes": ["authorization_code", "refresh_token"],
-          "allowedScopes": ["openid"],
-          "requireConsent": false
-        }
-        """
-            .formatted(REDIRECT_URI);
-    HttpRequest request =
-        HttpRequest.newBuilder(
-                baseUri("/api/v1/admin/organizations/" + organizationId + "/clients"))
-            .header("Authorization", "Bearer " + platformToken)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    JsonNode body = objectMapper.readTree(response.body());
-    return new ClientCredentials(
-        body.get("clientId").asString(), body.get("clientSecret").asString());
-  }
-
   private UUID registerAccount(UUID organizationId, String email)
       throws IOException, InterruptedException {
     HttpRequest getForm =
@@ -323,6 +291,4 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
   private URI baseUri(String path) {
     return URI.create("http://localhost:" + port + path);
   }
-
-  private record ClientCredentials(String clientId, String clientSecret) {}
 }

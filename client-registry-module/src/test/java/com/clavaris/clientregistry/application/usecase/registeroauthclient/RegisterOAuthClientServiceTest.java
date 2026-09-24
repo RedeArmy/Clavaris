@@ -24,7 +24,6 @@ class RegisterOAuthClientServiceTest {
   private final UUID organizationId = UUID.randomUUID();
   private OAuthClientRepository oauthClients;
   private OrganizationExistsChecker organizationExistsChecker;
-  private OrganizationEnvironmentChecker environmentChecker;
   private ClientSecretHasher hasher;
   // A real, simple stub rather than a Mockito mock — generatesADifferentClientIdAndSecretOnEachCall
   // below needs distinct values per call, same as the real SecureRandom-backed adapter would give.
@@ -36,17 +35,11 @@ class RegisterOAuthClientServiceTest {
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
     organizationExistsChecker = mock(OrganizationExistsChecker.class);
-    environmentChecker = mock(OrganizationEnvironmentChecker.class);
     hasher = mock(ClientSecretHasher.class);
     auditEvents = mock(AuditEventRecorder.class);
     service =
         new RegisterOAuthClientService(
-            oauthClients,
-            organizationExistsChecker,
-            environmentChecker,
-            hasher,
-            secretGenerator,
-            auditEvents);
+            oauthClients, organizationExistsChecker, hasher, secretGenerator, auditEvents);
 
     when(organizationExistsChecker.exists(organizationId)).thenReturn(true);
     when(hasher.hash(anyString())).thenReturn("argon2id$hashed");
@@ -177,11 +170,12 @@ class RegisterOAuthClientServiceTest {
         .containsExactly("https://jobseeker.example.com/logged-out");
   }
 
-  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  // SDE-III correction, 2026-09-24: clientId no longer encodes the owning Organization's
+  // environment (superseded 2026-09-04 behaviour) — it visually collided with the Organization's
+  // own pk_test_/pk_live_ publishable key. A fixed client_ prefix, same environment-free
+  // convention as a plain Stripe resource id; see this class's own Javadoc for the full reasoning.
   @Test
-  void prefixesTheClientIdWithLiveForAProductionOrganization() {
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(false);
-
+  void prefixesTheClientIdWithAFixedClientPrefixRegardlessOfOrganizationEnvironment() {
     RegisterOAuthClientResult result =
         service.handle(
             new RegisterOAuthClientCommand(
@@ -193,24 +187,6 @@ class RegisterOAuthClientServiceTest {
                 List.of(),
                 ACTOR));
 
-    assertThat(result.client().clientId()).startsWith("live_");
-  }
-
-  @Test
-  void prefixesTheClientIdWithTestForADevelopmentOrganization() {
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
-
-    RegisterOAuthClientResult result =
-        service.handle(
-            new RegisterOAuthClientCommand(
-                organizationId,
-                List.of("https://jobseeker.example.com/callback"),
-                List.of("authorization_code"),
-                List.of("openid"),
-                true,
-                List.of(),
-                ACTOR));
-
-    assertThat(result.client().clientId()).startsWith("test_");
+    assertThat(result.client().clientId()).startsWith("client_");
   }
 }
