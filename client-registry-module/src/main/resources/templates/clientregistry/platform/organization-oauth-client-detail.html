@@ -27,9 +27,17 @@
                      is the only editable section on this page — everything else is read-only, by
                      design, not because a control was forgotten. -->
                 <div id="client-detail-content" th:fragment="detail" class="clavaris-configure-content">
+                    <!-- Live UX request, 2026-09-24: the raw Client ID no longer doubles as this
+                         page's <h1> — it already appears, once, in the "Client credentials" card
+                         below; showing it twice (bold title AND table row) read as a duplicate, not
+                         emphasis. OAuthClient has no separate display name to title this page with
+                         (BR-ORG-06: every client is auto-provisioned with fixed defaults, no
+                         user-chosen name field), so a generic category title is used instead — same
+                         convention this dashboard's own category pages (Signing Keys, API Keys)
+                         already use for their own <h1>. -->
                     <div class="clavaris-page-header">
                         <div>
-                            <h1><code th:text="${client.clientId()}">client id</code></h1>
+                            <h1>OAuth Client</h1>
                             <p>
                                 <span class="clavaris-badge"
                                       th:classappend="${client.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
