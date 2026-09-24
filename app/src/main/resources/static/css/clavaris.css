@@ -749,6 +749,23 @@ code {
   margin-top: var(--space-4);
 }
 
+/* SDE-III, 2026-09-24 (Clerk-parity API Keys page): a multi-line value (the JWKS public key,
+   PEM-encoded) needs a block-level, wrapping monospace container — the plain <code> rule above
+   only covers single-line values. */
+.clavaris-code-block {
+  display: block;
+  overflow-x: auto;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: color-mix(in srgb, var(--clavaris-border) 15%, transparent);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+
 /* Danger Zone (TD-FUT-032, promote-to-production/delete-Organization) — a visibly distinct
    border, not just alert text, so the one genuinely destructive section on organization-detail.html
    reads as different from every read-only/reversible one above it at a glance. */

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organizationName} + ' — API Keys — Clavaris')}">
+    <title>API Keys — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>API Keys</span>
+            </p>
+
+            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <!-- Clerk-parity dashboard read-out — mirrors
+                 https://clerk.com/docs/guides/development/clerk-environment-variables, same values
+                 GetOrganizationApiKeysUseCase already serves as JSON on the management API. Nothing
+                 on this page is editable: the publishable key and both API URLs are derived, and the
+                 JWKS public key is rotated from its own "Signing Keys" page, not here. -->
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'api-keys')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>API Keys</h1>
+                            <p>The identifiers and endpoints a consuming application needs to connect
+                                to this Organization — its own tenant issuer, the shared token
+                                endpoint, and the JWKS document/public key used to verify tokens it
+                                issues.</p>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section">
+                        <div class="clavaris-section-card">
+                            <h2>Publishable key</h2>
+                            <p>Safe to embed in client-side code — it is a routing identifier, not a
+                                credential.</p>
+                            <code th:text="${apiKeys.publishableKey()}">pk_test_...</code>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Frontend API URL</h2>
+                            <p>This Organization's own tenant issuer (ADR-0010 §5.1) — the OIDC
+                                discovery document, authorization endpoint, and hosted login all live
+                                under it.</p>
+                            <code th:text="${apiKeys.frontendApiUrl()}">issuer</code>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>Backend API URL</h2>
+                            <p>The shared <code>client_credentials</code> token endpoint — reached
+                                with either a Secret Key or a platform-issued credential.</p>
+                            <code th:text="${apiKeys.backendApiUrl()}">token endpoint</code>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>JWKS URL</h2>
+                            <p>Fetched by most OIDC client libraries automatically — only needed
+                                directly for manual or offline verification setups.</p>
+                            <code th:text="${apiKeys.jwksUrl()}">jwks url</code>
+                        </div>
+
+                        <div class="clavaris-section-card">
+                            <h2>JWKS public key</h2>
+                            <p>This Organization's own active signing key (ADR-0010 §5.2), PEM-
+                                encoded — paste it directly into a backend or edge environment for
+                                networkless JWT verification, without fetching the JWKS URL at
+                                runtime. Rotating loses this exact value: see the
+                                <a th:href="@{/platform/dashboard/organizations/{id}/signing-keys(id=${organizationId})}">Signing Keys</a>
+                                page for rotation.</p>
+                            <pre class="clavaris-code-block" th:if="${apiKeys.jwksPublicKey()}"><code th:text="${apiKeys.jwksPublicKey()}">-----BEGIN PUBLIC KEY-----</code></pre>
+                            <p class="clavaris-empty-state" th:unless="${apiKeys.jwksPublicKey()}">
+                                No active signing key found for this Organization yet.
+                            </p>
+                        </div>
+
+                        <p class="clavaris-text-muted">API version: <code th:text="${apiKeys.configuredApiVersion()}">v1</code></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
