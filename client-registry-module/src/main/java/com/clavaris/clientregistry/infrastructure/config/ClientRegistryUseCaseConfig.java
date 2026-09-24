@@ -50,6 +50,8 @@ import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClie
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.RedirectPolicyRepository;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.DnsTxtRecordLookup;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipService;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipUseCase;
@@ -124,6 +126,14 @@ class ClientRegistryUseCaseConfig {
   /* package */ DeactivateOAuthClientUseCase deactivateOAuthClientUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new DeactivateOAuthClientService(oauthClients, auditEvents);
+  }
+
+  // BR-ORG-06 (SDE-III refactor, 2026-09-23): the one post-creation mutation an Organization owner
+  // may make on their own OAuthClient — see OAuthClient#updateRedirectSettings's own Javadoc.
+  @Bean
+  /* package */ UpdateOAuthClientRedirectSettingsUseCase updateOAuthClientRedirectSettingsUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientRedirectSettingsService(oauthClients, auditEvents);
   }
 
   // SDE-III review, 2026-09-11: same gap-closing as deactivateOAuthClientUseCase above — see

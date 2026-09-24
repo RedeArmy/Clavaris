@@ -8,13 +8,22 @@ import com.clavaris.organization.domain.model.RateLimitPolicy;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * BR-ORG-06: creates the {@code Organization} row and provisions its initial {@code SigningKey}
- * synchronously, in the same operation — an Organization that exists but cannot yet issue a token
- * is never allowed to be an observable state. {@code @Transactional} covers both this module's own
- * {@code Organization} write and identity-module's {@code SigningKey} write reached through {@link
- * SigningKeyProvisioner}: this is a modular monolith on one database, so both writes share the same
- * connection/transaction manager despite crossing a module boundary — true atomicity, not a
- * best-effort saga.
+ * BR-ORG-06: creates the {@code Organization} row and provisions its initial {@code SigningKey} AND
+ * default {@code OAuthClient} synchronously, in the same operation — an Organization that exists
+ * but cannot yet issue a token, or has no client an owner can actually use, is never allowed to be
+ * an observable state. {@code @Transactional} covers this module's own {@code Organization} write,
+ * identity-module's {@code SigningKey} write ({@link SigningKeyProvisioner}), and
+ * client-registry-module's {@code OAuthClient} write ({@link OAuthClientProvisioner}): this is a
+ * modular monolith on one database, so all three writes share the same connection/transaction
+ * manager despite crossing module boundaries — true atomicity, not a best-effort saga.
+ *
+ * <p><b>SDE-III refactor, 2026-09-23 (Clerk-parity self-service simplification):</b> registering an
+ * Organization's first real {@code OAuthClient} used to be a separate, subsequent, manual action —
+ * an owner had to understand OAuth2 grant types/scopes/consent well enough to fill in a form before
+ * their Organization could authenticate anything. The default client now registers itself here,
+ * with {@code OAuthClientDefaults}' fixed grants/scopes/consent and no redirect URI yet (the owner
+ * adds that afterward, the one field this flow can't fill in on their behalf) — amends this class's
+ * own previously-documented "separate action" rule.
  *
  * <p>TD-SEC-007: also writes the {@code organization.created} audit event in this same transaction
  * — this is the exact action the technical-debt register named as unaudited ("Every platform-tier
@@ -36,6 +45,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
 
   private final OrganizationRepository organizations;
   private final SigningKeyProvisioner keyProvisioner;
+  private final OAuthClientProvisioner oauthClientProvisioner;
   private final PlatformAccountExistsChecker platformAccountExistsChecker;
   private final AuditEventRecorder auditEvents;
   private final RateLimitPolicyRepository policies;
@@ -47,6 +57,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
   public CreateOrganizationService(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
+      final OAuthClientProvisioner oauthClientProvisioner,
       final PlatformAccountExistsChecker platformAccountExistsChecker,
       final AuditEventRecorder auditEvents,
       final RateLimitPolicyRepository policies,
@@ -54,6 +65,7 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
       final int hardSystemWideCap) {
     this.organizations = organizations;
     this.keyProvisioner = keyProvisioner;
+    this.oauthClientProvisioner = oauthClientProvisioner;
     this.platformAccountExistsChecker = platformAccountExistsChecker;
     this.auditEvents = auditEvents;
     this.policies = policies;
@@ -93,6 +105,8 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
 
     final SigningKeyProvisioner.ProvisionedSigningKey signingKey =
         keyProvisioner.provisionFor(organization.id());
+    final OAuthClientProvisioner.ProvisionedOAuthClient oauthClient =
+        oauthClientProvisioner.provisionFor(organization.id(), command.actor());
 
     auditEvents.write(
         command.actor(),
@@ -101,6 +115,6 @@ public class CreateOrganizationService implements CreateOrganizationUseCase {
         organization.id().toString(),
         "ownerPlatformAccountId=" + command.ownerPlatformAccountId());
 
-    return new CreateOrganizationResult(organization, signingKey);
+    return new CreateOrganizationResult(organization, signingKey, oauthClient);
   }
 }

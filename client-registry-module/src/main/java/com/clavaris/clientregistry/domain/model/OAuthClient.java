@@ -17,16 +17,16 @@ import java.util.UUID;
  * <p>Deliberately a separate class from {@code PlatformClient} — belongs to exactly one
  * Organization, never none (data-model.md §2).
  *
- * <p>PMD's DataClass/AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this
- * class for the same reason {@code PlatformClient} suppresses them — the deliberate record-style
- * accessor convention used throughout this codebase's value objects. TooManyMethods is the same
- * shape of false positive: eight one-line accessors plus two rehydration factories is what a value
- * object with this many fields looks like, not a sign this class does too much. LongVariable:
- * {@code postLogoutRedirectUris} is the exact OIDC spec term (post_logout_redirect_uris), not
- * arbitrarily long — same precedent as {@code PlatformScopes}' own identical suppression.
+ * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
+ * the same reason {@code PlatformClient} suppresses them — the deliberate record-style accessor
+ * convention used throughout this codebase's value objects. TooManyMethods is the same shape of
+ * false positive: eight one-line accessors plus two rehydration factories plus three real mutators
+ * ({@code deactivate}/{@code rotateSecret}/{@code updateRedirectSettings}) is what a value object
+ * with this many fields looks like, not a sign this class does too much. LongVariable: {@code
+ * postLogoutRedirectUris} is the exact OIDC spec term (post_logout_redirect_uris), not arbitrarily
+ * long — same precedent as {@code PlatformScopes}' own identical suppression.
  */
 @SuppressWarnings({
-  "PMD.DataClass",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
@@ -90,16 +90,25 @@ public final class OAuthClient {
     this.clientId = ClientCredentialFields.requireNonBlank(clientId, "clientId");
     this.clientSecretHash =
         ClientCredentialFields.requireNonBlank(clientSecretHash, "clientSecretHash");
-    this.redirectUris = requireValidRedirectUris(redirectUris);
+    // BR-ORG-06 (SDE-III refactor, 2026-09-23): an Organization's default OAuthClient is now
+    // auto-provisioned synchronously at Organization-creation time, before the owning
+    // PlatformAccount has typed any redirect URI at all — requiring >=1 here would make that
+    // provisioning impossible. Empty is the genuine "not configured yet" state, same as
+    // postLogoutRedirectUris already allowed; BR-CLIENT-01's exact-match guarantee simply has
+    // nothing to match against until the user adds one, so /authorize requests for this client
+    // fail closed (no registered redirect URI to match) rather than being rejected at
+    // registration time.
+    this.redirectUris = requireValidUris(redirectUris, "redirectUris");
     this.allowedGrantTypes = List.copyOf(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
     this.allowedScopes = requireValidScopes(allowedScopes);
     this.requireConsent = requireConsent;
-    // TD-FUT-018: genuinely optional, unlike redirectUris — a client with no post-logout redirect
-    // configured simply gets SAS's own bare default (redirect to {clavarisBaseUrl}/), same
-    // behavior as before this field existed. Still validated the same way (well-formed, absolute)
-    // when present: RFC-shaped junk here would be un-matchable at RP-Initiated Logout time either
-    // way, same reasoning requireValidRedirectUris already applies to redirectUris.
-    this.postLogoutRedirectUris = requireValidAbsoluteUris(postLogoutRedirectUris);
+    // TD-FUT-018: genuinely optional, same as redirectUris now is (see that field's own comment
+    // above) — a client with no post-logout redirect configured simply gets SAS's own bare
+    // default (redirect to {clavarisBaseUrl}/). Still validated the same way (well-formed,
+    // absolute) when present: RFC-shaped junk here would be un-matchable at RP-Initiated Logout
+    // time either way, same requireValidUris rule redirectUris uses.
+    this.postLogoutRedirectUris =
+        requireValidUris(postLogoutRedirectUris, "postLogoutRedirectUris");
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     this.version = version;
@@ -197,6 +206,31 @@ public final class OAuthClient {
         postLogoutRedirectUris,
         createdAt,
         false,
+        version);
+  }
+
+  /**
+   * SDE-III refactor, 2026-09-23 (auto-provisioned default client) — {@code redirectUris}/{@code
+   * postLogoutRedirectUris} are the only two fields a consuming Organization may change after
+   * creation; {@code allowedGrantTypes}/{@code allowedScopes}/{@code requireConsent} stay
+   * creation-time-only, fixed by {@code OAuthClientDefaults}. Bundled into one mutator, not two —
+   * the dashboard edits both in a single "Redirect settings" form, and there is no scenario where
+   * changing one without the other is a real, distinct operation worth its own use case.
+   */
+  public OAuthClient updateRedirectSettings(
+      final List<String> redirectUris, final List<String> postLogoutRedirectUris) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        requireValidUris(redirectUris, "redirectUris"),
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        requireValidUris(postLogoutRedirectUris, "postLogoutRedirectUris"),
+        createdAt,
+        active,
         version);
   }
 
@@ -309,22 +343,18 @@ public final class OAuthClient {
   // ever applied at /authorize time. That guarantee only means something if what's stored here is
   // itself a well-formed, absolute URI to begin with; a malformed entry would be un-matchable
   // (and un-auditable) either way, so it's rejected at registration, not discovered later.
-  private static List<String> requireValidRedirectUris(final List<String> redirectUris) {
-    requireNonEmpty(redirectUris, "redirectUris");
-    for (final String redirectUri : redirectUris) {
-      requireWellFormedAbsoluteSecureUri(redirectUri, "redirectUris");
-    }
-    return List.copyOf(redirectUris);
-  }
-
-  // TD-FUT-018: same well-formed/absolute/secure requirement as requireValidRedirectUris above,
-  // minus its non-empty requirement — unlike redirectUris (meaningless empty, BR-CLIENT-01 has
-  // nothing to match against), an empty post-logout allowlist is the genuinely valid "not
-  // configured" state, not an error.
-  private static List<String> requireValidAbsoluteUris(final List<String> uris) {
-    Objects.requireNonNull(uris, "postLogoutRedirectUris must not be null");
+  //
+  // SDE-III refactor, 2026-09-23: shares one validator with postLogoutRedirectUris now that both
+  // fields allow an empty list (redirectUris' own comment in the constructor explains why) — the
+  // two were already identical except for redirectUris' now-removed non-empty requirement. Also
+  // deliberately unbounded on both (Clerk-parity check, live-verified against Clerk's own OAuth
+  // Applications "Redirect URIs" field, which is itself a multi-entry list, not a single value) —
+  // a consuming application legitimately needing web+native, or a canary/staging URL alongside
+  // production, on the same client is a real, common case, not one this system should foreclose.
+  private static List<String> requireValidUris(final List<String> uris, final String fieldName) {
+    Objects.requireNonNull(uris, fieldName + " must not be null");
     for (final String uri : uris) {
-      requireWellFormedAbsoluteSecureUri(uri, "postLogoutRedirectUris");
+      requireWellFormedAbsoluteSecureUri(uri, fieldName);
     }
     return List.copyOf(uris);
   }

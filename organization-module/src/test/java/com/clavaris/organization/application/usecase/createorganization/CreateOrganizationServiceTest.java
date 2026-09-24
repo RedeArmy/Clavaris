@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.organization.application.usecase.createorganization.OAuthClientProvisioner.ProvisionedOAuthClient;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.domain.model.RateLimitPolicy;
@@ -28,6 +29,7 @@ class CreateOrganizationServiceTest {
 
   private OrganizationRepository organizations;
   private SigningKeyProvisioner keyProvisioner;
+  private OAuthClientProvisioner oauthClientProvisioner;
   private PlatformAccountExistsChecker platformAccountExistsChecker;
   private AuditEventRecorder auditEvents;
   private RateLimitPolicyRepository policies;
@@ -37,14 +39,18 @@ class CreateOrganizationServiceTest {
   void setUp() {
     organizations = mock(OrganizationRepository.class);
     keyProvisioner = mock(SigningKeyProvisioner.class);
+    oauthClientProvisioner = mock(OAuthClientProvisioner.class);
     platformAccountExistsChecker = mock(PlatformAccountExistsChecker.class);
     auditEvents = mock(AuditEventRecorder.class);
     policies = mock(RateLimitPolicyRepository.class);
     when(platformAccountExistsChecker.exists(any())).thenReturn(true);
+    when(oauthClientProvisioner.provisionFor(any(), any()))
+        .thenReturn(new ProvisionedOAuthClient(UUID.randomUUID(), "test_a-client-id"));
     service =
         new CreateOrganizationService(
             organizations,
             keyProvisioner,
+            oauthClientProvisioner,
             platformAccountExistsChecker,
             auditEvents,
             policies,
@@ -62,6 +68,22 @@ class CreateOrganizationServiceTest {
 
     assertThat(result.organization().name()).isEqualTo("JobSeeker");
     verify(organizations).insert(result.organization());
+  }
+
+  // BR-ORG-06 (SDE-III refactor, 2026-09-23): the default OAuthClient must be provisioned for the
+  // exact Organization just created, not a stale or mismatched id — same regression-test shape as
+  // provisionsTheInitialSigningKeySynchronouslyInTheSameOperation below, for the client instead of
+  // the signing key.
+  @Test
+  void provisionsTheDefaultOAuthClientSynchronouslyInTheSameOperation() {
+    when(keyProvisioner.provisionFor(any()))
+        .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
+
+    final CreateOrganizationResult result =
+        service.handle(new CreateOrganizationCommand("JobSeeker", UUID.randomUUID(), ACTOR));
+
+    verify(oauthClientProvisioner).provisionFor(result.organization().id(), ACTOR);
+    assertThat(result.oauthClient().clientId()).isEqualTo("test_a-client-id");
   }
 
   @Test
@@ -114,6 +136,7 @@ class CreateOrganizationServiceTest {
     verify(organizations, never()).save(any());
     verify(organizations, never()).insert(any());
     verifyNoInteractions(keyProvisioner);
+    verifyNoInteractions(oauthClientProvisioner);
     verifyNoInteractions(auditEvents);
   }
 
