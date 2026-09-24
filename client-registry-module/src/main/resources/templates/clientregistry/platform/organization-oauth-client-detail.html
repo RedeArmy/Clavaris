@@ -90,6 +90,21 @@
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
                             </form>
                         </div>
+                        <!-- Live UX request, 2026-09-24: Activate and permanent delete only ever
+                             appear once a client is already inactive — never alongside Rotate
+                             secret/Deactivate above, so there's no risk of confusing the two states
+                             or reaching for "delete" on a client still in active use. -->
+                        <div class="clavaris-row-actions" th:unless="${client.active()}" style="margin-top: var(--space-4);">
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                  hx-target="#client-detail-content" hx-swap="outerHTML">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Activate</button>
+                            </form>
+                            <a class="clavaris-button clavaris-button--danger clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/delete(organizationId=${organizationId},clientId=${client.clientId()})}">Delete permanently</a>
+                        </div>
                     </div>
 
                     <!-- BR-ORG-06: the one section on this page an Organization owner may actually
@@ -122,12 +137,21 @@
                          broadly: a webhook-only consumer has nothing to fix here at all. -->
                     <div class="clavaris-section-card">
                         <h2>Redirect settings</h2>
-                        <p class="clavaris-alert clavaris-alert--warning" th:if="${#lists.isEmpty(client.redirectUris())}">
+                        <p class="clavaris-alert clavaris-alert--warning" th:if="${#lists.isEmpty(client.redirectUris()) and client.active()}">
                             No redirect URI configured yet — end-user login (authorization_code) won't
                             work for this client until you add one below. Machine-to-machine calls
                             (client_credentials) already work without one.
                         </p>
-                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
+                        <!-- Live UX bug fix, 2026-09-24: this form previously stayed editable even
+                             on a deactivated client — see UpdateOAuthClientRedirectSettingsService's
+                             own OAuthClientInactiveException Javadoc for the real, server-side
+                             guard this th:if mirrors on the client-visible side. -->
+                        <p class="clavaris-empty-state" th:unless="${client.active()}">
+                            This client is inactive — redirect settings can't be edited until you
+                            reactivate it above.
+                        </p>
+                        <form th:if="${client.active()}"
+                              th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
                               th:object="${redirectSettingsForm}" method="post"
                               th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
                               hx-target="#client-detail-content" hx-swap="outerHTML">

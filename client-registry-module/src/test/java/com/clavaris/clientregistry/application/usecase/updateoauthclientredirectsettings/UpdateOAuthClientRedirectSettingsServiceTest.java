@@ -143,6 +143,27 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
     verifyNoInteractions(auditEvents);
   }
 
+  // Live UX bug fix, 2026-09-24: an inactive client's redirect settings must not be editable —
+  // see OAuthClientInactiveException's own Javadoc.
+  @Test
+  void rejectsAnInactiveClientWithoutPersistingOrRecordingAnything() {
+    OAuthClient existing = sampleClient().deactivate();
+    when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
+    UpdateOAuthClientRedirectSettingsCommand command =
+        new UpdateOAuthClientRedirectSettingsCommand(
+            "target-client",
+            organizationId,
+            List.of("https://jobseeker.example.com/callback"),
+            List.of(),
+            ACTOR);
+
+    assertThatExceptionOfType(OAuthClientInactiveException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(oauthClients, never()).save(any());
+    verifyNoInteractions(auditEvents);
+  }
+
   @Test
   void rejectsAMalformedRedirectUriWithoutPersistingOrRecordingAnything() {
     OAuthClient existing = sampleClient();

@@ -444,6 +444,32 @@ class OAuthClientTest {
     assertThat(deactivated.createdAt()).isEqualTo(client.createdAt());
   }
 
+  // Live UX request, 2026-09-24: reactivation — same "keeps every other field unchanged" shape as
+  // deactivateReturnsAnInactiveCopyKeepingEveryOtherFieldUnchanged above.
+  @Test
+  void activateReturnsAnActiveCopyKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    OAuthClient deactivated = client.deactivate();
+
+    OAuthClient reactivated = deactivated.activate();
+
+    assertThat(reactivated.active()).isTrue();
+    assertThat(reactivated.id()).isEqualTo(client.id());
+    assertThat(reactivated.clientId()).isEqualTo(client.clientId());
+    assertThat(reactivated.clientSecretHash()).isEqualTo(client.clientSecretHash());
+    assertThat(reactivated.redirectUris()).isEqualTo(client.redirectUris());
+    assertThat(reactivated.createdAt()).isEqualTo(client.createdAt());
+  }
+
   @Test
   void rotateSecretReturnsACopyWithTheNewHashKeepingEveryOtherFieldUnchanged() {
     OAuthClient client =

@@ -1,5 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientCommand;
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
@@ -15,6 +17,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretCommand;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
@@ -65,15 +68,23 @@ import org.springframework.web.server.ResponseStatusException;
 // @PostMapping handler method name the same real concept — same "the field is the collaborator,
 // the method is the endpoint that calls it" shape every other controller in this codebase already
 // has for its own use-case fields (e.g. PlatformAccountProfileAdminController's own identical
-// suppression). PMD.TooManyMethods: the four add/remove-row endpoints (live UX request,
-// 2026-09-24 — a real list UI, not a textarea) are each a genuinely distinct HTTP mapping, not
-// sprawl — same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own class-level
-// suppression documents for an identical situation.
+// suppression). PMD.TooManyMethods/GodClass: the four add/remove-row endpoints (live UX request,
+// 2026-09-24 — a real list UI, not a textarea) plus the new activate() (2026-09-24, symmetric with
+// the already-existing deactivate()) are each a genuinely distinct HTTP mapping, not sprawl — same
+// "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own class-level suppression documents
+// for an identical situation; the alternative (splitting this into several controllers per
+// sub-resource) would scatter the ownership-check/populateDetailModel plumbing every one of these
+// endpoints shares, not remove any real complexity. PMD.ExcessiveParameterList: one constructor
+// parameter per collaborating use case, same rationale as every other multi-collaborator
+// constructor in this codebase (see e.g. RegisterOAuthClientService's own java:S107 precedent) —
+// a synthetic parameter object here would add indirection without removing complexity.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.TooManyMethods"
+  "PMD.TooManyMethods",
+  "PMD.GodClass",
+  "PMD.ExcessiveParameterList"
 })
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
@@ -93,6 +104,7 @@ public class PlatformOAuthClientController {
   private final ListOAuthClientsPagedUseCase listClientsPaged;
   private final GetOAuthClientForOrganizationUseCase getClient;
   private final DeactivateOAuthClientUseCase deactivateClient;
+  private final ActivateOAuthClientUseCase activateClient;
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
   private final UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings;
   private final OrganizationForPlatformAccountResolver organizationResolver;
@@ -109,6 +121,7 @@ public class PlatformOAuthClientController {
       final ListOAuthClientsPagedUseCase listClientsPaged,
       final GetOAuthClientForOrganizationUseCase getClient,
       final DeactivateOAuthClientUseCase deactivateClient,
+      final ActivateOAuthClientUseCase activateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
       final UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings,
       final OrganizationForPlatformAccountResolver organizationResolver,
@@ -118,6 +131,7 @@ public class PlatformOAuthClientController {
     this.listClientsPaged = listClientsPaged;
     this.getClient = getClient;
     this.deactivateClient = deactivateClient;
+    this.activateClient = activateClient;
     this.rotateClientSecret = rotateClientSecret;
     this.updateRedirectSettings = updateRedirectSettings;
     this.organizationResolver = organizationResolver;
@@ -295,6 +309,48 @@ public class PlatformOAuthClientController {
         + clientId;
   }
 
+  // Live UX request, 2026-09-24: reactivates a previously deactivated client — same two-exit
+  // shape as deactivate() above.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{clientId}/activate")
+  public String activate(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+
+    try {
+      activateClient.handle(
+          new ActivateOAuthClientCommand(
+              clientId,
+              organizationId,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.activateoauthclient
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      populateDetailModel(
+          model,
+          organizationId,
+          owned.organizationName(),
+          requireOwnedClient(organizationId, clientId));
+      return DETAIL_FRAGMENT;
+    }
+    return "redirect:/platform/dashboard/organizations/"
+        + organizationId
+        + "/oauth-clients/"
+        + clientId;
+  }
+
   // Never returns "redirect:" — same rationale as create() above.
   @PostMapping("/{clientId}/rotate-secret")
   public String rotateSecret(
@@ -335,7 +391,11 @@ public class PlatformOAuthClientController {
 
   // BR-ORG-06: the one field pair an Organization owner may edit after creation. No secret
   // involved — a plain redirect (non-HTMX) is safe, unlike create()/rotateSecret() above.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // PMD.CyclomaticComplexity: the new OAuthClientInactiveException catch (2026-09-24, live UX bug
+  // fix) is one more genuinely distinct rejection reason, not incidental branching — same "each
+  // branch is a real, separate case the caller needs to see" reasoning
+  // OAuthClient#requireWellFormedAbsoluteSecureUri's own identical suppression documents.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
   @PostMapping("/{clientId}/redirect-settings")
   public String updateRedirectSettings(
       final HttpServletRequest request,
@@ -381,6 +441,13 @@ public class PlatformOAuthClientController {
                 .OAuthClientNotFoundException
             _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final OAuthClientInactiveException _) {
+      // Live UX bug fix, 2026-09-24: a deactivated client's redirect settings were still
+      // editable — see OAuthClientInactiveException's own Javadoc. The form itself is now hidden
+      // behind client.active() on the template, so this only fires against a stale page or a
+      // direct POST, same defensive posture as every other "not expected via normal navigation,
+      // still rejected loudly" guard in this codebase.
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "This OAuthClient is inactive.");
     } catch (final IllegalArgumentException e) {
       // BR-CLIENT-01/OAuthClient's own well-formed/absolute/secure URI validation — surfaced as a
       // 400 here rather than an unhandled 500, same posture every other malformed-input path in

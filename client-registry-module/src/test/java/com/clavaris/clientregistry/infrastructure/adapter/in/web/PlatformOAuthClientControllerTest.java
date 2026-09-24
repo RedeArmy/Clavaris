@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationQuery;
@@ -29,6 +30,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
@@ -67,6 +69,7 @@ class PlatformOAuthClientControllerTest {
   private ListOAuthClientsPagedUseCase listClientsPaged;
   private GetOAuthClientForOrganizationUseCase getClient;
   private DeactivateOAuthClientUseCase deactivateClient;
+  private ActivateOAuthClientUseCase activateClient;
   private RotateOAuthClientSecretUseCase rotateClientSecret;
   private UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings;
   private OrganizationForPlatformAccountResolver organizationResolver;
@@ -80,6 +83,7 @@ class PlatformOAuthClientControllerTest {
     listClientsPaged = mock(ListOAuthClientsPagedUseCase.class);
     getClient = mock(GetOAuthClientForOrganizationUseCase.class);
     deactivateClient = mock(DeactivateOAuthClientUseCase.class);
+    activateClient = mock(ActivateOAuthClientUseCase.class);
     rotateClientSecret = mock(RotateOAuthClientSecretUseCase.class);
     updateRedirectSettings = mock(UpdateOAuthClientRedirectSettingsUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
@@ -112,6 +116,7 @@ class PlatformOAuthClientControllerTest {
                     listClientsPaged,
                     getClient,
                     deactivateClient,
+                    activateClient,
                     rotateClientSecret,
                     updateRedirectSettings,
                     organizationResolver,
@@ -292,6 +297,47 @@ class PlatformOAuthClientControllerTest {
         .andExpect(content().string(not(containsString("No redirect URI configured yet"))));
   }
 
+  // Live UX bug fix, 2026-09-24: the redirect-settings form (and the "no redirect URI" warning,
+  // meaningless once nothing can be edited) must be hidden on an inactive client — Rotate secret/
+  // Deactivate hide the same way, Activate/Delete permanently appear instead.
+  @Test
+  void showsActivateAndDeletePermanentlyAndHidesTheRedirectSettingsFormForAnInactiveClient()
+      throws Exception {
+    OAuthClient client = sampleClient().deactivate();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(">Activate<")))
+        .andExpect(content().string(containsString("Delete permanently")))
+        // Not "Save redirect settings" alone — an unrelated HTML comment elsewhere on this page
+        // mentions that exact phrase in prose (comments pass through to rendered output,
+        // Thymeleaf doesn't strip them), same class of false-positive already found and fixed
+        // once this session for a card-reordering test. ">...</button>" only matches the real
+        // button tag, not the comment.
+        .andExpect(content().string(not(containsString(">Save redirect settings<"))))
+        .andExpect(content().string(not(containsString("No redirect URI configured yet"))))
+        .andExpect(content().string(not(containsString(">Rotate secret<"))))
+        .andExpect(content().string(not(containsString(">Deactivate<"))));
+  }
+
+  @Test
+  void hidesActivateAndDeletePermanentlyAndShowsTheRedirectSettingsFormForAnActiveClient()
+      throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(">Save redirect settings<")))
+        .andExpect(content().string(containsString(">Rotate secret<")))
+        .andExpect(content().string(containsString(">Deactivate<")))
+        .andExpect(content().string(not(containsString(">Activate<"))))
+        .andExpect(content().string(not(containsString("Delete permanently"))));
+  }
+
   @Test
   void htmxGetDetailReturnsTheDetailFragment() throws Exception {
     OAuthClient client = sampleClient();
@@ -407,6 +453,56 @@ class PlatformOAuthClientControllerTest {
     mockMvc
         .perform(post(basePath() + "/test_someone_elses/deactivate"))
         .andExpect(status().isNotFound());
+  }
+
+  // Live UX request, 2026-09-24: reactivation — same shape as the deactivate tests above.
+  @Test
+  void plainActivatePostRedirectsToTheDetailPageOnSuccess() throws Exception {
+    OAuthClient client = sampleClient();
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/activate"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(activateClient).handle(any());
+  }
+
+  @Test
+  void htmxActivatePostReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/activate").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  @Test
+  void activateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.activateoauthclient
+                .OAuthClientNotFoundException("test_someone_elses"))
+        .when(activateClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/test_someone_elses/activate"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void activateReturnsConflictWhenTheClientWasModifiedConcurrently() throws Exception {
+    OAuthClient client = sampleClient();
+    doThrow(new ConcurrentClientModificationException(client.clientId()))
+        .when(activateClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/activate"))
+        .andExpect(status().isConflict());
   }
 
   @Test
@@ -530,6 +626,20 @@ class PlatformOAuthClientControllerTest {
             post(basePath() + "/test_abc/redirect-settings")
                 .param("redirectUris", "not a uri at all ::"))
         .andExpect(status().isBadRequest());
+  }
+
+  // Live UX bug fix, 2026-09-24: an inactive client's redirect settings must not be editable.
+  @Test
+  void updateRedirectSettingsReturnsConflictWhenTheClientIsInactive() throws Exception {
+    doThrow(new OAuthClientInactiveException("test_abc"))
+        .when(updateRedirectSettings)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(basePath() + "/test_abc/redirect-settings")
+                .param("redirectUris", "https://jobseeker.example.com/callback"))
+        .andExpect(status().isConflict());
   }
 
   // Live UX request, 2026-09-24: at least one real redirect URI is required to save — without

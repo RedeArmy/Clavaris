@@ -1,5 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.config;
 
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientService;
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientService;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
@@ -14,6 +16,9 @@ import com.clavaris.clientregistry.application.usecase.deactivateorganizationcli
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteoauthclient.DeleteOAuthClientService;
+import com.clavaris.clientregistry.application.usecase.deleteoauthclient.DeleteOAuthClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteoauthclient.OAuthClientTokenRevoker;
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingService;
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigService;
@@ -127,6 +132,23 @@ class ClientRegistryUseCaseConfig {
   /* package */ DeactivateOAuthClientUseCase deactivateOAuthClientUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new DeactivateOAuthClientService(oauthClients, auditEvents);
+  }
+
+  // Live UX request, 2026-09-24: reactivates a previously deactivated client.
+  @Bean
+  /* package */ ActivateOAuthClientUseCase activateOAuthClientUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new ActivateOAuthClientService(oauthClients, auditEvents);
+  }
+
+  // Live UX request, 2026-09-24: permanent, irreversible deletion — only reachable once the
+  // client is already deactivated. See DeleteOAuthClientService's own Javadoc.
+  @Bean
+  /* package */ DeleteOAuthClientUseCase deleteOAuthClientUseCase(
+      final OAuthClientRepository oauthClients,
+      final OAuthClientTokenRevoker tokenRevoker,
+      final AuditEventRecorder auditEvents) {
+    return new DeleteOAuthClientService(oauthClients, tokenRevoker, auditEvents);
   }
 
   // BR-ORG-06 (SDE-III refactor, 2026-09-23): the one post-creation mutation an Organization owner

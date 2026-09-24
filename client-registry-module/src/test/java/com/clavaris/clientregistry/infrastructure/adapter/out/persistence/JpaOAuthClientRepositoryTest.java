@@ -87,6 +87,29 @@ class JpaOAuthClientRepositoryTest {
     assertThat(found.get().active()).isTrue();
   }
 
+  // Live UX request, 2026-09-24: the first single-entity hard delete for this credential type —
+  // see DeleteOAuthClientService's own Javadoc.
+  @Test
+  void deleteRemovesTheRowSoAFollowingLookupFindsNothing() {
+    OAuthClient client =
+        OAuthClient.register(
+            UUID.randomUUID(),
+            "a-client-to-delete",
+            "argon2id$hashed",
+            List.of("https://jobseeker.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(client);
+    assertThat(repository.findByClientId("a-client-to-delete")).isPresent();
+
+    repository.delete(client);
+
+    assertThat(repository.findByClientId("a-client-to-delete")).isEmpty();
+    assertThat(repository.findById(client.id())).isEmpty();
+  }
+
   // SDE-III review, 2026-09-11: the real, load-bearing behavior behind switching save() from an
   // insert-only entityManager.persist to SpringData's own upsert save — a second save() call for
   // the same id must update the existing row, not throw a duplicate-key violation.
