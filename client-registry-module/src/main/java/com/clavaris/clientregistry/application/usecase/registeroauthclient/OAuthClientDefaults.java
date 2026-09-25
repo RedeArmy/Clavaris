@@ -40,6 +40,7 @@ public final class OAuthClientDefaults {
    * Spring Authorization Server tolerates a client_credentials-capable client that also carries
    * authorization_code/refresh_token fine).
    */
+  @SuppressWarnings("java:S1444")
   public static final List<String> GRANT_TYPES = OAuthGrantTypeCatalog.KNOWN;
 
   /**
@@ -48,6 +49,7 @@ public final class OAuthClientDefaults {
    * {@code refresh_token} grant above (a client that can't request offline access has no meaningful
    * use for a refresh token in the first place).
    */
+  @SuppressWarnings("java:S1444")
   public static final List<String> SCOPES = OidcScopeCatalog.KNOWN;
 
   /** ADR-0017: secure-by-default — no exception for the auto-provisioned client. */

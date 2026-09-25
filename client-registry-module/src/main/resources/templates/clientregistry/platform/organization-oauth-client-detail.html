@@ -393,11 +393,14 @@
                              string inside an onclick attribute. The label/id pair below is a static
                              fallback only (a static HTML analyzer reads this raw source, not the
                              DOM after cloning) — addScopeRow() below overwrites both with a real,
-                             unique value on every clone, so two added rows never collide. -->
+                             unique value on every clone, so two added rows never collide. Its own
+                             id/for ("scope-template") is deliberately distinct from the
+                             server-rendered rows' own static fallback ("scope") above, so a raw-
+                             source analyzer never sees the same id declared twice. -->
                         <template id="scope-row-template">
                             <div class="clavaris-uri-row">
-                                <label for="scope" class="clavaris-visually-hidden">Scope</label>
-                                <input type="text" id="scope" name="allowedScopes"/>
+                                <label for="scope-template" class="clavaris-visually-hidden">Scope</label>
+                                <input type="text" id="scope-template" name="allowedScopes"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
                                         onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
                             </div>
