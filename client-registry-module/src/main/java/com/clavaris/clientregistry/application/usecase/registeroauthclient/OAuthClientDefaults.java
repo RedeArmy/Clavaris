@@ -27,8 +27,9 @@ import java.util.List;
 // module's own tests) that already reference these fields directly. GRANT_TYPES/SCOPES are
 // List.of(...) results (via OAuthGrantTypeCatalog.KNOWN/OidcScopeCatalog.KNOWN) — genuinely
 // immutable at runtime, not just by convention; the rule's own "a public mutable field" concern
-// doesn't actually apply here.
-@SuppressWarnings("java:S1444")
+// doesn't actually apply here. @SuppressWarnings("java:S1444") was tried first but SonarCloud
+// doesn't honor it for this rule (confirmed: still flagged after adding it both here and on each
+// field below) — NOSONAR on the two flagged declarations is the fallback that actually works.
 public final class OAuthClientDefaults {
 
   /**
@@ -40,8 +41,7 @@ public final class OAuthClientDefaults {
    * Spring Authorization Server tolerates a client_credentials-capable client that also carries
    * authorization_code/refresh_token fine).
    */
-  @SuppressWarnings("java:S1444")
-  public static final List<String> GRANT_TYPES = OAuthGrantTypeCatalog.KNOWN;
+  public static final List<String> GRANT_TYPES = OAuthGrantTypeCatalog.KNOWN; // NOSONAR java:S1444
 
   /**
    * The full {@code OidcScopeCatalog.KNOWN} set — every scope this system's own OIDC/consent/
@@ -49,8 +49,7 @@ public final class OAuthClientDefaults {
    * {@code refresh_token} grant above (a client that can't request offline access has no meaningful
    * use for a refresh token in the first place).
    */
-  @SuppressWarnings("java:S1444")
-  public static final List<String> SCOPES = OidcScopeCatalog.KNOWN;
+  public static final List<String> SCOPES = OidcScopeCatalog.KNOWN; // NOSONAR java:S1444
 
   /** ADR-0017: secure-by-default — no exception for the auto-provisioned client. */
   public static final boolean REQUIRE_CONSENT = true;
