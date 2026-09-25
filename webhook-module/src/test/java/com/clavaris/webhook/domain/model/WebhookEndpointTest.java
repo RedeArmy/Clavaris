@@ -132,6 +132,80 @@ class WebhookEndpointTest {
   }
 
   @Test
+  void subscribesToReturnsTrueForEveryEventTypeWhenSubscribedToTheAllEventsWildcard() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(),
+            "https://example.com",
+            null,
+            List.of(WebhookEndpoint.ALL_EVENTS_WILDCARD),
+            "secret");
+
+    assertThat(endpoint.subscribesTo("account.created")).isTrue();
+    // Not even registered as a real event type option anywhere — the wildcard still matches it,
+    // proving this isn't just a coincidentally-broad allowlist.
+    assertThat(endpoint.subscribesTo("some_future_event_type.not_invented_yet")).isTrue();
+  }
+
+  @Test
+  void updateUrlReplacesTheUrlAndLeavesEveryOtherFieldUnchanged() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://old.example.com", "desc", List.of("x"), "secret");
+
+    WebhookEndpoint updated = endpoint.updateUrl("https://new.example.com");
+
+    assertThat(updated.url()).isEqualTo("https://new.example.com");
+    assertThat(updated.id()).isEqualTo(endpoint.id());
+    assertThat(updated.description()).isEqualTo("desc");
+    assertThat(updated.subscribedEventTypes()).containsExactly("x");
+  }
+
+  @Test
+  void updateUrlRejectsAPlainHttpUrlSameAsRegistration() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com", null, List.of("x"), "secret");
+
+    assertThatIllegalArgumentException().isThrownBy(() -> endpoint.updateUrl("http://insecure"));
+  }
+
+  @Test
+  void updateDescriptionReplacesTheDescriptionAndLeavesEveryOtherFieldUnchanged() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com", "old desc", List.of("x"), "secret");
+
+    WebhookEndpoint updated = endpoint.updateDescription("new desc");
+
+    assertThat(updated.description()).isEqualTo("new desc");
+    assertThat(updated.url()).isEqualTo(endpoint.url());
+  }
+
+  @Test
+  void updateEventTypesReplacesTheSubscriptionAndLeavesEveryOtherFieldUnchanged() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com", null, List.of("account.created"), "secret");
+
+    WebhookEndpoint updated =
+        endpoint.updateEventTypes(List.of("account.deleted", "workspace.created"));
+
+    assertThat(updated.subscribedEventTypes())
+        .containsExactlyInAnyOrder("account.deleted", "workspace.created");
+    assertThat(updated.url()).isEqualTo(endpoint.url());
+  }
+
+  @Test
+  void updateEventTypesRejectsAnEmptyListSameAsRegistration() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com", null, List.of("x"), "secret");
+
+    assertThatIllegalArgumentException().isThrownBy(() -> endpoint.updateEventTypes(List.of()));
+  }
+
+  @Test
   void reconstitutePreservesTheRealPersistedIdAndCreatedAt() {
     UUID id = UUID.randomUUID();
     Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");

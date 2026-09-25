@@ -26,6 +26,14 @@ public interface WebhookEndpointRepository {
   void save(WebhookEndpoint endpoint);
 
   /**
+   * Live UX request, 2026-09-25: permanent, single-entity delete — see {@code
+   * deletewebhookendpoint.DeleteWebhookEndpointService}'s own Javadoc. {@code webhook_deliveries}
+   * rows for this endpoint are removed by the database itself ({@code ON DELETE CASCADE}), not by
+   * this method walking them by hand.
+   */
+  void delete(WebhookEndpoint endpoint);
+
+  /**
    * TD-PERF-019: same write as {@link #save}, for the one call site that knows for a fact this
    * {@code WebhookEndpoint} has never been persisted before — {@code
    * RegisterWebhookEndpointService}, which always constructs via {@code

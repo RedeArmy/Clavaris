@@ -329,6 +329,18 @@ class JpaWebhookEndpointRepositoryTest {
     assertThat(backToFirstPage.hasPrevious()).isFalse();
   }
 
+  @Test
+  void deleteRemovesTheRowPermanently() {
+    WebhookEndpoint endpoint =
+        WebhookEndpoint.register(
+            UUID.randomUUID(), "https://example.com", null, List.of("x"), "secret");
+    repository.insert(endpoint);
+
+    repository.delete(endpoint);
+
+    assertThat(repository.findById(endpoint.id())).isEmpty();
+  }
+
   private static WebhookEndpoint reconstituteAt(
       final UUID organizationId, final String url, final Instant createdAt) {
     return WebhookEndpoint.reconstitute(

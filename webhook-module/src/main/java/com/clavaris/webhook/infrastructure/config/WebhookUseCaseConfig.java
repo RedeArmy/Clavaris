@@ -5,6 +5,8 @@ import com.clavaris.webhook.application.usecase.activatewebhookendpoint.Activate
 import com.clavaris.webhook.application.usecase.activatewebhookendpoint.ActivateWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointService;
 import com.clavaris.webhook.application.usecase.deactivatewebhookendpoint.DeactivateWebhookEndpointUseCase;
+import com.clavaris.webhook.application.usecase.deletewebhookendpoint.DeleteWebhookEndpointService;
+import com.clavaris.webhook.application.usecase.deletewebhookendpoint.DeleteWebhookEndpointUseCase;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.DeliverPendingWebhooksService;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.DeliverPendingWebhooksUseCase;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDeliveryRepository;
@@ -30,6 +32,12 @@ import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebh
 import com.clavaris.webhook.application.usecase.replaywebhookdelivery.ReplayWebhookDeliveryUseCase;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretService;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionService;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionUseCase;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesService;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesUseCase;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlService;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlUseCase;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -121,6 +129,35 @@ class WebhookUseCaseConfig {
   /* package */ ActivateWebhookEndpointUseCase activateWebhookEndpointUseCase(
       final WebhookEndpointRepository endpoints, final AuditEventRecorder auditEvents) {
     return new ActivateWebhookEndpointService(endpoints, auditEvents);
+  }
+
+  // Live UX request, 2026-09-25: URL/description/event types editable after registration, plus
+  // permanent delete — four new @Bean methods, same "wiring, not sprawl" reasoning this class's own
+  // existing suppressions already document.
+  @Bean
+  /* package */ UpdateWebhookEndpointUrlUseCase updateWebhookEndpointUrlUseCase(
+      final WebhookEndpointRepository endpoints,
+      final WebhookUrlSsrfGuard ssrfGuard,
+      final AuditEventRecorder auditEvents) {
+    return new UpdateWebhookEndpointUrlService(endpoints, ssrfGuard, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateWebhookEndpointDescriptionUseCase updateWebhookEndpointDescriptionUseCase(
+      final WebhookEndpointRepository endpoints, final AuditEventRecorder auditEvents) {
+    return new UpdateWebhookEndpointDescriptionService(endpoints, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateWebhookEndpointEventTypesUseCase updateWebhookEndpointEventTypesUseCase(
+      final WebhookEndpointRepository endpoints, final AuditEventRecorder auditEvents) {
+    return new UpdateWebhookEndpointEventTypesService(endpoints, auditEvents);
+  }
+
+  @Bean
+  /* package */ DeleteWebhookEndpointUseCase deleteWebhookEndpointUseCase(
+      final WebhookEndpointRepository endpoints, final AuditEventRecorder auditEvents) {
+    return new DeleteWebhookEndpointService(endpoints, auditEvents);
   }
 
   @SuppressWarnings("PMD.LongVariable")

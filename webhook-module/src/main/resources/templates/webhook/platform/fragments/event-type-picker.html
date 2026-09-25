@@ -1,0 +1,95 @@
+<!--
+Live UX request, 2026-09-25 (Clerk/PayPal-parity Event Catalog): the checkbox vocabulary shared by
+the "Register a new webhook endpoint" page and the endpoint detail page's own "Event types" edit
+dialog — one fragment, so the search/category/wildcard behavior never drifts between the two. Each
+option row carries a data-label (value + description, lowercased) the search box filters against
+client-side; a category header hides itself once every row under it is filtered out. The "All
+Events" wildcard is PayPal's own pattern (see the checkbox itself for why WebhookEndpoint.
+ALL_EVENTS_WILDCARD is submitted through a separate, normally-disabled hidden input rather than one
+of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that one sentinel value as
+"every event type, including one this codebase doesn't produce yet".
+-->
+<div th:fragment="picker(fieldName, selectedValues)">
+    <div class="clavaris-field">
+        <label for="event-search">Search events</label>
+        <input type="text" id="event-search" placeholder="Search events…" autocomplete="off"
+               oninput="window.filterWebhookEventOptions(this.value)"/>
+    </div>
+
+    <div class="clavaris-field">
+        <label class="clavaris-toggle">
+            <input type="checkbox" id="all-events-checkbox"
+                   th:checked="${#lists.contains(selectedValues, '*')}"
+                   onchange="window.toggleAllEventsWildcard(this.checked)"/>
+            <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+            <span class="clavaris-toggle__label">All Events — including event types this system adds in the future</span>
+        </label>
+        <!-- Never a real per-event checkbox's own value: keeping the wildcard out of the
+             individually-checkable list means an owner can never half-select it (e.g. by having
+             both "*" and "account.created" checked at once, which WebhookEndpoint#subscribesTo
+             would silently treat as just "*" anyway) — the toggle above and this hidden input are
+             the only place "*" can come from, and they're always in sync (see the script below). -->
+        <input type="hidden" id="all-events-hidden-value" th:name="${fieldName}" value="*"
+               th:disabled="${!#lists.contains(selectedValues, '*')}"/>
+    </div>
+
+    <div id="event-type-options" class="clavaris-uri-fieldset" style="max-height: 260px; overflow-y: auto;">
+        <div th:each="option, iterStat : ${T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG}">
+            <p class="clavaris-event-category-header"
+               th:if="${iterStat.index == 0 or !option.category().equals(T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG[iterStat.index - 1].category())}"
+               th:text="${option.category()}"
+               th:attr="data-category=${option.category()}">category</p>
+            <div class="clavaris-event-option"
+                 th:attr="data-label=${#strings.toLowerCase(option.value() + ' ' + option.description())},data-category=${option.category()}">
+                <label th:title="${option.description()}">
+                    <input type="checkbox" th:name="${fieldName}" th:value="${option.value()}"
+                           th:checked="${#lists.contains(selectedValues, option.value())}"
+                           th:disabled="${#lists.contains(selectedValues, '*')}"/>
+                    <span th:text="${option.value()}">event type</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <p id="event-search-empty" class="clavaris-empty-state" style="display: none;">No events match your search.</p>
+
+    <script>
+        // Live UX request, 2026-09-25: shared by every page that includes this fragment — defined
+        // once as window-level functions (not an IIFE-scoped closure) since both the register page
+        // and the edit-event-types dialog only ever include this fragment once each, and the
+        // onchange/oninput attributes above call these by name.
+        window.toggleAllEventsWildcard = function (checked) {
+            document.getElementById('all-events-hidden-value').disabled = !checked;
+            document.querySelectorAll('#event-type-options input[type=checkbox]').forEach(function (checkbox) {
+                checkbox.disabled = checked;
+                if (checked) {
+                    checkbox.checked = false;
+                }
+            });
+        };
+
+        window.filterWebhookEventOptions = function (query) {
+            var normalized = query.trim().toLowerCase();
+            var anyVisible = false;
+            var visibleCategories = {};
+            document.querySelectorAll('#event-type-options .clavaris-event-option').forEach(function (row) {
+                var matches = normalized === '' || row.getAttribute('data-label').indexOf(normalized) !== -1;
+                row.style.display = matches ? '' : 'none';
+                if (matches) {
+                    anyVisible = true;
+                    visibleCategories[row.getAttribute('data-category')] = true;
+                }
+            });
+            document.querySelectorAll('#event-type-options .clavaris-event-category-header').forEach(function (header) {
+                header.style.display = visibleCategories[header.getAttribute('data-category')] ? '' : 'none';
+            });
+            document.getElementById('event-search-empty').style.display = anyVisible ? 'none' : '';
+        };
+
+        // Initial load: an endpoint already subscribed to "*" must render with every individual
+        // checkbox already disabled, not just the hidden input already-enabled — same state
+        // toggleAllEventsWildcard(true) produces on a later, interactive change.
+        if (document.getElementById('all-events-checkbox').checked) {
+            window.toggleAllEventsWildcard(true);
+        }
+    </script>
+</div>

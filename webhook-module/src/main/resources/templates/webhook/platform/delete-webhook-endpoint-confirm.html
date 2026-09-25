@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Delete Webhook Endpoint — Clavaris')}">
+    <title>Delete Webhook Endpoint — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}(organizationId=${organizationId},endpointId=${endpoint.id()})}" th:text="${endpoint.url()}">endpoint url</a> /
+                <span>Delete</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Delete Webhook Endpoint</h1>
+                    <p>A permanent, irreversible action — read this carefully before confirming.</p>
+                </div>
+            </div>
+
+            <!-- Live UX request, 2026-09-25: the third genuine two-step confirmation flow in this
+                 codebase — see PlatformDeleteWebhookEndpointController's own Javadoc for the full
+                 design. -->
+            <div class="clavaris-section">
+                <div class="clavaris-section-card">
+                    <p class="clavaris-alert clavaris-alert--error">
+                        <strong>This is permanent and cannot be undone.</strong> Deleting
+                        <code th:text="${endpoint.url()}">endpoint url</code> destroys:
+                    </p>
+                    <ul>
+                        <li>The endpoint itself and its signing secret — no future event will ever
+                            be delivered to this URL again</li>
+                        <li>Its entire delivery history (every past attempt, succeeded or failed)</li>
+                    </ul>
+
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationExpiredError}">
+                        That confirmation expired or was already used — a fresh one has been
+                        issued below. Please confirm again.
+                    </p>
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationMismatchError}">
+                        What you typed didn't match — a fresh confirmation has been issued below.
+                        Please try again.
+                    </p>
+
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/delete(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                          method="post">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <input type="hidden" name="confirmationToken" th:value="${confirmationToken}"/>
+
+                        <div class="clavaris-field">
+                            <label for="confirmed-text">Type <strong>delete</strong> to confirm</label>
+                            <input id="confirmed-text" type="text" name="confirmedText" autocomplete="off" required/>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete this endpoint permanently</button>
+                        <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                           th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}(organizationId=${organizationId},endpointId=${endpoint.id()})}">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
