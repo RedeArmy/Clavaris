@@ -67,7 +67,7 @@
                                     <td>
                                         <code th:if="${justRegisteredRawSecret}" th:text="${justRegisteredRawSecret}">secret</code>
                                         <span th:unless="${justRegisteredRawSecret}" class="clavaris-text-muted">
-                                            Shown once, at creation or rotation — Clavaris never stores or displays it again. Use "Rotate secret" below for a new one.
+                                            Shown once, at creation, rotation, or reactivation — Clavaris never stores or displays it again. Use "Rotate secret" below for a new one.
                                         </span>
                                     </td>
                                 </tr>
@@ -89,6 +89,26 @@
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
                             </form>
+                        </div>
+                        <!-- Live UX request, 2026-09-24: Activate and permanent delete only ever
+                             appear once a client is already inactive — never alongside Rotate
+                             secret/Deactivate above, so there's no risk of confusing the two states
+                             or reaching for "delete" on a client still in active use. Live UX
+                             request, 2026-09-25: Activate also rotates the secret (see
+                             ActivateOAuthClientResult's own Javadoc) — the button's own title
+                             says so upfront, and the same "New client secret" banner
+                             create/rotate already show appears here too. -->
+                        <div class="clavaris-row-actions" th:unless="${client.active()}" style="margin-top: var(--space-4);">
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
+                                  hx-target="#client-detail-content" hx-swap="outerHTML">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit"
+                                        title="Also rotates the client secret — the new one is shown once, right after.">Activate</button>
+                            </form>
+                            <a class="clavaris-button clavaris-button--danger clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/delete(organizationId=${organizationId},clientId=${client.clientId()})}">Delete permanently</a>
                         </div>
                     </div>
 
@@ -122,12 +142,21 @@
                          broadly: a webhook-only consumer has nothing to fix here at all. -->
                     <div class="clavaris-section-card">
                         <h2>Redirect settings</h2>
-                        <p class="clavaris-alert clavaris-alert--warning" th:if="${#lists.isEmpty(client.redirectUris())}">
+                        <p class="clavaris-alert clavaris-alert--warning" th:if="${#lists.isEmpty(client.redirectUris()) and client.active()}">
                             No redirect URI configured yet — end-user login (authorization_code) won't
                             work for this client until you add one below. Machine-to-machine calls
                             (client_credentials) already work without one.
                         </p>
-                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
+                        <!-- Live UX bug fix, 2026-09-24: this form previously stayed editable even
+                             on a deactivated client — see UpdateOAuthClientRedirectSettingsService's
+                             own OAuthClientInactiveException Javadoc for the real, server-side
+                             guard this th:if mirrors on the client-visible side. -->
+                        <p class="clavaris-empty-state" th:unless="${client.active()}">
+                            This client is inactive — redirect settings can't be edited until you
+                            reactivate it above.
+                        </p>
+                        <form th:if="${client.active()}"
+                              th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
                               th:object="${redirectSettingsForm}" method="post"
                               th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/redirect-settings(organizationId=${organizationId},clientId=${client.clientId()})}"
                               hx-target="#client-detail-content" hx-swap="outerHTML">
@@ -236,20 +265,48 @@
                         </div>
                     </div>
 
-                    <!-- BR-ORG-06: read-only — grant types/scopes/consent are fixed at creation
-                         (OAuthClientDefaults) and never editable from the dashboard. -->
+                    <!-- SDE-III correction, 2026-09-24 (live UX request): reverses this card's own
+                         original "read-only, fixed at creation, never editable" design — an owner
+                         may now edit each of the three from its own popup, gated behind
+                         client.active() the same way Redirect settings already is (see
+                         UpdateOAuthClient{GrantTypes,Scopes,Consent}Service's own
+                         OAuthClientInactiveException). Grant types: a checkbox list of
+                         OAuthGrantTypeCatalog.KNOWN only, never free text — the one real guard
+                         against a value OrganizationRegisteredClientRepository would otherwise
+                         forward blindly into Spring Authorization Server (see that catalog's own
+                         Javadoc). Scopes: free-text add/remove, same shape as Redirect URIs, since
+                         OidcScopeCatalog.KNOWN is reference only, not an allowlist. Consent: a
+                         plain toggle. Each popup is a native <dialog> (organization-dialog.js,
+                         already loaded on this page via dashboard-nav.html) — this codebase's own
+                         first non-HTMX-lazy-loaded modal use, since each dialog's content is small
+                         enough to render eagerly with the rest of the page. -->
                     <div class="clavaris-section-card">
                         <h2>Configuration</h2>
-                        <div class="clavaris-table-wrapper">
+                        <!-- Live UX request, 2026-09-25: hides the values themselves when
+                             inactive, not just the Edit buttons — same "the whole content area is
+                             gone, not just non-interactive" treatment Redirect settings' own
+                             <form th:if="${client.active()}"> already gets, for the identical
+                             reason (nothing about an inactive client's configuration is relevant
+                             to show or safe to imply is still "the current setting" until it's
+                             reactivated). -->
+                        <div class="clavaris-table-wrapper" th:if="${client.active()}">
                             <table class="clavaris-table">
                                 <tbody>
                                 <tr>
                                     <th scope="row">Grant types</th>
                                     <td th:text="${#strings.listJoin(client.allowedGrantTypes(), ', ')}">grant types</td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="grant-types-dialog">Edit</button>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th scope="row">Scopes</th>
                                     <td th:text="${#strings.listJoin(client.allowedScopes(), ', ')}">scopes</td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="scopes-dialog">Edit</button>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th scope="row">Consent screen</th>
@@ -258,11 +315,136 @@
                                               th:classappend="${client.requireConsent()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                               th:text="${client.requireConsent()} ? 'Required' : 'Skipped'">Required</span>
                                     </td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="consent-dialog">Edit</button>
+                                    </td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div>
+                        <p class="clavaris-empty-state" th:unless="${client.active()}">
+                            This client is inactive — configuration can't be edited until you
+                            reactivate it above.
+                        </p>
                     </div>
+
+                    <!-- Live UX request, 2026-09-25: the three dialogs below are gated behind
+                         client.active() too, not just their own trigger buttons — each pre-fills
+                         real current data into its own form (checked checkboxes/scope input
+                         values), so a closed-but-still-rendered dialog would leave that data
+                         sitting in the DOM even with no way to open it. Same "the whole content
+                         area is gone" treatment as the read-only table above. -->
+                    <dialog id="grant-types-dialog" class="clavaris-dialog" th:if="${client.active()}">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Grant types</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close grant types dialog">&times;</button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/grant-types(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="clavaris-field" th:each="grantType : ${T(com.clavaris.clientregistry.domain.model.OAuthGrantTypeCatalog).KNOWN}">
+                                <label>
+                                    <input type="checkbox" name="allowedGrantTypes" th:value="${grantType}"
+                                           th:checked="${#lists.contains(client.allowedGrantTypes(), grantType)}"/>
+                                    <span th:text="${grantType}">grant type</span>
+                                </label>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save grant types</button>
+                            </div>
+                        </form>
+                    </dialog>
+
+                    <dialog id="scopes-dialog" class="clavaris-dialog" th:if="${client.active()}">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Scopes</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close scopes dialog">&times;</button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/scopes(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post" id="scopes-form">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="clavaris-field">
+                                <fieldset class="clavaris-uri-fieldset">
+                                    <legend>Scopes</legend>
+                                    <div id="scopes-rows">
+                                        <div class="clavaris-uri-row" th:each="scope, rowStat : ${client.allowedScopes()}">
+                                            <label for="scope" th:for="${'scope' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Scope ' + (rowStat.index + 1)">Scope</label>
+                                            <input type="text" id="scope" th:id="${'scope' + rowStat.index}" name="allowedScopes" th:value="${scope}"/>
+                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                                    onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
+                                        </div>
+                                    </div>
+                                </fieldset>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                        onclick="addScopeRow()">+ Add scope</button>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save scopes</button>
+                            </div>
+                        </form>
+                        <!-- Scopes add/remove is client-side-only until "Save scopes" submits the
+                             whole list — an HTMX round trip (Redirect URIs' own pattern) would
+                             replace this <dialog>'s ancestor content and silently close it, since
+                             <dialog>'s open state lives in the browser, not the server. <template>
+                             keeps the row markup in exactly one place instead of an escaped HTML
+                             string inside an onclick attribute. The label/id pair below is a static
+                             fallback only (a static HTML analyzer reads this raw source, not the
+                             DOM after cloning) — addScopeRow() below overwrites both with a real,
+                             unique value on every clone, so two added rows never collide. Its own
+                             id/for ("scope-template") is deliberately distinct from the
+                             server-rendered rows' own static fallback ("scope") above, so a raw-
+                             source analyzer never sees the same id declared twice. -->
+                        <template id="scope-row-template">
+                            <div class="clavaris-uri-row">
+                                <label for="scope-template" class="clavaris-visually-hidden">Scope</label>
+                                <input type="text" id="scope-template" name="allowedScopes"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                        onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
+                            </div>
+                        </template>
+                        <script>
+                            // Live UX request, 2026-09-25 (SonarCloud accessibility fix): each
+                            // cloned row needs its own unique id/for pair, not the template's own
+                            // static fallback repeated — a growing counter, seeded past every
+                            // server-rendered row's own rowStat.index, guarantees no collision.
+                            (function () {
+                                var scopeRowCounter = document.querySelectorAll('#scopes-rows .clavaris-uri-row').length;
+                                window.addScopeRow = function () {
+                                    var clone = document.getElementById('scope-row-template').content.cloneNode(true);
+                                    var id = 'scope' + scopeRowCounter++;
+                                    clone.querySelector('input').id = id;
+                                    clone.querySelector('label').setAttribute('for', id);
+                                    document.getElementById('scopes-rows').appendChild(clone);
+                                };
+                            })();
+                        </script>
+                    </dialog>
+
+                    <dialog id="consent-dialog" class="clavaris-dialog" th:if="${client.active()}">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Consent screen</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close consent screen dialog">&times;</button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/consent(organizationId=${organizationId},clientId=${client.clientId()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="clavaris-field">
+                                <label class="clavaris-toggle">
+                                    <input type="checkbox" name="requireConsent" th:checked="${client.requireConsent()}"/>
+                                    <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                    <span class="clavaris-toggle__label">Require consent screen</span>
+                                </label>
+                                <p>ADR-0017: whether Clavaris shows the end user a consent screen before issuing an authorization code to this client.</p>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save consent setting</button>
+                            </div>
+                        </form>
+                    </dialog>
                 </div>
             </div>
         </div>

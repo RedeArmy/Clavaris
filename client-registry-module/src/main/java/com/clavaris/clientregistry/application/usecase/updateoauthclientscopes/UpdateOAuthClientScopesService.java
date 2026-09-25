@@ -1,47 +1,40 @@
-package com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings;
+package com.clavaris.clientregistry.application.usecase.updateoauthclientscopes;
 
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 
 /**
- * Same ownership-verification/audit shape as {@code
- * deactivateoauthclient.DeactivateOAuthClientService}.
+ * Same rationale/shape as {@code updateoauthclientgranttypes.UpdateOAuthClientGrantTypesService}.
  */
-public class UpdateOAuthClientRedirectSettingsService
-    implements UpdateOAuthClientRedirectSettingsUseCase {
+public class UpdateOAuthClientScopesService implements UpdateOAuthClientScopesUseCase {
 
   private final OAuthClientRepository oauthClients;
   private final AuditEventRecorder auditEvents;
 
-  public UpdateOAuthClientRedirectSettingsService(
+  public UpdateOAuthClientScopesService(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     this.oauthClients = oauthClients;
     this.auditEvents = auditEvents;
   }
 
   @Override
-  public void handle(final UpdateOAuthClientRedirectSettingsCommand command) {
+  public void handle(final UpdateOAuthClientScopesCommand command) {
     final OAuthClient existing =
         oauthClients
             .findByClientId(command.clientId())
-            // Same cross-tenant-mismatch-collapses-to-404 reasoning as
-            // DeactivateOAuthClientService's own identical check.
             .filter(found -> found.organizationId().equals(command.organizationId()))
             .orElseThrow(() -> new OAuthClientNotFoundException(command.clientId()));
 
-    // Live UX bug fix, 2026-09-24: a deactivated client's redirect settings were still editable —
-    // see OAuthClientInactiveException's own Javadoc.
     if (!existing.active()) {
       throw new OAuthClientInactiveException(command.clientId());
     }
 
-    oauthClients.save(
-        existing.updateRedirectSettings(command.redirectUris(), command.postLogoutRedirectUris()));
+    oauthClients.save(existing.updateScopes(command.allowedScopes()));
 
     auditEvents.write(
         command.actor(),
-        "oauth_client.redirect_settings_updated",
+        "oauth_client.scopes_updated",
         "Organization",
         existing.organizationId().toString(),
         "clientId=" + command.clientId());

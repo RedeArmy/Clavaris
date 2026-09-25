@@ -54,4 +54,12 @@ public interface OAuthClientRepository {
    * ever registered.
    */
   void deleteAllByOrganizationId(UUID organizationId);
+
+  /**
+   * Live UX request, 2026-09-24: the first single-entity hard delete for this credential type — see
+   * {@code deleteoauthclient.DeleteOAuthClientService}'s own Javadoc. Takes the full domain object,
+   * not a bare id, same shape as {@link #save(OAuthClient)} — the caller already has it in hand
+   * from its own ownership-checked {@link #findByClientId} lookup.
+   */
+  void delete(OAuthClient client);
 }

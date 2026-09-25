@@ -100,6 +100,15 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
     oauthClients.flush();
   }
 
+  // deleteById, not a derived deleteByClientId query — JpaRepository already provides it for
+  // free, and the caller (DeleteOAuthClientService) already holds the full domain object from its
+  // own ownership-checked findByClientId lookup, same shape save(OAuthClient) already takes.
+  @Override
+  public void delete(final OAuthClient client) {
+    oauthClients.deleteById(client.id());
+    oauthClients.flush();
+  }
+
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // organization-module's own JpaOrganizationRepository#findKeysetPageOwnedBy already documents.
   @Override

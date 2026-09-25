@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{clientregistry/fragments/head :: head(${organizationName} + ' — ' + ${client.clientId()} + ' — Delete OAuth Client — Clavaris')}">
+    <title>Delete OAuth Client — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{clientregistry/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}">OAuth Clients</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}(organizationId=${organizationId},clientId=${client.clientId()})}" th:text="${client.clientId()}">client id</a> /
+                <span>Delete</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1>Delete OAuth Client</h1>
+                    <p>A permanent, irreversible action — read this carefully before confirming.</p>
+                </div>
+            </div>
+
+            <!-- Live UX request, 2026-09-24: the second genuine two-step confirmation flow in this
+                 codebase — see PlatformDeleteOAuthClientController's own Javadoc for the full
+                 design, including why the typed field below deliberately accepts either "delete"
+                 or the Client ID, unlike the Organization-delete flow's own single-string match. -->
+            <div class="clavaris-section">
+                <div class="clavaris-section-card">
+                    <p class="clavaris-alert clavaris-alert--error">
+                        <strong>This is permanent and cannot be undone.</strong> Deleting
+                        <code th:text="${client.clientId()}">client id</code> destroys:
+                    </p>
+                    <ul>
+                        <li>The client itself and its credentials — no consuming application will
+                            ever be able to authenticate with this Client ID again</li>
+                        <li>Every redirect URI and post-logout redirect URI configured on it</li>
+                        <li>Any already-issued token still associated with it, revoked immediately</li>
+                    </ul>
+
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationExpiredError}">
+                        That confirmation expired or was already used — a fresh one has been
+                        issued below. Please confirm again.
+                    </p>
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationMismatchError}">
+                        What you typed didn't match — a fresh confirmation has been issued below.
+                        Please try again.
+                    </p>
+
+                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/delete(organizationId=${organizationId},clientId=${client.clientId()})}"
+                          method="post">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <input type="hidden" name="confirmationToken" th:value="${confirmationToken}"/>
+
+                        <div class="clavaris-field">
+                            <label for="confirmed-text">
+                                Type <strong>delete</strong> or the Client ID
+                                (<code th:text="${client.clientId()}">client id</code>) to confirm
+                            </label>
+                            <input id="confirmed-text" type="text" name="confirmedText" autocomplete="off" required/>
+                        </div>
+
+                        <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete this OAuth Client permanently</button>
+                        <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                           th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}(organizationId=${organizationId},clientId=${client.clientId()})}">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

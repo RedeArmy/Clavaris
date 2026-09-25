@@ -1,4 +1,4 @@
-package com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings;
+package com.clavaris.clientregistry.application.usecase.updateoauthclientscopes;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,21 +19,24 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Same rationale/shape as {@code deactivateoauthclient.DeactivateOAuthClientServiceTest}. */
-class UpdateOAuthClientRedirectSettingsServiceTest {
+/**
+ * Same rationale/shape as {@code
+ * updateoauthclientgranttypes.UpdateOAuthClientGrantTypesServiceTest}.
+ */
+class UpdateOAuthClientScopesServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformAccount(UUID.randomUUID());
 
   private final UUID organizationId = UUID.randomUUID();
   private OAuthClientRepository oauthClients;
   private AuditEventRecorder auditEvents;
-  private UpdateOAuthClientRedirectSettingsService service;
+  private UpdateOAuthClientScopesService service;
 
   @BeforeEach
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new UpdateOAuthClientRedirectSettingsService(oauthClients, auditEvents);
+    service = new UpdateOAuthClientScopesService(oauthClients, auditEvents);
   }
 
   private OAuthClient sampleClient() {
@@ -42,55 +45,23 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
         "target-client",
         "argon2id$hashed",
         List.of(),
-        List.of("authorization_code", "refresh_token", "client_credentials"),
-        List.of("openid", "profile", "email", "offline_access"),
+        List.of("authorization_code"),
+        List.of("openid"),
         true,
         List.of());
   }
 
   @Test
-  void savesTheClientWithTheNewRedirectSettings() {
+  void savesTheClientWithTheNewScopes() {
     OAuthClient existing = sampleClient();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
 
     service.handle(
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "target-client",
-            organizationId,
-            List.of("https://jobseeker.example.com/callback"),
-            List.of("https://jobseeker.example.com/logged-out"),
-            ACTOR));
+        new UpdateOAuthClientScopesCommand(
+            "target-client", organizationId, List.of("openid", "test.read"), ACTOR));
 
     verify(oauthClients)
-        .save(
-            argThat(
-                saved ->
-                    saved.redirectUris().equals(List.of("https://jobseeker.example.com/callback"))
-                        && saved
-                            .postLogoutRedirectUris()
-                            .equals(List.of("https://jobseeker.example.com/logged-out"))));
-  }
-
-  @Test
-  void leavesGrantTypesScopesAndConsentUntouched() {
-    OAuthClient existing = sampleClient();
-    when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
-
-    service.handle(
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "target-client",
-            organizationId,
-            List.of("https://jobseeker.example.com/callback"),
-            List.of(),
-            ACTOR));
-
-    verify(oauthClients)
-        .save(
-            argThat(
-                saved ->
-                    saved.allowedGrantTypes().equals(existing.allowedGrantTypes())
-                        && saved.allowedScopes().equals(existing.allowedScopes())
-                        && saved.requireConsent() == existing.requireConsent()));
+        .save(argThat(saved -> saved.allowedScopes().equals(List.of("openid", "test.read"))));
   }
 
   @Test
@@ -99,13 +70,12 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
 
     service.handle(
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "target-client", organizationId, List.of(), List.of(), ACTOR));
+        new UpdateOAuthClientScopesCommand("target-client", organizationId, List.of(), ACTOR));
 
     verify(auditEvents)
         .write(
             ACTOR,
-            "oauth_client.redirect_settings_updated",
+            "oauth_client.scopes_updated",
             "Organization",
             organizationId.toString(),
             "clientId=target-client");
@@ -114,9 +84,8 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
   @Test
   void rejectsAnUnknownClientIdWithoutPersistingOrRecordingAnything() {
     when(oauthClients.findByClientId("ghost-client")).thenReturn(Optional.empty());
-    UpdateOAuthClientRedirectSettingsCommand command =
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "ghost-client", organizationId, List.of(), List.of(), ACTOR);
+    UpdateOAuthClientScopesCommand command =
+        new UpdateOAuthClientScopesCommand("ghost-client", organizationId, List.of(), ACTOR);
 
     assertThatExceptionOfType(OAuthClientNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -125,16 +94,14 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
     verifyNoInteractions(auditEvents);
   }
 
-  // Same tenant-mismatch-collapses-to-404 reasoning DeactivateOAuthClientServiceTest's own
-  // identical test documents.
   @Test
   void rejectsAClientThatBelongsToADifferentOrganizationWithoutPersistingOrRecordingAnything() {
     OAuthClient existing = sampleClient();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
     UUID unrelatedOrganizationId = UUID.randomUUID();
-    UpdateOAuthClientRedirectSettingsCommand command =
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "target-client", unrelatedOrganizationId, List.of(), List.of(), ACTOR);
+    UpdateOAuthClientScopesCommand command =
+        new UpdateOAuthClientScopesCommand(
+            "target-client", unrelatedOrganizationId, List.of(), ACTOR);
 
     assertThatExceptionOfType(OAuthClientNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -143,19 +110,13 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
     verifyNoInteractions(auditEvents);
   }
 
-  // Live UX bug fix, 2026-09-24: an inactive client's redirect settings must not be editable —
-  // see OAuthClientInactiveException's own Javadoc.
   @Test
   void rejectsAnInactiveClientWithoutPersistingOrRecordingAnything() {
     OAuthClient existing = sampleClient().deactivate();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
-    UpdateOAuthClientRedirectSettingsCommand command =
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "target-client",
-            organizationId,
-            List.of("https://jobseeker.example.com/callback"),
-            List.of(),
-            ACTOR);
+    UpdateOAuthClientScopesCommand command =
+        new UpdateOAuthClientScopesCommand(
+            "target-client", organizationId, List.of("openid"), ACTOR);
 
     assertThatExceptionOfType(OAuthClientInactiveException.class)
         .isThrownBy(() -> service.handle(command));
@@ -165,12 +126,12 @@ class UpdateOAuthClientRedirectSettingsServiceTest {
   }
 
   @Test
-  void rejectsAMalformedRedirectUriWithoutPersistingOrRecordingAnything() {
+  void rejectsAReservedPlatformNamespaceScopeWithoutPersistingOrRecordingAnything() {
     OAuthClient existing = sampleClient();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
-    UpdateOAuthClientRedirectSettingsCommand command =
-        new UpdateOAuthClientRedirectSettingsCommand(
-            "target-client", organizationId, List.of("not a uri at all ::"), List.of(), ACTOR);
+    UpdateOAuthClientScopesCommand command =
+        new UpdateOAuthClientScopesCommand(
+            "target-client", organizationId, List.of("platform:organizations:write"), ACTOR);
 
     assertThatExceptionOfType(IllegalArgumentException.class)
         .isThrownBy(() -> service.handle(command));

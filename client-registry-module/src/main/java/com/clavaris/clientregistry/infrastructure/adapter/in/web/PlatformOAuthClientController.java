@@ -1,5 +1,8 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientCommand;
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientResult;
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
@@ -15,8 +18,15 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretCommand;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentCommand;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesCommand;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsCommand;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesCommand;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.AuditActor;
@@ -66,14 +76,32 @@ import org.springframework.web.server.ResponseStatusException;
 // the method is the endpoint that calls it" shape every other controller in this codebase already
 // has for its own use-case fields (e.g. PlatformAccountProfileAdminController's own identical
 // suppression). PMD.TooManyMethods: the four add/remove-row endpoints (live UX request,
-// 2026-09-24 — a real list UI, not a textarea) are each a genuinely distinct HTTP mapping, not
-// sprawl — same "wiring, not sprawl" reasoning OrganizationUseCaseConfig's own class-level
-// suppression documents for an identical situation.
+// 2026-09-24 — a real list UI, not a textarea) plus activate() and the three Configuration-card
+// mutators (updateGrantTypes/updateScopes/updateConsent, also 2026-09-24) are each a genuinely
+// distinct HTTP mapping, not sprawl — same "wiring, not sprawl" reasoning
+// OrganizationUseCaseConfig's own class-level suppression documents for an identical situation.
+// The alternative (splitting this into several controllers per sub-resource) would scatter the
+// ownership-check/populateDetailModel plumbing every one of these endpoints shares, not remove any
+// real complexity. PMD.ExcessiveParameterList/CouplingBetweenObjects: one constructor parameter
+// per collaborating use case, same rationale as every other multi-collaborator constructor in
+// this codebase (see e.g. RegisterOAuthClientService's own java:S107 precedent) — a synthetic
+// parameter object here would add indirection without removing complexity, and this class's own
+// job (route every Configuration-card mutation to its own use case) structurally requires knowing
+// about all of them. PMD.AvoidDuplicateLiterals: "PMD.OnlyOneReturn" as a repeated
+// @SuppressWarnings value across several genuinely-multi-exit handler methods — extracting it to
+// a named constant would not make any of those methods clearer. PMD.CyclomaticComplexity (class
+// total): the sum of every endpoint's own already-justified per-method complexity — a controller
+// routing eleven genuinely distinct HTTP mappings to their own use cases inherently sums to a
+// large total; each individual method stays within its own documented, reasonable complexity.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.TooManyMethods"
+  "PMD.TooManyMethods",
+  "PMD.ExcessiveParameterList",
+  "PMD.CouplingBetweenObjects",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.CyclomaticComplexity"
 })
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/oauth-clients")
@@ -88,13 +116,20 @@ public class PlatformOAuthClientController {
   private static final String REDIRECT_URIS_ERROR_ATTRIBUTE = "redirectUrisError";
   private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
+  private static final String INACTIVE_CLIENT_ERROR = "This OAuthClient is inactive.";
+  private static final String JUST_REGISTERED_RAW_SECRET_ATTRIBUTE = "justRegisteredRawSecret";
+  private static final String JUST_REGISTERED_CLIENT_ID_ATTRIBUTE = "justRegisteredClientId";
 
   private final RegisterOAuthClientUseCase registerClient;
   private final ListOAuthClientsPagedUseCase listClientsPaged;
   private final GetOAuthClientForOrganizationUseCase getClient;
   private final DeactivateOAuthClientUseCase deactivateClient;
+  private final ActivateOAuthClientUseCase activateClient;
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
   private final UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings;
+  private final UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
+  private final UpdateOAuthClientScopesUseCase updateScopes;
+  private final UpdateOAuthClientConsentUseCase updateConsent;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final String clavarisBaseUrl;
@@ -109,8 +144,12 @@ public class PlatformOAuthClientController {
       final ListOAuthClientsPagedUseCase listClientsPaged,
       final GetOAuthClientForOrganizationUseCase getClient,
       final DeactivateOAuthClientUseCase deactivateClient,
+      final ActivateOAuthClientUseCase activateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
       final UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings,
+      final UpdateOAuthClientGrantTypesUseCase updateGrantTypes,
+      final UpdateOAuthClientScopesUseCase updateScopes,
+      final UpdateOAuthClientConsentUseCase updateConsent,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
@@ -118,8 +157,12 @@ public class PlatformOAuthClientController {
     this.listClientsPaged = listClientsPaged;
     this.getClient = getClient;
     this.deactivateClient = deactivateClient;
+    this.activateClient = activateClient;
     this.rotateClientSecret = rotateClientSecret;
     this.updateRedirectSettings = updateRedirectSettings;
+    this.updateGrantTypes = updateGrantTypes;
+    this.updateScopes = updateScopes;
+    this.updateConsent = updateConsent;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
     this.clavarisBaseUrl = clavarisBaseUrl;
@@ -182,6 +225,16 @@ public class PlatformOAuthClientController {
     return getClient
         .handle(new GetOAuthClientForOrganizationQuery(clientId, organizationId))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+  }
+
+  // Shared by every plain (non-HTMX) success exit on this controller — six call sites as of
+  // 2026-09-24 (deactivate/activate/redirect-settings/grant-types/scopes/consent), extracted once
+  // real duplication set in, not preemptively.
+  private static String redirectToDetail(final UUID organizationId, final String clientId) {
+    return "redirect:/platform/dashboard/organizations/"
+        + organizationId
+        + "/oauth-clients/"
+        + clientId;
   }
 
   // TD-PERF-020 (keyset revision, 2026-09-14): ?after=/?before= carry an opaque KeysetCursor
@@ -250,8 +303,8 @@ public class PlatformOAuthClientController {
     }
 
     populateDetailModel(model, organizationId, owned.organizationName(), result.client());
-    model.addAttribute("justRegisteredRawSecret", result.rawClientSecret());
-    model.addAttribute("justRegisteredClientId", result.client().clientId());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawClientSecret());
+    model.addAttribute(JUST_REGISTERED_CLIENT_ID_ATTRIBUTE, result.client().clientId());
     return DETAIL_VIEW;
   }
 
@@ -289,10 +342,48 @@ public class PlatformOAuthClientController {
           requireOwnedClient(organizationId, clientId));
       return DETAIL_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/"
-        + organizationId
-        + "/oauth-clients/"
-        + clientId;
+    return redirectToDetail(organizationId, clientId);
+  }
+
+  // Live UX request, 2026-09-24: reactivates a previously deactivated client. Live UX request,
+  // 2026-09-25: also rotates its secret (see ActivateOAuthClientResult's own Javadoc) — never
+  // returns "redirect:", same rationale as create()/rotateSecret(): the raw secret shown exactly
+  // once here has nowhere safe to travel through a redirect.
+  @PostMapping("/{clientId}/activate")
+  public String activate(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+
+    final ActivateOAuthClientResult result;
+    try {
+      result =
+          activateClient.handle(
+              new ActivateOAuthClientCommand(
+                  clientId,
+                  organizationId,
+                  AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.activateoauthclient
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    populateDetailModel(
+        model,
+        organizationId,
+        owned.organizationName(),
+        requireOwnedClient(organizationId, clientId));
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawSecret());
+    model.addAttribute(JUST_REGISTERED_CLIENT_ID_ATTRIBUTE, result.clientId());
+    return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
   }
 
   // Never returns "redirect:" — same rationale as create() above.
@@ -328,14 +419,18 @@ public class PlatformOAuthClientController {
         organizationId,
         owned.organizationName(),
         requireOwnedClient(organizationId, clientId));
-    model.addAttribute("justRegisteredRawSecret", result.rawSecret());
-    model.addAttribute("justRegisteredClientId", result.clientId());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawSecret());
+    model.addAttribute(JUST_REGISTERED_CLIENT_ID_ATTRIBUTE, result.clientId());
     return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
   }
 
   // BR-ORG-06: the one field pair an Organization owner may edit after creation. No secret
   // involved — a plain redirect (non-HTMX) is safe, unlike create()/rotateSecret() above.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // PMD.CyclomaticComplexity: the new OAuthClientInactiveException catch block, added 2026-09-24
+  // as a live UX bug fix, is one more genuinely distinct rejection reason, not incidental
+  // branching — same "each branch is a real, separate case the caller needs to see" reasoning
+  // OAuthClient#requireWellFormedAbsoluteSecureUri's own identical suppression documents.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
   @PostMapping("/{clientId}/redirect-settings")
   public String updateRedirectSettings(
       final HttpServletRequest request,
@@ -381,6 +476,13 @@ public class PlatformOAuthClientController {
                 .OAuthClientNotFoundException
             _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final OAuthClientInactiveException _) {
+      // Live UX bug fix, 2026-09-24: a deactivated client's redirect settings were still
+      // editable — see OAuthClientInactiveException's own Javadoc. The form itself is now hidden
+      // behind client.active() on the template, so this only fires against a stale page or a
+      // direct POST, same defensive posture as every other "not expected via normal navigation,
+      // still rejected loudly" guard in this codebase.
+      throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
     } catch (final IllegalArgumentException e) {
       // BR-CLIENT-01/OAuthClient's own well-formed/absolute/secure URI validation — surfaced as a
       // 400 here rather than an unhandled 500, same posture every other malformed-input path in
@@ -397,10 +499,166 @@ public class PlatformOAuthClientController {
           requireOwnedClient(organizationId, clientId));
       return DETAIL_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/"
-        + organizationId
-        + "/oauth-clients/"
-        + clientId;
+    return redirectToDetail(organizationId, clientId);
+  }
+
+  // Live UX request, 2026-09-24: reverses BR-ORG-06's original "creation-time-only" rule — see
+  // OAuthClientDefaults's own updated Javadoc. Checkbox list, never free text:
+  // OAuthGrantTypeCatalog
+  // .KNOWN is the only set OAuthClient's own constructor validation (requireKnownGrantTypes)
+  // accepts, so an unchecked/unrecognised value 400s here rather than silently reaching
+  // OrganizationRegisteredClientRepository, which would otherwise forward it blindly into Spring
+  // Authorization Server. PMD.CyclomaticComplexity: four genuinely distinct rejection reasons
+  // (not found/inactive/malformed/concurrent conflict) plus the HTMX-vs-redirect branch, same
+  // "each branch is a real, separate case" reasoning updateRedirectSettings's own identical
+  // suppression documents.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+  @PostMapping("/{clientId}/grant-types")
+  public String updateGrantTypes(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @RequestParam(name = "allowedGrantTypes", required = false)
+          final List<String> allowedGrantTypes,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+
+    try {
+      updateGrantTypes.handle(
+          new UpdateOAuthClientGrantTypesCommand(
+              clientId,
+              organizationId,
+              allowedGrantTypes == null ? List.of() : allowedGrantTypes,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes
+                .OAuthClientInactiveException
+            _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
+    } catch (final IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      populateDetailModel(
+          model,
+          organizationId,
+          owned.organizationName(),
+          requireOwnedClient(organizationId, clientId));
+      return DETAIL_FRAGMENT;
+    }
+    return redirectToDetail(organizationId, clientId);
+  }
+
+  // Same rationale/shape as updateGrantTypes above — free text, add/remove, mirroring Redirect
+  // URIs (OidcScopeCatalog.KNOWN is reference only, not an allowlist, so no checkbox restriction
+  // here — a real client_credentials-only OAuthClient legitimately needs custom scopes).
+  // Blank entries (an in-progress row in the modal's own add/remove UI) are dropped, same
+  // tolerance UpdateOAuthClientRedirectSettingsForm's own parse methods already give redirect URIs.
+  // PMD.CyclomaticComplexity: same rationale as updateGrantTypes's own identical suppression.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+  @PostMapping("/{clientId}/scopes")
+  public String updateScopes(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @RequestParam(name = "allowedScopes", required = false) final List<String> allowedScopes,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+    final List<String> parsedScopes =
+        allowedScopes == null
+            ? List.of()
+            : allowedScopes.stream().map(String::strip).filter(s -> !s.isEmpty()).toList();
+
+    try {
+      updateScopes.handle(
+          new UpdateOAuthClientScopesCommand(
+              clientId,
+              organizationId,
+              parsedScopes,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientscopes
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientscopes
+                .OAuthClientInactiveException
+            _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
+    } catch (final IllegalArgumentException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      populateDetailModel(
+          model,
+          organizationId,
+          owned.organizationName(),
+          requireOwnedClient(organizationId, clientId));
+      return DETAIL_FRAGMENT;
+    }
+    return redirectToDetail(organizationId, clientId);
+  }
+
+  // Same rationale/shape as updateGrantTypes/updateScopes above — a plain toggle, ADR-0017's own
+  // secure-by-default posture stays the starting point, not a floor an owner can never move off.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{clientId}/consent")
+  public String updateConsent(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      @RequestParam(name = "requireConsent", defaultValue = "false") final boolean requireConsent,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+
+    try {
+      updateConsent.handle(
+          new UpdateOAuthClientConsentCommand(
+              clientId,
+              organizationId,
+              requireConsent,
+              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientconsent
+                .OAuthClientNotFoundException
+            _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (
+        final com.clavaris.clientregistry.application.usecase.updateoauthclientconsent
+                .OAuthClientInactiveException
+            _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, INACTIVE_CLIENT_ERROR);
+    } catch (final ConcurrentClientModificationException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      populateDetailModel(
+          model,
+          organizationId,
+          owned.organizationName(),
+          requireOwnedClient(organizationId, clientId));
+      return DETAIL_FRAGMENT;
+    }
+    return redirectToDetail(organizationId, clientId);
   }
 
   // Live UX request, 2026-09-24: a real add/remove-row list UI, not a one-entry-per-line

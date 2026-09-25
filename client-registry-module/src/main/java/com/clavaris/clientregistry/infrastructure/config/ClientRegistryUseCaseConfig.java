@@ -1,5 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.config;
 
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientService;
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientService;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
@@ -14,6 +16,9 @@ import com.clavaris.clientregistry.application.usecase.deactivateorganizationcli
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientService;
 import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.DeactivatePlatformClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteoauthclient.DeleteOAuthClientService;
+import com.clavaris.clientregistry.application.usecase.deleteoauthclient.DeleteOAuthClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteoauthclient.OAuthClientTokenRevoker;
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingService;
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigService;
@@ -52,8 +57,14 @@ import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClie
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.RedirectPolicyRepository;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsService;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.DnsTxtRecordLookup;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipService;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipUseCase;
@@ -129,12 +140,53 @@ class ClientRegistryUseCaseConfig {
     return new DeactivateOAuthClientService(oauthClients, auditEvents);
   }
 
+  // Live UX request, 2026-09-24: reactivates a previously deactivated client. Live UX request,
+  // 2026-09-25: also rotates its secret — see ActivateOAuthClientResult's own Javadoc.
+  @Bean
+  /* package */ ActivateOAuthClientUseCase activateOAuthClientUseCase(
+      final OAuthClientRepository oauthClients,
+      final ClientSecretHasher hasher,
+      final OAuthClientSecretGenerator secretGenerator,
+      final AuditEventRecorder auditEvents) {
+    return new ActivateOAuthClientService(oauthClients, hasher, secretGenerator, auditEvents);
+  }
+
+  // Live UX request, 2026-09-24: permanent, irreversible deletion — only reachable once the
+  // client is already deactivated. See DeleteOAuthClientService's own Javadoc.
+  @Bean
+  /* package */ DeleteOAuthClientUseCase deleteOAuthClientUseCase(
+      final OAuthClientRepository oauthClients,
+      final OAuthClientTokenRevoker tokenRevoker,
+      final AuditEventRecorder auditEvents) {
+    return new DeleteOAuthClientService(oauthClients, tokenRevoker, auditEvents);
+  }
+
   // BR-ORG-06 (SDE-III refactor, 2026-09-23): the one post-creation mutation an Organization owner
   // may make on their own OAuthClient — see OAuthClient#updateRedirectSettings's own Javadoc.
   @Bean
   /* package */ UpdateOAuthClientRedirectSettingsUseCase updateOAuthClientRedirectSettingsUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new UpdateOAuthClientRedirectSettingsService(oauthClients, auditEvents);
+  }
+
+  // Live UX request, 2026-09-24: reverses BR-ORG-06's original "creation-time-only" rule for
+  // grant types/scopes/consent — see OAuthClientDefaults's own updated Javadoc.
+  @Bean
+  /* package */ UpdateOAuthClientGrantTypesUseCase updateOAuthClientGrantTypesUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientGrantTypesService(oauthClients, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateOAuthClientScopesUseCase updateOAuthClientScopesUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientScopesService(oauthClients, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateOAuthClientConsentUseCase updateOAuthClientConsentUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientConsentService(oauthClients, auditEvents);
   }
 
   // SDE-III refactor, 2026-09-23 (Clerk-style master-detail OAuth Clients page): backs the new

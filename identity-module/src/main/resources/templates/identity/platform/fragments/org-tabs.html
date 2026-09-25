@@ -6,8 +6,9 @@ declares a Maven dependency on another, so a single shared fragment would only b
 the app module's aggregated runtime classpath, not from any one module's own standalone-MockMvc
 controller tests. "Users" is a plain link to the already-existing, separate
 /platform/dashboard/organizations/{organizationId}/users page (this module's own) — not embedded
-here. "Configure" links to Secret Keys, the same default landing item Clerk's own equivalent tab
-uses (its screenshot's own "API keys" is the closest Clerk concept to a Secret Key here).
+here. "Configure" links to OAuth Clients (changed 2026-09-25, live UX request — was Secret Keys):
+the end-user login client is what most owners configure right after checking their API Keys, same
+reasoning that already moved OAuth Clients to second position in the Configure sidebar itself.
 
 SDE-III refactor, 2026-09-22: organization-users.html used to carry its own one-off "Back to
 {organizationName}" link (identity/platform/fragments/back-link.html) pointing at the Workspaces
@@ -32,7 +33,7 @@ plain muted text (clavaris-back-link's own styling) — see that class's own com
            th:classappend="${active == 'users'} ? 'active'">Users</a>
         <a th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organizationId})}"
            th:classappend="${active == 'logs'} ? 'active'">Logs</a>
-        <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
+        <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
            th:classappend="${active == 'configure'} ? 'active'">Configure</a>
     </div>
 </div>

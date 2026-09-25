@@ -1,19 +1,35 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
+import com.clavaris.clientregistry.domain.model.OAuthGrantTypeCatalog;
+import com.clavaris.clientregistry.domain.model.OidcScopeCatalog;
 import java.util.List;
 
 /**
  * BR-ORG-06 (SDE-III refactor, 2026-09-23, Clerk-parity self-service simplification): the fixed
- * defaults every new {@code OAuthClient} registers with now — both the one auto-provisioned
+ * starting point every new {@code OAuthClient} registers with — both the one auto-provisioned
  * synchronously at Organization-creation time (organization-module's own {@code
  * OAuthClientProvisioner} port, bridged in {@code app}) and any additional client an Organization
  * owner adds later via the dashboard's own "Add client" action. Neither caller lets the end user
- * pick grant types, scopes, or the consent-screen setting — those three are Clavaris's own,
- * consciously chosen, not a per-client decision an Organization owner has to understand OAuth2 well
- * enough to get right. {@code redirectUris}/{@code postLogoutRedirectUris} are deliberately NOT
- * here — the one thing the user configures afterward, via {@code
+ * pick these three at REGISTRATION time — an Organization owner isn't asked to understand OAuth2
+ * well enough to fill them in while creating a client. {@code redirectUris}/{@code
+ * postLogoutRedirectUris} are deliberately NOT here — always configured afterward, via {@code
  * updateoauthclientredirectsettings}.
+ *
+ * <p><b>SDE-III correction, 2026-09-24 (live UX request):</b> these three are no longer
+ * creation-time-only — {@code updateoauthclientgranttypes}/{@code updateoauthclientscopes}/{@code
+ * updateoauthclientconsent} let an owner edit each one afterward too, same as redirect settings
+ * already could. This class still names the correct, safe starting point a brand-new client
+ * registers with; it no longer means "and can never change."
  */
+// java:S1444 ("make this member protected"): this is a final, uninstantiable constants holder —
+// protected would be meaningless (no subclass can ever exist) and would break every real caller
+// across module boundaries (RegisterOAuthClientController, PlatformOAuthClientController, this
+// module's own tests) that already reference these fields directly. GRANT_TYPES/SCOPES are
+// List.of(...) results (via OAuthGrantTypeCatalog.KNOWN/OidcScopeCatalog.KNOWN) — genuinely
+// immutable at runtime, not just by convention; the rule's own "a public mutable field" concern
+// doesn't actually apply here. @SuppressWarnings("java:S1444") was tried first but SonarCloud
+// doesn't honor it for this rule (confirmed: still flagged after adding it both here and on each
+// field below) — NOSONAR on the two flagged declarations is the fallback that actually works.
 public final class OAuthClientDefaults {
 
   /**
@@ -25,8 +41,7 @@ public final class OAuthClientDefaults {
    * Spring Authorization Server tolerates a client_credentials-capable client that also carries
    * authorization_code/refresh_token fine).
    */
-  public static final List<String> GRANT_TYPES =
-      List.of("authorization_code", "refresh_token", "client_credentials");
+  public static final List<String> GRANT_TYPES = OAuthGrantTypeCatalog.KNOWN; // NOSONAR java:S1444
 
   /**
    * The full {@code OidcScopeCatalog.KNOWN} set — every scope this system's own OIDC/consent/
@@ -34,7 +49,7 @@ public final class OAuthClientDefaults {
    * {@code refresh_token} grant above (a client that can't request offline access has no meaningful
    * use for a refresh token in the first place).
    */
-  public static final List<String> SCOPES = List.of("openid", "profile", "email", "offline_access");
+  public static final List<String> SCOPES = OidcScopeCatalog.KNOWN; // NOSONAR java:S1444
 
   /** ADR-0017: secure-by-default — no exception for the auto-provisioned client. */
   public static final boolean REQUIRE_CONSENT = true;
