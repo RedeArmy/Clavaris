@@ -1082,4 +1082,69 @@ class PlatformOAuthClientControllerTest {
         .andExpect(content().string(not(containsString(">Required<"))))
         .andExpect(content().string(not(containsString(">Skipped<"))));
   }
+
+  // Live UX request, 2026-09-25: "Add these to your application" gets the same "the whole content
+  // area is gone" treatment as Redirect settings/Configuration for an inactive client — a
+  // deactivated client's credentials are rejected at every one of these endpoints anyway (see
+  // OrganizationOidcIssuerIntegrationTest#rejectsADeactivatedClientAtTheOrganizationTokenEndpoint),
+  // so showing this panel as if it were still usable would be misleading.
+  @Test
+  void setupInstructionsCardHidesValuesForAnInactiveClientAndShowsAnExplanation() throws Exception {
+    OAuthClient client = sampleClient().deactivate();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("these setup values won't work until you")))
+        .andExpect(content().string(not(containsString(".well-known/openid-configuration"))))
+        .andExpect(content().string(not(containsString("/oauth2/jwks"))))
+        .andExpect(content().string(not(containsString("/connect/logout"))));
+  }
+
+  @Test
+  void setupInstructionsCardShowsValuesForAnActiveClient() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(".well-known/openid-configuration")))
+        .andExpect(
+            content().string(not(containsString("these setup values won't work until you"))));
+  }
+
+  // Live UX request, 2026-09-25: the default "Shown once, at creation, rotation, or reactivation"
+  // muted text invites the reader to use "Rotate secret" — but that button only shows for an
+  // active client. An inactive client gets its own explanation tied to Activate instead, the only
+  // action that yields a new secret while inactive.
+  @Test
+  void clientSecretCellExplainsReactivationIsNeededForAnInactiveClient() throws Exception {
+    OAuthClient client = sampleClient().deactivate();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("reactivate it above to get an updated client secret.")))
+        .andExpect(content().string(not(containsString("Shown once, at creation, rotation"))));
+  }
+
+  @Test
+  void clientSecretCellShowsTheDefaultRotationHintForAnActiveClient() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Shown once, at creation, rotation")))
+        .andExpect(
+            content()
+                .string(
+                    not(containsString("reactivate it above to get an updated client secret."))));
+  }
 }
