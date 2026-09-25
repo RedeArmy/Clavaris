@@ -369,15 +369,16 @@
                                 <fieldset class="clavaris-uri-fieldset">
                                     <legend>Scopes</legend>
                                     <div id="scopes-rows">
-                                        <div class="clavaris-uri-row" th:each="scope : ${client.allowedScopes()}">
-                                            <input type="text" name="allowedScopes" th:value="${scope}"/>
+                                        <div class="clavaris-uri-row" th:each="scope, rowStat : ${client.allowedScopes()}">
+                                            <label for="scope" th:for="${'scope' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Scope ' + (rowStat.index + 1)">Scope</label>
+                                            <input type="text" id="scope" th:id="${'scope' + rowStat.index}" name="allowedScopes" th:value="${scope}"/>
                                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
                                                     onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
                                         </div>
                                     </div>
                                 </fieldset>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
-                                        onclick="document.getElementById('scopes-rows').appendChild(document.getElementById('scope-row-template').content.cloneNode(true))">+ Add scope</button>
+                                        onclick="addScopeRow()">+ Add scope</button>
                             </div>
                             <div class="clavaris-dialog__actions">
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
@@ -389,14 +390,34 @@
                              replace this <dialog>'s ancestor content and silently close it, since
                              <dialog>'s open state lives in the browser, not the server. <template>
                              keeps the row markup in exactly one place instead of an escaped HTML
-                             string inside an onclick attribute. -->
+                             string inside an onclick attribute. The label/id pair below is a static
+                             fallback only (a static HTML analyzer reads this raw source, not the
+                             DOM after cloning) — addScopeRow() below overwrites both with a real,
+                             unique value on every clone, so two added rows never collide. -->
                         <template id="scope-row-template">
                             <div class="clavaris-uri-row">
-                                <input type="text" name="allowedScopes"/>
+                                <label for="scope" class="clavaris-visually-hidden">Scope</label>
+                                <input type="text" id="scope" name="allowedScopes"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
                                         onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
                             </div>
                         </template>
+                        <script>
+                            // Live UX request, 2026-09-25 (SonarCloud accessibility fix): each
+                            // cloned row needs its own unique id/for pair, not the template's own
+                            // static fallback repeated — a growing counter, seeded past every
+                            // server-rendered row's own rowStat.index, guarantees no collision.
+                            (function () {
+                                var scopeRowCounter = document.querySelectorAll('#scopes-rows .clavaris-uri-row').length;
+                                window.addScopeRow = function () {
+                                    var clone = document.getElementById('scope-row-template').content.cloneNode(true);
+                                    var id = 'scope' + scopeRowCounter++;
+                                    clone.querySelector('input').id = id;
+                                    clone.querySelector('label').setAttribute('for', id);
+                                    document.getElementById('scopes-rows').appendChild(clone);
+                                };
+                            })();
+                        </script>
                     </dialog>
 
                     <dialog id="consent-dialog" class="clavaris-dialog" th:if="${client.active()}">

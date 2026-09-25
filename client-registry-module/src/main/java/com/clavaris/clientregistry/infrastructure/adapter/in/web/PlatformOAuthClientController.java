@@ -79,8 +79,8 @@ import org.springframework.web.server.ResponseStatusException;
 // 2026-09-24 — a real list UI, not a textarea) plus activate() and the three Configuration-card
 // mutators (updateGrantTypes/updateScopes/updateConsent, also 2026-09-24) are each a genuinely
 // distinct HTTP mapping, not sprawl — same "wiring, not sprawl" reasoning
-// OrganizationUseCaseConfig's own class-level suppression documents for an identical situation;
-// the alternative (splitting this into several controllers per sub-resource) would scatter the
+// OrganizationUseCaseConfig's own class-level suppression documents for an identical situation.
+// The alternative (splitting this into several controllers per sub-resource) would scatter the
 // ownership-check/populateDetailModel plumbing every one of these endpoints shares, not remove any
 // real complexity. PMD.ExcessiveParameterList/CouplingBetweenObjects: one constructor parameter
 // per collaborating use case, same rationale as every other multi-collaborator constructor in
@@ -117,6 +117,8 @@ public class PlatformOAuthClientController {
   private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String INACTIVE_CLIENT_ERROR = "This OAuthClient is inactive.";
+  private static final String JUST_REGISTERED_RAW_SECRET_ATTRIBUTE = "justRegisteredRawSecret";
+  private static final String JUST_REGISTERED_CLIENT_ID_ATTRIBUTE = "justRegisteredClientId";
 
   private final RegisterOAuthClientUseCase registerClient;
   private final ListOAuthClientsPagedUseCase listClientsPaged;
@@ -301,8 +303,8 @@ public class PlatformOAuthClientController {
     }
 
     populateDetailModel(model, organizationId, owned.organizationName(), result.client());
-    model.addAttribute("justRegisteredRawSecret", result.rawClientSecret());
-    model.addAttribute("justRegisteredClientId", result.client().clientId());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawClientSecret());
+    model.addAttribute(JUST_REGISTERED_CLIENT_ID_ATTRIBUTE, result.client().clientId());
     return DETAIL_VIEW;
   }
 
@@ -379,8 +381,8 @@ public class PlatformOAuthClientController {
         organizationId,
         owned.organizationName(),
         requireOwnedClient(organizationId, clientId));
-    model.addAttribute("justRegisteredRawSecret", result.rawSecret());
-    model.addAttribute("justRegisteredClientId", result.clientId());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawSecret());
+    model.addAttribute(JUST_REGISTERED_CLIENT_ID_ATTRIBUTE, result.clientId());
     return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
   }
 
@@ -417,16 +419,16 @@ public class PlatformOAuthClientController {
         organizationId,
         owned.organizationName(),
         requireOwnedClient(organizationId, clientId));
-    model.addAttribute("justRegisteredRawSecret", result.rawSecret());
-    model.addAttribute("justRegisteredClientId", result.clientId());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawSecret());
+    model.addAttribute(JUST_REGISTERED_CLIENT_ID_ATTRIBUTE, result.clientId());
     return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
   }
 
   // BR-ORG-06: the one field pair an Organization owner may edit after creation. No secret
   // involved — a plain redirect (non-HTMX) is safe, unlike create()/rotateSecret() above.
-  // PMD.CyclomaticComplexity: the new OAuthClientInactiveException catch (2026-09-24, live UX bug
-  // fix) is one more genuinely distinct rejection reason, not incidental branching — same "each
-  // branch is a real, separate case the caller needs to see" reasoning
+  // PMD.CyclomaticComplexity: the new OAuthClientInactiveException catch block, added 2026-09-24
+  // as a live UX bug fix, is one more genuinely distinct rejection reason, not incidental
+  // branching — same "each branch is a real, separate case the caller needs to see" reasoning
   // OAuthClient#requireWellFormedAbsoluteSecureUri's own identical suppression documents.
   @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
   @PostMapping("/{clientId}/redirect-settings")

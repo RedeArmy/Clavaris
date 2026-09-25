@@ -21,6 +21,14 @@ import java.util.List;
  * already could. This class still names the correct, safe starting point a brand-new client
  * registers with; it no longer means "and can never change."
  */
+// java:S1444 ("make this member protected"): this is a final, uninstantiable constants holder —
+// protected would be meaningless (no subclass can ever exist) and would break every real caller
+// across module boundaries (RegisterOAuthClientController, PlatformOAuthClientController, this
+// module's own tests) that already reference these fields directly. GRANT_TYPES/SCOPES are
+// List.of(...) results (via OAuthGrantTypeCatalog.KNOWN/OidcScopeCatalog.KNOWN) — genuinely
+// immutable at runtime, not just by convention; the rule's own "a public mutable field" concern
+// doesn't actually apply here.
+@SuppressWarnings("java:S1444")
 public final class OAuthClientDefaults {
 
   /**
