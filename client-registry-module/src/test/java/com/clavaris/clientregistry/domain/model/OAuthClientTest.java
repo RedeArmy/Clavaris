@@ -293,6 +293,24 @@ class OAuthClientTest {
                     List.of()));
   }
 
+  // Live UX request, 2026-09-24 (Configuration card made editable): unlike allowedScopes,
+  // allowedGrantTypes genuinely is a closed set — see OAuthGrantTypeCatalog's own Javadoc.
+  @Test
+  void rejectsAGrantTypeOutsideTheKnownCatalog() {
+    assertThatIllegalArgumentException()
+        .isThrownBy(
+            () ->
+                OAuthClient.register(
+                    organizationId,
+                    "a-client",
+                    "argon2id$hashed",
+                    List.of("https://example.com/callback"),
+                    List.of("authorization_code", "implicit"),
+                    List.of(),
+                    true,
+                    List.of()));
+  }
+
   // TD-FUT-018: same well-formed/absolute requirement as redirectUris, applied here — unlike
   // redirectUris, an empty list is valid (see registerCarriesTheGivenFields above); a malformed
   // entry never is.
@@ -599,5 +617,120 @@ class OAuthClientTest {
     OAuthClient rotated = deactivated.rotateSecret("argon2id$new-hashed");
 
     assertThat(rotated.active()).isFalse();
+  }
+
+  // Live UX request, 2026-09-24: reverses this class's own original "creation-time-only" rule for
+  // grant types/scopes/consent — updateGrantTypes/updateScopes/updateConsent replace exactly one
+  // field each, leaving everything else (including redirect settings) untouched.
+  @Test
+  void updateGrantTypesReplacesOnlyThatFieldKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    OAuthClient updated = client.updateGrantTypes(List.of("authorization_code", "refresh_token"));
+
+    assertThat(updated.allowedGrantTypes()).containsExactly("authorization_code", "refresh_token");
+    assertThat(updated.redirectUris()).isEqualTo(client.redirectUris());
+    assertThat(updated.allowedScopes()).isEqualTo(client.allowedScopes());
+    assertThat(updated.requireConsent()).isEqualTo(client.requireConsent());
+  }
+
+  @Test
+  void updateGrantTypesRejectsAnEmptyList() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of(),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThatIllegalArgumentException().isThrownBy(() -> client.updateGrantTypes(List.of()));
+  }
+
+  @Test
+  void updateGrantTypesRejectsAGrantTypeOutsideTheKnownCatalog() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of(),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> client.updateGrantTypes(List.of("implicit")));
+  }
+
+  @Test
+  void updateScopesReplacesOnlyThatFieldKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    OAuthClient updated = client.updateScopes(List.of("openid", "test.read"));
+
+    assertThat(updated.allowedScopes()).containsExactly("openid", "test.read");
+    assertThat(updated.redirectUris()).isEqualTo(client.redirectUris());
+    assertThat(updated.allowedGrantTypes()).isEqualTo(client.allowedGrantTypes());
+  }
+
+  @Test
+  void updateScopesRejectsAReservedPlatformNamespaceScope() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of(),
+            List.of("authorization_code"),
+            List.of(),
+            true,
+            List.of());
+
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> client.updateScopes(List.of("platform:organizations:write")));
+  }
+
+  @Test
+  void updateConsentReplacesOnlyThatFieldKeepingEveryOtherFieldUnchanged() {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "a-client",
+            "argon2id$hashed",
+            List.of("https://example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+
+    OAuthClient updated = client.updateConsent(false);
+
+    assertThat(updated.requireConsent()).isFalse();
+    assertThat(updated.redirectUris()).isEqualTo(client.redirectUris());
+    assertThat(updated.allowedGrantTypes()).isEqualTo(client.allowedGrantTypes());
+    assertThat(updated.allowedScopes()).isEqualTo(client.allowedScopes());
   }
 }

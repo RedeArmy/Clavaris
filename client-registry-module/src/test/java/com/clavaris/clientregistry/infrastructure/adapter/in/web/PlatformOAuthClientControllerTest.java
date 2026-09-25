@@ -30,8 +30,11 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Regis
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.RegisterOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretResult;
 import com.clavaris.clientregistry.application.usecase.rotateoauthclientsecret.RotateOAuthClientSecretUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.OAuthClientInactiveException;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.domain.model.ConcurrentClientModificationException;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.domain.model.KeysetCursor;
@@ -72,6 +75,9 @@ class PlatformOAuthClientControllerTest {
   private ActivateOAuthClientUseCase activateClient;
   private RotateOAuthClientSecretUseCase rotateClientSecret;
   private UpdateOAuthClientRedirectSettingsUseCase updateRedirectSettings;
+  private UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
+  private UpdateOAuthClientScopesUseCase updateScopes;
+  private UpdateOAuthClientConsentUseCase updateConsent;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -86,6 +92,9 @@ class PlatformOAuthClientControllerTest {
     activateClient = mock(ActivateOAuthClientUseCase.class);
     rotateClientSecret = mock(RotateOAuthClientSecretUseCase.class);
     updateRedirectSettings = mock(UpdateOAuthClientRedirectSettingsUseCase.class);
+    updateGrantTypes = mock(UpdateOAuthClientGrantTypesUseCase.class);
+    updateScopes = mock(UpdateOAuthClientScopesUseCase.class);
+    updateConsent = mock(UpdateOAuthClientConsentUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -119,6 +128,9 @@ class PlatformOAuthClientControllerTest {
                     activateClient,
                     rotateClientSecret,
                     updateRedirectSettings,
+                    updateGrantTypes,
+                    updateScopes,
+                    updateConsent,
                     organizationResolver,
                     currentPlatformAccount,
                     "https://clavaris.example.test"))
@@ -845,5 +857,213 @@ class PlatformOAuthClientControllerTest {
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("Register a new OAuth Client"))));
+  }
+
+  // Live UX request, 2026-09-24: the Configuration card became editable — same test shapes as
+  // the equivalent updateRedirectSettings/deactivate tests above.
+  @Test
+  void plainUpdateGrantTypesPostRedirectsToTheDetailPageOnSuccess() throws Exception {
+    OAuthClient client = sampleClient();
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/grant-types")
+                .param("allowedGrantTypes", "authorization_code", "refresh_token"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(updateGrantTypes).handle(any());
+  }
+
+  @Test
+  void htmxUpdateGrantTypesReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/grant-types")
+                .param("allowedGrantTypes", "client_credentials")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  // An owner unchecking every box submits no allowedGrantTypes param at all — must not NPE.
+  @Test
+  void updateGrantTypesWithNoCheckboxesCheckedSubmitsAnEmptyList() throws Exception {
+    OAuthClient client = sampleClient();
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/grant-types"))
+        .andExpect(status().is3xxRedirection());
+
+    verify(updateGrantTypes).handle(any());
+  }
+
+  @Test
+  void updateGrantTypesReturnsNotFoundWhenTheClientBelongsToADifferentOrganization()
+      throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes
+                .OAuthClientNotFoundException("test_someone_elses"))
+        .when(updateGrantTypes)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/test_someone_elses/grant-types"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void updateGrantTypesReturnsConflictWhenTheClientIsInactive() throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes
+                .OAuthClientInactiveException("test_abc"))
+        .when(updateGrantTypes)
+        .handle(any());
+
+    mockMvc.perform(post(basePath() + "/test_abc/grant-types")).andExpect(status().isConflict());
+  }
+
+  @Test
+  void plainUpdateScopesPostRedirectsToTheDetailPageOnSuccess() throws Exception {
+    OAuthClient client = sampleClient();
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/scopes")
+                .param("allowedScopes", "openid", "test.read"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(updateScopes).handle(any());
+  }
+
+  @Test
+  void htmxUpdateScopesReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/scopes")
+                .param("allowedScopes", "openid")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  // Same blank-row tolerance the redirect-URI add/remove-row UI already gives — the modal's own
+  // "+ Add scope" JS can leave an unfilled row behind.
+  @Test
+  void updateScopesDropsBlankEntriesBeforeCallingTheUseCase() throws Exception {
+    OAuthClient client = sampleClient();
+    ArgumentCaptor<
+            com.clavaris.clientregistry.application.usecase.updateoauthclientscopes
+                .UpdateOAuthClientScopesCommand>
+        captor =
+            ArgumentCaptor.forClass(
+                com.clavaris.clientregistry.application.usecase.updateoauthclientscopes
+                    .UpdateOAuthClientScopesCommand.class);
+
+    mockMvc.perform(
+        post(basePath() + "/" + client.clientId() + "/scopes")
+            .param("allowedScopes", "openid", "", "  "));
+
+    verify(updateScopes).handle(captor.capture());
+    assertThat(captor.getValue().allowedScopes()).containsExactly("openid");
+  }
+
+  @Test
+  void updateScopesReturnsConflictWhenTheClientIsInactive() throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientscopes
+                .OAuthClientInactiveException("test_abc"))
+        .when(updateScopes)
+        .handle(any());
+
+    mockMvc.perform(post(basePath() + "/test_abc/scopes")).andExpect(status().isConflict());
+  }
+
+  @Test
+  void plainUpdateConsentPostRedirectsToTheDetailPageOnSuccess() throws Exception {
+    OAuthClient client = sampleClient();
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/consent").param("requireConsent", "true"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
+
+    verify(updateConsent).handle(any());
+  }
+
+  @Test
+  void htmxUpdateConsentReturnsTheDetailFragment() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(
+            post(basePath() + "/" + client.clientId() + "/consent").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW + " :: detail"));
+  }
+
+  // An unchecked toggle submits no requireConsent param at all — must resolve to false, not NPE.
+  @Test
+  void updateConsentWithTheToggleUncheckedSubmitsFalse() throws Exception {
+    OAuthClient client = sampleClient();
+    ArgumentCaptor<
+            com.clavaris.clientregistry.application.usecase.updateoauthclientconsent
+                .UpdateOAuthClientConsentCommand>
+        captor =
+            ArgumentCaptor.forClass(
+                com.clavaris.clientregistry.application.usecase.updateoauthclientconsent
+                    .UpdateOAuthClientConsentCommand.class);
+
+    mockMvc.perform(post(basePath() + "/" + client.clientId() + "/consent"));
+
+    verify(updateConsent).handle(captor.capture());
+    assertThat(captor.getValue().requireConsent()).isFalse();
+  }
+
+  @Test
+  void updateConsentReturnsConflictWhenTheClientIsInactive() throws Exception {
+    doThrow(
+            new com.clavaris.clientregistry.application.usecase.updateoauthclientconsent
+                .OAuthClientInactiveException("test_abc"))
+        .when(updateConsent)
+        .handle(any());
+
+    mockMvc.perform(post(basePath() + "/test_abc/consent")).andExpect(status().isConflict());
+  }
+
+  @Test
+  void configurationCardShowsEditButtonsAndDialogsOnlyForAnActiveClient() throws Exception {
+    OAuthClient client = sampleClient();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("grant-types-dialog")))
+        .andExpect(content().string(containsString("scopes-dialog")))
+        .andExpect(content().string(containsString("consent-dialog")));
+  }
+
+  @Test
+  void configurationCardHidesEditButtonsForAnInactiveClientAndShowsAnExplanation()
+      throws Exception {
+    OAuthClient client = sampleClient().deactivate();
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
+
+    mockMvc
+        .perform(get(basePath() + "/" + client.clientId()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("configuration can't be edited until you")))
+        .andExpect(
+            content().string(not(containsString("data-dialog-open=\"grant-types-dialog\""))));
   }
 }

@@ -57,8 +57,14 @@ import com.clavaris.clientregistry.application.usecase.setclientbranding.SetClie
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.RedirectPolicyRepository;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientService;
 import com.clavaris.clientregistry.application.usecase.setredirectpolicyforclient.SetRedirectPolicyForClientUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientconsent.UpdateOAuthClientConsentUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientgranttypes.UpdateOAuthClientGrantTypesUseCase;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsService;
 import com.clavaris.clientregistry.application.usecase.updateoauthclientredirectsettings.UpdateOAuthClientRedirectSettingsUseCase;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesService;
+import com.clavaris.clientregistry.application.usecase.updateoauthclientscopes.UpdateOAuthClientScopesUseCase;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.DnsTxtRecordLookup;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipService;
 import com.clavaris.clientregistry.application.usecase.verifyclientdomainownership.VerifyClientDomainOwnershipUseCase;
@@ -157,6 +163,26 @@ class ClientRegistryUseCaseConfig {
   /* package */ UpdateOAuthClientRedirectSettingsUseCase updateOAuthClientRedirectSettingsUseCase(
       final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
     return new UpdateOAuthClientRedirectSettingsService(oauthClients, auditEvents);
+  }
+
+  // Live UX request, 2026-09-24: reverses BR-ORG-06's original "creation-time-only" rule for
+  // grant types/scopes/consent — see OAuthClientDefaults's own updated Javadoc.
+  @Bean
+  /* package */ UpdateOAuthClientGrantTypesUseCase updateOAuthClientGrantTypesUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientGrantTypesService(oauthClients, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateOAuthClientScopesUseCase updateOAuthClientScopesUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientScopesService(oauthClients, auditEvents);
+  }
+
+  @Bean
+  /* package */ UpdateOAuthClientConsentUseCase updateOAuthClientConsentUseCase(
+      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
+    return new UpdateOAuthClientConsentService(oauthClients, auditEvents);
   }
 
   // SDE-III refactor, 2026-09-23 (Clerk-style master-detail OAuth Clients page): backs the new

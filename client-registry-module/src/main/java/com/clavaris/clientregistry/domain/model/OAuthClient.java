@@ -20,18 +20,25 @@ import java.util.UUID;
  * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
  * the same reason {@code PlatformClient} suppresses them — the deliberate record-style accessor
  * convention used throughout this codebase's value objects. TooManyMethods is the same shape of
- * false positive: eight one-line accessors plus two rehydration factories plus three real mutators
- * ({@code deactivate}/{@code rotateSecret}/{@code updateRedirectSettings}) is what a value object
- * with this many fields looks like, not a sign this class does too much. LongVariable: {@code
- * postLogoutRedirectUris} is the exact OIDC spec term (post_logout_redirect_uris), not arbitrarily
- * long — same precedent as {@code PlatformScopes}' own identical suppression.
+ * false positive: eight one-line accessors plus two rehydration factories plus seven real mutators
+ * ({@code deactivate}/{@code activate}/{@code rotateSecret}/{@code updateRedirectSettings}/{@code
+ * updateGrantTypes}/{@code updateScopes}/{@code updateConsent}, the last three added 2026-09-24
+ * when the Configuration card became editable) is what a value object with this many fields looks
+ * like, not a sign this class does too much. LongVariable: {@code postLogoutRedirectUris} is the
+ * exact OIDC spec term (post_logout_redirect_uris), not arbitrarily long — same precedent as {@code
+ * PlatformScopes}' own identical suppression.
  */
+// PMD.GodClass: same seven-real-mutators-plus-accessors shape TooManyMethods above already
+// explains — this metric (WMC/ATFD/TCC combined) crossed its own threshold the moment
+// updateGrantTypes/updateScopes/updateConsent joined deactivate/activate/rotateSecret/
+// updateRedirectSettings, not because this class gained a new, unrelated responsibility.
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
   "PMD.TooManyMethods",
-  "PMD.LongVariable"
+  "PMD.LongVariable",
+  "PMD.GodClass"
 })
 public final class OAuthClient {
 
@@ -99,7 +106,8 @@ public final class OAuthClient {
     // fail closed (no registered redirect URI to match) rather than being rejected at
     // registration time.
     this.redirectUris = requireValidUris(redirectUris, "redirectUris");
-    this.allowedGrantTypes = List.copyOf(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
+    this.allowedGrantTypes =
+        requireKnownGrantTypes(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
     this.allowedScopes = requireValidScopes(allowedScopes);
     this.requireConsent = requireConsent;
     // TD-FUT-018: genuinely optional, same as redirectUris now is (see that field's own comment
@@ -258,6 +266,63 @@ public final class OAuthClient {
   }
 
   /**
+   * SDE-III correction, 2026-09-24 (live UX request): reverses BR-ORG-06's original
+   * "creation-time-only, fixed by OAuthClientDefaults" rule for {@code allowedGrantTypes} — an
+   * Organization owner may now change it from the dashboard's own "Configuration" card, gated
+   * behind a checkbox list of {@link OAuthGrantTypeCatalog#KNOWN} (never free text), same
+   * validation this constructor already runs against every other construction path.
+   */
+  public OAuthClient updateGrantTypes(final List<String> allowedGrantTypes) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        postLogoutRedirectUris,
+        createdAt,
+        active,
+        version);
+  }
+
+  /** Same rationale as {@link #updateGrantTypes(List)}, for {@code allowedScopes}. */
+  public OAuthClient updateScopes(final List<String> allowedScopes) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        postLogoutRedirectUris,
+        createdAt,
+        active,
+        version);
+  }
+
+  /** Same rationale as {@link #updateGrantTypes(List)}, for {@code requireConsent}. */
+  public OAuthClient updateConsent(final boolean requireConsent) {
+    return new OAuthClient(
+        id,
+        organizationId,
+        clientId,
+        clientSecretHash,
+        redirectUris,
+        allowedGrantTypes,
+        allowedScopes,
+        requireConsent,
+        postLogoutRedirectUris,
+        createdAt,
+        active,
+        version);
+  }
+
+  /**
    * Same rationale as {@code OrganizationClient#rotateSecret}/{@code PlatformClient#rotateSecret}.
    */
   public OAuthClient rotateSecret(
@@ -282,6 +347,24 @@ public final class OAuthClient {
       throw new IllegalArgumentException(fieldName + " must not be empty");
     }
     return values;
+  }
+
+  // Live UX request, 2026-09-24 (Configuration card made editable): unlike allowedScopes,
+  // allowedGrantTypes genuinely IS a closed set in this system — see OAuthGrantTypeCatalog's own
+  // Javadoc for why. This is the one real guard against a value
+  // OrganizationRegisteredClientRepository
+  // would otherwise forward blindly into Spring Authorization Server.
+  private static List<String> requireKnownGrantTypes(final List<String> allowedGrantTypes) {
+    for (final String grantType : allowedGrantTypes) {
+      if (!OAuthGrantTypeCatalog.KNOWN.contains(grantType)) {
+        throw new IllegalArgumentException(
+            "allowedGrantTypes must only contain known grant types "
+                + OAuthGrantTypeCatalog.KNOWN
+                + ": "
+                + grantType);
+      }
+    }
+    return List.copyOf(allowedGrantTypes);
   }
 
   // TD-ARCH-004: rejects the one half of "allowedScopes is free text nothing validates" that's
