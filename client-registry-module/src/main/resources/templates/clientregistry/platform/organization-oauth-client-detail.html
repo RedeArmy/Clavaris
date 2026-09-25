@@ -66,8 +66,18 @@
                                     <th scope="row">Client secret</th>
                                     <td>
                                         <code th:if="${justRegisteredRawSecret}" th:text="${justRegisteredRawSecret}">secret</code>
-                                        <span th:unless="${justRegisteredRawSecret}" class="clavaris-text-muted">
+                                        <!-- Live UX request, 2026-09-25: an inactive client can't rotate its
+                                             secret (Rotate secret only shows th:if="${client.active()}" above),
+                                             so the default "Shown once..." muted text — which invites the
+                                             reader to use that very button — no longer applies; it's replaced
+                                             with an explanation tied to Activate, which is the only action
+                                             that yields a new secret while inactive (see
+                                             ActivateOAuthClientResult's own Javadoc). -->
+                                        <span th:if="${justRegisteredRawSecret == null and client.active()}" class="clavaris-text-muted">
                                             Shown once, at creation, rotation, or reactivation — Clavaris never stores or displays it again. Use "Rotate secret" below for a new one.
+                                        </span>
+                                        <span th:if="${justRegisteredRawSecret == null and !client.active()}" class="clavaris-text-muted">
+                                            This client is inactive — reactivate it above to get an updated client secret.
                                         </span>
                                     </td>
                                 </tr>
@@ -226,10 +236,17 @@
                          Javadoc for where each value comes from. -->
                     <div class="clavaris-section-card">
                         <h2>Add these to your application</h2>
-                        <p>Most OIDC client libraries only need the <strong>issuer</strong> (or discovery
+                        <!-- Live UX request, 2026-09-25: same "the whole content area is gone, not
+                             just non-interactive" treatment as Redirect settings/Configuration
+                             above — a deactivated client's credentials are rejected at every one
+                             of these endpoints (proved end-to-end by
+                             OrganizationOidcIssuerIntegrationTest#rejectsADeactivatedClientAtTheOrganizationTokenEndpoint),
+                             so showing this panel as if it were still usable would be misleading
+                             until the client is reactivated. -->
+                        <p th:if="${client.active()}">Most OIDC client libraries only need the <strong>issuer</strong> (or discovery
                             URL), <strong>client ID</strong>, and the client secret above — they fetch
                             every other endpoint themselves from the discovery document.</p>
-                        <div class="clavaris-table-wrapper">
+                        <div class="clavaris-table-wrapper" th:if="${client.active()}">
                             <table class="clavaris-table">
                                 <tbody>
                                 <tr>
@@ -263,6 +280,10 @@
                                 </tbody>
                             </table>
                         </div>
+                        <p class="clavaris-empty-state" th:unless="${client.active()}">
+                            This client is inactive — these setup values won't work until you
+                            reactivate it above.
+                        </p>
                     </div>
 
                     <!-- SDE-III correction, 2026-09-24 (live UX request): reverses this card's own
