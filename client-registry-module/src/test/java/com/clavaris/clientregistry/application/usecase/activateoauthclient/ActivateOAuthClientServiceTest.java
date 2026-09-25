@@ -10,7 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
@@ -20,21 +22,32 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Same rationale/shape as {@code deactivateoauthclient.DeactivateOAuthClientServiceTest}. */
+/**
+ * Live UX request, 2026-09-25: reactivation also rotates the secret — same rationale/shape as
+ * {@code rotateoauthclientsecret.RotateOAuthClientSecretServiceTest}, plus the {@code
+ * deactivateoauthclient.DeactivateOAuthClientServiceTest}-style not-found/cross-tenant cases.
+ */
 class ActivateOAuthClientServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformAccount(UUID.randomUUID());
 
   private final UUID organizationId = UUID.randomUUID();
   private OAuthClientRepository oauthClients;
+  private ClientSecretHasher hasher;
+  private OAuthClientSecretGenerator secretGenerator;
   private AuditEventRecorder auditEvents;
   private ActivateOAuthClientService service;
 
   @BeforeEach
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
+    hasher = mock(ClientSecretHasher.class);
+    secretGenerator = mock(OAuthClientSecretGenerator.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new ActivateOAuthClientService(oauthClients, auditEvents);
+    service = new ActivateOAuthClientService(oauthClients, hasher, secretGenerator, auditEvents);
+
+    when(secretGenerator.generate()).thenReturn("raw-new-secret");
+    when(hasher.hash("raw-new-secret")).thenReturn("argon2id$new-hashed");
   }
 
   private OAuthClient sampleInactiveClient() {
@@ -42,7 +55,7 @@ class ActivateOAuthClientServiceTest {
         OAuthClient.register(
             organizationId,
             "target-client",
-            "argon2id$hashed",
+            "argon2id$original-hashed",
             List.of("https://jobseeker.example.com/callback"),
             List.of("authorization_code"),
             List.of("openid"),
@@ -63,7 +76,20 @@ class ActivateOAuthClientServiceTest {
   }
 
   @Test
-  void recordsAnAuditEvent() {
+  void alsoRotatesTheSecret() {
+    OAuthClient existing = sampleInactiveClient();
+    when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
+
+    ActivateOAuthClientResult result =
+        service.handle(new ActivateOAuthClientCommand("target-client", organizationId, ACTOR));
+
+    assertThat(result.rawSecret()).isEqualTo("raw-new-secret");
+    verify(oauthClients)
+        .save(argThat(saved -> saved.clientSecretHash().equals("argon2id$new-hashed")));
+  }
+
+  @Test
+  void recordsBothAnActivationAndASecretRotationAuditEvent() {
     OAuthClient existing = sampleInactiveClient();
     when(oauthClients.findByClientId("target-client")).thenReturn(Optional.of(existing));
 
@@ -73,6 +99,13 @@ class ActivateOAuthClientServiceTest {
         .write(
             ACTOR,
             "oauth_client.activated",
+            "Organization",
+            organizationId.toString(),
+            "clientId=target-client");
+    verify(auditEvents)
+        .write(
+            ACTOR,
+            "oauth_client.secret_rotated",
             "Organization",
             organizationId.toString(),
             "clientId=target-client");
