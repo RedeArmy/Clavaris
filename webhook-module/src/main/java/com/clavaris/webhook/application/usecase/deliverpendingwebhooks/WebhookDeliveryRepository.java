@@ -1,6 +1,9 @@
 package com.clavaris.webhook.application.usecase.deliverpendingwebhooks;
 
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,4 +58,24 @@ public interface WebhookDeliveryRepository {
    * WebhookDelivery}'s own Javadoc), so this doesn't need to go through {@code endpointId} at all.
    */
   void deleteAllByOrganizationId(UUID organizationId);
+
+  /**
+   * Live UX request, 2026-09-25 (Clerk-parity org-wide Logs tab): every delivery across every one
+   * of an Organization's own endpoints, newest first — {@code listwebhookdeliveriesforendpoint}'s
+   * own {@link #findAllByEndpointId} sibling, scoped one level up. Same keyset shape {@code
+   * registerwebhookendpoint.WebhookEndpointRepository#findKeysetPageByOrganizationId} already
+   * establishes.
+   */
+  KeysetPage<WebhookDelivery> findKeysetPageByOrganizationId(
+      UUID organizationId, KeysetPageRequest pageRequest);
+
+  /**
+   * Live UX request, 2026-09-25 (Clerk-parity Activity tab): every delivery across every one of an
+   * Organization's own endpoints with at least one attempt inside the window — {@code
+   * getwebhookdeliveryactivityfororganization.GetWebhookDeliveryActivityForOrganizationService}'s
+   * own source data, bucketed into hourly success/failure counts in Java, not SQL {@code GROUP BY}
+   * — see {@code SpringDataWebhookDeliveryJpaRepository}'s own Javadoc for why that's safe here (a
+   * short, bounded recent window, never the whole table).
+   */
+  List<WebhookDelivery> findAllByOrganizationIdWithAttemptSince(UUID organizationId, Instant since);
 }

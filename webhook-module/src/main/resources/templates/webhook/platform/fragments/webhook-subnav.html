@@ -1,0 +1,17 @@
+<!--
+Live UX request, 2026-09-25 (Clerk-parity Webhooks section navigation): Endpoints / Event Catalog /
+Logs / Activity as sibling tabs, matching Clerk's own dashboard exactly. Only included on the four
+org-wide pages (the endpoints list, the new Event Catalog/Logs/Activity pages) — a single endpoint's
+own detail/Deliveries pages are drill-downs reached from "Endpoints", not siblings of it, so they
+don't carry this row (same distinction Clerk's own dashboard draws).
+-->
+<div th:fragment="tabs(organizationId, active)" class="clavaris-org-tabs" style="margin-bottom: var(--space-4);">
+    <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
+       th:classappend="${active == 'endpoints'} ? 'active'">Endpoints</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints/event-catalog(id=${organizationId})}"
+       th:classappend="${active == 'event-catalog'} ? 'active'">Event Catalog</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints/logs(id=${organizationId})}"
+       th:classappend="${active == 'logs'} ? 'active'">Logs</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints/activity(id=${organizationId})}"
+       th:classappend="${active == 'activity'} ? 'active'">Activity</a>
+</div>

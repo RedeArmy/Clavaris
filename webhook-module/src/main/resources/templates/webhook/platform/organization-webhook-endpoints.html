@@ -20,6 +20,8 @@
                 <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
 
                 <div class="clavaris-configure-content">
+                    <div th:replace="~{webhook/platform/fragments/webhook-subnav :: tabs(${organizationId}, 'endpoints')}"></div>
+
                     <div class="clavaris-page-header">
                         <div>
                             <h1>Webhook Endpoints</h1>

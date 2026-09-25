@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Logs — Clavaris')}">
+    <title>Webhook Logs — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Logs</span>
+            </p>
+
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div th:replace="~{webhook/platform/fragments/webhook-subnav :: tabs(${organizationId}, 'logs')}"></div>
+
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Logs</h1>
+                            <p>Every delivery attempt across every one of this Organization's own
+                                webhook endpoints, newest first.</p>
+                        </div>
+                    </div>
+
+                    <div id="logs-content" th:fragment="logs" class="clavaris-section">
+                        <p class="clavaris-alert clavaris-alert--error" th:if="${notReplayableError}">
+                            That delivery is still owned by the ordinary retry engine (not yet in a
+                            terminal state) — it can't be replayed right now.
+                        </p>
+
+                        <div class="clavaris-section-card" th:if="${#lists.isEmpty(deliveries)}">
+                            <p class="clavaris-empty-state">No deliveries yet for this Organization.</p>
+                        </div>
+                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(deliveries)}">
+                            <table class="clavaris-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Endpoint</th>
+                                    <th scope="col">Event type</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Attempts</th>
+                                    <th scope="col">Last attempt</th>
+                                    <th scope="col">Created</th>
+                                    <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="delivery : ${deliveries}">
+                                    <td>
+                                        <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}(organizationId=${organizationId},endpointId=${delivery.endpointId()})}"
+                                           th:text="${endpointUrlsByEndpointId[delivery.endpointId()]} ?: 'deleted endpoint'">endpoint</a>
+                                    </td>
+                                    <td th:text="${delivery.eventType()}">event type</td>
+                                    <td>
+                                        <span class="clavaris-badge"
+                                              th:classappend="${delivery.status().name() == 'SUCCEEDED'} ? 'clavaris-badge--success' : (${delivery.status().name() == 'FAILED' or delivery.status().name() == 'EXHAUSTED'} ? 'clavaris-badge--error' : 'clavaris-badge--muted')"
+                                              th:text="${delivery.status().name()}">status</span>
+                                    </td>
+                                    <td th:text="${delivery.attemptCount()}">attempts</td>
+                                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(delivery.lastAttemptAt())} ?: '—'">last attempt</td>
+                                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(delivery.createdAt())}">created</td>
+                                    <td>
+                                        <div class="clavaris-row-actions" th:if="${delivery.status().isReplayable()}">
+                                            <form method="post"
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs/{endpointId}/{deliveryId}/replay(organizationId=${organizationId},endpointId=${delivery.endpointId()},deliveryId=${delivery.id()})}"
+                                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs/{endpointId}/{deliveryId}/replay(organizationId=${organizationId},endpointId=${delivery.endpointId()},deliveryId=${delivery.id()})}"
+                                                  hx-target="#logs-content" hx-swap="outerHTML">
+                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Replay</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <nav class="clavaris-pagination"
+                             th:if="${deliveriesPage.hasPrevious() or deliveriesPage.hasNext()}"
+                             aria-label="Logs pages">
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:if="${deliveriesPage.hasPrevious()}"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs(organizationId=${organizationId},before=${deliveriesPage.startCursor().encode()})}"
+                               th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs(organizationId=${organizationId},before=${deliveriesPage.startCursor().encode()})}"
+                               hx-target="#logs-content" hx-swap="outerHTML">Previous</a>
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:if="${deliveriesPage.hasNext()}"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs(organizationId=${organizationId},after=${deliveriesPage.endCursor().encode()})}"
+                               th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs(organizationId=${organizationId},after=${deliveriesPage.endCursor().encode()})}"
+                               hx-target="#logs-content" hx-swap="outerHTML">Next</a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

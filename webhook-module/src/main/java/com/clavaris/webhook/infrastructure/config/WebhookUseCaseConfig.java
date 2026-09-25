@@ -14,10 +14,14 @@ import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookHt
 import com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsService;
 import com.clavaris.webhook.application.usecase.dispatchoutboxevents.DispatchOutboxEventsUseCase;
 import com.clavaris.webhook.application.usecase.dispatchoutboxevents.OutboxEventReader;
+import com.clavaris.webhook.application.usecase.getwebhookdeliveryactivityfororganization.GetWebhookDeliveryActivityForOrganizationService;
+import com.clavaris.webhook.application.usecase.getwebhookdeliveryactivityfororganization.GetWebhookDeliveryActivityForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationService;
 import com.clavaris.webhook.application.usecase.getwebhookendpointfororganization.GetWebhookEndpointForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointService;
 import com.clavaris.webhook.application.usecase.listwebhookdeliveriesforendpoint.ListWebhookDeliveriesForEndpointUseCase;
+import com.clavaris.webhook.application.usecase.listwebhookdeliveriesfororganizationpaged.ListWebhookDeliveriesForOrganizationPagedService;
+import com.clavaris.webhook.application.usecase.listwebhookdeliveriesfororganizationpaged.ListWebhookDeliveriesForOrganizationPagedUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationService;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganization.ListWebhookEndpointsForOrganizationUseCase;
 import com.clavaris.webhook.application.usecase.listwebhookendpointsfororganizationpaged.ListWebhookEndpointsForOrganizationPagedService;
@@ -223,5 +227,19 @@ class WebhookUseCaseConfig {
   /* package */ ListWebhookDeliveriesForEndpointUseCase listWebhookDeliveriesForEndpointUseCase(
       final WebhookEndpointRepository endpoints, final WebhookDeliveryRepository deliveries) {
     return new ListWebhookDeliveriesForEndpointService(endpoints, deliveries);
+  }
+
+  // Live UX request, 2026-09-25 (Clerk-parity Logs/Activity tabs): two new @Bean methods, same
+  // "wiring, not sprawl" reasoning this class's own existing suppressions already document.
+  @Bean
+  /* package */ ListWebhookDeliveriesForOrganizationPagedUseCase
+      listWebhookDeliveriesForOrganizationPagedUseCase(final WebhookDeliveryRepository deliveries) {
+    return new ListWebhookDeliveriesForOrganizationPagedService(deliveries);
+  }
+
+  @Bean
+  /* package */ GetWebhookDeliveryActivityForOrganizationUseCase
+      getWebhookDeliveryActivityForOrganizationUseCase(final WebhookDeliveryRepository deliveries) {
+    return new GetWebhookDeliveryActivityForOrganizationService(deliveries);
   }
 }

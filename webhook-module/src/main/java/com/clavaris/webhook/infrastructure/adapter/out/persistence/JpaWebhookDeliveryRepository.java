@@ -1,5 +1,9 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.webhook.application.usecase.deliverpendingwebhooks.WebhookDeliveryRepository;
 import com.clavaris.webhook.domain.model.WebhookDelivery;
 import com.clavaris.webhook.domain.model.WebhookDeliveryStatus;
@@ -21,8 +25,14 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>TD-PERF-019: {@code insert} calls {@link EntityManager#persist} directly, not {@code
  * SpringDataWebhookDeliveryJpaRepository#save} — see {@code WebhookDeliveryRepository#insert}'s own
  * Javadoc for which call site that's safe for and why {@code save} itself is unchanged.
+ *
+ * <p>PMD.TooManyMethods (the Logs tab's own {@code findKeysetPageByOrganizationId}/{@code
+ * findAllByOrganizationIdWithAttemptSince} pushed this past the default threshold): every method
+ * here backs a real, distinct {@code WebhookDeliveryRepository} port method this module's use cases
+ * actually need — same "one port, several use cases" shape {@code JpaWebhookEndpointRepository}'s
+ * own identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
+@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable", "PMD.TooManyMethods"})
 @Repository
 class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
 
@@ -117,6 +127,54 @@ class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
   @Transactional
   public void deleteAllByOrganizationId(final UUID organizationId) {
     deliveries.deleteAllByOrganizationId(organizationId);
+  }
+
+  // Same "three @Query methods back one keyset page" shape as JpaWebhookEndpointRepository's own
+  // identical findKeysetPageByOrganizationId.
+  @Override
+  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
+  public KeysetPage<WebhookDelivery> findKeysetPageByOrganizationId(
+      final UUID organizationId, final KeysetPageRequest pageRequest) {
+    final PageRequest limit = PageRequest.of(0, pageRequest.size() + 1);
+    if (pageRequest.after() != null) {
+      final KeysetCursor cursor = pageRequest.after();
+      return SpringDataKeysetPageMapper.forward(
+          deliveries.findPageByOrganizationIdAfter(
+              organizationId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          true,
+          this::toDomain,
+          this::cursorOf);
+    }
+    if (pageRequest.before() != null) {
+      final KeysetCursor cursor = pageRequest.before();
+      return SpringDataKeysetPageMapper.backward(
+          deliveries.findPageByOrganizationIdBefore(
+              organizationId, cursor.createdAt(), cursor.id(), limit),
+          pageRequest.size(),
+          this::toDomain,
+          this::cursorOf);
+    }
+    return SpringDataKeysetPageMapper.forward(
+        deliveries.findFirstPageByOrganizationId(organizationId, limit),
+        pageRequest.size(),
+        false,
+        this::toDomain,
+        this::cursorOf);
+  }
+
+  private KeysetCursor cursorOf(final WebhookDeliveryEntity entity) {
+    return new KeysetCursor(entity.getCreatedAt(), entity.getId());
+  }
+
+  @Override
+  public List<WebhookDelivery> findAllByOrganizationIdWithAttemptSince(
+      final UUID organizationId, final Instant since) {
+    return deliveries
+        .findAllByOrganizationIdAndLastAttemptAtGreaterThanEqual(organizationId, since)
+        .stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   private WebhookDelivery toDomain(final WebhookDeliveryEntity entity) {

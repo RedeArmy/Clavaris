@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Event Catalog — Clavaris')}">
+    <title>Event Catalog — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Event Catalog</span>
+            </p>
+
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div th:replace="~{webhook/platform/fragments/webhook-subnav :: tabs(${organizationId}, 'event-catalog')}"></div>
+
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Event Catalog</h1>
+                            <p>Every event type a webhook endpoint can subscribe to today. This
+                                list is a reference — subscribe to individual events (or "All
+                                Events") from an endpoint's own detail page.</p>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section-card">
+                        <div th:each="option, iterStat : ${T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG}">
+                            <p class="clavaris-event-category-header"
+                               th:if="${iterStat.index == 0 or !option.category().equals(T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG[iterStat.index - 1].category())}"
+                               th:text="${option.category()}">category</p>
+                            <div class="clavaris-table-wrapper" style="margin-bottom: 0;">
+                                <table class="clavaris-table">
+                                    <tbody>
+                                    <tr>
+                                        <td style="white-space: nowrap;"><code th:text="${option.value()}">event.type</code></td>
+                                        <td th:text="${option.description()}">description</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

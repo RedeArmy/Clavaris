@@ -9,6 +9,18 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/*
+ * Live UX request, 2026-09-25 (Clerk-parity org-wide Logs/Activity): the four keyset methods below
+ * back WebhookDeliveryRepository#findKeysetPageByOrganizationId — copied from
+ * SpringDataWebhookEndpointJpaRepository's own identical three-@Query shape (see that interface's
+ * own Javadoc for why three @Query methods back one keyset page instead of a single
+ * Pageable-driven derived method). findAllByOrganizationIdAndLastAttemptAtGreaterThanEqual backs
+ * the Activity page's own hourly-bucket aggregation, computed in Java (not SQL GROUP BY) — same
+ * "correct and simple first" posture WebhookEndpointRepository#findActiveByOrganizationIdAndEventType's
+ * own in-memory filter already documents, bounded to a short recent window (a handful of hours),
+ * never the whole table.
+ */
+
 interface SpringDataWebhookDeliveryJpaRepository
     extends JpaRepository<WebhookDeliveryEntity, UUID> {
 
@@ -58,4 +70,44 @@ interface SpringDataWebhookDeliveryJpaRepository
   long deleteByCreatedAtBeforeAndStatusIn(Instant cutoff, List<String> statuses);
 
   void deleteAllByOrganizationId(UUID organizationId);
+
+  List<WebhookDeliveryEntity> findAllByOrganizationIdAndLastAttemptAtGreaterThanEqual(
+      UUID organizationId, Instant since);
+
+  @Query(
+      """
+      SELECT d FROM WebhookDeliveryEntity d
+      WHERE d.organizationId = :organizationId
+      ORDER BY d.createdAt DESC, d.id DESC
+      """)
+  List<WebhookDeliveryEntity> findFirstPageByOrganizationId(
+      @Param("organizationId") UUID organizationId, Pageable pageable);
+
+  @Query(
+      """
+      SELECT d FROM WebhookDeliveryEntity d
+      WHERE d.organizationId = :organizationId
+        AND (d.createdAt < :cursorCreatedAt
+             OR (d.createdAt = :cursorCreatedAt AND d.id < :cursorId))
+      ORDER BY d.createdAt DESC, d.id DESC
+      """)
+  List<WebhookDeliveryEntity> findPageByOrganizationIdAfter(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      Pageable pageable);
+
+  @Query(
+      """
+      SELECT d FROM WebhookDeliveryEntity d
+      WHERE d.organizationId = :organizationId
+        AND (d.createdAt > :cursorCreatedAt
+             OR (d.createdAt = :cursorCreatedAt AND d.id > :cursorId))
+      ORDER BY d.createdAt ASC, d.id ASC
+      """)
+  List<WebhookDeliveryEntity> findPageByOrganizationIdBefore(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      Pageable pageable);
 }
