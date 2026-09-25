@@ -2,6 +2,8 @@ package com.clavaris.webhook.application.usecase.updatewebhookendpointurl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,15 +61,13 @@ class UpdateWebhookEndpointUrlServiceTest {
             UUID.randomUUID(), "https://old.example.com", null, List.of("x"), "secret");
     when(endpoints.findById(existing.id())).thenReturn(Optional.of(existing));
     UnsafeWebhookUrlException ssrfRejection = new UnsafeWebhookUrlException("private address");
-    org.mockito.Mockito.doThrow(ssrfRejection)
-        .when(ssrfGuard)
-        .requireSafeToRegister("https://internal.example.com");
+    doThrow(ssrfRejection).when(ssrfGuard).requireSafeToRegister("https://internal.example.com");
     UpdateWebhookEndpointUrlCommand command =
         new UpdateWebhookEndpointUrlCommand(existing.id(), "https://internal.example.com", ACTOR);
 
     assertThatExceptionOfType(UnsafeWebhookUrlException.class)
         .isThrownBy(() -> service.handle(command));
-    verify(endpoints, never()).save(org.mockito.ArgumentMatchers.any());
+    verify(endpoints, never()).save(any());
   }
 
   @Test

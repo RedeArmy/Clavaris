@@ -72,15 +72,15 @@ of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that o
             var anyVisible = false;
             var visibleCategories = {};
             document.querySelectorAll('#event-type-options .clavaris-event-option').forEach(function (row) {
-                var matches = normalized === '' || row.getAttribute('data-label').indexOf(normalized) !== -1;
+                var matches = normalized === '' || row.dataset.label.includes(normalized);
                 row.style.display = matches ? '' : 'none';
                 if (matches) {
                     anyVisible = true;
-                    visibleCategories[row.getAttribute('data-category')] = true;
+                    visibleCategories[row.dataset.category] = true;
                 }
             });
             document.querySelectorAll('#event-type-options .clavaris-event-category-header').forEach(function (header) {
-                header.style.display = visibleCategories[header.getAttribute('data-category')] ? '' : 'none';
+                header.style.display = visibleCategories[header.dataset.category] ? '' : 'none';
             });
             document.getElementById('event-search-empty').style.display = anyVisible ? 'none' : '';
         };

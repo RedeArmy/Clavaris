@@ -37,7 +37,7 @@ public class GetWebhookDeliveryActivityForOrganizationService
   public WebhookDeliveryActivity handle(
       final GetWebhookDeliveryActivityForOrganizationQuery query) {
     final Instant nowHour = Instant.now().truncatedTo(ChronoUnit.HOURS);
-    final Instant windowStart = nowHour.minus(Duration.ofHours(WINDOW_HOURS - 1));
+    final Instant windowStart = nowHour.minus(Duration.ofHours(WINDOW_HOURS - 1L));
 
     final Map<Instant, long[]> countsByHour = new TreeMap<>();
     for (Instant hour = windowStart;
