@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Activity — Clavaris')}">
+    <title>Activity — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Activity</span>
+            </p>
+
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div th:replace="~{webhook/platform/fragments/webhook-subnav :: tabs(${organizationId}, 'activity')}"></div>
+
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Activity</h1>
+                            <p>Delivery attempts across every one of this Organization's own
+                                webhook endpoints, last 6 hours.</p>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section-card">
+                        <div style="display: flex; gap: var(--space-6);">
+                            <div>
+                                <p class="clavaris-text-muted" style="margin: 0;">Successful Attempts</p>
+                                <p style="font-size: 2rem; font-weight: 600; margin: 0;" th:text="${activity.successfulAttempts()}">0</p>
+                            </div>
+                            <div>
+                                <p class="clavaris-text-muted" style="margin: 0;">Failed Attempts</p>
+                                <p style="font-size: 2rem; font-weight: 600; margin: 0;" th:text="${activity.failedAttempts()}">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live UX request, 2026-09-25: a plain CSS bar chart, deliberately not a JS
+                         charting library — this codebase has none today, and six bars is well
+                         within what CSS heights alone can render legibly. Each bar stacks its own
+                         success (green) portion below its failure (red) portion; height is each
+                         bucket's own share of maxBucketTotal (the controller's own computation —
+                         see that class's own Javadoc for why the max lives there, not here). -->
+                    <div class="clavaris-section-card">
+                        <h2>Recent Activity</h2>
+                        <div th:if="${maxBucketTotal == 0}" class="clavaris-empty-state">
+                            No delivery attempts in the last 6 hours.
+                        </div>
+                        <div th:unless="${maxBucketTotal == 0}"
+                             style="display: flex; align-items: flex-end; gap: var(--space-3); height: 160px;">
+                            <div th:each="bucket : ${activity.hourlyBuckets()}"
+                                 style="flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); height: 100%; justify-content: flex-end;">
+                                <div style="width: 100%; display: flex; flex-direction: column-reverse; justify-content: flex-start;"
+                                     th:style="'height: ' + (${(bucket.successCount() + bucket.failureCount()) * 100 / maxBucketTotal}) + '%;'">
+                                    <div style="background: var(--clavaris-success, #16a34a); width: 100%; border-radius: 2px 2px 0 0;"
+                                         th:if="${bucket.successCount() > 0}"
+                                         th:style="'background: var(--clavaris-success, #16a34a); width: 100%; height: ' + (${bucket.successCount() * 100 / (bucket.successCount() + bucket.failureCount())}) + '%;'"></div>
+                                    <div style="background: var(--clavaris-danger, #dc2626); width: 100%;"
+                                         th:if="${bucket.failureCount() > 0}"
+                                         th:style="'background: var(--clavaris-danger, #dc2626); width: 100%; height: ' + (${bucket.failureCount() * 100 / (bucket.successCount() + bucket.failureCount())}) + '%;'"></div>
+                                </div>
+                                <span class="clavaris-text-muted" style="font-size: 0.75rem;" th:text="${#temporals.format(bucket.hourStart(), 'HH:mm')}">HH:mm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

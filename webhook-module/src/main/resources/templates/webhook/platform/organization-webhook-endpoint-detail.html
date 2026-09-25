@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — ' + ${endpoint.url()} + ' — Clavaris')}">
+    <title>Webhook Endpoint — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <span th:text="${endpoint.url()}">endpoint url</span>
+            </p>
+
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <!-- Live UX request, 2026-09-25 (Clerk-parity master-detail redesign, same shape as
+                     OAuth Client's own detail page): everything below used to live inline on the
+                     endpoints list — URL/description/event types are now editable here via popup
+                     dialogs (organization-dialog.js, already loaded by dashboard-nav.html), and
+                     Deactivate/Activate/Rotate secret/Delete all moved off the list's own row
+                     actions onto this page. -->
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Webhook Endpoint</h1>
+                            <p>
+                                <span class="clavaris-badge"
+                                      th:classappend="${endpoint.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                      th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
+                                &#183; Registered <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(endpoint.createdAt())}">date</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
+                        <strong>New signing secret:</strong>
+                        <code th:text="${justRegisteredRawSecret}">secret</code><br/>
+                        Copy this now — it will not be shown again.
+                    </p>
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${unsafeWebhookUrlError}">
+                        That URL isn't safe to deliver webhooks to (it resolves to a private, loopback,
+                        or otherwise internal network address).
+                    </p>
+                    <p class="clavaris-alert clavaris-alert--error" th:if="${emptyEventTypesError}">
+                        Select at least one event type, or turn on "All Events".
+                    </p>
+
+                    <div class="clavaris-section-card">
+                        <h2>Endpoint details</h2>
+                        <div class="clavaris-table-wrapper">
+                            <table class="clavaris-table">
+                                <tbody>
+                                <tr>
+                                    <th scope="row">URL</th>
+                                    <td><code th:text="${endpoint.url()}">url</code></td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="url-dialog">Edit</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Description</th>
+                                    <td th:text="${#strings.isEmpty(endpoint.description())} ? '—' : ${endpoint.description()}">description</td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="description-dialog">Edit</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Signing secret</th>
+                                    <td>
+                                        <span class="clavaris-text-muted">
+                                            Shown once, at registration or rotation — Clavaris never stores or displays it again. Use "Rotate secret" below for a new one.
+                                        </span>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="clavaris-row-actions" style="margin-top: var(--space-4);">
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deliveries(organizationId=${organizationId},endpointId=${endpoint.id()})}">Deliveries</a>
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/rotate-secret(organizationId=${organizationId},endpointId=${endpoint.id()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rotate secret</button>
+                            </form>
+                            <form method="post" th:if="${endpoint.active()}"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deactivate(organizationId=${organizationId},endpointId=${endpoint.id()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
+                            </form>
+                            <form method="post" th:unless="${endpoint.active()}"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/activate(organizationId=${organizationId},endpointId=${endpoint.id()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Reactivate</button>
+                            </form>
+                            <a class="clavaris-button clavaris-button--danger clavaris-button--inline" th:unless="${endpoint.active()}"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/delete(organizationId=${organizationId},endpointId=${endpoint.id()})}">Delete permanently</a>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section-card">
+                        <h2>Event types</h2>
+                        <div class="clavaris-table-wrapper">
+                            <table class="clavaris-table">
+                                <tbody>
+                                <tr>
+                                    <th scope="row">Subscribed to</th>
+                                    <td th:if="${#lists.contains(endpoint.subscribedEventTypes(), '*')}">All Events</td>
+                                    <td th:unless="${#lists.contains(endpoint.subscribedEventTypes(), '*')}"
+                                        th:text="${#strings.listJoin(endpoint.subscribedEventTypes(), ', ')}">event types</td>
+                                    <td>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                type="button" data-dialog-open="event-types-dialog">Edit</button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <dialog id="url-dialog" class="clavaris-dialog">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Endpoint URL</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close URL dialog">&times;</button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/url(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="clavaris-field">
+                                <label for="edit-url">URL</label>
+                                <input id="edit-url" type="url" name="url" th:value="${endpoint.url()}" required/>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save URL</button>
+                            </div>
+                        </form>
+                    </dialog>
+
+                    <dialog id="description-dialog" class="clavaris-dialog">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Description</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close description dialog">&times;</button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/description(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div class="clavaris-field">
+                                <label for="edit-description">Description</label>
+                                <textarea id="edit-description" name="description" rows="2"
+                                          th:text="${endpoint.description()}"
+                                          placeholder="An optional description of what this endpoint is used for."></textarea>
+                            </div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save description</button>
+                            </div>
+                        </form>
+                    </dialog>
+
+                    <dialog id="event-types-dialog" class="clavaris-dialog">
+                        <div class="clavaris-dialog__header">
+                            <div><h2>Event types</h2></div>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close event types dialog">&times;</button>
+                        </div>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/event-types(organizationId=${organizationId},endpointId=${endpoint.id()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <div th:replace="~{webhook/platform/fragments/event-type-picker :: picker('subscribedEventTypes', ${endpoint.subscribedEventTypes()})}"></div>
+                            <div class="clavaris-dialog__actions">
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save event types</button>
+                            </div>
+                        </form>
+                    </dialog>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

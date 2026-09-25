@@ -1,0 +1,7 @@
+package com.clavaris.webhook.application.usecase.getwebhookdeliveryactivityfororganization;
+
+@FunctionalInterface
+public interface GetWebhookDeliveryActivityForOrganizationUseCase {
+
+  WebhookDeliveryActivity handle(GetWebhookDeliveryActivityForOrganizationQuery query);
+}

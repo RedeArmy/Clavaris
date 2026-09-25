@@ -292,6 +292,32 @@ input[type="radio"] {
   width: auto;
   min-width: 0;
 }
+
+/* Live UX request, 2026-09-25 — the webhook endpoint event-type picker (Clerk/PayPal-parity Event
+   Catalog): a category header (event-type-picker.html's own fragment) above each contiguous run of
+   options sharing the same category, and a compact single-line row per option — deliberately not
+   .clavaris-uri-row's own gapped/bordered look, since this list can run to a couple dozen rows. */
+.clavaris-event-category-header {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clavaris-text-muted);
+}
+.clavaris-event-category-header:first-child {
+  margin-top: 0;
+}
+.clavaris-event-option {
+  padding: 2px 0;
+}
+.clavaris-event-option label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 400;
+  cursor: pointer;
+}
 .clavaris-uri-row .clavaris-button {
   flex: 0 0 auto;
 }

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Event Catalog — Clavaris')}">
+    <title>Event Catalog — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <span>Event Catalog</span>
+            </p>
+
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div th:replace="~{webhook/platform/fragments/webhook-subnav :: tabs(${organizationId}, 'event-catalog')}"></div>
+
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Event Catalog</h1>
+                            <p>Every event type a webhook endpoint can subscribe to today. This
+                                list is a reference — subscribe to individual events (or "All
+                                Events") from an endpoint's own detail page.</p>
+                        </div>
+                    </div>
+
+                    <!-- SonarCloud accessibility fix, 2026-09-25: was a separate, header-less
+                         <table> per event row — one real table with a real <thead>, category rows
+                         as their own full-width <th scope="colgroup"> divider row instead. -->
+                    <div class="clavaris-section-card">
+                        <div class="clavaris-table-wrapper">
+                            <table class="clavaris-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Event type</th>
+                                    <th scope="col">Description</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <th:block th:each="option, iterStat : ${T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG}">
+                                    <tr th:if="${iterStat.index == 0 or !option.category().equals(T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG[iterStat.index - 1].category())}">
+                                        <th scope="colgroup" colspan="2" class="clavaris-event-category-header" th:text="${option.category()}">category</th>
+                                    </tr>
+                                    <tr>
+                                        <td style="white-space: nowrap;"><code th:text="${option.value()}">event.type</code></td>
+                                        <td th:text="${option.description()}">description</td>
+                                    </tr>
+                                </th:block>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

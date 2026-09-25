@@ -57,6 +57,14 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
     entityManager.persist(toEntity(endpoint));
   }
 
+  // Same @Transactional rationale as insert()'s own identical annotation above — a Spring Data
+  // delete needs a real, currently-open transaction on this thread.
+  @Override
+  @Transactional
+  public void delete(final WebhookEndpoint endpoint) {
+    endpoints.deleteById(endpoint.id());
+  }
+
   private WebhookEndpointEntity toEntity(final WebhookEndpoint endpoint) {
     return new WebhookEndpointEntity(
         endpoint.id(),

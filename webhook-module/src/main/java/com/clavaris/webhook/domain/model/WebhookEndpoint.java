@@ -34,6 +34,18 @@ import java.util.UUID;
 })
 public final class WebhookEndpoint {
 
+  /**
+   * Live UX request, 2026-09-25 (PayPal-parity "All Events" subscription): a single sentinel entry
+   * in {@code subscribedEventTypes} meaning "every event type, including one this codebase doesn't
+   * produce yet" — deliberately not a separate boolean field, so every existing caller that already
+   * treats this list as the complete subscription (persistence, {@link #subscribesTo}) keeps
+   * working unchanged; only {@link #subscribesTo} and {@link #requireNonEmptyEventTypes} know this
+   * string is special. An owner who wants this must type it deliberately (the dashboard's own "All
+   * Events" checkbox submits exactly this value and disables the individual checkboxes) — it is
+   * never the default, and never implied by an empty selection.
+   */
+  public static final String ALL_EVENTS_WILDCARD = "*";
+
   private final UUID id;
   private final UUID organizationId;
   private final String url;
@@ -170,9 +182,69 @@ public final class WebhookEndpoint {
         createdAt);
   }
 
-  /** BR-WEBHOOK-06: only event types this endpoint actually subscribed to are ever delivered. */
+  /**
+   * Live UX request, 2026-09-25: the endpoint's own URL, editable after registration (unlike
+   * OAuthClient's grant types/scopes before this same live UX request pattern, this one was
+   * explicitly asked to be editable, not fixed-at-creation) — re-validated exactly like
+   * registration (BR-WEBHOOK-07 https-only here; the separate SSRF check is the calling service's
+   * job, same split {@code RegisterWebhookEndpointService} already establishes).
+   */
+  public WebhookEndpoint updateUrl(final String newUrl) {
+    return new WebhookEndpoint(
+        id,
+        organizationId,
+        requireValidUrl(newUrl),
+        description,
+        subscribedEventTypes,
+        currentSecretEncrypted,
+        previousSecretEncrypted,
+        previousSecretExpiresAt,
+        active,
+        createdAt);
+  }
+
+  /**
+   * Live UX request, 2026-09-25: same editable-after-registration treatment as {@link #updateUrl}.
+   */
+  public WebhookEndpoint updateDescription(final String newDescription) {
+    return new WebhookEndpoint(
+        id,
+        organizationId,
+        url,
+        newDescription,
+        subscribedEventTypes,
+        currentSecretEncrypted,
+        previousSecretEncrypted,
+        previousSecretExpiresAt,
+        active,
+        createdAt);
+  }
+
+  /**
+   * Live UX request, 2026-09-25: same editable-after-registration treatment as {@link #updateUrl}.
+   */
+  public WebhookEndpoint updateEventTypes(final List<String> newEventTypes) {
+    return new WebhookEndpoint(
+        id,
+        organizationId,
+        url,
+        description,
+        requireNonEmptyEventTypes(newEventTypes),
+        currentSecretEncrypted,
+        previousSecretEncrypted,
+        previousSecretExpiresAt,
+        active,
+        createdAt);
+  }
+
+  /**
+   * BR-WEBHOOK-06: only event types this endpoint actually subscribed to are ever delivered. {@link
+   * #ALL_EVENTS_WILDCARD} short-circuits every event, including one no producer has ever written
+   * yet — see that constant's own Javadoc.
+   */
   public boolean subscribesTo(final String eventType) {
-    return subscribedEventTypes.contains(eventType);
+    return subscribedEventTypes.contains(ALL_EVENTS_WILDCARD)
+        || subscribedEventTypes.contains(eventType);
   }
 
   /**

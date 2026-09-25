@@ -19,9 +19,16 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretCommand;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretResult;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionCommand;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionUseCase;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesCommand;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesUseCase;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlCommand;
+import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlUseCase;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -37,56 +44,64 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * ADR-0025, ADR-0007: the dashboard's own webhook endpoint (subscription) management — register,
- * list, deactivate, reactivate, and rotate the signing secret of an Organization's own {@code
- * WebhookEndpoint}s. Every write here goes through the exact same use cases the REST admin API
- * already exposes ({@link RegisterWebhookEndpointUseCase}, {@link
- * DeactivateWebhookEndpointUseCase}, {@link ActivateWebhookEndpointUseCase}, {@link
- * RotateWebhookEndpointSecretUseCase}) — this controller adds a second, session-authenticated
- * {@link AuditActor#platformAccount} caller, not a second implementation. See {@code
- * RegisterWebhookEndpointCommand}'s own Javadoc for why this widening needed no restriction to
- * correct, unlike its Secret Key/OAuth Client siblings.
+ * list, view, deactivate, reactivate, rotate the signing secret of, and edit an Organization's own
+ * {@code WebhookEndpoint}s. Every write here goes through the exact same use cases the REST admin
+ * API already exposes — this controller adds a second, session-authenticated {@link
+ * AuditActor#platformAccount} caller, not a second implementation.
+ *
+ * <p>Live UX request, 2026-09-25 (Clerk-parity master-detail redesign, same shape {@code
+ * client-registry-module}'s own OAuth Client list/detail split already establishes): registration
+ * moved to its own page ({@code showRegisterForm}/{@code register-webhook-endpoint.html}) instead
+ * of sitting inline at the bottom of the list; every per-endpoint action
+ * (deactivate/activate/rotate secret, plus the new URL/description/event-type edits below) moved
+ * off the list's own row actions onto a new per-endpoint detail page ({@code showDetail}/{@code
+ * organization-webhook-endpoint-detail.html}). The list itself keeps its existing HTMX-fragment
+ * keyset pagination (unchanged); the detail page's own forms are plain (no {@code hx-post}) — a
+ * single endpoint's own page has no sibling content an in-place swap would need to avoid
+ * re-rendering.
  *
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver} — never
  * a bare repository call — so an organizationId this {@code PlatformAccount} doesn't own resolves
  * identically to "doesn't exist" (a 404), same anti-enumeration posture as every other dashboard
- * controller in this codebase. Neither {@link DeactivateWebhookEndpointCommand}, {@link
- * ActivateWebhookEndpointCommand}, nor {@link RotateWebhookEndpointSecretCommand} carries an {@code
- * organizationId} of its own (all three key off the endpoint's own {@code endpointId} alone) — this
+ * controller in this codebase. Deactivate/activate/rotate-secret/update-* commands carry no {@code
+ * organizationId} of their own (all key off the endpoint's own {@code endpointId} alone) — this
  * controller resolves the target {@link WebhookEndpoint} via the O(1) {@code
- * GetWebhookEndpointForOrganizationUseCase} first (TD-PERF-026, SDE-III review, 2026-09-16 — see
- * {@code WebhookDashboardControllerSupport#requireEndpointBelongsToOrganization}'s own Javadoc for
- * the O(n) full-organization-list scan this replaced), so an {@code endpointId} belonging to a
- * different Organization 404s before any mutating use case is ever called, not after.
+ * GetWebhookEndpointForOrganizationUseCase} first (TD-PERF-026), so an {@code endpointId} belonging
+ * to a different Organization 404s before any mutating use case is ever called, not after.
  *
- * <p>Unlike Secret Keys/OAuth Clients, this endpoint has a genuine, independent {@code :activate}
- * action reversing {@code :deactivate} — both reachable from this page, since {@code
- * WebhookEndpoint} itself (unlike {@code OrganizationClient}/{@code OAuthClient}) supports
- * reactivation, not just a one-way deactivate. Register/rotate-secret never return {@code
- * "redirect:"} even for a plain (non-HTMX) form submit — {@link
+ * <p>Register/rotate-secret/update-url never return {@code "redirect:"} on the path that shows a
+ * one-time secret or re-displays a rejected value — {@link
  * RegisterWebhookEndpointResult#rawSigningSecret()}/{@link
- * RotateWebhookEndpointSecretResult#rawNewSigningSecret()} are shown exactly once and have nowhere
- * safe to travel through a redirect; deactivate/activate carry no secret, so both keep this
- * codebase's normal "success redirects, HTMX gets a fragment" convention.
+ * RotateWebhookEndpointSecretResult#rawNewSigningSecret()} have nowhere safe to travel through a
+ * redirect, and an SSRF-rejected URL needs its form re-displayed with the value the owner just
+ * typed, not lost to a fresh GET.
  */
-// PMD.ExcessiveImports (TD-PERF-020's own ListWebhookEndpointsForOrganizationPagedQuery/UseCase
-// pushed this past the default threshold of 30): every import here backs a real, distinct
-// collaborator this controller genuinely needs — same "wiring, not sprawl" reasoning
-// OrganizationUseCaseConfig's own class-level Javadoc documents for an identical situation.
+// PMD.ExcessiveImports/PMD.CouplingBetweenObjects: every import/collaborator here backs a real,
+// distinct use case or form object this controller genuinely needs — same "wiring, not sprawl"
+// reasoning this codebase's own comparable controllers already document.
 // PMD.AvoidDuplicateLiterals: "PMD.OnlyOneReturn" is repeated once per handler method that
-// legitimately needs it (create/deactivate/activate/showList, TD-PERF-020's own HX-Request
-// branch added the fourth) — same false-positive class ContentSecurityPolicyHeaderWriter's own
+// legitimately needs it — same false-positive class ContentSecurityPolicyHeaderWriter's own
 // identical class-level suppression already documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects",
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.TooManyMethods"
+})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints")
 public class PlatformWebhookEndpointController {
 
   private static final String LIST_VIEW = "webhook/platform/organization-webhook-endpoints";
   private static final String ENDPOINTS_FRAGMENT = LIST_VIEW + " :: endpoints";
+  private static final String REGISTER_VIEW = "webhook/platform/register-webhook-endpoint";
+  private static final String DETAIL_VIEW = "webhook/platform/organization-webhook-endpoint-detail";
   private static final String CREATE_FORM_ATTRIBUTE = "createForm";
   private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
-  private static final String EVENT_TYPE_OPTIONS_ATTRIBUTE = "eventTypeOptions";
+  private static final String ENDPOINT_ATTRIBUTE = "endpoint";
+  private static final String JUST_REGISTERED_RAW_SECRET_ATTRIBUTE = "justRegisteredRawSecret";
 
   private final RegisterWebhookEndpointUseCase registerEndpoint;
   private final GetWebhookEndpointForOrganizationUseCase getEndpoint;
@@ -94,17 +109,17 @@ public class PlatformWebhookEndpointController {
   private final DeactivateWebhookEndpointUseCase deactivateEndpoint;
   private final ActivateWebhookEndpointUseCase activateEndpoint;
   private final RotateWebhookEndpointSecretUseCase rotateEndpointSecret;
+  private final UpdateWebhookEndpointUrlUseCase updateEndpointUrl;
+  private final UpdateWebhookEndpointDescriptionUseCase updateEndpointDescription;
+  private final UpdateWebhookEndpointEventTypesUseCase updateEndpointEventTypes;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  // TD-PERF-026 (SDE-III review, 2026-09-16): ListWebhookEndpointsForOrganizationUseCase dropped —
-  // it existed on this controller purely to back requireEndpointBelongsToOrganization's former O(n)
-  // workaround (see that method's own Javadoc), now answered in O(1) by
-  // GetWebhookEndpointForOrganizationUseCase. Same "drop the now-dead ListX dependency" precedent
-  // client-registry-module's own PlatformOrganizationClientController/PlatformOAuthClientController
-  // already established (SDE-III review, 2026-09-15) for an identical shape of workaround.
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other multi-collaborator constructor in this codebase.
+  // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
+  // as every other multi-collaborator constructor in this codebase. The three update-* use cases
+  // added by this class's own live UX request, 2026-09-25 pushed the count from 8 to 11, past
+  // PMD's own default threshold of 10.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public PlatformWebhookEndpointController(
       final RegisterWebhookEndpointUseCase registerEndpoint,
       final GetWebhookEndpointForOrganizationUseCase getEndpoint,
@@ -112,6 +127,9 @@ public class PlatformWebhookEndpointController {
       final DeactivateWebhookEndpointUseCase deactivateEndpoint,
       final ActivateWebhookEndpointUseCase activateEndpoint,
       final RotateWebhookEndpointSecretUseCase rotateEndpointSecret,
+      final UpdateWebhookEndpointUrlUseCase updateEndpointUrl,
+      final UpdateWebhookEndpointDescriptionUseCase updateEndpointDescription,
+      final UpdateWebhookEndpointEventTypesUseCase updateEndpointEventTypes,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerEndpoint = registerEndpoint;
@@ -120,6 +138,9 @@ public class PlatformWebhookEndpointController {
     this.deactivateEndpoint = deactivateEndpoint;
     this.activateEndpoint = activateEndpoint;
     this.rotateEndpointSecret = rotateEndpointSecret;
+    this.updateEndpointUrl = updateEndpointUrl;
+    this.updateEndpointDescription = updateEndpointDescription;
+    this.updateEndpointEventTypes = updateEndpointEventTypes;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
   }
@@ -143,7 +164,6 @@ public class PlatformWebhookEndpointController {
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
     populateEndpointsModel(model, organizationId, KeysetPageRequest.fromCursors(after, before));
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       return ENDPOINTS_FRAGMENT;
@@ -151,9 +171,46 @@ public class PlatformWebhookEndpointController {
     return LIST_VIEW;
   }
 
-  // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't
-  // safely travel through one. PMD.OnlyOneReturn: create/validation-error/unsafe-url each need
-  // their own exit, same rationale as every other handler in this codebase.
+  @GetMapping("/new")
+  public String showRegisterForm(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      final Model model) {
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
+    final String organizationName =
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    populateHeaderModel(model, organizationId, organizationName);
+    model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
+    return REGISTER_VIEW;
+  }
+
+  @GetMapping("/{endpointId}")
+  public String showDetail(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID endpointId,
+      final Model model) {
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
+    final String organizationName =
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    final WebhookEndpoint endpoint =
+        WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+            getEndpoint, organizationId, endpointId);
+    populateHeaderModel(model, organizationId, organizationName);
+    model.addAttribute(ENDPOINT_ATTRIBUTE, endpoint);
+    return DETAIL_VIEW;
+  }
+
+  // Never returns "redirect:" on the rejected-registration paths — see this class's own Javadoc
+  // for why a re-displayed form can't safely be a fresh GET either (the SSRF-rejected value the
+  // owner just typed would be lost). PMD.OnlyOneReturn: create/validation-error/unsafe-url each
+  // need their own exit, same rationale as every other handler in this codebase.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
@@ -171,10 +228,7 @@ public class PlatformWebhookEndpointController {
     populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
-      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-      return WebhookDashboardControllerSupport.isHtmxRequest(request)
-          ? ENDPOINTS_FRAGMENT
-          : LIST_VIEW;
+      return REGISTER_VIEW;
     }
 
     final RegisterWebhookEndpointResult result;
@@ -196,57 +250,35 @@ public class PlatformWebhookEndpointController {
       // TD-SEC-053: surfaced as a form error, not a raw 400 — the REST API's own equivalent
       // caller (an operator scripting against the admin API) gets a bare status code; a human
       // filling out this form needs to see why their submission was rejected.
-      return renderCreateFormError(request, organizationId, form, model, "unsafeWebhookUrlError");
+      model.addAttribute("unsafeWebhookUrlError", true);
+      model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
+      return REGISTER_VIEW;
     } catch (final WebhookEndpointLimitExceededException _) {
       // BR-WEBHOOK-08: same "form error, not a bare status code" reasoning as the SSRF catch
       // above.
-      return renderCreateFormError(
-          request, organizationId, form, model, "webhookEndpointLimitExceededError");
+      model.addAttribute("webhookEndpointLimitExceededError", true);
+      model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
+      return REGISTER_VIEW;
     }
 
-    model.addAttribute("justRegisteredRawSecret", result.rawSigningSecret());
-    model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-    return WebhookDashboardControllerSupport.isHtmxRequest(request)
-        ? ENDPOINTS_FRAGMENT
-        : LIST_VIEW;
+    // Renders the new endpoint's own detail page directly — same "never redirect a one-time
+    // secret" rule as rotateSecret() below, and the natural place to land now that registration
+    // no longer happens inline on the list (see this class's own Javadoc).
+    model.addAttribute(ENDPOINT_ATTRIBUTE, result.endpoint());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawSigningSecret());
+    return DETAIL_VIEW;
   }
 
-  // Shared by create()'s own two rejected-registration catch blocks (TD-SEC-053's unsafe-URL
-  // rejection, BR-WEBHOOK-08's cap rejection) — same shape, differing only in which single boolean
-  // model attribute names the reason. Extracted once a second catch block would otherwise have
-  // pushed create() over PMD's own CyclomaticComplexity threshold, and duplicating this same
-  // four-line body a second time was never the better fix.
-  private String renderCreateFormError(
-      final HttpServletRequest request,
-      final UUID organizationId,
-      final RegisterWebhookEndpointForm form,
-      final Model model,
-      final String errorAttributeName) {
-    model.addAttribute(errorAttributeName, true);
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, form);
-    populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-    return WebhookDashboardControllerSupport.isHtmxRequest(request)
-        ? ENDPOINTS_FRAGMENT
-        : LIST_VIEW;
-  }
-
-  // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
-  // controller's own identical "after a mutation succeeds" suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{endpointId}/deactivate")
   public String deactivate(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @PathVariable final UUID endpointId,
-      final Model model) {
+      @PathVariable final UUID endpointId) {
     final UUID ownerPlatformAccountId =
         WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
             currentPlatformAccount, request);
-    final String organizationName =
-        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
-            organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+        organizationResolver, organizationId, ownerPlatformAccountId);
     WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
         getEndpoint, organizationId, endpointId);
 
@@ -254,28 +286,19 @@ public class PlatformWebhookEndpointController {
         new DeactivateWebhookEndpointCommand(
             endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
-      populateHeaderModel(model, organizationId, organizationName);
-      model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-      return ENDPOINTS_FRAGMENT;
-    }
-    return "redirect:/platform/dashboard/organizations/" + organizationId + "/webhook-endpoints";
+    return redirectToDetail(organizationId, endpointId);
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{endpointId}/activate")
   public String activate(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @PathVariable final UUID endpointId,
-      final Model model) {
+      @PathVariable final UUID endpointId) {
     final UUID ownerPlatformAccountId =
         WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
             currentPlatformAccount, request);
-    final String organizationName =
-        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
-            organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+        organizationResolver, organizationId, ownerPlatformAccountId);
     WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
         getEndpoint, organizationId, endpointId);
 
@@ -283,16 +306,10 @@ public class PlatformWebhookEndpointController {
         new ActivateWebhookEndpointCommand(
             endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
-      populateHeaderModel(model, organizationId, organizationName);
-      model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-      populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-      return ENDPOINTS_FRAGMENT;
-    }
-    return "redirect:/platform/dashboard/organizations/" + organizationId + "/webhook-endpoints";
+    return redirectToDetail(organizationId, endpointId);
   }
 
-  // Never returns "redirect:" — same rationale as create() above.
+  // Never returns "redirect:" — see this class's own Javadoc.
   @PostMapping("/{endpointId}/rotate-secret")
   public String rotateSecret(
       final HttpServletRequest request,
@@ -314,21 +331,122 @@ public class PlatformWebhookEndpointController {
                 endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
     populateHeaderModel(model, organizationId, organizationName);
-    model.addAttribute("justRegisteredRawSecret", result.rawNewSigningSecret());
-    model.addAttribute("justRegisteredEndpointId", result.endpoint().id());
-    model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
-    populateEndpointsModel(model, organizationId, KeysetPageRequest.first());
-    return WebhookDashboardControllerSupport.isHtmxRequest(request)
-        ? ENDPOINTS_FRAGMENT
-        : LIST_VIEW;
+    model.addAttribute(ENDPOINT_ATTRIBUTE, result.endpoint());
+    model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawNewSigningSecret());
+    return DETAIL_VIEW;
+  }
+
+  // Never returns "redirect:" on the rejected-URL path — same rationale as create() above: the
+  // value the owner just typed would be lost to a fresh GET.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{endpointId}/url")
+  public String updateUrl(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID endpointId,
+      @RequestParam final String url,
+      final Model model) {
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
+    final String organizationName =
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+        getEndpoint, organizationId, endpointId);
+
+    final WebhookEndpoint updated;
+    try {
+      updated =
+          updateEndpointUrl.handle(
+              new UpdateWebhookEndpointUrlCommand(
+                  endpointId, url, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final UnsafeWebhookUrlException _) {
+      // Same "form error, not a bare status code" reasoning as create()'s own identical catch.
+      populateHeaderModel(model, organizationId, organizationName);
+      model.addAttribute(
+          ENDPOINT_ATTRIBUTE,
+          WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+              getEndpoint, organizationId, endpointId));
+      model.addAttribute("unsafeWebhookUrlError", true);
+      return DETAIL_VIEW;
+    }
+
+    populateHeaderModel(model, organizationId, organizationName);
+    model.addAttribute(ENDPOINT_ATTRIBUTE, updated);
+    return redirectToDetail(organizationId, endpointId);
+  }
+
+  @PostMapping("/{endpointId}/description")
+  public String updateDescription(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID endpointId,
+      @RequestParam(required = false) final String description) {
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
+    WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+        organizationResolver, organizationId, ownerPlatformAccountId);
+    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+        getEndpoint, organizationId, endpointId);
+
+    updateEndpointDescription.handle(
+        new UpdateWebhookEndpointDescriptionCommand(
+            endpointId, description, AuditActor.platformAccount(ownerPlatformAccountId)));
+
+    return redirectToDetail(organizationId, endpointId);
+  }
+
+  // PMD.OnlyOneReturn: the empty-selection form-error exit and the real success redirect are two
+  // genuinely distinct outcomes, same rationale as updateUrl()'s own identical suppression.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{endpointId}/event-types")
+  public String updateEventTypes(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID endpointId,
+      @RequestParam(required = false) final List<String> subscribedEventTypes,
+      final Model model) {
+    final UUID ownerPlatformAccountId =
+        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
+            currentPlatformAccount, request);
+    final String organizationName =
+        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
+            organizationResolver, organizationId, ownerPlatformAccountId);
+    final WebhookEndpoint existing =
+        WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
+            getEndpoint, organizationId, endpointId);
+
+    if (subscribedEventTypes == null || subscribedEventTypes.isEmpty()) {
+      // Same "form error, not a bare status code" reasoning as create()'s own identical catch —
+      // WebhookEndpoint#updateEventTypes would otherwise throw IllegalArgumentException
+      // (BR-WEBHOOK-06) for a caller this dashboard form can genuinely produce (every checkbox
+      // and the "All Events" toggle both left unchecked).
+      populateHeaderModel(model, organizationId, organizationName);
+      model.addAttribute(ENDPOINT_ATTRIBUTE, existing);
+      model.addAttribute("emptyEventTypesError", true);
+      return DETAIL_VIEW;
+    }
+
+    updateEndpointEventTypes.handle(
+        new UpdateWebhookEndpointEventTypesCommand(
+            endpointId, subscribedEventTypes, AuditActor.platformAccount(ownerPlatformAccountId)));
+
+    return redirectToDetail(organizationId, endpointId);
+  }
+
+  private String redirectToDetail(final UUID organizationId, final UUID endpointId) {
+    return "redirect:/platform/dashboard/organizations/"
+        + organizationId
+        + "/webhook-endpoints/"
+        + endpointId;
   }
 
   private void populateHeaderModel(
       final Model model, final UUID organizationId, final String organizationName) {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
-    model.addAttribute(
-        EVENT_TYPE_OPTIONS_ATTRIBUTE, KnownWebhookEventTypeOptions.DASHBOARD_OPTIONS);
   }
 
   private void populateEndpointsModel(

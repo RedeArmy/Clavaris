@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — New Endpoint — Clavaris')}">
+    <title>New Webhook Endpoint — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <span>New Endpoint</span>
+            </p>
+
+            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>
+
+                <!-- Live UX request, 2026-09-25 (Clerk-parity "Endpoints > New Endpoint"): registration
+                     moved off the bottom of the endpoints list onto its own page — the same "one thing
+                     to focus on" shape Clerk's own Add Endpoint page and PayPal's own Add Webhook modal
+                     both use, instead of competing for attention with an already-populated table above
+                     it. create() still never redirects on success (the raw signing secret can't safely
+                     travel through one) — the result renders back on the endpoints list, same as before
+                     this page existed; this page's only job is collecting the form. -->
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>New Webhook Endpoint</h1>
+                            <p>A URL this Organization's own consuming application receives event
+                                deliveries at. The signing secret is shown exactly once, on the
+                                endpoints list, right after you register.</p>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section-card">
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}"
+                              th:object="${createForm}" method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                            <div class="clavaris-field">
+                                <label for="webhook-url">Endpoint URL</label>
+                                <p class="clavaris-field-error" th:if="${#fields.hasErrors('url')}" th:errors="*{url}">URL error</p>
+                                <input id="webhook-url" type="url" th:field="*{url}" placeholder="https://example.com/webhooks/clavaris" required/>
+                            </div>
+
+                            <div class="clavaris-field">
+                                <label for="webhook-description">Description (optional)</label>
+                                <textarea id="webhook-description" th:field="*{description}" rows="2"
+                                          placeholder="An optional description of what this endpoint is used for."></textarea>
+                            </div>
+
+                            <!-- SonarCloud accessibility fix, 2026-09-25: a bare <label> here labels
+                                 no single control (the picker is a whole group of checkboxes plus a
+                                 search input) — fieldset/legend is the same real fix this codebase's
+                                 own Redirect URIs list already established for an identical shape of
+                                 group label. -->
+                            <fieldset class="clavaris-field clavaris-uri-fieldset">
+                                <legend>Subscribe to events</legend>
+                                <p class="clavaris-field-error" th:if="${#fields.hasErrors('subscribedEventTypes')}" th:errors="*{subscribedEventTypes}">Event types error</p>
+                                <div th:replace="~{webhook/platform/fragments/event-type-picker :: picker('subscribedEventTypes', ${createForm.subscribedEventTypes})}"></div>
+                            </fieldset>
+
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Register endpoint</button>
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Cancel</a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
