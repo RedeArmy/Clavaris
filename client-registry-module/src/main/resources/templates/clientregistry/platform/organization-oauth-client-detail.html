@@ -67,7 +67,7 @@
                                     <td>
                                         <code th:if="${justRegisteredRawSecret}" th:text="${justRegisteredRawSecret}">secret</code>
                                         <span th:unless="${justRegisteredRawSecret}" class="clavaris-text-muted">
-                                            Shown once, at creation or rotation — Clavaris never stores or displays it again. Use "Rotate secret" below for a new one.
+                                            Shown once, at creation, rotation, or reactivation — Clavaris never stores or displays it again. Use "Rotate secret" below for a new one.
                                         </span>
                                     </td>
                                 </tr>
@@ -93,14 +93,19 @@
                         <!-- Live UX request, 2026-09-24: Activate and permanent delete only ever
                              appear once a client is already inactive — never alongside Rotate
                              secret/Deactivate above, so there's no risk of confusing the two states
-                             or reaching for "delete" on a client still in active use. -->
+                             or reaching for "delete" on a client still in active use. Live UX
+                             request, 2026-09-25: Activate also rotates the secret (see
+                             ActivateOAuthClientResult's own Javadoc) — the button's own title
+                             says so upfront, and the same "New client secret" banner
+                             create/rotate already show appears here too. -->
                         <div class="clavaris-row-actions" th:unless="${client.active()}" style="margin-top: var(--space-4);">
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   hx-target="#client-detail-content" hx-swap="outerHTML">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Activate</button>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit"
+                                        title="Also rotates the client secret — the new one is shown once, right after.">Activate</button>
                             </form>
                             <a class="clavaris-button clavaris-button--danger clavaris-button--inline"
                                th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/delete(organizationId=${organizationId},clientId=${client.clientId()})}">Delete permanently</a>
@@ -277,7 +282,14 @@
                          enough to render eagerly with the rest of the page. -->
                     <div class="clavaris-section-card">
                         <h2>Configuration</h2>
-                        <div class="clavaris-table-wrapper">
+                        <!-- Live UX request, 2026-09-25: hides the values themselves when
+                             inactive, not just the Edit buttons — same "the whole content area is
+                             gone, not just non-interactive" treatment Redirect settings' own
+                             <form th:if="${client.active()}"> already gets, for the identical
+                             reason (nothing about an inactive client's configuration is relevant
+                             to show or safe to imply is still "the current setting" until it's
+                             reactivated). -->
+                        <div class="clavaris-table-wrapper" th:if="${client.active()}">
                             <table class="clavaris-table">
                                 <tbody>
                                 <tr>
@@ -285,7 +297,7 @@
                                     <td th:text="${#strings.listJoin(client.allowedGrantTypes(), ', ')}">grant types</td>
                                     <td>
                                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                                type="button" th:if="${client.active()}" data-dialog-open="grant-types-dialog">Edit</button>
+                                                type="button" data-dialog-open="grant-types-dialog">Edit</button>
                                     </td>
                                 </tr>
                                 <tr>
@@ -293,7 +305,7 @@
                                     <td th:text="${#strings.listJoin(client.allowedScopes(), ', ')}">scopes</td>
                                     <td>
                                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                                type="button" th:if="${client.active()}" data-dialog-open="scopes-dialog">Edit</button>
+                                                type="button" data-dialog-open="scopes-dialog">Edit</button>
                                     </td>
                                 </tr>
                                 <tr>
@@ -305,7 +317,7 @@
                                     </td>
                                     <td>
                                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                                type="button" th:if="${client.active()}" data-dialog-open="consent-dialog">Edit</button>
+                                                type="button" data-dialog-open="consent-dialog">Edit</button>
                                     </td>
                                 </tr>
                                 </tbody>
@@ -317,7 +329,13 @@
                         </p>
                     </div>
 
-                    <dialog id="grant-types-dialog" class="clavaris-dialog">
+                    <!-- Live UX request, 2026-09-25: the three dialogs below are gated behind
+                         client.active() too, not just their own trigger buttons — each pre-fills
+                         real current data into its own form (checked checkboxes/scope input
+                         values), so a closed-but-still-rendered dialog would leave that data
+                         sitting in the DOM even with no way to open it. Same "the whole content
+                         area is gone" treatment as the read-only table above. -->
+                    <dialog id="grant-types-dialog" class="clavaris-dialog" th:if="${client.active()}">
                         <div class="clavaris-dialog__header">
                             <div><h2>Grant types</h2></div>
                             <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close grant types dialog">&times;</button>
@@ -339,7 +357,7 @@
                         </form>
                     </dialog>
 
-                    <dialog id="scopes-dialog" class="clavaris-dialog">
+                    <dialog id="scopes-dialog" class="clavaris-dialog" th:if="${client.active()}">
                         <div class="clavaris-dialog__header">
                             <div><h2>Scopes</h2></div>
                             <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close scopes dialog">&times;</button>
@@ -381,7 +399,7 @@
                         </template>
                     </dialog>
 
-                    <dialog id="consent-dialog" class="clavaris-dialog">
+                    <dialog id="consent-dialog" class="clavaris-dialog" th:if="${client.active()}">
                         <div class="clavaris-dialog__header">
                             <div><h2>Consent screen</h2></div>
                             <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close consent screen dialog">&times;</button>

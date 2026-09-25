@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.OAuthClientNotFoundException;
@@ -467,22 +468,29 @@ class PlatformOAuthClientControllerTest {
         .andExpect(status().isNotFound());
   }
 
-  // Live UX request, 2026-09-24: reactivation — same shape as the deactivate tests above.
+  // Live UX request, 2026-09-24: reactivation. Live UX request, 2026-09-25: also rotates the
+  // secret — never redirects (same rationale as create()/rotateSecret()), always renders the
+  // detail page/fragment directly with the new raw secret shown once.
   @Test
-  void plainActivatePostRedirectsToTheDetailPageOnSuccess() throws Exception {
+  void plainActivatePostRendersTheDetailPageDirectlyWithTheNewSecretNeverARedirect()
+      throws Exception {
     OAuthClient client = sampleClient();
+    when(activateClient.handle(any()))
+        .thenReturn(new ActivateOAuthClientResult(client.clientId(), "new-raw-secret"));
+    when(getClient.handle(any())).thenReturn(Optional.of(client));
 
     mockMvc
         .perform(post(basePath() + "/" + client.clientId() + "/activate"))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl(basePath() + "/" + client.clientId()));
-
-    verify(activateClient).handle(any());
+        .andExpect(status().isOk())
+        .andExpect(view().name(DETAIL_VIEW))
+        .andExpect(model().attribute("justRegisteredRawSecret", "new-raw-secret"));
   }
 
   @Test
   void htmxActivatePostReturnsTheDetailFragment() throws Exception {
     OAuthClient client = sampleClient();
+    when(activateClient.handle(any()))
+        .thenReturn(new ActivateOAuthClientResult(client.clientId(), "new-raw-secret"));
     when(getClient.handle(any())).thenReturn(Optional.of(client));
 
     mockMvc
@@ -1053,8 +1061,11 @@ class PlatformOAuthClientControllerTest {
         .andExpect(content().string(containsString("consent-dialog")));
   }
 
+  // Live UX request, 2026-09-25: an inactive client hides the Configuration values themselves,
+  // not just the Edit buttons — same "the whole content area is gone" treatment Redirect settings
+  // already gets, for the identical reason.
   @Test
-  void configurationCardHidesEditButtonsForAnInactiveClientAndShowsAnExplanation()
+  void configurationCardHidesEditButtonsAndValuesForAnInactiveClientAndShowsAnExplanation()
       throws Exception {
     OAuthClient client = sampleClient().deactivate();
     when(getClient.handle(any())).thenReturn(Optional.of(client));
@@ -1063,7 +1074,12 @@ class PlatformOAuthClientControllerTest {
         .perform(get(basePath() + "/" + client.clientId()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("configuration can't be edited until you")))
-        .andExpect(
-            content().string(not(containsString("data-dialog-open=\"grant-types-dialog\""))));
+        .andExpect(content().string(not(containsString("data-dialog-open=\"grant-types-dialog\""))))
+        .andExpect(content().string(not(containsString("data-dialog-open=\"scopes-dialog\""))))
+        .andExpect(content().string(not(containsString("data-dialog-open=\"consent-dialog\""))))
+        .andExpect(content().string(not(containsString("authorization_code"))))
+        .andExpect(content().string(not(containsString("offline_access"))))
+        .andExpect(content().string(not(containsString(">Required<"))))
+        .andExpect(content().string(not(containsString(">Skipped<"))));
   }
 }

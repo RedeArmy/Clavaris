@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
 import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientCommand;
+import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientResult;
 import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateoauthclient.DeactivateOAuthClientUseCase;
@@ -342,9 +343,10 @@ public class PlatformOAuthClientController {
     return redirectToDetail(organizationId, clientId);
   }
 
-  // Live UX request, 2026-09-24: reactivates a previously deactivated client — same two-exit
-  // shape as deactivate() above.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // Live UX request, 2026-09-24: reactivates a previously deactivated client. Live UX request,
+  // 2026-09-25: also rotates its secret (see ActivateOAuthClientResult's own Javadoc) — never
+  // returns "redirect:", same rationale as create()/rotateSecret(): the raw secret shown exactly
+  // once here has nowhere safe to travel through a redirect.
   @PostMapping("/{clientId}/activate")
   public String activate(
       final HttpServletRequest request,
@@ -355,12 +357,14 @@ public class PlatformOAuthClientController {
         DashboardControllerSupport.requireOwnedOrganization(
             request, organizationId, currentPlatformAccount, organizationResolver);
 
+    final ActivateOAuthClientResult result;
     try {
-      activateClient.handle(
-          new ActivateOAuthClientCommand(
-              clientId,
-              organizationId,
-              AuditActor.platformAccount(owned.ownerPlatformAccountId())));
+      result =
+          activateClient.handle(
+              new ActivateOAuthClientCommand(
+                  clientId,
+                  organizationId,
+                  AuditActor.platformAccount(owned.ownerPlatformAccountId())));
     } catch (
         final com.clavaris.clientregistry.application.usecase.activateoauthclient
                 .OAuthClientNotFoundException
@@ -370,15 +374,14 @@ public class PlatformOAuthClientController {
       throw new ResponseStatusException(HttpStatus.CONFLICT);
     }
 
-    if (DashboardControllerSupport.isHtmxRequest(request)) {
-      populateDetailModel(
-          model,
-          organizationId,
-          owned.organizationName(),
-          requireOwnedClient(organizationId, clientId));
-      return DETAIL_FRAGMENT;
-    }
-    return redirectToDetail(organizationId, clientId);
+    populateDetailModel(
+        model,
+        organizationId,
+        owned.organizationName(),
+        requireOwnedClient(organizationId, clientId));
+    model.addAttribute("justRegisteredRawSecret", result.rawSecret());
+    model.addAttribute("justRegisteredClientId", result.clientId());
+    return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
   }
 
   // Never returns "redirect:" — same rationale as create() above.

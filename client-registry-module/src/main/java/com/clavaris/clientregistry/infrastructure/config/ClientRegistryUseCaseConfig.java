@@ -140,11 +140,15 @@ class ClientRegistryUseCaseConfig {
     return new DeactivateOAuthClientService(oauthClients, auditEvents);
   }
 
-  // Live UX request, 2026-09-24: reactivates a previously deactivated client.
+  // Live UX request, 2026-09-24: reactivates a previously deactivated client. Live UX request,
+  // 2026-09-25: also rotates its secret — see ActivateOAuthClientResult's own Javadoc.
   @Bean
   /* package */ ActivateOAuthClientUseCase activateOAuthClientUseCase(
-      final OAuthClientRepository oauthClients, final AuditEventRecorder auditEvents) {
-    return new ActivateOAuthClientService(oauthClients, auditEvents);
+      final OAuthClientRepository oauthClients,
+      final ClientSecretHasher hasher,
+      final OAuthClientSecretGenerator secretGenerator,
+      final AuditEventRecorder auditEvents) {
+    return new ActivateOAuthClientService(oauthClients, hasher, secretGenerator, auditEvents);
   }
 
   // Live UX request, 2026-09-24: permanent, irreversible deletion — only reachable once the
