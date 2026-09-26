@@ -13,8 +13,9 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 
 /**
  * {@code /userinfo} response mapper — replaces SAS's own {@code DefaultOidcUserInfoMapper} so the
- * {@code workspace_id}/{@code workspace_role} claims {@link WorkspaceRoleClaimsCustomizer} adds to
- * the ID token actually reach {@code /userinfo}, not just the token response.
+ * {@code workspace_id}/{@code workspace_role}/{@code workspace_permissions} claims (ADR-0027 adds
+ * the third) {@link WorkspaceRoleClaimsCustomizer} adds to the ID token actually reach {@code
+ * /userinfo}, not just the token response.
  *
  * <p><b>Why this is needed at all</b> (confirmed live, {@code javap} against the actually-resolved
  * SAS 7.1.0 jar, same discipline TD-SEC-028's own investigation already used): the default mapper
@@ -29,9 +30,10 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
  * scope-gating) for every standard claim, so nothing already-conformant regresses — this codebase
  * doesn't populate any of {@code email}/{@code phone_number}/{@code profile}'s own sub-claims
  * today, so that half is currently a no-op, but must stay correct the day it isn't. {@code
- * workspace_id}/ {@code workspace_role} are added unconditionally on top, whenever present on the
- * ID token — they have no dedicated OIDC scope of their own (BR-WS doesn't define one), so gating
- * them behind a scope isn't applicable the way it is for the standard claim groups.
+ * workspace_id}/{@code workspace_role}/{@code workspace_permissions} are added unconditionally on
+ * top, whenever present on the ID token — they have no dedicated OIDC scope of their own (BR-WS
+ * doesn't define one), so gating them behind a scope isn't applicable the way it is for the
+ * standard claim groups.
  */
 // PMD.LongVariable: WORKSPACE_ID_CLAIM/WORKSPACE_ROLE_CLAIM name exactly what they hold — the
 // literal claim key this class writes into the userinfo response, same "abbreviating would only
@@ -64,6 +66,7 @@ public class WorkspaceAwareOidcUserInfoMapper
   private static final String ADDRESS_CLAIM = "address";
   private static final String WORKSPACE_ID_CLAIM = "workspace_id";
   private static final String WORKSPACE_ROLE_CLAIM = "workspace_role";
+  private static final String WORKSPACE_PERMISSIONS_CLAIM = "workspace_permissions";
 
   // PMD.LawOfDemeter: context.getAuthorization()/getAccessToken() is the standard SAS API shape
   // for this extension point — same "there is no other way to reach it" reasoning as
@@ -102,6 +105,10 @@ public class WorkspaceAwareOidcUserInfoMapper
     }
     if (idTokenClaims.containsKey(WORKSPACE_ROLE_CLAIM)) {
       userInfoClaims.put(WORKSPACE_ROLE_CLAIM, idTokenClaims.get(WORKSPACE_ROLE_CLAIM));
+    }
+    if (idTokenClaims.containsKey(WORKSPACE_PERMISSIONS_CLAIM)) {
+      userInfoClaims.put(
+          WORKSPACE_PERMISSIONS_CLAIM, idTokenClaims.get(WORKSPACE_PERMISSIONS_CLAIM));
     }
 
     return new OidcUserInfo(userInfoClaims);

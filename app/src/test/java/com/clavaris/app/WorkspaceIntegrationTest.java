@@ -83,10 +83,11 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     UUID organizationId =
         promoteToProduction(platformToken, createOrganization(platformToken, "Workspace Flow Co"));
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
+    UUID roleId = reservedRoleIdFor(organizationId);
 
-    JsonNode membership = addMember(platformToken, workspaceId, "new-member@example.com", null);
+    JsonNode membership = addMember(platformToken, workspaceId, "new-member@example.com", roleId);
 
-    assertThat(membership.get("role").asString()).isEqualTo("MEMBER");
+    assertThat(membership.get("roleId").asString()).isEqualTo(roleId.toString());
     UUID accountId = UUID.fromString(membership.get("accountId").asString());
     Integer accountRows =
         jdbcTemplate.queryForObject(
@@ -116,22 +117,23 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Role Change Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Sales");
-    // BR-WS-01's replacement invariant needs a second ADMIN in place before the first can be
-    // demoted/removed — two members, both created as ADMIN, then one demoted to MEMBER and
-    // removed, proving the whole lifecycle, not just the happy-path single call.
-    JsonNode firstAdmin = addMember(platformToken, workspaceId, "admin-one@example.com", "ADMIN");
-    JsonNode secondAdmin = addMember(platformToken, workspaceId, "admin-two@example.com", "ADMIN");
+    UUID roleId = reservedRoleIdFor(organizationId);
+    // BR-WS-01's replacement invariant (ADR-0027 generalizes it) needs a second manage_members
+    // holder in place before the first can be unassigned/removed — two members, both assigned the
+    // one reserved role, then one is unassigned and removed, proving the whole lifecycle, not just
+    // the happy-path single call.
+    JsonNode firstAdmin = addMember(platformToken, workspaceId, "admin-one@example.com", roleId);
+    JsonNode secondAdmin = addMember(platformToken, workspaceId, "admin-two@example.com", roleId);
     UUID firstAccountId = UUID.fromString(firstAdmin.get("accountId").asString());
     UUID secondAccountId = UUID.fromString(secondAdmin.get("accountId").asString());
 
-    // Demotes the first admin — secondAccountId remains the workspace's own last ADMIN, so
-    // removing the (now plain member) firstAccountId next is always safe and never trips
-    // BR-WS-01's replacement invariant.
+    // Unassigns the first member's role — secondAccountId remains the workspace's own last
+    // manage_members holder, so removing the (now roleless) firstAccountId next is always safe
+    // and never trips BR-WS-01's replacement invariant.
     HttpResponse<String> changeRoleResponse =
-        changeRole(platformToken, workspaceId, firstAccountId, "MEMBER");
+        changeRole(platformToken, workspaceId, firstAccountId, null);
     assertThat(changeRoleResponse.statusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(changeRoleResponse.body()).get("role").asString())
-        .isEqualTo("MEMBER");
+    assertThat(objectMapper.readTree(changeRoleResponse.body()).get("roleId").isNull()).isTrue();
 
     HttpResponse<String> removeResponse = removeMember(platformToken, workspaceId, firstAccountId);
     assertThat(removeResponse.statusCode()).isEqualTo(204);
@@ -163,7 +165,13 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Refresh Token Revocation Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Support");
-    JsonNode member = addMember(platformToken, workspaceId, "removed-member@example.com", null);
+    UUID roleId = reservedRoleIdFor(organizationId);
+    // A second member sharing the same (only) role keeps at least one manage_members holder in
+    // place once the first is removed below — same BR-WS-01 reasoning
+    // changingRoleAndRemovingAMemberWorkEndToEnd's own two-member setup already documents; this
+    // test's own point is refresh-token revocation, not the invariant itself.
+    addMember(platformToken, workspaceId, "keeps-workspace-alive@example.com", roleId);
+    JsonNode member = addMember(platformToken, workspaceId, "removed-member@example.com", roleId);
     UUID accountId = UUID.fromString(member.get("accountId").asString());
 
     UUID sessionId = UUID.randomUUID();
@@ -195,7 +203,12 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Last Admin Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Ops");
-    JsonNode onlyAdmin = addMember(platformToken, workspaceId, "only-admin@example.com", "ADMIN");
+    JsonNode onlyAdmin =
+        addMember(
+            platformToken,
+            workspaceId,
+            "only-admin@example.com",
+            reservedRoleIdFor(organizationId));
     UUID accountId = UUID.fromString(onlyAdmin.get("accountId").asString());
 
     HttpResponse<String> removeResponse = removeMember(platformToken, workspaceId, accountId);
@@ -215,10 +228,11 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Duplicate Email Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Support");
-    addMember(platformToken, workspaceId, "taken@example.com", null);
+    UUID roleId = reservedRoleIdFor(organizationId);
+    addMember(platformToken, workspaceId, "taken@example.com", roleId);
 
     HttpResponse<String> secondAttempt =
-        addMemberRaw(platformToken, workspaceId, "taken@example.com", null);
+        addMemberRaw(platformToken, workspaceId, "taken@example.com", roleId);
 
     assertThat(secondAttempt.statusCode()).isEqualTo(409);
   }
@@ -231,7 +245,12 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Account Delete Cascade Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
-    JsonNode member = addMember(platformToken, workspaceId, "will-be-deleted@example.com", null);
+    JsonNode member =
+        addMember(
+            platformToken,
+            workspaceId,
+            "will-be-deleted@example.com",
+            reservedRoleIdFor(organizationId));
     UUID accountId = UUID.fromString(member.get("accountId").asString());
     assertThat(
             jdbcTemplate.queryForObject(
@@ -261,7 +280,7 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Organization Delete Cascade Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
-    addMember(platformToken, workspaceId, "member@example.com", null);
+    addMember(platformToken, workspaceId, "member@example.com", reservedRoleIdFor(organizationId));
     assertThat(
             jdbcTemplate.queryForObject(
                 "select count(*) from workspace_memberships where workspace_id = ?",
@@ -290,26 +309,26 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
   void returns404WhenAddingAMemberToAnUnknownWorkspace() throws Exception {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
 
+    // Any real-looking UUID works here — the Workspace lookup itself fails first, before
+    // AddWorkspaceMemberService ever validates roleId against an Organization (there is no
+    // Organization to resolve one against).
     HttpResponse<String> response =
-        addMemberRaw(platformToken, UUID.randomUUID(), "someone@example.com", null);
+        addMemberRaw(platformToken, UUID.randomUUID(), "someone@example.com", UUID.randomUUID());
 
     assertThat(response.statusCode()).isEqualTo(404);
   }
 
-  private JsonNode addMember(String platformToken, UUID workspaceId, String email, String role)
+  private JsonNode addMember(String platformToken, UUID workspaceId, String email, UUID roleId)
       throws IOException, InterruptedException {
-    HttpResponse<String> response = addMemberRaw(platformToken, workspaceId, email, role);
+    HttpResponse<String> response = addMemberRaw(platformToken, workspaceId, email, roleId);
     assertThat(response.statusCode()).isEqualTo(201);
     return objectMapper.readTree(response.body());
   }
 
   private HttpResponse<String> addMemberRaw(
-      String platformToken, UUID workspaceId, String email, String role)
+      String platformToken, UUID workspaceId, String email, UUID roleId)
       throws IOException, InterruptedException {
-    String body =
-        role == null
-            ? "{\"email\":\"" + email + "\"}"
-            : "{\"email\":\"" + email + "\",\"role\":\"" + role + "\"}";
+    String body = "{\"email\":\"" + email + "\",\"roleId\":\"" + roleId + "\"}";
     HttpRequest request =
         HttpRequest.newBuilder(baseUri("/api/v1/admin/workspaces/" + workspaceId + "/members"))
             .header("Authorization", "Bearer " + platformToken)
@@ -319,18 +338,34 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
+  // ADR-0027 §5: null (unassign) is an explicitly allowed target — the request body omits
+  // roleId entirely rather than sending a literal "null" string UUID (which the controller's own
+  // UUID conversion would reject as malformed, not treat as absent).
   private HttpResponse<String> changeRole(
-      String platformToken, UUID workspaceId, UUID accountId, String newRole)
+      String platformToken, UUID workspaceId, UUID accountId, UUID newRoleId)
       throws IOException, InterruptedException {
+    String body = newRoleId == null ? "{}" : "{\"roleId\":\"" + newRoleId + "\"}";
     HttpRequest request =
         HttpRequest.newBuilder(
                 baseUri(
                     "/api/v1/admin/workspaces/" + workspaceId + "/members/" + accountId + "/role"))
             .header("Authorization", "Bearer " + platformToken)
             .header("Content-Type", "application/json")
-            .PUT(HttpRequest.BodyPublishers.ofString("{\"role\":\"" + newRole + "\"}"))
+            .PUT(HttpRequest.BodyPublishers.ofString(body))
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  // ADR-0027 §2: CreateWorkspaceService seeds exactly one reserved WorkspaceRole per
+  // Organization on its first Workspace — there is no management-API endpoint yet to list/create
+  // custom roles (Slice 3/6, not shipped), so this reaches into the database directly, same
+  // "read the seeded row back for test setup" posture other integration tests in this codebase
+  // already use for data no REST endpoint yet exposes.
+  private UUID reservedRoleIdFor(UUID organizationId) {
+    return jdbcTemplate.queryForObject(
+        "select id from workspace_roles where organization_id = ? and reserved = true",
+        UUID.class,
+        organizationId);
   }
 
   private HttpResponse<String> removeMember(String platformToken, UUID workspaceId, UUID accountId)
