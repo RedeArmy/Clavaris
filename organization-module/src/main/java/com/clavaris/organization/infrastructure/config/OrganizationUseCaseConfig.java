@@ -25,6 +25,8 @@ import com.clavaris.organization.application.usecase.createworkspace.CreateWorks
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
+import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleService;
+import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationService;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationUseCase;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -34,6 +36,8 @@ import com.clavaris.organization.application.usecase.deleteorganization.Organiza
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationWebhookDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleService;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationService;
@@ -84,6 +88,8 @@ import com.clavaris.organization.application.usecase.setratelimitpolicyfororgani
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleService;
+import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -330,6 +336,32 @@ class OrganizationUseCaseConfig {
   /* package */ ListWorkspaceRolesForOrganizationUseCase listWorkspaceRolesForOrganizationUseCase(
       final WorkspaceRoleRepository roles) {
     return new ListWorkspaceRolesForOrganizationService(roles);
+  }
+
+  @Bean
+  /* package */ CreateWorkspaceRoleUseCase createWorkspaceRoleUseCase(
+      final WorkspaceRoleRepository roles,
+      final OrganizationRepository organizations,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new CreateWorkspaceRoleService(roles, organizations, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ UpdateWorkspaceRoleUseCase updateWorkspaceRoleUseCase(
+      final WorkspaceRoleRepository roles,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new UpdateWorkspaceRoleService(roles, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ DeleteWorkspaceRoleUseCase deleteWorkspaceRoleUseCase(
+      final WorkspaceRoleRepository roles,
+      final WorkspaceMembershipRepository memberships,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new DeleteWorkspaceRoleService(roles, memberships, auditEvents, eventOutboxWriter);
   }
 
   // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.

@@ -50,6 +50,11 @@ class JpaWorkspaceRoleRepository implements WorkspaceRoleRepository {
     return roles.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
   }
 
+  @Override
+  public void deleteById(final UUID roleId) {
+    roles.deleteById(roleId);
+  }
+
   private WorkspaceRole toDomain(final WorkspaceRoleEntity entity) {
     final Set<String> permissions =
         Set.of(objectMapper.readValue(entity.getPermissions(), String[].class));

@@ -28,4 +28,10 @@ public interface WorkspaceRoleRepository {
    * of it.
    */
   List<WorkspaceRole> findAllByOrganizationId(UUID organizationId);
+
+  /**
+   * {@code DeleteWorkspaceRoleService}'s own final step — only ever called after that use case has
+   * already confirmed the role is unreserved and unreferenced by any membership (ADR-0027 §5).
+   */
+  void deleteById(UUID roleId);
 }

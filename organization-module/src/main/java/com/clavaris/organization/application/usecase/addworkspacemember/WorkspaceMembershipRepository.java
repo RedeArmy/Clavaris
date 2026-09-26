@@ -81,4 +81,13 @@ public interface WorkspaceMembershipRepository {
    * Account.
    */
   void deleteAllByAccountId(UUID accountId);
+
+  /**
+   * ADR-0027 §5: {@code DeleteWorkspaceRoleService}'s own guard — a {@code WorkspaceRole} still
+   * referenced by any membership, in any Workspace (roles are Organization-scoped, not
+   * Workspace-scoped), cannot be deleted. Global by {@code roleId} alone, not scoped to one
+   * Workspace — the same role can be assigned to members across every Workspace its own
+   * Organization owns.
+   */
+  boolean existsByRoleId(UUID roleId);
 }

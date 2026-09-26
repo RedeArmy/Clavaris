@@ -221,6 +221,24 @@ class JpaWorkspaceMembershipRepositoryTest {
     assertThat(repository.findAllByAccountId(UUID.randomUUID())).isEmpty();
   }
 
+  // ADR-0027 §5: DeleteWorkspaceRoleService's own guard — global by roleId, not scoped to one
+  // Workspace (a role can be assigned to members across every Workspace its own Organization
+  // owns).
+  @Test
+  void existsByRoleIdIsTrueWhenAnyMembershipReferencesIt() {
+    Organization organization = Organization.register("Test Org", UUID.randomUUID());
+    organizations.save(organization);
+    UUID roleId = newPersistedRoleIdFor(organization.id());
+    repository.save(WorkspaceMembership.join(newPersistedWorkspaceId(), UUID.randomUUID(), roleId));
+
+    assertThat(repository.existsByRoleId(roleId)).isTrue();
+  }
+
+  @Test
+  void existsByRoleIdIsFalseWhenNoMembershipReferencesIt() {
+    assertThat(repository.existsByRoleId(UUID.randomUUID())).isFalse();
+  }
+
   // deleteAllByAccountId is a derived "deleteBy" query method (find-then-remove-each JPA
   // semantics, not a raw bulk DELETE) — it requires an active EntityManager-bound transaction,
   // same reason identity-module's own structurally identical AccountRepository

@@ -140,6 +140,11 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
     memberships.flush();
   }
 
+  @Override
+  public boolean existsByRoleId(final UUID roleId) {
+    return memberships.existsByRoleId(roleId);
+  }
+
   private WorkspaceMembership toDomain(final WorkspaceMembershipEntity entity) {
     return WorkspaceMembership.reconstitute(
         entity.getId(),

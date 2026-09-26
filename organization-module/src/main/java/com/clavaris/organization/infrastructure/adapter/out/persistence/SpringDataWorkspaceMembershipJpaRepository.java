@@ -26,6 +26,8 @@ interface SpringDataWorkspaceMembershipJpaRepository
 
   void deleteAllByAccountId(UUID accountId);
 
+  boolean existsByRoleId(UUID roleId);
+
   // TD-PERF-020 (keyset revision, 2026-09-14): backs
   // WorkspaceMembershipRepository#findKeysetPageByWorkspaceId — see
   // SpringDataOrganizationJpaRepository's own Javadoc for why three @Query methods back this
