@@ -49,7 +49,13 @@ public final class KnownWebhookEventTypeOptions {
           new EventTypeOption(
               "workspace_membership.removed", "A member left or was removed from a Workspace."),
           new EventTypeOption(
-              "workspace_membership.role_changed", "A member's Workspace role changed."));
+              "workspace_membership.role_changed", "A member's Workspace role changed."),
+          new EventTypeOption("workspace_role.created", "A new WorkspaceRole was created."),
+          new EventTypeOption(
+              "workspace_role.updated",
+              "A WorkspaceRole's name, permissions, or parent role changed."),
+          new EventTypeOption(
+              "workspace_role.deleted", "A WorkspaceRole was permanently deleted."));
 
   public static final List<String> DASHBOARD_OPTIONS =
       CATALOG.stream().map(EventTypeOption::value).toList();
