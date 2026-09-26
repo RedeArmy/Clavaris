@@ -24,6 +24,7 @@ import com.clavaris.identity.application.usecase.requestplatformaccountemailveri
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.RequestPlatformAccountEmailVerificationUseCase;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.PlatformAccountId;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
@@ -38,12 +39,15 @@ class RegisterPlatformAccountControllerTest {
 
   private RegisterPlatformAccountUseCase useCase;
   private RequestPlatformAccountEmailVerificationUseCase requestEmailVerification;
+  private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     useCase = mock(RegisterPlatformAccountUseCase.class);
     requestEmailVerification = mock(RequestPlatformAccountEmailVerificationUseCase.class);
+    currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
+    when(currentPlatformAccount.resolve(any())).thenReturn(Optional.empty());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -61,7 +65,8 @@ class RegisterPlatformAccountControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new RegisterPlatformAccountController(useCase, requestEmailVerification))
+                new RegisterPlatformAccountController(
+                    useCase, requestEmailVerification, currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -73,6 +78,22 @@ class RegisterPlatformAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/register"))
         .andExpect(model().attributeExists("form"));
+  }
+
+  // Live bug fix, 2026-09-26: this page used to render the signup form unconditionally, even for
+  // a request whose session was already an authenticated PlatformAccount — see this class's own
+  // Javadoc for the full fix.
+  @Test
+  void getRedirectsToTheDashboardWhenAlreadyAuthenticatedInsteadOfShowingTheForm()
+      throws Exception {
+    when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(PlatformAccountId.newId()));
+
+    mockMvc
+        .perform(get("/platform/register"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/platform/dashboard"));
+
+    verifyNoInteractions(useCase);
   }
 
   // Same rationale as PlatformLoginControllerTest's own identical test.

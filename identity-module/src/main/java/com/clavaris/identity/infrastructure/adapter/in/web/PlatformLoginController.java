@@ -23,6 +23,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * HttpSession}, not an OAuth token issuance (see {@link PlatformAuthenticatedSessionEstablisher}'s
  * own Javadoc for why). Same "doesn't touch Spring Security's own types directly" split as {@link
  * LoginController}.
+ *
+ * <p>Live bug fix, 2026-09-26: {@code showForm} used to render the login form unconditionally, even
+ * for a request whose session was already an authenticated {@code PlatformAccount} — a real,
+ * confusing "I'm already signed in, why is it asking me to log in again" experience, reachable any
+ * time this page was linked from somewhere (the index page's own "Sign in" button) without checking
+ * first. Now redirects straight to {@code /platform/dashboard} instead, the same destination a
+ * fresh login already lands on.
  */
 @Controller
 @RequestMapping("/platform/login")
@@ -30,21 +37,39 @@ public class PlatformLoginController {
 
   private static final String FORM_VIEW = "identity/platform/login";
 
+  // PMD.LongVariable: DASHBOARD_REDIRECT names exactly what it is, same convention this class's
+  // own FORM_VIEW constant already establishes.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String DASHBOARD_REDIRECT = "redirect:/platform/dashboard";
+
   private final AuthenticatePlatformAccountWithPasswordUseCase useCase;
   private final PlatformAuthenticatedSessionEstablisher sessions;
   private final RecordPlatformAccountLoginDeviceUseCase recordLoginDevice;
 
+  @SuppressWarnings("PMD.LongVariable")
+  private final CurrentPlatformAccountResolver currentPlatformAccount;
+
   public PlatformLoginController(
       final AuthenticatePlatformAccountWithPasswordUseCase useCase,
       final PlatformAuthenticatedSessionEstablisher sessions,
-      final RecordPlatformAccountLoginDeviceUseCase recordLoginDevice) {
+      final RecordPlatformAccountLoginDeviceUseCase recordLoginDevice,
+      @SuppressWarnings("PMD.LongVariable")
+          final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.useCase = useCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
+    this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // PMD.OnlyOneReturn: the already-authenticated redirect and the real form render are two
+  // genuinely distinct exits — same rationale as every other multi-outcome handler in this
+  // codebase.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
-  public String showForm(final Model model) {
+  public String showForm(final HttpServletRequest request, final Model model) {
+    if (currentPlatformAccount.resolve(request).isPresent()) {
+      return DASHBOARD_REDIRECT;
+    }
     model.addAttribute("form", new PlatformLoginForm());
     return FORM_VIEW;
   }
