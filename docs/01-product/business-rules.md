@@ -57,10 +57,18 @@ their original design (`OWNER`/`ADMIN`/`MEMBER` + invitations) to match an expli
 scope decision — see the addendum for the full rationale. The renumbering keeps `BR-WS-03`'s ID
 stable since its substance (immediate revocation on removal) is unchanged, only clarified.
 
-- **BR-WS-01** — A workspace must always retain at least one `ADMIN` member; a role change or
-  removal that would leave zero `ADMIN`s is rejected. Enforced at the application layer, not left to
-  a database constraint alone. Replaces the original `OWNER`-with-atomic-transfer design — v1 has no
-  `OWNER` role, only `ADMIN`/`MEMBER` (BR-WS-05).
+**Superseded again, ADR-0027 (2026-09-26):** the fixed `ADMIN | MEMBER` enum the addendum above
+introduced is itself now replaced by consumer-defined `WorkspaceRole`s — BR-WS-01/05/06 below are
+rewritten a second time to match; BR-WS-03/04's substance is unaffected. Two new rules (BR-WS-07/08)
+cover role deletion and the parent-hierarchy this model adds that the old enum had no room for.
+
+- **BR-WS-01** — A workspace must always retain at least one membership whose *effective*
+  permissions (a role's own permissions plus every ancestor's, resolved through
+  `WorkspaceRoleHierarchy`) include the reserved `clavaris:workspace:manage_members` permission; a
+  role change, unassignment, or member removal that would leave zero such memberships is rejected
+  (`ManageMembersGuard`). Enforced at the application layer, not left to a database constraint
+  alone. Framed by role name (`ADMIN`) before ADR-0027; framed by effective permission now, since a
+  consumer can rename or restructure roles freely as long as this invariant holds.
 - **BR-WS-02 (deferred to v1.1+)** — An invite-by-email-then-accept flow is not built in v1; see
   BR-WS-04 for the v1 mechanism (direct provisioning). Kept as a placeholder ID so a future
   `WorkspaceInvitation` doesn't have to renumber anything else in this section.
@@ -76,19 +84,42 @@ stable since its substance (immediate revocation on removal) is unchanged, only 
 - **BR-WS-04** — A workspace member is provisioned directly: adding a member creates a real
   `Account` (identity-module) scoped to the workspace's own Organization and immediately triggers
   that Organization's existing password-reset-request flow, so the new member sets their own
-  password on first login. There is no invitation-accept step in v1 (see BR-WS-02).
-- **BR-WS-05** — Workspace roles are Clavaris-internal only: `ADMIN` (can manage the workspace's own
-  membership) or `MEMBER` (cannot) — nothing else. Any business/product-domain role (e.g.
-  "recruiter", "candidate") is explicitly out of scope here; that differentiation belongs entirely to
-  the consuming application (e.g. JobSeeker), never to Clavaris.
-- **BR-WS-06** — A member's current `workspace_id`/`workspace_role` are carried as claims on every
-  ID token and access token the interactive Authorization Code flow issues for that Account, and on
-  the corresponding `/userinfo` response — the mechanism a consuming application uses to know, at
-  login time, whether that user should see its own admin surface. Refreshed on every login and on
-  every silent token refresh (both reissue through the same token-generation path); there is no
-  separate polling or webhook step required to observe a role change for an account that's about to
-  authenticate again. Omitted entirely (not a null/empty claim) for an Account with no Workspace
-  membership.
+  password on first login. There is no invitation-accept step in v1 (see BR-WS-02). A role
+  (`roleId`) is required at add-time; unlike a later role change, there is no "add with no role"
+  path.
+- **BR-WS-05** — `WorkspaceRole`s are consumer-defined (ADR-0027), not a fixed Clavaris enum: a
+  `name` and a set of `permissions` strings, both opaque to Clavaris — same posture
+  `OAuthClient.allowedScopes`/`WebhookEndpoint.subscribedEventTypes` already hold. Scoped to the
+  `Organization`, shared across every `Workspace` it owns, not redefined per Workspace. Exactly one
+  `reserved` role is system-seeded per Organization (on its first Workspace's creation), always
+  carrying both reserved permissions (`clavaris:workspace:manage_members`,
+  `clavaris:workspace:manage_roles` — the only two permission strings Clavaris's own logic ever
+  interprets); it can never be stripped of them and can never be deleted (BR-WS-07). Any
+  business/product-domain role (e.g. "recruiter", "candidate") is still explicitly out of scope
+  here; that differentiation belongs entirely to the consuming application (e.g. JobSeeker), never
+  to Clavaris — ADR-0027 makes the *names* consumer-defined, not the *domain logic*.
+- **BR-WS-06** — A member's current `workspace_id` is carried as a claim on every ID token and
+  access token the interactive Authorization Code flow issues for that Account, and on the
+  corresponding `/userinfo` response; `workspace_role` (the assigned role's `name`) and
+  `workspace_permissions` (that role's *effective* permissions — its own plus every ancestor's,
+  resolved through `WorkspaceRoleHierarchy`, ADR-0027) are added alongside it, both omitted (not a
+  null/empty claim) when the membership has no role currently assigned. This is the mechanism a
+  consuming application uses to know, at login time, whether a user should see its own admin
+  surface and specifically what it's allowed to do there. Refreshed on every login and on every
+  silent token refresh (both reissue through the same token-generation path); no separate polling or
+  webhook step is required to observe a role change for an account about to authenticate again.
+  `workspace_id` alone is omitted entirely for an Account with no Workspace membership at all.
+- **BR-WS-07** — Deleting a `WorkspaceRole` is rejected while any membership (in any Workspace that
+  Organization owns) still references it — a consumer must explicitly reassign every holder to a
+  different role, or unassign them (leaving `roleId` null, BR-WS-01 permitting), before the role can
+  be deleted. No automatic cascade reassignment exists. The one `reserved` role per Organization can
+  never be deleted at all, regardless of assignment state (BR-WS-05).
+- **BR-WS-08** — A `WorkspaceRole` may declare one optional `parentRoleId` (ADR-0027 §3); a role's
+  effective permissions include every ancestor's, resolved by walking that chain
+  (`WorkspaceRoleHierarchy`). A role cannot be its own parent (rejected in the entity itself) and a
+  multi-hop cycle across several roles is rejected the same way, on both create and update — the
+  only hierarchy shape Clavaris enforces; a role's position in that chain otherwise carries no
+  Clavaris-interpreted meaning beyond permission inheritance.
 
 ## Client registry (`BR-CLIENT`)
 
