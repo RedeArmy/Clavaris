@@ -146,14 +146,22 @@ class PlatformWebhookEndpointControllerTest {
   }
 
   // Live bug, 2026-09-22: see PlatformOAuthClientControllerTest's own identical test for the full
-  // rationale — both scripts load unconditionally from dashboard-nav.html.
+  // rationale — every script here loads unconditionally from dashboard-nav.html.
+  //
+  // event-type-picker.js added 2026-09-26 after a real live bug of the identical class: the
+  // picker's own parent/child checkboxes did nothing in a real browser (CSP silently blocked the
+  // inline onchange="..."/<script> this fragment used to carry) — this content assertion, like
+  // the two scripts above it, only proves the <script src> tag is present in the response, never
+  // that the JS inside actually runs or that CSP allows it; that gap is exactly how the original
+  // bug shipped undetected. See event-type-picker.js's own comment for the fix.
   @Test
-  void sidebarLoadsBothScriptsManageAccountNeeds() throws Exception {
+  void sidebarLoadsEveryScriptManageAccountAndTheEventPickerNeed() throws Exception {
     mockMvc
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("/js/htmx.min.js")))
-        .andExpect(content().string(containsString("/js/organization-dialog.js")));
+        .andExpect(content().string(containsString("/js/organization-dialog.js")))
+        .andExpect(content().string(containsString("/js/event-type-picker.js")));
   }
 
   @Test

@@ -47,4 +47,11 @@
          standalone tags these replace have been removed from every page that had them. -->
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
+    <!-- Real bug found live, 2026-09-26: event-type-picker.html's own parent/child category
+         checkboxes and "All Events" toggle did nothing in a real browser — CSP silently blocked
+         the inline onchange="..."/<script> this fragment used to carry (see event-type-picker.js's
+         own Javadoc-style comment for the full story). Loaded unconditionally here, same "every
+         page that includes this sidebar gets it" reasoning as htmx/organization-dialog.js above —
+         a no-op on any page without #event-type-options in the DOM. -->
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/event-type-picker.js') : '/js/event-type-picker.js'}" defer></script>
 </aside>
