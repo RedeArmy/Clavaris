@@ -39,6 +39,7 @@ class PlatformLoginControllerTest {
   private AuthenticatePlatformAccountWithPasswordUseCase useCase;
   private PlatformAuthenticatedSessionEstablisher sessionEstablisher;
   private RecordPlatformAccountLoginDeviceUseCase recordLoginDevice;
+  private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -46,7 +47,9 @@ class PlatformLoginControllerTest {
     useCase = mock(AuthenticatePlatformAccountWithPasswordUseCase.class);
     sessionEstablisher = mock(PlatformAuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordPlatformAccountLoginDeviceUseCase.class);
+    currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
+    when(currentPlatformAccount.resolve(any())).thenReturn(Optional.empty());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -64,7 +67,8 @@ class PlatformLoginControllerTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new PlatformLoginController(useCase, sessionEstablisher, recordLoginDevice))
+                new PlatformLoginController(
+                    useCase, sessionEstablisher, recordLoginDevice, currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -76,6 +80,22 @@ class PlatformLoginControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/login"))
         .andExpect(model().attributeExists("form"));
+  }
+
+  // Live bug fix, 2026-09-26: this page used to render the login form unconditionally, even for a
+  // request whose session was already an authenticated PlatformAccount — see this class's own
+  // Javadoc for the full fix.
+  @Test
+  void getRedirectsToTheDashboardWhenAlreadyAuthenticatedInsteadOfShowingTheForm()
+      throws Exception {
+    when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(PlatformAccountId.newId()));
+
+    mockMvc
+        .perform(get("/platform/login"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/platform/dashboard"));
+
+    verifyNoInteractions(useCase);
   }
 
   // SDE-III review, 2026-09-16 — social-provider brand icons: this tier's own pair is always

@@ -9,7 +9,16 @@
         <a class="clavaris-nav__brand" th:href="@{/}" aria-label="Clavaris home">
             <img class="clavaris-brand-lockup" th:src="${#resourceUrl != null ? #resourceUrl.url('/brand/clavaris-logo-polished.svg') : '/brand/clavaris-logo-polished.svg'}" alt="Clavaris" width="190" height="40"/>
         </a>
-        <div class="clavaris-nav__actions">
+        <!-- Live bug fix, 2026-09-26: an already-authenticated PlatformAccount now gets a single
+             dashboard-bound button instead of the anonymous-visitor pair below, both of which now
+             redirect an already-signed-in visitor straight back to the dashboard anyway
+             (PlatformLoginController/RegisterPlatformAccountController's own identical fix), but used
+             to keep their original wording right up until the click, which read as this page not
+             knowing an active session existed at all. -->
+        <div class="clavaris-nav__actions" th:if="${authenticated}">
+            <a class="clavaris-button" th:href="@{/platform/dashboard}">Go to dashboard</a>
+        </div>
+        <div class="clavaris-nav__actions" th:unless="${authenticated}">
             <a th:href="@{/platform/login}">Sign in</a>
             <a class="clavaris-button" th:href="@{/platform/register}">Get started</a>
         </div>
@@ -21,7 +30,10 @@
             <h1>Identity infrastructure<br/>you actually own</h1>
             <p>A standalone OIDC/OAuth2 provider with real per-tenant isolation — your data, your
                 signing keys, your deployment. Standard protocol, zero proprietary lock-in.</p>
-            <div class="clavaris-hero__actions">
+            <div class="clavaris-hero__actions" th:if="${authenticated}">
+                <a class="clavaris-button" th:href="@{/platform/dashboard}">Go to dashboard</a>
+            </div>
+            <div class="clavaris-hero__actions" th:unless="${authenticated}">
                 <a class="clavaris-button" th:href="@{/platform/register}">Get started</a>
                 <a class="clavaris-button clavaris-button--secondary" th:href="@{/platform/login}">Sign in</a>
             </div>
