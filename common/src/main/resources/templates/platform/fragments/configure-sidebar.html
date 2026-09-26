@@ -23,6 +23,11 @@ pages below it.
 OAuth Clients moved to second (2026-09-24, live UX request) — the end-user login client is what
 most owners configure right after checking their API Keys/issuer, ahead of Secret Keys (the
 management-API credential, a less common first step for a brand-new Organization).
+
+Workspace Roles added 2026-09-26 (ADR-0027 Slice 5, PlatformWorkspaceRoleController,
+organization-module) — placed after Webhook Endpoints: a WorkspaceRole is Organization-scoped,
+shared across every Workspace that Organization owns, the same "standalone page, not an inline
+Workspace-detail section" shape Rate Limit/Danger Zone's own promotion already established.
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
@@ -36,6 +41,8 @@ management-API credential, a less common first step for a brand-new Organization
        th:classappend="${active == 'signing-keys'} ? 'active'">Signing Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
        th:classappend="${active == 'webhook-endpoints'} ? 'active'">Webhook Endpoints</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/workspace-roles(id=${organizationId})}"
+       th:classappend="${active == 'workspace-roles'} ? 'active'">Workspace Roles</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
        th:classappend="${active == 'rate-limit'} ? 'active'">Rate Limit</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/danger-zone(id=${organizationId})}"
