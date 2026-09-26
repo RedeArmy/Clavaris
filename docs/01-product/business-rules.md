@@ -112,8 +112,13 @@ cover role deletion and the parent-hierarchy this model adds that the old enum h
 - **BR-WS-07** — Deleting a `WorkspaceRole` is rejected while any membership (in any Workspace that
   Organization owns) still references it — a consumer must explicitly reassign every holder to a
   different role, or unassign them (leaving `roleId` null, BR-WS-01 permitting), before the role can
-  be deleted. No automatic cascade reassignment exists. The one `reserved` role per Organization can
-  never be deleted at all, regardless of assignment state (BR-WS-05).
+  be deleted. Deletion is likewise rejected while any other `WorkspaceRole` still names it as
+  `parentRoleId` (BR-WS-08) — a consumer must re-parent or clear that reference first;
+  `workspace_roles.parent_role_id` has no `ON DELETE` action at the database level specifically so
+  this stays an explicit application-layer rejection, not a silent cascade or a raw constraint
+  error. No automatic cascade reassignment or re-parenting exists for either case. The one
+  `reserved` role per Organization can never be deleted at all, regardless of assignment or
+  parent-of-another-role state (BR-WS-05).
 - **BR-WS-08** — A `WorkspaceRole` may declare one optional `parentRoleId` (ADR-0027 §3); a role's
   effective permissions include every ancestor's, resolved by walking that chain
   (`WorkspaceRoleHierarchy`). A role cannot be its own parent (rejected in the entity itself) and a

@@ -9,11 +9,13 @@ import com.clavaris.organization.application.usecase.createworkspacerole.Duplica
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.updateworkspacerole.CannotStripReservedWorkspaceRolePermissionsException;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
@@ -236,12 +238,13 @@ public class PlatformWorkspaceRoleController {
       // the parent-role dropdown only ever offers this Organization's own real roles — but a loud
       // 404 is still safer than assuming either guarantee can never race with a concurrent change.
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-    } catch (final IllegalArgumentException _) {
-      // WorkspaceRole#withPermissions's own reserved-permissions guard (ADR-0027 §2) — the
-      // rendered form makes the reserved role's permissions field readonly precisely so a normal
-      // submit can never reach this, but a raw/tampered POST still could. Same "form structurally
-      // prevents this, a bare 400 is still correct for a tampered request" posture
-      // PlatformOrganizationClientController#create's own identical catch already establishes.
+    } catch (final CannotStripReservedWorkspaceRolePermissionsException
+        | IllegalArgumentException _) {
+      // UpdateWorkspaceRoleService's own typed guard (ADR-0027 §2) raises the first; the rendered
+      // form makes the reserved role's permissions field readonly precisely so a normal submit can
+      // never reach either, but a raw/tampered POST still could. IllegalArgumentException is a
+      // defense-in-depth backstop for WorkspaceRole#withPermissions's own identical (but untyped)
+      // guard, never expected to trigger on its own now that the typed guard runs first.
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
 
@@ -275,6 +278,8 @@ public class PlatformWorkspaceRoleController {
       throw new ResponseStatusException(HttpStatus.CONFLICT);
     } catch (final WorkspaceRoleStillAssignedException _) {
       return redisplayDetail(model, organization, rolesById, existing, "stillAssignedError");
+    } catch (final WorkspaceRoleHasChildRolesException _) {
+      return redisplayDetail(model, organization, rolesById, existing, "hasChildRolesError");
     }
 
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/workspace-roles";

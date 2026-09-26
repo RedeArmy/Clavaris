@@ -17,9 +17,11 @@ import com.clavaris.organization.application.usecase.createworkspacerole.CreateW
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.updateworkspacerole.CannotStripReservedWorkspaceRolePermissionsException;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
 import com.clavaris.organization.domain.model.Organization;
@@ -210,6 +212,16 @@ class PlatformWorkspaceRoleControllerTest {
   }
 
   @Test
+  void updatePostThatWouldStripTheReservedRolesPermissionsReturns400() throws Exception {
+    when(updateRole.handle(any()))
+        .thenThrow(new CannotStripReservedWorkspaceRolePermissionsException(reservedRole.id()));
+
+    mockMvc
+        .perform(post(rolesPath() + "/" + reservedRole.id()).param("name", "Admin"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void updatePostForAnUnknownRoleReturns404() throws Exception {
     mockMvc
         .perform(post(rolesPath() + "/" + UUID.randomUUID()).param("name", "Anything"))
@@ -239,6 +251,19 @@ class PlatformWorkspaceRoleControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-role-detail"))
         .andExpect(model().attribute("stillAssignedError", true));
+  }
+
+  @Test
+  void deletePostWhileStillAParentReRendersTheDetailPageWithAnError() throws Exception {
+    org.mockito.Mockito.doThrow(new WorkspaceRoleHasChildRolesException(customRole.id()))
+        .when(deleteRole)
+        .handle(any());
+
+    mockMvc
+        .perform(post(rolesPath() + "/" + customRole.id() + "/delete"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-role-detail"))
+        .andExpect(model().attribute("hasChildRolesError", true));
   }
 
   @Test

@@ -18,6 +18,18 @@ public interface WorkspaceRoleRepository {
 
   void save(WorkspaceRole role);
 
+  /**
+   * Same write as {@link #save}, but flushed immediately rather than deferred to the enclosing
+   * transaction's own commit — {@code CreateWorkspaceService}'s own reserved-role bootstrap is the
+   * one call site that needs the {@code ux_workspace_roles_organization_id_name} constraint
+   * violation (two concurrent first-Workspace creations for the same brand-new Organization) to
+   * surface synchronously, catchable right where it's thrown, not at a commit boundary the calling
+   * method has already returned past — same "a dedicated flushed write for the one race-sensitive
+   * caller, plain {@link #save} everywhere else" precedent {@code KnownDeviceRepository#insert}
+   * already establishes for an identical shape of race.
+   */
+  void saveAndFlush(WorkspaceRole role);
+
   Optional<WorkspaceRole> findById(UUID roleId);
 
   /**

@@ -40,6 +40,15 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
     if (memberships.existsByRoleId(command.roleId())) {
       throw new WorkspaceRoleStillAssignedException(command.roleId());
     }
+    // workspace_roles.parent_role_id has no ON DELETE action (see that migration's own comment) —
+    // without this check, deleting a role that's still some other role's parent would instead
+    // fail with a raw Postgres foreign-key violation, not this clean, typed rejection.
+    final boolean hasChildRoles =
+        roles.findAllByOrganizationId(role.organizationId()).stream()
+            .anyMatch(candidate -> command.roleId().equals(candidate.parentRoleId()));
+    if (hasChildRoles) {
+      throw new WorkspaceRoleHasChildRolesException(command.roleId());
+    }
 
     roles.deleteById(command.roleId());
 

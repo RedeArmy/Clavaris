@@ -15,6 +15,7 @@ import com.clavaris.organization.application.usecase.addworkspacemember.Workspac
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +44,7 @@ class DeleteWorkspaceRoleServiceTest {
     organizationId = UUID.randomUUID();
     role = WorkspaceRole.define(organizationId, "Supervisor", null, Set.of());
     when(roles.findById(role.id())).thenReturn(Optional.of(role));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
     when(memberships.existsByRoleId(role.id())).thenReturn(false);
     service = new DeleteWorkspaceRoleService(roles, memberships, auditEvents, outbox);
   }
@@ -106,6 +108,20 @@ class DeleteWorkspaceRoleServiceTest {
     DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(role.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleStillAssignedException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(roles, never()).deleteById(any());
+    verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
+  }
+
+  @Test
+  void rejectsDeletingARoleThatIsStillAnotherRolesParent() {
+    WorkspaceRole childRole = WorkspaceRole.define(organizationId, "Child", role.id(), Set.of());
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role, childRole));
+    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(role.id(), ACTOR);
+
+    assertThatExceptionOfType(WorkspaceRoleHasChildRolesException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(roles, never()).deleteById(any());

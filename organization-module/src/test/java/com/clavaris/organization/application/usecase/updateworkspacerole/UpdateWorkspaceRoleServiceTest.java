@@ -154,4 +154,33 @@ class UpdateWorkspaceRoleServiceTest {
 
     assertThat(updated.parentRoleId()).isEqualTo(parent.id());
   }
+
+  @Test
+  void rejectsStrippingTheReservedRolesReservedPermissions() {
+    WorkspaceRole reserved = WorkspaceRole.defineReserved(organizationId, "Admin");
+    when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(reserved));
+    UpdateWorkspaceRoleCommand command =
+        new UpdateWorkspaceRoleCommand(reserved.id(), reserved.name(), null, Set.of(), ACTOR);
+
+    assertThatExceptionOfType(CannotStripReservedWorkspaceRolePermissionsException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(roles, never()).save(any());
+  }
+
+  @Test
+  void allowsRenamingTheReservedRoleWhileKeepingItsReservedPermissions() {
+    WorkspaceRole reserved = WorkspaceRole.defineReserved(organizationId, "Admin");
+    when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(reserved));
+    UpdateWorkspaceRoleCommand command =
+        new UpdateWorkspaceRoleCommand(
+            reserved.id(), "Renamed Admin", null, reserved.permissions(), ACTOR);
+
+    WorkspaceRole updated = service.handle(command);
+
+    assertThat(updated.name()).isEqualTo("Renamed Admin");
+    assertThat(updated.reserved()).isTrue();
+  }
 }

@@ -9,9 +9,11 @@ import com.clavaris.organization.application.usecase.createworkspacerole.Duplica
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.updateworkspacerole.CannotStripReservedWorkspaceRolePermissionsException;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
@@ -115,7 +117,11 @@ class WorkspaceRolesController {
       description =
           "No WorkspaceRole exists with the given id, or parentRoleId doesn't"
               + " reference one belonging to the same Organization")
-  @ApiResponse(responseCode = "409", description = "A WorkspaceRole with this name already exists")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "A WorkspaceRole with this name already exists, or this role is reserved and the"
+              + " request would strip one of its reserved permissions")
   @ApiResponse(
       responseCode = "422",
       description = "This parentRoleId would create a cycle in the role hierarchy")
@@ -137,7 +143,8 @@ class WorkspaceRolesController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final WorkspaceRoleNotFoundException _) {
       return ResponseEntity.notFound().build();
-    } catch (final DuplicateWorkspaceRoleNameException _) {
+    } catch (final DuplicateWorkspaceRoleNameException
+        | CannotStripReservedWorkspaceRolePermissionsException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     } catch (final WorkspaceRoleCycleException _) {
       return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).build();
@@ -153,7 +160,9 @@ class WorkspaceRolesController {
   @ApiResponse(responseCode = "404", description = "No WorkspaceRole exists with the given id")
   @ApiResponse(
       responseCode = "409",
-      description = "This role is reserved, or still assigned to at least one member")
+      description =
+          "This role is reserved, still assigned to at least one member, or still the parent of"
+              + " at least one other role")
   @DeleteMapping("/{roleId}")
   /* package */ ResponseEntity<Void> delete(
       @PathVariable final UUID organizationId,
@@ -166,7 +175,8 @@ class WorkspaceRolesController {
     } catch (final WorkspaceRoleNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final CannotDeleteReservedWorkspaceRoleException
-        | WorkspaceRoleStillAssignedException _) {
+        | WorkspaceRoleStillAssignedException
+        | WorkspaceRoleHasChildRolesException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
     return ResponseEntity.noContent().build();

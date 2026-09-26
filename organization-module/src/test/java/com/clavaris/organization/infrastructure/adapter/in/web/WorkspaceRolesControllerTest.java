@@ -16,8 +16,10 @@ import com.clavaris.organization.application.usecase.createworkspacerole.CreateW
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.updateworkspacerole.CannotStripReservedWorkspaceRolePermissionsException;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
 import com.clavaris.organization.domain.model.WorkspaceRole;
@@ -92,6 +94,20 @@ class WorkspaceRolesControllerTest {
     mockMvc
         .perform(post(path()).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void createRejectsANameOver255CharactersWithoutEverCallingTheUseCase() throws Exception {
+    String tooLong = "a".repeat(256);
+
+    mockMvc
+        .perform(
+            post(path())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + tooLong + "\"}"))
+        .andExpect(status().isBadRequest());
+
+    org.mockito.Mockito.verifyNoInteractions(createRole);
   }
 
   @Test
@@ -192,6 +208,35 @@ class WorkspaceRolesControllerTest {
   }
 
   @Test
+  void updateRejectsANameOver255CharactersWithoutEverCallingTheUseCase() throws Exception {
+    String tooLong = "a".repeat(256);
+
+    mockMvc
+        .perform(
+            patch(path() + "/" + UUID.randomUUID())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + tooLong + "\"}"))
+        .andExpect(status().isBadRequest());
+
+    org.mockito.Mockito.verifyNoInteractions(updateRole);
+  }
+
+  @Test
+  void updateReturns409WhenTheRequestWouldStripTheReservedRolesPermissions() throws Exception {
+    when(updateRole.handle(any()))
+        .thenThrow(new CannotStripReservedWorkspaceRolePermissionsException(UUID.randomUUID()));
+
+    mockMvc
+        .perform(
+            patch(path() + "/" + UUID.randomUUID())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Admin\"}"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
   void deleteReturns204OnSuccess() throws Exception {
     mockMvc
         .perform(delete(path() + "/" + UUID.randomUUID()).principal(ACTING_PLATFORM_CLIENT))
@@ -226,6 +271,18 @@ class WorkspaceRolesControllerTest {
   void deleteReturns409WhenTheRoleIsStillAssigned() throws Exception {
     UUID roleId = UUID.randomUUID();
     org.mockito.Mockito.doThrow(new WorkspaceRoleStillAssignedException(roleId))
+        .when(deleteRole)
+        .handle(any());
+
+    mockMvc
+        .perform(delete(path() + "/" + roleId).principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void deleteReturns409WhenTheRoleIsStillAnotherRolesParent() throws Exception {
+    UUID roleId = UUID.randomUUID();
+    org.mockito.Mockito.doThrow(new WorkspaceRoleHasChildRolesException(roleId))
         .when(deleteRole)
         .handle(any());
 

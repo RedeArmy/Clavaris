@@ -6,6 +6,7 @@ import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRo
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceRoleUpdatedEvent;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.service.WorkspaceRoleHierarchy;
 import java.util.Map;
@@ -42,6 +43,7 @@ public class UpdateWorkspaceRoleService implements UpdateWorkspaceRoleUseCase {
 
     requireNameNotTaken(existing, command, rolesById);
     requireValidParentRoleId(existing, command, rolesById);
+    requirePermissionsKeepReservedSet(existing, command);
 
     final WorkspaceRole updated =
         existing
@@ -96,6 +98,17 @@ public class UpdateWorkspaceRoleService implements UpdateWorkspaceRoleUseCase {
     }
     if (WorkspaceRoleHierarchy.wouldCreateCycle(command.roleId(), newParentRoleId, rolesById)) {
       throw new WorkspaceRoleCycleException(command.roleId(), newParentRoleId);
+    }
+  }
+
+  // Raised here, ahead of WorkspaceRole#withPermissions's own identical (but untyped) guard —
+  // see CannotStripReservedWorkspaceRolePermissionsException's own Javadoc for why this matters
+  // for the REST admin API specifically, not just the dashboard.
+  private void requirePermissionsKeepReservedSet(
+      final WorkspaceRole existing, final UpdateWorkspaceRoleCommand command) {
+    if (existing.reserved()
+        && !command.permissions().containsAll(ReservedWorkspacePermissions.ALL)) {
+      throw new CannotStripReservedWorkspaceRolePermissionsException(command.roleId());
     }
   }
 }

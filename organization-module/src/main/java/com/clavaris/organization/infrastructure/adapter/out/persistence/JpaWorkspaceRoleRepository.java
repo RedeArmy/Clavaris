@@ -29,15 +29,23 @@ class JpaWorkspaceRoleRepository implements WorkspaceRoleRepository {
 
   @Override
   public void save(final WorkspaceRole role) {
-    roles.save(
-        new WorkspaceRoleEntity(
-            role.id(),
-            role.organizationId(),
-            role.name(),
-            role.parentRoleId(),
-            objectMapper.writeValueAsString(role.permissions()),
-            role.reserved(),
-            role.createdAt()));
+    roles.save(toEntity(role));
+  }
+
+  @Override
+  public void saveAndFlush(final WorkspaceRole role) {
+    roles.saveAndFlush(toEntity(role));
+  }
+
+  private WorkspaceRoleEntity toEntity(final WorkspaceRole role) {
+    return new WorkspaceRoleEntity(
+        role.id(),
+        role.organizationId(),
+        role.name(),
+        role.parentRoleId(),
+        objectMapper.writeValueAsString(role.permissions()),
+        role.reserved(),
+        role.createdAt());
   }
 
   @Override

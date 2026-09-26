@@ -21,6 +21,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class CreateWorkspaceServiceTest {
 
@@ -66,7 +67,7 @@ class CreateWorkspaceServiceTest {
     service.handle(new CreateWorkspaceCommand(organizationId, "Engineering", ACTOR));
 
     ArgumentCaptor<WorkspaceRole> captor = ArgumentCaptor.forClass(WorkspaceRole.class);
-    verify(roles).save(captor.capture());
+    verify(roles).saveAndFlush(captor.capture());
     WorkspaceRole seeded = captor.getValue();
     assertThat(seeded.organizationId()).isEqualTo(organizationId);
     assertThat(seeded.reserved()).isTrue();
@@ -80,7 +81,25 @@ class CreateWorkspaceServiceTest {
 
     service.handle(new CreateWorkspaceCommand(organizationId, "Engineering", ACTOR));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
+  }
+
+  // A concurrent first-Workspace creation for the same brand-new Organization could lose the
+  // ux_workspace_roles_organization_id_name race — see CreateWorkspaceService's own Javadoc.
+  // This must degrade, not propagate: the invariant (a reserved role exists) still holds, since
+  // the winner's own saveAndFlush already committed it.
+  @Test
+  void toleratesLosingTheReservedRoleCreationRaceWithoutFailingTheWorkspaceCreation() {
+    UUID organizationId = UUID.randomUUID();
+    org.mockito.Mockito.doThrow(new DataIntegrityViolationException("duplicate key"))
+        .when(roles)
+        .saveAndFlush(any());
+
+    Workspace workspace =
+        service.handle(new CreateWorkspaceCommand(organizationId, "Engineering", ACTOR));
+
+    assertThat(workspace.name()).isEqualTo("Engineering");
+    verify(workspaces).save(workspace);
   }
 
   @Test
@@ -110,7 +129,7 @@ class CreateWorkspaceServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(workspaces, never()).save(any());
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
   }
