@@ -27,6 +27,15 @@
              specifically, "../app/..." resolves back to this module's own target — app/../app/...
              normalises to itself. -->
         <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml,../app/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+
+        <!-- SonarCloud "Coverage on New Code" flags every static/js/**.js file at 0% the moment it's
+             added (event-type-picker.js, 2026-09-26) — structurally unsatisfiable, not a real gap:
+             JaCoCo instruments JVM bytecode, never browser-executed JS, and this codebase has no JS
+             test runner (Thymeleaf server-side rendering, no-SPA philosophy, tech stack §3). These
+             files are still covered functionally by the MockMvc/Testcontainers tests that assert on
+             their wiring (e.g. PlatformWebhookEndpointControllerTest's script-tag assertions) — this
+             exclusion only stops a coverage metric no JVM tool can ever produce for them. -->
+        <sonar.coverage.exclusions>src/main/resources/static/js/**</sonar.coverage.exclusions>
     </properties>
 
     <dependencies>
