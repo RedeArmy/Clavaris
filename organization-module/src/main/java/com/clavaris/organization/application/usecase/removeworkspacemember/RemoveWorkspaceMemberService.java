@@ -1,13 +1,13 @@
 package com.clavaris.organization.application.usecase.removeworkspacemember;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
-import com.clavaris.organization.application.usecase.addworkspacemember.LastAdminGuard;
+import com.clavaris.organization.application.usecase.addworkspacemember.ManageMembersGuard;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceMemberRemovedEvent;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +34,7 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
 
   private final WorkspaceMembershipRepository memberships;
   private final WorkspaceRepository workspaces;
+  private final WorkspaceRoleRepository roles;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
@@ -43,15 +44,19 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
   @SuppressWarnings("PMD.LongVariable")
   private final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
+  // AddWorkspaceMemberService's own identical suppression.
   public RemoveWorkspaceMemberService(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
       @SuppressWarnings("PMD.LongVariable")
           final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker) {
     this.memberships = memberships;
     this.workspaces = workspaces;
+    this.roles = roles;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
     this.refreshTokenRevoker = refreshTokenRevoker;
@@ -68,21 +73,10 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
                     new WorkspaceMembershipNotFoundException(
                         command.workspaceId(), command.accountId()));
 
-    // SDE-III review, 2026-09-03: LastAdminGuard both closes a real TOCTOU race (two concurrent
-    // requests against this Workspace could otherwise each pass this check and both commit) and
-    // removes the duplicate-verbatim guard this class used to carry alongside
-    // ChangeWorkspaceMemberRoleService's own copy — see that class's own Javadoc for the full
-    // reasoning.
-    if (membership.role() == WorkspaceRole.ADMIN) {
-      LastAdminGuard.assertAtLeastOneAdminWouldRemain(
-          memberships,
-          command.workspaceId(),
-          () -> new CannotRemoveLastAdminException(command.workspaceId()));
-    }
-
     // webhook-module's own EventOutboxWriter needs organizationId — resolved before the delete
-    // below so a concurrently-deleted Workspace (no v1 use case does this today, but nothing at
-    // this layer forbids it) can't leave this lookup with nothing to find.
+    // below (and before the guard, which needs it to load this Organization's own roles) so a
+    // concurrently-deleted Workspace (no v1 use case does this today, but nothing at this layer
+    // forbids it) can't leave this lookup with nothing to find.
     final UUID organizationId =
         workspaces
             .findOrganizationIdById(membership.workspaceId())
@@ -93,6 +87,17 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
                             + membership.workspaceId()
                             + " that doesn't exist — data integrity violated before reaching this"
                             + " use case"));
+
+    // ADR-0027 §2: ManageMembersGuard replaces LastAdminGuard — removal is a "reassign to null"
+    // for this check's purposes, same as ChangeWorkspaceMemberRoleService's own unassign path.
+    ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
+        memberships,
+        roles,
+        command.workspaceId(),
+        organizationId,
+        membership.roleId(),
+        null,
+        () -> new CannotRemoveLastAdminException(command.workspaceId()));
 
     memberships.deleteById(membership.id());
 

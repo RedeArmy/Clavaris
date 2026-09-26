@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,8 +39,9 @@ class AddWorkspaceMemberControllerTest {
 
   @Test
   void returns201WithTheCreatedMembership() throws Exception {
+    UUID roleId = UUID.randomUUID();
     WorkspaceMembership membership =
-        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), WorkspaceRole.MEMBER);
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), roleId);
     when(useCase.handle(any())).thenReturn(membership);
 
     mockMvc
@@ -48,10 +49,10 @@ class AddWorkspaceMemberControllerTest {
             post("/api/v1/admin/workspaces/" + workspaceId + "/members")
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"new@example.com\"}"))
+                .content("{\"email\":\"new@example.com\",\"roleId\":\"" + roleId + "\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.accountId").value(membership.accountId().toString()))
-        .andExpect(jsonPath("$.role").value("MEMBER"));
+        .andExpect(jsonPath("$.roleId").value(roleId.toString()));
   }
 
   @Test
@@ -60,7 +61,17 @@ class AddWorkspaceMemberControllerTest {
         .perform(
             post("/api/v1/admin/workspaces/" + workspaceId + "/members")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"not-an-email\"}"))
+                .content("{\"email\":\"not-an-email\",\"roleId\":\"" + UUID.randomUUID() + "\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void rejectsAMissingRoleIdWithoutEverCallingTheUseCase() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/admin/workspaces/" + workspaceId + "/members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"new@example.com\"}"))
         .andExpect(status().isBadRequest());
   }
 
@@ -73,7 +84,22 @@ class AddWorkspaceMemberControllerTest {
             post("/api/v1/admin/workspaces/" + workspaceId + "/members")
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"new@example.com\"}"))
+                .content(
+                    "{\"email\":\"new@example.com\",\"roleId\":\"" + UUID.randomUUID() + "\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void returns404WhenTheRoleIdDoesNotExist() throws Exception {
+    UUID unknownRoleId = UUID.randomUUID();
+    when(useCase.handle(any())).thenThrow(new WorkspaceRoleNotFoundException(unknownRoleId));
+
+    mockMvc
+        .perform(
+            post("/api/v1/admin/workspaces/" + workspaceId + "/members")
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"new@example.com\",\"roleId\":\"" + unknownRoleId + "\"}"))
         .andExpect(status().isNotFound());
   }
 
@@ -89,7 +115,8 @@ class AddWorkspaceMemberControllerTest {
             post("/api/v1/admin/workspaces/" + workspaceId + "/members")
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"email\":\"taken@example.com\"}"))
+                .content(
+                    "{\"email\":\"taken@example.com\",\"roleId\":\"" + UUID.randomUUID() + "\"}"))
         .andExpect(status().isConflict());
   }
 }

@@ -13,10 +13,13 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,52 +30,50 @@ class RemoveWorkspaceMemberServiceTest {
 
   private WorkspaceMembershipRepository memberships;
   private WorkspaceRepository workspaces;
+  private WorkspaceRoleRepository roles;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
   private RemoveWorkspaceMemberService service;
 
+  private UUID organizationId;
+  private WorkspaceRole manageMembersRole;
+  private WorkspaceRole plainRole;
+
   @BeforeEach
   void setUp() {
     memberships = mock(WorkspaceMembershipRepository.class);
     workspaces = mock(WorkspaceRepository.class);
-    when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(UUID.randomUUID()));
+    roles = mock(WorkspaceRoleRepository.class);
+    organizationId = UUID.randomUUID();
+    when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(organizationId));
+
+    manageMembersRole = WorkspaceRole.defineReserved(organizationId, "Admin");
+    plainRole = WorkspaceRole.define(organizationId, "Member", null, Set.of());
+    when(roles.findAllByOrganizationId(organizationId))
+        .thenReturn(List.of(manageMembersRole, plainRole));
+
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
     refreshTokenRevoker = mock(WorkspaceMemberRefreshTokenRevoker.class);
     service =
         new RemoveWorkspaceMemberService(
-            memberships, workspaces, auditEvents, outbox, refreshTokenRevoker);
+            memberships, workspaces, roles, auditEvents, outbox, refreshTokenRevoker);
   }
 
   private WorkspaceMembership existingMembership(
-      final UUID workspaceId, final UUID accountId, final WorkspaceRole role) {
-    WorkspaceMembership membership = WorkspaceMembership.join(workspaceId, accountId, role);
+      final UUID workspaceId, final UUID accountId, final UUID roleId) {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspaceId, accountId, roleId);
     when(memberships.findByWorkspaceIdAndAccountId(workspaceId, accountId))
         .thenReturn(Optional.of(membership));
     return membership;
   }
 
   @Test
-  void removesAMemberWithoutCheckingTheAdminCount() {
+  void removesAMemberWithoutCheckingTheHolderCount() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    WorkspaceMembership membership =
-        existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
-
-    service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
-
-    verify(memberships, never()).countByWorkspaceIdAndRole(any(), any());
-    verify(memberships).deleteById(membership.id());
-  }
-
-  @Test
-  void removesAnAdminWhenAnotherAdminRemains() {
-    UUID workspaceId = UUID.randomUUID();
-    UUID accountId = UUID.randomUUID();
-    WorkspaceMembership membership =
-        existingMembership(workspaceId, accountId, WorkspaceRole.ADMIN);
-    when(memberships.countByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN)).thenReturn(2L);
+    WorkspaceMembership membership = existingMembership(workspaceId, accountId, plainRole.id());
 
     service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
 
@@ -80,11 +81,29 @@ class RemoveWorkspaceMemberServiceTest {
   }
 
   @Test
-  void rejectsRemovingTheLastAdminWithoutDeletingAnything() {
+  void removesAHolderWhenAnotherHolderRemains() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.ADMIN);
-    when(memberships.countByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN)).thenReturn(1L);
+    WorkspaceMembership membership =
+        existingMembership(workspaceId, accountId, manageMembersRole.id());
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(
+            List.of(
+                membership,
+                WorkspaceMembership.join(workspaceId, UUID.randomUUID(), manageMembersRole.id())));
+
+    service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
+
+    verify(memberships).deleteById(membership.id());
+  }
+
+  @Test
+  void rejectsRemovingTheLastHolderWithoutDeletingAnything() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    WorkspaceMembership membership =
+        existingMembership(workspaceId, accountId, manageMembersRole.id());
+    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(membership));
     RemoveWorkspaceMemberCommand command =
         new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR);
 
@@ -103,7 +122,7 @@ class RemoveWorkspaceMemberServiceTest {
   void revokesEveryRefreshTokenForTheRemovedMembersAccountOnSuccess() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    existingMembership(workspaceId, accountId, plainRole.id());
 
     service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
 
@@ -114,8 +133,7 @@ class RemoveWorkspaceMemberServiceTest {
   void recordsAnAuditEventAndAnOutboxEventOnSuccess() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    WorkspaceMembership membership =
-        existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    WorkspaceMembership membership = existingMembership(workspaceId, accountId, plainRole.id());
 
     service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
 
@@ -157,7 +175,7 @@ class RemoveWorkspaceMemberServiceTest {
   void refusesToProceedWhenTheMembershipsOwnWorkspaceNoLongerExists() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    existingMembership(workspaceId, accountId, plainRole.id());
     when(workspaces.findOrganizationIdById(workspaceId)).thenReturn(Optional.empty());
     RemoveWorkspaceMemberCommand command =
         new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR);

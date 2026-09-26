@@ -15,15 +15,19 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.Workspace;
+import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class CreateWorkspaceServiceTest {
 
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
 
   private WorkspaceRepository workspaces;
+  private WorkspaceRoleRepository roles;
   private OrganizationRepository organizations;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
@@ -32,11 +36,13 @@ class CreateWorkspaceServiceTest {
   @BeforeEach
   void setUp() {
     workspaces = mock(WorkspaceRepository.class);
+    roles = mock(WorkspaceRoleRepository.class);
     organizations = mock(OrganizationRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
     when(organizations.existsById(any())).thenReturn(true);
-    service = new CreateWorkspaceService(workspaces, organizations, auditEvents, outbox);
+    when(roles.findAllByOrganizationId(any())).thenReturn(List.of());
+    service = new CreateWorkspaceService(workspaces, roles, organizations, auditEvents, outbox);
   }
 
   @Test
@@ -49,6 +55,32 @@ class CreateWorkspaceServiceTest {
     assertThat(workspace.name()).isEqualTo("Engineering");
     assertThat(workspace.organizationId()).isEqualTo(organizationId);
     verify(workspaces).save(workspace);
+  }
+
+  // ADR-0027 §2: every Organization needs its one reserved bootstrap role for the member-add
+  // flow to have anything to offer.
+  @Test
+  void seedsTheReservedRoleWhenNoneExistsYetForThisOrganization() {
+    UUID organizationId = UUID.randomUUID();
+
+    service.handle(new CreateWorkspaceCommand(organizationId, "Engineering", ACTOR));
+
+    ArgumentCaptor<WorkspaceRole> captor = ArgumentCaptor.forClass(WorkspaceRole.class);
+    verify(roles).save(captor.capture());
+    WorkspaceRole seeded = captor.getValue();
+    assertThat(seeded.organizationId()).isEqualTo(organizationId);
+    assertThat(seeded.reserved()).isTrue();
+  }
+
+  @Test
+  void doesNotReseedTheReservedRoleWhenOneAlreadyExistsForThisOrganization() {
+    UUID organizationId = UUID.randomUUID();
+    when(roles.findAllByOrganizationId(organizationId))
+        .thenReturn(List.of(WorkspaceRole.defineReserved(organizationId, "Admin")));
+
+    service.handle(new CreateWorkspaceCommand(organizationId, "Engineering", ACTOR));
+
+    verify(roles, never()).save(any());
   }
 
   @Test
@@ -78,6 +110,7 @@ class CreateWorkspaceServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(workspaces, never()).save(any());
+    verify(roles, never()).save(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
   }

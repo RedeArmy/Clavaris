@@ -11,30 +11,50 @@ class WorkspaceMembershipTest {
   void joinAssignsARandomIdAndCapturesTheGivenFields() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
+    UUID roleId = UUID.randomUUID();
 
-    WorkspaceMembership membership =
-        WorkspaceMembership.join(workspaceId, accountId, WorkspaceRole.MEMBER);
+    WorkspaceMembership membership = WorkspaceMembership.join(workspaceId, accountId, roleId);
 
     assertThat(membership.id()).isNotNull();
     assertThat(membership.workspaceId()).isEqualTo(workspaceId);
     assertThat(membership.accountId()).isEqualTo(accountId);
-    assertThat(membership.role()).isEqualTo(WorkspaceRole.MEMBER);
+    assertThat(membership.roleId()).isEqualTo(roleId);
     assertThat(membership.createdAt()).isNotNull();
   }
 
   @Test
-  void withRoleReturnsACopyWithOnlyTheRoleChanged() {
+  void joinAllowsANullRoleId() {
+    WorkspaceMembership membership =
+        WorkspaceMembership.join(UUID.randomUUID(), UUID.randomUUID(), null);
+
+    assertThat(membership.roleId()).isNull();
+  }
+
+  @Test
+  void withRoleIdReturnsACopyWithOnlyTheRoleIdChanged() {
+    UUID originalRoleId = UUID.randomUUID();
+    UUID newRoleId = UUID.randomUUID();
     WorkspaceMembership original =
-        WorkspaceMembership.join(UUID.randomUUID(), UUID.randomUUID(), WorkspaceRole.MEMBER);
+        WorkspaceMembership.join(UUID.randomUUID(), UUID.randomUUID(), originalRoleId);
 
-    WorkspaceMembership promoted = original.withRole(WorkspaceRole.ADMIN);
+    WorkspaceMembership reassigned = original.withRoleId(newRoleId);
 
-    assertThat(promoted.id()).isEqualTo(original.id());
-    assertThat(promoted.workspaceId()).isEqualTo(original.workspaceId());
-    assertThat(promoted.accountId()).isEqualTo(original.accountId());
-    assertThat(promoted.createdAt()).isEqualTo(original.createdAt());
-    assertThat(promoted.role()).isEqualTo(WorkspaceRole.ADMIN);
-    // The original instance is untouched — withRole never mutates in place.
-    assertThat(original.role()).isEqualTo(WorkspaceRole.MEMBER);
+    assertThat(reassigned.id()).isEqualTo(original.id());
+    assertThat(reassigned.workspaceId()).isEqualTo(original.workspaceId());
+    assertThat(reassigned.accountId()).isEqualTo(original.accountId());
+    assertThat(reassigned.createdAt()).isEqualTo(original.createdAt());
+    assertThat(reassigned.roleId()).isEqualTo(newRoleId);
+    // The original instance is untouched — withRoleId never mutates in place.
+    assertThat(original.roleId()).isEqualTo(originalRoleId);
+  }
+
+  @Test
+  void withRoleIdCanUnassignByPassingNull() {
+    WorkspaceMembership original =
+        WorkspaceMembership.join(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+    WorkspaceMembership unassigned = original.withRoleId(null);
+
+    assertThat(unassigned.roleId()).isNull();
   }
 }

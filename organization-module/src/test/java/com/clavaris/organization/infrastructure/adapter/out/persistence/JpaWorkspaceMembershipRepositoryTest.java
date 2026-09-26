@@ -7,12 +7,14 @@ import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +39,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code workspaces}, which itself references {@code organizations} — every membership below is
  * attached to a real, persisted {@link Workspace} row (itself attached to a real, persisted {@link
  * Organization}), never bare random {@link UUID}s, or the inserts would fail those FK constraints
- * before this test could observe anything.
+ * before this test could observe anything. Most tests here use a {@code null} {@code roleId}
+ * (ADR-0027 — an explicitly allowed "no role assigned" state) since they exercise membership
+ * plumbing (listing, pagination, deletion), not role referential integrity — {@code
+ * savesAMembershipAndPersistsItsRealFields} is the one test that round-trips a real, persisted
+ * {@link WorkspaceRole} id, to prove that FK-backed path too.
  */
 @SpringBootTest(classes = JpaWorkspaceMembershipRepositoryTest.TestConfig.class)
 @Testcontainers
@@ -52,6 +58,8 @@ class JpaWorkspaceMembershipRepositoryTest {
 
   @Autowired private WorkspaceRepository workspaces;
 
+  @Autowired private WorkspaceRoleRepository roles;
+
   @Autowired private OrganizationRepository organizations;
 
   private UUID newPersistedWorkspaceId() {
@@ -62,43 +70,49 @@ class JpaWorkspaceMembershipRepositoryTest {
     return workspace.id();
   }
 
+  private UUID newPersistedRoleIdFor(final UUID organizationId) {
+    WorkspaceRole role = WorkspaceRole.define(organizationId, "Test Role", null, Set.of("a"));
+    roles.save(role);
+    return role.id();
+  }
+
   @Test
   void savesAMembershipAndPersistsItsRealFields() {
-    UUID workspaceId = newPersistedWorkspaceId();
+    Organization organization = Organization.register("Test Org", UUID.randomUUID());
+    organizations.save(organization);
+    Workspace workspace = Workspace.register(organization.id(), "Test Workspace");
+    workspaces.save(workspace);
+    UUID roleId = newPersistedRoleIdFor(organization.id());
     UUID accountId = UUID.randomUUID();
-    WorkspaceMembership membership =
-        WorkspaceMembership.join(workspaceId, accountId, WorkspaceRole.ADMIN);
+    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, roleId);
 
     repository.save(membership);
 
     WorkspaceMembershipEntity persisted =
         springDataRepository.findById(membership.id()).orElseThrow();
-    assertThat(persisted.getWorkspaceId()).isEqualTo(workspaceId);
+    assertThat(persisted.getWorkspaceId()).isEqualTo(workspace.id());
     assertThat(persisted.getAccountId()).isEqualTo(accountId);
-    assertThat(persisted.getRole()).isEqualTo(WorkspaceRole.ADMIN);
+    assertThat(persisted.getRoleId()).isEqualTo(roleId);
   }
 
   @Test
-  void countByWorkspaceIdAndRoleCountsOnlyThatWorkspacesMatchingRows() {
+  void savesAMembershipWithNoRoleAssigned() {
     UUID workspaceId = newPersistedWorkspaceId();
-    UUID otherWorkspaceId = newPersistedWorkspaceId();
-    repository.save(WorkspaceMembership.join(workspaceId, UUID.randomUUID(), WorkspaceRole.ADMIN));
-    repository.save(WorkspaceMembership.join(workspaceId, UUID.randomUUID(), WorkspaceRole.ADMIN));
-    repository.save(WorkspaceMembership.join(workspaceId, UUID.randomUUID(), WorkspaceRole.MEMBER));
-    repository.save(
-        WorkspaceMembership.join(otherWorkspaceId, UUID.randomUUID(), WorkspaceRole.ADMIN));
+    WorkspaceMembership membership = WorkspaceMembership.join(workspaceId, UUID.randomUUID(), null);
 
-    assertThat(repository.countByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN)).isEqualTo(2);
+    repository.save(membership);
+
+    WorkspaceMembershipEntity persisted =
+        springDataRepository.findById(membership.id()).orElseThrow();
+    assertThat(persisted.getRoleId()).isNull();
   }
 
   @Test
   void findAllByWorkspaceIdReturnsOnlyThatWorkspacesMemberships() {
     UUID workspaceA = newPersistedWorkspaceId();
     UUID workspaceB = newPersistedWorkspaceId();
-    WorkspaceMembership inA =
-        WorkspaceMembership.join(workspaceA, UUID.randomUUID(), WorkspaceRole.MEMBER);
-    WorkspaceMembership inB =
-        WorkspaceMembership.join(workspaceB, UUID.randomUUID(), WorkspaceRole.MEMBER);
+    WorkspaceMembership inA = WorkspaceMembership.join(workspaceA, UUID.randomUUID(), null);
+    WorkspaceMembership inB = WorkspaceMembership.join(workspaceB, UUID.randomUUID(), null);
     repository.save(inA);
     repository.save(inB);
 
@@ -114,12 +128,9 @@ class JpaWorkspaceMembershipRepositoryTest {
     UUID workspaceA = newPersistedWorkspaceId();
     UUID workspaceB = newPersistedWorkspaceId();
     UUID workspaceC = newPersistedWorkspaceId();
-    WorkspaceMembership inA =
-        WorkspaceMembership.join(workspaceA, UUID.randomUUID(), WorkspaceRole.MEMBER);
-    WorkspaceMembership inB =
-        WorkspaceMembership.join(workspaceB, UUID.randomUUID(), WorkspaceRole.ADMIN);
-    WorkspaceMembership inC =
-        WorkspaceMembership.join(workspaceC, UUID.randomUUID(), WorkspaceRole.MEMBER);
+    WorkspaceMembership inA = WorkspaceMembership.join(workspaceA, UUID.randomUUID(), null);
+    WorkspaceMembership inB = WorkspaceMembership.join(workspaceB, UUID.randomUUID(), null);
+    WorkspaceMembership inC = WorkspaceMembership.join(workspaceC, UUID.randomUUID(), null);
     repository.save(inA);
     repository.save(inB);
     repository.save(inC);
@@ -134,9 +145,7 @@ class JpaWorkspaceMembershipRepositoryTest {
 
   @Test
   void findAllByWorkspaceIdsReturnsEmptyForAnEmptyCollectionRatherThanEveryMembership() {
-    repository.save(
-        WorkspaceMembership.join(
-            newPersistedWorkspaceId(), UUID.randomUUID(), WorkspaceRole.ADMIN));
+    repository.save(WorkspaceMembership.join(newPersistedWorkspaceId(), UUID.randomUUID(), null));
 
     assertThat(repository.findAllByWorkspaceIds(List.of())).isEmpty();
   }
@@ -148,18 +157,14 @@ class JpaWorkspaceMembershipRepositoryTest {
   void findKeysetPageByWorkspaceIdReturnsNewestFirstAndSupportsForwardAndBackwardNavigation() {
     UUID workspaceId = newPersistedWorkspaceId();
     Instant now = Instant.now();
-    WorkspaceMembership first =
-        reconstituteAt(workspaceId, now.minusSeconds(20), WorkspaceRole.ADMIN);
-    WorkspaceMembership second =
-        reconstituteAt(workspaceId, now.minusSeconds(10), WorkspaceRole.MEMBER);
-    WorkspaceMembership third = reconstituteAt(workspaceId, now, WorkspaceRole.MEMBER);
+    WorkspaceMembership first = reconstituteAt(workspaceId, now.minusSeconds(20));
+    WorkspaceMembership second = reconstituteAt(workspaceId, now.minusSeconds(10));
+    WorkspaceMembership third = reconstituteAt(workspaceId, now);
     repository.save(first);
     repository.save(second);
     repository.save(third);
     // A different Workspace's own membership must never leak into this one's own page.
-    repository.save(
-        WorkspaceMembership.join(
-            newPersistedWorkspaceId(), UUID.randomUUID(), WorkspaceRole.MEMBER));
+    repository.save(WorkspaceMembership.join(newPersistedWorkspaceId(), UUID.randomUUID(), null));
 
     KeysetPage<WorkspaceMembership> firstPage =
         repository.findKeysetPageByWorkspaceId(workspaceId, new KeysetPageRequest(null, null, 2));
@@ -192,19 +197,17 @@ class JpaWorkspaceMembershipRepositoryTest {
   }
 
   private static WorkspaceMembership reconstituteAt(
-      final UUID workspaceId, final Instant createdAt, final WorkspaceRole role) {
+      final UUID workspaceId, final Instant createdAt) {
     return WorkspaceMembership.reconstitute(
-        UUID.randomUUID(), workspaceId, UUID.randomUUID(), role, createdAt);
+        UUID.randomUUID(), workspaceId, UUID.randomUUID(), null, createdAt);
   }
 
   @Test
   void findAllByAccountIdReturnsOnlyThatAccountsMemberships() {
     UUID accountId = UUID.randomUUID();
-    WorkspaceMembership own =
-        WorkspaceMembership.join(newPersistedWorkspaceId(), accountId, WorkspaceRole.ADMIN);
+    WorkspaceMembership own = WorkspaceMembership.join(newPersistedWorkspaceId(), accountId, null);
     WorkspaceMembership someoneElse =
-        WorkspaceMembership.join(
-            newPersistedWorkspaceId(), UUID.randomUUID(), WorkspaceRole.MEMBER);
+        WorkspaceMembership.join(newPersistedWorkspaceId(), UUID.randomUUID(), null);
     repository.save(own);
     repository.save(someoneElse);
 
@@ -230,12 +233,11 @@ class JpaWorkspaceMembershipRepositoryTest {
   void deleteAllByAccountIdRemovesEveryMembershipForThatAccountAcrossWorkspaces() {
     UUID accountId = UUID.randomUUID();
     WorkspaceMembership inWorkspace1 =
-        WorkspaceMembership.join(newPersistedWorkspaceId(), accountId, WorkspaceRole.MEMBER);
+        WorkspaceMembership.join(newPersistedWorkspaceId(), accountId, null);
     WorkspaceMembership inWorkspace2 =
-        WorkspaceMembership.join(newPersistedWorkspaceId(), accountId, WorkspaceRole.ADMIN);
+        WorkspaceMembership.join(newPersistedWorkspaceId(), accountId, null);
     WorkspaceMembership someoneElse =
-        WorkspaceMembership.join(
-            newPersistedWorkspaceId(), UUID.randomUUID(), WorkspaceRole.MEMBER);
+        WorkspaceMembership.join(newPersistedWorkspaceId(), UUID.randomUUID(), null);
     repository.save(inWorkspace1);
     repository.save(inWorkspace2);
     repository.save(someoneElse);
@@ -253,11 +255,13 @@ class JpaWorkspaceMembershipRepositoryTest {
       basePackageClasses = {
         SpringDataWorkspaceMembershipJpaRepository.class,
         SpringDataWorkspaceJpaRepository.class,
+        SpringDataWorkspaceRoleJpaRepository.class,
         SpringDataOrganizationJpaRepository.class
       })
   @Import({
     JpaWorkspaceMembershipRepository.class,
     JpaWorkspaceRepository.class,
+    JpaWorkspaceRoleRepository.class,
     JpaOrganizationRepository.class
   })
   static class TestConfig {}

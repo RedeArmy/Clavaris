@@ -24,6 +24,7 @@ import com.clavaris.organization.application.usecase.createproductionenvironment
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceService;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationService;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationUseCase;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -60,6 +61,8 @@ import com.clavaris.organization.application.usecase.listworkspacemembers.ListWo
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedService;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationService;
+import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationService;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedService;
@@ -261,10 +264,12 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ CreateWorkspaceUseCase createWorkspaceUseCase(
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final OrganizationRepository organizations,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
-    return new CreateWorkspaceService(workspaces, organizations, auditEvents, eventOutboxWriter);
+    return new CreateWorkspaceService(
+        workspaces, roles, organizations, auditEvents, eventOutboxWriter);
   }
 
   // AddWorkspaceMemberService's own Javadoc explains why this needs a real TransactionTemplate,
@@ -274,6 +279,7 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ AddWorkspaceMemberUseCase addWorkspaceMemberUseCase(
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final WorkspaceMembershipRepository memberships,
       @SuppressWarnings("PMD.LongVariable") final AccountProvisioner accountProvisioner,
       final AuditEventRecorder auditEvents,
@@ -281,6 +287,7 @@ class OrganizationUseCaseConfig {
       @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
     return new AddWorkspaceMemberService(
         workspaces,
+        roles,
         memberships,
         accountProvisioner,
         auditEvents,
@@ -292,29 +299,37 @@ class OrganizationUseCaseConfig {
   /* package */ ChangeWorkspaceMemberRoleUseCase changeWorkspaceMemberRoleUseCase(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new ChangeWorkspaceMemberRoleService(
-        memberships, workspaces, auditEvents, eventOutboxWriter);
+        memberships, workspaces, roles, auditEvents, eventOutboxWriter);
   }
 
   @Bean
   /* package */ RemoveWorkspaceMemberUseCase removeWorkspaceMemberUseCase(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter,
       // TD-WS-002 mitigation: see WorkspaceMemberRefreshTokenRevoker's own Javadoc.
       @SuppressWarnings("PMD.LongVariable")
           final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker) {
     return new RemoveWorkspaceMemberService(
-        memberships, workspaces, auditEvents, eventOutboxWriter, refreshTokenRevoker);
+        memberships, workspaces, roles, auditEvents, eventOutboxWriter, refreshTokenRevoker);
   }
 
   @Bean
   /* package */ ListWorkspacesForOrganizationUseCase listWorkspacesForOrganizationUseCase(
       final WorkspaceRepository workspaces) {
     return new ListWorkspacesForOrganizationService(workspaces);
+  }
+
+  @Bean
+  /* package */ ListWorkspaceRolesForOrganizationUseCase listWorkspaceRolesForOrganizationUseCase(
+      final WorkspaceRoleRepository roles) {
+    return new ListWorkspaceRolesForOrganizationService(roles);
   }
 
   // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.

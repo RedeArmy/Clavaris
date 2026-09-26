@@ -1,10 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -13,9 +10,10 @@ import java.util.UUID;
 /**
  * JPA row mapping for {@code workspace_memberships} — {@code accountId} is a plain column, no
  * {@code @ManyToOne}/FK: see the owning migration's own comment for why (no cross-module JPA
- * relationship is possible here). {@code role} stored as its enum name ({@link EnumType#STRING}) —
- * a future reordering of {@link WorkspaceRole}'s constants must never silently change a persisted
- * row's meaning, which {@link EnumType#ORDINAL} would risk.
+ * relationship is possible here). {@code roleId} (ADR-0027 — replaces the old fixed-enum {@code
+ * role}) is likewise a plain, nullable column, not a {@code @ManyToOne} to {@code
+ * WorkspaceRoleEntity}: {@code null} means "no role currently assigned," an explicitly allowed
+ * state (ADR-0027 §5).
  */
 @SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
@@ -30,9 +28,8 @@ public class WorkspaceMembershipEntity {
   @Column(name = "account_id", nullable = false)
   private UUID accountId;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false)
-  private WorkspaceRole role;
+  @Column(name = "role_id")
+  private UUID roleId;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
@@ -43,12 +40,12 @@ public class WorkspaceMembershipEntity {
       final UUID id,
       final UUID workspaceId,
       final UUID accountId,
-      final WorkspaceRole role,
+      final UUID roleId,
       final Instant createdAt) {
     this.id = id;
     this.workspaceId = workspaceId;
     this.accountId = accountId;
-    this.role = role;
+    this.roleId = roleId;
     this.createdAt = createdAt;
   }
 
@@ -64,8 +61,8 @@ public class WorkspaceMembershipEntity {
     return accountId;
   }
 
-  public WorkspaceRole getRole() {
-    return role;
+  public UUID getRoleId() {
+    return roleId;
   }
 
   public Instant getCreatedAt() {

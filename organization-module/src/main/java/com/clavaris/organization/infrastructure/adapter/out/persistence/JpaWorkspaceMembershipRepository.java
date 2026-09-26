@@ -6,7 +6,6 @@ import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeysetPageMapper;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -63,7 +62,7 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
             membership.id(),
             membership.workspaceId(),
             membership.accountId(),
-            membership.role(),
+            membership.roleId(),
             membership.createdAt()));
   }
 
@@ -128,11 +127,6 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
   }
 
   @Override
-  public long countByWorkspaceIdAndRole(final UUID workspaceId, final WorkspaceRole role) {
-    return memberships.countByWorkspaceIdAndRole(workspaceId, role);
-  }
-
-  @Override
   public void deleteById(final UUID membershipId) {
     memberships.deleteById(membershipId);
     // .flush() — same "must actually reach Postgres now, not deferred" reasoning as
@@ -151,7 +145,7 @@ class JpaWorkspaceMembershipRepository implements WorkspaceMembershipRepository 
         entity.getId(),
         entity.getWorkspaceId(),
         entity.getAccountId(),
-        entity.getRole(),
+        entity.getRoleId(),
         entity.getCreatedAt());
   }
 }

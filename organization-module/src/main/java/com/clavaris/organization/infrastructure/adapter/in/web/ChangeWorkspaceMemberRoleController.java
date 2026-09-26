@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleCommand;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
@@ -20,8 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code PUT /api/v1/admin/workspaces/{workspaceId}/members/{accountId}/role} — BR-WS-01's
- * replacement invariant (ADR-0010 §3 addendum): a demotion that would leave zero ADMINs is
- * rejected.
+ * replacement invariant (ADR-0027): a role change (including unassigning, {@code roleId: null})
+ * that would leave zero members holding {@code clavaris:workspace:manage_members} is rejected.
  */
 @RestController
 class ChangeWorkspaceMemberRoleController {
@@ -36,14 +37,18 @@ class ChangeWorkspaceMemberRoleController {
   // Three exits (404 unknown membership, 409 last-admin guard, 200 success) — same rationale as
   // AddWorkspaceMemberController's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
-  @Operation(summary = "Change a Workspace member's role (BR-WS-05)")
+  @Operation(summary = "Change or unassign a Workspace member's role (ADR-0027)")
   @ApiResponse(responseCode = "200", description = "Role changed")
   @ApiResponse(
       responseCode = "404",
-      description = "No membership exists for this account/workspace")
+      description =
+          "No membership exists for this account/workspace, or roleId doesn't"
+              + " reference a WorkspaceRole belonging to its Organization")
   @ApiResponse(
       responseCode = "409",
-      description = "This would leave the Workspace with zero ADMIN members")
+      description =
+          "This would leave the Workspace with zero members holding"
+              + " clavaris:workspace:manage_members")
   @PutMapping("/api/v1/admin/workspaces/{workspaceId}/members/{accountId}/role")
   /* package */ ResponseEntity<WorkspaceMembershipResponse> changeRole(
       @PathVariable final UUID workspaceId,
@@ -57,9 +62,9 @@ class ChangeWorkspaceMemberRoleController {
               new ChangeWorkspaceMemberRoleCommand(
                   workspaceId,
                   accountId,
-                  request.role(),
+                  request.roleId(),
                   AuditActor.platformClient(authentication.getName())));
-    } catch (final WorkspaceMembershipNotFoundException _) {
+    } catch (final WorkspaceMembershipNotFoundException | WorkspaceRoleNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final CannotDemoteLastAdminException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();

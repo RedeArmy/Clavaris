@@ -7,6 +7,7 @@ import com.clavaris.organization.application.usecase.addworkspacemember.AccountP
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleCommand;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
@@ -19,6 +20,8 @@ import com.clavaris.organization.application.usecase.getworkspacefororganization
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
+import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.CannotRemoveLastAdminException;
@@ -30,7 +33,10 @@ import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -109,19 +115,23 @@ public class PlatformWorkspaceController {
   private final GetWorkspaceForOrganizationUseCase getWorkspace;
   private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private final ListWorkspaceMembersPagedUseCase listMembers;
+  private final ListWorkspaceRolesForOrganizationUseCase listRoles;
   private final CreateWorkspaceUseCase createWorkspace;
   private final AddWorkspaceMemberUseCase addMemberUseCase;
   private final ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private final RemoveWorkspaceMemberUseCase removeMemberUseCase;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other multi-collaborator constructor in this codebase.
+  // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
+  // as every other multi-collaborator constructor in this codebase; ADR-0027's own
+  // listRoles addition pushed this past PMD's default threshold (10), not a new design smell.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public PlatformWorkspaceController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final GetWorkspaceForOrganizationUseCase getWorkspace,
       final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
       final ListWorkspaceMembersPagedUseCase listMembers,
+      final ListWorkspaceRolesForOrganizationUseCase listRoles,
       final CreateWorkspaceUseCase createWorkspace,
       final AddWorkspaceMemberUseCase addMemberUseCase,
       final ChangeWorkspaceMemberRoleUseCase changeMemberRole,
@@ -131,6 +141,7 @@ public class PlatformWorkspaceController {
     this.getWorkspace = getWorkspace;
     this.listWorkspaces = listWorkspaces;
     this.listMembers = listMembers;
+    this.listRoles = listRoles;
     this.createWorkspace = createWorkspace;
     this.addMemberUseCase = addMemberUseCase;
     this.changeMemberRole = changeMemberRole;
@@ -235,12 +246,13 @@ public class PlatformWorkspaceController {
           new AddWorkspaceMemberCommand(
               workspaceId,
               form.getEmail(),
-              form.getRole(),
+              form.getRoleId(),
               AuditActor.platformAccount(ownerPlatformAccountId)));
-    } catch (final WorkspaceNotFoundException _) {
+    } catch (final WorkspaceNotFoundException | WorkspaceRoleNotFoundException _) {
       // Not expected on this path — requireOwnedWorkspace above already confirmed workspaceId
-      // exists — but a loud 404 is still safer than assuming that guarantee can never race with
-      // a concurrent deletion (this module's own future increments may add one).
+      // exists, and the form's own role selector only ever offers this Organization's real
+      // roles — but a loud 404 is still safer than assuming either guarantee can never race
+      // with a concurrent deletion (this module's own future increments may add one).
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final AccountProvisioner.AccountAlreadyExistsException _) {
       model.addAttribute("emailAlreadyRegisteredError", true);
@@ -259,7 +271,9 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID accountId,
-      @RequestParam final WorkspaceRole newRole,
+      // ADR-0027: nullable — an absent/blank value unassigns the member's role entirely (§5),
+      // an explicitly allowed state, not a validation error.
+      @RequestParam(required = false) final UUID newRoleId,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
@@ -269,8 +283,11 @@ public class PlatformWorkspaceController {
     try {
       changeMemberRole.handle(
           new ChangeWorkspaceMemberRoleCommand(
-              workspaceId, accountId, newRole, AuditActor.platformAccount(ownerPlatformAccountId)));
-    } catch (final WorkspaceMembershipNotFoundException _) {
+              workspaceId,
+              accountId,
+              newRoleId,
+              AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceMembershipNotFoundException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
       model.addAttribute("cannotDemoteLastAdminError", true);
@@ -340,6 +357,16 @@ public class PlatformWorkspaceController {
       final KeysetPageRequest pageRequest) {
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     model.addAttribute("workspace", workspace);
+    // ADR-0027: keyed by id — the member-add/role-change forms' own role selector iterates
+    // roles.values(), and the member table's own role badge resolves a member's roleId straight
+    // to its WorkspaceRole (or null, gracefully, for an unassigned/deleted-role member) via
+    // roles.get(...) — one attribute serving both needs. Every WorkspaceRole defined for this
+    // Workspace's own Organization, not just this one Workspace's assigned subset (roles are
+    // Organization-scoped, shared across every Workspace it owns).
+    final Map<UUID, WorkspaceRole> rolesById =
+        listRoles.handle(new ListWorkspaceRolesForOrganizationQuery(organization.id())).stream()
+            .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
+    model.addAttribute("roles", rolesById);
     final KeysetPage<WorkspaceMembership> membersPage =
         listMembers.handle(new ListWorkspaceMembersPagedQuery(workspace.id(), pageRequest));
     model.addAttribute("members", membersPage.content());

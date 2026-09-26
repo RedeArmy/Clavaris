@@ -1,13 +1,14 @@
 package com.clavaris.organization.application.usecase.changeworkspacememberrole;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
-import com.clavaris.organization.application.usecase.addworkspacemember.LastAdminGuard;
+import com.clavaris.organization.application.usecase.addworkspacemember.ManageMembersGuard;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceMemberRoleChangedEvent;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,16 +17,21 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
 
   private final WorkspaceMembershipRepository memberships;
   private final WorkspaceRepository workspaces;
+  private final WorkspaceRoleRepository roles;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
+  // AddWorkspaceMemberService's own identical suppression.
   public ChangeWorkspaceMemberRoleService(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.memberships = memberships;
     this.workspaces = workspaces;
+    this.roles = roles;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
   }
@@ -41,44 +47,50 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
                     new WorkspaceMembershipNotFoundException(
                         command.workspaceId(), command.accountId()));
 
-    // Only a demotion away from ADMIN can ever violate the invariant — promoting to ADMIN, or
-    // "changing" a MEMBER to MEMBER, never reduces the ADMIN count.
-    @SuppressWarnings("PMD.LongVariable")
-    final boolean isDemotionFromAdmin =
-        membership.role() == WorkspaceRole.ADMIN && command.newRole() != WorkspaceRole.ADMIN;
-    // SDE-III review, 2026-09-03: LastAdminGuard both closes a real TOCTOU race and removes the
-    // duplicate-verbatim guard this class used to carry alongside RemoveWorkspaceMemberService's
-    // own copy — see LastAdminGuard's own Javadoc for the full reasoning.
-    if (isDemotionFromAdmin) {
-      LastAdminGuard.assertAtLeastOneAdminWouldRemain(
-          memberships,
-          command.workspaceId(),
-          () -> new CannotDemoteLastAdminException(command.workspaceId()));
-    }
-
-    final WorkspaceRole previousRole = membership.role();
-    final WorkspaceMembership updated = membership.withRole(command.newRole());
-    memberships.save(updated);
-
     // webhook-module's own EventOutboxWriter needs organizationId — see
-    // RemoveWorkspaceMemberService's own identical lookup for the full reasoning.
+    // RemoveWorkspaceMemberService's own identical lookup for the full reasoning. Resolved before
+    // the guard below too: ManageMembersGuard needs it to load this Organization's own roles.
     final UUID organizationId =
         workspaces
-            .findOrganizationIdById(updated.workspaceId())
+            .findOrganizationIdById(membership.workspaceId())
             .orElseThrow(
                 () ->
                     new IllegalStateException(
                         "WorkspaceMembership references workspaceId "
-                            + updated.workspaceId()
+                            + membership.workspaceId()
                             + " that doesn't exist — data integrity violated before reaching this"
                             + " use case"));
+
+    // ADR-0027: null is an explicitly allowed target (unassign) — only a real role id needs
+    // validating against this Organization's own role set.
+    if (command.newRoleId() != null
+        && roles.findById(command.newRoleId()).stream()
+            .noneMatch(role -> role.organizationId().equals(organizationId))) {
+      throw new WorkspaceRoleNotFoundException(command.newRoleId());
+    }
+
+    // ADR-0027 §2: ManageMembersGuard replaces LastAdminGuard — see its own Javadoc for why it
+    // short-circuits (no lock/load at all) whenever this change couldn't possibly reduce the
+    // Workspace's manage_members-holder count.
+    ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
+        memberships,
+        roles,
+        command.workspaceId(),
+        organizationId,
+        membership.roleId(),
+        command.newRoleId(),
+        () -> new CannotDemoteLastAdminException(command.workspaceId()));
+
+    final UUID previousRoleId = membership.roleId();
+    final WorkspaceMembership updated = membership.withRoleId(command.newRoleId());
+    memberships.save(updated);
 
     auditEvents.write(
         command.actor(),
         "workspace_membership.role_changed",
         "WorkspaceMembership",
         updated.id().toString(),
-        "previousRole=" + previousRole + " newRole=" + command.newRole());
+        "previousRoleId=" + previousRoleId + " newRoleId=" + command.newRoleId());
 
     outbox.write(
         "WorkspaceMembership",
@@ -89,8 +101,8 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
             updated.id(),
             updated.workspaceId(),
             updated.accountId(),
-            previousRole,
-            updated.role()));
+            previousRoleId,
+            updated.roleId()));
 
     return updated;
   }

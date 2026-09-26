@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,14 +30,15 @@ class ListWorkspaceMembersControllerTest {
   @Test
   void returns200WithEveryMembership() throws Exception {
     UUID workspaceId = UUID.randomUUID();
+    UUID roleId = UUID.randomUUID();
     WorkspaceMembership membership =
-        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), WorkspaceRole.ADMIN);
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), roleId);
     when(useCase.handle(any())).thenReturn(List.of(membership));
 
     mockMvc
         .perform(get("/api/v1/admin/workspaces/" + workspaceId + "/members"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].accountId").value(membership.accountId().toString()))
-        .andExpect(jsonPath("$[0].role").value("ADMIN"));
+        .andExpect(jsonPath("$[0].roleId").value(roleId.toString()));
   }
 }

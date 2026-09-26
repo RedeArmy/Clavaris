@@ -14,11 +14,13 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ class AddWorkspaceMemberServiceTest {
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
 
   private WorkspaceRepository workspaces;
+  private WorkspaceRoleRepository roles;
   private WorkspaceMembershipRepository memberships;
   private AccountProvisioner accountProvisioner;
   private AuditEventRecorder auditEvents;
@@ -40,10 +43,12 @@ class AddWorkspaceMemberServiceTest {
   private AddWorkspaceMemberService service;
 
   private Workspace workspace;
+  private WorkspaceRole role;
 
   @BeforeEach
   void setUp() {
     workspaces = mock(WorkspaceRepository.class);
+    roles = mock(WorkspaceRoleRepository.class);
     memberships = mock(WorkspaceMembershipRepository.class);
     accountProvisioner = mock(AccountProvisioner.class);
     auditEvents = mock(AuditEventRecorder.class);
@@ -51,6 +56,9 @@ class AddWorkspaceMemberServiceTest {
 
     workspace = Workspace.register(UUID.randomUUID(), "Engineering");
     when(workspaces.findById(workspace.id())).thenReturn(Optional.of(workspace));
+
+    role = WorkspaceRole.define(workspace.organizationId(), "Member", null, Set.of());
+    when(roles.findById(role.id())).thenReturn(Optional.of(role));
 
     // A real TransactionTemplate would need a real PlatformTransactionManager/DataSource — this
     // fake just runs the callback immediately, same effect for a unit test that never touches a
@@ -69,6 +77,7 @@ class AddWorkspaceMemberServiceTest {
     service =
         new AddWorkspaceMemberService(
             workspaces,
+            roles,
             memberships,
             accountProvisioner,
             auditEvents,
@@ -84,12 +93,11 @@ class AddWorkspaceMemberServiceTest {
 
     WorkspaceMembership membership =
         service.handle(
-            new AddWorkspaceMemberCommand(
-                workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR));
+            new AddWorkspaceMemberCommand(workspace.id(), "new@example.com", role.id(), ACTOR));
 
     assertThat(membership.workspaceId()).isEqualTo(workspace.id());
     assertThat(membership.accountId()).isEqualTo(accountId);
-    assertThat(membership.role()).isEqualTo(WorkspaceRole.MEMBER);
+    assertThat(membership.roleId()).isEqualTo(role.id());
     verify(memberships).save(membership);
   }
 
@@ -101,8 +109,7 @@ class AddWorkspaceMemberServiceTest {
 
     WorkspaceMembership membership =
         service.handle(
-            new AddWorkspaceMemberCommand(
-                workspace.id(), "new@example.com", WorkspaceRole.ADMIN, ACTOR));
+            new AddWorkspaceMemberCommand(workspace.id(), "new@example.com", role.id(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -125,8 +132,7 @@ class AddWorkspaceMemberServiceTest {
     UUID unknownWorkspaceId = UUID.randomUUID();
     when(workspaces.findById(unknownWorkspaceId)).thenReturn(Optional.empty());
     AddWorkspaceMemberCommand command =
-        new AddWorkspaceMemberCommand(
-            unknownWorkspaceId, "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+        new AddWorkspaceMemberCommand(unknownWorkspaceId, "new@example.com", role.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -135,6 +141,37 @@ class AddWorkspaceMemberServiceTest {
     verify(memberships, never()).save(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+  }
+
+  // ADR-0027: roleId must belong to this same Workspace's own Organization.
+  @Test
+  void rejectsARoleIdThatDoesNotExistWithoutProvisioningAnything() {
+    UUID unknownRoleId = UUID.randomUUID();
+    when(roles.findById(unknownRoleId)).thenReturn(Optional.empty());
+    AddWorkspaceMemberCommand command =
+        new AddWorkspaceMemberCommand(workspace.id(), "new@example.com", unknownRoleId, ACTOR);
+
+    assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(accountProvisioner);
+    verify(memberships, never()).save(any());
+  }
+
+  @Test
+  void rejectsARoleIdBelongingToADifferentOrganizationWithoutProvisioningAnything() {
+    WorkspaceRole otherOrganizationRole =
+        WorkspaceRole.define(UUID.randomUUID(), "Someone Else's Role", null, Set.of());
+    when(roles.findById(otherOrganizationRole.id())).thenReturn(Optional.of(otherOrganizationRole));
+    AddWorkspaceMemberCommand command =
+        new AddWorkspaceMemberCommand(
+            workspace.id(), "new@example.com", otherOrganizationRole.id(), ACTOR);
+
+    assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(accountProvisioner);
+    verify(memberships, never()).save(any());
   }
 
   // BR-WS-04: this port's own AccountAlreadyExistsException must propagate unchanged, never
@@ -146,8 +183,7 @@ class AddWorkspaceMemberServiceTest {
             new AccountProvisioner.AccountAlreadyExistsException(
                 workspace.organizationId(), "taken@example.com"));
     AddWorkspaceMemberCommand command =
-        new AddWorkspaceMemberCommand(
-            workspace.id(), "taken@example.com", WorkspaceRole.MEMBER, ACTOR);
+        new AddWorkspaceMemberCommand(workspace.id(), "taken@example.com", role.id(), ACTOR);
 
     assertThatExceptionOfType(AccountProvisioner.AccountAlreadyExistsException.class)
         .isThrownBy(() -> service.handle(command));
@@ -167,8 +203,7 @@ class AddWorkspaceMemberServiceTest {
     RuntimeException membershipFailure = new RuntimeException("membership save failed");
     doThrow(membershipFailure).when(memberships).save(any());
     AddWorkspaceMemberCommand command =
-        new AddWorkspaceMemberCommand(
-            workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+        new AddWorkspaceMemberCommand(workspace.id(), "new@example.com", role.id(), ACTOR);
 
     assertThatExceptionOfType(RuntimeException.class)
         .isThrownBy(() -> service.handle(command))
@@ -193,8 +228,7 @@ class AddWorkspaceMemberServiceTest {
         .when(accountProvisioner)
         .deprovision(any(), any());
     AddWorkspaceMemberCommand command =
-        new AddWorkspaceMemberCommand(
-            workspace.id(), "new@example.com", WorkspaceRole.MEMBER, ACTOR);
+        new AddWorkspaceMemberCommand(workspace.id(), "new@example.com", role.id(), ACTOR);
 
     assertThatExceptionOfType(RuntimeException.class)
         .isThrownBy(() -> service.handle(command))

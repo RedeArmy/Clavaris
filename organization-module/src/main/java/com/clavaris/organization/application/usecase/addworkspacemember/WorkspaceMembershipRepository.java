@@ -3,7 +3,6 @@ package com.clavaris.organization.application.usecase.addworkspacemember;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -58,24 +57,18 @@ public interface WorkspaceMembershipRepository {
   List<WorkspaceMembership> findAllByAccountId(UUID accountId);
 
   /**
-   * BR-WS-01's replacement invariant ("a workspace must always retain at least one ADMIN") — {@code
-   * changeworkspacememberrole}/{@code removeworkspacemember} both need this count *before*
-   * demoting/removing an ADMIN, without paying for a full row fetch just to count them.
-   */
-  long countByWorkspaceIdAndRole(UUID workspaceId, WorkspaceRole role);
-
-  /**
    * SDE-III review, 2026-09-03 — real bug found and closed: without this, two concurrent requests
-   * against the same Workspace (one removing an ADMIN, one demoting a different ADMIN) could each
-   * read {@link #countByWorkspaceIdAndRole} as "2 remain," each pass {@code LastAdminGuard}'s own
-   * guard, and both commit — leaving zero ADMINs, exactly what that guard exists to make
-   * impossible. A transaction-scoped Postgres advisory lock ({@code pg_advisory_xact_lock}, keyed
-   * on {@code workspaceId}, auto-released at commit or rollback) serializes every caller for the
-   * same Workspace regardless of which specific membership rows exist before or after — same
-   * mechanism, same reasoning, as {@code SigningKeyRepository#lockForRotation}'s own identical fix
-   * for the signing-key rotation race (a row-level {@code SELECT ... FOR UPDATE} doesn't work for a
-   * {@code COUNT}-based check at all — there is no single row to lock). {@link LastAdminGuard} is
-   * the one caller; must be invoked before {@link #countByWorkspaceIdAndRole}, not after.
+   * against the same Workspace (one removing a {@code manage_members} holder, one demoting a
+   * different one) could each read the same "N remain" count, each pass {@code
+   * ManageMembersGuard}'s own guard, and both commit — leaving zero holders, exactly what that
+   * guard exists to make impossible. A transaction-scoped Postgres advisory lock ({@code
+   * pg_advisory_xact_lock}, keyed on {@code workspaceId}, auto-released at commit or rollback)
+   * serializes every caller for the same Workspace regardless of which specific membership rows
+   * exist before or after — same mechanism, same reasoning, as {@code
+   * SigningKeyRepository#lockForRotation}'s own identical fix for the signing-key rotation race (a
+   * row-level {@code SELECT ... FOR UPDATE} doesn't work for a count-based check at all — there is
+   * no single row to lock). {@code ManageMembersGuard} is the one caller; must be invoked before
+   * loading roles/memberships to count, not after.
    */
   void lockForRoleChange(UUID workspaceId);
 

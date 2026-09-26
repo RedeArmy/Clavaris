@@ -1,6 +1,5 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -24,8 +23,6 @@ interface SpringDataWorkspaceMembershipJpaRepository
   List<WorkspaceMembershipEntity> findAllByWorkspaceIdIn(Collection<UUID> workspaceIds);
 
   List<WorkspaceMembershipEntity> findAllByAccountId(UUID accountId);
-
-  long countByWorkspaceIdAndRole(UUID workspaceId, WorkspaceRole role);
 
   void deleteAllByAccountId(UUID accountId);
 
