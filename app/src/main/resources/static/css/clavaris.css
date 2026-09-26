@@ -339,16 +339,30 @@ input[type="radio"] {
   cursor: pointer;
 }
 
-/* webhook-event-catalog.html's own static reference table — a plain <th scope="colgroup"> divider
-   row, not the interactive picker's checkbox row above (different element, different context;
-   same category-name typography). */
-.clavaris-event-category-header {
+/* Live UX request, 2026-09-25 — webhook-event-catalog.html's own per-category <details>: closed by
+   default, click the category name (<summary>) to reveal its own event table underneath — replaced
+   the page's earlier plain <th scope="colgroup"> divider row (this class used to style that; no
+   template references it anymore). Native <details>/<summary> needs no JS for the expand/collapse
+   behavior itself; these rules only make <summary> read the same as every other category label in
+   this dashboard (event-type-picker's own .clavaris-event-category-row) instead of the browser's
+   own plain-text default. */
+.clavaris-event-category-details {
+  margin-bottom: var(--space-3);
+}
+.clavaris-event-category-details:last-child {
+  margin-bottom: 0;
+}
+.clavaris-event-category-details summary {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--clavaris-text-muted);
-  text-align: left;
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+.clavaris-event-category-details .clavaris-table-wrapper {
+  margin-top: var(--space-2);
 }
 .clavaris-uri-row .clavaris-button {
   flex: 0 0 auto;
