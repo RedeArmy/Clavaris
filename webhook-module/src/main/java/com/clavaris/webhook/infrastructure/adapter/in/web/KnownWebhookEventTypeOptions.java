@@ -1,6 +1,8 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Web-layer only — {@code WebhookEndpoint.subscribedEventTypes} carries no domain-level catalog
@@ -56,10 +58,31 @@ public final class KnownWebhookEventTypeOptions {
     // Constants only.
   }
 
+  /**
+   * Live UX request, 2026-09-25 (Event Catalog tab, collapsible-per-category polish): {@code
+   * CATALOG} itself stays a flat, ordered list (every other caller — the dashboard's own event
+   * picker, {@link #DASHBOARD_OPTIONS} — genuinely needs it flat); this is purely a display-layer
+   * grouping for {@code webhook-event-catalog.html}'s own one {@code <details>} disclosure per
+   * category. {@code LinkedHashMap} as the {@code groupingBy} supplier preserves {@code CATALOG}'s
+   * own category order (already contiguous by construction) rather than an unrelated hash order.
+   */
+  public static List<CategoryGroup> groupedByCategory() {
+    return CATALOG.stream()
+        .collect(
+            Collectors.groupingBy(
+                EventTypeOption::category, LinkedHashMap::new, Collectors.toList()))
+        .entrySet()
+        .stream()
+        .map(entry -> new CategoryGroup(entry.getKey(), entry.getValue()))
+        .toList();
+  }
+
   public record EventTypeOption(String value, String description) {
 
     public String category() {
       return value.substring(0, value.indexOf('.'));
     }
   }
+
+  public record CategoryGroup(String category, List<EventTypeOption> events) {}
 }

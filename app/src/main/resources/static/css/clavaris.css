@@ -293,23 +293,43 @@ input[type="radio"] {
   min-width: 0;
 }
 
-/* Live UX request, 2026-09-25 — the webhook endpoint event-type picker (Clerk/PayPal-parity Event
-   Catalog): a category header (event-type-picker.html's own fragment) above each contiguous run of
-   options sharing the same category, and a compact single-line row per option — deliberately not
-   .clavaris-uri-row's own gapped/bordered look, since this list can run to a couple dozen rows. */
-.clavaris-event-category-header {
+/* Live UX request, 2026-09-25 — the webhook endpoint event-type picker: a category row (event-
+   type-picker.html's own fragment) above each contiguous run of options sharing the same category,
+   and a compact single-line, indented row per option underneath it — deliberately not .clavaris-
+   uri-row's own gapped/bordered look, since this list can run to a couple dozen rows.
+
+   Live UX request, 2026-09-25 (polish pass): the real bug behind the picker's own "checkbox way
+   over on the left, label text way over on the right" misalignment — .clavaris-field input's own
+   width: 100% (meant for text inputs) was inherited by every checkbox nested under a .clavaris-
+   field ancestor (the register page's own fieldset), stretching each ~16px checkbox to the full
+   row width and shoving its sibling <span> to the far right inside the flex row. .clavaris-event-
+   picker input[type=checkbox] below overrides that back down to its natural size, scoped to this
+   picker only. .clavaris-event-option's own left padding is what actually renders the category ->
+   event hierarchy — the category row sits flush left, every event under it is indented one step. */
+.clavaris-event-picker input[type="checkbox"] {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.clavaris-event-category-row {
   margin: var(--space-3) 0 var(--space-1);
+}
+.clavaris-event-category-row:first-child {
+  margin-top: 0;
+}
+.clavaris-event-category-row label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--clavaris-text-muted);
-}
-.clavaris-event-category-header:first-child {
-  margin-top: 0;
+  cursor: pointer;
 }
 .clavaris-event-option {
-  padding: 2px 0;
+  padding: 2px 0 2px var(--space-6);
 }
 .clavaris-event-option label {
   display: flex;
@@ -317,6 +337,32 @@ input[type="radio"] {
   gap: var(--space-2);
   font-weight: 400;
   cursor: pointer;
+}
+
+/* Live UX request, 2026-09-25 — webhook-event-catalog.html's own per-category <details>: closed by
+   default, click the category name (<summary>) to reveal its own event table underneath — replaced
+   the page's earlier plain <th scope="colgroup"> divider row (this class used to style that; no
+   template references it anymore). Native <details>/<summary> needs no JS for the expand/collapse
+   behavior itself; these rules only make <summary> read the same as every other category label in
+   this dashboard (event-type-picker's own .clavaris-event-category-row) instead of the browser's
+   own plain-text default. */
+.clavaris-event-category-details {
+  margin-bottom: var(--space-3);
+}
+.clavaris-event-category-details:last-child {
+  margin-bottom: 0;
+}
+.clavaris-event-category-details summary {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clavaris-text-muted);
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+.clavaris-event-category-details .clavaris-table-wrapper {
+  margin-top: var(--space-2);
 }
 .clavaris-uri-row .clavaris-button {
   flex: 0 0 auto;

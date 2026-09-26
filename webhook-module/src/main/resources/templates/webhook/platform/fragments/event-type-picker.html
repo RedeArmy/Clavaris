@@ -3,11 +3,18 @@ Live UX request, 2026-09-25 (Clerk/PayPal-parity Event Catalog): the checkbox vo
 the "Register a new webhook endpoint" page and the endpoint detail page's own "Event types" edit
 dialog — one fragment, so the search/category/wildcard behavior never drifts between the two. Each
 option row carries a data-label (value + description, lowercased) the search box filters against
-client-side; a category header hides itself once every row under it is filtered out. The "All
-Events" wildcard is PayPal's own pattern (see the checkbox itself for why WebhookEndpoint.
+client-side; a category row hides itself once every row under it is filtered out. The "All Events"
+wildcard is PayPal's own pattern (see the checkbox itself for why WebhookEndpoint.
 ALL_EVENTS_WILDCARD is submitted through a separate, normally-disabled hidden input rather than one
 of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that one sentinel value as
 "every event type, including one this codebase doesn't produce yet".
+
+Live UX request, 2026-09-25 (polish pass): each category is now its own checkbox, not just a plain
+label — checking it selects every event underneath it in one click (window.toggleEventCategory),
+and it reflects back to checked/indeterminate/unchecked as the individual events under it change
+(window.updateEventCategoryCheckboxState) — the standard "select all in this group" parent/child
+checkbox pattern. Child rows are visually indented under their own category (.clavaris-event-option
+below) so the hierarchy reads the same way it behaves.
 -->
 <div th:fragment="picker(fieldName, selectedValues)">
     <div class="clavaris-field">
@@ -33,18 +40,26 @@ of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that o
                th:disabled="${!#lists.contains(selectedValues, '*')}"/>
     </div>
 
-    <div id="event-type-options" class="clavaris-uri-fieldset" style="max-height: 260px; overflow-y: auto;">
+    <div id="event-type-options" class="clavaris-uri-fieldset clavaris-event-picker" style="max-height: 320px; overflow-y: auto;">
         <div th:each="option, iterStat : ${T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG}">
-            <p class="clavaris-event-category-header"
-               th:if="${iterStat.index == 0 or !option.category().equals(T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG[iterStat.index - 1].category())}"
-               th:text="${option.category()}"
-               th:attr="data-category=${option.category()}">category</p>
+            <div class="clavaris-event-category-row"
+                 th:if="${iterStat.index == 0 or !option.category().equals(T(com.clavaris.webhook.infrastructure.adapter.in.web.KnownWebhookEventTypeOptions).CATALOG[iterStat.index - 1].category())}"
+                 th:attr="data-category=${option.category()}">
+                <label>
+                    <input type="checkbox" class="clavaris-event-category-checkbox"
+                           th:attr="data-category=${option.category()}"
+                           onchange="window.toggleEventCategory(this)"/>
+                    <span th:text="${option.category()}">category</span>
+                </label>
+            </div>
             <div class="clavaris-event-option"
                  th:attr="data-label=${#strings.toLowerCase(option.value() + ' ' + option.description())},data-category=${option.category()}">
                 <label th:title="${option.description()}">
                     <input type="checkbox" th:name="${fieldName}" th:value="${option.value()}"
                            th:checked="${#lists.contains(selectedValues, option.value())}"
-                           th:disabled="${#lists.contains(selectedValues, '*')}"/>
+                           th:disabled="${#lists.contains(selectedValues, '*')}"
+                           th:attr="data-category=${option.category()}"
+                           onchange="window.updateEventCategoryCheckboxState(this)"/>
                     <span th:text="${option.value()}">event type</span>
                 </label>
             </div>
@@ -61,10 +76,49 @@ of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that o
             document.getElementById('all-events-hidden-value').disabled = !checked;
             document.querySelectorAll('#event-type-options input[type=checkbox]').forEach(function (checkbox) {
                 checkbox.disabled = checked;
+                checkbox.indeterminate = false;
                 if (checked) {
                     checkbox.checked = false;
                 }
             });
+        };
+
+        // Parent → children: checking/unchecking a category checkbox applies to every event
+        // checkbox filed under that same category, regardless of the search box's current filter
+        // (a category the owner already expanded stays fully controllable even while filtered).
+        window.toggleEventCategory = function (categoryCheckbox) {
+            var category = categoryCheckbox.dataset.category;
+            var checked = categoryCheckbox.checked;
+            categoryCheckbox.indeterminate = false;
+            document
+                .querySelectorAll('#event-type-options .clavaris-event-option input[data-category="' + category + '"]')
+                .forEach(function (checkbox) {
+                    if (!checkbox.disabled) {
+                        checkbox.checked = checked;
+                    }
+                });
+        };
+
+        // Children → parent: every individual checkbox change re-derives its own category
+        // checkbox's state — checked only once every child is checked, indeterminate for a
+        // partial selection, unchecked once none are.
+        window.updateEventCategoryCheckboxState = function (changedCheckbox) {
+            var category = changedCheckbox.dataset.category;
+            var categoryCheckbox = document.querySelector(
+                '#event-type-options .clavaris-event-category-checkbox[data-category="' + category + '"]');
+            if (!categoryCheckbox) {
+                return;
+            }
+            var children = document.querySelectorAll(
+                '#event-type-options .clavaris-event-option input[data-category="' + category + '"]');
+            var checkedCount = 0;
+            children.forEach(function (checkbox) {
+                if (checkbox.checked) {
+                    checkedCount++;
+                }
+            });
+            categoryCheckbox.checked = checkedCount === children.length;
+            categoryCheckbox.indeterminate = checkedCount > 0 && checkedCount < children.length;
         };
 
         window.filterWebhookEventOptions = function (query) {
@@ -79,15 +133,23 @@ of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that o
                     visibleCategories[row.dataset.category] = true;
                 }
             });
-            document.querySelectorAll('#event-type-options .clavaris-event-category-header').forEach(function (header) {
-                header.style.display = visibleCategories[header.dataset.category] ? '' : 'none';
+            document.querySelectorAll('#event-type-options .clavaris-event-category-row').forEach(function (row) {
+                row.style.display = visibleCategories[row.dataset.category] ? '' : 'none';
             });
             document.getElementById('event-search-empty').style.display = anyVisible ? 'none' : '';
         };
 
-        // Initial load: an endpoint already subscribed to "*" must render with every individual
-        // checkbox already disabled, not just the hidden input already-enabled — same state
-        // toggleAllEventsWildcard(true) produces on a later, interactive change.
+        // Initial load: derive every category checkbox's own starting state from whichever event
+        // checkboxes already came pre-checked (editing an existing endpoint), and — same as a live
+        // toggle — an endpoint already subscribed to "*" renders with every individual and category
+        // checkbox already disabled.
+        document.querySelectorAll('#event-type-options .clavaris-event-category-checkbox').forEach(function (categoryCheckbox) {
+            var firstChild = document.querySelector(
+                '#event-type-options .clavaris-event-option input[data-category="' + categoryCheckbox.dataset.category + '"]');
+            if (firstChild) {
+                window.updateEventCategoryCheckboxState(firstChild);
+            }
+        });
         if (document.getElementById('all-events-checkbox').checked) {
             window.toggleAllEventsWildcard(true);
         }
