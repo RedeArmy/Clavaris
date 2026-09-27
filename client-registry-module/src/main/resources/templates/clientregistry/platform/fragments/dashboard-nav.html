@@ -49,4 +49,9 @@
          standalone tags these replace have been removed from every page that had them. -->
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
+    <!-- Live UX request: the "Create a new Secret Key" scope picker's own category checkbox — see
+         scope-picker.js's own header comment. Loaded unconditionally, same "every page under this
+         sidebar gets it, blind to whether that one page's own content needs it" reasoning the two
+         scripts above already establish; a no-op wherever #scope-options doesn't exist. -->
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/scope-picker.js') : '/js/scope-picker.js'}" defer></script>
 </aside>

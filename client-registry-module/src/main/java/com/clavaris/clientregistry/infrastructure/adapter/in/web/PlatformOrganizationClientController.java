@@ -79,6 +79,7 @@ public class PlatformOrganizationClientController {
   private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String ALL_SCOPES_ATTRIBUTE = "allScopes";
+  private static final String SCOPE_CATEGORIES_ATTRIBUTE = "scopeCategories";
 
   private final CreateOrganizationClientUseCase createClient;
   private final ListOrganizationClientsPagedUseCase listClientsPaged;
@@ -297,6 +298,11 @@ public class PlatformOrganizationClientController {
     // regardless of what this form submits); narrowing the choices here means the operator-only
     // scopes are never even offered, instead of being offered and then rejected after submit.
     model.addAttribute(ALL_SCOPES_ATTRIBUTE, PlatformScopes.ORGANIZATION_CLIENT_ALLOWED);
+    // Live UX request: the create-form's own checkbox picker groups by category (currently just
+    // the one, "platform") with a parent checkbox that selects every scope beneath it — same
+    // parent/child shape webhook-module's own event-type picker already establishes. ALL_SCOPES
+    // ATTRIBUTE stays as-is (a real, already-tested caller keys off it) — this is additive.
+    model.addAttribute(SCOPE_CATEGORIES_ATTRIBUTE, PlatformScopeCategories.groupedByCategory());
   }
 
   private void populateClientsModel(
