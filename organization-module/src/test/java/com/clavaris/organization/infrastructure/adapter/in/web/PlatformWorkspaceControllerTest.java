@@ -16,23 +16,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.WorkspaceRoleAlreadyInAnotherTeamException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
+import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
+import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
+import com.clavaris.organization.application.usecase.removerolefromworkspaceteam.RemoveRoleFromWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.CannotRemoveLastAdminException;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
+import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -64,6 +75,14 @@ class PlatformWorkspaceControllerTest {
   private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private RemoveWorkspaceMemberUseCase removeMember;
   private CurrentPlatformAccountResolver currentPlatformAccount;
+  private ListWorkspaceTeamsForWorkspaceUseCase listTeams;
+  private ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
+  private ListGroupedWorkspaceRoleIdsUseCase listGroupedRoleIds;
+  private CreateWorkspaceTeamUseCase createTeam;
+  private RenameWorkspaceTeamUseCase renameTeam;
+  private DeleteWorkspaceTeamUseCase deleteTeam;
+  private AddRoleToWorkspaceTeamUseCase addRoleToTeam;
+  private RemoveRoleFromWorkspaceTeamUseCase removeRoleFromTeam;
   private MockMvc mockMvc;
   private Organization organization;
   private Workspace workspace;
@@ -81,6 +100,14 @@ class PlatformWorkspaceControllerTest {
     changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
     removeMember = mock(RemoveWorkspaceMemberUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
+    listTeams = mock(ListWorkspaceTeamsForWorkspaceUseCase.class);
+    listTeamRoleIds = mock(ListWorkspaceTeamRoleIdsUseCase.class);
+    listGroupedRoleIds = mock(ListGroupedWorkspaceRoleIdsUseCase.class);
+    createTeam = mock(CreateWorkspaceTeamUseCase.class);
+    renameTeam = mock(RenameWorkspaceTeamUseCase.class);
+    deleteTeam = mock(DeleteWorkspaceTeamUseCase.class);
+    addRoleToTeam = mock(AddRoleToWorkspaceTeamUseCase.class);
+    removeRoleFromTeam = mock(RemoveRoleFromWorkspaceTeamUseCase.class);
 
     organization = Organization.register("Acme Co", OWNER_ID);
     workspace = Workspace.register(organization.id(), "Engineering");
@@ -92,6 +119,9 @@ class PlatformWorkspaceControllerTest {
     when(listWorkspaces.handle(any())).thenReturn(emptyWorkspacesPage());
     when(listMembers.handle(any())).thenReturn(emptyMembersPage());
     when(listRoles.handle(any())).thenReturn(List.of(role));
+    when(listTeams.handle(any())).thenReturn(List.of());
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+    when(listGroupedRoleIds.handle(any())).thenReturn(Set.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -119,7 +149,15 @@ class PlatformWorkspaceControllerTest {
                     addMember,
                     changeMemberRole,
                     removeMember,
-                    currentPlatformAccount))
+                    currentPlatformAccount,
+                    listTeams,
+                    listTeamRoleIds,
+                    listGroupedRoleIds,
+                    createTeam,
+                    renameTeam,
+                    deleteTeam,
+                    addRoleToTeam,
+                    removeRoleFromTeam))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -130,6 +168,10 @@ class PlatformWorkspaceControllerTest {
 
   private String membersPath() {
     return workspacesPath() + "/" + workspace.id() + "/members";
+  }
+
+  private String teamsPath() {
+    return workspacesPath() + "/" + workspace.id() + "/teams";
   }
 
   private static KeysetPage<Workspace> emptyWorkspacesPage() {
@@ -196,7 +238,11 @@ class PlatformWorkspaceControllerTest {
   void showsTheOrganizationsRolesForTheRoleSelector() throws Exception {
     mockMvc.perform(get(workspacesPath() + "/" + workspace.id()));
 
-    verify(listRoles).handle(any());
+    // ADR-0028: called twice on a full showDetail render now — once by populateMembersModel
+    // (member-add/role-change forms' own role selector), once independently by
+    // populateTeamsModel (the Teams section's own role catalog) — a small, deliberate redundant
+    // read for this low-traffic admin dashboard, not a regression. See that method's own Javadoc.
+    verify(listRoles, org.mockito.Mockito.atLeastOnce()).handle(any());
   }
 
   // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
@@ -357,5 +403,110 @@ class PlatformWorkspaceControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-detail"))
         .andExpect(model().attribute("cannotRemoveLastAdminError", true));
+  }
+
+  // ADR-0028: the Workspace-detail page's own Teams section.
+  @Test
+  void showsTheWorkspacesOwnTeams() throws Exception {
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+
+    mockMvc
+        .perform(get(workspacesPath() + "/" + workspace.id()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("teams", List.of(team)));
+  }
+
+  @Test
+  void plainCreateTeamPostRedirectsOnSuccess() throws Exception {
+    mockMvc
+        .perform(post(teamsPath()).param("name", "QA"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(createTeam).handle(any());
+  }
+
+  @Test
+  void htmxCreateTeamPostReturnsTheTeamsFragment() throws Exception {
+    mockMvc
+        .perform(post(teamsPath()).param("name", "QA").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-detail :: teams"));
+  }
+
+  @Test
+  void createTeamWithADuplicateNameRendersAnErrorInsteadOfPropagatingTheException()
+      throws Exception {
+    doThrow(new DuplicateWorkspaceTeamNameException("QA")).when(createTeam).handle(any());
+
+    mockMvc
+        .perform(post(teamsPath()).param("name", "QA"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-detail"))
+        .andExpect(model().attribute("duplicateTeamNameError", true));
+  }
+
+  @Test
+  void plainRenameTeamPostRedirectsOnSuccess() throws Exception {
+    UUID teamId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/rename").param("name", "Quality Assurance"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(renameTeam).handle(any());
+  }
+
+  @Test
+  void plainDeleteTeamPostRedirectsOnSuccess() throws Exception {
+    UUID teamId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/delete"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(deleteTeam).handle(any());
+  }
+
+  @Test
+  void plainAddRoleToTeamPostRedirectsOnSuccess() throws Exception {
+    UUID teamId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/roles").param("roleId", role.id().toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(addRoleToTeam).handle(any());
+  }
+
+  @Test
+  void addRoleToTeamAlreadyInAnotherTeamRendersAnErrorInsteadOfPropagatingTheException()
+      throws Exception {
+    UUID teamId = UUID.randomUUID();
+    doThrow(new WorkspaceRoleAlreadyInAnotherTeamException(role.id(), UUID.randomUUID()))
+        .when(addRoleToTeam)
+        .handle(any());
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/roles").param("roleId", role.id().toString()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-detail"))
+        .andExpect(model().attribute("roleAlreadyInAnotherTeamError", true));
+  }
+
+  @Test
+  void plainRemoveRoleFromTeamPostRedirectsOnSuccess() throws Exception {
+    UUID teamId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/roles/" + role.id() + "/remove"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(removeRoleFromTeam).handle(any());
   }
 }
