@@ -45,6 +45,8 @@ import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteW
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamService;
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountService;
+import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountUseCase;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationService;
@@ -327,6 +329,12 @@ class OrganizationUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter) {
     return new ChangeWorkspaceMemberRoleService(
         memberships, workspaces, roles, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ FindWorkspaceMembershipForAccountUseCase findWorkspaceMembershipForAccountUseCase(
+      final WorkspaceMembershipRepository memberships) {
+    return new FindWorkspaceMembershipForAccountService(memberships);
   }
 
   @Bean

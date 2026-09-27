@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- ADR-0029: loaded by identity-module's organization-users.html into its own shared
+     #assign-role-dialog-body via hx-get/hx-post — this file never renders on its own, only as a
+     fragment target. Team <select> is present only when the Workspace actually has one or more
+     WorkspaceTeams; its "— No team (ungrouped) —" option always exists so an Organization that
+     mixes teamed and standalone roles (ADR-0028's own QA/Supervisor/Tester + standalone Admin
+     example) can still reach every role, not just the teamed ones. assign-role-picker.js filters
+     the Role <select>'s own <option>s by the chosen team's data-team-id, client-side — same
+     "grouped picker, no second round trip" convention scope-picker.js already establishes. -->
+<div id="assign-role-dialog-body" th:fragment="assignRoleForm">
+    <div th:if="${membership == null}">
+        <p class="clavaris-empty-state">This account isn't a member of any Workspace yet.</p>
+    </div>
+    <form th:unless="${membership == null}" method="post"
+          th:action="@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
+          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
+          hx-target="#assign-role-dialog-body" hx-swap="innerHTML">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+        <p class="clavaris-field-error" th:if="${cannotDemoteLastAdminError}">
+            This would leave the Workspace with no one able to manage its own members — assign a
+            different substitute first.
+        </p>
+
+        <div class="clavaris-field" th:if="${!teams.isEmpty()}">
+            <label for="assignRoleTeamId">Team</label>
+            <select id="assignRoleTeamId" name="teamId">
+                <option value="ungrouped"
+                        th:selected="${currentRoleId == null or roleTeamId.get(currentRoleId) == null}">
+                    — No team (ungrouped) —
+                </option>
+                <option th:each="team : ${teams}" th:value="${team.id()}" th:text="${team.name()}"
+                        th:selected="${currentRoleId != null and team.id() == roleTeamId.get(currentRoleId)}">
+                    Team
+                </option>
+            </select>
+        </div>
+
+        <div class="clavaris-field">
+            <label for="assignRoleNewRoleId">Role</label>
+            <select id="assignRoleNewRoleId" name="newRoleId" required>
+                <option th:each="role : ${allRoles}" th:value="${role.id()}" th:text="${role.name()}"
+                        th:attr="data-team-id=${roleTeamId.get(role.id()) ?: 'ungrouped'}"
+                        th:selected="${currentRoleId != null and currentRoleId == role.id()}">
+                    Role
+                </option>
+            </select>
+        </div>
+
+        <div class="clavaris-dialog__actions">
+            <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-dialog-close>Cancel</button>
+            <button type="submit" class="clavaris-button clavaris-button--inline">Save</button>
+        </div>
+    </form>
+</div>
+<div id="assign-role-dialog-body" th:fragment="assignRoleSaved">
+    <p class="clavaris-empty-state">Role updated.</p>
+</div>
+</body>
+</html>
