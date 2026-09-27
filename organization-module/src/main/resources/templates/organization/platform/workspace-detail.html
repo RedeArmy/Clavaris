@@ -195,8 +195,13 @@
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                           hx-target="#teams-content" hx-swap="outerHTML">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <label class="clavaris-visually-hidden" th:for="${'rename-team-' + team.id()}">Rename <span th:text="${team.name()}">team</span></label>
-                        <input type="text" name="name" th:id="${'rename-team-' + team.id()}" th:value="${team.name()}" required/>
+                        <!-- Static "for"/"id" fallback values below, both overridden by their own
+                             th:for/th:id at render time with the real per-row unique id: a static
+                             analyzer reading this template's raw source (not Thymeleaf's rendered
+                             output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                             alone, for this accessibility rule. -->
+                        <label class="clavaris-visually-hidden" for="rename-team" th:for="${'rename-team-' + team.id()}">Rename <span th:text="${team.name()}">team</span></label>
+                        <input type="text" name="name" id="rename-team" th:id="${'rename-team-' + team.id()}" th:value="${team.name()}" required/>
                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rename</button>
                     </form>
 
@@ -231,11 +236,16 @@
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                           hx-target="#teams-content" hx-swap="outerHTML">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <label class="clavaris-visually-hidden" th:for="${'add-role-' + team.id()}">Add a role to <span th:text="${team.name()}">team</span></label>
+                        <!-- Static "for"/"id" fallback values below, both overridden by their own
+                             th:for/th:id at render time with the real per-row unique id: a static
+                             analyzer reading this template's raw source (not Thymeleaf's rendered
+                             output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                             alone, for this accessibility rule. -->
+                        <label class="clavaris-visually-hidden" for="add-role" th:for="${'add-role-' + team.id()}">Add a role to <span th:text="${team.name()}">team</span></label>
                         <!-- ADR-0028 §2: only this Organization's own ungrouped roles are offered — a
                              role already in a different team in this Workspace must be removed from
                              it first (AddRoleToWorkspaceTeamService's own guard). -->
-                        <select th:id="${'add-role-' + team.id()}" name="roleId">
+                        <select id="add-role" th:id="${'add-role-' + team.id()}" name="roleId">
                             <option th:each="roleOption : ${ungroupedRoles}"
                                     th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
                         </select>
