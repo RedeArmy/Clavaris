@@ -16,8 +16,7 @@ class WorkspaceTeamRoleIdTest {
   void isEqualToItself() {
     WorkspaceTeamRoleId id = new WorkspaceTeamRoleId(UUID.randomUUID(), UUID.randomUUID());
 
-    assertThat(id).isEqualTo(id);
-    assertThat(id).hasSameHashCodeAs(id);
+    assertThat(id).isEqualTo(id).hasSameHashCodeAs(id);
   }
 
   @Test
@@ -28,8 +27,7 @@ class WorkspaceTeamRoleIdTest {
     WorkspaceTeamRoleId first = new WorkspaceTeamRoleId(teamId, roleId);
     WorkspaceTeamRoleId second = new WorkspaceTeamRoleId(teamId, roleId);
 
-    assertThat(first).isEqualTo(second);
-    assertThat(first).hasSameHashCodeAs(second);
+    assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
   }
 
   @Test
@@ -56,7 +54,6 @@ class WorkspaceTeamRoleIdTest {
   void isNotEqualToNullOrADifferentType() {
     WorkspaceTeamRoleId id = new WorkspaceTeamRoleId(UUID.randomUUID(), UUID.randomUUID());
 
-    assertThat(id).isNotEqualTo(null);
-    assertThat(id).isNotEqualTo("not a WorkspaceTeamRoleId");
+    assertThat(id).isNotEqualTo(null).isNotEqualTo("not a WorkspaceTeamRoleId");
   }
 }

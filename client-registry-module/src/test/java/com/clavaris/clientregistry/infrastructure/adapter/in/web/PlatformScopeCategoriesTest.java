@@ -28,7 +28,8 @@ class PlatformScopeCategoriesTest {
     // A "doesNotContainAnyElementsOf" check alone would pass vacuously if groupedByCategory() ever
     // regressed to returning nothing at all — assert it's non-empty first, so this test actually
     // proves the exclusion, not just the absence of a false positive.
-    assertThat(allGroupedScopes).isNotEmpty();
-    assertThat(allGroupedScopes).doesNotContainAnyElementsOf(PlatformScopes.OPERATOR_ONLY);
+    assertThat(allGroupedScopes)
+        .isNotEmpty()
+        .doesNotContainAnyElementsOf(PlatformScopes.OPERATOR_ONLY);
   }
 }
