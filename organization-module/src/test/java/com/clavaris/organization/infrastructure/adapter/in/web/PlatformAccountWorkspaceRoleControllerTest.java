@@ -138,6 +138,22 @@ class PlatformAccountWorkspaceRoleControllerTest {
         .andExpect(content().string(containsString(role.name())));
   }
 
+  // SDE-III review, 2026-09-27: findMembership resolves by accountId alone, with no
+  // organizationId filter of its own (see that use case's own Javadoc) — this is the real,
+  // previously-untested cross-tenant scenario that check exists to reject: an accountId whose
+  // real workspace membership belongs to an Organization the caller doesn't own. Before this
+  // controller's own showForm() gained the same requireOwnedWorkspace check save() already had,
+  // this would have rendered that other Organization's own team names/ids into the response
+  // instead of 404ing.
+  @Test
+  void returnsNotFoundWhenTheMembershipsWorkspaceBelongsToAnotherOrganization() throws Exception {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
+    when(findMembership.handle(any())).thenReturn(Optional.of(membership));
+    when(getWorkspace.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc.perform(get(assignRolePath())).andExpect(status().isNotFound());
+  }
+
   @Test
   void showsTheTeamSelectorOnlyWhenTeamsExist() throws Exception {
     WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());

@@ -40,14 +40,16 @@ class RemoveRoleFromWorkspaceTeamServiceTest {
 
   @Test
   void removesTheRoleFromTheTeam() {
-    service.handle(new RemoveRoleFromWorkspaceTeamCommand(team.id(), roleId, ACTOR));
+    service.handle(
+        new RemoveRoleFromWorkspaceTeamCommand(team.workspaceId(), team.id(), roleId, ACTOR));
 
     verify(teams).removeRoleFromTeam(team.id(), roleId);
   }
 
   @Test
   void recordsAnAuditEvent() {
-    service.handle(new RemoveRoleFromWorkspaceTeamCommand(team.id(), roleId, ACTOR));
+    service.handle(
+        new RemoveRoleFromWorkspaceTeamCommand(team.workspaceId(), team.id(), roleId, ACTOR));
 
     verify(auditEvents)
         .write(
@@ -63,7 +65,18 @@ class RemoveRoleFromWorkspaceTeamServiceTest {
     UUID unknownTeamId = UUID.randomUUID();
     when(teams.findById(unknownTeamId)).thenReturn(Optional.empty());
     RemoveRoleFromWorkspaceTeamCommand command =
-        new RemoveRoleFromWorkspaceTeamCommand(unknownTeamId, roleId, ACTOR);
+        new RemoveRoleFromWorkspaceTeamCommand(team.workspaceId(), unknownTeamId, roleId, ACTOR);
+
+    assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(teams, never()).removeRoleFromTeam(any(), any());
+  }
+
+  @Test
+  void rejectsATeamBelongingToADifferentWorkspace() {
+    RemoveRoleFromWorkspaceTeamCommand command =
+        new RemoveRoleFromWorkspaceTeamCommand(UUID.randomUUID(), team.id(), roleId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

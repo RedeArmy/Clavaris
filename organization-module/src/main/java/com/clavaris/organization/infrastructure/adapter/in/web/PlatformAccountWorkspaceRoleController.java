@@ -118,6 +118,15 @@ public class PlatformAccountWorkspaceRoleController {
 
     final Optional<WorkspaceMembership> membership =
         findMembership.handle(new FindWorkspaceMembershipForAccountQuery(accountId));
+    // SDE-III review, 2026-09-27: findMembership resolves by accountId alone (no organizationId
+    // filter, see that use case's own Javadoc) — without this check, a membership belonging to an
+    // Organization the caller doesn't own would still populate the model below with that other
+    // Organization's own team names/ids (real cross-tenant disclosure, not hypothetical: the
+    // fragment renders every team's th:text/data-team-id). save() below already had this exact
+    // check; showForm() didn't, an inconsistency between the two handlers of the same resource,
+    // not a deliberate difference — same anti-enumeration posture every other dashboard controller
+    // in this codebase already holds itself to.
+    membership.ifPresent(m -> requireOwnedWorkspace(organizationId, m.workspaceId()));
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("accountId", accountId);
     model.addAttribute("membership", membership.orElse(null));

@@ -28,6 +28,7 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
     final WorkspaceTeam team =
         teams
             .findById(command.teamId())
+            .filter(candidate -> candidate.workspaceId().equals(command.workspaceId()))
             .orElseThrow(() -> new WorkspaceTeamNotFoundException(command.teamId()));
 
     teams.deleteById(command.teamId());

@@ -38,14 +38,14 @@ class DeleteWorkspaceTeamServiceTest {
 
   @Test
   void deletesTheTeam() {
-    service.handle(new DeleteWorkspaceTeamCommand(team.id(), ACTOR));
+    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
 
     verify(teams).deleteById(team.id());
   }
 
   @Test
   void recordsAnAuditEvent() {
-    service.handle(new DeleteWorkspaceTeamCommand(team.id(), ACTOR));
+    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -60,7 +60,19 @@ class DeleteWorkspaceTeamServiceTest {
   void rejectsAnUnknownTeamId() {
     UUID unknownTeamId = UUID.randomUUID();
     when(teams.findById(unknownTeamId)).thenReturn(Optional.empty());
-    DeleteWorkspaceTeamCommand command = new DeleteWorkspaceTeamCommand(unknownTeamId, ACTOR);
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(team.workspaceId(), unknownTeamId, ACTOR);
+
+    assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(teams, never()).deleteById(any());
+  }
+
+  @Test
+  void rejectsATeamBelongingToADifferentWorkspace() {
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(UUID.randomUUID(), team.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

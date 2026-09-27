@@ -1,15 +1,18 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<body>
 <!-- ADR-0029: loaded by identity-module's organization-users.html into its own shared
      #assign-role-dialog-body via hx-get/hx-post — this file never renders on its own, only as a
-     fragment target. Team <select> is present only when the Workspace actually has one or more
+     fragment target. Neither fragment div below carries that id itself: only the parent page's
+     own static container needs it (the real, permanent hx-target; hx-swap="innerHTML" replaces
+     its content, never the container itself), and two sibling divs sharing one id in this file's
+     own markup was a real duplicate-id finding (SonarCloud) with no upside — nothing here ever
+     selects by it. Team <select> is present only when the Workspace actually has one or more
      WorkspaceTeams; its "— No team (ungrouped) —" option always exists so an Organization that
      mixes teamed and standalone roles (ADR-0028's own QA/Supervisor/Tester + standalone Admin
      example) can still reach every role, not just the teamed ones. assign-role-picker.js filters
      the Role <select>'s own <option>s by the chosen team's data-team-id, client-side — same
-     "grouped picker, no second round trip" convention scope-picker.js already establishes. -->
-<div id="assign-role-dialog-body" th:fragment="assignRoleForm">
+     "grouped picker, no second round trip" convention scope-picker.js already establishes. No
+     <!DOCTYPE html>/<html>/<body> wrapper — same fragment-file convention every sibling under
+     */fragments/ already follows (e.g. identity/fragments/head.html), not a full standalone page. -->
+<div th:fragment="assignRoleForm">
     <div th:if="${membership == null}">
         <p class="clavaris-empty-state">This account isn't a member of any Workspace yet.</p>
     </div>
@@ -55,8 +58,6 @@
         </div>
     </form>
 </div>
-<div id="assign-role-dialog-body" th:fragment="assignRoleSaved">
+<div th:fragment="assignRoleSaved">
     <p class="clavaris-empty-state">Role updated.</p>
 </div>
-</body>
-</html>

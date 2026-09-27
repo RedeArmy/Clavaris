@@ -42,6 +42,7 @@ public class AddRoleToWorkspaceTeamService implements AddRoleToWorkspaceTeamUseC
     final WorkspaceTeam team =
         teams
             .findById(command.teamId())
+            .filter(candidate -> candidate.workspaceId().equals(command.workspaceId()))
             .orElseThrow(() -> new WorkspaceTeamNotFoundException(command.teamId()));
 
     final Workspace workspace =

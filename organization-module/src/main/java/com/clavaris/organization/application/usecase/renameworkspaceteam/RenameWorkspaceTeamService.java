@@ -23,6 +23,7 @@ public class RenameWorkspaceTeamService implements RenameWorkspaceTeamUseCase {
     final WorkspaceTeam existing =
         teams
             .findById(command.teamId())
+            .filter(candidate -> candidate.workspaceId().equals(command.workspaceId()))
             .orElseThrow(() -> new WorkspaceTeamNotFoundException(command.teamId()));
 
     final boolean nameChanged = !existing.name().equals(command.newName());

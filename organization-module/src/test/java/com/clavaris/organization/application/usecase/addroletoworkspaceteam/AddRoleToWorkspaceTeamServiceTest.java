@@ -63,14 +63,14 @@ class AddRoleToWorkspaceTeamServiceTest {
 
   @Test
   void addsTheRoleToTheTeam() {
-    service.handle(new AddRoleToWorkspaceTeamCommand(team.id(), role.id(), ACTOR));
+    service.handle(new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), role.id(), ACTOR));
 
     verify(teams).addRoleToTeam(team.id(), role.id());
   }
 
   @Test
   void recordsAnAuditEvent() {
-    service.handle(new AddRoleToWorkspaceTeamCommand(team.id(), role.id(), ACTOR));
+    service.handle(new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), role.id(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -86,7 +86,7 @@ class AddRoleToWorkspaceTeamServiceTest {
     when(teams.findTeamIdForRoleInWorkspace(workspace.id(), role.id()))
         .thenReturn(Optional.of(team.id()));
 
-    service.handle(new AddRoleToWorkspaceTeamCommand(team.id(), role.id(), ACTOR));
+    service.handle(new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), role.id(), ACTOR));
 
     verify(teams, never()).addRoleToTeam(any(), any());
   }
@@ -97,7 +97,7 @@ class AddRoleToWorkspaceTeamServiceTest {
     when(teams.findTeamIdForRoleInWorkspace(workspace.id(), role.id()))
         .thenReturn(Optional.of(otherTeamId));
     AddRoleToWorkspaceTeamCommand command =
-        new AddRoleToWorkspaceTeamCommand(team.id(), role.id(), ACTOR);
+        new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), role.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleAlreadyInAnotherTeamException.class)
         .isThrownBy(() -> service.handle(command));
@@ -110,7 +110,18 @@ class AddRoleToWorkspaceTeamServiceTest {
     UUID unknownTeamId = UUID.randomUUID();
     when(teams.findById(unknownTeamId)).thenReturn(Optional.empty());
     AddRoleToWorkspaceTeamCommand command =
-        new AddRoleToWorkspaceTeamCommand(unknownTeamId, role.id(), ACTOR);
+        new AddRoleToWorkspaceTeamCommand(workspace.id(), unknownTeamId, role.id(), ACTOR);
+
+    assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(teams, never()).addRoleToTeam(any(), any());
+  }
+
+  @Test
+  void rejectsATeamBelongingToADifferentWorkspace() {
+    AddRoleToWorkspaceTeamCommand command =
+        new AddRoleToWorkspaceTeamCommand(UUID.randomUUID(), team.id(), role.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -123,7 +134,7 @@ class AddRoleToWorkspaceTeamServiceTest {
     UUID unknownRoleId = UUID.randomUUID();
     when(roles.findById(unknownRoleId)).thenReturn(Optional.empty());
     AddRoleToWorkspaceTeamCommand command =
-        new AddRoleToWorkspaceTeamCommand(team.id(), unknownRoleId, ACTOR);
+        new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), unknownRoleId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -136,7 +147,7 @@ class AddRoleToWorkspaceTeamServiceTest {
     WorkspaceRole otherOrgRole = WorkspaceRole.define(UUID.randomUUID(), "Foreign", null, Set.of());
     when(roles.findById(otherOrgRole.id())).thenReturn(Optional.of(otherOrgRole));
     AddRoleToWorkspaceTeamCommand command =
-        new AddRoleToWorkspaceTeamCommand(team.id(), otherOrgRole.id(), ACTOR);
+        new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), otherOrgRole.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -148,7 +159,7 @@ class AddRoleToWorkspaceTeamServiceTest {
   void rejectsWhenTheTeamsOwnWorkspaceNoLongerExists() {
     when(workspaces.findById(workspace.id())).thenReturn(Optional.empty());
     AddRoleToWorkspaceTeamCommand command =
-        new AddRoleToWorkspaceTeamCommand(team.id(), role.id(), ACTOR);
+        new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), role.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

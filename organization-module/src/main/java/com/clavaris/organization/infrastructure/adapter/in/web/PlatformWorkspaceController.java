@@ -133,6 +133,8 @@ public class PlatformWorkspaceController {
   private static final String MEMBER_FORM_ATTRIBUTE = "memberForm";
   private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
+  private static final String ORGANIZATIONS_REDIRECT_PREFIX =
+      "redirect:/platform/dashboard/organizations/";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
   // PlatformOrganizationDashboardController's own identical constant.
@@ -240,7 +242,7 @@ public class PlatformWorkspaceController {
       model.addAttribute("workspaceForm", new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/" + organizationId;
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
   }
 
   private void addWorkspacesToModel(
@@ -476,7 +478,7 @@ public class PlatformWorkspaceController {
     try {
       renameTeamUseCase.handle(
           new RenameWorkspaceTeamCommand(
-              teamId, name, AuditActor.platformAccount(ownerPlatformAccountId)));
+              workspaceId, teamId, name, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceTeamNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final DuplicateWorkspaceTeamNameException _) {
@@ -506,7 +508,7 @@ public class PlatformWorkspaceController {
     try {
       deleteTeamUseCase.handle(
           new DeleteWorkspaceTeamCommand(
-              teamId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              workspaceId, teamId, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceTeamNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
@@ -531,7 +533,7 @@ public class PlatformWorkspaceController {
     try {
       addRoleToTeamUseCase.handle(
           new AddRoleToWorkspaceTeamCommand(
-              teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              workspaceId, teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceTeamNotFoundException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final WorkspaceRoleAlreadyInAnotherTeamException _) {
@@ -562,7 +564,7 @@ public class PlatformWorkspaceController {
     try {
       removeRoleFromTeamUseCase.handle(
           new RemoveRoleFromWorkspaceTeamCommand(
-              teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              workspaceId, teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceTeamNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
@@ -583,10 +585,7 @@ public class PlatformWorkspaceController {
       populateTeamsModel(model, workspace);
       return TEAMS_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/"
-        + organization.id()
-        + "/workspaces/"
-        + workspace.id();
+    return ORGANIZATIONS_REDIRECT_PREFIX + organization.id() + "/workspaces/" + workspace.id();
   }
 
   // Shared "a mutation just succeeded" tail: HTMX gets the members fragment re-rendered in place
@@ -605,10 +604,7 @@ public class PlatformWorkspaceController {
       populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return MEMBERS_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/"
-        + organization.id()
-        + "/workspaces/"
-        + workspace.id();
+    return ORGANIZATIONS_REDIRECT_PREFIX + organization.id() + "/workspaces/" + workspace.id();
   }
 
   private void populateMembersModel(

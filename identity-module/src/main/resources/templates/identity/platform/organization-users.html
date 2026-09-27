@@ -41,7 +41,8 @@
                  plain page load. -->
             <form class="clavaris-search-form" method="get"
                   th:action="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId})}">
-                <input type="search" name="q" placeholder="Search by name, username, or email"
+                <label class="clavaris-visually-hidden" for="usersSearchQuery">Search users</label>
+                <input id="usersSearchQuery" type="search" name="q" placeholder="Search by name, username, or email"
                        th:value="${searchTerm}"/>
                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Search</button>
             </form>

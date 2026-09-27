@@ -26,6 +26,7 @@ public class RemoveRoleFromWorkspaceTeamService implements RemoveRoleFromWorkspa
     final WorkspaceTeam team =
         teams
             .findById(command.teamId())
+            .filter(candidate -> candidate.workspaceId().equals(command.workspaceId()))
             .orElseThrow(() -> new WorkspaceTeamNotFoundException(command.teamId()));
 
     teams.removeRoleFromTeam(command.teamId(), command.roleId());

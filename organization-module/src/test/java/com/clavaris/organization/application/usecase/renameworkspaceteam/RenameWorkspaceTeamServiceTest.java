@@ -45,7 +45,8 @@ class RenameWorkspaceTeamServiceTest {
   @Test
   void renamesTheTeam() {
     WorkspaceTeam renamed =
-        service.handle(new RenameWorkspaceTeamCommand(team.id(), "Quality Assurance", ACTOR));
+        service.handle(
+            new RenameWorkspaceTeamCommand(workspaceId, team.id(), "Quality Assurance", ACTOR));
 
     assertThat(renamed.name()).isEqualTo("Quality Assurance");
     verify(teams).save(renamed);
@@ -53,7 +54,8 @@ class RenameWorkspaceTeamServiceTest {
 
   @Test
   void recordsAnAuditEvent() {
-    service.handle(new RenameWorkspaceTeamCommand(team.id(), "Quality Assurance", ACTOR));
+    service.handle(
+        new RenameWorkspaceTeamCommand(workspaceId, team.id(), "Quality Assurance", ACTOR));
 
     verify(auditEvents)
         .write(
@@ -66,7 +68,8 @@ class RenameWorkspaceTeamServiceTest {
 
   @Test
   void allowsKeepingItsOwnCurrentNameUnchanged() {
-    WorkspaceTeam renamed = service.handle(new RenameWorkspaceTeamCommand(team.id(), "QA", ACTOR));
+    WorkspaceTeam renamed =
+        service.handle(new RenameWorkspaceTeamCommand(workspaceId, team.id(), "QA", ACTOR));
 
     assertThat(renamed.name()).isEqualTo("QA");
   }
@@ -76,7 +79,18 @@ class RenameWorkspaceTeamServiceTest {
     UUID unknownTeamId = UUID.randomUUID();
     when(teams.findById(unknownTeamId)).thenReturn(Optional.empty());
     RenameWorkspaceTeamCommand command =
-        new RenameWorkspaceTeamCommand(unknownTeamId, "Anything", ACTOR);
+        new RenameWorkspaceTeamCommand(workspaceId, unknownTeamId, "Anything", ACTOR);
+
+    assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(teams, never()).save(any());
+  }
+
+  @Test
+  void rejectsATeamBelongingToADifferentWorkspace() {
+    RenameWorkspaceTeamCommand command =
+        new RenameWorkspaceTeamCommand(UUID.randomUUID(), team.id(), "Anything", ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -89,7 +103,7 @@ class RenameWorkspaceTeamServiceTest {
     WorkspaceTeam other = WorkspaceTeam.define(workspaceId, "Support");
     when(teams.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(team, other));
     RenameWorkspaceTeamCommand command =
-        new RenameWorkspaceTeamCommand(team.id(), "Support", ACTOR);
+        new RenameWorkspaceTeamCommand(workspaceId, team.id(), "Support", ACTOR);
 
     assertThatExceptionOfType(DuplicateWorkspaceTeamNameException.class)
         .isThrownBy(() -> service.handle(command));
