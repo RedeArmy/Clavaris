@@ -50,9 +50,20 @@
                     <tr th:each="member : ${members}">
                         <td th:text="${member.accountId()}">Account id</td>
                         <td>
+                            <!-- ADR-0027: a member's role is now a real, consumer-defined WorkspaceRole
+                                 (resolved by id from the roles map, never a fixed enum) — roles.get(...)
+                                 returns null gracefully for an unassigned member or one whose role was
+                                 since deleted, neither of which should ever throw here. The badge color
+                                 checks the role's own direct permissions only (not the full parent-chain
+                                 -inherited set WorkspaceRoleHierarchy computes) — a display-only
+                                 simplification, fine while no shipped UI can yet configure inherited
+                                 manage_members access (Slice 3). -->
                             <span class="clavaris-badge"
-                                  th:classappend="${member.role().name() == 'ADMIN'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
-                                  th:text="${member.role()}">MEMBER</span>
+                                  th:if="${member.roleId() != null and roles.get(member.roleId()) != null}"
+                                  th:classappend="${roles.get(member.roleId()).permissions().contains('clavaris:workspace:manage_members')} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:text="${roles.get(member.roleId()).name()}">Role</span>
+                            <span class="clavaris-badge clavaris-badge--muted"
+                                  th:unless="${member.roleId() != null and roles.get(member.roleId()) != null}">No role</span>
                         </td>
                         <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(member.createdAt())}">Joined at</td>
                         <td>
@@ -68,9 +79,14 @@
                                          output) only recognizes a literal HTML for/id pair, never th:for/th:id
                                          alone, for this accessibility rule. -->
                                     <label class="clavaris-visually-hidden" for="new-role" th:for="${'new-role-' + member.accountId()}">New role for <span th:text="${member.accountId()}">account</span></label>
-                                    <select id="new-role" th:id="${'new-role-' + member.accountId()}" name="newRole">
-                                        <option value="ADMIN" th:selected="${member.role().name() == 'ADMIN'}">Admin</option>
-                                        <option value="MEMBER" th:selected="${member.role().name() == 'MEMBER'}">Member</option>
+                                    <!-- ADR-0027: real per-Organization roles, not a fixed two-value enum —
+                                         no "unassign" option here yet (Slice 5): every member reaching this
+                                         page was added with a real role already assigned. -->
+                                    <select id="new-role" th:id="${'new-role-' + member.accountId()}" name="newRoleId">
+                                        <option th:each="roleOption : ${roles.values()}"
+                                                th:value="${roleOption.id()}"
+                                                th:text="${roleOption.name()}"
+                                                th:selected="${member.roleId() != null and roleOption.id() == member.roleId()}"></option>
                                     </select>
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Update role</button>
                                 </form>
@@ -122,9 +138,11 @@
 
                         <div class="clavaris-field">
                             <label for="member-role">Role</label>
-                            <select id="member-role" th:field="*{role}">
-                                <option th:each="roleOption : ${T(com.clavaris.organization.domain.model.WorkspaceRole).values()}"
-                                        th:value="${roleOption}" th:text="${roleOption}"></option>
+                            <!-- ADR-0027: real per-Organization roles — CreateWorkspaceService always
+                                 seeds at least the one reserved role, so this list is never empty. -->
+                            <select id="member-role" th:field="*{roleId}">
+                                <option th:each="roleOption : ${roles.values()}"
+                                        th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
                             </select>
                         </div>
 

@@ -98,7 +98,7 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
     ClientCredentials client = registerOAuthClient(platformToken, organizationId);
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
     String email = "workspace-admin@example.com";
-    addMember(platformToken, workspaceId, email, "ADMIN");
+    addMember(platformToken, workspaceId, email, reservedRoleIdFor(organizationId));
     String password = completePasswordSetup(organizationId, email);
 
     HttpResponse<String> tokenResponse =
@@ -108,15 +108,19 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
     String accessToken = tokenBody.get("access_token").asString();
     String idToken = tokenBody.get("id_token").asString();
 
+    // ADR-0027: workspace_role is now the reserved WorkspaceRole's own consumer-facing name
+    // (CreateWorkspaceService's own seeded default), not a fixed enum value.
     JsonNode idTokenClaims = decodeJwtClaims(idToken);
     assertThat(idTokenClaims.get("workspace_id").asString()).isEqualTo(workspaceId.toString());
-    assertThat(idTokenClaims.get("workspace_role").asString()).isEqualTo("ADMIN");
+    assertThat(idTokenClaims.get("workspace_role").asString()).isEqualTo("Admin");
+    assertThat(idTokenClaims.get("workspace_permissions").toString())
+        .contains("clavaris:workspace:manage_members", "clavaris:workspace:manage_roles");
 
     HttpResponse<String> userInfoResponse = getUserInfo(organizationId, accessToken);
     assertThat(userInfoResponse.statusCode()).isEqualTo(200);
     JsonNode userInfo = objectMapper.readTree(userInfoResponse.body());
     assertThat(userInfo.get("workspace_id").asString()).isEqualTo(workspaceId.toString());
-    assertThat(userInfo.get("workspace_role").asString()).isEqualTo("ADMIN");
+    assertThat(userInfo.get("workspace_role").asString()).isEqualTo("Admin");
   }
 
   // Regression coverage for the real bug WorkspaceRoleClaimsCustomizerTest's own unit test
@@ -137,7 +141,7 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
     ClientCredentials client = registerOAuthClientWithRefreshGrant(platformToken, organizationId);
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Engineering");
     String email = "refresh-admin@example.com";
-    addMember(platformToken, workspaceId, email, "ADMIN");
+    addMember(platformToken, workspaceId, email, reservedRoleIdFor(organizationId));
     String password = completePasswordSetup(organizationId, email);
 
     HttpResponse<String> tokenResponse =
@@ -153,7 +157,7 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
         decodeJwtClaims(objectMapper.readTree(refreshResponse.body()).get("id_token").asString());
     assertThat(refreshedIdTokenClaims.get("workspace_id").asString())
         .isEqualTo(workspaceId.toString());
-    assertThat(refreshedIdTokenClaims.get("workspace_role").asString()).isEqualTo("ADMIN");
+    assertThat(refreshedIdTokenClaims.get("workspace_role").asString()).isEqualTo("Admin");
   }
 
   @Test
@@ -269,7 +273,7 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private HttpResponse<String> addMember(
-      String platformToken, UUID workspaceId, String email, String role)
+      String platformToken, UUID workspaceId, String email, UUID roleId)
       throws IOException, InterruptedException {
     HttpRequest request =
         HttpRequest.newBuilder(baseUri("/api/v1/admin/workspaces/" + workspaceId + "/members"))
@@ -277,11 +281,23 @@ class WorkspaceRoleClaimIntegrationTest extends RedisBackedIntegrationTest {
             .header("Content-Type", "application/json")
             .POST(
                 HttpRequest.BodyPublishers.ofString(
-                    "{\"email\":\"" + email + "\",\"role\":\"" + role + "\"}"))
+                    "{\"email\":\"" + email + "\",\"roleId\":\"" + roleId + "\"}"))
             .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     assertThat(response.statusCode()).isEqualTo(201);
     return response;
+  }
+
+  // ADR-0027 §2: CreateWorkspaceService seeds exactly one reserved WorkspaceRole per
+  // Organization on its first Workspace — there is no management-API endpoint yet to list/create
+  // custom roles (Slice 3/6, not shipped), so this reaches into the database directly, same
+  // "read the seeded row back for test setup" posture WorkspaceIntegrationTest's own identical
+  // helper uses.
+  private UUID reservedRoleIdFor(UUID organizationId) {
+    return jdbcTemplate.queryForObject(
+        "select id from workspace_roles where organization_id = ? and reserved = true",
+        UUID.class,
+        organizationId);
   }
 
   private UUID createWorkspace(String platformToken, UUID organizationId, String name)

@@ -7,11 +7,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,8 +46,8 @@ class ChangeWorkspaceMemberRoleControllerTest {
 
   @Test
   void returns200WithTheUpdatedMembership() throws Exception {
-    WorkspaceMembership updated =
-        WorkspaceMembership.join(workspaceId, accountId, WorkspaceRole.ADMIN);
+    UUID roleId = UUID.randomUUID();
+    WorkspaceMembership updated = WorkspaceMembership.join(workspaceId, accountId, roleId);
     when(useCase.handle(any())).thenReturn(updated);
 
     mockMvc
@@ -55,9 +55,26 @@ class ChangeWorkspaceMemberRoleControllerTest {
             put(path())
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"role\":\"ADMIN\"}"))
+                .content("{\"roleId\":\"" + roleId + "\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.role").value("ADMIN"));
+        .andExpect(jsonPath("$.roleId").value(roleId.toString()));
+  }
+
+  // ADR-0027 §5: an absent/null roleId is an explicitly allowed "unassign" request, not a
+  // validation error.
+  @Test
+  void anAbsentRoleIdUnassignsTheMembersRole() throws Exception {
+    WorkspaceMembership updated = WorkspaceMembership.join(workspaceId, accountId, null);
+    when(useCase.handle(any())).thenReturn(updated);
+
+    mockMvc
+        .perform(
+            put(path())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accountId").value(accountId.toString()));
   }
 
   @Test
@@ -70,12 +87,26 @@ class ChangeWorkspaceMemberRoleControllerTest {
             put(path())
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"role\":\"ADMIN\"}"))
+                .content("{\"roleId\":\"" + UUID.randomUUID() + "\"}"))
         .andExpect(status().isNotFound());
   }
 
   @Test
-  void returns409WhenThisWouldDemoteTheLastAdmin() throws Exception {
+  void returns404WhenTheRoleIdDoesNotExist() throws Exception {
+    UUID unknownRoleId = UUID.randomUUID();
+    when(useCase.handle(any())).thenThrow(new WorkspaceRoleNotFoundException(unknownRoleId));
+
+    mockMvc
+        .perform(
+            put(path())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"roleId\":\"" + unknownRoleId + "\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void returns409WhenThisWouldLeaveZeroManageMembersHolders() throws Exception {
     when(useCase.handle(any())).thenThrow(new CannotDemoteLastAdminException(workspaceId));
 
     mockMvc
@@ -83,14 +114,7 @@ class ChangeWorkspaceMemberRoleControllerTest {
             put(path())
                 .principal(ACTING_PLATFORM_CLIENT)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"role\":\"MEMBER\"}"))
+                .content("{}"))
         .andExpect(status().isConflict());
-  }
-
-  @Test
-  void rejectsAMissingRoleWithoutEverCallingTheUseCase() throws Exception {
-    mockMvc
-        .perform(put(path()).contentType(MediaType.APPLICATION_JSON).content("{}"))
-        .andExpect(status().isBadRequest());
   }
 }

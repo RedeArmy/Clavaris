@@ -1,6 +1,5 @@
 package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -25,9 +24,9 @@ interface SpringDataWorkspaceMembershipJpaRepository
 
   List<WorkspaceMembershipEntity> findAllByAccountId(UUID accountId);
 
-  long countByWorkspaceIdAndRole(UUID workspaceId, WorkspaceRole role);
-
   void deleteAllByAccountId(UUID accountId);
+
+  boolean existsByRoleId(UUID roleId);
 
   // TD-PERF-020 (keyset revision, 2026-09-14): backs
   // WorkspaceMembershipRepository#findKeysetPageByWorkspaceId — see

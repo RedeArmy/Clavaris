@@ -1,6 +1,10 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
-import com.clavaris.organization.domain.model.WorkspaceRole;
-import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 
-public record ChangeWorkspaceMemberRoleRequest(@NotNull WorkspaceRole role) {}
+/**
+ * {@code roleId} (ADR-0027 — replaces the old fixed-enum {@code role}) is nullable by design: a
+ * {@code null} value unassigns the membership's role entirely (ADR-0027 §5), an explicitly allowed
+ * state, not an invalid request.
+ */
+public record ChangeWorkspaceMemberRoleRequest(UUID roleId) {}

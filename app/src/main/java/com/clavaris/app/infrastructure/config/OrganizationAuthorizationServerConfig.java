@@ -33,6 +33,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -223,6 +224,7 @@ public class OrganizationAuthorizationServerConfig {
       final JWKSource<SecurityContext> signingJwkSource,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final WorkspaceMembershipRepository workspaceMemberships,
+      final WorkspaceRoleRepository workspaceRoles,
       final IssueRefreshTokenUseCase issueRefreshToken,
       final AccountRepository accounts,
       final String clavarisBaseUrl) {
@@ -231,7 +233,7 @@ public class OrganizationAuthorizationServerConfig {
     final AuthenticationContextClaimsCustomizer authenticationContextClaims =
         new AuthenticationContextClaimsCustomizer();
     final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
-        new WorkspaceRoleClaimsCustomizer(workspaceMemberships);
+        new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles);
     final ProfilePictureClaimsCustomizer profilePictureClaims =
         new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
     jwtGenerator.setJwtCustomizer(
@@ -310,6 +312,7 @@ public class OrganizationAuthorizationServerConfig {
       final TokenIssuanceEventLogger tokenIssuanceLogger,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final WorkspaceMembershipRepository workspaceMemberships,
+      final WorkspaceRoleRepository workspaceRoles,
       final IssueRefreshTokenUseCase issueRefreshToken,
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final RateLimiter rateLimiter,
@@ -401,6 +404,7 @@ public class OrganizationAuthorizationServerConfig {
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,
             workspaceMemberships,
+            workspaceRoles,
             issueRefreshToken,
             accounts,
             clavarisBaseUrl);

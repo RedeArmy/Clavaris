@@ -8,9 +8,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,18 +23,21 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 
 /**
- * Proves the two properties that actually matter: the claim lands on both token types for a real
- * workspace member's login, and never appears at all for an Account with no membership or for a
- * grant with no end-user principal (client_credentials) — same "prove what a real token would
- * carry" discipline as {@code AuthenticationContextClaimsCustomizerTest}/{@code
+ * Proves the properties that actually matter: {@code workspace_id}/{@code workspace_role}/{@code
+ * workspace_permissions} (ADR-0027) land on both token types for a real workspace member's login,
+ * never appear at all for an Account with no membership or for a grant with no end-user principal
+ * (client_credentials), and {@code workspace_role}/{@code workspace_permissions} specifically are
+ * omitted (only {@code workspace_id}) when the membership has no role assigned — same "prove what a
+ * real token would carry" discipline as {@code AuthenticationContextClaimsCustomizerTest}/{@code
  * TokenIssuanceEventLoggerTest}.
  */
 class WorkspaceRoleClaimsCustomizerTest {
 
   private final WorkspaceMembershipRepository memberships =
       mock(WorkspaceMembershipRepository.class);
+  private final WorkspaceRoleRepository roles = mock(WorkspaceRoleRepository.class);
   private final WorkspaceRoleClaimsCustomizer customizer =
-      new WorkspaceRoleClaimsCustomizer(memberships);
+      new WorkspaceRoleClaimsCustomizer(memberships, roles);
 
   private static JwtEncodingContext contextFor(final UUID accountId) {
     return contextFor(accountId, AuthorizationGrantType.AUTHORIZATION_CODE);
@@ -48,11 +54,16 @@ class WorkspaceRoleClaimsCustomizerTest {
   }
 
   @Test
-  void addsWorkspaceIdAndRoleForAnAccountWithAMembership() {
+  void addsWorkspaceIdRoleAndPermissionsForAnAccountWithAnAssignedRole() {
     UUID accountId = UUID.randomUUID();
     UUID workspaceId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
+    WorkspaceRole role =
+        WorkspaceRole.define(organizationId, "Supervisor", null, Set.of("org:posts:create"));
     when(memberships.findAllByAccountId(accountId))
-        .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, WorkspaceRole.ADMIN)));
+        .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, role.id())));
+    when(roles.findById(role.id())).thenReturn(Optional.of(role));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context = contextFor(accountId);
     when(context.getClaims()).thenReturn(claims);
@@ -61,7 +72,34 @@ class WorkspaceRoleClaimsCustomizerTest {
 
     JwtClaimsSet built = claims.build();
     assertThat(built.getClaimAsString("workspace_id")).isEqualTo(workspaceId.toString());
-    assertThat(built.getClaimAsString("workspace_role")).isEqualTo("ADMIN");
+    assertThat(built.getClaimAsString("workspace_role")).isEqualTo("Supervisor");
+    assertThat(built.<List<String>>getClaim("workspace_permissions"))
+        .containsExactly("org:posts:create");
+  }
+
+  // ADR-0027 §3: effective permissions walk the parent chain, not just the assigned role's own.
+  @Test
+  void workspacePermissionsIncludeInheritedPermissionsFromTheParentRole() {
+    UUID accountId = UUID.randomUUID();
+    UUID workspaceId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
+    WorkspaceRole parent =
+        WorkspaceRole.define(organizationId, "Agent", null, Set.of("agent-perm"));
+    WorkspaceRole child =
+        WorkspaceRole.define(organizationId, "Supervisor", parent.id(), Set.of("supervisor-perm"));
+    when(memberships.findAllByAccountId(accountId))
+        .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, child.id())));
+    when(roles.findById(child.id())).thenReturn(Optional.of(child));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(parent, child));
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context = contextFor(accountId);
+    when(context.getClaims()).thenReturn(claims);
+
+    customizer.customize(context);
+
+    JwtClaimsSet built = claims.build();
+    assertThat(built.<List<String>>getClaim("workspace_permissions"))
+        .containsExactlyInAnyOrder("agent-perm", "supervisor-perm");
   }
 
   // Regression test: RefreshTokenRotationAuthenticationProvider reports REFRESH_TOKEN as its own
@@ -70,12 +108,15 @@ class WorkspaceRoleClaimsCustomizerTest {
   // AUTHORIZATION_CODE-only guard would have silently broken BR-WS-06's own "reaches the client on
   // the next silent refresh" claim.
   @Test
-  void addsWorkspaceIdAndRoleForARefreshTokenGrantToo() {
+  void addsTheClaimsForARefreshTokenGrantToo() {
     UUID accountId = UUID.randomUUID();
     UUID workspaceId = UUID.randomUUID();
+    UUID organizationId = UUID.randomUUID();
+    WorkspaceRole role = WorkspaceRole.define(organizationId, "Member", null, Set.of());
     when(memberships.findAllByAccountId(accountId))
-        .thenReturn(
-            List.of(WorkspaceMembership.join(workspaceId, accountId, WorkspaceRole.MEMBER)));
+        .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, role.id())));
+    when(roles.findById(role.id())).thenReturn(Optional.of(role));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
     JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
     JwtEncodingContext context = contextFor(accountId, AuthorizationGrantType.REFRESH_TOKEN);
     when(context.getClaims()).thenReturn(claims);
@@ -84,7 +125,26 @@ class WorkspaceRoleClaimsCustomizerTest {
 
     JwtClaimsSet built = claims.build();
     assertThat(built.getClaimAsString("workspace_id")).isEqualTo(workspaceId.toString());
-    assertThat(built.getClaimAsString("workspace_role")).isEqualTo("MEMBER");
+    assertThat(built.getClaimAsString("workspace_role")).isEqualTo("Member");
+  }
+
+  // ADR-0027 §5: a membership can exist with no role assigned — only workspace_id is added.
+  @Test
+  void addsOnlyWorkspaceIdWhenTheMembershipHasNoRoleAssigned() {
+    UUID accountId = UUID.randomUUID();
+    UUID workspaceId = UUID.randomUUID();
+    when(memberships.findAllByAccountId(accountId))
+        .thenReturn(List.of(WorkspaceMembership.join(workspaceId, accountId, null)));
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context = contextFor(accountId);
+    when(context.getClaims()).thenReturn(claims);
+
+    customizer.customize(context);
+
+    JwtClaimsSet built = claims.build();
+    assertThat(built.getClaimAsString("workspace_id")).isEqualTo(workspaceId.toString());
+    assertThat(built.getClaimAsString("workspace_role")).isNull();
+    verifyNoInteractions(roles);
   }
 
   @Test
@@ -109,6 +169,7 @@ class WorkspaceRoleClaimsCustomizerTest {
     customizer.customize(context);
 
     verifyNoInteractions(memberships);
+    verifyNoInteractions(roles);
   }
 
   @Test

@@ -13,11 +13,15 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,68 +32,88 @@ class ChangeWorkspaceMemberRoleServiceTest {
 
   private WorkspaceMembershipRepository memberships;
   private WorkspaceRepository workspaces;
+  private WorkspaceRoleRepository roles;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private ChangeWorkspaceMemberRoleService service;
+
+  private UUID organizationId;
+  private WorkspaceRole manageMembersRole;
+  private WorkspaceRole plainRole;
 
   @BeforeEach
   void setUp() {
     memberships = mock(WorkspaceMembershipRepository.class);
     workspaces = mock(WorkspaceRepository.class);
-    when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(UUID.randomUUID()));
+    roles = mock(WorkspaceRoleRepository.class);
+    organizationId = UUID.randomUUID();
+    when(workspaces.findOrganizationIdById(any())).thenReturn(Optional.of(organizationId));
+
+    manageMembersRole = WorkspaceRole.defineReserved(organizationId, "Admin");
+    plainRole = WorkspaceRole.define(organizationId, "Member", null, Set.of());
+    when(roles.findAllByOrganizationId(organizationId))
+        .thenReturn(List.of(manageMembersRole, plainRole));
+    when(roles.findById(manageMembersRole.id())).thenReturn(Optional.of(manageMembersRole));
+    when(roles.findById(plainRole.id())).thenReturn(Optional.of(plainRole));
+
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
-    service = new ChangeWorkspaceMemberRoleService(memberships, workspaces, auditEvents, outbox);
+    service =
+        new ChangeWorkspaceMemberRoleService(memberships, workspaces, roles, auditEvents, outbox);
   }
 
   private WorkspaceMembership existingMembership(
-      final UUID workspaceId, final UUID accountId, final WorkspaceRole role) {
-    WorkspaceMembership membership = WorkspaceMembership.join(workspaceId, accountId, role);
+      final UUID workspaceId, final UUID accountId, final UUID roleId) {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspaceId, accountId, roleId);
     when(memberships.findByWorkspaceIdAndAccountId(workspaceId, accountId))
         .thenReturn(Optional.of(membership));
     return membership;
   }
 
   @Test
-  void promotesAMemberToAdminWithoutCheckingTheAdminCount() {
+  void promotesAMemberToTheManageMembersRoleWithoutCheckingTheHolderCount() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    existingMembership(workspaceId, accountId, plainRole.id());
 
     WorkspaceMembership updated =
         service.handle(
             new ChangeWorkspaceMemberRoleCommand(
-                workspaceId, accountId, WorkspaceRole.ADMIN, ACTOR));
+                workspaceId, accountId, manageMembersRole.id(), ACTOR));
 
-    assertThat(updated.role()).isEqualTo(WorkspaceRole.ADMIN);
-    verify(memberships, never()).countByWorkspaceIdAndRole(any(), any());
+    assertThat(updated.roleId()).isEqualTo(manageMembersRole.id());
     verify(memberships).save(updated);
   }
 
   @Test
-  void demotesAnAdminWhenAnotherAdminRemains() {
+  void demotesAHolderWhenAnotherHolderRemains() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.ADMIN);
-    when(memberships.countByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN)).thenReturn(2L);
+    existingMembership(workspaceId, accountId, manageMembersRole.id());
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(
+            List.of(
+                WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id()),
+                WorkspaceMembership.join(workspaceId, UUID.randomUUID(), manageMembersRole.id())));
 
     WorkspaceMembership updated =
         service.handle(
-            new ChangeWorkspaceMemberRoleCommand(
-                workspaceId, accountId, WorkspaceRole.MEMBER, ACTOR));
+            new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, plainRole.id(), ACTOR));
 
-    assertThat(updated.role()).isEqualTo(WorkspaceRole.MEMBER);
+    assertThat(updated.roleId()).isEqualTo(plainRole.id());
     verify(memberships).save(updated);
   }
 
   @Test
-  void rejectsDemotingTheLastAdminWithoutSavingAnything() {
+  void rejectsDemotingTheLastHolderWithoutSavingAnything() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.ADMIN);
-    when(memberships.countByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN)).thenReturn(1L);
+    existingMembership(workspaceId, accountId, manageMembersRole.id());
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(
+            List.of(WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id())));
     ChangeWorkspaceMemberRoleCommand command =
-        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, WorkspaceRole.MEMBER, ACTOR);
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, plainRole.id(), ACTOR);
 
     assertThatExceptionOfType(CannotDemoteLastAdminException.class)
         .isThrownBy(() -> service.handle(command));
@@ -100,15 +124,32 @@ class ChangeWorkspaceMemberRoleServiceTest {
   }
 
   @Test
+  void rejectsUnassigningTheLastHolderWithoutSavingAnything() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, manageMembersRole.id());
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(
+            List.of(WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id())));
+    ChangeWorkspaceMemberRoleCommand command =
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, null, ACTOR);
+
+    assertThatExceptionOfType(CannotDemoteLastAdminException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(memberships, never()).save(any());
+  }
+
+  @Test
   void recordsAnAuditEventAndAnOutboxEventOnSuccess() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    existingMembership(workspaceId, accountId, plainRole.id());
 
     WorkspaceMembership updated =
         service.handle(
             new ChangeWorkspaceMemberRoleCommand(
-                workspaceId, accountId, WorkspaceRole.ADMIN, ACTOR));
+                workspaceId, accountId, manageMembersRole.id(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -133,7 +174,7 @@ class ChangeWorkspaceMemberRoleServiceTest {
     when(memberships.findByWorkspaceIdAndAccountId(workspaceId, accountId))
         .thenReturn(Optional.empty());
     ChangeWorkspaceMemberRoleCommand command =
-        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, WorkspaceRole.ADMIN, ACTOR);
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, manageMembersRole.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceMembershipNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -143,22 +184,52 @@ class ChangeWorkspaceMemberRoleServiceTest {
     verifyNoInteractions(outbox);
   }
 
+  // ADR-0027: newRoleId must belong to this same membership's own Organization.
   @Test
-  void refusesToProceedWhenTheMembershipsOwnWorkspaceNoLongerExists() {
-    // The role change itself is already saved by the time this lookup runs (see the service's
-    // own field order) — unlike RemoveWorkspaceMemberService, where the equivalent lookup runs
-    // before the mutating deleteById call. Only the outbox-adjacent side effects that come after
-    // the lookup are what this exception must still prevent.
+  void rejectsAnUnknownNewRoleIdWithoutSavingAnything() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
-    existingMembership(workspaceId, accountId, WorkspaceRole.MEMBER);
+    existingMembership(workspaceId, accountId, plainRole.id());
+    UUID unknownRoleId = UUID.randomUUID();
+    when(roles.findById(unknownRoleId)).thenReturn(Optional.empty());
+    ChangeWorkspaceMemberRoleCommand command =
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, unknownRoleId, ACTOR);
+
+    assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(memberships, never()).save(any());
+  }
+
+  @Test
+  void allowsUnassigningTheRoleEntirely() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, plainRole.id());
+
+    WorkspaceMembership updated =
+        service.handle(new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, null, ACTOR));
+
+    assertThat(updated.roleId()).isNull();
+    verify(memberships).save(updated);
+  }
+
+  // Unlike RemoveWorkspaceMemberService, this lookup now runs (and can fail-fast) before any
+  // save — ManageMembersGuard itself needs organizationId to load this Organization's own roles,
+  // so the lookup moved ahead of the mutating save, not after it.
+  @Test
+  void refusesToProceedWhenTheMembershipsOwnWorkspaceNoLongerExists() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, plainRole.id());
     when(workspaces.findOrganizationIdById(workspaceId)).thenReturn(Optional.empty());
     ChangeWorkspaceMemberRoleCommand command =
-        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, WorkspaceRole.ADMIN, ACTOR);
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, manageMembersRole.id(), ACTOR);
 
     assertThatExceptionOfType(IllegalStateException.class)
         .isThrownBy(() -> service.handle(command));
 
+    verify(memberships, never()).save(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
   }

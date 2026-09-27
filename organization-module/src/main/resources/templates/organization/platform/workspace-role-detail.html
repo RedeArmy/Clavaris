@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${role.name()} + ' — ' + ${organization.name()} + ' — Clavaris')}">
+    <title>Workspace Role — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> /
+                <span th:text="${role.name()}">Role</span>
+            </p>
+
+            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organization.id()}, 'workspace-roles')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1 th:text="${role.name()}">Role name</h1>
+                            <p>
+                                <span class="clavaris-badge clavaris-badge--success" th:if="${role.reserved()}">Reserved</span>
+                                Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(role.createdAt())}">date</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="clavaris-section-card">
+                        <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateNameError}">A role with that name already exists in this Organization.</p>
+                        <p class="clavaris-alert clavaris-alert--error" th:if="${parentCycleError}">That parent role would create a cycle — a role can never descend from itself.</p>
+                        <p class="clavaris-alert clavaris-alert--error" th:if="${stillAssignedError}">This role is still assigned to at least one member — reassign or unassign them first (a member can be left without a role).</p>
+                        <p class="clavaris-alert clavaris-alert--error" th:if="${hasChildRolesError}">This role is still the parent of at least one other role — re-parent or clear those roles' parent first.</p>
+
+                        <!-- ADR-0027 §2: a reserved role can never be renamed away from its own
+                             management permissions or deleted — this form still lets an owner edit a
+                             reserved role's name/parent, but its permissions field is disabled: the
+                             domain (WorkspaceRole#withPermissions) would reject stripping them anyway,
+                             so the form makes that structurally clear rather than surfacing a 400. -->
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}"
+                              th:object="${editForm}" method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                            <div class="clavaris-field">
+                                <label for="role-name">Name</label>
+                                <input id="role-name" type="text" th:field="*{name}" required/>
+                                <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                            </div>
+
+                            <div class="clavaris-field">
+                                <label for="role-parent">Parent role (optional)</label>
+                                <select id="role-parent" th:field="*{parentRoleId}">
+                                    <option value="">&#8212; None &#8212;</option>
+                                    <option th:each="roleOption : ${roles}" th:if="${roleOption.id() != role.id()}"
+                                            th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
+                                </select>
+                                <p class="clavaris-field-hint">A role inherits every permission its parent (and its parent's own ancestors) carries.</p>
+                            </div>
+
+                            <div class="clavaris-field">
+                                <label for="role-permissions">Permissions</label>
+                                <!-- readonly, not disabled: a disabled field is never submitted by the
+                                     browser at all, which would silently post permissionsText=null for
+                                     a reserved role and trip WorkspaceRole#withPermissions's own reserved-
+                                     permissions guard as an unhandled IllegalArgumentException. readonly
+                                     still submits this field's current (unchanged) value. -->
+                                <textarea id="role-permissions" th:field="*{permissionsText}" rows="6"
+                                          th:readonly="${role.reserved()}"
+                                          placeholder="One permission per line, e.g.&#10;jobseeker:candidates:review&#10;jobseeker:interviews:schedule"></textarea>
+                                <p class="clavaris-field-hint" th:unless="${role.reserved()}">One opaque permission string per line — your own application defines what each one means.</p>
+                                <p class="clavaris-field-hint" th:if="${role.reserved()}">This Organization's reserved role always carries its own management permissions and can't have them edited away.</p>
+                            </div>
+
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
+                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                               th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Cancel</a>
+                        </form>
+                    </div>
+
+                    <div class="clavaris-section-card" th:unless="${role.reserved()}">
+                        <h2>Delete this role</h2>
+                        <p>Permanently deletes this role. Blocked while any member still holds it —
+                            reassign or unassign (BR-WS: a member can be left without a role) every
+                            member who does first.</p>
+                        <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}/delete(organizationId=${organization.id()},roleId=${role.id()})}"
+                              method="post">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete role</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

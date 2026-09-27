@@ -119,13 +119,25 @@ classDiagram
         +UUID id
         +UUID workspaceId
         +UUID accountId
-        +WorkspaceRole role
+        +UUID roleId
+        +Instant createdAt
+    }
+    class WorkspaceRole {
+        +UUID id
+        +UUID organizationId
+        +String name
+        +UUID parentRoleId
+        +Set~String~ permissions
+        +boolean reserved
         +Instant createdAt
     }
 
     Organization "1" --> "0..*" Workspace : contains
     Organization "1" --> "0..1" RateLimitPolicy : overrides default with
+    Organization "1" --> "1..*" WorkspaceRole : defines
     Workspace "1" --> "1..*" WorkspaceMembership : has
+    WorkspaceRole "0..1" --> "0..*" WorkspaceRole : parent of
+    WorkspaceRole "0..1" --> "0..*" WorkspaceMembership : assigned to
 ```
 
 `WorkspaceInvitation` (invite-by-email-then-accept) is **deferred to v1.1+**, not built — see the
@@ -138,7 +150,9 @@ no invitation entity exists in this diagram yet.
 - **`RateLimitPolicy`** — ADR-0010 §6.2: **capacity layer only** (noisy-neighbor protection), an optional one-to-one override of the system-default per-`Organization` aggregate request ceiling. Absence of a row means "use the system default," never "unlimited," and no policy can ever exceed a hard system-wide cap. **v1: operator-managed only** — no self-service tenant editing yet, matching manual `OAuthClient` registration (`prd-mvp.md` §2.2); self-service arrives in v1.1 gated on audit logging of changes. Enforcement bucket keys in Redis are namespaced by `organization_id`.
 - **Anti-abuse layer (ADR-0010 §6.1, not a stored entity)** — fixed, system-defined thresholds keyed by `(organization_id, account_or_ip_identifier)`, applied uniformly to every Organization and never tenant-configurable, even in v1.1. This is the actual credential-stuffing defense BR-ID-06 exists for; `RateLimitPolicy` above governs capacity, not this.
 - **`Workspace.organizationId`** — mandatory; a Workspace always belongs to exactly one Organization. Renamed from the pre-ADR-0010 `Organization` entity — same semantics (a company/team grouping inside one consumer's usage), different name to avoid colliding with the new tenant-boundary meaning of "Organization."
-- **`WorkspaceMembership.role`** — `ADMIN | MEMBER`, fixed enum in v1 (BR-WS-01/05: at least one `ADMIN` at all times, enforced at the application layer, not left to a database constraint alone). **v1 scope note (ADR-0010 §3 addendum, 2026-08-27)**: this supersedes the originally-documented `OWNER | ADMIN | MEMBER` design — no `OWNER` role or ownership-transfer machinery exists in v1. Any business/product-domain role (e.g. "recruiter", "candidate") is explicitly out of scope here (BR-WS-05); that differentiation belongs entirely to the consuming application.
+- **`WorkspaceRole`** — ADR-0027 (supersedes the `ADMIN | MEMBER` fixed enum described below and ADR-0010 §3 addendum's own `OWNER | ADMIN | MEMBER` note before it). A named bundle of **opaque, consumer-defined** `permissions` strings — Clavaris never interprets a role's `name` or its permissions, same posture `OAuthClient.allowedScopes`/`WebhookEndpoint.subscribedEventTypes` already hold. Scoped to `Organization`, not `Workspace` — one role set is shared across every `Workspace` that Organization owns. `parentRoleId` is an optional single-hop reference; a role's *effective* permissions are its own plus every ancestor's, resolved by `WorkspaceRoleHierarchy` (multi-hop cycles rejected there, a same-role self-parent rejected in the entity itself). `reserved` is `true` for exactly one system-seeded role per Organization (created by `CreateWorkspaceService` on that Organization's first `Workspace`), carrying the two reserved permissions below — it can never be stripped of them and can never be deleted. Deleting any (non-reserved) role is also rejected while another role still names it as `parentRoleId` — `workspace_roles.parent_role_id` deliberately has no `ON DELETE` action, so this is an explicit `DeleteWorkspaceRoleService` check (BR-WS-07/08), not a database cascade.
+- **Reserved permission namespace (ADR-0027 §1)** — `clavaris:workspace:manage_members`/`clavaris:workspace:manage_roles` are the only two permission strings Clavaris's own authorization logic (`ManageMembersGuard`) ever interprets; every other permission string is opaque, exactly like an OAuth scope. BR-WS-01/05's old "at least one ADMIN at all times" invariant is now framed as "at least one membership whose *effective* permissions include `clavaris:workspace:manage_members`," evaluated through the parent-chain, not a fixed role name.
+- **`WorkspaceMembership.roleId`** — nullable `UUID` (ADR-0027, replaces the old `role` enum column). `null` means "a member of this Workspace with no role currently assigned" — an explicitly allowed state, reached via unassignment (never via `AddWorkspaceMemberService`, which always requires a role at add-time). Role deletion is blocked while any membership still references it (BR-WS-07); a consumer must reassign or explicitly unassign every holder first.
 - **`WorkspaceMembership.accountId`** — BR-WS-04: a plain `UUID`, not an identity-module type — organization-module never depends on identity-module (same cross-module-reference discipline `Organization.ownerPlatformAccountId` already follows). Provisioned directly by `AddWorkspaceMemberService` (a real `Account` created for every new member), never linked from a pre-existing `Account` — v1 has no "attach an existing Account to a second Workspace" flow.
 - **`WorkspaceInvitation`** — BR-WS-02: **deferred to v1.1+, not built.** Members are provisioned directly in v1 (BR-WS-04); this entity would scope one email + one workspace, expire, and be single-use (`consumedAt`) if/when it's added.
 
@@ -305,8 +319,11 @@ Since ADR-0010, two more cross-module references follow this same discipline and
 | `AccountDeletedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: `organization-module`'s workspace memberships are removed synchronously via a direct port call in the same transaction (BR-DATA-03) — never via an event listener reacting to this event later. **Live since the Workspace feature, 2026-08-27** (`WorkspaceMembershipEraserBridge`) — this row described the intended design before the feature existed to implement it; it now does. | ✅ → `account.deleted` |
 | `WorkspaceCreatedEvent` | `organization-module` | — | ✅ → `workspace.created` |
 | `WorkspaceMemberAddedEvent` | `organization-module` | Best-effort side effect (BR-WS-04): provisioning the new member's `Account` and triggering their password-reset email both already completed, outside any transaction, before this is raised — see `AddWorkspaceMemberService`'s own Javadoc | ✅ → `workspace_membership.added` |
-| `WorkspaceMemberRoleChangedEvent` | `organization-module` | — | ✅ → `workspace_membership.role_changed` |
+| `WorkspaceMemberRoleChangedEvent` | `organization-module` | — (ADR-0027: carries the new `roleId`, nullable for an unassignment, not the old fixed enum value) | ✅ → `workspace_membership.role_changed` |
 | `WorkspaceMemberRemovedEvent` | `organization-module` | — | ✅ → `workspace_membership.removed` |
+| `WorkspaceRoleCreatedEvent` | `organization-module` | — (ADR-0027) | ✅ → `workspace_role.created` |
+| `WorkspaceRoleUpdatedEvent` | `organization-module` | — (ADR-0027) | ✅ → `workspace_role.updated` |
+| `WorkspaceRoleDeletedEvent` | `organization-module` | — (ADR-0027) | ✅ → `workspace_role.deleted` |
 
 Not every internal domain event becomes a webhook — only the ones a consumer plausibly needs to react to (ADR-0007 §3). This table is the seed of the event catalog in `prd-mvp.md` §2.3; extending it is additive (BR-WEBHOOK area) and does not require an ADR revision by itself. **When adding a new row, classify it as one of the two reaction kinds above explicitly — don't leave a new ambiguous "triggers X" without saying which.**
 

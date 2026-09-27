@@ -15,7 +15,6 @@ import com.clavaris.organization.application.usecase.addworkspacemember.Workspac
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,7 @@ class GetAuditLogForOrganizationServiceTest {
     UUID organizationId = UUID.randomUUID();
     Workspace workspace = Workspace.register(organizationId, "Engineering");
     WorkspaceMembership membership =
-        WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), WorkspaceRole.MEMBER);
+        WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), UUID.randomUUID());
     String oauthClientId = UUID.randomUUID().toString();
     String webhookEndpointId = UUID.randomUUID().toString();
 

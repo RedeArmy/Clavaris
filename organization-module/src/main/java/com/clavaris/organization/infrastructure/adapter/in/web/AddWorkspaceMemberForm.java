@@ -1,14 +1,17 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 
 /**
  * Web-layer form object for the dashboard's own "add member" form on the Workspace-detail page —
  * same {@code AddWorkspaceMemberRequest}-is-the-REST-API's-own-DTO split {@link
- * CreateOrganizationForm}'s own Javadoc documents. {@code role} defaults to {@link
- * WorkspaceRole#MEMBER} when the select is left on its default option (BR-WS-05).
+ * CreateOrganizationForm}'s own Javadoc documents. {@code roleId} (ADR-0027 — replaces the old
+ * fixed-enum {@code role}) is a required select over this Organization's own {@code WorkspaceRole}
+ * list, populated by the controller — unlike the old enum, there's no fixed default value to fall
+ * back to when the select is left unset.
  */
 // PMD.DataClass: a plain web-layer form bean is *supposed* to be just fields + getters/setters —
 // same "expected here, not a smell to fix" rationale AccountEntity's own identical suppression
@@ -20,7 +23,8 @@ public class AddWorkspaceMemberForm {
   @Email(message = "Must be a valid email address")
   private String email;
 
-  private WorkspaceRole role = WorkspaceRole.MEMBER;
+  @NotNull(message = "Role is required")
+  private UUID roleId;
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   public AddWorkspaceMemberForm() {
@@ -35,11 +39,11 @@ public class AddWorkspaceMemberForm {
     this.email = email;
   }
 
-  public WorkspaceRole getRole() {
-    return role;
+  public UUID getRoleId() {
+    return roleId;
   }
 
-  public void setRole(final WorkspaceRole role) {
-    this.role = role == null ? WorkspaceRole.MEMBER : role;
+  public void setRoleId(final UUID roleId) {
+    this.roleId = roleId;
   }
 }

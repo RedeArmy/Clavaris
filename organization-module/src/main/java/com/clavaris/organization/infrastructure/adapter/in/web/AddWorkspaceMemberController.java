@@ -5,6 +5,7 @@ import com.clavaris.organization.application.usecase.addworkspacemember.AccountP
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -37,7 +38,11 @@ class AddWorkspaceMemberController {
   @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Add a new member to a Workspace, provisioning a real Account (BR-WS-04)")
   @ApiResponse(responseCode = "201", description = "Account provisioned; membership created")
-  @ApiResponse(responseCode = "404", description = "No Workspace exists with the given id")
+  @ApiResponse(
+      responseCode = "404",
+      description =
+          "No Workspace exists with the given id, or roleId doesn't reference a"
+              + " WorkspaceRole belonging to its Organization")
   @ApiResponse(
       responseCode = "409",
       description = "The given email is already registered in this Workspace's own Organization")
@@ -53,9 +58,9 @@ class AddWorkspaceMemberController {
               new AddWorkspaceMemberCommand(
                   workspaceId,
                   request.email(),
-                  request.roleOrDefault(),
+                  request.roleId(),
                   AuditActor.platformClient(authentication.getName())));
-    } catch (final WorkspaceNotFoundException _) {
+    } catch (final WorkspaceNotFoundException | WorkspaceRoleNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final AccountProvisioner.AccountAlreadyExistsException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();

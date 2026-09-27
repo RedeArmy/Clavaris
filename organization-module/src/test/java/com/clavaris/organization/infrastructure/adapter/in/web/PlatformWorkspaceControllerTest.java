@@ -25,6 +25,7 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.CannotRemoveLastAdminException;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
@@ -34,6 +35,7 @@ import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,7 @@ class PlatformWorkspaceControllerTest {
   private GetWorkspaceForOrganizationUseCase getWorkspace;
   private ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private ListWorkspaceMembersPagedUseCase listMembers;
+  private ListWorkspaceRolesForOrganizationUseCase listRoles;
   private CreateWorkspaceUseCase createWorkspace;
   private AddWorkspaceMemberUseCase addMember;
   private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
@@ -64,6 +67,7 @@ class PlatformWorkspaceControllerTest {
   private MockMvc mockMvc;
   private Organization organization;
   private Workspace workspace;
+  private WorkspaceRole role;
 
   @BeforeEach
   void setUp() {
@@ -71,6 +75,7 @@ class PlatformWorkspaceControllerTest {
     getWorkspace = mock(GetWorkspaceForOrganizationUseCase.class);
     listWorkspaces = mock(ListWorkspacesForOrganizationPagedUseCase.class);
     listMembers = mock(ListWorkspaceMembersPagedUseCase.class);
+    listRoles = mock(ListWorkspaceRolesForOrganizationUseCase.class);
     createWorkspace = mock(CreateWorkspaceUseCase.class);
     addMember = mock(AddWorkspaceMemberUseCase.class);
     changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
@@ -79,12 +84,14 @@ class PlatformWorkspaceControllerTest {
 
     organization = Organization.register("Acme Co", OWNER_ID);
     workspace = Workspace.register(organization.id(), "Engineering");
+    role = WorkspaceRole.defineReserved(organization.id(), "Admin");
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
     when(getWorkspace.handle(any())).thenReturn(Optional.of(workspace));
     when(listWorkspaces.handle(any())).thenReturn(emptyWorkspacesPage());
     when(listMembers.handle(any())).thenReturn(emptyMembersPage());
+    when(listRoles.handle(any())).thenReturn(List.of(role));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -107,6 +114,7 @@ class PlatformWorkspaceControllerTest {
                     getWorkspace,
                     listWorkspaces,
                     listMembers,
+                    listRoles,
                     createWorkspace,
                     addMember,
                     changeMemberRole,
@@ -171,7 +179,7 @@ class PlatformWorkspaceControllerTest {
   @Test
   void showsTheWorkspaceAndItsMembers() throws Exception {
     WorkspaceMembership membership =
-        WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), WorkspaceRole.ADMIN);
+        WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role.id());
     KeysetCursor cursor = cursorOf(membership);
     when(listMembers.handle(any()))
         .thenReturn(new KeysetPage<>(List.of(membership), cursor, cursor, false, false));
@@ -182,6 +190,13 @@ class PlatformWorkspaceControllerTest {
         .andExpect(view().name("organization/platform/workspace-detail"))
         .andExpect(model().attribute("workspace", workspace))
         .andExpect(model().attribute("members", List.of(membership)));
+  }
+
+  @Test
+  void showsTheOrganizationsRolesForTheRoleSelector() throws Exception {
+    mockMvc.perform(get(workspacesPath() + "/" + workspace.id()));
+
+    verify(listRoles).handle(any());
   }
 
   // TD-PERF-020 (keyset revision): proves ?after= is actually decoded and threaded into the
@@ -227,11 +242,13 @@ class PlatformWorkspaceControllerTest {
   @Test
   void plainAddMemberPostRedirectsBackToTheWorkspacePage() throws Exception {
     when(addMember.handle(any()))
-        .thenReturn(
-            WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), WorkspaceRole.MEMBER));
+        .thenReturn(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role.id()));
 
     mockMvc
-        .perform(post(membersPath()).param("email", "new@acme.example").param("role", "MEMBER"))
+        .perform(
+            post(membersPath())
+                .param("email", "new@acme.example")
+                .param("roleId", role.id().toString()))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
 
@@ -241,14 +258,13 @@ class PlatformWorkspaceControllerTest {
   @Test
   void htmxAddMemberPostReturnsTheMembersFragment() throws Exception {
     when(addMember.handle(any()))
-        .thenReturn(
-            WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), WorkspaceRole.MEMBER));
+        .thenReturn(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role.id()));
 
     mockMvc
         .perform(
             post(membersPath())
                 .param("email", "new@acme.example")
-                .param("role", "MEMBER")
+                .param("roleId", role.id().toString())
                 .header("HX-Request", "true"))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-detail :: members"));
@@ -264,7 +280,10 @@ class PlatformWorkspaceControllerTest {
         .handle(any());
 
     mockMvc
-        .perform(post(membersPath()).param("email", "dupe@acme.example").param("role", "MEMBER"))
+        .perform(
+            post(membersPath())
+                .param("email", "dupe@acme.example")
+                .param("roleId", role.id().toString()))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-detail"))
         .andExpect(model().attribute("emailAlreadyRegisteredError", true));
@@ -274,10 +293,25 @@ class PlatformWorkspaceControllerTest {
   void plainChangeRolePostRedirectsOnSuccess() throws Exception {
     UUID accountId = UUID.randomUUID();
     when(changeMemberRole.handle(any()))
-        .thenReturn(WorkspaceMembership.join(workspace.id(), accountId, WorkspaceRole.ADMIN));
+        .thenReturn(WorkspaceMembership.join(workspace.id(), accountId, role.id()));
 
     mockMvc
-        .perform(post(membersPath() + "/" + accountId + "/role").param("newRole", "ADMIN"))
+        .perform(
+            post(membersPath() + "/" + accountId + "/role")
+                .param("newRoleId", role.id().toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+  }
+
+  // ADR-0027 §5: omitting newRoleId entirely is a valid unassign request, not a validation error.
+  @Test
+  void plainChangeRolePostWithNoNewRoleIdUnassignsTheRole() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(changeMemberRole.handle(any()))
+        .thenReturn(WorkspaceMembership.join(workspace.id(), accountId, null));
+
+    mockMvc
+        .perform(post(membersPath() + "/" + accountId + "/role"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
   }
@@ -286,12 +320,15 @@ class PlatformWorkspaceControllerTest {
   void changeRoleThatWouldLeaveNoAdminRendersAnErrorInsteadOfPropagatingTheException()
       throws Exception {
     UUID accountId = UUID.randomUUID();
+    WorkspaceRole plainRole = WorkspaceRole.define(organization.id(), "Member", null, Set.of());
     doThrow(new CannotDemoteLastAdminException(workspace.id()))
         .when(changeMemberRole)
         .handle(any());
 
     mockMvc
-        .perform(post(membersPath() + "/" + accountId + "/role").param("newRole", "MEMBER"))
+        .perform(
+            post(membersPath() + "/" + accountId + "/role")
+                .param("newRoleId", plainRole.id().toString()))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-detail"))
         .andExpect(model().attribute("cannotDemoteLastAdminError", true));

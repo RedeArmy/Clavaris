@@ -2,6 +2,7 @@ package com.clavaris.organization.application.usecase.addworkspacemember;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceMemberAddedEvent;
 import com.clavaris.organization.domain.model.Workspace;
@@ -58,6 +59,7 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
   private static final Logger LOG = LoggerFactory.getLogger(AddWorkspaceMemberService.class);
 
   private final WorkspaceRepository workspaces;
+  private final WorkspaceRoleRepository roles;
   private final WorkspaceMembershipRepository memberships;
   private final AccountProvisioner accountProvisioner;
   private final AuditEventRecorder auditEvents;
@@ -68,12 +70,14 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
   // DeleteOrganizationService's own identical suppression: this flow genuinely needs every one.
   public AddWorkspaceMemberService(
       final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
       final WorkspaceMembershipRepository memberships,
       final AccountProvisioner accountProvisioner,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
       final TransactionTemplate transactionTemplate) {
     this.workspaces = workspaces;
+    this.roles = roles;
     this.memberships = memberships;
     this.accountProvisioner = accountProvisioner;
     this.auditEvents = auditEvents;
@@ -88,6 +92,16 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
             .findById(command.workspaceId())
             .orElseThrow(() -> new WorkspaceNotFoundException(command.workspaceId()));
 
+    // ADR-0027: roleId must reference a real WorkspaceRole belonging to this same Workspace's own
+    // Organization — same anti-enumeration posture as WorkspaceRoleNotFoundException's own
+    // Javadoc (a role from a different Organization is reported identically to "doesn't exist").
+    final boolean roleBelongsToThisOrganization =
+        roles.findById(command.roleId()).stream()
+            .anyMatch(role -> role.organizationId().equals(workspace.organizationId()));
+    if (!roleBelongsToThisOrganization) {
+      throw new WorkspaceRoleNotFoundException(command.roleId());
+    }
+
     // Outside any transaction this class opens — see this class's own Javadoc.
     final AccountProvisioner.ProvisionedAccount account =
         accountProvisioner.provisionAndSendWelcome(workspace.organizationId(), command.email());
@@ -96,7 +110,7 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
       return transactionTemplate.execute(
           status -> {
             final WorkspaceMembership membership =
-                WorkspaceMembership.join(workspace.id(), account.accountId(), command.role());
+                WorkspaceMembership.join(workspace.id(), account.accountId(), command.roleId());
             memberships.save(membership);
 
             auditEvents.write(
@@ -104,7 +118,7 @@ public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
                 "workspace_membership.added",
                 "WorkspaceMembership",
                 membership.id().toString(),
-                "workspaceId=" + workspace.id() + " role=" + command.role());
+                "workspaceId=" + workspace.id() + " roleId=" + command.roleId());
 
             outbox.write(
                 "WorkspaceMembership",
