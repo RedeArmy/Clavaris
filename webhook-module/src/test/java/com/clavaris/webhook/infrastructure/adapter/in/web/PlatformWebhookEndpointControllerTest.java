@@ -154,6 +154,10 @@ class PlatformWebhookEndpointControllerTest {
   // the two scripts above it, only proves the <script src> tag is present in the response, never
   // that the JS inside actually runs or that CSP allows it; that gap is exactly how the original
   // bug shipped undetected. See event-type-picker.js's own comment for the fix.
+  //
+  // category-checkbox-picker.js added 2026-09-27: event-type-picker.js calls directly into it
+  // (no bundler in this codebase's static JS, so load order is load-bearing) — missing this tag
+  // would break the picker exactly as silently as the original CSP bug did.
   @Test
   void sidebarLoadsEveryScriptManageAccountAndTheEventPickerNeed() throws Exception {
     mockMvc
@@ -161,6 +165,7 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("/js/htmx.min.js")))
         .andExpect(content().string(containsString("/js/organization-dialog.js")))
+        .andExpect(content().string(containsString("/js/category-checkbox-picker.js")))
         .andExpect(content().string(containsString("/js/event-type-picker.js")));
   }
 

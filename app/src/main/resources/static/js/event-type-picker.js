@@ -10,7 +10,11 @@
   // CSP, so this passed every automated check while doing nothing in a real browser. Same
   // event-delegation shape organization-dialog.js already establishes: one listener on document,
   // safe to load unconditionally on every dashboard page (a no-op wherever #event-type-options
-  // doesn't exist).
+  // doesn't exist). Shared category-checkbox-picker.js logic (loaded before this script) covers
+  // the parts identical to scope-picker.js's own.
+
+  const CONTAINER_ID = "event-type-options";
+  const CATEGORY_CHECKBOX_CLASS = "clavaris-event-category-checkbox";
 
   const toggleEventCategory = (categoryCheckbox) => {
     const category = categoryCheckbox.dataset.category;
@@ -25,27 +29,6 @@
           checkbox.checked = checked;
         }
       });
-  };
-
-  const updateEventCategoryCheckboxState = (changedCheckbox) => {
-    const category = changedCheckbox.dataset.category;
-    const categoryCheckbox = document.querySelector(
-      '#event-type-options .clavaris-event-category-checkbox[data-category="' + category + '"]',
-    );
-    if (!categoryCheckbox) {
-      return;
-    }
-    const children = document.querySelectorAll(
-      '#event-type-options .clavaris-event-option input[data-category="' + category + '"]',
-    );
-    let checkedCount = 0;
-    children.forEach((checkbox) => {
-      if (checkbox.checked) {
-        checkedCount += 1;
-      }
-    });
-    categoryCheckbox.checked = checkedCount === children.length;
-    categoryCheckbox.indeterminate = checkedCount > 0 && checkedCount < children.length;
   };
 
   // Turning the wildcard on checks every box (category and individual alike) so the toggle's own
@@ -67,12 +50,16 @@
       toggleAllEventsWildcard(event.target.checked);
       return;
     }
-    if (event.target.matches?.(".clavaris-event-category-checkbox")) {
+    if (event.target.matches?.("." + CATEGORY_CHECKBOX_CLASS)) {
       toggleEventCategory(event.target);
       return;
     }
     if (event.target.matches?.("#event-type-options .clavaris-event-option input[type=checkbox]")) {
-      updateEventCategoryCheckboxState(event.target);
+      window.ClavarisCategoryPicker.updateCategoryCheckboxState(
+        CONTAINER_ID,
+        CATEGORY_CHECKBOX_CLASS,
+        event.target,
+      );
     }
   });
 
@@ -81,18 +68,7 @@
   // toggle — an endpoint already subscribed to "*" renders with every checkbox already checked
   // and disabled.
   document.addEventListener("DOMContentLoaded", () => {
-    document
-      .querySelectorAll("#event-type-options .clavaris-event-category-checkbox")
-      .forEach((categoryCheckbox) => {
-        const firstChild = document.querySelector(
-          '#event-type-options .clavaris-event-option input[data-category="' +
-            categoryCheckbox.dataset.category +
-            '"]',
-        );
-        if (firstChild) {
-          updateEventCategoryCheckboxState(firstChild);
-        }
-      });
+    window.ClavarisCategoryPicker.initializeCategoryCheckboxes(CONTAINER_ID, CATEGORY_CHECKBOX_CLASS);
     const allEventsCheckbox = document.getElementById("all-events-checkbox");
     if (allEventsCheckbox?.checked) {
       toggleAllEventsWildcard(true);

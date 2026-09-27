@@ -7,7 +7,12 @@
   // and its wildcard concept (no "all scopes" sentinel exists the way "*" does for a webhook
   // event type). Same CSP posture as that script and organization-dialog.js: no inline
   // onchange="..." attributes, one delegated listener on document, safe to load unconditionally
-  // on every dashboard page (a no-op wherever #scope-options doesn't exist).
+  // on every dashboard page (a no-op wherever #scope-options doesn't exist). Shared
+  // category-checkbox-picker.js logic (loaded before this script) covers the parts identical to
+  // event-type-picker.js's own.
+
+  const CONTAINER_ID = "scope-options";
+  const CATEGORY_CHECKBOX_CLASS = "clavaris-scope-category-checkbox";
 
   const toggleScopeCategory = (categoryCheckbox) => {
     const category = categoryCheckbox.dataset.category;
@@ -22,34 +27,17 @@
       });
   };
 
-  const updateScopeCategoryCheckboxState = (changedCheckbox) => {
-    const category = changedCheckbox.dataset.category;
-    const categoryCheckbox = document.querySelector(
-      '#scope-options .clavaris-scope-category-checkbox[data-category="' + category + '"]',
-    );
-    if (!categoryCheckbox) {
-      return;
-    }
-    const children = document.querySelectorAll(
-      '#scope-options .clavaris-event-option input[data-category="' + category + '"]',
-    );
-    let checkedCount = 0;
-    children.forEach((checkbox) => {
-      if (checkbox.checked) {
-        checkedCount += 1;
-      }
-    });
-    categoryCheckbox.checked = checkedCount === children.length;
-    categoryCheckbox.indeterminate = checkedCount > 0 && checkedCount < children.length;
-  };
-
   document.addEventListener("change", (event) => {
-    if (event.target.matches?.(".clavaris-scope-category-checkbox")) {
+    if (event.target.matches?.("." + CATEGORY_CHECKBOX_CLASS)) {
       toggleScopeCategory(event.target);
       return;
     }
     if (event.target.matches?.("#scope-options .clavaris-event-option input[type=checkbox]")) {
-      updateScopeCategoryCheckboxState(event.target);
+      window.ClavarisCategoryPicker.updateCategoryCheckboxState(
+        CONTAINER_ID,
+        CATEGORY_CHECKBOX_CLASS,
+        event.target,
+      );
     }
   });
 
@@ -57,17 +45,6 @@
   // checkboxes already came pre-checked — not reachable on the create form today (it always
   // starts empty), but keeps this script correct the day an edit form reuses the same picker.
   document.addEventListener("DOMContentLoaded", () => {
-    document
-      .querySelectorAll("#scope-options .clavaris-scope-category-checkbox")
-      .forEach((categoryCheckbox) => {
-        const firstChild = document.querySelector(
-          '#scope-options .clavaris-event-option input[data-category="' +
-            categoryCheckbox.dataset.category +
-            '"]',
-        );
-        if (firstChild) {
-          updateScopeCategoryCheckboxState(firstChild);
-        }
-      });
+    window.ClavarisCategoryPicker.initializeCategoryCheckboxes(CONTAINER_ID, CATEGORY_CHECKBOX_CLASS);
   });
 })();
