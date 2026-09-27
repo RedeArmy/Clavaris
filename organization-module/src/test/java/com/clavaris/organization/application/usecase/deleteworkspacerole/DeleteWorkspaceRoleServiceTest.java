@@ -14,6 +14,7 @@ import com.clavaris.organization.application.usecase.addworkspacemember.Workspac
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
@@ -100,6 +101,42 @@ class DeleteWorkspaceRoleServiceTest {
     verify(roles, never()).deleteById(any());
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
+  }
+
+  // ADR-0028 §3: the reserved role is no longer permanently undeletable — allowed once some other
+  // role's own effective permissions already cover both reserved permissions.
+  @Test
+  void allowsDeletingTheReservedRoleOnceASubstituteRoleExists() {
+    WorkspaceRole reserved = WorkspaceRole.defineReserved(organizationId, "Admin");
+    WorkspaceRole substitute =
+        WorkspaceRole.define(organizationId, "Owner", null, ReservedWorkspacePermissions.ALL);
+    when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(reserved, substitute));
+    when(memberships.existsByRoleId(reserved.id())).thenReturn(false);
+    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(reserved.id(), ACTOR);
+
+    service.handle(command);
+
+    verify(roles).deleteById(reserved.id());
+  }
+
+  // A substitute must cover BOTH reserved permissions — one alone still leaves the Organization
+  // without a real path to manage the other, so this must not be treated as sufficient.
+  @Test
+  void rejectsDeletingTheReservedRoleWhenTheOnlySubstituteIsMissingOneReservedPermission() {
+    WorkspaceRole reserved = WorkspaceRole.defineReserved(organizationId, "Admin");
+    WorkspaceRole partialSubstitute =
+        WorkspaceRole.define(
+            organizationId, "Partial", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
+    when(roles.findAllByOrganizationId(organizationId))
+        .thenReturn(List.of(reserved, partialSubstitute));
+    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(reserved.id(), ACTOR);
+
+    assertThatExceptionOfType(CannotDeleteReservedWorkspaceRoleException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(roles, never()).deleteById(any());
   }
 
   @Test
