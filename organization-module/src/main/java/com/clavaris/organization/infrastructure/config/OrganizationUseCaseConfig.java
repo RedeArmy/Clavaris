@@ -5,6 +5,8 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionEntryRepository;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryService;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AddAccessRestrictionEntryUseCase;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamService;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
@@ -27,6 +29,9 @@ import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRe
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleService;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleUseCase;
+import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamService;
+import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationService;
 import com.clavaris.organization.application.usecase.deleteorganization.DeleteOrganizationUseCase;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -38,6 +43,8 @@ import com.clavaris.organization.application.usecase.deleteorganizationsocialcre
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleService;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamService;
+import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationService;
@@ -71,11 +78,21 @@ import com.clavaris.organization.application.usecase.listworkspacesfororganizati
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedService;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsService;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsService;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceService;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryService;
 import com.clavaris.organization.application.usecase.removeaccessrestrictionentry.RemoveAccessRestrictionEntryUseCase;
+import com.clavaris.organization.application.usecase.removerolefromworkspaceteam.RemoveRoleFromWorkspaceTeamService;
+import com.clavaris.organization.application.usecase.removerolefromworkspaceteam.RemoveRoleFromWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberRefreshTokenRevoker;
+import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamService;
+import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationUseCase;
@@ -362,6 +379,60 @@ class OrganizationUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new DeleteWorkspaceRoleService(roles, memberships, auditEvents, eventOutboxWriter);
+  }
+
+  // ADR-0028: WorkspaceTeam CRUD + role-association use cases.
+  @Bean
+  /* package */ CreateWorkspaceTeamUseCase createWorkspaceTeamUseCase(
+      final WorkspaceTeamRepository teams,
+      final WorkspaceRepository workspaces,
+      final AuditEventRecorder auditEvents) {
+    return new CreateWorkspaceTeamService(teams, workspaces, auditEvents);
+  }
+
+  @Bean
+  /* package */ RenameWorkspaceTeamUseCase renameWorkspaceTeamUseCase(
+      final WorkspaceTeamRepository teams, final AuditEventRecorder auditEvents) {
+    return new RenameWorkspaceTeamService(teams, auditEvents);
+  }
+
+  @Bean
+  /* package */ DeleteWorkspaceTeamUseCase deleteWorkspaceTeamUseCase(
+      final WorkspaceTeamRepository teams, final AuditEventRecorder auditEvents) {
+    return new DeleteWorkspaceTeamService(teams, auditEvents);
+  }
+
+  @Bean
+  /* package */ AddRoleToWorkspaceTeamUseCase addRoleToWorkspaceTeamUseCase(
+      final WorkspaceTeamRepository teams,
+      final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
+      final AuditEventRecorder auditEvents) {
+    return new AddRoleToWorkspaceTeamService(teams, workspaces, roles, auditEvents);
+  }
+
+  @Bean
+  /* package */ RemoveRoleFromWorkspaceTeamUseCase removeRoleFromWorkspaceTeamUseCase(
+      final WorkspaceTeamRepository teams, final AuditEventRecorder auditEvents) {
+    return new RemoveRoleFromWorkspaceTeamService(teams, auditEvents);
+  }
+
+  @Bean
+  /* package */ ListWorkspaceTeamsForWorkspaceUseCase listWorkspaceTeamsForWorkspaceUseCase(
+      final WorkspaceTeamRepository teams) {
+    return new ListWorkspaceTeamsForWorkspaceService(teams);
+  }
+
+  @Bean
+  /* package */ ListWorkspaceTeamRoleIdsUseCase listWorkspaceTeamRoleIdsUseCase(
+      final WorkspaceTeamRepository teams) {
+    return new ListWorkspaceTeamRoleIdsService(teams);
+  }
+
+  @Bean
+  /* package */ ListGroupedWorkspaceRoleIdsUseCase listGroupedWorkspaceRoleIdsUseCase(
+      final WorkspaceTeamRepository teams) {
+    return new ListGroupedWorkspaceRoleIdsService(teams);
   }
 
   // TD-PERF-020: the dashboard's own paginated sibling — see that use case's own Javadoc.
