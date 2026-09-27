@@ -3,6 +3,9 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamCommand;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.addroletoworkspaceteam.WorkspaceRoleAlreadyInAnotherTeamException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
@@ -14,6 +17,12 @@ import com.clavaris.organization.application.usecase.changeworkspacememberrole.C
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceCommand;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
+import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamCommand;
+import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
+import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamNotFoundException;
+import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamCommand;
+import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationQuery;
@@ -24,16 +33,32 @@ import com.clavaris.organization.application.usecase.listworkspacerolesfororgani
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
+import com.clavaris.organization.application.usecase.removerolefromworkspaceteam.RemoveRoleFromWorkspaceTeamCommand;
+import com.clavaris.organization.application.usecase.removerolefromworkspaceteam.RemoveRoleFromWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.CannotRemoveLastAdminException;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
+import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamCommand;
+import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import com.clavaris.organization.domain.model.WorkspaceTeam;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -104,8 +129,12 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACES_FRAGMENT = ORGANIZATION_DETAIL_VIEW + " :: workspaces";
   private static final String WORKSPACE_DETAIL_VIEW = "organization/platform/workspace-detail";
   private static final String MEMBERS_FRAGMENT = WORKSPACE_DETAIL_VIEW + " :: members";
+  private static final String TEAMS_FRAGMENT = WORKSPACE_DETAIL_VIEW + " :: teams";
   private static final String MEMBER_FORM_ATTRIBUTE = "memberForm";
+  private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
+  private static final String ORGANIZATIONS_REDIRECT_PREFIX =
+      "redirect:/platform/dashboard/organizations/";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
   // PlatformOrganizationDashboardController's own identical constant.
@@ -121,10 +150,20 @@ public class PlatformWorkspaceController {
   private final ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private final RemoveWorkspaceMemberUseCase removeMemberUseCase;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
+  private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
+  private final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
+  private final ListGroupedWorkspaceRoleIdsUseCase listGroupedRoleIds;
+  private final CreateWorkspaceTeamUseCase createTeamUseCase;
+  private final RenameWorkspaceTeamUseCase renameTeamUseCase;
+  private final DeleteWorkspaceTeamUseCase deleteTeamUseCase;
+  private final AddRoleToWorkspaceTeamUseCase addRoleToTeamUseCase;
+  private final RemoveRoleFromWorkspaceTeamUseCase removeRoleFromTeamUseCase;
 
   // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
-  // as every other multi-collaborator constructor in this codebase; ADR-0027's own
-  // listRoles addition pushed this past PMD's default threshold (10), not a new design smell.
+  // as every other multi-collaborator constructor in this codebase; ADR-0028's own Teams section
+  // (8 further collaborators: 3 read use cases, 5 mutating ones) pushed this well past PMD's
+  // default threshold (10) — wiring, not sprawl, same reasoning OrganizationUseCaseConfig's own
+  // class-level Javadoc documents for an identical situation.
   @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public PlatformWorkspaceController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
@@ -136,7 +175,15 @@ public class PlatformWorkspaceController {
       final AddWorkspaceMemberUseCase addMemberUseCase,
       final ChangeWorkspaceMemberRoleUseCase changeMemberRole,
       final RemoveWorkspaceMemberUseCase removeMemberUseCase,
-      final CurrentPlatformAccountResolver currentPlatformAccount) {
+      final CurrentPlatformAccountResolver currentPlatformAccount,
+      final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
+      final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds,
+      final ListGroupedWorkspaceRoleIdsUseCase listGroupedRoleIds,
+      final CreateWorkspaceTeamUseCase createTeamUseCase,
+      final RenameWorkspaceTeamUseCase renameTeamUseCase,
+      final DeleteWorkspaceTeamUseCase deleteTeamUseCase,
+      final AddRoleToWorkspaceTeamUseCase addRoleToTeamUseCase,
+      final RemoveRoleFromWorkspaceTeamUseCase removeRoleFromTeamUseCase) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
     this.listWorkspaces = listWorkspaces;
@@ -147,6 +194,14 @@ public class PlatformWorkspaceController {
     this.changeMemberRole = changeMemberRole;
     this.removeMemberUseCase = removeMemberUseCase;
     this.currentPlatformAccount = currentPlatformAccount;
+    this.listTeams = listTeams;
+    this.listTeamRoleIds = listTeamRoleIds;
+    this.listGroupedRoleIds = listGroupedRoleIds;
+    this.createTeamUseCase = createTeamUseCase;
+    this.renameTeamUseCase = renameTeamUseCase;
+    this.deleteTeamUseCase = deleteTeamUseCase;
+    this.addRoleToTeamUseCase = addRoleToTeamUseCase;
+    this.removeRoleFromTeamUseCase = removeRoleFromTeamUseCase;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -187,7 +242,7 @@ public class PlatformWorkspaceController {
       model.addAttribute("workspaceForm", new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/" + organizationId;
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
   }
 
   private void addWorkspacesToModel(
@@ -217,6 +272,11 @@ public class PlatformWorkspaceController {
     model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
     populateMembersModel(
         model, organization, workspace, KeysetPageRequest.fromCursors(after, before));
+    // ADR-0028: populated unconditionally, even on the HTMX members-pagination branch below —
+    // harmless extra model data the members fragment's own Thymeleaf selector simply never
+    // renders, and it means a plain (non-HTMX) full-page GET always has the Teams section's own
+    // data ready without a second branch to remember.
+    populateTeamsModel(model, workspace);
     // TD-PERF-020: same "a pagination link is itself an hx-get, and its hx-target can't safely
     // receive a full HTML document" reasoning PlatformOrganizationDetailController's own identical
     // branching documents.
@@ -238,6 +298,12 @@ public class PlatformWorkspaceController {
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     if (bindingResult.hasErrors()) {
       populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      // ADR-0028: the full (non-HTMX) page render below also includes the Teams section, which
+      // needs its own data populated too — omitting this on an error-redisplay path (as opposed
+      // to a successful mutation, which always redirects to a fresh GET) left "workspace"/"teams"
+      // unset here, a real bug caught by this controller's own test suite (a null workspace.name()
+      // SpelEvaluationException on the very next render).
+      populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -258,6 +324,12 @@ public class PlatformWorkspaceController {
       model.addAttribute("emailAlreadyRegisteredError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, form);
       populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      // ADR-0028: the full (non-HTMX) page render below also includes the Teams section, which
+      // needs its own data populated too — omitting this on an error-redisplay path (as opposed
+      // to a successful mutation, which always redirects to a fresh GET) left "workspace"/"teams"
+      // unset here, a real bug caught by this controller's own test suite (a null workspace.name()
+      // SpelEvaluationException on the very next render).
+      populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -293,6 +365,12 @@ public class PlatformWorkspaceController {
       model.addAttribute("cannotDemoteLastAdminError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
       populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      // ADR-0028: the full (non-HTMX) page render below also includes the Teams section, which
+      // needs its own data populated too — omitting this on an error-redisplay path (as opposed
+      // to a successful mutation, which always redirects to a fresh GET) left "workspace"/"teams"
+      // unset here, a real bug caught by this controller's own test suite (a null workspace.name()
+      // SpelEvaluationException on the very next render).
+      populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
@@ -322,10 +400,192 @@ public class PlatformWorkspaceController {
       model.addAttribute("cannotRemoveLastAdminError", true);
       model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
       populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      // ADR-0028: the full (non-HTMX) page render below also includes the Teams section, which
+      // needs its own data populated too — omitting this on an error-redisplay path (as opposed
+      // to a successful mutation, which always redirects to a fresh GET) left "workspace"/"teams"
+      // unset here, a real bug caught by this controller's own test suite (a null workspace.name()
+      // SpelEvaluationException on the very next render).
+      populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? MEMBERS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
     return afterMutation(request, organization, workspace, model);
+  }
+
+  // ADR-0028: the Workspace-detail page's own Teams section — create/rename/delete a team, and
+  // add/remove one of this Organization's own roles to/from it. Every write here goes through the
+  // exact same use cases a future REST admin API would (none exists yet for Teams — dashboard-only
+  // in this increment, same "no permission semantics of its own" posture the ADR's own §4/open-
+  // question-3 documents).
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/teams")
+  public String createTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @Valid @ModelAttribute(CREATE_TEAM_FORM_ATTRIBUTE) final CreateWorkspaceTeamForm form,
+      final BindingResult bindingResult,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    if (bindingResult.hasErrors()) {
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      // ADR-0028: the full (non-HTMX) page render below also includes the Members section, which
+      // needs its own data populated too — same "each section's own populate* method is only
+      // guaranteed to run on its own action, never assume the other one already did" lesson the
+      // member-action handlers' own identical fix above already documents, mirrored here.
+      // MEMBER_FORM_ATTRIBUTE isn't set by populateMembersModel itself (every caller sets it
+      // explicitly, same established convention) — a fresh blank one, since this action never
+      // touches the member-add form's own state.
+      model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
+    }
+
+    try {
+      createTeamUseCase.handle(
+          new CreateWorkspaceTeamCommand(
+              workspaceId, form.getName(), AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final DuplicateWorkspaceTeamNameException _) {
+      model.addAttribute("duplicateTeamNameError", true);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
+    }
+
+    return afterTeamMutation(request, organization, workspace, model);
+  }
+
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/teams/{teamId}/rename")
+  public String renameTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID teamId,
+      @RequestParam final String name,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    try {
+      renameTeamUseCase.handle(
+          new RenameWorkspaceTeamCommand(
+              workspaceId, teamId, name, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceTeamNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final DuplicateWorkspaceTeamNameException _) {
+      model.addAttribute("duplicateTeamNameError", true);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
+    }
+
+    return afterTeamMutation(request, organization, workspace, model);
+  }
+
+  @PostMapping("/{workspaceId}/teams/{teamId}/delete")
+  public String deleteTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID teamId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    try {
+      deleteTeamUseCase.handle(
+          new DeleteWorkspaceTeamCommand(
+              workspaceId, teamId, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceTeamNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    return afterTeamMutation(request, organization, workspace, model);
+  }
+
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/teams/{teamId}/roles")
+  public String addRoleToTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID teamId,
+      @RequestParam final UUID roleId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    try {
+      addRoleToTeamUseCase.handle(
+          new AddRoleToWorkspaceTeamCommand(
+              workspaceId, teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceTeamNotFoundException | WorkspaceRoleNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final WorkspaceRoleAlreadyInAnotherTeamException _) {
+      model.addAttribute("roleAlreadyInAnotherTeamError", true);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      model.addAttribute(MEMBER_FORM_ATTRIBUTE, new AddWorkspaceMemberForm());
+      populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
+    }
+
+    return afterTeamMutation(request, organization, workspace, model);
+  }
+
+  @PostMapping("/{workspaceId}/teams/{teamId}/roles/{roleId}/remove")
+  public String removeRoleFromTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID teamId,
+      @PathVariable final UUID roleId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    try {
+      removeRoleFromTeamUseCase.handle(
+          new RemoveRoleFromWorkspaceTeamCommand(
+              workspaceId, teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceTeamNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    return afterTeamMutation(request, organization, workspace, model);
+  }
+
+  // Shared "a team mutation just succeeded" tail — same rationale as afterMutation's own
+  // identical shape for member actions, just targeting the Teams section instead.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private String afterTeamMutation(
+      final HttpServletRequest request,
+      final Organization organization,
+      final Workspace workspace,
+      final Model model) {
+    if (isHtmxRequest(request)) {
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      populateTeamsModel(model, workspace);
+      return TEAMS_FRAGMENT;
+    }
+    return ORGANIZATIONS_REDIRECT_PREFIX + organization.id() + "/workspaces/" + workspace.id();
   }
 
   // Shared "a mutation just succeeded" tail: HTMX gets the members fragment re-rendered in place
@@ -344,10 +604,7 @@ public class PlatformWorkspaceController {
       populateMembersModel(model, organization, workspace, KeysetPageRequest.first());
       return MEMBERS_FRAGMENT;
     }
-    return "redirect:/platform/dashboard/organizations/"
-        + organization.id()
-        + "/workspaces/"
-        + workspace.id();
+    return ORGANIZATIONS_REDIRECT_PREFIX + organization.id() + "/workspaces/" + workspace.id();
   }
 
   private void populateMembersModel(
@@ -371,6 +628,52 @@ public class PlatformWorkspaceController {
         listMembers.handle(new ListWorkspaceMembersPagedQuery(workspace.id(), pageRequest));
     model.addAttribute("members", membersPage.content());
     model.addAttribute("membersPage", membersPage);
+  }
+
+  // ADR-0028: teams (List<WorkspaceTeam>), the roles grouped into each one (Map<UUID, List
+  // <WorkspaceRole>>, keyed by teamId), and every Organization role with no team association in
+  // this Workspace ("ungrouped"). Reloads this Organization's own role catalog independently of
+  // populateMembersModel's own identical-shaped lookup — a small, deliberate redundant read (this
+  // is a low-traffic admin dashboard) rather than threading a shared map between two otherwise-
+  // independent model-population methods.
+  private void populateTeamsModel(final Model model, final Workspace workspace) {
+    // Self-sufficient on "workspace" (unlike "organization", which every call site already sets
+    // independently) — several call sites (the Team-mutation error/success paths) call this
+    // method without ever calling populateMembersModel, which is otherwise the only place that
+    // attribute gets set; a missing "workspace" here is a null workspace.name()
+    // SpelEvaluationException on the very next render, not a graceful no-op.
+    model.addAttribute("workspace", workspace);
+    final Map<UUID, WorkspaceRole> rolesById =
+        listRoles
+            .handle(new ListWorkspaceRolesForOrganizationQuery(workspace.organizationId()))
+            .stream()
+            .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
+
+    final List<WorkspaceTeam> teams =
+        listTeams.handle(new ListWorkspaceTeamsForWorkspaceQuery(workspace.id()));
+    final Map<UUID, List<WorkspaceRole>> rolesByTeamId = new LinkedHashMap<>();
+    for (final WorkspaceTeam team : teams) {
+      final List<WorkspaceRole> teamRoles =
+          listTeamRoleIds.handle(new ListWorkspaceTeamRoleIdsQuery(team.id())).stream()
+              .map(rolesById::get)
+              .filter(Objects::nonNull)
+              .sorted(Comparator.comparing(WorkspaceRole::name))
+              .toList();
+      rolesByTeamId.put(team.id(), teamRoles);
+    }
+
+    final Set<UUID> groupedRoleIds =
+        listGroupedRoleIds.handle(new ListGroupedWorkspaceRoleIdsQuery(workspace.id()));
+    final List<WorkspaceRole> ungroupedRoles =
+        rolesById.values().stream()
+            .filter(role -> !groupedRoleIds.contains(role.id()))
+            .sorted(Comparator.comparing(WorkspaceRole::name))
+            .toList();
+
+    model.addAttribute("teams", teams);
+    model.addAttribute("teamRoles", rolesByTeamId);
+    model.addAttribute("ungroupedRoles", ungroupedRoles);
+    model.addAttribute(CREATE_TEAM_FORM_ATTRIBUTE, new CreateWorkspaceTeamForm());
   }
 
   private Organization requireOwnedOrganization(

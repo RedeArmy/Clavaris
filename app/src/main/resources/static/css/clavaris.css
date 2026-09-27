@@ -804,6 +804,32 @@ code {
   margin-bottom: 32px;
 }
 
+/* ADR-0029: the Users tab's own inline search bar — same visual treatment .clavaris-field input
+   already gives every other text input, just without that class's own stacked label/margin
+   layout, which a single-input inline search bar doesn't need. */
+.clavaris-search-form {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.clavaris-search-form input[type="search"] {
+  flex: 1;
+  padding: var(--space-3);
+  font: inherit;
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.clavaris-search-form input[type="search"]:focus {
+  outline: none;
+  border-color: var(--clavaris-brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
+}
+
 .clavaris-page-header h1 {
   margin: 0;
   font-size: clamp(1.65rem, 3vw, 2.25rem);

@@ -23,11 +23,28 @@ class ListAccountsForOrganizationServiceTest {
     AccountRepository accounts = mock(AccountRepository.class);
     Account account = Account.register(organizationId, new Email("ada@example.com"));
     KeysetPage<Account> page = new KeysetPage<>(List.of(account), null, null, false, false);
-    when(accounts.findKeysetPageByOrganizationId(organizationId, pageRequest)).thenReturn(page);
+    when(accounts.findKeysetPageByOrganizationId(organizationId, pageRequest, null))
+        .thenReturn(page);
     ListAccountsForOrganizationService service = new ListAccountsForOrganizationService(accounts);
 
     KeysetPage<Account> result =
-        service.handle(new ListAccountsForOrganizationQuery(organizationId, pageRequest));
+        service.handle(new ListAccountsForOrganizationQuery(organizationId, pageRequest, null));
+
+    assertThat(result).isSameAs(page);
+  }
+
+  @Test
+  void passesTheSearchTermThroughToTheRepository() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    KeysetPageRequest pageRequest = KeysetPageRequest.first();
+    AccountRepository accounts = mock(AccountRepository.class);
+    KeysetPage<Account> page = new KeysetPage<>(List.of(), null, null, false, false);
+    when(accounts.findKeysetPageByOrganizationId(organizationId, pageRequest, "ada"))
+        .thenReturn(page);
+    ListAccountsForOrganizationService service = new ListAccountsForOrganizationService(accounts);
+
+    KeysetPage<Account> result =
+        service.handle(new ListAccountsForOrganizationQuery(organizationId, pageRequest, "ada"));
 
     assertThat(result).isSameAs(page);
   }

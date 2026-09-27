@@ -207,6 +207,19 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(model().attribute("allScopes", PlatformScopes.ORGANIZATION_CLIENT_ALLOWED));
   }
 
+  // Live UX request: the create form's scope picker groups by category (currently just
+  // "platform") with a parent checkbox that selects every scope beneath it.
+  @Test
+  void theScopeCategoriesModelAttributeGroupsEveryAllowedScopeUnderPlatform() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(
+            model().attribute("scopeCategories", PlatformScopeCategories.groupedByCategory()))
+        .andExpect(content().string(containsString("clavaris-scope-category-checkbox")))
+        .andExpect(content().string(containsString("data-category=\"platform\"")));
+  }
+
   // Defense in depth: OrganizationClient.register's own domain-level guard is the real,
   // unconditional invariant (proved directly in OrganizationClientTest) — this proves the web
   // layer surfaces that as a clean 400, not GlobalExceptionHandler's catch-all 500, when a request

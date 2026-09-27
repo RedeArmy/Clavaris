@@ -62,6 +62,11 @@ introduced is itself now replaced by consumer-defined `WorkspaceRole`s — BR-WS
 rewritten a second time to match; BR-WS-03/04's substance is unaffected. Two new rules (BR-WS-07/08)
 cover role deletion and the parent-hierarchy this model adds that the old enum had no room for.
 
+**Extended, ADR-0028 (2026-09-26):** `WorkspaceTeam` (BR-WS-09) adds a per-Workspace grouping label
+over a subset of an Organization's own `WorkspaceRole`s — organizational only, no new permission
+semantics. BR-WS-05/07 are amended, not replaced: the reserved role can now be deleted once a
+substitute role exists (was "can never be deleted at all").
+
 - **BR-WS-01** — A workspace must always retain at least one membership whose *effective*
   permissions (a role's own permissions plus every ancestor's, resolved through
   `WorkspaceRoleHierarchy`) include the reserved `clavaris:workspace:manage_members` permission; a
@@ -94,7 +99,9 @@ cover role deletion and the parent-hierarchy this model adds that the old enum h
   `reserved` role is system-seeded per Organization (on its first Workspace's creation), always
   carrying both reserved permissions (`clavaris:workspace:manage_members`,
   `clavaris:workspace:manage_roles` — the only two permission strings Clavaris's own logic ever
-  interprets); it can never be stripped of them and can never be deleted (BR-WS-07). Any
+  interprets); it can never be stripped of them (`WorkspaceRole#withPermissions`'s own guard) and
+  can be deleted only once another role already provides a substitute (BR-WS-07, ADR-0028 §3 —
+  superseded from "can never be deleted" at all). Any
   business/product-domain role (e.g. "recruiter", "candidate") is still explicitly out of scope
   here; that differentiation belongs entirely to the consuming application (e.g. JobSeeker), never
   to Clavaris — ADR-0027 makes the *names* consumer-defined, not the *domain logic*.
@@ -117,14 +124,27 @@ cover role deletion and the parent-hierarchy this model adds that the old enum h
   `workspace_roles.parent_role_id` has no `ON DELETE` action at the database level specifically so
   this stays an explicit application-layer rejection, not a silent cascade or a raw constraint
   error. No automatic cascade reassignment or re-parenting exists for either case. The one
-  `reserved` role per Organization can never be deleted at all, regardless of assignment or
-  parent-of-another-role state (BR-WS-05).
+  `reserved` role per Organization additionally requires a substitute (ADR-0028 §3, superseding the
+  original "can never be deleted at all" text): deletion is rejected unless some *other*
+  `WorkspaceRole` in the same Organization already has both reserved permissions in its own
+  *effective* set (own permissions plus every ancestor's, `WorkspaceRoleHierarchy`) — a definitional
+  check only, not a check that any real membership already holds that substitute role. Once
+  deleted, `reserved` is not transferred to any other row; the Organization simply has zero
+  `reserved = true` roles going forward, self-governed entirely through roles it defined itself.
 - **BR-WS-08** — A `WorkspaceRole` may declare one optional `parentRoleId` (ADR-0027 §3); a role's
   effective permissions include every ancestor's, resolved by walking that chain
   (`WorkspaceRoleHierarchy`). A role cannot be its own parent (rejected in the entity itself) and a
   multi-hop cycle across several roles is rejected the same way, on both create and update — the
   only hierarchy shape Clavaris enforces; a role's position in that chain otherwise carries no
   Clavaris-interpreted meaning beyond permission inheritance.
+- **BR-WS-09** (ADR-0028) — A `WorkspaceTeam` is a named, `Workspace`-scoped grouping label over a
+  subset of that Workspace's own Organization's `WorkspaceRole`s — purely organizational, carries
+  no permission semantics of its own, and is never a second thing a member is assigned to (a
+  member's assignment is still just their `WorkspaceMembership.roleId`). A role may belong to at
+  most one team per Workspace; the same role may still be grouped differently (or not at all) in a
+  different Workspace, since `WorkspaceRole` itself stays Organization-scoped, unchanged from
+  ADR-0027. Managing a team carries no permission semantics of its own — same access control as
+  every other Workspace-detail dashboard action.
 
 ## Client registry (`BR-CLIENT`)
 

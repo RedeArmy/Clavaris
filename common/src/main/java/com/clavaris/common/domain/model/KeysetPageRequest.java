@@ -43,6 +43,23 @@ public record KeysetPageRequest(KeysetCursor after, KeysetCursor before, int siz
   }
 
   /**
+   * ADR-0029: the Users tab's own 25-per-page override — every other one of this codebase's
+   * dashboard lists still gets {@link #DEFAULT_SIZE} through the no-size overloads above, unaware
+   * this one exists.
+   */
+  public static KeysetPageRequest first(final int size) {
+    return new KeysetPageRequest(null, null, size);
+  }
+
+  public static KeysetPageRequest after(final KeysetCursor cursor, final int size) {
+    return new KeysetPageRequest(cursor, null, size);
+  }
+
+  public static KeysetPageRequest before(final KeysetCursor cursor, final int size) {
+    return new KeysetPageRequest(null, cursor, size);
+  }
+
+  /**
    * Every one of this codebase's six paginated dashboard controllers builds a request from its own
    * GET's {@code ?after=}/{@code ?before=} query params the exact same way — genuinely shared
    * decode logic, not the structural-mirroring kind a same-named helper backfired on earlier this
@@ -51,16 +68,22 @@ public record KeysetPageRequest(KeysetCursor after, KeysetCursor before, int siz
    * own {@code @RequestParam(required = false)} default. Malformed input still decodes loudly (see
    * {@link KeysetCursor}'s own Javadoc) — never silently falls back to the first page.
    */
+  public static KeysetPageRequest fromCursors(final String after, final String before) {
+    return fromCursors(after, before, DEFAULT_SIZE);
+  }
+
+  /** ADR-0029: same decode logic as the two-arg overload, with an explicit page size. */
   @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — same rationale as every
   // other short-circuiting lookup in this codebase.
-  public static KeysetPageRequest fromCursors(final String after, final String before) {
+  public static KeysetPageRequest fromCursors(
+      final String after, final String before, final int size) {
     if (after != null && !after.isBlank()) {
-      return after(KeysetCursor.decode(after));
+      return after(KeysetCursor.decode(after), size);
     }
     if (before != null && !before.isBlank()) {
-      return before(KeysetCursor.decode(before));
+      return before(KeysetCursor.decode(before), size);
     }
-    return first();
+    return first(size);
   }
 
   public boolean isFirst() {

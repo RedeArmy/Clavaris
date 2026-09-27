@@ -6,6 +6,8 @@ import com.clavaris.identity.application.usecase.admincreateaccountfororganizati
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationQuery;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplay;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplayReader;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
@@ -16,6 +18,8 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -42,7 +46,10 @@ import org.springframework.web.bind.annotation.RequestParam;
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver} — same
  * anti-enumeration posture as every other dashboard controller.
  */
-@SuppressWarnings("PMD.LongVariable")
+// PMD.ExcessiveImports: ADR-0029 added a search/pagination-affecting request param and a new
+// read-only role-display collaborator to a class that already sat right at PMD's own threshold —
+// wiring, not sprawl, same reasoning every other growing controller in this codebase documents.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users")
 public class PlatformAccountsController {
@@ -56,27 +63,38 @@ public class PlatformAccountsController {
 
   private static final String HX_REQUEST_HEADER = "HX-Request";
 
+  // ADR-0029: this page's own override — every other dashboard list still gets
+  // KeysetPageRequest.DEFAULT_SIZE (20) through the no-size overloads, unaware this exists.
+  private static final int PAGE_SIZE = 25;
+
   private final ListAccountsForOrganizationUseCase listAccounts;
   private final AdminCreateAccountForOrganizationUseCase createAccount;
+  private final WorkspaceRoleDisplayReader roleDisplayReader;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
   public PlatformAccountsController(
       final ListAccountsForOrganizationUseCase listAccounts,
       final AdminCreateAccountForOrganizationUseCase createAccount,
+      final WorkspaceRoleDisplayReader roleDisplayReader,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.listAccounts = listAccounts;
     this.createAccount = createAccount;
+    this.roleDisplayReader = roleDisplayReader;
     this.organizationAccess =
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
 
+  // PMD.ShortVariable: "q" — same short, deliberate query-string param name every search box on
+  // the web uses (Google's own included), not a placeholder that should have a longer name.
+  @SuppressWarnings("PMD.ShortVariable")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @RequestParam(required = false) final String after,
       @RequestParam(required = false) final String before,
+      @RequestParam(required = false) final String q,
       final Model model) {
     final PlatformAccountId ownerPlatformAccountId =
         organizationAccess.requireCurrentPlatformAccount(request);
@@ -85,7 +103,8 @@ public class PlatformAccountsController {
         organizationAccess.requireOwnedOrganizationName(orgId, ownerPlatformAccountId);
     populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new AdminCreateAccountForm());
-    populateUsersModel(model, orgId, KeysetPageRequest.fromCursors(after, before));
+    model.addAttribute("searchTerm", q);
+    populateUsersModel(model, orgId, KeysetPageRequest.fromCursors(after, before, PAGE_SIZE), q);
     return isHtmxRequest(request) ? USERS_FRAGMENT : LIST_VIEW;
   }
 
@@ -142,7 +161,7 @@ public class PlatformAccountsController {
     }
 
     populateHeaderModel(model, organizationId, organizationName);
-    populateUsersModel(model, orgId, KeysetPageRequest.first());
+    populateUsersModel(model, orgId, KeysetPageRequest.first(PAGE_SIZE), null);
     return LIST_VIEW;
   }
 
@@ -153,11 +172,23 @@ public class PlatformAccountsController {
   }
 
   private void populateUsersModel(
-      final Model model, final OrganizationId organizationId, final KeysetPageRequest pageRequest) {
+      final Model model,
+      final OrganizationId organizationId,
+      final KeysetPageRequest pageRequest,
+      final String searchTerm) {
     final KeysetPage<Account> usersPage =
-        listAccounts.handle(new ListAccountsForOrganizationQuery(organizationId, pageRequest));
+        listAccounts.handle(
+            new ListAccountsForOrganizationQuery(organizationId, pageRequest, searchTerm));
     model.addAttribute("users", usersPage.content());
     model.addAttribute("usersPage", usersPage);
+    // ADR-0029: one batched read against organization-module's own tables for the whole page,
+    // never N+1 — see WorkspaceRoleDisplayReader's own Javadoc for why this reads that module's
+    // tables directly instead of calling into it.
+    final List<UUID> accountIds =
+        usersPage.content().stream().map(account -> account.id().value()).toList();
+    final Map<UUID, WorkspaceRoleDisplay> roleDisplayByAccountId =
+        roleDisplayReader.findByAccountIds(accountIds);
+    model.addAttribute("roleDisplayByAccountId", roleDisplayByAccountId);
   }
 
   private static boolean isHtmxRequest(final HttpServletRequest request) {

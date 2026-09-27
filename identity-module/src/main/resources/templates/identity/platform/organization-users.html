@@ -35,6 +35,18 @@
                 <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-user-dialog">Create user</button>
             </div>
 
+            <!-- ADR-0029: a search resets to the first page, same as any other pagination-
+                 affecting input already does — GET, not HTMX, so the browser's own back/forward
+                 and bookmarking keep working for a search the same way they already do for a
+                 plain page load. -->
+            <form class="clavaris-search-form" method="get"
+                  th:action="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId})}">
+                <label class="clavaris-visually-hidden" for="usersSearchQuery">Search users</label>
+                <input id="usersSearchQuery" type="search" name="q" placeholder="Search by name, username, or email"
+                       th:value="${searchTerm}"/>
+                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Search</button>
+            </form>
+
             <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity. Pagination stays
                  HTMX (same TD-PERF-020 convention as every sibling list); create is a plain form
                  POST inside a &lt;dialog&gt;, not HTMX — see PlatformAccountsController's own
@@ -56,6 +68,7 @@
                             <th scope="col">Email</th>
                             <th scope="col">Username</th>
                             <th scope="col">Phone number</th>
+                            <th scope="col">Role</th>
                             <th scope="col">Last signed in</th>
                             <th scope="col">Joined</th>
                             <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
@@ -74,6 +87,13 @@
                             <td th:text="${account.email().value()}">email</td>
                             <td th:text="${account.username().isPresent()} ? ${account.username().get().value()} : '—'">username</td>
                             <td th:text="${account.phoneNumber().orElse('—')}">phone</td>
+                            <!-- ADR-0029: roleDisplayByAccountId is keyed by the account's own
+                                 UUID (not present at all when the account belongs to no
+                                 Workspace, and roleName() is null when it belongs to one but has
+                                 no role currently assigned — ADR-0027 §5's explicitly allowed
+                                 state) — both cases render the same em-dash. -->
+                            <td th:with="roleDisplay=${roleDisplayByAccountId.get(account.id().value())}"
+                                th:text="${roleDisplay != null and roleDisplay.roleName() != null} ? ${roleDisplay.roleName()} : '—'">role</td>
                             <td th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</td>
                             <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</td>
                             <td>
@@ -106,6 +126,16 @@
                                              already uses for a validation-error re-render. -->
                                         <a class="clavaris-menu__item"
                                            th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()},openImpersonate=true)}">Impersonate user</a>
+                                        <!-- ADR-0029: served entirely by organization-module's own
+                                             PlatformAccountWorkspaceRoleController — no Maven
+                                             dependency on that module from here, just a plain
+                                             hx-get/hx-post against its own public URLs, the same
+                                             way any two independently-deployable services would
+                                             compose a UI. -->
+                                        <button type="button" class="clavaris-menu__item"
+                                                data-dialog-open="assign-role-dialog"
+                                                th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${account.id().value()})}"
+                                                hx-target="#assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
                                         <hr class="clavaris-menu__divider"/>
                                         <form method="post" th:if="${account.status().name() == 'ACTIVE'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/suspend(organizationId=${organizationId},accountId=${account.id().value()})}">
@@ -161,13 +191,13 @@
                      aria-label="Users pages">
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${usersPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},before=${usersPage.startCursor().encode()})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},before=${usersPage.startCursor().encode()})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},before=${usersPage.startCursor().encode()},q=${searchTerm})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},before=${usersPage.startCursor().encode()},q=${searchTerm})}"
                        hx-target="#users-content" hx-swap="outerHTML">Previous</a>
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                        th:if="${usersPage.hasNext()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()})}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()},q=${searchTerm})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/users(organizationId=${organizationId},after=${usersPage.endCursor().encode()},q=${searchTerm})}"
                        hx-target="#users-content" hx-swap="outerHTML">Next</a>
                 </nav>
             </div>
@@ -243,9 +273,27 @@
                     </div>
                 </form>
             </dialog>
+
+            <!-- ADR-0029: one shared dialog for the whole page — each row's own "Assign role"
+                 button loads its own account's fragment into #assign-role-dialog-body via its own
+                 hx-get (not "click once": unlike manage-account-dialog, every row's content really
+                 does differ). Content comes from organization-module's own
+                 PlatformAccountWorkspaceRoleController, not this module — see that controller's
+                 own Javadoc for the full cross-module reasoning. -->
+            <dialog id="assign-role-dialog" class="clavaris-dialog">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Workspace</span>
+                        <h2>Assign role</h2>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close assign role dialog">×</button>
+                </div>
+                <div id="assign-role-dialog-body">Loading&hellip;</div>
+            </dialog>
         </div>
     </main>
 </div>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/row-menu.js') : '/js/row-menu.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/assign-role-refresh.js') : '/js/assign-role-refresh.js'}" defer></script>
 </body>
 </html>

@@ -52,6 +52,8 @@
          the inline onchange="..."/<script> this fragment used to carry (see event-type-picker.js's
          own Javadoc-style comment for the full story). Loaded unconditionally here, same "every
          page that includes this sidebar gets it" reasoning as htmx/organization-dialog.js above —
-         a no-op on any page without #event-type-options in the DOM. -->
+         a no-op on any page without #event-type-options in the DOM.
+         category-checkbox-picker.js must load first — event-type-picker.js calls into it directly. -->
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/category-checkbox-picker.js') : '/js/category-checkbox-picker.js'}" defer></script>
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/event-type-picker.js') : '/js/event-type-picker.js'}" defer></script>
 </aside>

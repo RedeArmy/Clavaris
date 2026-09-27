@@ -6,7 +6,13 @@ import com.clavaris.organization.application.usecase.addworkspacemember.Workspac
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceRoleDeletedEvent;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import com.clavaris.organization.domain.service.WorkspaceRoleHierarchy;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** Orchestration for {@link DeleteWorkspaceRoleUseCase}. */
 public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
@@ -34,7 +40,16 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
             .findById(command.roleId())
             .orElseThrow(() -> new WorkspaceRoleNotFoundException(command.roleId()));
 
-    if (role.reserved()) {
+    final Map<UUID, WorkspaceRole> rolesById =
+        roles.findAllByOrganizationId(role.organizationId()).stream()
+            .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
+
+    // ADR-0028 §3: the reserved role is no longer permanently undeletable — a tenant may delete
+    // it once some other role already carries both reserved permissions in its own effective set,
+    // so the Organization never loses its own path to self-governance. Checks role definitions
+    // only, not real membership coverage of the substitute — see that ADR's own open-question 2
+    // for why that narrower check was the one confirmed.
+    if (role.reserved() && !hasSubstituteReservedRole(command.roleId(), rolesById)) {
       throw new CannotDeleteReservedWorkspaceRoleException(command.roleId());
     }
     if (memberships.existsByRoleId(command.roleId())) {
@@ -44,7 +59,7 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
     // without this check, deleting a role that's still some other role's parent would instead
     // fail with a raw Postgres foreign-key violation, not this clean, typed rejection.
     final boolean hasChildRoles =
-        roles.findAllByOrganizationId(role.organizationId()).stream()
+        rolesById.values().stream()
             .anyMatch(candidate -> command.roleId().equals(candidate.parentRoleId()));
     if (hasChildRoles) {
       throw new WorkspaceRoleHasChildRolesException(command.roleId());
@@ -65,5 +80,15 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
         role.id(),
         role.organizationId(),
         WorkspaceRoleDeletedEvent.of(role.id(), role.organizationId()));
+  }
+
+  private static boolean hasSubstituteReservedRole(
+      final UUID roleId, final Map<UUID, WorkspaceRole> rolesById) {
+    return rolesById.values().stream()
+        .filter(candidate -> !candidate.id().equals(roleId))
+        .anyMatch(
+            candidate ->
+                WorkspaceRoleHierarchy.effectivePermissions(candidate.id(), rolesById)
+                    .containsAll(ReservedWorkspacePermissions.ALL));
   }
 }

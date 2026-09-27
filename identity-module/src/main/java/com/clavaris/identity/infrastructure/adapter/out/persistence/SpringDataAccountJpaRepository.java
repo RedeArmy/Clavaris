@@ -73,14 +73,30 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: backs
   // AccountRepository#findKeysetPageByOrganizationId, same three-@Query keyset-pagination shape
   // TD-PERF-020 already established for OAuthClient/Workspace lists.
+  //
+  // ADR-0029: each query below gained one added "AND (searchTerm IS NULL OR ...)" clause — a null
+  // searchTerm is a no-op (same "absence means no filter" convention RateLimitPolicy already
+  // follows), never a rewrite of the existing keyset seek predicate above it. Matches name
+  // (first/last), username, or email — a search resets to the first page, same as changing any
+  // other pagination-affecting input already does. CAST(:searchTerm AS string) everywhere below,
+  // not a bare :searchTerm: a null parameter with no other type hint gets bound as an unspecified
+  // (bytea-defaulting) type by the JDBC driver, and Postgres then rejects LOWER(bytea) — a real
+  // failure this query's own JpaAccountRepositoryTest caught, not a hypothetical.
   @Query(
       """
       SELECT a FROM AccountEntity a
       WHERE a.organizationId = :organizationId
+        AND (CAST(:searchTerm AS string) IS NULL
+             OR LOWER(a.firstName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.username) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%')))
       ORDER BY a.createdAt DESC, a.id DESC
       """)
   List<AccountEntity> findFirstPageByOrganizationId(
-      @Param("organizationId") UUID organizationId, Pageable pageable);
+      @Param("organizationId") UUID organizationId,
+      @Param("searchTerm") String searchTerm,
+      Pageable pageable);
 
   @Query(
       """
@@ -88,12 +104,18 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
       WHERE a.organizationId = :organizationId
         AND (a.createdAt < :cursorCreatedAt
              OR (a.createdAt = :cursorCreatedAt AND a.id < :cursorId))
+        AND (CAST(:searchTerm AS string) IS NULL
+             OR LOWER(a.firstName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.username) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%')))
       ORDER BY a.createdAt DESC, a.id DESC
       """)
   List<AccountEntity> findPageByOrganizationIdAfter(
       @Param("organizationId") UUID organizationId,
       @Param("cursorCreatedAt") Instant cursorCreatedAt,
       @Param("cursorId") UUID cursorId,
+      @Param("searchTerm") String searchTerm,
       Pageable pageable);
 
   @Query(
@@ -102,11 +124,17 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
       WHERE a.organizationId = :organizationId
         AND (a.createdAt > :cursorCreatedAt
              OR (a.createdAt = :cursorCreatedAt AND a.id > :cursorId))
+        AND (CAST(:searchTerm AS string) IS NULL
+             OR LOWER(a.firstName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.username) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
+             OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%')))
       ORDER BY a.createdAt ASC, a.id ASC
       """)
   List<AccountEntity> findPageByOrganizationIdBefore(
       @Param("organizationId") UUID organizationId,
       @Param("cursorCreatedAt") Instant cursorCreatedAt,
       @Param("cursorId") UUID cursorId,
+      @Param("searchTerm") String searchTerm,
       Pageable pageable);
 }
