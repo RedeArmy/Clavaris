@@ -140,12 +140,13 @@ class ManageMembersGuardTest {
   void throwsWhenReassigningTheLastHolderToARoleWithoutManageMembers() {
     final WorkspaceRole role = manageMembersRole();
     final WorkspaceRole plain = plainRole();
+    final UUID plainRoleId = plain.id();
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role, plain));
     when(memberships.findAllByWorkspaceId(workspaceId))
         .thenReturn(List.of(membershipWithRole(role.id())));
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
-        .isThrownBy(() -> assertKeepsAtLeastOneHolder(role, plain.id()));
+        .isThrownBy(() -> assertKeepsAtLeastOneHolder(role, plainRoleId));
   }
 
   @Test
