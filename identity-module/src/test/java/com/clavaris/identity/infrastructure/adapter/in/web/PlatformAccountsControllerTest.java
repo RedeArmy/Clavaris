@@ -370,6 +370,35 @@ class PlatformAccountsControllerTest {
     verify(roleDisplayReader).findByAccountIds(List.of(account.id().value()));
   }
 
+  // ADR-0029: the "Assign role" menu item opens a shared dialog whose body is loaded via hx-get
+  // against organization-module's own PlatformAccountWorkspaceRoleController — proves the URL
+  // renders with the raw account UUID (same AccountId#toString bug class as
+  // rowMenuActionsLinkToTheRawAccountIdNotItsRecordToString above) and that the shared dialog
+  // shell itself is present exactly once on the page.
+  @Test
+  void assignRoleMenuItemLinksToOrganizationModulesOwnEndpointWithTheRawAccountId()
+      throws Exception {
+    Account account = sampleAccount();
+    KeysetCursor cursor = cursorOf(account);
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(account), cursor, cursor, false, false));
+    String rawId = account.id().value().toString();
+    String expectedUrl =
+        "/platform/dashboard/organizations/"
+            + organizationId
+            + "/accounts/"
+            + rawId
+            + "/assign-role";
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Assign role")))
+        .andExpect(content().string(containsString(expectedUrl)))
+        .andExpect(content().string(containsString("id=\"assign-role-dialog\"")))
+        .andExpect(content().string(containsString("/js/assign-role-refresh.js")));
+  }
+
   @Test
   void rowMenuOffersUnbanInsteadOfBanForABannedAccount() throws Exception {
     Account banned = sampleAccount();
