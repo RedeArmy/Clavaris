@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -246,9 +247,7 @@ class WorkspaceRolesControllerTest {
   @Test
   void deleteReturns404WhenTheRoleDoesNotExist() throws Exception {
     UUID unknownRoleId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new WorkspaceRoleNotFoundException(unknownRoleId))
-        .when(deleteRole)
-        .handle(any());
+    doThrow(new WorkspaceRoleNotFoundException(unknownRoleId)).when(deleteRole).handle(any());
 
     mockMvc
         .perform(delete(path() + "/" + unknownRoleId).principal(ACTING_PLATFORM_CLIENT))
@@ -258,9 +257,7 @@ class WorkspaceRolesControllerTest {
   @Test
   void deleteReturns409WhenTheRoleIsReserved() throws Exception {
     UUID roleId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new CannotDeleteReservedWorkspaceRoleException(roleId))
-        .when(deleteRole)
-        .handle(any());
+    doThrow(new CannotDeleteReservedWorkspaceRoleException(roleId)).when(deleteRole).handle(any());
 
     mockMvc
         .perform(delete(path() + "/" + roleId).principal(ACTING_PLATFORM_CLIENT))
@@ -270,9 +267,7 @@ class WorkspaceRolesControllerTest {
   @Test
   void deleteReturns409WhenTheRoleIsStillAssigned() throws Exception {
     UUID roleId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new WorkspaceRoleStillAssignedException(roleId))
-        .when(deleteRole)
-        .handle(any());
+    doThrow(new WorkspaceRoleStillAssignedException(roleId)).when(deleteRole).handle(any());
 
     mockMvc
         .perform(delete(path() + "/" + roleId).principal(ACTING_PLATFORM_CLIENT))
@@ -282,9 +277,7 @@ class WorkspaceRolesControllerTest {
   @Test
   void deleteReturns409WhenTheRoleIsStillAnotherRolesParent() throws Exception {
     UUID roleId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new WorkspaceRoleHasChildRolesException(roleId))
-        .when(deleteRole)
-        .handle(any());
+    doThrow(new WorkspaceRoleHasChildRolesException(roleId)).when(deleteRole).handle(any());
 
     mockMvc
         .perform(delete(path() + "/" + roleId).principal(ACTING_PLATFORM_CLIENT))

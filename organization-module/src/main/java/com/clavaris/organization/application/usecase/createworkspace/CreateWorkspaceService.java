@@ -86,15 +86,16 @@ public class CreateWorkspaceService implements CreateWorkspaceUseCase {
   }
 
   // Check-then-act, not lock-then-check: two concurrent first-Workspace creations for the same
-  // brand-new Organization could both see alreadyExists == false and both attempt to save a
-  // reserved role — ux_workspace_roles_organization_id_name (both would use RESERVED_ROLE_NAME)
-  // turns the loser into a DataIntegrityViolationException, not two reserved rows.
-  // saveAndFlush, not save: see WorkspaceRoleRepository#saveAndFlush's own Javadoc for why this
-  // one call site needs the constraint violation to surface here, synchronously, not deferred to
-  // this @Transactional method's own commit (by which point this catch has already returned).
+  // brand-new Organization could both find no reserved role yet and both attempt to save one —
+  // the unique index on organization id and name (both would use the same reserved role name)
+  // turns the loser into a duplicate-key failure, not two reserved rows.
+  // Uses the flushed write, not the plain one: see WorkspaceRoleRepository's own saveAndFlush
+  // Javadoc for why this one call site needs the constraint violation to surface here,
+  // synchronously, rather than deferred to this method's own enclosing transaction commit, well
+  // past the point this catch could still do anything about it.
   // Caught and ignored, same "statistically negligible race, degrade rather than propagate a raw
   // 500" posture RecordAccountLoginDeviceService's own identical KnownDevice-insert catch
-  // establishes — the invariant this method exists for (a reserved role exists) still holds
+  // establishes — the invariant this method exists for, that a reserved role exists, still holds
   // either way.
   private void ensureReservedRoleExists(final UUID organizationId) {
     final boolean alreadyExists =

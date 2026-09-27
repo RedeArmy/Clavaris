@@ -44,9 +44,10 @@ public final class ManageMembersGuard {
   // what they are — same convention this codebase's other descriptively-named parameters follow.
   // PMD.OnlyOneReturn: the two short-circuit exits and the final fall-through are three genuinely
   // distinct outcomes — same "each needs its own exit" rationale RegisterAccountController's own
-  // identical suppression documents. PMD.AvoidLiteralsInIfCondition: the 1 is BR-WS-01's own
-  // invariant spelled out literally ("at least one holder"), same rationale {@code LastAdminGuard}
-  // (this class's own predecessor) already documented for its identical check.
+  // identical suppression documents. PMD.AvoidLiteralsInIfCondition: the threshold of one is
+  // BR-WS-01's own invariant spelled out literally (at least one holder must remain), same
+  // rationale this class's own predecessor, LastAdminGuard, already documented for its identical
+  // check.
   @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.AvoidLiteralsInIfCondition"})
   public static void assertActionKeepsAtLeastOneHolder(
       final WorkspaceMembershipRepository memberships,

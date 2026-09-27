@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -242,7 +243,7 @@ class PlatformWorkspaceRoleControllerTest {
 
   @Test
   void deletePostWhileStillAssignedReRendersTheDetailPageWithAnError() throws Exception {
-    org.mockito.Mockito.doThrow(new WorkspaceRoleStillAssignedException(customRole.id()))
+    doThrow(new WorkspaceRoleStillAssignedException(customRole.id()))
         .when(deleteRole)
         .handle(any());
 
@@ -255,7 +256,7 @@ class PlatformWorkspaceRoleControllerTest {
 
   @Test
   void deletePostWhileStillAParentReRendersTheDetailPageWithAnError() throws Exception {
-    org.mockito.Mockito.doThrow(new WorkspaceRoleHasChildRolesException(customRole.id()))
+    doThrow(new WorkspaceRoleHasChildRolesException(customRole.id()))
         .when(deleteRole)
         .handle(any());
 
@@ -268,7 +269,7 @@ class PlatformWorkspaceRoleControllerTest {
 
   @Test
   void deletePostForAReservedRoleReturns409() throws Exception {
-    org.mockito.Mockito.doThrow(new CannotDeleteReservedWorkspaceRoleException(reservedRole.id()))
+    doThrow(new CannotDeleteReservedWorkspaceRoleException(reservedRole.id()))
         .when(deleteRole)
         .handle(any());
 

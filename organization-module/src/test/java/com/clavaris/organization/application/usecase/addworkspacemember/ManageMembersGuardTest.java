@@ -37,6 +37,22 @@ class ManageMembersGuardTest {
     return WorkspaceRole.define(organizationId, "Member", null, Set.of());
   }
 
+  // Extracted so assertThatExceptionOfType's own lambda below invokes exactly one method, not
+  // this call plus the CannotRemoveLastHolderExceptionForTest::new reference alongside it —
+  // same "one invocation per assertion lambda" discipline this codebase's other exception-
+  // asserting tests already follow.
+  private void assertKeepsAtLeastOneHolder(
+      final WorkspaceRole currentRole, final UUID targetRoleId) {
+    ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
+        memberships,
+        roles,
+        workspaceId,
+        organizationId,
+        currentRole.id(),
+        targetRoleId,
+        CannotRemoveLastHolderExceptionForTest::new);
+  }
+
   @Test
   void locksBeforeLoadingRolesAndMemberships() {
     final WorkspaceRole role = manageMembersRole();
@@ -117,16 +133,7 @@ class ManageMembersGuardTest {
         .thenReturn(List.of(membershipWithRole(role.id())));
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
-        .isThrownBy(
-            () ->
-                ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
-                    memberships,
-                    roles,
-                    workspaceId,
-                    organizationId,
-                    role.id(),
-                    null,
-                    CannotRemoveLastHolderExceptionForTest::new));
+        .isThrownBy(() -> assertKeepsAtLeastOneHolder(role, null));
   }
 
   @Test
@@ -138,16 +145,7 @@ class ManageMembersGuardTest {
         .thenReturn(List.of(membershipWithRole(role.id())));
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
-        .isThrownBy(
-            () ->
-                ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
-                    memberships,
-                    roles,
-                    workspaceId,
-                    organizationId,
-                    role.id(),
-                    plain.id(),
-                    CannotRemoveLastHolderExceptionForTest::new));
+        .isThrownBy(() -> assertKeepsAtLeastOneHolder(role, plain.id()));
   }
 
   @Test

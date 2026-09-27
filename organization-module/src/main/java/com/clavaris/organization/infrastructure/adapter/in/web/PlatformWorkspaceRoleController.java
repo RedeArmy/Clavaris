@@ -91,6 +91,8 @@ public class PlatformWorkspaceRoleController {
   private static final String ROLES_ATTRIBUTE = "roles";
   private static final String ROLES_BY_ID_ATTRIBUTE = "rolesById";
   private static final String ROLE_ATTRIBUTE = "role";
+  private static final String ORGANIZATIONS_REDIRECT_PREFIX =
+      "redirect:/platform/dashboard/organizations/";
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final ListWorkspaceRolesForOrganizationUseCase listRoles;
@@ -181,7 +183,7 @@ public class PlatformWorkspaceRoleController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
 
-    return "redirect:/platform/dashboard/organizations/" + organizationId + "/workspace-roles";
+    return redirectToList(organizationId);
   }
 
   @GetMapping("/{roleId}")
@@ -248,10 +250,7 @@ public class PlatformWorkspaceRoleController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
 
-    return "redirect:/platform/dashboard/organizations/"
-        + organizationId
-        + "/workspace-roles/"
-        + updated.id();
+    return redirectToDetail(organizationId, updated.id());
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -282,7 +281,15 @@ public class PlatformWorkspaceRoleController {
       return redisplayDetail(model, organization, rolesById, existing, "hasChildRolesError");
     }
 
-    return "redirect:/platform/dashboard/organizations/" + organizationId + "/workspace-roles";
+    return redirectToList(organizationId);
+  }
+
+  private String redirectToList(final UUID organizationId) {
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId + "/workspace-roles";
+  }
+
+  private String redirectToDetail(final UUID organizationId, final UUID roleId) {
+    return redirectToList(organizationId) + "/" + roleId;
   }
 
   private String redisplayDetail(

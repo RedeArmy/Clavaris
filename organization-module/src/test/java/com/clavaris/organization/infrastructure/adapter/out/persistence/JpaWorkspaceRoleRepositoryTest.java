@@ -7,7 +7,6 @@ import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRo
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -105,7 +104,7 @@ class JpaWorkspaceRoleRepositoryTest {
 
   @Test
   void findByIdReturnsEmptyForAnUnknownRoleId() {
-    assertThat(repository.findById(UUID.randomUUID())).isEqualTo(Optional.empty());
+    assertThat(repository.findById(UUID.randomUUID())).isEmpty();
   }
 
   @Test

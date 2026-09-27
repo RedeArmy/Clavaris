@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -91,9 +92,7 @@ class CreateWorkspaceServiceTest {
   @Test
   void toleratesLosingTheReservedRoleCreationRaceWithoutFailingTheWorkspaceCreation() {
     UUID organizationId = UUID.randomUUID();
-    org.mockito.Mockito.doThrow(new DataIntegrityViolationException("duplicate key"))
-        .when(roles)
-        .saveAndFlush(any());
+    doThrow(new DataIntegrityViolationException("duplicate key")).when(roles).saveAndFlush(any());
 
     Workspace workspace =
         service.handle(new CreateWorkspaceCommand(organizationId, "Engineering", ACTOR));
