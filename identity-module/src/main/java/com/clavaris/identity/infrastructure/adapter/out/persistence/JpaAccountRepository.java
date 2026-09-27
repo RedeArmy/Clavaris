@@ -250,16 +250,21 @@ class JpaAccountRepository implements AccountRepository {
 
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: same TD-PERF-020 keyset
   // pagination shape client-registry-module's own JpaOAuthClientRepository already establishes.
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
+  // PMD.OnlyOneReturn: three real, distinct exits — first/after/before.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   @Override
   public KeysetPage<Account> findKeysetPageByOrganizationId(
-      final OrganizationId organizationId, final KeysetPageRequest pageRequest) {
+      final OrganizationId organizationId,
+      final KeysetPageRequest pageRequest,
+      final String searchTerm) {
+    final String normalizedSearchTerm =
+        searchTerm == null || searchTerm.isBlank() ? null : searchTerm.trim();
     final PageRequest limit = PageRequest.of(0, pageRequest.size() + 1);
     if (pageRequest.after() != null) {
       final KeysetCursor cursor = pageRequest.after();
       return SpringDataKeysetPageMapper.forward(
           accounts.findPageByOrganizationIdAfter(
-              organizationId.value(), cursor.createdAt(), cursor.id(), limit),
+              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit),
           pageRequest.size(),
           true,
           this::toDomain,
@@ -269,13 +274,13 @@ class JpaAccountRepository implements AccountRepository {
       final KeysetCursor cursor = pageRequest.before();
       return SpringDataKeysetPageMapper.backward(
           accounts.findPageByOrganizationIdBefore(
-              organizationId.value(), cursor.createdAt(), cursor.id(), limit),
+              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit),
           pageRequest.size(),
           this::toDomain,
           this::cursorOf);
     }
     return SpringDataKeysetPageMapper.forward(
-        accounts.findFirstPageByOrganizationId(organizationId.value(), limit),
+        accounts.findFirstPageByOrganizationId(organizationId.value(), normalizedSearchTerm, limit),
         pageRequest.size(),
         false,
         this::toDomain,

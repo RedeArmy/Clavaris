@@ -14,6 +14,7 @@ public class ListAccountsForOrganizationService implements ListAccountsForOrgani
 
   @Override
   public KeysetPage<Account> handle(final ListAccountsForOrganizationQuery query) {
-    return accounts.findKeysetPageByOrganizationId(query.organizationId(), query.pageRequest());
+    return accounts.findKeysetPageByOrganizationId(
+        query.organizationId(), query.pageRequest(), query.searchTerm());
   }
 }

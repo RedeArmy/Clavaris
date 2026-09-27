@@ -113,7 +113,11 @@ public interface AccountRepository {
    * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: same TD-PERF-020 keyset
    * pagination shape as {@code client-registry-module}'s own {@code
    * OAuthClientRepository#findKeysetPageByOrganizationId}.
+   *
+   * @param searchTerm ADR-0029 — matched case-insensitively against first/last name, username, or
+   *     email; {@code null} (or blank) applies no filter at all, same "absence is a no-op"
+   *     convention {@code RateLimitPolicy} already follows.
    */
   KeysetPage<Account> findKeysetPageByOrganizationId(
-      OrganizationId organizationId, KeysetPageRequest pageRequest);
+      OrganizationId organizationId, KeysetPageRequest pageRequest, String searchTerm);
 }

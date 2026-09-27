@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,7 +20,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationQuery;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplay;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplayReader;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
@@ -31,10 +35,12 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -49,6 +55,7 @@ class PlatformAccountsControllerTest {
 
   private ListAccountsForOrganizationUseCase listAccounts;
   private AdminCreateAccountForOrganizationUseCase createAccount;
+  private WorkspaceRoleDisplayReader roleDisplayReader;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -58,6 +65,7 @@ class PlatformAccountsControllerTest {
   void setUp() {
     listAccounts = mock(ListAccountsForOrganizationUseCase.class);
     createAccount = mock(AdminCreateAccountForOrganizationUseCase.class);
+    roleDisplayReader = mock(WorkspaceRoleDisplayReader.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -66,6 +74,7 @@ class PlatformAccountsControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.of("Acme Co"));
     when(listAccounts.handle(any())).thenReturn(emptyPage());
+    when(roleDisplayReader.findByAccountIds(any())).thenReturn(Map.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -84,7 +93,11 @@ class PlatformAccountsControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformAccountsController(
-                    listAccounts, createAccount, organizationResolver, currentPlatformAccount))
+                    listAccounts,
+                    createAccount,
+                    roleDisplayReader,
+                    organizationResolver,
+                    currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -285,6 +298,27 @@ class PlatformAccountsControllerTest {
     verify(listAccounts).handle(any());
   }
 
+  // ADR-0029
+  @Test
+  void usesTwentyFiveAsThePageSizeInsteadOfTheSharedDefaultOfTwenty() throws Exception {
+    mockMvc.perform(get(basePath()));
+
+    ArgumentCaptor<ListAccountsForOrganizationQuery> captor =
+        ArgumentCaptor.forClass(ListAccountsForOrganizationQuery.class);
+    verify(listAccounts).handle(captor.capture());
+    assertThat(captor.getValue().pageRequest().size()).isEqualTo(25);
+  }
+
+  @Test
+  void passesTheSearchQueryParamThroughToTheUseCase() throws Exception {
+    mockMvc.perform(get(basePath()).param("q", "ada"));
+
+    ArgumentCaptor<ListAccountsForOrganizationQuery> captor =
+        ArgumentCaptor.forClass(ListAccountsForOrganizationQuery.class);
+    verify(listAccounts).handle(captor.capture());
+    assertThat(captor.getValue().searchTerm()).isEqualTo("ada");
+  }
+
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab 3-dot row menu: proves the template's
   // own Lock/Unlock and Ban/Unban toggle-by-status branching renders without error for every real
   // AccountStatus this menu has to handle, not just the ACTIVE default every other test here uses.
@@ -301,6 +335,39 @@ class PlatformAccountsControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Unlock account")))
         .andExpect(content().string(not(containsString("Lock account"))));
+  }
+
+  // ADR-0029: proves the Role column actually renders WorkspaceRoleDisplayReader's own resolved
+  // roleName, and shows an em-dash when the reader has nothing for that account (no Workspace
+  // membership at all, or one with no role currently assigned — both look identical here).
+  @Test
+  void showsTheResolvedWorkspaceRoleNameInTheRoleColumn() throws Exception {
+    Account account = sampleAccount();
+    KeysetCursor cursor = cursorOf(account);
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(account), cursor, cursor, false, false));
+    when(roleDisplayReader.findByAccountIds(any()))
+        .thenReturn(
+            Map.of(
+                account.id().value(),
+                new WorkspaceRoleDisplay(UUID.randomUUID(), UUID.randomUUID(), "Admin")));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Admin")));
+  }
+
+  @Test
+  void showsAnEmDashInTheRoleColumnWhenTheReaderHasNothingForThatAccount() throws Exception {
+    Account account = sampleAccount();
+    KeysetCursor cursor = cursorOf(account);
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(account), cursor, cursor, false, false));
+
+    mockMvc.perform(get(basePath())).andExpect(status().isOk());
+
+    verify(roleDisplayReader).findByAccountIds(List.of(account.id().value()));
   }
 
   @Test

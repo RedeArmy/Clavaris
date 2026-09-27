@@ -401,7 +401,7 @@ class JpaAccountRepositoryTest {
 
     KeysetPage<Account> firstPage =
         repository.findKeysetPageByOrganizationId(
-            organizationId, new KeysetPageRequest(null, null, 2));
+            organizationId, new KeysetPageRequest(null, null, 2), null);
 
     assertThat(firstPage.content())
         .extracting(Account::id)
@@ -411,7 +411,7 @@ class JpaAccountRepositoryTest {
 
     KeysetPage<Account> secondPage =
         repository.findKeysetPageByOrganizationId(
-            organizationId, new KeysetPageRequest(firstPage.endCursor(), null, 2));
+            organizationId, new KeysetPageRequest(firstPage.endCursor(), null, 2), null);
 
     assertThat(secondPage.content()).extracting(Account::id).containsExactly(first.id());
     assertThat(secondPage.hasNext()).isFalse();
@@ -419,13 +419,47 @@ class JpaAccountRepositoryTest {
 
     KeysetPage<Account> backToFirstPage =
         repository.findKeysetPageByOrganizationId(
-            organizationId, new KeysetPageRequest(null, secondPage.startCursor(), 2));
+            organizationId, new KeysetPageRequest(null, secondPage.startCursor(), 2), null);
 
     assertThat(backToFirstPage.content())
         .extracting(Account::id)
         .containsExactly(third.id(), second.id());
     assertThat(backToFirstPage.hasNext()).isTrue();
     assertThat(backToFirstPage.hasPrevious()).isFalse();
+  }
+
+  // ADR-0029: real-Postgres proof the added LIKE predicate actually filters, case-insensitively,
+  // and only within this Organization's own accounts — not just that it compiles.
+  @Test
+  void findKeysetPageByOrganizationIdFiltersByCaseInsensitiveSearchTerm() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    Account first = reconstituteAt(organizationId, "first@example.com", now.minusSeconds(10));
+    Account second = reconstituteAt(organizationId, "second@example.com", now);
+    repository.insert(first);
+    repository.insert(second);
+
+    KeysetPage<Account> found =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 10), "SECOND");
+
+    assertThat(found.content()).extracting(Account::id).containsExactly(second.id());
+  }
+
+  @Test
+  void findKeysetPageByOrganizationIdReturnsEveryAccountWhenSearchTermIsBlank() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    Account first = reconstituteAt(organizationId, "first@example.com", now.minusSeconds(10));
+    Account second = reconstituteAt(organizationId, "second@example.com", now);
+    repository.insert(first);
+    repository.insert(second);
+
+    KeysetPage<Account> found =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 10), "   ");
+
+    assertThat(found.content()).hasSize(2);
   }
 
   private static Account reconstituteAt(

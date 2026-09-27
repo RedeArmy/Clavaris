@@ -92,4 +92,34 @@ class KeysetPageRequestTest {
     assertThat(request.after()).isEqualTo(A_CURSOR);
     assertThat(request.before()).isNull();
   }
+
+  // ADR-0029: the explicit-size overloads — every other caller keeps using the no-size ones above,
+  // unaffected by these existing at all.
+  @Test
+  void firstWithAnExplicitSizeUsesIt() {
+    assertThat(KeysetPageRequest.first(25).size()).isEqualTo(25);
+  }
+
+  @Test
+  void afterWithAnExplicitSizeUsesIt() {
+    final KeysetPageRequest request = KeysetPageRequest.after(A_CURSOR, 25);
+
+    assertThat(request.after()).isEqualTo(A_CURSOR);
+    assertThat(request.size()).isEqualTo(25);
+  }
+
+  @Test
+  void beforeWithAnExplicitSizeUsesIt() {
+    final KeysetPageRequest request = KeysetPageRequest.before(A_CURSOR, 25);
+
+    assertThat(request.before()).isEqualTo(A_CURSOR);
+    assertThat(request.size()).isEqualTo(25);
+  }
+
+  @Test
+  void fromCursorsWithAnExplicitSizeUsesItOnEveryBranch() {
+    assertThat(KeysetPageRequest.fromCursors(null, null, 25).size()).isEqualTo(25);
+    assertThat(KeysetPageRequest.fromCursors(A_CURSOR.encode(), null, 25).size()).isEqualTo(25);
+    assertThat(KeysetPageRequest.fromCursors(null, A_CURSOR.encode(), 25).size()).isEqualTo(25);
+  }
 }
