@@ -260,11 +260,14 @@ class PlatformWorkspaceControllerTest {
     mockMvc.perform(get(workspacesPath() + "/" + workspace.id())).andExpect(status().isNotFound());
   }
 
-  // Live UX request, 2026-09-28: "Delete" next to "View" on the Workspaces list.
+  // Live UX request, 2026-09-28 (revised same day): "Delete" next to "View" on the Workspaces
+  // list, gated behind a popup requiring the Workspace's own current name to be typed in.
   @Test
-  void plainDeleteWorkspacePostRedirectsOnSuccess() throws Exception {
+  void plainDeleteWorkspacePostRedirectsOnSuccessWhenTheTypedNameMatches() throws Exception {
     mockMvc
-        .perform(post(workspacesPath() + "/" + workspace.id() + "/delete"))
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", workspace.name()))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/platform/dashboard/organizations/" + organization.id()));
 
@@ -272,14 +275,46 @@ class PlatformWorkspaceControllerTest {
   }
 
   @Test
-  void htmxDeleteWorkspacePostReturnsTheWorkspacesFragment() throws Exception {
+  void htmxDeleteWorkspacePostReturnsTheWorkspacesFragmentWhenTheTypedNameMatches()
+      throws Exception {
     mockMvc
         .perform(
-            post(workspacesPath() + "/" + workspace.id() + "/delete").header("HX-Request", "true"))
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", workspace.name())
+                .header("HX-Request", "true"))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/organization-detail :: workspaces"));
 
     verify(deleteWorkspace).handle(any());
+  }
+
+  @Test
+  void plainDeleteWorkspacePostWithTheWrongTypedNameReRendersWithAMismatchErrorInsteadOfDeleting()
+      throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", "not the real name"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail"))
+        .andExpect(model().attribute("deleteWorkspaceMismatchId", workspace.id()));
+
+    verify(deleteWorkspace, never()).handle(any());
+  }
+
+  @Test
+  void htmxDeleteWorkspacePostWithTheWrongTypedNameReturnsTheFragmentWithAMismatchError()
+      throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", "not the real name")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail :: workspaces"))
+        .andExpect(model().attribute("deleteWorkspaceMismatchId", workspace.id()));
+
+    verify(deleteWorkspace, never()).handle(any());
   }
 
   @Test
@@ -288,7 +323,9 @@ class PlatformWorkspaceControllerTest {
     when(getWorkspace.handle(any())).thenReturn(Optional.empty());
 
     mockMvc
-        .perform(post(workspacesPath() + "/" + UUID.randomUUID() + "/delete"))
+        .perform(
+            post(workspacesPath() + "/" + UUID.randomUUID() + "/delete")
+                .param("confirmedName", "anything"))
         .andExpect(status().isNotFound());
 
     verify(deleteWorkspace, never()).handle(any());

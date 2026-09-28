@@ -19,12 +19,19 @@
     }
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
+  // Delete Workspace feature, 2026-09-28: a name-mismatch error re-rendered via an HTMX fragment
+  // swap (the per-row delete-workspace dialog's own hx-post/hx-target) never fires
+  // DOMContentLoaded — same re-init gap assign-role-picker.js's own htmx:afterSwap listener
+  // already closes for an unrelated dialog. Extracted so the real full-page-load case and the
+  // HTMX-swap case share one implementation.
+  const openDialogMarkedForAutoOpen = () => {
     const dialog = document.querySelector("[data-dialog-open-on-load]")?.closest("dialog");
     if (dialog?.showModal) {
       dialog.showModal();
     }
-  });
+  };
+  document.addEventListener("DOMContentLoaded", openDialogMarkedForAutoOpen);
+  document.body.addEventListener("htmx:afterSwap", openDialogMarkedForAutoOpen);
 
   // Live UX request, 2026-09-27 (real gap found live): workspace-teams-hierarchy.html's own
   // "Assign role" dialog had no way to close itself after a successful save — unlike the Users

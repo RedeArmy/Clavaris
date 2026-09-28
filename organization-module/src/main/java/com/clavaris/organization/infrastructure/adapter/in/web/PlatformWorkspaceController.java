@@ -296,22 +296,38 @@ public class PlatformWorkspaceController {
     model.addAttribute("workspacesPage", workspacesPage);
   }
 
-  // Live UX request, 2026-09-28: "Delete" next to "View" on the Workspaces list — a real,
-  // permanent hard delete. requireOwnedWorkspace's own anti-enumeration check is enough here (see
-  // its own Javadoc): unlike deleteTeam/deleteRole, this method never needs the returned Workspace
-  // itself afterward, only its existence+ownership guard, same discard-the-return-value precedent
-  // PlatformAccountWorkspaceRoleController#showForm already establishes for an identical check.
+  // Live UX request, 2026-09-28: "Delete" next to "View" on the Workspaces list, gated behind a
+  // popup that states the deletion is permanent and requires typing the Workspace's own current
+  // name — same "typed-name is a human-confidence guard only, not a security control" posture
+  // PlatformDeleteOrganizationController's own identical check documents (the real delete target
+  // always comes from the already-ownership-checked workspaceId path variable, never re-derived
+  // from confirmedName). Deliberately NOT that class's own single-use-confirmation-token flow:
+  // that ceremony is reserved for Organization deletion's strictly larger blast radius (an entire
+  // tenant's account pool), documented there as "the single most destructive action this
+  // dashboard exposes" — this is a popup, not a dedicated confirm page, matching every other
+  // dialog-gated mutation already on this dashboard.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/delete")
   public String deleteWorkspace(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
+      @RequestParam("confirmedName") final String confirmedName,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
-    requireOwnedWorkspace(organizationId, workspaceId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    if (!workspace.name().equals(confirmedName)) {
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
+      model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+      // Which row's own dialog should reopen with the error — see organization-detail.html's own
+      // per-row th:if on this attribute.
+      model.addAttribute("deleteWorkspaceMismatchId", workspaceId);
+      return isHtmxRequest(request) ? WORKSPACES_FRAGMENT : ORGANIZATION_DETAIL_VIEW;
+    }
 
     deleteWorkspaceUseCase.handle(
         new DeleteWorkspaceCommand(
