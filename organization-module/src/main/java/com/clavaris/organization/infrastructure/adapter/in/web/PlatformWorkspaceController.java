@@ -135,12 +135,17 @@ import org.springframework.web.server.ResponseStatusException;
 // Workspace/Team/Role-mutating endpoints plus their shared read-model helpers; splitting it along
 // resource lines (Workspaces vs. Teams vs. Roles) is a real, larger refactor for a future pass, not
 // a fix this redesign should bundle in.
+// java:S1075: WORKSPACES_PATH_SEGMENT ("/workspaces/") is a route this server-rendered app owns
+// and serves itself, not an external URI a deployment should be able to repoint — same "these are
+// code, not runtime config" reasoning SocialLoginAuthenticationSuccessHandler's own identical
+// suppression already documents.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.AvoidDuplicateLiterals",
   "PMD.TooManyMethods",
-  "PMD.CouplingBetweenObjects"
+  "PMD.CouplingBetweenObjects",
+  "java:S1075"
 })
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
