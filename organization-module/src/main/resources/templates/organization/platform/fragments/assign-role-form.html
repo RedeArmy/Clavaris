@@ -1,22 +1,32 @@
-<!-- ADR-0029: loaded by identity-module's organization-users.html into its own shared
-     #assign-role-dialog-body via hx-get/hx-post — this file never renders on its own, only as a
-     fragment target. Neither fragment div below carries that id itself: only the parent page's
-     own static container needs it (the real, permanent hx-target; hx-swap="innerHTML" replaces
-     its content, never the container itself), and two sibling divs sharing one id in this file's
-     own markup was a real duplicate-id finding (SonarCloud) with no upside — nothing here ever
-     selects by it. Team <select> is present only when the Workspace actually has one or more
-     WorkspaceTeams; its "— No team (ungrouped) —" option always exists so an Organization that
-     mixes teamed and standalone roles (ADR-0028's own QA/Supervisor/Tester + standalone Admin
-     example) can still reach every role, not just the teamed ones. assign-role-picker.js filters
-     the Role <select>'s own <option>s by the chosen team's data-team-id, client-side — same
-     "grouped picker, no second round trip" convention scope-picker.js already establishes. No
-     <!DOCTYPE html>/<html>/<body> wrapper — same fragment-file convention every sibling under
-     */fragments/ already follows (e.g. identity/fragments/head.html), not a full standalone page. -->
+<!-- ADR-0029, redesigned 2026-09-27 ("Way 2" of a live UX request) — loaded by identity-module's
+     organization-users.html into its own shared #assign-role-dialog-body via hx-get/hx-post. This
+     file never renders on its own, only as a fragment target. No <!DOCTYPE html>/<html>/<body>
+     wrapper — same fragment-file convention every sibling under */fragments/ already follows.
+
+     Three tiers, each collapsing to a fixed hidden value instead of a <select> whenever there's
+     nothing genuinely to choose from (PlatformAccountWorkspaceRoleController's own Javadoc has the
+     full "why" for each):
+       - Workspace: only shown (and only when the account has no membership yet) when the
+         Organization has 2+ Workspaces; changing it reloads this whole fragment via its own
+         hx-get, since Team/Role depend on which Workspace is active.
+       - Team: "— No team (ungrouped) —" plus every real team that has at least one role in it
+         (a team with zero roles doesn't count, doesn't show); only shown when there are 2+ such
+         buckets to choose from. assign-role-picker.js filters the Role <select>'s own <option>s by
+         the chosen team's data-team-id, client-side — same "grouped picker, no second round trip"
+         convention scope-picker.js already establishes — and re-applies itself after every htmx
+         swap (workspace change, validation-error redisplay), not just on first load.
+       - Role: always a real <select> when hasAnyRoles is true — every role from every qualifying
+         bucket, never filtered server-side (the Team select is a pure client-side lens over the
+         same full list). -->
 <div th:fragment="assignRoleForm">
-    <div th:if="${membership == null}">
-        <p class="clavaris-empty-state">This account isn't a member of any Workspace yet.</p>
+    <div th:if="${noWorkspacesYet}">
+        <p class="clavaris-empty-state">This Organization has no Workspaces yet.</p>
     </div>
-    <form th:unless="${membership == null}" method="post"
+    <div th:if="${!noWorkspacesYet and !hasAnyRoles}">
+        <p class="clavaris-empty-state">This Workspace has no roles yet.</p>
+    </div>
+
+    <form th:if="${!noWorkspacesYet and hasAnyRoles}" method="post"
           th:action="@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
           hx-target="#assign-role-dialog-body" hx-swap="innerHTML">
@@ -27,7 +37,21 @@
             different substitute first.
         </p>
 
-        <div class="clavaris-field" th:if="${!teams.isEmpty()}">
+        <input type="hidden" th:if="${membership != null}" name="workspaceId" th:value="${membership.workspaceId()}"/>
+        <input type="hidden" th:if="${membership == null and !showWorkspaceSelector}" name="workspaceId" th:value="${activeWorkspaceId}"/>
+        <div class="clavaris-field" th:if="${membership == null and showWorkspaceSelector}">
+            <label for="assignRoleWorkspaceId">Workspace</label>
+            <select id="assignRoleWorkspaceId" name="workspaceId"
+                    th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${accountId})}"
+                    hx-trigger="change" hx-include="this"
+                    hx-target="#assign-role-dialog-body" hx-swap="innerHTML">
+                <option th:each="workspaceOption : ${workspaces}" th:value="${workspaceOption.id()}"
+                        th:text="${workspaceOption.name()}"
+                        th:selected="${workspaceOption.id() == activeWorkspaceId}">Workspace</option>
+            </select>
+        </div>
+
+        <div class="clavaris-field" th:if="${showTeamSelector}">
             <label for="assignRoleTeamId">Team</label>
             <select id="assignRoleTeamId" name="teamId">
                 <option value="ungrouped"

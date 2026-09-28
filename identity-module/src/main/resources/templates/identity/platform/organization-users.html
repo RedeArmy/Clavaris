@@ -294,6 +294,9 @@
     </main>
 </div>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/row-menu.js') : '/js/row-menu.js'}" defer></script>
+<!-- Live UX request, 2026-09-27 (real bug found: referenced by assign-role-form.html's own
+     comment but never actually shipped anywhere — the Team filter it describes was a no-op). -->
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/assign-role-picker.js') : '/js/assign-role-picker.js'}" defer></script>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/assign-role-refresh.js') : '/js/assign-role-refresh.js'}" defer></script>
 </body>
 </html>
