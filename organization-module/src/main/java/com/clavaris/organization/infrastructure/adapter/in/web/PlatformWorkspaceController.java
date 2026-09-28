@@ -13,6 +13,9 @@ import com.clavaris.organization.application.usecase.assignworkspaceroletoaccoun
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleCommand;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceCommand;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleCommand;
@@ -141,12 +144,18 @@ import org.springframework.web.server.ResponseStatusException;
 // and serves itself, not an external URI a deployment should be able to repoint — same "these are
 // code, not runtime config" reasoning SocialLoginAuthenticationSuccessHandler's own identical
 // suppression already documents.
+// PMD.CyclomaticComplexity ("Remove user from role"/"Delete role auto-unassign" live UX request,
+// 2026-09-28): same TooManyMethods rationale above — this controller's own per-handler complexity
+// stays low (deleteRole's own extra CannotDemoteLastAdminException branch is one more genuinely
+// distinct outcome, not tangled logic), it's the class TOTAL that crossed the threshold purely
+// from handler count, not from any one method being hard to follow.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.AvoidDuplicateLiterals",
   "PMD.TooManyMethods",
   "PMD.CouplingBetweenObjects",
+  "PMD.CyclomaticComplexity",
   "java:S1075"
 })
 @Controller
@@ -200,6 +209,7 @@ public class PlatformWorkspaceController {
   private final ListWorkspaceMembersUseCase listMembersUseCase;
   private final OrganizationAccountDirectory accountDirectory;
   private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase;
+  private final ChangeWorkspaceMemberRoleUseCase changeMemberRoleUseCase;
 
   // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
   // as every other multi-collaborator constructor in this codebase; this controller's own Teams &
@@ -226,7 +236,8 @@ public class PlatformWorkspaceController {
       final DeleteWorkspaceRoleUseCase deleteRoleUseCase,
       final ListWorkspaceMembersUseCase listMembersUseCase,
       final OrganizationAccountDirectory accountDirectory,
-      final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase) {
+      final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase,
+      final ChangeWorkspaceMemberRoleUseCase changeMemberRoleUseCase) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
     this.listWorkspaces = listWorkspaces;
@@ -246,6 +257,7 @@ public class PlatformWorkspaceController {
     this.listMembersUseCase = listMembersUseCase;
     this.accountDirectory = accountDirectory;
     this.assignRoleToAccountUseCase = assignRoleToAccountUseCase;
+    this.changeMemberRoleUseCase = changeMemberRoleUseCase;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -379,6 +391,38 @@ public class PlatformWorkspaceController {
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+    populateTeamsHierarchyModel(model, workspace);
+    return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
+  }
+
+  // Live UX request, 2026-09-28: "Remove" next to each member in the Teams hierarchy — unassigns
+  // just that one member's role (composes the existing ChangeWorkspaceMemberRoleUseCase with
+  // newRoleId=null, ADR-0027 §5's own explicitly-allowed "roleless member" state), the account and
+  // its WorkspaceMembership both survive untouched. Same ManageMembersGuard protection every other
+  // role-changing action already applies, surfaced here as CannotDemoteLastAdminException.
+  @PostMapping("/{workspaceId}/members/{accountId}/unassign-role")
+  public String unassignMemberFromRole(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID accountId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    try {
+      changeMemberRoleUseCase.handle(
+          new ChangeWorkspaceMemberRoleCommand(
+              workspaceId, accountId, null, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceMembershipNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final CannotDemoteLastAdminException _) {
+      model.addAttribute("cannotDemoteLastAdminError", true);
+    }
+
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateTeamsHierarchyModel(model, workspace);
     return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
@@ -698,7 +742,7 @@ public class PlatformWorkspaceController {
     try {
       deleteRoleUseCase.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              roleId, workspaceId, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDeleteReservedWorkspaceRoleException _) {
@@ -710,6 +754,14 @@ public class PlatformWorkspaceController {
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     } catch (final WorkspaceRoleHasChildRolesException _) {
       model.addAttribute("roleHasChildRolesError", true);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
+    } catch (final CannotDemoteLastAdminException _) {
+      // Live UX request, 2026-09-28: deleting this role now auto-unassigns every holder in this
+      // Workspace first (DeleteWorkspaceRoleService's own Javadoc) — this is that bulk unassign
+      // hitting the exact same ManageMembersGuard every other role-changing action already does.
+      model.addAttribute("cannotDemoteLastAdminError", true);
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;

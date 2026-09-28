@@ -168,6 +168,47 @@ class JpaWorkspaceTeamRepositoryTest {
         .doesNotContain(ungroupedRoleId);
   }
 
+  // Delete Workspace Team cascade feature, 2026-09-28: org-wide, deliberately not scoped to one
+  // Workspace — the role may be grouped into a team of a DIFFERENT Workspace of the same
+  // Organization (ADR-0028 §2).
+  @Test
+  void isRoleGroupedInAnyOtherTeamFindsAGroupingInADifferentWorkspaceOfTheSameOrganization() {
+    UUID workspaceA = newPersistedWorkspaceId();
+    UUID workspaceB = newPersistedWorkspaceId();
+    Organization organization = Organization.register("Role Org", UUID.randomUUID());
+    organizations.save(organization);
+    UUID roleId = newPersistedRoleIdFor(organization.id());
+    WorkspaceTeam teamInA = WorkspaceTeam.define(workspaceA, "QA");
+    repository.save(teamInA);
+    WorkspaceTeam teamInB = WorkspaceTeam.define(workspaceB, "Support");
+    repository.save(teamInB);
+    repository.addRoleToTeam(teamInB.id(), roleId);
+
+    assertThat(repository.isRoleGroupedInAnyOtherTeam(roleId, teamInA.id())).isTrue();
+  }
+
+  @Test
+  void isRoleGroupedInAnyOtherTeamExcludesTheGivenTeamsOwnGrouping() {
+    UUID workspaceId = newPersistedWorkspaceId();
+    Organization organization = Organization.register("Role Org", UUID.randomUUID());
+    organizations.save(organization);
+    UUID roleId = newPersistedRoleIdFor(organization.id());
+    WorkspaceTeam team = WorkspaceTeam.define(workspaceId, "QA");
+    repository.save(team);
+    repository.addRoleToTeam(team.id(), roleId);
+
+    assertThat(repository.isRoleGroupedInAnyOtherTeam(roleId, team.id())).isFalse();
+  }
+
+  @Test
+  void isRoleGroupedInAnyOtherTeamIsFalseWhenTheRoleIsUngroupedEverywhere() {
+    Organization organization = Organization.register("Role Org", UUID.randomUUID());
+    organizations.save(organization);
+    UUID roleId = newPersistedRoleIdFor(organization.id());
+
+    assertThat(repository.isRoleGroupedInAnyOtherTeam(roleId, UUID.randomUUID())).isFalse();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(

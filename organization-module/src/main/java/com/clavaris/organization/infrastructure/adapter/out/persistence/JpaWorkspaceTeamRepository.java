@@ -91,6 +91,11 @@ class JpaWorkspaceTeamRepository implements WorkspaceTeamRepository {
         .collect(Collectors.toSet());
   }
 
+  @Override
+  public boolean isRoleGroupedInAnyOtherTeam(final UUID roleId, final UUID excludedTeamId) {
+    return teamRoles.existsByWorkspaceRoleIdAndWorkspaceTeamIdNot(roleId, excludedTeamId);
+  }
+
   private List<UUID> teamIdsFor(final UUID workspaceId) {
     return teams.findAllByWorkspaceId(workspaceId).stream()
         .map(WorkspaceTeamEntity::getId)

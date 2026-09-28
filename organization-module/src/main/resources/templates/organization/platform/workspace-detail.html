@@ -42,6 +42,7 @@
                 <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateRoleNameError}">A role with that name already exists in this Organization.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleStillAssignedError}">That role is still assigned to at least one member — reassign or unassign them first.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleHasChildRolesError}">That role is still the parent of at least one other role — re-parent or clear them first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">Deleting that role would leave nobody able to manage members or roles in this Workspace — reassign its last such member to another role first.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
                     <p class="clavaris-empty-state">No teams yet — add the first one above.</p>

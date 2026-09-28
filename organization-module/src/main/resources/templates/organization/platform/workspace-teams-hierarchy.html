@@ -37,7 +37,12 @@
                  This fragment self-refreshes on a successful assignment (HX-Trigger
                  workspace-role-assigned, same convention/event name ADR-0029's own Users-tab list
                  refresh already established for an identical "a popup changed data this page also
-                 shows" situation), so the newly assigned user appears here without a full reload. -->
+                 shows" situation), so the newly assigned user appears here without a full reload.
+
+                 Live UX request, 2026-09-28: "Remove" next to each member — unassigns just that one
+                 member's role (the account/membership itself survives, ADR-0027 §5's own explicitly
+                 allowed "roleless member" state); plain single-click hx-post + CSRF, same ceremony
+                 every other mutation on this fragment already uses. -->
             <div id="teams-hierarchy-content" th:fragment="hierarchy" class="clavaris-section"
                  hx-trigger="workspace-role-assigned from:body"
                  th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
@@ -45,6 +50,8 @@
                 <h2>Team hierarchy</h2>
                 <p>Every team in this Workspace, the roles grouped into it, and the members
                     currently holding each role.</p>
+
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace — reassign this member to another role first.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams) and #lists.isEmpty(ungroupedRoles)}">
                     <p class="clavaris-empty-state">No teams or roles yet.</p>
@@ -62,7 +69,16 @@
                     <div class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</li>
+                            <li class="clavaris-row-actions" th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
+                                <span th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</span>
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
+                                      hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                                </form>
+                            </li>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>
@@ -79,7 +95,16 @@
                     <div class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</li>
+                            <li class="clavaris-row-actions" th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
+                                <span th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</span>
+                                <form method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
+                                      hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                                </form>
+                            </li>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>
