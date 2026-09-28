@@ -898,6 +898,22 @@ code {
   color: var(--clavaris-danger);
 }
 
+/* SDE-III addition, 2026-09-27 — workspace-teams-hierarchy.html's own Team -> Role -> Members
+   nesting: a left border + indent reads as "child of the card above" without a third level of
+   .clavaris-section-card nesting (that class's own box-shadow/border stacks poorly three deep). */
+.clavaris-hierarchy-role {
+  margin-top: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid color-mix(in srgb, var(--clavaris-border) 80%, transparent);
+}
+.clavaris-hierarchy-role h4 {
+  margin: 0 0 var(--space-1);
+}
+.clavaris-hierarchy-role ul {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
 .clavaris-empty-state {
   padding: var(--space-6);
   text-align: center;

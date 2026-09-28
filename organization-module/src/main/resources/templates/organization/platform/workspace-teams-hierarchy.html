@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${workspace.name()} + ' — ' + ${organization.name()} + ' — Clavaris')}">
+    <title>Workspace — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <div th:replace="~{organization/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organization.id()})}, 'Back to Workspaces')}"></div>
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span th:text="${workspace.name()}">Workspace</span>
+            </p>
+
+            <div class="clavaris-page-header">
+                <div>
+                    <h1 th:text="${workspace.name()}">Workspace name</h1>
+                    <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
+                </div>
+            </div>
+
+            <div th:replace="~{organization/platform/fragments/workspace-tabs :: tabs(${organization.id()}, ${workspace.id()}, 'teams')}"></div>
+
+            <!-- SDE-III addition, 2026-09-27 (live UX request): a read-only view of the hierarchy
+                 the Manage tab's own CRUD builds — team, the roles grouped into it, and every
+                 member currently holding each role. Roles with no team (created, or left ungrouped
+                 after their own team was deleted, via Configure > Workspace Roles or the Manage
+                 tab's own "add existing role" path) render under a synthetic "No team" group instead
+                 of being silently dropped from the picture. Same "just list the raw accountId, no
+                 name resolution" fidelity the old Members table already had on this same page —
+                 organization-module has no access to identity-module's own Account records (module
+                 boundary, no Maven dependency between them), so a friendly name isn't available here
+                 without a cross-module read model this view doesn't have (unlike ADR-0029's own
+                 Assign-role popup, which is served BY identity-module's own page, not the reverse). -->
+            <div class="clavaris-section">
+                <h2>Team hierarchy</h2>
+                <p>Every team in this Workspace, the roles grouped into it, and the members
+                    currently holding each role.</p>
+
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams) and #lists.isEmpty(ungroupedRoles)}">
+                    <p class="clavaris-empty-state">No teams or roles yet.</p>
+                </div>
+
+                <div class="clavaris-section-card" th:each="team : ${teams}">
+                    <h3 th:text="${team.name()}">Team name</h3>
+                    <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
+                    <div class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
+                        <h4 th:text="${role.name()}">Role name</h4>
+                        <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
+                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountId}">Account id</li>
+                        </ul>
+                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
+                    </div>
+                </div>
+
+                <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
+                    <h3>No team</h3>
+                    <div class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
+                        <h4 th:text="${role.name()}">Role name</h4>
+                        <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
+                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountId}">Account id</li>
+                        </ul>
+                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

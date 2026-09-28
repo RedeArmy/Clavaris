@@ -27,6 +27,8 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationQuery;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersQuery;
+import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
@@ -45,6 +47,7 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -140,6 +143,8 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACES_FRAGMENT = ORGANIZATION_DETAIL_VIEW + " :: workspaces";
   private static final String WORKSPACE_DETAIL_VIEW = "organization/platform/workspace-detail";
   private static final String TEAMS_FRAGMENT = WORKSPACE_DETAIL_VIEW + " :: teams";
+  private static final String TEAMS_HIERARCHY_VIEW =
+      "organization/platform/workspace-teams-hierarchy";
   private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String CREATE_ROLE_FORM_ATTRIBUTE = "createRoleForm";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
@@ -165,6 +170,7 @@ public class PlatformWorkspaceController {
   private final AddRoleToWorkspaceTeamUseCase addRoleToTeamUseCase;
   private final CreateWorkspaceRoleUseCase createRoleUseCase;
   private final DeleteWorkspaceRoleUseCase deleteRoleUseCase;
+  private final ListWorkspaceMembersUseCase listMembersUseCase;
 
   // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
   // as every other multi-collaborator constructor in this codebase; this controller's own Teams &
@@ -187,7 +193,8 @@ public class PlatformWorkspaceController {
       final DeleteWorkspaceTeamUseCase deleteTeamUseCase,
       final AddRoleToWorkspaceTeamUseCase addRoleToTeamUseCase,
       final CreateWorkspaceRoleUseCase createRoleUseCase,
-      final DeleteWorkspaceRoleUseCase deleteRoleUseCase) {
+      final DeleteWorkspaceRoleUseCase deleteRoleUseCase,
+      final ListWorkspaceMembersUseCase listMembersUseCase) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
     this.listWorkspaces = listWorkspaces;
@@ -203,6 +210,7 @@ public class PlatformWorkspaceController {
     this.addRoleToTeamUseCase = addRoleToTeamUseCase;
     this.createRoleUseCase = createRoleUseCase;
     this.deleteRoleUseCase = deleteRoleUseCase;
+    this.listMembersUseCase = listMembersUseCase;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -266,6 +274,26 @@ public class PlatformWorkspaceController {
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateTeamsModel(model, workspace);
     return WORKSPACE_DETAIL_VIEW;
+  }
+
+  // SDE-III addition, 2026-09-27 (live UX request): a second, read-only tab on this same page —
+  // the Team -> Role -> Members hierarchy the Manage tab's own CRUD builds. A real GET route (not
+  // an HTMX-only fragment), same "each tab is its own bookmarkable, no-JS-required page" convention
+  // org-tabs.html's own Organization-level tabs already establish; workspace-tabs.html is this
+  // module's own two-tab equivalent.
+  @GetMapping("/{workspaceId}/teams")
+  public String showTeamsHierarchy(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+    populateTeamsHierarchyModel(model, workspace);
+    return TEAMS_HIERARCHY_VIEW;
   }
 
   // ADR-0028: the Workspace-detail page's own Teams & Roles section — create/rename/delete a team,
@@ -523,6 +551,53 @@ public class PlatformWorkspaceController {
     // otherwise set it; a missing "workspace" here is a null workspace.name()
     // SpelEvaluationException on the very next render, not a graceful no-op.
     model.addAttribute("workspace", workspace);
+    final TeamsAndRoles teamsAndRoles = loadTeamsAndRoles(workspace);
+
+    model.addAttribute("teams", teamsAndRoles.teams());
+    model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
+    model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
+    model.addAttribute(CREATE_TEAM_FORM_ATTRIBUTE, new CreateWorkspaceTeamForm());
+    model.addAttribute(CREATE_ROLE_FORM_ATTRIBUTE, new CreateWorkspaceTeamRoleForm());
+  }
+
+  // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy — same
+  // teams/rolesByTeamId
+  // /ungroupedRoles as the Manage tab (loadTeamsAndRoles is shared, not duplicated), plus every
+  // member currently holding each role, keyed by roleId. Every roleId this Organization has gets a
+  // (possibly empty) entry — never a missing map key — so the template never has to null-check
+  // accountIdsByRoleId.get(...) the way it would if Collectors.groupingBy's own "only present keys
+  // that had at least one match" behavior were used directly.
+  private void populateTeamsHierarchyModel(final Model model, final Workspace workspace) {
+    model.addAttribute("workspace", workspace);
+    final TeamsAndRoles teamsAndRoles = loadTeamsAndRoles(workspace);
+
+    final Map<UUID, List<UUID>> accountIdsByRoleId = new LinkedHashMap<>();
+    teamsAndRoles.rolesByTeamId().values().stream()
+        .flatMap(List::stream)
+        .forEach(role -> accountIdsByRoleId.put(role.id(), new ArrayList<>()));
+    teamsAndRoles
+        .ungroupedRoles()
+        .forEach(role -> accountIdsByRoleId.put(role.id(), new ArrayList<>()));
+    listMembersUseCase.handle(new ListWorkspaceMembersQuery(workspace.id())).stream()
+        .filter(membership -> membership.roleId() != null)
+        .forEach(
+            membership ->
+                accountIdsByRoleId
+                    .computeIfAbsent(membership.roleId(), key -> new ArrayList<>())
+                    .add(membership.accountId()));
+
+    model.addAttribute("teams", teamsAndRoles.teams());
+    model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
+    model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
+    model.addAttribute("accountIdsByRoleId", accountIdsByRoleId);
+  }
+
+  private record TeamsAndRoles(
+      List<WorkspaceTeam> teams,
+      Map<UUID, List<WorkspaceRole>> rolesByTeamId,
+      List<WorkspaceRole> ungroupedRoles) {}
+
+  private TeamsAndRoles loadTeamsAndRoles(final Workspace workspace) {
     final Map<UUID, WorkspaceRole> rolesById =
         listRoles
             .handle(new ListWorkspaceRolesForOrganizationQuery(workspace.organizationId()))
@@ -550,11 +625,7 @@ public class PlatformWorkspaceController {
             .sorted(Comparator.comparing(WorkspaceRole::name))
             .toList();
 
-    model.addAttribute("teams", teams);
-    model.addAttribute("teamRoles", rolesByTeamId);
-    model.addAttribute("ungroupedRoles", ungroupedRoles);
-    model.addAttribute(CREATE_TEAM_FORM_ATTRIBUTE, new CreateWorkspaceTeamForm());
-    model.addAttribute(CREATE_ROLE_FORM_ATTRIBUTE, new CreateWorkspaceTeamRoleForm());
+    return new TeamsAndRoles(teams, rolesByTeamId, ungroupedRoles);
   }
 
   private Organization requireOwnedOrganization(

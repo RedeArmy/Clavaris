@@ -1,0 +1,15 @@
+<!--
+SDE-III addition, 2026-09-27 — Workspace-detail's own two-tab sub-navigation (Manage / Teams), same
+real-GET-route-per-tab shape org-tabs.html already establishes at the Organization level (see that
+fragment's own comment for why each module hand-duplicates its own copy of a shared-fragment-across-
+templates idea — that cross-module constraint doesn't apply here, since both templates that include
+this one live in this same module, so one shared fragment is fine). No "Back to Workspaces" link
+here — both templates that include this fragment already carry their own copy of back-link.html
+above it; a second one here would be a redundant "go back" affordance for the same destination.
+-->
+<div th:fragment="tabs(organizationId, workspaceId, active)" class="clavaris-org-tabs">
+    <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organizationId},workspaceId=${workspaceId})}"
+       th:classappend="${active == 'manage'} ? 'active'">Manage</a>
+    <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organizationId},workspaceId=${workspaceId})}"
+       th:classappend="${active == 'teams'} ? 'active'">Teams</a>
+</div>

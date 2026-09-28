@@ -30,6 +30,7 @@ import com.clavaris.organization.application.usecase.deleteworkspacerole.Workspa
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
@@ -38,6 +39,7 @@ import com.clavaris.organization.application.usecase.listworkspaceteamsforworksp
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
+import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.List;
@@ -76,6 +78,7 @@ class PlatformWorkspaceControllerTest {
   private AddRoleToWorkspaceTeamUseCase addRoleToTeam;
   private CreateWorkspaceRoleUseCase createRole;
   private DeleteWorkspaceRoleUseCase deleteRole;
+  private ListWorkspaceMembersUseCase listMembers;
   private MockMvc mockMvc;
   private Organization organization;
   private Workspace workspace;
@@ -98,6 +101,7 @@ class PlatformWorkspaceControllerTest {
     addRoleToTeam = mock(AddRoleToWorkspaceTeamUseCase.class);
     createRole = mock(CreateWorkspaceRoleUseCase.class);
     deleteRole = mock(DeleteWorkspaceRoleUseCase.class);
+    listMembers = mock(ListWorkspaceMembersUseCase.class);
 
     organization = Organization.register("Acme Co", OWNER_ID);
     workspace = Workspace.register(organization.id(), "Engineering");
@@ -111,6 +115,7 @@ class PlatformWorkspaceControllerTest {
     when(listTeams.handle(any())).thenReturn(List.of());
     when(listTeamRoleIds.handle(any())).thenReturn(List.of());
     when(listGroupedRoleIds.handle(any())).thenReturn(Set.of());
+    when(listMembers.handle(any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -143,7 +148,8 @@ class PlatformWorkspaceControllerTest {
                     deleteTeam,
                     addRoleToTeam,
                     createRole,
-                    deleteRole))
+                    deleteRole,
+                    listMembers))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -234,6 +240,59 @@ class PlatformWorkspaceControllerTest {
     when(getOrganization.handle(any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(workspacesPath() + "/" + workspace.id())).andExpect(status().isNotFound());
+  }
+
+  // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy.
+  @Test
+  void showsTheTeamsHierarchyPage() throws Exception {
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-teams-hierarchy"))
+        .andExpect(model().attribute("teams", List.of(team)));
+  }
+
+  @Test
+  void showsEveryMemberHoldingARoleInTheHierarchy() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(listMembers.handle(any()))
+        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString(accountId.toString())));
+  }
+
+  // ADR-0027 §5: a membership can be roleless — that account must not blow up the hierarchy's own
+  // per-role grouping (its accountId simply never appears under any role).
+  @Test
+  void doesNotBlowUpOnARolelessMembership() throws Exception {
+    when(listMembers.handle(any()))
+        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), null)));
+
+    mockMvc.perform(get(teamsPath())).andExpect(status().isOk());
+  }
+
+  @Test
+  void groupsAnUngroupedRoleUnderNoTeamInTheHierarchy() throws Exception {
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("ungroupedRoles", List.of(role)))
+        .andExpect(content().string(containsString("No team")));
+  }
+
+  @Test
+  void teamsHierarchyReturnsNotFoundWhenTheWorkspaceDoesNotBelongToTheOrganization()
+      throws Exception {
+    when(getWorkspace.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc.perform(get(teamsPath())).andExpect(status().isNotFound());
   }
 
   // ADR-0028: the Workspace-detail page's own Teams & Roles section.

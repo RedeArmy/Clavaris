@@ -31,6 +31,8 @@
                 </div>
             </div>
 
+            <div th:replace="~{organization/platform/fragments/workspace-tabs :: tabs(${organization.id()}, ${workspace.id()}, 'manage')}"></div>
+
             <!-- SDE-III redesign, 2026-09-27 (live UX request): the old separate "Members" section
                  is gone — see PlatformWorkspaceController's own class Javadoc for the full
                  reasoning (a deliberate, confirmed choice, not an oversight; member management
