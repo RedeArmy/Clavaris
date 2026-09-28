@@ -102,7 +102,8 @@ class AssignWorkspaceRoleToAccountServiceTest {
         .thenReturn(
             List.of(
                 existing,
-                WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), manageMembersRole.id())));
+                WorkspaceMembership.join(
+                    workspace.id(), UUID.randomUUID(), manageMembersRole.id())));
 
     WorkspaceMembership updated =
         service.handle(
@@ -157,8 +158,7 @@ class AssignWorkspaceRoleToAccountServiceTest {
     WorkspaceRole foreignRole = WorkspaceRole.define(UUID.randomUUID(), "Foreign", null, Set.of());
     when(roles.findById(foreignRole.id())).thenReturn(Optional.of(foreignRole));
     AssignWorkspaceRoleToAccountCommand command =
-        new AssignWorkspaceRoleToAccountCommand(
-            workspace.id(), accountId, foreignRole.id(), ACTOR);
+        new AssignWorkspaceRoleToAccountCommand(workspace.id(), accountId, foreignRole.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));

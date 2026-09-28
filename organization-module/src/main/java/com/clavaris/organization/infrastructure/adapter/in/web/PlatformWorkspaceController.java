@@ -7,6 +7,12 @@ import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddR
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.WorkspaceRoleAlreadyInAnotherTeamException;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AccountNotInOrganizationException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountCommand;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceCommand;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleCommand;
@@ -43,9 +49,11 @@ import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameW
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
+import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -145,6 +153,16 @@ public class PlatformWorkspaceController {
   private static final String TEAMS_FRAGMENT = WORKSPACE_DETAIL_VIEW + " :: teams";
   private static final String TEAMS_HIERARCHY_VIEW =
       "organization/platform/workspace-teams-hierarchy";
+  private static final String TEAMS_HIERARCHY_FRAGMENT = TEAMS_HIERARCHY_VIEW + " :: hierarchy";
+  private static final String ASSIGN_ROLE_FORM_FRAGMENT =
+      "organization/platform/fragments/team-assign-role-form :: assignRoleForm";
+  private static final String ASSIGN_ROLE_SAVED_FRAGMENT =
+      "organization/platform/fragments/team-assign-role-form :: assignRoleSaved";
+  // htmx's own response-header convention — same ADR-0029 event name/purpose
+  // PlatformAccountWorkspaceRoleController's own identical constant documents: workspace-
+  // teams-hierarchy.html's own hierarchy fragment listens for this on document.body to
+  // self-refresh after a successful assignment.
+  private static final String ROLE_ASSIGNED_EVENT = "workspace-role-assigned";
   private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String CREATE_ROLE_FORM_ATTRIBUTE = "createRoleForm";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
@@ -171,6 +189,8 @@ public class PlatformWorkspaceController {
   private final CreateWorkspaceRoleUseCase createRoleUseCase;
   private final DeleteWorkspaceRoleUseCase deleteRoleUseCase;
   private final ListWorkspaceMembersUseCase listMembersUseCase;
+  private final OrganizationAccountDirectory accountDirectory;
+  private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase;
 
   // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
   // as every other multi-collaborator constructor in this codebase; this controller's own Teams &
@@ -194,7 +214,9 @@ public class PlatformWorkspaceController {
       final AddRoleToWorkspaceTeamUseCase addRoleToTeamUseCase,
       final CreateWorkspaceRoleUseCase createRoleUseCase,
       final DeleteWorkspaceRoleUseCase deleteRoleUseCase,
-      final ListWorkspaceMembersUseCase listMembersUseCase) {
+      final ListWorkspaceMembersUseCase listMembersUseCase,
+      final OrganizationAccountDirectory accountDirectory,
+      final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
     this.listWorkspaces = listWorkspaces;
@@ -211,6 +233,8 @@ public class PlatformWorkspaceController {
     this.createRoleUseCase = createRoleUseCase;
     this.deleteRoleUseCase = deleteRoleUseCase;
     this.listMembersUseCase = listMembersUseCase;
+    this.accountDirectory = accountDirectory;
+    this.assignRoleToAccountUseCase = assignRoleToAccountUseCase;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -280,7 +304,10 @@ public class PlatformWorkspaceController {
   // the Team -> Role -> Members hierarchy the Manage tab's own CRUD builds. A real GET route (not
   // an HTMX-only fragment), same "each tab is its own bookmarkable, no-JS-required page" convention
   // org-tabs.html's own Organization-level tabs already establish; workspace-tabs.html is this
-  // module's own two-tab equivalent.
+  // module's own two-tab equivalent. Also doubles as the self-refresh target the "Assign role"
+  // popups below fire on success (workspace-teams-hierarchy.html's own hx-trigger), hence the HTMX
+  // fragment branch — same shape every other mutating section on this dashboard already has, just
+  // triggered by a custom event instead of a click.
   @GetMapping("/{workspaceId}/teams")
   public String showTeamsHierarchy(
       final HttpServletRequest request,
@@ -293,7 +320,109 @@ public class PlatformWorkspaceController {
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateTeamsHierarchyModel(model, workspace);
-    return TEAMS_HIERARCHY_VIEW;
+    return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
+  }
+
+  // Live UX request, 2026-09-27: "Assign role" popup scoped to one specific team — the "User"
+  // picker excludes every account that already holds one of THIS team's own roles (an account with
+  // a role in a DIFFERENT team, or no role at all, is still offered — assigning them here simply
+  // moves/originates their one membership, same single-role model
+  // AssignWorkspaceRoleToAccountUseCase's
+  // own Javadoc documents).
+  @GetMapping("/{workspaceId}/teams/{teamId}/assign-role")
+  public String showAssignRoleFormForTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID teamId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    final List<WorkspaceRole> teamRoles = requireOwnedTeamRoles(workspace, teamId);
+    populateAssignRoleModel(
+        model,
+        organizationId,
+        workspace,
+        teamRoles,
+        assignRoleToTeamAction(organizationId, workspaceId, teamId));
+    return ASSIGN_ROLE_FORM_FRAGMENT;
+  }
+
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/teams/{teamId}/assign-role")
+  public String assignRoleForTeam(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID teamId,
+      @RequestParam final UUID accountId,
+      @RequestParam final UUID roleId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    final List<WorkspaceRole> teamRoles = requireOwnedTeamRoles(workspace, teamId);
+    return processAssignRole(
+        response,
+        organizationId,
+        workspace,
+        accountId,
+        roleId,
+        teamRoles,
+        ownerPlatformAccountId,
+        assignRoleToTeamAction(organizationId, workspaceId, teamId),
+        model);
+  }
+
+  // Live UX request, 2026-09-27: the synthetic "No team" group's own "Assign role" popup — same
+  // shape as the per-team one above, scoped to this Workspace's own ungrouped roles instead of one
+  // team's roles. Only reachable when at least one ungrouped role exists — the template never
+  // renders this button otherwise, same guard the "No team" card's own th:unless already applies.
+  @GetMapping("/{workspaceId}/roles/assign-role")
+  public String showAssignRoleFormForNoTeam(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    final List<WorkspaceRole> ungroupedRoles = loadTeamsAndRoles(workspace).ungroupedRoles();
+    populateAssignRoleModel(
+        model,
+        organizationId,
+        workspace,
+        ungroupedRoles,
+        assignRoleToNoTeamAction(organizationId, workspaceId));
+    return ASSIGN_ROLE_FORM_FRAGMENT;
+  }
+
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/roles/assign-role")
+  public String assignRoleForNoTeam(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @RequestParam final UUID accountId,
+      @RequestParam final UUID roleId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    final List<WorkspaceRole> ungroupedRoles = loadTeamsAndRoles(workspace).ungroupedRoles();
+    return processAssignRole(
+        response,
+        organizationId,
+        workspace,
+        accountId,
+        roleId,
+        ungroupedRoles,
+        ownerPlatformAccountId,
+        assignRoleToNoTeamAction(organizationId, workspaceId),
+        model);
   }
 
   // ADR-0028: the Workspace-detail page's own Teams & Roles section — create/rename/delete a team,
@@ -626,6 +755,111 @@ public class PlatformWorkspaceController {
             .toList();
 
     return new TeamsAndRoles(teams, rolesByTeamId, ungroupedRoles);
+  }
+
+  // Resolves teamId's own roles from THIS workspace's real teams (loadTeamsAndRoles's own
+  // rolesByTeamId map is keyed only by teamIds that genuinely belong to this workspace) — a teamId
+  // that isn't one of them (wrong workspace, wrong organization, or just made up) 404s here before
+  // either "Assign role" handler below does anything else with it.
+  private List<WorkspaceRole> requireOwnedTeamRoles(final Workspace workspace, final UUID teamId) {
+    final List<WorkspaceRole> teamRoles = loadTeamsAndRoles(workspace).rolesByTeamId().get(teamId);
+    if (teamRoles == null) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+    return teamRoles;
+  }
+
+  private static String assignRoleToTeamAction(
+      final UUID organizationId, final UUID workspaceId, final UUID teamId) {
+    return "/platform/dashboard/organizations/"
+        + organizationId
+        + "/workspaces/"
+        + workspaceId
+        + "/teams/"
+        + teamId
+        + "/assign-role";
+  }
+
+  private static String assignRoleToNoTeamAction(
+      final UUID organizationId, final UUID workspaceId) {
+    return "/platform/dashboard/organizations/"
+        + organizationId
+        + "/workspaces/"
+        + workspaceId
+        + "/roles/assign-role";
+  }
+
+  // Live UX request, 2026-09-27: eligibleAccounts is every account in this Organization
+  // (OrganizationAccountDirectory) EXCLUDING one that already holds a role within this specific
+  // group (groupRoles — one team's own roles, or the ungrouped set for the "No team" group) — an
+  // account with a role in a DIFFERENT group, or no role at all, is still eligible here.
+  private void populateAssignRoleModel(
+      final Model model,
+      final UUID organizationId,
+      final Workspace workspace,
+      final List<WorkspaceRole> groupRoles,
+      final String assignRoleAction) {
+    final Set<UUID> groupRoleIds =
+        groupRoles.stream().map(WorkspaceRole::id).collect(Collectors.toSet());
+    final Set<UUID> accountsAlreadyInGroup =
+        listMembersUseCase.handle(new ListWorkspaceMembersQuery(workspace.id())).stream()
+            .filter(
+                membership ->
+                    membership.roleId() != null && groupRoleIds.contains(membership.roleId()))
+            .map(WorkspaceMembership::accountId)
+            .collect(Collectors.toSet());
+    final List<OrganizationAccountSummary> eligibleAccounts =
+        accountDirectory.listAccountsForOrganization(organizationId).stream()
+            .filter(account -> !accountsAlreadyInGroup.contains(account.accountId()))
+            .sorted(Comparator.comparing(OrganizationAccountSummary::label))
+            .toList();
+
+    model.addAttribute("eligibleAccounts", eligibleAccounts);
+    model.addAttribute("groupRoles", groupRoles);
+    model.addAttribute("assignRoleAction", assignRoleAction);
+  }
+
+  // Shared POST tail for both showAssignRoleFormForTeam/-ForNoTeam's own mutating counterparts.
+  // Fires ROLE_ASSIGNED_EVENT on success — same HX-Trigger convention
+  // PlatformAccountWorkspaceRoleController's own save() already establishes — so
+  // workspace-teams-hierarchy.html's own hierarchy fragment (listening on document.body)
+  // self-refreshes with the newly assigned member, no full page reload.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private String processAssignRole(
+      final HttpServletResponse response,
+      final UUID organizationId,
+      final Workspace workspace,
+      final UUID accountId,
+      final UUID roleId,
+      final List<WorkspaceRole> groupRoles,
+      final UUID ownerPlatformAccountId,
+      final String assignRoleAction,
+      final Model model) {
+    final boolean roleBelongsToThisGroup =
+        groupRoles.stream().anyMatch(role -> role.id().equals(roleId));
+    if (!roleBelongsToThisGroup) {
+      // The popup's own Role <select> only ever offers this group's own roles — reaching this
+      // means the submitted roleId was tampered with, not a real user mistake.
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      assignRoleToAccountUseCase.handle(
+          new AssignWorkspaceRoleToAccountCommand(
+              workspace.id(),
+              accountId,
+              roleId,
+              AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final AccountNotInOrganizationException | WorkspaceRoleNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final CannotDemoteLastAdminException _) {
+      model.addAttribute("cannotDemoteLastAdminError", true);
+      populateAssignRoleModel(model, organizationId, workspace, groupRoles, assignRoleAction);
+      return ASSIGN_ROLE_FORM_FRAGMENT;
+    }
+
+    response.setHeader("HX-Trigger", ROLE_ASSIGNED_EVENT);
+    return ASSIGN_ROLE_SAVED_FRAGMENT;
   }
 
   private Organization requireOwnedOrganization(

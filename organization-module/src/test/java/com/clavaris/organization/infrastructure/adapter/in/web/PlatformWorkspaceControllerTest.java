@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +19,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.WorkspaceRoleAlreadyInAnotherTeamException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
@@ -42,6 +45,7 @@ import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -79,6 +83,8 @@ class PlatformWorkspaceControllerTest {
   private CreateWorkspaceRoleUseCase createRole;
   private DeleteWorkspaceRoleUseCase deleteRole;
   private ListWorkspaceMembersUseCase listMembers;
+  private OrganizationAccountDirectory accountDirectory;
+  private AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private MockMvc mockMvc;
   private Organization organization;
   private Workspace workspace;
@@ -102,6 +108,8 @@ class PlatformWorkspaceControllerTest {
     createRole = mock(CreateWorkspaceRoleUseCase.class);
     deleteRole = mock(DeleteWorkspaceRoleUseCase.class);
     listMembers = mock(ListWorkspaceMembersUseCase.class);
+    accountDirectory = mock(OrganizationAccountDirectory.class);
+    assignRoleToAccount = mock(AssignWorkspaceRoleToAccountUseCase.class);
 
     organization = Organization.register("Acme Co", OWNER_ID);
     workspace = Workspace.register(organization.id(), "Engineering");
@@ -116,6 +124,7 @@ class PlatformWorkspaceControllerTest {
     when(listTeamRoleIds.handle(any())).thenReturn(List.of());
     when(listGroupedRoleIds.handle(any())).thenReturn(Set.of());
     when(listMembers.handle(any())).thenReturn(List.of());
+    when(accountDirectory.listAccountsForOrganization(any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -149,7 +158,9 @@ class PlatformWorkspaceControllerTest {
                     addRoleToTeam,
                     createRole,
                     deleteRole,
-                    listMembers))
+                    listMembers,
+                    accountDirectory,
+                    assignRoleToAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -293,6 +304,185 @@ class PlatformWorkspaceControllerTest {
     when(getWorkspace.handle(any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(teamsPath())).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void htmxGetOnTheTeamsHierarchyReturnsJustItsOwnFragment() throws Exception {
+    mockMvc
+        .perform(get(teamsPath()).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-teams-hierarchy :: hierarchy"));
+  }
+
+  // SDE-III addition, 2026-09-27: "Assign role" popup scoped to one specific team (Way 1 of the
+  // live UX request — the Teams tab's own per-team/per-"No team" trigger).
+  @Test
+  void showsEveryOrganizationAccountNotAlreadyInThisTeamAsEligible() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    OrganizationAccountSummary eligible =
+        new OrganizationAccountSummary(UUID.randomUUID(), "eligible@example.com");
+    OrganizationAccountSummary alreadyInTeam =
+        new OrganizationAccountSummary(UUID.randomUUID(), "already@example.com");
+    when(accountDirectory.listAccountsForOrganization(organization.id()))
+        .thenReturn(List.of(eligible, alreadyInTeam));
+    when(listMembers.handle(any()))
+        .thenReturn(
+            List.of(
+                WorkspaceMembership.join(workspace.id(), alreadyInTeam.accountId(), role.id())));
+
+    mockMvc
+        .perform(get(teamsPath() + "/" + teamId + "/assign-role"))
+        .andExpect(status().isOk())
+        .andExpect(
+            view().name("organization/platform/fragments/team-assign-role-form :: assignRoleForm"))
+        .andExpect(model().attribute("eligibleAccounts", List.of(eligible)))
+        .andExpect(model().attribute("groupRoles", List.of(role)));
+  }
+
+  @Test
+  void assignRoleFormForAnUnknownTeamReturnsNotFound() throws Exception {
+    mockMvc
+        .perform(get(teamsPath() + "/" + UUID.randomUUID() + "/assign-role"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void plainAssignRoleForTeamPostRedirectsOnSuccess() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    UUID accountId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(teamsPath() + "/" + teamId + "/assign-role")
+                .param("accountId", accountId.toString())
+                .param("roleId", role.id().toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(assignRoleToAccount).handle(any());
+  }
+
+  @Test
+  void htmxAssignRoleForTeamPostFiresTheRoleAssignedTriggerOnSuccess() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+
+    mockMvc
+        .perform(
+            post(teamsPath() + "/" + teamId + "/assign-role")
+                .param("accountId", UUID.randomUUID().toString())
+                .param("roleId", role.id().toString())
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("HX-Trigger", "workspace-role-assigned"))
+        .andExpect(
+            view()
+                .name("organization/platform/fragments/team-assign-role-form :: assignRoleSaved"));
+  }
+
+  // Defense in depth: the popup's own Role <select> only ever offers this team's own roles.
+  @Test
+  void assignRoleForTeamWithARoleNotBelongingToThatTeamReturnsBadRequest() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+    WorkspaceRole otherRole = WorkspaceRole.define(organization.id(), "Other", null, Set.of());
+
+    mockMvc
+        .perform(
+            post(teamsPath() + "/" + teamId + "/assign-role")
+                .param("accountId", UUID.randomUUID().toString())
+                .param("roleId", otherRole.id().toString()))
+        .andExpect(status().isBadRequest());
+
+    verify(assignRoleToAccount, never()).handle(any());
+  }
+
+  @Test
+  void assignRoleForTeamRendersAnErrorInsteadOfPropagatingTheException() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    doThrow(new CannotDemoteLastAdminException(workspace.id()))
+        .when(assignRoleToAccount)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(teamsPath() + "/" + teamId + "/assign-role")
+                .param("accountId", UUID.randomUUID().toString())
+                .param("roleId", role.id().toString()))
+        .andExpect(status().isOk())
+        .andExpect(
+            view().name("organization/platform/fragments/team-assign-role-form :: assignRoleForm"))
+        .andExpect(model().attribute("cannotDemoteLastAdminError", true));
+  }
+
+  // SDE-III addition, 2026-09-27: the synthetic "No team" group's own "Assign role" popup.
+  @Test
+  void showsTheAssignRoleFormForTheNoTeamGroup() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/assign-role"))
+        .andExpect(status().isOk())
+        .andExpect(
+            view().name("organization/platform/fragments/team-assign-role-form :: assignRoleForm"))
+        .andExpect(model().attribute("groupRoles", List.of(role)));
+  }
+
+  @Test
+  void plainAssignRoleForNoTeamPostRedirectsOnSuccess() throws Exception {
+    mockMvc
+        .perform(
+            post(rolesPath() + "/assign-role")
+                .param("accountId", UUID.randomUUID().toString())
+                .param("roleId", role.id().toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(assignRoleToAccount).handle(any());
+  }
+
+  @Test
+  void assignRoleForNoTeamWithARoleThatIsGroupedIntoATeamReturnsBadRequest() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listGroupedRoleIds.handle(any())).thenReturn(Set.of(role.id()));
+
+    mockMvc
+        .perform(
+            post(rolesPath() + "/assign-role")
+                .param("accountId", UUID.randomUUID().toString())
+                .param("roleId", role.id().toString()))
+        .andExpect(status().isBadRequest());
+
+    verify(assignRoleToAccount, never()).handle(any());
+  }
+
+  // Anti-cross-tenant: AssignWorkspaceRoleToAccountService's own accountId re-verification.
+  @Test
+  void assignRoleRendersNotFoundWhenTheAccountDoesNotBelongToThisOrganization() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    doThrow(new AccountNotInOrganizationException(accountId, organization.id()))
+        .when(assignRoleToAccount)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(rolesPath() + "/assign-role")
+                .param("accountId", accountId.toString())
+                .param("roleId", role.id().toString()))
+        .andExpect(status().isNotFound());
   }
 
   // ADR-0028: the Workspace-detail page's own Teams & Roles section.

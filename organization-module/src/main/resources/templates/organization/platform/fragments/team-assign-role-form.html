@@ -1,0 +1,55 @@
+<!-- Live UX request, 2026-09-27: loaded via hx-get/hx-post into workspace-teams-hierarchy.html's own
+     shared #team-assign-role-dialog-body — same "one shared dialog per page, HTMX-loaded content"
+     convention ADR-0029's own assign-role-form.html already establishes, just for the Teams tab's
+     own per-team/per-"No team" trigger instead of a per-account one. No <!DOCTYPE html>/<html>/
+     <body> wrapper — same fragment-file convention every sibling under */fragments/ already
+     follows. eligibleAccounts already excludes every account that already holds a role in this
+     specific team/group (PlatformWorkspaceController's own populateAssignRoleModel) — this fragment
+     never re-filters, it only renders whatever the controller already resolved. -->
+<div th:fragment="assignRoleForm">
+    <div th:if="${#lists.isEmpty(eligibleAccounts)}">
+        <p class="clavaris-empty-state">Every account in this Organization already has a role here.</p>
+    </div>
+    <div th:if="${#lists.isEmpty(groupRoles)}">
+        <p class="clavaris-empty-state">This group has no roles yet.</p>
+    </div>
+    <!-- assignRoleAction is a complete, already-built relative URL (PlatformWorkspaceController's
+         own populateAssignRoleModel) — printed as a plain string, not wrapped in a Thymeleaf @{...}
+         link expression, since it's already fully resolved server-side and the two call sites
+         (per-team vs. the synthetic "No team" group) would otherwise need this exact form
+         duplicated once per URL shape instead of shared here. -->
+    <form th:if="${!#lists.isEmpty(eligibleAccounts) and !#lists.isEmpty(groupRoles)}" method="post"
+          th:action="${assignRoleAction}"
+          th:attr="hx-post=${assignRoleAction}"
+          hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+        <p class="clavaris-field-error" th:if="${cannotDemoteLastAdminError}">
+            This would leave the Workspace with no one able to manage its own members — assign a
+            different substitute first.
+        </p>
+
+        <div class="clavaris-field">
+            <label for="assignRoleAccountId">User</label>
+            <select id="assignRoleAccountId" name="accountId" required>
+                <option th:each="account : ${eligibleAccounts}" th:value="${account.accountId()}"
+                        th:text="${account.label()}">Account</option>
+            </select>
+        </div>
+
+        <div class="clavaris-field">
+            <label for="assignRoleRoleId">Role</label>
+            <select id="assignRoleRoleId" name="roleId" required>
+                <option th:each="role : ${groupRoles}" th:value="${role.id()}" th:text="${role.name()}">Role</option>
+            </select>
+        </div>
+
+        <div class="clavaris-dialog__actions">
+            <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-dialog-close>Cancel</button>
+            <button type="submit" class="clavaris-button clavaris-button--inline">Assign</button>
+        </div>
+    </form>
+</div>
+<div th:fragment="assignRoleSaved">
+    <p class="clavaris-empty-state">Role assigned.</p>
+</div>
