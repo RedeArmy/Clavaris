@@ -1,0 +1,24 @@
+<!--
+SonarCloud duplication fix, 2026-09-28: workspace-detail.html and workspace-teams-hierarchy.html
+(both this module, both operating on the same ${organization}/${workspace} model attributes) had
+hand-duplicated this exact back-link + breadcrumb + title block. Same "one shared fragment is fine,
+both callers live in this module" rationale workspace-tabs.html's own comment already documents for
+an identical situation — extracted here rather than into that file to keep each fragment's own
+responsibility (tabs vs. header) separate, same split back-link.html and org-tabs.html already keep
+at the Organization level.
+-->
+<div th:fragment="header(organization, workspace)">
+    <div th:replace="~{organization/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organization.id()})}, 'Back to Workspaces')}"></div>
+    <p class="clavaris-breadcrumb">
+        <a th:href="@{/platform/dashboard}">Organizations</a> /
+        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+        <span th:text="${workspace.name()}">Workspace</span>
+    </p>
+
+    <div class="clavaris-page-header">
+        <div>
+            <h1 th:text="${workspace.name()}">Workspace name</h1>
+            <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
+        </div>
+    </div>
+</div>

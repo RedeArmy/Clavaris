@@ -396,6 +396,7 @@ class PlatformAccountsControllerTest {
         .andExpect(content().string(containsString("Assign role")))
         .andExpect(content().string(containsString(expectedUrl)))
         .andExpect(content().string(containsString("id=\"assign-role-dialog\"")))
+        .andExpect(content().string(containsString("/js/assign-role-picker.js")))
         .andExpect(content().string(containsString("/js/assign-role-refresh.js")));
   }
 

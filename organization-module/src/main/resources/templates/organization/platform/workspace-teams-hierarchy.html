@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${workspace.name()} + ' — ' + ${organization.name()} + ' — Clavaris')}">
+    <title>Workspace — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <div th:replace="~{organization/platform/fragments/workspace-page-header :: header(${organization}, ${workspace})}"></div>
+
+            <div th:replace="~{organization/platform/fragments/workspace-tabs :: tabs(${organization.id()}, ${workspace.id()}, 'teams')}"></div>
+
+            <!-- SDE-III addition, 2026-09-27 (live UX request): a read-only view of the hierarchy
+                 the Manage tab's own CRUD builds — team, the roles grouped into it, and every
+                 member currently holding each role. Roles with no team (created, or left ungrouped
+                 after their own team was deleted, via Configure > Workspace Roles or the Manage
+                 tab's own "add existing role" path) render under a synthetic "No team" group instead
+                 of being silently dropped from the picture. Same "just list the raw accountId, no
+                 name resolution" fidelity the old Members table already had on this same page —
+                 organization-module has no access to identity-module's own Account records (module
+                 boundary, no Maven dependency between them), so a friendly name isn't available here
+                 without a cross-module read model this view doesn't have (unlike ADR-0029's own
+                 Assign-role popup, which is served BY identity-module's own page, not the reverse).
+
+                 Live UX request, 2026-09-27: "Assign role" — one button per team (and one for the
+                 synthetic "No team" group) opens a shared popup scoped to that group: pick one of
+                 this Organization's own accounts that doesn't already hold a role in this specific
+                 group, then one of the group's own roles. Composes AssignWorkspaceRoleToAccountUseCase
+                 — creates a brand-new WorkspaceMembership for an account with none yet, or replaces
+                 an existing one's role, transparently either way (see that use case's own Javadoc).
+                 This fragment self-refreshes on a successful assignment (HX-Trigger
+                 workspace-role-assigned, same convention/event name ADR-0029's own Users-tab list
+                 refresh already established for an identical "a popup changed data this page also
+                 shows" situation), so the newly assigned user appears here without a full reload. -->
+            <div id="teams-hierarchy-content" th:fragment="hierarchy" class="clavaris-section"
+                 hx-trigger="workspace-role-assigned from:body"
+                 th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                 hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
+                <h2>Team hierarchy</h2>
+                <p>Every team in this Workspace, the roles grouped into it, and the members
+                    currently holding each role.</p>
+
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams) and #lists.isEmpty(ungroupedRoles)}">
+                    <p class="clavaris-empty-state">No teams or roles yet.</p>
+                </div>
+
+                <div class="clavaris-section-card" th:each="team : ${teams}">
+                    <div class="clavaris-page-header">
+                        <h3 th:text="${team.name()}">Team name</h3>
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                data-dialog-open="team-assign-role-dialog"
+                                th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/assign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
+                    </div>
+                    <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
+                    <div class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
+                        <h4 th:text="${role.name()}">Role name</h4>
+                        <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
+                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountId}">Account id</li>
+                        </ul>
+                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
+                    </div>
+                </div>
+
+                <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
+                    <div class="clavaris-page-header">
+                        <h3>No team</h3>
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                data-dialog-open="team-assign-role-dialog"
+                                th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/assign-role(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                                hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
+                    </div>
+                    <div class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
+                        <h4 th:text="${role.name()}">Role name</h4>
+                        <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
+                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountId}">Account id</li>
+                        </ul>
+                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
+                    </div>
+                </div>
+            </div>
+
+            <dialog id="team-assign-role-dialog" class="clavaris-dialog">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Role</span>
+                        <h2>Assign role</h2>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close assign role dialog">×</button>
+                </div>
+                <div id="team-assign-role-dialog-body">Loading&hellip;</div>
+            </dialog>
+        </div>
+    </main>
+</div>
+</body>
+</html>

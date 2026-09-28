@@ -1,11 +1,12 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AccountNotInOrganizationException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountCommand;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleCommand;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountQuery;
 import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
@@ -14,6 +15,8 @@ import com.clavaris.organization.application.usecase.getworkspacefororganization
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
+import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsQuery;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceQuery;
@@ -24,6 +27,7 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,9 +48,29 @@ import org.springframework.web.server.ResponseStatusException;
  * tab) opens for an Account, without giving identity-module a Maven dependency on this module — the
  * dialog's body is loaded via a plain HTMX {@code hx-get}/{@code hx-post} against this controller's
  * own URLs, the same way any two independently-deployable services would compose a UI, just without
- * the network hop (ADR-0029 §3). The popup can never bypass {@link
- * ChangeWorkspaceMemberRoleUseCase}'s own invariants — it is the exact same use case ADR-0027/0028
- * already built and tested, called from a second entry point, never a parallel write path.
+ * the network hop (ADR-0029 §3).
+ *
+ * <p>SDE-III redesign, 2026-09-27 (live UX request, "Way 2"): rebuilt on {@link
+ * AssignWorkspaceRoleToAccountUseCase} instead of {@link
+ * com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase}
+ * — the popup can now reach an account with no {@link WorkspaceMembership} at all (previously a
+ * 404, "This account isn't a member of any Workspace yet" with no way forward), originating a
+ * brand-new membership rather than only ever reassigning an existing one. When a membership already
+ * exists, its own {@code workspaceId} stays fixed (no way to move an existing member to a different
+ * Workspace through this popup — a deliberately narrower scope than "assign," kept out to avoid an
+ * unrequested, unexplored capability). When one doesn't exist yet, a Workspace selector appears —
+ * hidden and auto-selected when the Organization has exactly one Workspace (or none: an empty state
+ * instead of a form), shown only when there's a genuine choice; changing it reloads this whole
+ * fragment (a coarser context switch than Team/Role, which stay client-side — see {@code
+ * assign-role-picker.js}) via its own {@code hx-get} so Team/Role reflect the newly chosen
+ * Workspace's own real data.
+ *
+ * <p>The Team selector (real, workspace-scoped teams, plus the synthetic "No team"/ungrouped
+ * bucket) only counts/shows a team that actually has at least one role in it — an empty team
+ * contributes nothing to pick from, so it's excluded entirely, not just from the options but from
+ * the "how many choices are there" count that decides whether to show the selector at all. If the
+ * total qualifying buckets (teams-with-roles + "No team" if it has any) is one or none, the
+ * selector doesn't render — whichever single bucket exists (if any) is used directly.
  *
  * <p>Distinct from {@link PlatformWorkspaceController}: this controller's resource is keyed by
  * {@code accountId}, not {@code workspaceId} — the caller doesn't know in advance which Workspace
@@ -56,10 +80,12 @@ import org.springframework.web.server.ResponseStatusException;
 // PMD.LongVariable: several fragment-name constants and currentPlatformAccount/
 // ownerPlatformAccountId are the same, deliberately descriptive names PlatformWorkspaceController
 // already uses throughout — same class-level suppression that class already carries.
-// PMD.ExcessiveImports: eight collaborators plus their commands/exceptions across three use-case
-// packages — wiring, not sprawl, same reasoning documented on every other growing controller in
-// this codebase.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// PMD.ExcessiveImports: every import backs a real, distinct collaborator or exception this
+// controller genuinely needs — wiring, not sprawl, same reasoning documented on every other
+// growing controller in this codebase. PMD.CouplingBetweenObjects: the Workspace/Team/Role
+// selector logic this "Way 2" redesign added (SDE-III, 2026-09-27) pushed this past the default
+// threshold (20) — same "wiring, not sprawl" reasoning, not a design smell to split up.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role")
@@ -69,6 +95,7 @@ public class PlatformAccountWorkspaceRoleController {
       "organization/platform/fragments/assign-role-form :: assignRoleForm";
   private static final String ASSIGN_ROLE_SAVED_FRAGMENT =
       "organization/platform/fragments/assign-role-form :: assignRoleSaved";
+  private static final String NO_WORKSPACES_YET_ATTRIBUTE = "noWorkspacesYet";
 
   // htmx's own response-header convention: any DOM event named here fires on document.body once
   // the swap completes — identity-module's Users-tab list container listens for this same name
@@ -80,10 +107,11 @@ public class PlatformAccountWorkspaceRoleController {
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final GetWorkspaceForOrganizationUseCase getWorkspace;
   private final FindWorkspaceMembershipForAccountUseCase findMembership;
+  private final ListWorkspacesForOrganizationUseCase listWorkspaces;
   private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
   private final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
   private final ListWorkspaceRolesForOrganizationUseCase listRoles;
-  private final ChangeWorkspaceMemberRoleUseCase changeMemberRole;
+  private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
@@ -92,26 +120,34 @@ public class PlatformAccountWorkspaceRoleController {
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final GetWorkspaceForOrganizationUseCase getWorkspace,
       final FindWorkspaceMembershipForAccountUseCase findMembership,
+      final ListWorkspacesForOrganizationUseCase listWorkspaces,
       final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
       final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds,
       final ListWorkspaceRolesForOrganizationUseCase listRoles,
-      final ChangeWorkspaceMemberRoleUseCase changeMemberRole,
+      final AssignWorkspaceRoleToAccountUseCase assignRoleToAccount,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
     this.findMembership = findMembership;
+    this.listWorkspaces = listWorkspaces;
     this.listTeams = listTeams;
     this.listTeamRoleIds = listTeamRoleIds;
     this.listRoles = listRoles;
-    this.changeMemberRole = changeMemberRole;
+    this.assignRoleToAccount = assignRoleToAccount;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
+  // SonarCloud finding, 2026-09-28: every branch below used to return the exact same
+  // ASSIGN_ROLE_FORM_FRAGMENT literal via its own early return ("a method should not always
+  // return the same value") — restructured to one final return, each branch only setting model
+  // attributes, not exiting; same shape resolveActiveWorkspaceId's own single-purpose helper
+  // doesn't need (that one genuinely returns different values per branch).
   @GetMapping
   public String showForm(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID accountId,
+      @RequestParam(required = false) final UUID workspaceId,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     requireOwnedOrganization(organizationId, ownerPlatformAccountId);
@@ -122,16 +158,33 @@ public class PlatformAccountWorkspaceRoleController {
     // filter, see that use case's own Javadoc) — without this check, a membership belonging to an
     // Organization the caller doesn't own would still populate the model below with that other
     // Organization's own team names/ids (real cross-tenant disclosure, not hypothetical: the
-    // fragment renders every team's th:text/data-team-id). save() below already had this exact
-    // check; showForm() didn't, an inconsistency between the two handlers of the same resource,
-    // not a deliberate difference — same anti-enumeration posture every other dashboard controller
-    // in this codebase already holds itself to.
+    // fragment renders every team's th:text/data-team-id).
     membership.ifPresent(m -> requireOwnedWorkspace(organizationId, m.workspaceId()));
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("accountId", accountId);
     model.addAttribute("membership", membership.orElse(null));
+    // Real bug found live, 2026-09-27: assign-role-form.html's own th:if="${!noWorkspacesYet and
+    // !hasAnyRoles}" throws (SpringEL can't unbox a null Boolean for `!`) whenever either attribute
+    // is left unset rather than explicitly false — every branch below must set both, not just the
+    // one branch that actually needs true/false to differ from this default.
+    model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, false);
+
     if (membership.isPresent()) {
-      populateRoleOptions(model, organizationId, membership.get());
+      populateRoleOptions(
+          model, organizationId, membership.get().workspaceId(), membership.get().roleId());
+    } else {
+      final List<Workspace> allWorkspaces =
+          listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
+      if (allWorkspaces.isEmpty()) {
+        model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, true);
+        model.addAttribute("hasAnyRoles", false);
+      } else {
+        final UUID activeWorkspaceId = resolveActiveWorkspaceId(allWorkspaces, workspaceId);
+        model.addAttribute("workspaces", allWorkspaces);
+        model.addAttribute("showWorkspaceSelector", allWorkspaces.size() > 1);
+        model.addAttribute("activeWorkspaceId", activeWorkspaceId);
+        populateRoleOptions(model, organizationId, activeWorkspaceId, null);
+      }
     }
     return ASSIGN_ROLE_FORM_FRAGMENT;
   }
@@ -143,35 +196,56 @@ public class PlatformAccountWorkspaceRoleController {
       final HttpServletResponse response,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID accountId,
+      @RequestParam final UUID workspaceId,
       @RequestParam final UUID newRoleId,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    requireOwnedWorkspace(organizationId, workspaceId);
 
-    final WorkspaceMembership membership =
-        findMembership
-            .handle(new FindWorkspaceMembershipForAccountQuery(accountId))
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-    // Defense in depth — requireOwnedWorkspace also confirms this membership's Workspace belongs
-    // to the Organization the current PlatformAccount actually owns, same anti-enumeration posture
-    // PlatformWorkspaceController's own identical check documents.
-    requireOwnedWorkspace(organizationId, membership.workspaceId());
+    final Optional<WorkspaceMembership> membership =
+        findMembership.handle(new FindWorkspaceMembershipForAccountQuery(accountId));
+    // Defense in depth — same anti-enumeration posture showForm's own identical check documents.
+    membership.ifPresent(m -> requireOwnedWorkspace(organizationId, m.workspaceId()));
+    // The form's own Workspace field is a hidden, fixed value whenever a membership already
+    // exists (see this class's own Javadoc — moving an existing member to a different Workspace
+    // isn't a capability this popup offers) — a mismatch here means the submitted value was
+    // tampered with, not a real user choice.
+    if (membership.isPresent() && !membership.get().workspaceId().equals(workspaceId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+    }
 
     try {
-      changeMemberRole.handle(
-          new ChangeWorkspaceMemberRoleCommand(
-              membership.workspaceId(),
+      assignRoleToAccount.handle(
+          new AssignWorkspaceRoleToAccountCommand(
+              workspaceId,
               accountId,
               newRoleId,
               AuditActor.platformAccount(ownerPlatformAccountId)));
-    } catch (final WorkspaceMembershipNotFoundException | WorkspaceRoleNotFoundException _) {
+    } catch (final WorkspaceNotFoundException
+        | WorkspaceRoleNotFoundException
+        | AccountNotInOrganizationException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
       model.addAttribute("organizationId", organizationId);
       model.addAttribute("accountId", accountId);
-      model.addAttribute("membership", membership);
+      model.addAttribute("membership", membership.orElse(null));
       model.addAttribute("cannotDemoteLastAdminError", true);
-      populateRoleOptions(model, organizationId, membership);
+      // Same "always set, never leave unset" fix showForm's own identical attribute documents —
+      // workspaceId was already validated to exist above, so this path can never actually hit
+      // "no workspaces," but the template still needs a real boolean here, not a missing one.
+      model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, false);
+      if (membership.isPresent()) {
+        populateRoleOptions(
+            model, organizationId, membership.get().workspaceId(), membership.get().roleId());
+      } else {
+        final List<Workspace> allWorkspaces =
+            listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
+        model.addAttribute("workspaces", allWorkspaces);
+        model.addAttribute("showWorkspaceSelector", allWorkspaces.size() > 1);
+        model.addAttribute("activeWorkspaceId", workspaceId);
+        populateRoleOptions(model, organizationId, workspaceId, null);
+      }
       return ASSIGN_ROLE_FORM_FRAGMENT;
     }
 
@@ -179,30 +253,61 @@ public class PlatformAccountWorkspaceRoleController {
     return ASSIGN_ROLE_SAVED_FRAGMENT;
   }
 
+  // A submitted workspaceId not among this Organization's own real Workspaces is tampering (the
+  // Workspace <select> only ever offers this list) — falls back to the first real Workspace
+  // instead, same "never trust a client value blindly" posture the rest of this controller holds
+  // to elsewhere.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private static UUID resolveActiveWorkspaceId(
+      final List<Workspace> allWorkspaces, final UUID requestedWorkspaceId) {
+    if (requestedWorkspaceId != null) {
+      final boolean valid =
+          allWorkspaces.stream().anyMatch(workspace -> workspace.id().equals(requestedWorkspaceId));
+      if (valid) {
+        return requestedWorkspaceId;
+      }
+    }
+    return allWorkspaces.get(0).id();
+  }
+
   // Same "teams, the roles grouped into each one, and every ungrouped role" shape
-  // PlatformWorkspaceController's own populateTeamsModel already establishes (ADR-0028) — reused
-  // here for the popup's own Team/Role selects rather than a Teams-section page.
+  // PlatformWorkspaceController's own populateTeamsModel already establishes (ADR-0028), plus this
+  // class's own "a team with zero roles doesn't count" filter (see this class's own Javadoc) —
+  // teams here is a strict subset of ListWorkspaceTeamsForWorkspaceUseCase's own result.
   private void populateRoleOptions(
-      final Model model, final UUID organizationId, final WorkspaceMembership membership) {
+      final Model model,
+      final UUID organizationId,
+      final UUID workspaceId,
+      final UUID currentRoleId) {
     final List<WorkspaceRole> allRoles =
         listRoles.handle(new ListWorkspaceRolesForOrganizationQuery(organizationId));
-    final List<WorkspaceTeam> teams =
-        listTeams.handle(new ListWorkspaceTeamsForWorkspaceQuery(membership.workspaceId()));
+    final List<WorkspaceTeam> allTeams =
+        listTeams.handle(new ListWorkspaceTeamsForWorkspaceQuery(workspaceId));
 
-    // Maps each grouped role's id to its own team id — the popup's own client-side script filters
-    // the Role <select> by this, defaulting anything absent here to "ungrouped".
     final Map<UUID, UUID> roleTeamId = new HashMap<>();
-    for (final WorkspaceTeam team : teams) {
-      for (final UUID roleId :
-          listTeamRoleIds.handle(new ListWorkspaceTeamRoleIdsQuery(team.id()))) {
+    final List<WorkspaceTeam> teamsWithRoles = new ArrayList<>();
+    for (final WorkspaceTeam team : allTeams) {
+      final List<UUID> teamRoleIds =
+          listTeamRoleIds.handle(new ListWorkspaceTeamRoleIdsQuery(team.id()));
+      if (teamRoleIds.isEmpty()) {
+        continue;
+      }
+      teamsWithRoles.add(team);
+      for (final UUID roleId : teamRoleIds) {
         roleTeamId.put(roleId, team.id());
       }
     }
 
-    model.addAttribute("teams", teams);
+    final boolean hasUngroupedRoles =
+        allRoles.stream().anyMatch(role -> !roleTeamId.containsKey(role.id()));
+    final int bucketCount = teamsWithRoles.size() + (hasUngroupedRoles ? 1 : 0);
+
+    model.addAttribute("teams", teamsWithRoles);
     model.addAttribute("allRoles", allRoles);
     model.addAttribute("roleTeamId", roleTeamId);
-    model.addAttribute("currentRoleId", membership.roleId());
+    model.addAttribute("currentRoleId", currentRoleId);
+    model.addAttribute("showTeamSelector", bucketCount > 1);
+    model.addAttribute("hasAnyRoles", bucketCount > 0);
   }
 
   private void requireOwnedOrganization(

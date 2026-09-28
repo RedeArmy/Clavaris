@@ -11,6 +11,9 @@ import com.clavaris.organization.application.usecase.addworkspacemember.AccountP
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountService;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleService;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
 import com.clavaris.organization.application.usecase.checkaccessrestrictionfororganization.CheckAccessRestrictionForOrganizationService;
@@ -329,6 +332,18 @@ class OrganizationUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter) {
     return new ChangeWorkspaceMemberRoleService(
         memberships, workspaces, roles, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ AssignWorkspaceRoleToAccountUseCase assignWorkspaceRoleToAccountUseCase(
+      final WorkspaceRepository workspaces,
+      final WorkspaceRoleRepository roles,
+      final WorkspaceMembershipRepository memberships,
+      final OrganizationAccountDirectory accountDirectory,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new AssignWorkspaceRoleToAccountService(
+        workspaces, roles, memberships, accountDirectory, auditEvents, eventOutboxWriter);
   }
 
   @Bean

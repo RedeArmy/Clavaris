@@ -8,186 +8,57 @@
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-                <span th:text="${workspace.name()}">Workspace</span>
-            </p>
+            <!-- Same back-link convention identity-module's own account-profile.html/
+                 account-audit-log.html establish for a page one level below Organization detail's
+                 own four top-level tabs (org-tabs.html isn't included here — this page isn't one
+                 of those tabs) — the breadcrumb below still shows the full path, this is the
+                 one-click "go back" a breadcrumb link alone doesn't read as. Hand-duplicated into
+                 this module's own fragments/back-link.html rather than referenced from
+                 identity-module directly — same cross-module constraint org-tabs.html's own
+                 comment documents (no Maven dependency between modules, so a shared fragment there
+                 wouldn't be reachable from this module's own standalone-MockMvc controller tests). -->
+            <div th:replace="~{organization/platform/fragments/workspace-page-header :: header(${organization}, ${workspace})}"></div>
 
-            <div class="clavaris-page-header">
-                <div>
-                    <h1 th:text="${workspace.name()}">Workspace name</h1>
-                    <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
-                </div>
-            </div>
+            <div th:replace="~{organization/platform/fragments/workspace-tabs :: tabs(${organization.id()}, ${workspace.id()}, 'manage')}"></div>
 
-            <!-- ADR-0025: same HTMX-fragment shape as dashboard.html/organization-detail.html's
-                 own fragments — every member action below (add, change role, remove) re-renders
-                 just this whole fragment when the request carries HX-Request; a real full-page GET
-                 produces the exact same markup, so the page works identically with JavaScript
-                 disabled. -->
-            <div id="members-content" th:fragment="members" class="clavaris-section">
-                <h2>Members</h2>
-
-                <p class="clavaris-alert clavaris-alert--error" th:if="${emailAlreadyRegisteredError}">That email is already registered in this Organization.</p>
-                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">A workspace must always keep at least one admin — choose a different admin first.</p>
-                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotRemoveLastAdminError}">A workspace must always keep at least one admin — promote another member first.</p>
-
-                <div class="clavaris-section-card" th:if="${#lists.isEmpty(members)}">
-                    <p class="clavaris-empty-state">No members yet — add the first one below.</p>
-                </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(members)}">
-                <table class="clavaris-table">
-                    <thead>
-                    <tr>
-                        <th scope="col">Account</th>
-                        <th scope="col">Role</th>
-                        <th scope="col">Joined</th>
-                        <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="member : ${members}">
-                        <td th:text="${member.accountId()}">Account id</td>
-                        <td>
-                            <!-- ADR-0027: a member's role is now a real, consumer-defined WorkspaceRole
-                                 (resolved by id from the roles map, never a fixed enum) — roles.get(...)
-                                 returns null gracefully for an unassigned member or one whose role was
-                                 since deleted, neither of which should ever throw here. The badge color
-                                 checks the role's own direct permissions only (not the full parent-chain
-                                 -inherited set WorkspaceRoleHierarchy computes) — a display-only
-                                 simplification, fine while no shipped UI can yet configure inherited
-                                 manage_members access (Slice 3). -->
-                            <span class="clavaris-badge"
-                                  th:if="${member.roleId() != null and roles.get(member.roleId()) != null}"
-                                  th:classappend="${roles.get(member.roleId()).permissions().contains('clavaris:workspace:manage_members')} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
-                                  th:text="${roles.get(member.roleId()).name()}">Role</span>
-                            <span class="clavaris-badge clavaris-badge--muted"
-                                  th:unless="${member.roleId() != null and roles.get(member.roleId()) != null}">No role</span>
-                        </td>
-                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(member.createdAt())}">Joined at</td>
-                        <td>
-                            <!-- ADR-0028: same .clavaris-menu 3-dot pattern organization-users.html
-                                 already establishes — "Assign role" is a second entry point onto the
-                                 exact same role-change action the inline select below still offers
-                                 unchanged; a plain in-page anchor to that select, no separate
-                                 implementation, works with JavaScript disabled the same way every
-                                 other control on this page already does. -->
-                            <details class="clavaris-menu">
-                                <summary class="clavaris-menu__trigger" th:attr="aria-label='Open actions menu for ' + ${member.accountId()}">&#8942;</summary>
-                                <div class="clavaris-menu__panel">
-                                    <a class="clavaris-menu__item" th:href="${'#new-role-' + member.accountId()}">Assign role</a>
-                                </div>
-                            </details>
-                            <div class="clavaris-row-actions">
-                                <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
-                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
-                                      hx-target="#members-content" hx-swap="outerHTML">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <!-- Static "for"/"id" fallback values below, both overridden by their own
-                                         th:for/th:id at render time with the real per-row unique id: a static
-                                         analyzer reading this template's raw source (not Thymeleaf's rendered
-                                         output) only recognizes a literal HTML for/id pair, never th:for/th:id
-                                         alone, for this accessibility rule. -->
-                                    <label class="clavaris-visually-hidden" for="new-role" th:for="${'new-role-' + member.accountId()}">New role for <span th:text="${member.accountId()}">account</span></label>
-                                    <!-- ADR-0027: real per-Organization roles, not a fixed two-value enum —
-                                         no "unassign" option here yet (Slice 5): every member reaching this
-                                         page was added with a real role already assigned. -->
-                                    <select id="new-role" th:id="${'new-role-' + member.accountId()}" name="newRoleId">
-                                        <option th:each="roleOption : ${roles.values()}"
-                                                th:value="${roleOption.id()}"
-                                                th:text="${roleOption.name()}"
-                                                th:selected="${member.roleId() != null and roleOption.id() == member.roleId()}"></option>
-                                    </select>
-                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Update role</button>
-                                </form>
-                                <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/remove(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
-                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/remove(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${member.accountId()})}"
-                                      hx-target="#members-content" hx-swap="outerHTML">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-                </div>
-
-                <!-- TD-PERF-020 (keyset revision, 2026-09-14): same keyset pagination shape as the
-                     Organizations/Workspaces tables — see PlatformWorkspaceController's own
-                     Javadoc. -->
-                <nav class="clavaris-pagination"
-                     th:if="${membersPage.hasPrevious() or membersPage.hasNext()}"
-                     aria-label="Members pages">
-                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                       th:if="${membersPage.hasPrevious()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},before=${membersPage.startCursor().encode()})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},before=${membersPage.startCursor().encode()})}"
-                       hx-target="#members-content" hx-swap="outerHTML">Previous</a>
-                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                       th:if="${membersPage.hasNext()}"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},after=${membersPage.endCursor().encode()})}"
-                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()},after=${membersPage.endCursor().encode()})}"
-                       hx-target="#members-content" hx-swap="outerHTML">Next</a>
-                </nav>
-
-                <div class="clavaris-section-card">
-                    <h2>Add a member</h2>
-                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
-                          th:object="${memberForm}" method="post"
-                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
-                          hx-target="#members-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-
-                        <div class="clavaris-field">
-                            <label for="member-email">Email</label>
-                            <input id="member-email" type="email" th:field="*{email}" required/>
-                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">Email error</p>
-                        </div>
-
-                        <div class="clavaris-field">
-                            <label for="member-role">Role</label>
-                            <!-- ADR-0027: real per-Organization roles — CreateWorkspaceService always
-                                 seeds at least the one reserved role, so this list is never empty. -->
-                            <select id="member-role" th:field="*{roleId}">
-                                <option th:each="roleOption : ${roles.values()}"
-                                        th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
-                            </select>
-                        </div>
-
-                        <button class="clavaris-button clavaris-button--inline" type="submit">Add member</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- ADR-0028: this Workspace's own Teams section — a named grouping label over a
-                 subset of this Organization's WorkspaceRoles (defined/edited at Configure >
-                 Workspace Roles, unchanged; this section only manages team grouping). Same
-                 HTMX-fragment shape as the Members section above, targeting #teams-content
-                 independently — a team action never re-renders the Members table and vice versa. -->
+            <!-- SDE-III redesign, 2026-09-27 (live UX request): the old separate "Members" section
+                 is gone — see PlatformWorkspaceController's own class Javadoc for the full
+                 reasoning (a deliberate, confirmed choice, not an oversight; member management
+                 stays available via the REST admin API). "Teams" is renamed "Teams & Roles":
+                 creating a team is now a popup (not an inline form), and a Workspace owner can
+                 create a WorkspaceRole and assign it to a team in one popup too, then modify/delete
+                 that role directly from its own team's roles dropdown. Same HTMX-fragment shape as
+                 every other section on this dashboard — every action below re-renders just this
+                 fragment when the request carries HX-Request; a real full-page GET produces the
+                 exact same markup, so the page works identically with JavaScript disabled. -->
             <div id="teams-content" th:fragment="teams" class="clavaris-section">
-                <h2>Teams</h2>
+                <div class="clavaris-page-header">
+                    <h2>Teams &amp; Roles</h2>
+                    <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-team-dialog">Add team</button>
+                </div>
 
                 <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateTeamNameError}">A team with that name already exists in this Workspace.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleAlreadyInAnotherTeamError}">That role already belongs to a different team in this Workspace — remove it from that team first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateRoleNameError}">A role with that name already exists in this Organization.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${roleStillAssignedError}">That role is still assigned to at least one member — reassign or unassign them first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${roleHasChildRolesError}">That role is still the parent of at least one other role — re-parent or clear them first.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
-                    <p class="clavaris-empty-state">No teams yet — create the first one below.</p>
+                    <p class="clavaris-empty-state">No teams yet — add the first one above.</p>
                 </div>
 
                 <div class="clavaris-section-card" th:each="team : ${teams}">
                     <div class="clavaris-page-header">
                         <h3 th:text="${team.name()}">Team name</h3>
-                        <form method="post"
-                              th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                              hx-target="#teams-content" hx-swap="outerHTML">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete team</button>
-                        </form>
+                        <div class="clavaris-row-actions">
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  hx-target="#teams-content" hx-swap="outerHTML">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete team</button>
+                            </form>
+                        </div>
                     </div>
 
                     <form method="post"
@@ -205,52 +76,64 @@
                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rename</button>
                     </form>
 
-                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(teamRoles.get(team.id()))}">
-                        <table class="clavaris-table">
-                            <thead>
-                            <tr>
-                                <th scope="col">Role</th>
-                                <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="role : ${teamRoles.get(team.id())}">
-                                <td th:text="${role.name()}">Role name</td>
-                                <td>
-                                    <form method="post"
-                                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles/{roleId}/remove(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()},roleId=${role.id()})}"
-                                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles/{roleId}/remove(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()},roleId=${role.id()})}"
-                                          hx-target="#teams-content" hx-swap="outerHTML">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove from team</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
+                    <!-- "A dropdown showing the roles" — a native <details>/<summary> disclosure,
+                         closed by default, same clavaris-event-category-details styling
+                         webhook-event-catalog.html's own per-category roster already establishes
+                         for an identically-shaped "click the label, reveal a table underneath". -->
+                    <details class="clavaris-event-category-details">
+                        <summary th:text="'Roles (' + ${#lists.size(teamRoles.get(team.id()))} + ')'">Roles</summary>
 
-                    <form method="post" th:if="${!#lists.isEmpty(ungroupedRoles)}"
-                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                          hx-target="#teams-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <!-- Static "for"/"id" fallback values below, both overridden by their own
-                             th:for/th:id at render time with the real per-row unique id: a static
-                             analyzer reading this template's raw source (not Thymeleaf's rendered
-                             output) only recognizes a literal HTML for/id pair, never th:for/th:id
-                             alone, for this accessibility rule. -->
-                        <label class="clavaris-visually-hidden" for="add-role" th:for="${'add-role-' + team.id()}">Add a role to <span th:text="${team.name()}">team</span></label>
-                        <!-- ADR-0028 §2: only this Organization's own ungrouped roles are offered — a
-                             role already in a different team in this Workspace must be removed from
-                             it first (AddRoleToWorkspaceTeamService's own guard). -->
-                        <select id="add-role" th:id="${'add-role-' + team.id()}" name="roleId">
-                            <option th:each="roleOption : ${ungroupedRoles}"
-                                    th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
-                        </select>
-                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Add role</button>
-                    </form>
+                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(teamRoles.get(team.id()))}">
+                            <table class="clavaris-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Role</th>
+                                    <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="role : ${teamRoles.get(team.id())}">
+                                    <td th:text="${role.name()}">Role name</td>
+                                    <td>
+                                        <div class="clavaris-row-actions">
+                                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                               th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}">Modify</a>
+                                            <form method="post"
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                                  hx-target="#teams-content" hx-swap="outerHTML">
+                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
+
+                        <form method="post" th:if="${!#lists.isEmpty(ungroupedRoles)}"
+                              th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                              hx-target="#teams-content" hx-swap="outerHTML">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <!-- Static "for"/"id" fallback values below, both overridden by their own
+                                 th:for/th:id at render time with the real per-row unique id: a static
+                                 analyzer reading this template's raw source (not Thymeleaf's rendered
+                                 output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                                 alone, for this accessibility rule. -->
+                            <label class="clavaris-visually-hidden" for="add-role" th:for="${'add-role-' + team.id()}">Add an existing role to <span th:text="${team.name()}">team</span></label>
+                            <!-- ADR-0028 §2: only this Organization's own ungrouped roles are offered — a
+                                 role already in a different team in this Workspace must be removed from
+                                 it first (AddRoleToWorkspaceTeamService's own guard). -->
+                            <select id="add-role" th:id="${'add-role-' + team.id()}" name="roleId">
+                                <option th:each="roleOption : ${ungroupedRoles}"
+                                        th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
+                            </select>
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Add existing role</button>
+                        </form>
+                    </details>
                 </div>
 
                 <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
@@ -261,27 +144,78 @@
                     </ul>
                 </div>
 
-                <div class="clavaris-section-card">
-                    <h3>Create a new team</h3>
-                    <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
-                          th:object="${createTeamForm}" method="post"
-                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
-                          hx-target="#teams-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-
-                        <div class="clavaris-field">
-                            <label for="team-name">Team name</label>
-                            <input id="team-name" type="text" th:field="*{name}" required/>
-                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
-                        </div>
-
-                        <button class="clavaris-button clavaris-button--inline" type="submit">Create team</button>
-                    </form>
+                <!-- "Create a new role" — a button below the roles listing, opening a popup for the
+                     role's name and the existing team to put it in. Hidden (with an explanatory
+                     empty state instead) while there's no team yet to assign it to — the popup's
+                     own team <select> would otherwise have nothing valid to offer. -->
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
+                    <p class="clavaris-empty-state">Add a team first, then you can create roles for it.</p>
                 </div>
+                <button th:unless="${#lists.isEmpty(teams)}" class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-role-dialog">Create a new role</button>
             </div>
+
+            <dialog id="create-team-dialog" class="clavaris-dialog">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Team</span>
+                        <h2>Create a new team</h2>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create team dialog">×</button>
+                </div>
+                <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                      th:object="${createTeamForm}" method="post">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="clavaris-field">
+                        <label for="team-name">Team name</label>
+                        <input id="team-name" type="text" th:field="*{name}" required/>
+                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}" data-dialog-open-on-load>Name error</p>
+                    </div>
+
+                    <div class="clavaris-dialog__actions">
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Create team</button>
+                    </div>
+                </form>
+            </dialog>
+
+            <dialog id="create-role-dialog" class="clavaris-dialog">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Role</span>
+                        <h2>Create a new role</h2>
+                        <p>Name it and put it on one of this Workspace's teams — its permissions and
+                            parent role can be set afterwards from Configure &gt; Workspace Roles.</p>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create role dialog">×</button>
+                </div>
+                <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                      th:object="${createRoleForm}" method="post">
+                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="clavaris-field">
+                        <label for="role-name">Role name</label>
+                        <input id="role-name" type="text" th:field="*{name}" required/>
+                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}" data-dialog-open-on-load>Name error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label for="role-team">Team</label>
+                        <select id="role-team" th:field="*{teamId}">
+                            <option th:each="teamOption : ${teams}"
+                                    th:value="${teamOption.id()}" th:text="${teamOption.name()}"></option>
+                        </select>
+                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('teamId')}" th:errors="*{teamId}" data-dialog-open-on-load>Team error</p>
+                    </div>
+
+                    <div class="clavaris-dialog__actions">
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Create role</button>
+                    </div>
+                </form>
+            </dialog>
         </div>
     </main>
 </div>
-<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/row-menu.js') : '/js/row-menu.js'}" defer></script>
 </body>
 </html>

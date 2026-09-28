@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -13,12 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AccountNotInOrganizationException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
 import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.domain.model.Organization;
@@ -28,6 +31,7 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,10 +50,11 @@ class PlatformAccountWorkspaceRoleControllerTest {
   private GetOrganizationForPlatformAccountUseCase getOrganization;
   private GetWorkspaceForOrganizationUseCase getWorkspace;
   private FindWorkspaceMembershipForAccountUseCase findMembership;
+  private ListWorkspacesForOrganizationUseCase listWorkspaces;
   private ListWorkspaceTeamsForWorkspaceUseCase listTeams;
   private ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
   private ListWorkspaceRolesForOrganizationUseCase listRoles;
-  private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
+  private AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
   private Organization organization;
@@ -62,10 +67,11 @@ class PlatformAccountWorkspaceRoleControllerTest {
     getOrganization = mock(GetOrganizationForPlatformAccountUseCase.class);
     getWorkspace = mock(GetWorkspaceForOrganizationUseCase.class);
     findMembership = mock(FindWorkspaceMembershipForAccountUseCase.class);
+    listWorkspaces = mock(ListWorkspacesForOrganizationUseCase.class);
     listTeams = mock(ListWorkspaceTeamsForWorkspaceUseCase.class);
     listTeamRoleIds = mock(ListWorkspaceTeamRoleIdsUseCase.class);
     listRoles = mock(ListWorkspaceRolesForOrganizationUseCase.class);
-    changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
+    assignRoleToAccount = mock(AssignWorkspaceRoleToAccountUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
     organization = Organization.register("Acme Co", OWNER_ID);
@@ -76,6 +82,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
     when(getWorkspace.handle(any())).thenReturn(Optional.of(workspace));
+    when(listWorkspaces.handle(any())).thenReturn(List.of(workspace));
     when(listTeams.handle(any())).thenReturn(List.of());
     when(listTeamRoleIds.handle(any())).thenReturn(List.of());
     when(listRoles.handle(any())).thenReturn(List.of(role));
@@ -100,10 +107,11 @@ class PlatformAccountWorkspaceRoleControllerTest {
                     getOrganization,
                     getWorkspace,
                     findMembership,
+                    listWorkspaces,
                     listTeams,
                     listTeamRoleIds,
                     listRoles,
-                    changeMemberRole,
+                    assignRoleToAccount,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
@@ -115,16 +123,6 @@ class PlatformAccountWorkspaceRoleControllerTest {
         + "/accounts/"
         + accountId
         + "/assign-role";
-  }
-
-  @Test
-  void showsAnEmptyStateWhenTheAccountHasNoWorkspaceMembership() throws Exception {
-    when(findMembership.handle(any())).thenReturn(Optional.empty());
-
-    mockMvc
-        .perform(get(assignRolePath()))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("any Workspace yet")));
   }
 
   @Test
@@ -141,10 +139,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
   // SDE-III review, 2026-09-27: findMembership resolves by accountId alone, with no
   // organizationId filter of its own (see that use case's own Javadoc) — this is the real,
   // previously-untested cross-tenant scenario that check exists to reject: an accountId whose
-  // real workspace membership belongs to an Organization the caller doesn't own. Before this
-  // controller's own showForm() gained the same requireOwnedWorkspace check save() already had,
-  // this would have rendered that other Organization's own team names/ids into the response
-  // instead of 404ing.
+  // real workspace membership belongs to an Organization the caller doesn't own.
   @Test
   void returnsNotFoundWhenTheMembershipsWorkspaceBelongsToAnotherOrganization() throws Exception {
     WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
@@ -154,12 +149,19 @@ class PlatformAccountWorkspaceRoleControllerTest {
     mockMvc.perform(get(assignRolePath())).andExpect(status().isNotFound());
   }
 
+  // Two qualifying buckets: the "QA" team (one role) plus the synthetic "No team" bucket (a
+  // second, ungrouped role) — one bucket alone (either shape) must NOT show the selector, see
+  // hidesTheTeamSelectorWithOnlyOneQualifyingBucket below for that half of the rule.
   @Test
-  void showsTheTeamSelectorOnlyWhenTeamsExist() throws Exception {
+  void showsTheTeamSelectorOnlyWhenAtLeastTwoBucketsQualify() throws Exception {
     WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
     when(findMembership.handle(any())).thenReturn(Optional.of(membership));
+    WorkspaceRole ungroupedRole =
+        WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+    when(listRoles.handle(any())).thenReturn(List.of(role, ungroupedRole));
     WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
     when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
 
     mockMvc
         .perform(get(assignRolePath()))
@@ -167,18 +169,55 @@ class PlatformAccountWorkspaceRoleControllerTest {
         .andExpect(content().string(containsString("QA")));
   }
 
+  // The inverse of the test above: a single team holding this Workspace's only role (no ungrouped
+  // roles) is exactly one qualifying bucket — the selector must stay hidden, same rule
+  // hidesAnEmptyTeamFromTheSelector documents for the "zero roles" half of "what counts as a
+  // bucket."
+  @Test
+  void hidesTheTeamSelectorWithOnlyOneQualifyingBucket() throws Exception {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
+    when(findMembership.handle(any())).thenReturn(Optional.of(membership));
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+
+    mockMvc
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("assignRoleTeamId"))));
+  }
+
+  // SDE-III addition, 2026-09-27: a team with zero roles doesn't count/show at all — same rule
+  // this controller's own Javadoc documents.
+  @Test
+  void hidesAnEmptyTeamFromTheSelector() throws Exception {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, null);
+    when(findMembership.handle(any())).thenReturn(Optional.of(membership));
+    WorkspaceTeam emptyTeam = WorkspaceTeam.define(workspace.id(), "EmptyTeam");
+    when(listTeams.handle(any())).thenReturn(List.of(emptyTeam));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("EmptyTeam"))));
+  }
+
   @Test
   void postSavesTheNewRoleAndTriggersTheRefreshEvent() throws Exception {
     WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
     when(findMembership.handle(any())).thenReturn(Optional.of(membership));
-    when(changeMemberRole.handle(any())).thenReturn(membership.withRoleId(role.id()));
+    when(assignRoleToAccount.handle(any())).thenReturn(membership.withRoleId(role.id()));
 
     mockMvc
-        .perform(post(assignRolePath()).param("newRoleId", role.id().toString()))
+        .perform(
+            post(assignRolePath())
+                .param("workspaceId", workspace.id().toString())
+                .param("newRoleId", role.id().toString()))
         .andExpect(status().isOk())
         .andExpect(header().string("HX-Trigger", "workspace-role-assigned"));
 
-    verify(changeMemberRole).handle(any());
+    verify(assignRoleToAccount).handle(any());
   }
 
   @Test
@@ -187,23 +226,142 @@ class PlatformAccountWorkspaceRoleControllerTest {
     WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
     when(findMembership.handle(any())).thenReturn(Optional.of(membership));
     doThrow(new CannotDemoteLastAdminException(workspace.id()))
-        .when(changeMemberRole)
+        .when(assignRoleToAccount)
         .handle(any());
 
     mockMvc
-        .perform(post(assignRolePath()).param("newRoleId", UUID.randomUUID().toString()))
+        .perform(
+            post(assignRolePath())
+                .param("workspaceId", workspace.id().toString())
+                .param("newRoleId", UUID.randomUUID().toString()))
         .andExpect(status().isOk())
         .andExpect(header().doesNotExist("HX-Trigger"));
   }
 
+  // SDE-III redesign, 2026-09-27 ("Way 2"): this used to 404 — the whole point of this redesign is
+  // that a roleless account (no membership yet) can now be assigned a role directly, originating
+  // its membership rather than requiring one to already exist.
   @Test
-  void postWhenTheAccountHasNoMembershipReturnsNotFound() throws Exception {
+  void postWhenTheAccountHasNoMembershipCreatesOneInsteadOfReturningNotFound() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    when(assignRoleToAccount.handle(any()))
+        .thenReturn(WorkspaceMembership.join(workspace.id(), accountId, role.id()));
+
+    mockMvc
+        .perform(
+            post(assignRolePath())
+                .param("workspaceId", workspace.id().toString())
+                .param("newRoleId", role.id().toString()))
+        .andExpect(status().isOk())
+        .andExpect(header().string("HX-Trigger", "workspace-role-assigned"));
+
+    verify(assignRoleToAccount).handle(any());
+  }
+
+  @Test
+  void postWithASubmittedWorkspaceNotOwnedByThisOrganizationReturnsNotFound() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    when(getWorkspace.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc
+        .perform(
+            post(assignRolePath())
+                .param("workspaceId", UUID.randomUUID().toString())
+                .param("newRoleId", role.id().toString()))
+        .andExpect(status().isNotFound());
+
+    verify(assignRoleToAccount, never()).handle(any());
+  }
+
+  // Anti-tampering: the existing membership's own workspaceId is the only value this popup ever
+  // renders (hidden field) for an already-a-member account — a mismatch means the submitted value
+  // was tampered with.
+  @Test
+  void postWithAWorkspaceIdMismatchingAnExistingMembershipReturnsBadRequest() throws Exception {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
+    when(findMembership.handle(any())).thenReturn(Optional.of(membership));
+    Workspace otherWorkspace = Workspace.register(organization.id(), "Support");
+    when(getWorkspace.handle(any())).thenReturn(Optional.of(otherWorkspace));
+
+    mockMvc
+        .perform(
+            post(assignRolePath())
+                .param("workspaceId", otherWorkspace.id().toString())
+                .param("newRoleId", role.id().toString()))
+        .andExpect(status().isBadRequest());
+
+    verify(assignRoleToAccount, never()).handle(any());
+  }
+
+  @Test
+  void postRendersNotFoundWhenTheAccountDoesNotBelongToThisOrganization() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    doThrow(new AccountNotInOrganizationException(accountId, organization.id()))
+        .when(assignRoleToAccount)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(assignRolePath())
+                .param("workspaceId", workspace.id().toString())
+                .param("newRoleId", role.id().toString()))
+        .andExpect(status().isNotFound());
+  }
+
+  // SDE-III addition, 2026-09-27: the Workspace selector's own visibility rules.
+  @Test
+  void showsAnEmptyStateWhenTheOrganizationHasNoWorkspacesYet() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    when(listWorkspaces.handle(any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("no Workspaces yet")));
+  }
+
+  @Test
+  void hidesTheWorkspaceSelectorWhenOnlyOneWorkspaceExists() throws Exception {
     when(findMembership.handle(any())).thenReturn(Optional.empty());
 
     mockMvc
-        .perform(post(assignRolePath()).param("newRoleId", UUID.randomUUID().toString()))
-        .andExpect(status().isNotFound());
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("assignRoleWorkspaceId"))));
+  }
 
-    verify(changeMemberRole, never()).handle(any());
+  @Test
+  void showsTheWorkspaceSelectorWhenMultipleWorkspacesExist() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    Workspace secondWorkspace = Workspace.register(organization.id(), "Support");
+    when(listWorkspaces.handle(any())).thenReturn(List.of(workspace, secondWorkspace));
+
+    mockMvc
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("assignRoleWorkspaceId")))
+        .andExpect(content().string(containsString("Support")));
+  }
+
+  @Test
+  void showsAnEmptyStateWhenTheActiveWorkspaceHasNoRolesYet() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    when(listRoles.handle(any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("no roles yet")));
+  }
+
+  @Test
+  void aWorkspaceQueryParamNotBelongingToThisOrganizationIsIgnored() throws Exception {
+    when(findMembership.handle(any())).thenReturn(Optional.empty());
+    Workspace secondWorkspace = Workspace.register(organization.id(), "Support");
+    when(listWorkspaces.handle(any())).thenReturn(List.of(workspace, secondWorkspace));
+
+    mockMvc
+        .perform(get(assignRolePath()).param("workspaceId", UUID.randomUUID().toString()))
+        .andExpect(status().isOk());
   }
 }

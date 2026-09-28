@@ -86,3 +86,22 @@ test("does nothing on load when the page has no validation error marker", () => 
 
   documentStub.dispatch("DOMContentLoaded");
 });
+
+test("closes any open dialog when a role is assigned elsewhere on the page", () => {
+  const documentStub = documentHarness();
+  let closeCalls = 0;
+  documentStub.querySelector = (selector) =>
+    selector === "dialog[open]" ? { close: () => { closeCalls += 1; } } : null;
+
+  loadScript(documentStub);
+  documentStub.dispatch("workspace-role-assigned");
+
+  assert.equal(closeCalls, 1);
+});
+
+test("does nothing on a role-assigned event when no dialog is open", () => {
+  const documentStub = documentHarness();
+  loadScript(documentStub);
+
+  assert.doesNotThrow(() => documentStub.dispatch("workspace-role-assigned"));
+});
