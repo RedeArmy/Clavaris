@@ -155,6 +155,11 @@ public class PlatformAccountWorkspaceRoleController {
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("accountId", accountId);
     model.addAttribute("membership", membership.orElse(null));
+    // Real bug found live, 2026-09-27: assign-role-form.html's own th:if="${!noWorkspacesYet and
+    // !hasAnyRoles}" throws (SpringEL can't unbox a null Boolean for `!`) whenever either attribute
+    // is left unset rather than explicitly false — every return path below must set both, not just
+    // the one branch that actually needs true/false to differ from this default.
+    model.addAttribute("noWorkspacesYet", false);
 
     if (membership.isPresent()) {
       populateRoleOptions(
@@ -166,6 +171,7 @@ public class PlatformAccountWorkspaceRoleController {
         listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
     if (allWorkspaces.isEmpty()) {
       model.addAttribute("noWorkspacesYet", true);
+      model.addAttribute("hasAnyRoles", false);
       return ASSIGN_ROLE_FORM_FRAGMENT;
     }
 
@@ -219,6 +225,10 @@ public class PlatformAccountWorkspaceRoleController {
       model.addAttribute("accountId", accountId);
       model.addAttribute("membership", membership.orElse(null));
       model.addAttribute("cannotDemoteLastAdminError", true);
+      // Same "always set, never leave unset" fix showForm's own identical attribute documents —
+      // workspaceId was already validated to exist above, so this path can never actually hit
+      // "no workspaces," but the template still needs a real boolean here, not a missing one.
+      model.addAttribute("noWorkspacesYet", false);
       if (membership.isPresent()) {
         populateRoleOptions(
             model, organizationId, membership.get().workspaceId(), membership.get().roleId());

@@ -365,6 +365,7 @@ public class PlatformWorkspaceController {
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     final List<WorkspaceRole> teamRoles = requireOwnedTeamRoles(workspace, teamId);
     return processAssignRole(
+        request,
         response,
         organizationId,
         workspace,
@@ -414,6 +415,7 @@ public class PlatformWorkspaceController {
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     final List<WorkspaceRole> ungroupedRoles = loadTeamsAndRoles(workspace).ungroupedRoles();
     return processAssignRole(
+        request,
         response,
         organizationId,
         workspace,
@@ -826,6 +828,7 @@ public class PlatformWorkspaceController {
   // self-refreshes with the newly assigned member, no full page reload.
   @SuppressWarnings("PMD.OnlyOneReturn")
   private String processAssignRole(
+      final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID organizationId,
       final Workspace workspace,
@@ -858,8 +861,20 @@ public class PlatformWorkspaceController {
       return ASSIGN_ROLE_FORM_FRAGMENT;
     }
 
-    response.setHeader("HX-Trigger", ROLE_ASSIGNED_EVENT);
-    return ASSIGN_ROLE_SAVED_FRAGMENT;
+    // Real bug found live, 2026-09-27: this used to always return the bare HTML fragment,
+    // breaking "every action here works identically with JavaScript disabled" (this class's own
+    // Javadoc) for a plain form submit — a JS-disabled browser would render a chrome-less "Role
+    // assigned." snippet instead of navigating anywhere. A plain submit now redirects back to the
+    // Teams tab, same as every other mutation in this controller.
+    if (isHtmxRequest(request)) {
+      response.setHeader("HX-Trigger", ROLE_ASSIGNED_EVENT);
+      return ASSIGN_ROLE_SAVED_FRAGMENT;
+    }
+    return ORGANIZATIONS_REDIRECT_PREFIX
+        + organizationId
+        + "/workspaces/"
+        + workspace.id()
+        + "/teams";
   }
 
   private Organization requireOwnedOrganization(

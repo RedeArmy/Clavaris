@@ -19,8 +19,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.WorkspaceRoleAlreadyInAnotherTeamException;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AccountNotInOrganizationException;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
+import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
@@ -363,7 +366,7 @@ class PlatformWorkspaceControllerTest {
                 .param("accountId", accountId.toString())
                 .param("roleId", role.id().toString()))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id() + "/teams"));
 
     verify(assignRoleToAccount).handle(any());
   }
@@ -447,7 +450,7 @@ class PlatformWorkspaceControllerTest {
                 .param("accountId", UUID.randomUUID().toString())
                 .param("roleId", role.id().toString()))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id() + "/teams"));
 
     verify(assignRoleToAccount).handle(any());
   }

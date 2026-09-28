@@ -31,6 +31,7 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -148,8 +149,32 @@ class PlatformAccountWorkspaceRoleControllerTest {
     mockMvc.perform(get(assignRolePath())).andExpect(status().isNotFound());
   }
 
+  // Two qualifying buckets: the "QA" team (one role) plus the synthetic "No team" bucket (a
+  // second, ungrouped role) — one bucket alone (either shape) must NOT show the selector, see
+  // hidesTheTeamSelectorWithOnlyOneQualifyingBucket below for that half of the rule.
   @Test
   void showsTheTeamSelectorOnlyWhenAtLeastTwoBucketsQualify() throws Exception {
+    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
+    when(findMembership.handle(any())).thenReturn(Optional.of(membership));
+    WorkspaceRole ungroupedRole =
+        WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+    when(listRoles.handle(any())).thenReturn(List.of(role, ungroupedRole));
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+
+    mockMvc
+        .perform(get(assignRolePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("QA")));
+  }
+
+  // The inverse of the test above: a single team holding this Workspace's only role (no ungrouped
+  // roles) is exactly one qualifying bucket — the selector must stay hidden, same rule
+  // hidesAnEmptyTeamFromTheSelector documents for the "zero roles" half of "what counts as a
+  // bucket."
+  @Test
+  void hidesTheTeamSelectorWithOnlyOneQualifyingBucket() throws Exception {
     WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
     when(findMembership.handle(any())).thenReturn(Optional.of(membership));
     WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
@@ -159,7 +184,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     mockMvc
         .perform(get(assignRolePath()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("QA")));
+        .andExpect(content().string(not(containsString("assignRoleTeamId"))));
   }
 
   // SDE-III addition, 2026-09-27: a team with zero roles doesn't count/show at all — same rule
