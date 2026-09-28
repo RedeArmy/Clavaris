@@ -65,6 +65,12 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
     return workspaces.findOrganizationIdById(workspaceId);
   }
 
+  @Override
+  @Transactional
+  public void deleteById(final UUID workspaceId) {
+    workspaces.deleteById(workspaceId);
+  }
+
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // JpaOrganizationRepository's own identical findKeysetPageOwnedBy already documents.
   @Override

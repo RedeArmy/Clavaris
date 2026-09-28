@@ -22,6 +22,8 @@ import com.clavaris.organization.application.usecase.createworkspaceteam.CreateW
 import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamNotFoundException;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceCommand;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
@@ -184,6 +186,7 @@ public class PlatformWorkspaceController {
   private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private final ListWorkspaceRolesForOrganizationUseCase listRoles;
   private final CreateWorkspaceUseCase createWorkspace;
+  private final DeleteWorkspaceUseCase deleteWorkspaceUseCase;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
   private final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
@@ -210,6 +213,7 @@ public class PlatformWorkspaceController {
       final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
       final ListWorkspaceRolesForOrganizationUseCase listRoles,
       final CreateWorkspaceUseCase createWorkspace,
+      final DeleteWorkspaceUseCase deleteWorkspaceUseCase,
       final CurrentPlatformAccountResolver currentPlatformAccount,
       final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
       final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds,
@@ -228,6 +232,7 @@ public class PlatformWorkspaceController {
     this.listWorkspaces = listWorkspaces;
     this.listRoles = listRoles;
     this.createWorkspace = createWorkspace;
+    this.deleteWorkspaceUseCase = deleteWorkspaceUseCase;
     this.currentPlatformAccount = currentPlatformAccount;
     this.listTeams = listTeams;
     this.listTeamRoleIds = listTeamRoleIds;
@@ -289,6 +294,40 @@ public class PlatformWorkspaceController {
             new ListWorkspacesForOrganizationPagedQuery(organizationId, pageRequest));
     model.addAttribute("workspaces", workspacesPage.content());
     model.addAttribute("workspacesPage", workspacesPage);
+  }
+
+  // Live UX request, 2026-09-28: "Delete" next to "View" on the Workspaces list — a real,
+  // permanent hard delete. requireOwnedWorkspace's own anti-enumeration check is enough here (see
+  // its own Javadoc): unlike deleteTeam/deleteRole, this method never needs the returned Workspace
+  // itself afterward, only its existence+ownership guard, same discard-the-return-value precedent
+  // PlatformAccountWorkspaceRoleController#showForm already establishes for an identical check.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/delete")
+  public String deleteWorkspace(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    requireOwnedWorkspace(organizationId, workspaceId);
+
+    deleteWorkspaceUseCase.handle(
+        new DeleteWorkspaceCommand(
+            workspaceId, AuditActor.platformAccount(ownerPlatformAccountId)));
+
+    if (isHtmxRequest(request)) {
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
+      // The fragment's own "Create workspace" form at the bottom is th:object-bound to this
+      // attribute (th:field="*{name}") — every other HTMX-returning caller of WORKSPACES_FRAGMENT
+      // (create()'s own htmx branch) sets it too; a real bug, caught by
+      // htmxDeleteWorkspacePostReturnsTheWorkspacesFragment, not hypothetical.
+      model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+      return WORKSPACES_FRAGMENT;
+    }
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
   }
 
   @GetMapping("/{workspaceId}")

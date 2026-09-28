@@ -39,4 +39,9 @@ public interface WorkspaceRepository {
   // ChangeWorkspaceMemberRoleService) start from a WorkspaceMembership, which only carries
   // workspaceId, not organizationId.
   Optional<UUID> findOrganizationIdById(UUID workspaceId);
+
+  // Delete Workspace feature, 2026-09-28: a real hard delete, backed by the DB-level cascade to
+  // workspace_memberships/workspace_teams (see DeleteWorkspaceService's own Javadoc for exactly
+  // what this does and does not erase) — no application-layer eraser loop needed.
+  void deleteById(UUID workspaceId);
 }

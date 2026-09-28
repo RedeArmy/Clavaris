@@ -89,6 +89,22 @@ class JpaWorkspaceRepositoryTest {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();
   }
 
+  // Delete Workspace feature, 2026-09-28: proves the plain row delete this port now exposes
+  // actually removes the row — the memberships/teams cascade itself is a schema-level fact (both
+  // FKs are ON DELETE CASCADE from workspaces, migrations V20260827130001/V20260926100000), not
+  // re-proven here, same "no dedicated cascade-proving test" scope
+  // DeleteOrganizationServiceTest's own sibling establishes for an identical cascade.
+  @Test
+  void deleteByIdRemovesTheWorkspaceRow() {
+    UUID organizationId = newPersistedOrganizationId();
+    Workspace workspace = Workspace.register(organizationId, "Temporary");
+    repository.save(workspace);
+
+    repository.deleteById(workspace.id());
+
+    assertThat(repository.findById(workspace.id())).isEmpty();
+  }
+
   // TD-PERF-020 (keyset revision, 2026-09-14): real-Postgres proof of the paginated sibling,
   // newest-first, forward and backward navigation — same "reconstitute with explicit createdAt
   // instants, not a real wall-clock gap" discipline JpaOrganizationRepositoryTest's own identical

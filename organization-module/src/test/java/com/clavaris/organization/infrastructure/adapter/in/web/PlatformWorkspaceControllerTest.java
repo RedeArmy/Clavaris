@@ -29,6 +29,7 @@ import com.clavaris.organization.application.usecase.createworkspacerole.CreateW
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
@@ -75,6 +76,7 @@ class PlatformWorkspaceControllerTest {
   private ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private ListWorkspaceRolesForOrganizationUseCase listRoles;
   private CreateWorkspaceUseCase createWorkspace;
+  private DeleteWorkspaceUseCase deleteWorkspace;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private ListWorkspaceTeamsForWorkspaceUseCase listTeams;
   private ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
@@ -100,6 +102,7 @@ class PlatformWorkspaceControllerTest {
     listWorkspaces = mock(ListWorkspacesForOrganizationPagedUseCase.class);
     listRoles = mock(ListWorkspaceRolesForOrganizationUseCase.class);
     createWorkspace = mock(CreateWorkspaceUseCase.class);
+    deleteWorkspace = mock(DeleteWorkspaceUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     listTeams = mock(ListWorkspaceTeamsForWorkspaceUseCase.class);
     listTeamRoleIds = mock(ListWorkspaceTeamRoleIdsUseCase.class);
@@ -151,6 +154,7 @@ class PlatformWorkspaceControllerTest {
                     listWorkspaces,
                     listRoles,
                     createWorkspace,
+                    deleteWorkspace,
                     currentPlatformAccount,
                     listTeams,
                     listTeamRoleIds,
@@ -254,6 +258,40 @@ class PlatformWorkspaceControllerTest {
     when(getOrganization.handle(any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(workspacesPath() + "/" + workspace.id())).andExpect(status().isNotFound());
+  }
+
+  // Live UX request, 2026-09-28: "Delete" next to "View" on the Workspaces list.
+  @Test
+  void plainDeleteWorkspacePostRedirectsOnSuccess() throws Exception {
+    mockMvc
+        .perform(post(workspacesPath() + "/" + workspace.id() + "/delete"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/platform/dashboard/organizations/" + organization.id()));
+
+    verify(deleteWorkspace).handle(any());
+  }
+
+  @Test
+  void htmxDeleteWorkspacePostReturnsTheWorkspacesFragment() throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete").header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail :: workspaces"));
+
+    verify(deleteWorkspace).handle(any());
+  }
+
+  @Test
+  void deleteWorkspaceReturnsNotFoundWhenTheWorkspaceDoesNotBelongToTheOrganization()
+      throws Exception {
+    when(getWorkspace.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc
+        .perform(post(workspacesPath() + "/" + UUID.randomUUID() + "/delete"))
+        .andExpect(status().isNotFound());
+
+    verify(deleteWorkspace, never()).handle(any());
   }
 
   // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy.

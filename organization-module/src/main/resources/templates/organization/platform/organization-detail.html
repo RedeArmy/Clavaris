@@ -60,8 +60,24 @@
                             <td th:text="${workspace.name()}">Workspace name</td>
                             <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">Created at</td>
                             <td>
-                                <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                   th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()})}">View</a>
+                                <div class="clavaris-row-actions">
+                                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()})}">View</a>
+                                    <!-- Live UX request, 2026-09-28: a full, permanent delete of the Workspace —
+                                         cascades to its own memberships/teams (DeleteWorkspaceService's own
+                                         Javadoc has the full "what is/isn't erased" reasoning). Plain single-click
+                                         hx-post + CSRF, same ceremony (none beyond the button itself) "Delete
+                                         team"/"Delete role" already use on workspace-detail.html — Organization
+                                         deletion's own two-step confirmation-token flow is reserved for that
+                                         strictly larger blast radius (an entire tenant's account pool), not this. -->
+                                    <form method="post"
+                                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                                          hx-target="#workspaces-content" hx-swap="outerHTML">
+                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         </tbody>

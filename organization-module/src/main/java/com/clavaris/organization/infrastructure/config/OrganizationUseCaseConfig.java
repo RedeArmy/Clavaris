@@ -44,6 +44,8 @@ import com.clavaris.organization.application.usecase.deleteorganization.Organiza
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationWebhookDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceService;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleService;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamService;
@@ -298,6 +300,14 @@ class OrganizationUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter) {
     return new CreateWorkspaceService(
         workspaces, roles, organizations, auditEvents, eventOutboxWriter);
+  }
+
+  @Bean
+  /* package */ DeleteWorkspaceUseCase deleteWorkspaceUseCase(
+      final WorkspaceRepository workspaces,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new DeleteWorkspaceService(workspaces, auditEvents, eventOutboxWriter);
   }
 
   // AddWorkspaceMemberService's own Javadoc explains why this needs a real TransactionTemplate,
