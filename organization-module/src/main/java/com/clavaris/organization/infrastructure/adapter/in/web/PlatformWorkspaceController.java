@@ -349,7 +349,6 @@ public class PlatformWorkspaceController {
     return ASSIGN_ROLE_FORM_FRAGMENT;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams/{teamId}/assign-role")
   public String assignRoleForTeam(
       final HttpServletRequest request,
@@ -400,7 +399,6 @@ public class PlatformWorkspaceController {
     return ASSIGN_ROLE_FORM_FRAGMENT;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/roles/assign-role")
   public String assignRoleForNoTeam(
       final HttpServletRequest request,
@@ -826,7 +824,10 @@ public class PlatformWorkspaceController {
   // PlatformAccountWorkspaceRoleController's own save() already establishes — so
   // workspace-teams-hierarchy.html's own hierarchy fragment (listening on document.body)
   // self-refreshes with the newly assigned member, no full page reload.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // PMD.ExcessiveParameterList: one parameter per genuinely distinct piece of context its two call
+  // sites (per-team, "No team") each already resolved — wiring shared between them, not sprawl,
+  // same reasoning this controller's own constructor documents for an identical threshold trip.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ExcessiveParameterList"})
   private String processAssignRole(
       final HttpServletRequest request,
       final HttpServletResponse response,

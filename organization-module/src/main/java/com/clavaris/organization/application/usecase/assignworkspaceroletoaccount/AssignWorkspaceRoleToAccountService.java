@@ -18,7 +18,17 @@ import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Orchestration for {@link AssignWorkspaceRoleToAccountUseCase} — see its own Javadoc. */
+// PMD.LongVariable: roleBelongsToThisOrganization/accountBelongsToThisOrganization spell out
+// exactly what each guard checks — same convention AddWorkspaceMemberService's own identical
+// roleBelongsToThisOrganization variable already establishes for this exact check.
+@SuppressWarnings("PMD.LongVariable")
 public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleToAccountUseCase {
+
+  // PMD.AvoidDuplicateLiterals: unlike AddWorkspaceMemberService/ChangeWorkspaceMemberRoleService
+  // (2 occurrences each, below PMD's threshold), this class's own two branches (update vs.
+  // originate) each carry their own audit+outbox pair, doubling the count — a real, not a false
+  // positive, so extracted here rather than suppressed.
+  private static final String AGGREGATE_TYPE = "WorkspaceMembership";
 
   private final WorkspaceRepository workspaces;
   private final WorkspaceRoleRepository roles;
@@ -101,11 +111,11 @@ public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleT
       auditEvents.write(
           command.actor(),
           "workspace_membership.role_changed",
-          "WorkspaceMembership",
+          AGGREGATE_TYPE,
           updated.id().toString(),
           "previousRoleId=" + previousRoleId + " newRoleId=" + command.roleId());
       outbox.write(
-          "WorkspaceMembership",
+          AGGREGATE_TYPE,
           "workspace_membership.role_changed",
           updated.id(),
           workspace.organizationId(),
@@ -119,11 +129,11 @@ public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleT
       auditEvents.write(
           command.actor(),
           "workspace_membership.added",
-          "WorkspaceMembership",
+          AGGREGATE_TYPE,
           updated.id().toString(),
           "workspaceId=" + workspace.id() + " roleId=" + command.roleId());
       outbox.write(
-          "WorkspaceMembership",
+          AGGREGATE_TYPE,
           "workspace_membership.added",
           updated.id(),
           workspace.organizationId(),

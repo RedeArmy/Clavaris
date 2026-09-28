@@ -14,6 +14,7 @@ import java.util.UUID;
  * page of them" — the Workspace-detail Teams tab's own "assign a role" picker needs the whole list
  * to filter against, not a paginated slice).
  */
+@FunctionalInterface
 public interface OrganizationAccountDirectory {
 
   List<OrganizationAccountSummary> listAccountsForOrganization(UUID organizationId);
