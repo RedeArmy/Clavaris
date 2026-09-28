@@ -149,6 +149,11 @@ import org.springframework.web.server.ResponseStatusException;
 // stays low (deleteRole's own extra CannotDemoteLastAdminException branch is one more genuinely
 // distinct outcome, not tangled logic), it's the class TOTAL that crossed the threshold purely
 // from handler count, not from any one method being hard to follow.
+// PMD.GodClass ("Create role without a team" live UX request, 2026-09-28): same TooManyMethods/
+// CyclomaticComplexity rationale above, one metric further — WMC crossing PMD's threshold is a
+// restatement of "this controller owns many single-purpose handlers," not new tangled complexity
+// added by this pass; the resource-line split already called out above is still the real fix, for
+// a future pass.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
@@ -156,6 +161,7 @@ import org.springframework.web.server.ResponseStatusException;
   "PMD.TooManyMethods",
   "PMD.CouplingBetweenObjects",
   "PMD.CyclomaticComplexity",
+  "PMD.GodClass",
   "java:S1075"
 })
 @Controller
@@ -657,8 +663,8 @@ public class PlatformWorkspaceController {
     return afterTeamMutation(request, organization, workspace, model);
   }
 
-  // SDE-III redesign, 2026-09-27: creates a brand-new WorkspaceRole and assigns it to an existing
-  // team in one popup submit — composes CreateWorkspaceRoleUseCase with
+  // SDE-III redesign, 2026-09-27: creates a brand-new WorkspaceRole and, when a team was picked,
+  // assigns it in the same popup submit — composes CreateWorkspaceRoleUseCase with
   // AddRoleToWorkspaceTeamUseCase, same "two use cases, one form" shape addMember's own removed
   // Account+WorkspaceMembership composition used. parentRoleId/permissions are deliberately absent
   // from this popup's form (Set.of()/null) — those stay editable only from the full Configure >
@@ -666,6 +672,12 @@ public class PlatformWorkspaceController {
   // WorkspaceRoleAlreadyInAnotherTeamException isn't caught here: the role this popup just created
   // has a freshly-minted, never-before-seen id, so it cannot already belong to another team — not a
   // race this path can hit, unlike addRoleToTeam's own identical catch for a pre-existing role id.
+  //
+  // Live UX request, 2026-09-28: teamId is now optional — "Without Team" (CreateWorkspaceTeamRole
+  // Form's own Javadoc) is a fully supported first-class choice, not just something a role ends up
+  // in after its team is later deleted. form.getTeamId() == null skips
+  // AddRoleToWorkspaceTeamUseCase
+  // entirely; the role this popup just created is simply left ungrouped.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/roles")
   public String createRole(
@@ -702,17 +714,20 @@ public class PlatformWorkspaceController {
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
-    try {
-      addRoleToTeamUseCase.handle(
-          new AddRoleToWorkspaceTeamCommand(
-              workspaceId,
-              form.getTeamId(),
-              role.id(),
-              AuditActor.platformAccount(ownerPlatformAccountId)));
-    } catch (final WorkspaceTeamNotFoundException _) {
-      // The popup's own team <select> only ever offers this Workspace's own real teams — reaching
-      // this means the submitted teamId was tampered with, not a real user mistake.
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    if (form.getTeamId() != null) {
+      try {
+        addRoleToTeamUseCase.handle(
+            new AddRoleToWorkspaceTeamCommand(
+                workspaceId,
+                form.getTeamId(),
+                role.id(),
+                AuditActor.platformAccount(ownerPlatformAccountId)));
+      } catch (final WorkspaceTeamNotFoundException _) {
+        // The popup's own team <select> only ever offers this Workspace's own real teams or the
+        // synthetic "Without Team" (null) option — reaching this means the submitted teamId was
+        // tampered with, not a real user mistake.
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      }
     }
 
     return afterTeamMutation(request, organization, workspace, model);

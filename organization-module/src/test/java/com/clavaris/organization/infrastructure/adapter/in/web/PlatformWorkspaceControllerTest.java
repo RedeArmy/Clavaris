@@ -396,12 +396,12 @@ class PlatformWorkspaceControllerTest {
   }
 
   @Test
-  void groupsAnUngroupedRoleUnderNoTeamInTheHierarchy() throws Exception {
+  void groupsAnUngroupedRoleUnderWithoutTeamInTheHierarchy() throws Exception {
     mockMvc
         .perform(get(teamsPath()))
         .andExpect(status().isOk())
         .andExpect(model().attribute("ungroupedRoles", List.of(role)))
-        .andExpect(content().string(containsString("No team")));
+        .andExpect(content().string(containsString("Without Team")));
   }
 
   @Test
@@ -788,6 +788,22 @@ class PlatformWorkspaceControllerTest {
 
     verify(createRole).handle(any());
     verify(addRoleToTeam).handle(any());
+  }
+
+  // Live UX request, 2026-09-28: "Without Team" is now a first-class choice in the popup itself,
+  // not just something a role ends up in after its team is later deleted.
+  @Test
+  void plainCreateRolePostWithoutATeamCreatesAnUngroupedRole() throws Exception {
+    WorkspaceRole created = WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+    when(createRole.handle(any())).thenReturn(created);
+
+    mockMvc
+        .perform(post(rolesPath()).param("name", "Reviewer").param("teamId", ""))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(createRole).handle(any());
+    verify(addRoleToTeam, never()).handle(any());
   }
 
   @Test
