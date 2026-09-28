@@ -95,6 +95,7 @@ public class PlatformAccountWorkspaceRoleController {
       "organization/platform/fragments/assign-role-form :: assignRoleForm";
   private static final String ASSIGN_ROLE_SAVED_FRAGMENT =
       "organization/platform/fragments/assign-role-form :: assignRoleSaved";
+  private static final String NO_WORKSPACES_YET_ATTRIBUTE = "noWorkspacesYet";
 
   // htmx's own response-header convention: any DOM event named here fires on document.body once
   // the swap completes — identity-module's Users-tab list container listens for this same name
@@ -136,7 +137,11 @@ public class PlatformAccountWorkspaceRoleController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // SonarCloud finding, 2026-09-28: every branch below used to return the exact same
+  // ASSIGN_ROLE_FORM_FRAGMENT literal via its own early return ("a method should not always
+  // return the same value") — restructured to one final return, each branch only setting model
+  // attributes, not exiting; same shape resolveActiveWorkspaceId's own single-purpose helper
+  // doesn't need (that one genuinely returns different values per branch).
   @GetMapping
   public String showForm(
       final HttpServletRequest request,
@@ -160,29 +165,27 @@ public class PlatformAccountWorkspaceRoleController {
     model.addAttribute("membership", membership.orElse(null));
     // Real bug found live, 2026-09-27: assign-role-form.html's own th:if="${!noWorkspacesYet and
     // !hasAnyRoles}" throws (SpringEL can't unbox a null Boolean for `!`) whenever either attribute
-    // is left unset rather than explicitly false — every return path below must set both, not just
-    // the one branch that actually needs true/false to differ from this default.
-    model.addAttribute("noWorkspacesYet", false);
+    // is left unset rather than explicitly false — every branch below must set both, not just the
+    // one branch that actually needs true/false to differ from this default.
+    model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, false);
 
     if (membership.isPresent()) {
       populateRoleOptions(
           model, organizationId, membership.get().workspaceId(), membership.get().roleId());
-      return ASSIGN_ROLE_FORM_FRAGMENT;
+    } else {
+      final List<Workspace> allWorkspaces =
+          listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
+      if (allWorkspaces.isEmpty()) {
+        model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, true);
+        model.addAttribute("hasAnyRoles", false);
+      } else {
+        final UUID activeWorkspaceId = resolveActiveWorkspaceId(allWorkspaces, workspaceId);
+        model.addAttribute("workspaces", allWorkspaces);
+        model.addAttribute("showWorkspaceSelector", allWorkspaces.size() > 1);
+        model.addAttribute("activeWorkspaceId", activeWorkspaceId);
+        populateRoleOptions(model, organizationId, activeWorkspaceId, null);
+      }
     }
-
-    final List<Workspace> allWorkspaces =
-        listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
-    if (allWorkspaces.isEmpty()) {
-      model.addAttribute("noWorkspacesYet", true);
-      model.addAttribute("hasAnyRoles", false);
-      return ASSIGN_ROLE_FORM_FRAGMENT;
-    }
-
-    final UUID activeWorkspaceId = resolveActiveWorkspaceId(allWorkspaces, workspaceId);
-    model.addAttribute("workspaces", allWorkspaces);
-    model.addAttribute("showWorkspaceSelector", allWorkspaces.size() > 1);
-    model.addAttribute("activeWorkspaceId", activeWorkspaceId);
-    populateRoleOptions(model, organizationId, activeWorkspaceId, null);
     return ASSIGN_ROLE_FORM_FRAGMENT;
   }
 
@@ -231,7 +234,7 @@ public class PlatformAccountWorkspaceRoleController {
       // Same "always set, never leave unset" fix showForm's own identical attribute documents —
       // workspaceId was already validated to exist above, so this path can never actually hit
       // "no workspaces," but the template still needs a real boolean here, not a missing one.
-      model.addAttribute("noWorkspacesYet", false);
+      model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, false);
       if (membership.isPresent()) {
         populateRoleOptions(
             model, organizationId, membership.get().workspaceId(), membership.get().roleId());

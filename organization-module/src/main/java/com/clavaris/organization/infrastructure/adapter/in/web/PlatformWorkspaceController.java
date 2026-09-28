@@ -163,6 +163,7 @@ public class PlatformWorkspaceController {
   // teams-hierarchy.html's own hierarchy fragment listens for this on document.body to
   // self-refresh after a successful assignment.
   private static final String ROLE_ASSIGNED_EVENT = "workspace-role-assigned";
+  private static final String WORKSPACES_PATH_SEGMENT = "/workspaces/";
   private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String CREATE_ROLE_FORM_ATTRIBUTE = "createRoleForm";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
@@ -366,13 +367,14 @@ public class PlatformWorkspaceController {
     return processAssignRole(
         request,
         response,
-        organizationId,
-        workspace,
-        accountId,
-        roleId,
-        teamRoles,
-        ownerPlatformAccountId,
-        assignRoleToTeamAction(organizationId, workspaceId, teamId),
+        new AssignRoleAttempt(
+            organizationId,
+            workspace,
+            accountId,
+            roleId,
+            teamRoles,
+            ownerPlatformAccountId,
+            assignRoleToTeamAction(organizationId, workspaceId, teamId)),
         model);
   }
 
@@ -415,13 +417,14 @@ public class PlatformWorkspaceController {
     return processAssignRole(
         request,
         response,
-        organizationId,
-        workspace,
-        accountId,
-        roleId,
-        ungroupedRoles,
-        ownerPlatformAccountId,
-        assignRoleToNoTeamAction(organizationId, workspaceId),
+        new AssignRoleAttempt(
+            organizationId,
+            workspace,
+            accountId,
+            roleId,
+            ungroupedRoles,
+            ownerPlatformAccountId,
+            assignRoleToNoTeamAction(organizationId, workspaceId)),
         model);
   }
 
@@ -668,7 +671,10 @@ public class PlatformWorkspaceController {
       populateTeamsModel(model, workspace);
       return TEAMS_FRAGMENT;
     }
-    return ORGANIZATIONS_REDIRECT_PREFIX + organization.id() + "/workspaces/" + workspace.id();
+    return ORGANIZATIONS_REDIRECT_PREFIX
+        + organization.id()
+        + WORKSPACES_PATH_SEGMENT
+        + workspace.id();
   }
 
   // ADR-0028: teams (List<WorkspaceTeam>), the roles grouped into each one (Map<UUID, List
@@ -773,7 +779,7 @@ public class PlatformWorkspaceController {
       final UUID organizationId, final UUID workspaceId, final UUID teamId) {
     return "/platform/dashboard/organizations/"
         + organizationId
-        + "/workspaces/"
+        + WORKSPACES_PATH_SEGMENT
         + workspaceId
         + "/teams/"
         + teamId
@@ -784,7 +790,7 @@ public class PlatformWorkspaceController {
       final UUID organizationId, final UUID workspaceId) {
     return "/platform/dashboard/organizations/"
         + organizationId
-        + "/workspaces/"
+        + WORKSPACES_PATH_SEGMENT
         + workspaceId
         + "/roles/assign-role";
   }
@@ -819,28 +825,33 @@ public class PlatformWorkspaceController {
     model.addAttribute("assignRoleAction", assignRoleAction);
   }
 
+  // SonarCloud finding, 2026-09-28: processAssignRole's own 7 context values (organizationId,
+  // workspace, accountId, roleId, groupRoles, ownerPlatformAccountId, assignRoleAction) all
+  // describe the SAME thing — one in-flight "assign a role" attempt, already resolved once by
+  // whichever of the two call sites (per-team, "No team") built it — bundled here rather than
+  // passed positionally, unlike a constructor's own disparate collaborating ports.
+  private record AssignRoleAttempt(
+      UUID organizationId,
+      Workspace workspace,
+      UUID accountId,
+      UUID roleId,
+      List<WorkspaceRole> groupRoles,
+      UUID ownerPlatformAccountId,
+      String assignRoleAction) {}
+
   // Shared POST tail for both showAssignRoleFormForTeam/-ForNoTeam's own mutating counterparts.
   // Fires ROLE_ASSIGNED_EVENT on success — same HX-Trigger convention
   // PlatformAccountWorkspaceRoleController's own save() already establishes — so
   // workspace-teams-hierarchy.html's own hierarchy fragment (listening on document.body)
   // self-refreshes with the newly assigned member, no full page reload.
-  // PMD.ExcessiveParameterList: one parameter per genuinely distinct piece of context its two call
-  // sites (per-team, "No team") each already resolved — wiring shared between them, not sprawl,
-  // same reasoning this controller's own constructor documents for an identical threshold trip.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ExcessiveParameterList"})
+  @SuppressWarnings("PMD.OnlyOneReturn")
   private String processAssignRole(
       final HttpServletRequest request,
       final HttpServletResponse response,
-      final UUID organizationId,
-      final Workspace workspace,
-      final UUID accountId,
-      final UUID roleId,
-      final List<WorkspaceRole> groupRoles,
-      final UUID ownerPlatformAccountId,
-      final String assignRoleAction,
+      final AssignRoleAttempt attempt,
       final Model model) {
     final boolean roleBelongsToThisGroup =
-        groupRoles.stream().anyMatch(role -> role.id().equals(roleId));
+        attempt.groupRoles().stream().anyMatch(role -> role.id().equals(attempt.roleId()));
     if (!roleBelongsToThisGroup) {
       // The popup's own Role <select> only ever offers this group's own roles — reaching this
       // means the submitted roleId was tampered with, not a real user mistake.
@@ -850,15 +861,20 @@ public class PlatformWorkspaceController {
     try {
       assignRoleToAccountUseCase.handle(
           new AssignWorkspaceRoleToAccountCommand(
-              workspace.id(),
-              accountId,
-              roleId,
-              AuditActor.platformAccount(ownerPlatformAccountId)));
+              attempt.workspace().id(),
+              attempt.accountId(),
+              attempt.roleId(),
+              AuditActor.platformAccount(attempt.ownerPlatformAccountId())));
     } catch (final AccountNotInOrganizationException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
       model.addAttribute("cannotDemoteLastAdminError", true);
-      populateAssignRoleModel(model, organizationId, workspace, groupRoles, assignRoleAction);
+      populateAssignRoleModel(
+          model,
+          attempt.organizationId(),
+          attempt.workspace(),
+          attempt.groupRoles(),
+          attempt.assignRoleAction());
       return ASSIGN_ROLE_FORM_FRAGMENT;
     }
 
@@ -872,9 +888,9 @@ public class PlatformWorkspaceController {
       return ASSIGN_ROLE_SAVED_FRAGMENT;
     }
     return ORGANIZATIONS_REDIRECT_PREFIX
-        + organizationId
-        + "/workspaces/"
-        + workspace.id()
+        + attempt.organizationId()
+        + WORKSPACES_PATH_SEGMENT
+        + attempt.workspace().id()
         + "/teams";
   }
 
