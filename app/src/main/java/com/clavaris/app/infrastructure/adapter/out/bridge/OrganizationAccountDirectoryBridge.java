@@ -22,8 +22,19 @@ import org.springframework.stereotype.Component;
  * {@link KeysetPageRequest#MAX_SIZE} page size) rather than returning just the first — this port's
  * contract is "every account in the Organization" for a picker to filter against, not a paginated
  * slice a dashboard list would render. Acceptable here (unlike a real user-facing list) because
- * this only backs an admin "assign a role" picker, not a page a caller waits on interactively for a
- * large Organization; see this port's own Javadoc.
+ * this only backs admin surfaces (the "assign a role" picker, and — 2026-09-28 — the Teams tab's
+ * own hierarchy display), not a page a caller waits on interactively for a large Organization; see
+ * this port's own Javadoc.
+ *
+ * <p>{@code label}, 2026-09-28 (live UX request): the Teams hierarchy's own member list used to
+ * render a bare {@code accountId} — real gap, organization-module has no access to
+ * identity-module's {@code Account} type at all (module boundary), so a friendly label was never
+ * available there without this exact port. {@code firstName}/{@code lastName} (BR-ID-01: both
+ * optional profile attributes, {@code email} is the only mandatory identity field) are preferred
+ * when either is present; {@code email} alone is the fallback — same "full name, or the one thing
+ * every Account is guaranteed to have" reasoning {@code organization-users.html}'s own {@code
+ * fullName}/email columns already establish for an identical display problem, one level up in
+ * identity-module itself.
  */
 @Component
 class OrganizationAccountDirectoryBridge implements OrganizationAccountDirectory {
@@ -45,8 +56,7 @@ class OrganizationAccountDirectoryBridge implements OrganizationAccountDirectory
       final KeysetPage<Account> page =
           listAccounts.handle(new ListAccountsForOrganizationQuery(orgId, pageRequest, null));
       for (final Account account : page.content()) {
-        summaries.add(
-            new OrganizationAccountSummary(account.id().value(), account.email().value()));
+        summaries.add(new OrganizationAccountSummary(account.id().value(), labelFor(account)));
       }
       if (!page.hasNext()) {
         break;
@@ -55,5 +65,11 @@ class OrganizationAccountDirectoryBridge implements OrganizationAccountDirectory
     }
 
     return List.copyOf(summaries);
+  }
+
+  private static String labelFor(final Account account) {
+    final String fullName =
+        (account.firstName().orElse("") + " " + account.lastName().orElse("")).trim();
+    return fullName.isEmpty() ? account.email().value() : fullName;
   }
 }

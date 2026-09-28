@@ -345,8 +345,30 @@ class PlatformWorkspaceControllerTest {
         .andExpect(model().attribute("teams", List.of(team)));
   }
 
+  // Live UX request, 2026-09-28: a bare accountId used to render here — real gap, closed via
+  // OrganizationAccountDirectory (same cross-module port the "Assign role" picker already uses).
   @Test
-  void showsEveryMemberHoldingARoleInTheHierarchy() throws Exception {
+  void showsEveryMemberHoldingARoleInTheHierarchyByNameNotId() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(listMembers.handle(any()))
+        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));
+    when(accountDirectory.listAccountsForOrganization(any()))
+        .thenReturn(List.of(new OrganizationAccountSummary(accountId, "Jane Doe")));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Jane Doe")))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.not(containsString(accountId.toString()))));
+  }
+
+  // Defensive only — every real accountId here comes from a WorkspaceMembership, which is only
+  // ever created against an account the directory already returned
+  // (AccountNotInOrganizationException
+  // guards that at creation time). Covers the fallback itself, not a reachable production gap.
+  @Test
+  void fallsBackToTheRawAccountIdWhenItIsMissingFromTheDirectory() throws Exception {
     UUID accountId = UUID.randomUUID();
     when(listMembers.handle(any()))
         .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));

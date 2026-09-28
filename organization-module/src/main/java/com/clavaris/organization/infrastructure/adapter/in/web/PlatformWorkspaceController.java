@@ -785,6 +785,17 @@ public class PlatformWorkspaceController {
     model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
     model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
     model.addAttribute("accountIdsByRoleId", accountIdsByRoleId);
+    // Live UX request, 2026-09-28: the member list used to render a bare accountId — see
+    // OrganizationAccountDirectoryBridge's own Javadoc for why the label (name, or email as a
+    // fallback) can only be resolved through this cross-module port, never a local join.
+    model.addAttribute("accountLabelById", accountLabelById(workspace.organizationId()));
+  }
+
+  private Map<UUID, String> accountLabelById(final UUID organizationId) {
+    return accountDirectory.listAccountsForOrganization(organizationId).stream()
+        .collect(
+            Collectors.toMap(
+                OrganizationAccountSummary::accountId, OrganizationAccountSummary::label));
   }
 
   private record TeamsAndRoles(

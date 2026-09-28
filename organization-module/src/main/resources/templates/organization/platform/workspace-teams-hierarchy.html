@@ -17,12 +17,16 @@
                  member currently holding each role. Roles with no team (created, or left ungrouped
                  after their own team was deleted, via Configure > Workspace Roles or the Manage
                  tab's own "add existing role" path) render under a synthetic "No team" group instead
-                 of being silently dropped from the picture. Same "just list the raw accountId, no
-                 name resolution" fidelity the old Members table already had on this same page —
-                 organization-module has no access to identity-module's own Account records (module
-                 boundary, no Maven dependency between them), so a friendly name isn't available here
-                 without a cross-module read model this view doesn't have (unlike ADR-0029's own
-                 Assign-role popup, which is served BY identity-module's own page, not the reverse).
+                 of being silently dropped from the picture.
+
+                 Live UX request, 2026-09-28: each member now renders as their name (or email, when
+                 no name is set) instead of a bare accountId — resolved via accountLabelById, backed
+                 by the same cross-module OrganizationAccountDirectory port the "Assign role" popups
+                 below already use (organization-module still has no direct access to identity-module's
+                 own Account type — module boundary, no Maven dependency between them — this port is
+                 the one sanctioned way across it). The ?: fallback to the raw id is defensive only:
+                 every accountId here comes from a real WorkspaceMembership, which itself was only
+                 ever created against an account this same directory already returned.
 
                  Live UX request, 2026-09-27: "Assign role" — one button per team (and one for the
                  synthetic "No team" group) opens a shared popup scoped to that group: pick one of
@@ -58,7 +62,7 @@
                     <div class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountId}">Account id</li>
+                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</li>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>
@@ -75,7 +79,7 @@
                     <div class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountId}">Account id</li>
+                            <li th:each="accountId : ${accountIdsByRoleId.get(role.id())}" th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</li>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>
