@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Proves the one nontrivial piece of logic this bridge adds over a plain delegate call: looping
- * every page of {@link ListAccountsForOrganizationUseCase} into one flat list — see the bridge's own
- * Javadoc for why "every account," not a page of them, is this port's actual contract.
+ * every page of {@link ListAccountsForOrganizationUseCase} into one flat list — see the bridge's
+ * own Javadoc for why "every account," not a page of them, is this port's actual contract.
  */
 class OrganizationAccountDirectoryBridgeTest {
 
@@ -39,8 +39,7 @@ class OrganizationAccountDirectoryBridgeTest {
         .thenReturn(new KeysetPage<>(List.of(first), cursor, cursor, true, false))
         .thenReturn(new KeysetPage<>(List.of(second), cursor, cursor, false, true));
 
-    List<OrganizationAccountSummary> summaries =
-        bridge.listAccountsForOrganization(organizationId);
+    List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
 
     assertThat(summaries)
         .containsExactlyInAnyOrder(
@@ -54,8 +53,7 @@ class OrganizationAccountDirectoryBridgeTest {
     when(listAccounts.handle(any()))
         .thenReturn(new KeysetPage<>(List.of(), null, null, false, false));
 
-    List<OrganizationAccountSummary> summaries =
-        bridge.listAccountsForOrganization(organizationId);
+    List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
 
     assertThat(summaries).isEmpty();
   }

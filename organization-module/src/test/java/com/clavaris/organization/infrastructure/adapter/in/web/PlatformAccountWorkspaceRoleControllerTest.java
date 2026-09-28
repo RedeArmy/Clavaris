@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -174,7 +175,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     mockMvc
         .perform(get(assignRolePath()))
         .andExpect(status().isOk())
-        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("EmptyTeam"))));
+        .andExpect(content().string(not(containsString("EmptyTeam"))));
   }
 
   @Test
@@ -301,8 +302,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     mockMvc
         .perform(get(assignRolePath()))
         .andExpect(status().isOk())
-        .andExpect(
-            content().string(org.hamcrest.Matchers.not(containsString("assignRoleWorkspaceId"))));
+        .andExpect(content().string(not(containsString("assignRoleWorkspaceId"))));
   }
 
   @Test
