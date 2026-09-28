@@ -8,19 +8,7 @@
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <div th:replace="~{organization/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organization.id()})}, 'Back to Workspaces')}"></div>
-            <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-                <span th:text="${workspace.name()}">Workspace</span>
-            </p>
-
-            <div class="clavaris-page-header">
-                <div>
-                    <h1 th:text="${workspace.name()}">Workspace name</h1>
-                    <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
-                </div>
-            </div>
+            <div th:replace="~{organization/platform/fragments/workspace-page-header :: header(${organization}, ${workspace})}"></div>
 
             <div th:replace="~{organization/platform/fragments/workspace-tabs :: tabs(${organization.id()}, ${workspace.id()}, 'teams')}"></div>
 
