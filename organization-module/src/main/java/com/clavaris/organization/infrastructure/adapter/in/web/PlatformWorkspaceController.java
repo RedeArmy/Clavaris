@@ -188,6 +188,9 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACES_PATH_SEGMENT = "/workspaces/";
   private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String CREATE_ROLE_FORM_ATTRIBUTE = "createRoleForm";
+  private static final String WORKSPACE_FORM_ATTRIBUTE = "workspaceForm";
+  private static final String CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE =
+      "cannotDemoteLastAdminError";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
   private static final String ORGANIZATIONS_REDIRECT_PREFIX =
       "redirect:/platform/dashboard/organizations/";
@@ -271,7 +274,7 @@ public class PlatformWorkspaceController {
   public String create(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @Valid @ModelAttribute("workspaceForm") final CreateWorkspaceForm form,
+      @Valid @ModelAttribute(WORKSPACE_FORM_ATTRIBUTE) final CreateWorkspaceForm form,
       final BindingResult bindingResult,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
@@ -299,7 +302,7 @@ public class PlatformWorkspaceController {
       // ordering), same reasoning PlatformOrganizationDashboardController's own identical
       // create() already documents.
       addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
-      model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+      model.addAttribute(WORKSPACE_FORM_ATTRIBUTE, new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
     return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
@@ -340,7 +343,7 @@ public class PlatformWorkspaceController {
     if (!workspace.name().equals(confirmedName)) {
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
-      model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+      model.addAttribute(WORKSPACE_FORM_ATTRIBUTE, new CreateWorkspaceForm());
       // Which row's own dialog should reopen with the error — see organization-detail.html's own
       // per-row th:if on this attribute.
       model.addAttribute("deleteWorkspaceMismatchId", workspaceId);
@@ -358,7 +361,7 @@ public class PlatformWorkspaceController {
       // attribute (th:field="*{name}") — every other HTMX-returning caller of WORKSPACES_FRAGMENT
       // (create()'s own htmx branch) sets it too; a real bug, caught by
       // htmxDeleteWorkspacePostReturnsTheWorkspacesFragment, not hypothetical.
-      model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+      model.addAttribute(WORKSPACE_FORM_ATTRIBUTE, new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
     return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
@@ -426,7 +429,7 @@ public class PlatformWorkspaceController {
     } catch (final WorkspaceMembershipNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
-      model.addAttribute("cannotDemoteLastAdminError", true);
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
     }
 
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
@@ -776,7 +779,7 @@ public class PlatformWorkspaceController {
       // Live UX request, 2026-09-28: deleting this role now auto-unassigns every holder in this
       // Workspace first (DeleteWorkspaceRoleService's own Javadoc) — this is that bulk unassign
       // hitting the exact same ManageMembersGuard every other role-changing action already does.
-      model.addAttribute("cannotDemoteLastAdminError", true);
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
@@ -1006,7 +1009,7 @@ public class PlatformWorkspaceController {
     } catch (final AccountNotInOrganizationException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
-      model.addAttribute("cannotDemoteLastAdminError", true);
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
       populateAssignRoleModel(
           model,
           attempt.organizationId(),

@@ -19,7 +19,16 @@ th:replace on a separate, nested <li> — the standard, unambiguous Thymeleaf id
 then replace each iteration with a fragment" (the two attributes must never share one tag). This
 fragment's own parameter is still named memberAccountId, not accountId, purely as a second,
 independent layer of defense against a caller-side name collision — not the actual fix.
--->
+
+SonarCloud finding, 2026-09-29: "Surround this <li> item tag by a <ul>, <ol> or <menu> container
+one" — the analyzer reads this file's own raw source, where the <li> below has no such parent; it
+has no way to see that every real caller only ever th:replaces it into a <ul> it doesn't define
+here (workspace-teams-hierarchy.html's own two call sites). Same "satisfy the raw-source check
+directly, don't suppress it" posture the static for/id fallback pairs elsewhere in this module
+already establish. The <ul> wrapper below is never actually rendered: Thymeleaf's th:replace only
+ever extracts the element carrying th:fragment itself (the <li>), never its ancestors — this <ul>
+exists purely so a static analyzer reading the file in isolation sees valid structure. -->
+<ul>
 <li class="clavaris-row-actions" th:fragment="row(organization, workspace, memberAccountId, label)">
     <span th:text="${label}">Account name</span>
     <form method="post"
@@ -30,3 +39,4 @@ independent layer of defense against a caller-side name collision — not the ac
         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
     </form>
 </li>
+</ul>
