@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.application.usecase.updateoauthclientgrantty
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Same rationale/shape as {@code
@@ -20,6 +21,7 @@ public class UpdateOAuthClientGrantTypesService implements UpdateOAuthClientGran
   }
 
   @Override
+  @Transactional
   public void handle(final UpdateOAuthClientGrantTypesCommand command) {
     final OAuthClient existing =
         oauthClients

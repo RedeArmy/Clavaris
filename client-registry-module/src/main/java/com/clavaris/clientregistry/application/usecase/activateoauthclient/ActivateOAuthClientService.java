@@ -5,6 +5,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuth
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Live UX request, 2026-09-25: reactivation now also rotates the client secret — see {@link
@@ -33,6 +34,7 @@ public class ActivateOAuthClientService implements ActivateOAuthClientUseCase {
   }
 
   @Override
+  @Transactional
   public ActivateOAuthClientResult handle(final ActivateOAuthClientCommand command) {
     final OAuthClient existing =
         oauthClients

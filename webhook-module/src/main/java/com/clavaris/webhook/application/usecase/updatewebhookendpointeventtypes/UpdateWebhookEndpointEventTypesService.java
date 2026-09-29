@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointNotFoundException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Live UX request, 2026-09-25: same editable-after-registration treatment as the endpoint's URL —
@@ -24,6 +25,7 @@ public class UpdateWebhookEndpointEventTypesService
   }
 
   @Override
+  @Transactional
   public WebhookEndpoint handle(final UpdateWebhookEndpointEventTypesCommand command) {
     final WebhookEndpoint existing =
         endpoints

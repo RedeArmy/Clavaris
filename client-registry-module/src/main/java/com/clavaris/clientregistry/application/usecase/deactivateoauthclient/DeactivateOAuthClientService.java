@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.application.usecase.deactivateoauthclient;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Same rationale as {@code deactivateorganizationclient.DeactivateOrganizationClientService}. */
 public class DeactivateOAuthClientService implements DeactivateOAuthClientUseCase {
@@ -17,6 +18,7 @@ public class DeactivateOAuthClientService implements DeactivateOAuthClientUseCas
   }
 
   @Override
+  @Transactional
   public void handle(final DeactivateOAuthClientCommand command) {
     final OAuthClient existing =
         oauthClients

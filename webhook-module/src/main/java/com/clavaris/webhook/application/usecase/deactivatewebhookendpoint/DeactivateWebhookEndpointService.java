@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointNotFoundException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Reversible — no hard delete, same "reversible over permanent where the semantics allow it"
@@ -25,6 +26,7 @@ public class DeactivateWebhookEndpointService implements DeactivateWebhookEndpoi
   }
 
   @Override
+  @Transactional
   public WebhookEndpoint handle(final DeactivateWebhookEndpointCommand command) {
     final WebhookEndpoint existing =
         endpoints

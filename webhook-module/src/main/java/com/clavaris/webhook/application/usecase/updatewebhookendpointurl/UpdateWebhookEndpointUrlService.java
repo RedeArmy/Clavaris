@@ -5,6 +5,7 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookUrlSsrfGuard;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Live UX request, 2026-09-25: the endpoint URL is editable after registration, unlike OAuth
@@ -31,6 +32,7 @@ public class UpdateWebhookEndpointUrlService implements UpdateWebhookEndpointUrl
   }
 
   @Override
+  @Transactional
   public WebhookEndpoint handle(final UpdateWebhookEndpointUrlCommand command) {
     final WebhookEndpoint existing =
         endpoints

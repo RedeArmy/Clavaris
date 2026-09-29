@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.C
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link RegisterOAuthClientUseCase}. Generates both {@code clientId} and the raw
@@ -56,6 +57,7 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
   }
 
   @Override
+  @Transactional
   public RegisterOAuthClientResult handle(final RegisterOAuthClientCommand command) {
     // BR-ORG-02: never let a client be registered under a non-existent Organization — the FK
     // constraint doesn't enforce this. Cross-module migration ordering isn't guaranteed (see the

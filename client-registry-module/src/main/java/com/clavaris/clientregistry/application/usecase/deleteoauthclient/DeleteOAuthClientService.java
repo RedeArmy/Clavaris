@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.application.usecase.deleteoauthclient;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Live UX request, 2026-09-24: the first single-entity (not cascade-from-Organization-delete) hard
@@ -29,6 +30,7 @@ public class DeleteOAuthClientService implements DeleteOAuthClientUseCase {
   }
 
   @Override
+  @Transactional
   public void handle(final DeleteOAuthClientCommand command) {
     final OAuthClient existing =
         oauthClients
