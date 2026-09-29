@@ -1,0 +1,32 @@
+<!--
+SonarQube-style branch self-review fix, 2026-09-29: the "one member, one Remove button" row used to
+be hand-duplicated between the team-grouped and "Without Team" role lists on
+workspace-teams-hierarchy.html — identical markup, only the enclosing th:each's own role differed.
+Extracted here, same "a block shared within one module gets its own fragments/*.html file"
+precedent every other fragment in this directory already establishes (team-assign-role-form.html,
+workspace-page-header.html, ...).
+
+Real bug found and fixed in the same pass: the caller side originally combined th:each and
+th:replace on the SAME <li> element (th:each="accountId : ..." th:replace="~{... :: row(...,
+${accountId}, ...)}"). th:insert/th:replace has higher Thymeleaf attribute precedence than
+th:each — on one tag, the fragment substitution is resolved before th:each's own iteration variable
+is bound for that pass, so ${accountId} in the argument list evaluated against a scope where it
+didn't exist yet. Every row silently rendered with a blank accountId (bare "members//unassign-role"
+URLs, no label) — a real production bug, caught only by PlatformWorkspaceControllerTest's own
+content-assertion tests, never by a status-code check (the page still returned 200). Fixed on the
+caller side (workspace-teams-hierarchy.html): th:each now lives on its own <th:block>, with
+th:replace on a separate, nested <li> — the standard, unambiguous Thymeleaf idiom for "iterate,
+then replace each iteration with a fragment" (the two attributes must never share one tag). This
+fragment's own parameter is still named memberAccountId, not accountId, purely as a second,
+independent layer of defense against a caller-side name collision — not the actual fix.
+-->
+<li class="clavaris-row-actions" th:fragment="row(organization, workspace, memberAccountId, label)">
+    <span th:text="${label}">Account name</span>
+    <form method="post"
+          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
+          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
+          hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+    </form>
+</li>

@@ -70,16 +70,9 @@
                     <div class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <li class="clavaris-row-actions" th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
-                                <span th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</span>
-                                <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
-                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
-                                      hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
-                                </form>
-                            </li>
+                            <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
+                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId})}"></li>
+                            </th:block>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>
@@ -96,16 +89,9 @@
                     <div class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <li class="clavaris-row-actions" th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
-                                <span th:text="${accountLabelById.get(accountId) ?: accountId}">Account name</span>
-                                <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
-                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${accountId})}"
-                                      hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
-                                </form>
-                            </li>
+                            <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
+                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId})}"></li>
+                            </th:block>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>

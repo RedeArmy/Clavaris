@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -33,6 +34,27 @@ import org.springframework.transaction.annotation.Transactional;
  * org-wide. Each unassignment goes through {@link ManageMembersGuard}, same protection every other
  * role-changing use case already applies — bulk-clearing every holder of a role must not leave this
  * Workspace with zero {@code manage_members} holders, same invariant as a single change.
+ *
+ * <p><b>{@code Propagation.REQUIRES_NEW}, SonarQube-style branch self-review, 2026-09-29 — a real
+ * bug found and fixed, not a style choice.</b> {@code
+ * DeleteWorkspaceTeamService#deleteRoleIfNowOrphaned} calls this use case from inside its OWN
+ * {@code @Transactional} method and catches every guard exception this method can throw, treating
+ * each as "leave the role ungrouped, not a failure." With the default {@code REQUIRED} propagation,
+ * that call joins the SAME physical transaction — Spring marks it rollback-only the instant this
+ * method throws, and catching the exception one level up does not clear that marker: the outer
+ * {@code DeleteWorkspaceTeamService#handle} would return normally, its own advice would try to
+ * commit, and Spring would throw {@code UnexpectedRollbackException} instead — silently discarding
+ * a team deletion that had already "succeeded," on literally every team-delete that orphans an
+ * undeletable role. Reproduced with a real Spring-proxy, real-Postgres test ({@code
+ * DeleteWorkspaceTeamTransactionIntegrationTest}) — a pure-Mockito unit test can never catch this,
+ * since mocking {@link DeleteWorkspaceRoleUseCase} means no real transactional proxy is ever
+ * involved. {@code REQUIRES_NEW} gives this method its own physical transaction: a failed attempt
+ * (and only that attempt — including any partial {@link #unassignHoldersWithinWorkspace}
+ * unassignments) rolls back in isolation, while the caller's own transaction (the team row already
+ * deleted) is unaffected and commits normally. No behavior change for this class's other caller
+ * ({@code PlatformWorkspaceController#deleteRole}, never itself inside an open transaction) —
+ * {@code REQUIRES_NEW} and {@code REQUIRED} are identical when there's no transaction to join in
+ * the first place.
  */
 public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
 
@@ -53,7 +75,7 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
   }
 
   @Override
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void handle(final DeleteWorkspaceRoleCommand command) {
     final WorkspaceRole role =
         roles

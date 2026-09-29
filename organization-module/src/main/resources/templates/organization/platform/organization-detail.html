@@ -103,9 +103,16 @@
                             <strong th:text="${workspace.name()}">Workspace</strong> — every team, role grouping,
                             and member's role assignment in it. This cannot be undone.</p>
                         <div class="clavaris-field">
-                            <label th:for="${'confirm-delete-workspace-' + workspace.id()}">Type
+                            <!-- Static "for"/"id" fallback values below, both overridden by their own
+                                 th:for/th:id at render time with the real per-row unique id: a static
+                                 analyzer reading this template's raw source (not Thymeleaf's rendered
+                                 output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                                 alone, for this accessibility rule — same "SonarCloud finding" fix
+                                 already applied to the rename-team/add-role fields on workspace-detail.html. -->
+                            <label for="confirm-delete-workspace" th:for="${'confirm-delete-workspace-' + workspace.id()}">Type
                                 <strong th:text="${workspace.name()}">name</strong> to confirm</label>
-                            <input type="text" name="confirmedName" th:id="${'confirm-delete-workspace-' + workspace.id()}"
+                            <input type="text" name="confirmedName" id="confirm-delete-workspace"
+                                   th:id="${'confirm-delete-workspace-' + workspace.id()}"
                                    autocomplete="off" required/>
                             <p class="clavaris-field-error" th:if="${deleteWorkspaceMismatchId == workspace.id()}"
                                data-dialog-open-on-load>That doesn't match the Workspace's current name.</p>
