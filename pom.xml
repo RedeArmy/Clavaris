@@ -100,6 +100,21 @@
              (11.0.26 is not, as of this writing) — this is the latest
              available patch release, not an arbitrary bump. -->
         <tomcat.version>11.0.26</tomcat.version>
+        <!-- CVE-2026-68497 (jackson-databind, HIGH — CPU DoS via unbounded numeric parsing),
+             confirmed live via a local Trivy scan of the built app image after CI's own Trivy
+             step failed silently (its findings go to an uploaded artifact, not the console log —
+             reproduced with `docker build` + `docker run aquasec/trivy image` locally instead of
+             guessing). Two separate BOMs, both affected — Spring Boot 4's own spring-boot-
+             dependencies imports BOTH the classic Jackson 2.x line (com.fasterxml.jackson,
+             groupId unchanged) AND the new Jackson 3.x line (tools.jackson, renamed groupId) at
+             once, and springdoc-openapi's own swagger-core-jakarta transitively pulls in Jackson
+             2.x independently of Spring Boot's own Jackson 3.x default — both resolve to a
+             vulnerable version simultaneously. Fixed versions confirmed present on Maven Central
+             before pinning (not assumed): 2.21.6/2.22.2 for jackson-2-bom, 3.1.6/3.2.2 for
+             jackson-bom — the smaller same-minor-line bump chosen for each, same "smallest safe
+             fix" precedent tomcat.version's own comment above already establishes. -->
+        <jackson-2-bom.version>2.21.6</jackson-2-bom.version>
+        <jackson-bom.version>3.1.6</jackson-bom.version>
         <!-- ADR-0026: identity-module's own SupabaseS3ProfilePictureStorage adapter talks to
              Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
              Supabase SDK dependency needed, same "build on vetted foundations" posture as every
@@ -182,6 +197,30 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
                 <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Same "declared before, and wins" mechanism as testcontainers-bom/netty-bom above —
+                 CVE-2026-68497 (jackson-2-bom.version/jackson-bom.version property comment above).
+                 spring-boot-dependencies itself imports BOTH of these jackson-bom coordinates as a
+                 NESTED BOM (com.fasterxml.jackson for the 2.x line, tools.jackson for the 3.x line);
+                 overriding the two version properties alone did not reach jackson-databind's actual
+                 resolved version (confirmed by testing: dependency:tree kept showing the old,
+                 vulnerable versions even after help:evaluate correctly reported the new property
+                 values — the same nested-BOM limitation testcontainers-bom/netty-bom's own comments
+                 already document, hit here independently before finding those precedents). Explicit
+                 imports here, ahead of spring-boot-dependencies, are what actually takes effect. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson-2-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

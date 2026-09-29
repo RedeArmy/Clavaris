@@ -52,7 +52,7 @@
                 <p>Every team in this Workspace, the roles grouped into it, and the members
                     currently holding each role.</p>
 
-                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace — reassign this member to another role first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. If you're sure, type "unassign" in the field that replaced their Remove button below to confirm and proceed anyway.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams) and #lists.isEmpty(ungroupedRoles)}">
                     <p class="clavaris-empty-state">No teams or roles yet.</p>
@@ -71,7 +71,7 @@
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
                             <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
-                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId})}"></li>
+                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId}, ${forceConfirmAccountId})}"></li>
                             </th:block>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
@@ -90,7 +90,7 @@
                         <h4 th:text="${role.name()}">Role name</h4>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
                             <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
-                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId})}"></li>
+                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId}, ${forceConfirmAccountId})}"></li>
                             </th:block>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>

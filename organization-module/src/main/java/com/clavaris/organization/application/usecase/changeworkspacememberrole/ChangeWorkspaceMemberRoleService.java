@@ -71,15 +71,19 @@ public class ChangeWorkspaceMemberRoleService implements ChangeWorkspaceMemberRo
 
     // ADR-0027 §2: ManageMembersGuard replaces LastAdminGuard — see its own Javadoc for why it
     // short-circuits (no lock/load at all) whenever this change couldn't possibly reduce the
-    // Workspace's manage_members-holder count.
-    ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
-        memberships,
-        roles,
-        command.workspaceId(),
-        organizationId,
-        membership.roleId(),
-        command.newRoleId(),
-        () -> new CannotDemoteLastAdminException(command.workspaceId()));
+    // Workspace's manage_members-holder count. Live UX request, 2026-09-29: command.force()
+    // skips this entirely — see ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc for why a
+    // deliberate, dashboard-only override is safe here.
+    if (!command.force()) {
+      ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
+          memberships,
+          roles,
+          command.workspaceId(),
+          organizationId,
+          membership.roleId(),
+          command.newRoleId(),
+          () -> new CannotDemoteLastAdminException(command.workspaceId()));
+    }
 
     final UUID previousRoleId = membership.roleId();
     final WorkspaceMembership updated = membership.withRoleId(command.newRoleId());
