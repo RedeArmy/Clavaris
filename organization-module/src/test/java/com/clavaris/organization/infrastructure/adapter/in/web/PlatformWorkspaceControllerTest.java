@@ -24,11 +24,14 @@ import com.clavaris.organization.application.usecase.assignworkspaceroletoaccoun
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
@@ -75,6 +78,7 @@ class PlatformWorkspaceControllerTest {
   private ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private ListWorkspaceRolesForOrganizationUseCase listRoles;
   private CreateWorkspaceUseCase createWorkspace;
+  private DeleteWorkspaceUseCase deleteWorkspace;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private ListWorkspaceTeamsForWorkspaceUseCase listTeams;
   private ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
@@ -88,6 +92,7 @@ class PlatformWorkspaceControllerTest {
   private ListWorkspaceMembersUseCase listMembers;
   private OrganizationAccountDirectory accountDirectory;
   private AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
+  private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
   private MockMvc mockMvc;
   private Organization organization;
   private Workspace workspace;
@@ -100,6 +105,7 @@ class PlatformWorkspaceControllerTest {
     listWorkspaces = mock(ListWorkspacesForOrganizationPagedUseCase.class);
     listRoles = mock(ListWorkspaceRolesForOrganizationUseCase.class);
     createWorkspace = mock(CreateWorkspaceUseCase.class);
+    deleteWorkspace = mock(DeleteWorkspaceUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     listTeams = mock(ListWorkspaceTeamsForWorkspaceUseCase.class);
     listTeamRoleIds = mock(ListWorkspaceTeamRoleIdsUseCase.class);
@@ -113,6 +119,7 @@ class PlatformWorkspaceControllerTest {
     listMembers = mock(ListWorkspaceMembersUseCase.class);
     accountDirectory = mock(OrganizationAccountDirectory.class);
     assignRoleToAccount = mock(AssignWorkspaceRoleToAccountUseCase.class);
+    changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
 
     organization = Organization.register("Acme Co", OWNER_ID);
     workspace = Workspace.register(organization.id(), "Engineering");
@@ -151,6 +158,7 @@ class PlatformWorkspaceControllerTest {
                     listWorkspaces,
                     listRoles,
                     createWorkspace,
+                    deleteWorkspace,
                     currentPlatformAccount,
                     listTeams,
                     listTeamRoleIds,
@@ -163,7 +171,8 @@ class PlatformWorkspaceControllerTest {
                     deleteRole,
                     listMembers,
                     accountDirectory,
-                    assignRoleToAccount))
+                    assignRoleToAccount,
+                    changeMemberRole))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -256,6 +265,77 @@ class PlatformWorkspaceControllerTest {
     mockMvc.perform(get(workspacesPath() + "/" + workspace.id())).andExpect(status().isNotFound());
   }
 
+  // Live UX request, 2026-09-28 (revised same day): "Delete" next to "View" on the Workspaces
+  // list, gated behind a popup requiring the Workspace's own current name to be typed in.
+  @Test
+  void plainDeleteWorkspacePostRedirectsOnSuccessWhenTheTypedNameMatches() throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", workspace.name()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/platform/dashboard/organizations/" + organization.id()));
+
+    verify(deleteWorkspace).handle(any());
+  }
+
+  @Test
+  void htmxDeleteWorkspacePostReturnsTheWorkspacesFragmentWhenTheTypedNameMatches()
+      throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", workspace.name())
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail :: workspaces"));
+
+    verify(deleteWorkspace).handle(any());
+  }
+
+  @Test
+  void plainDeleteWorkspacePostWithTheWrongTypedNameReRendersWithAMismatchErrorInsteadOfDeleting()
+      throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", "not the real name"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail"))
+        .andExpect(model().attribute("deleteWorkspaceMismatchId", workspace.id()));
+
+    verify(deleteWorkspace, never()).handle(any());
+  }
+
+  @Test
+  void htmxDeleteWorkspacePostWithTheWrongTypedNameReturnsTheFragmentWithAMismatchError()
+      throws Exception {
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + workspace.id() + "/delete")
+                .param("confirmedName", "not the real name")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/organization-detail :: workspaces"))
+        .andExpect(model().attribute("deleteWorkspaceMismatchId", workspace.id()));
+
+    verify(deleteWorkspace, never()).handle(any());
+  }
+
+  @Test
+  void deleteWorkspaceReturnsNotFoundWhenTheWorkspaceDoesNotBelongToTheOrganization()
+      throws Exception {
+    when(getWorkspace.handle(any())).thenReturn(Optional.empty());
+
+    mockMvc
+        .perform(
+            post(workspacesPath() + "/" + UUID.randomUUID() + "/delete")
+                .param("confirmedName", "anything"))
+        .andExpect(status().isNotFound());
+
+    verify(deleteWorkspace, never()).handle(any());
+  }
+
   // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy.
   @Test
   void showsTheTeamsHierarchyPage() throws Exception {
@@ -270,8 +350,31 @@ class PlatformWorkspaceControllerTest {
         .andExpect(model().attribute("teams", List.of(team)));
   }
 
+  // Live UX request, 2026-09-28: a bare accountId used to render here — real gap, closed via
+  // OrganizationAccountDirectory (same cross-module port the "Assign role" picker already uses).
   @Test
-  void showsEveryMemberHoldingARoleInTheHierarchy() throws Exception {
+  void showsEveryMemberHoldingARoleInTheHierarchyByNameNotId() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(listMembers.handle(any()))
+        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));
+    when(accountDirectory.listAccountsForOrganization(any()))
+        .thenReturn(List.of(new OrganizationAccountSummary(accountId, "Jane Doe")));
+
+    // The raw accountId still legitimately appears in the "Remove" button's own form action URL
+    // (live UX request, 2026-09-28) — only the DISPLAYED label is asserted here, not "the id
+    // appears nowhere on the page at all."
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Jane Doe")));
+  }
+
+  // Defensive only — every real accountId here comes from a WorkspaceMembership, which is only
+  // ever created against an account the directory already returned
+  // (AccountNotInOrganizationException
+  // guards that at creation time). Covers the fallback itself, not a reachable production gap.
+  @Test
+  void fallsBackToTheRawAccountIdWhenItIsMissingFromTheDirectory() throws Exception {
     UUID accountId = UUID.randomUUID();
     when(listMembers.handle(any()))
         .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));
@@ -293,12 +396,12 @@ class PlatformWorkspaceControllerTest {
   }
 
   @Test
-  void groupsAnUngroupedRoleUnderNoTeamInTheHierarchy() throws Exception {
+  void groupsAnUngroupedRoleUnderWithoutTeamInTheHierarchy() throws Exception {
     mockMvc
         .perform(get(teamsPath()))
         .andExpect(status().isOk())
         .andExpect(model().attribute("ungroupedRoles", List.of(role)))
-        .andExpect(content().string(containsString("No team")));
+        .andExpect(content().string(containsString("Without Team")));
   }
 
   @Test
@@ -315,6 +418,106 @@ class PlatformWorkspaceControllerTest {
         .perform(get(teamsPath()).header("HX-Request", "true"))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-teams-hierarchy :: hierarchy"));
+  }
+
+  // Live UX request, 2026-09-28: "Remove" next to each member in the Teams hierarchy.
+  @Test
+  void plainUnassignMemberFromRolePostRendersTheHierarchyPage() throws Exception {
+    UUID accountId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(
+                workspacesPath()
+                    + "/"
+                    + workspace.id()
+                    + "/members/"
+                    + accountId
+                    + "/unassign-role"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-teams-hierarchy"));
+
+    verify(changeMemberRole).handle(any());
+  }
+
+  @Test
+  void htmxUnassignMemberFromRolePostReturnsTheHierarchyFragment() throws Exception {
+    UUID accountId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(workspacesPath()
+                    + "/"
+                    + workspace.id()
+                    + "/members/"
+                    + accountId
+                    + "/unassign-role")
+                .header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-teams-hierarchy :: hierarchy"));
+
+    verify(changeMemberRole).handle(any());
+  }
+
+  @Test
+  void unassignMemberFromRoleReturnsNotFoundForAnUnknownMembership() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    doThrow(new WorkspaceMembershipNotFoundException(workspace.id(), accountId))
+        .when(changeMemberRole)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(
+                workspacesPath()
+                    + "/"
+                    + workspace.id()
+                    + "/members/"
+                    + accountId
+                    + "/unassign-role"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void unassignMemberFromRoleRendersAnErrorWhenItWouldLeaveNoManageMembersHolder()
+      throws Exception {
+    UUID accountId = UUID.randomUUID();
+    doThrow(new CannotDemoteLastAdminException(workspace.id()))
+        .when(changeMemberRole)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post(
+                workspacesPath()
+                    + "/"
+                    + workspace.id()
+                    + "/members/"
+                    + accountId
+                    + "/unassign-role"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-teams-hierarchy"))
+        .andExpect(model().attribute("cannotDemoteLastAdminError", true));
+  }
+
+  @Test
+  void unassignMemberFromRoleReturnsNotFoundWhenTheWorkspaceDoesNotBelongToTheOrganization()
+      throws Exception {
+    when(getWorkspace.handle(any())).thenReturn(Optional.empty());
+    UUID accountId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(
+                workspacesPath()
+                    + "/"
+                    + UUID.randomUUID()
+                    + "/members/"
+                    + accountId
+                    + "/unassign-role"))
+        .andExpect(status().isNotFound());
+
+    verify(changeMemberRole, never()).handle(any());
   }
 
   // SDE-III addition, 2026-09-27: "Assign role" popup scoped to one specific team (Way 1 of the
@@ -587,6 +790,22 @@ class PlatformWorkspaceControllerTest {
     verify(addRoleToTeam).handle(any());
   }
 
+  // Live UX request, 2026-09-28: "Without Team" is now a first-class choice in the popup itself,
+  // not just something a role ends up in after its team is later deleted.
+  @Test
+  void plainCreateRolePostWithoutATeamCreatesAnUngroupedRole() throws Exception {
+    WorkspaceRole created = WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+    when(createRole.handle(any())).thenReturn(created);
+
+    mockMvc
+        .perform(post(rolesPath()).param("name", "Reviewer").param("teamId", ""))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(createRole).handle(any());
+    verify(addRoleToTeam, never()).handle(any());
+  }
+
   @Test
   void htmxCreateRolePostReturnsTheTeamsFragment() throws Exception {
     UUID teamId = UUID.randomUUID();
@@ -688,5 +907,21 @@ class PlatformWorkspaceControllerTest {
     mockMvc
         .perform(post(rolesPath() + "/" + role.id() + "/delete"))
         .andExpect(status().isConflict());
+  }
+
+  // Live UX request, 2026-09-28: deleting a role now auto-unassigns every holder in this
+  // Workspace first — this is that bulk unassign hitting ManageMembersGuard.
+  @Test
+  void deleteRoleThatWouldLeaveNoManageMembersHolderRendersAnErrorInsteadOfPropagatingTheException()
+      throws Exception {
+    WorkspaceRole plainRole = WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+    when(listRoles.handle(any())).thenReturn(List.of(role, plainRole));
+    doThrow(new CannotDemoteLastAdminException(workspace.id())).when(deleteRole).handle(any());
+
+    mockMvc
+        .perform(post(rolesPath() + "/" + plainRole.id() + "/delete"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-detail"))
+        .andExpect(model().attribute("cannotDemoteLastAdminError", true));
   }
 }

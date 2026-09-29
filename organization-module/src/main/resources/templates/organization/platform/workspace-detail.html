@@ -42,6 +42,7 @@
                 <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateRoleNameError}">A role with that name already exists in this Organization.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleStillAssignedError}">That role is still assigned to at least one member — reassign or unassign them first.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleHasChildRolesError}">That role is still the parent of at least one other role — re-parent or clear them first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">Deleting that role would leave nobody able to manage members or roles in this Workspace — reassign its last such member to another role first.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
                     <p class="clavaris-empty-state">No teams yet — add the first one above.</p>
@@ -137,21 +138,20 @@
                 </div>
 
                 <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
-                    <h3>Ungrouped roles</h3>
-                    <p>Every role defined for this Organization that isn't grouped into a team in this Workspace.</p>
+                    <h3>Without Team</h3>
+                    <p>Every role defined for this Organization that isn't grouped into a team in this Workspace —
+                        a fully supported state, not a leftover (the reserved Admin role starts here too).</p>
                     <ul>
                         <li th:each="role : ${ungroupedRoles}" th:text="${role.name()}">Role name</li>
                     </ul>
                 </div>
 
                 <!-- "Create a new role" — a button below the roles listing, opening a popup for the
-                     role's name and the existing team to put it in. Hidden (with an explanatory
-                     empty state instead) while there's no team yet to assign it to — the popup's
-                     own team <select> would otherwise have nothing valid to offer. -->
-                <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
-                    <p class="clavaris-empty-state">Add a team first, then you can create roles for it.</p>
-                </div>
-                <button th:unless="${#lists.isEmpty(teams)}" class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-role-dialog">Create a new role</button>
+                     role's name and, optionally, an existing team to put it in. Live UX request,
+                     2026-09-28: always available now — "Without Team" (the popup's own default
+                     <select> option) is a first-class choice, not something that only happens later
+                     when a role's own team gets deleted. -->
+                <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-role-dialog">Create a new role</button>
             </div>
 
             <dialog id="create-team-dialog" class="clavaris-dialog">
@@ -184,8 +184,9 @@
                     <div>
                         <span class="clavaris-dialog__eyebrow">Role</span>
                         <h2>Create a new role</h2>
-                        <p>Name it and put it on one of this Workspace's teams — its permissions and
-                            parent role can be set afterwards from Configure &gt; Workspace Roles.</p>
+                        <p>Name it and, optionally, put it on one of this Workspace's teams — leave the
+                            team as "Without Team" to create it ungrouped. Permissions and parent role
+                            can be set afterwards from Configure &gt; Workspace Roles.</p>
                     </div>
                     <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create role dialog">×</button>
                 </div>
@@ -201,7 +202,13 @@
 
                     <div class="clavaris-field">
                         <label for="role-team">Team</label>
+                        <!-- Live UX request, 2026-09-28: "Without Team" (blank value — teamId is now
+                             optional, CreateWorkspaceTeamRoleForm's own Javadoc) is the default,
+                             first option — creating an ungrouped role is the common case this popup
+                             now supports directly, not just a side effect of a team being deleted
+                             later. -->
                         <select id="role-team" th:field="*{teamId}">
+                            <option value="">Without Team</option>
                             <option th:each="teamOption : ${teams}"
                                     th:value="${teamOption.id()}" th:text="${teamOption.name()}"></option>
                         </select>

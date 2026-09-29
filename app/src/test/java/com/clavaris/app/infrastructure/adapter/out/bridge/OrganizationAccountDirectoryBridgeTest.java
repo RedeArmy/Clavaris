@@ -47,6 +47,22 @@ class OrganizationAccountDirectoryBridgeTest {
             new OrganizationAccountSummary(second.id().value(), "bo@example.com"));
   }
 
+  // Live UX request, 2026-09-28: the Teams hierarchy's own member list needed a friendly label,
+  // not a bare accountId — name preferred over email whenever either profile field is set.
+  @Test
+  void labelsAnAccountByItsFullNameWhenEitherNameFieldIsSet() {
+    UUID organizationId = UUID.randomUUID();
+    Account account = anAccount(organizationId, "ada@example.com");
+    account.updateProfile("Ada", "Lovelace");
+    when(listAccounts.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(account), null, null, false, false));
+
+    List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
+
+    assertThat(summaries)
+        .containsExactly(new OrganizationAccountSummary(account.id().value(), "Ada Lovelace"));
+  }
+
   @Test
   void returnsAnEmptyListForAnOrganizationWithNoAccounts() {
     UUID organizationId = UUID.randomUUID();

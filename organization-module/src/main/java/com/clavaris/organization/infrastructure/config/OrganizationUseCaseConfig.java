@@ -44,6 +44,8 @@ import com.clavaris.organization.application.usecase.deleteorganization.Organiza
 import com.clavaris.organization.application.usecase.deleteorganization.OrganizationWebhookDataEraser;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialService;
 import com.clavaris.organization.application.usecase.deleteorganizationsocialcredential.DeleteOrganizationSocialCredentialUseCase;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceService;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleService;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamService;
@@ -300,6 +302,14 @@ class OrganizationUseCaseConfig {
         workspaces, roles, organizations, auditEvents, eventOutboxWriter);
   }
 
+  @Bean
+  /* package */ DeleteWorkspaceUseCase deleteWorkspaceUseCase(
+      final WorkspaceRepository workspaces,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new DeleteWorkspaceService(workspaces, auditEvents, eventOutboxWriter);
+  }
+
   // AddWorkspaceMemberService's own Javadoc explains why this needs a real TransactionTemplate,
   // not @Transactional on the service method itself: it calls AccountProvisioner (a real
   // cross-module write + network mail send) between its own read and its own transactional write,
@@ -421,8 +431,11 @@ class OrganizationUseCaseConfig {
 
   @Bean
   /* package */ DeleteWorkspaceTeamUseCase deleteWorkspaceTeamUseCase(
-      final WorkspaceTeamRepository teams, final AuditEventRecorder auditEvents) {
-    return new DeleteWorkspaceTeamService(teams, auditEvents);
+      final WorkspaceTeamRepository teams,
+      @SuppressWarnings("PMD.LongVariable")
+          final DeleteWorkspaceRoleUseCase deleteWorkspaceRoleUseCase,
+      final AuditEventRecorder auditEvents) {
+    return new DeleteWorkspaceTeamService(teams, deleteWorkspaceRoleUseCase, auditEvents);
   }
 
   @Bean

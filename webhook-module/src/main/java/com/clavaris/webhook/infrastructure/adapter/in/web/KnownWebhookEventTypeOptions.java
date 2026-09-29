@@ -45,6 +45,7 @@ public final class KnownWebhookEventTypeOptions {
               "social_identity.linked",
               "A social identity (Google, GitHub) was linked to an Account."),
           new EventTypeOption("workspace.created", "A new Workspace was created."),
+          new EventTypeOption("workspace.deleted", "A Workspace was permanently deleted."),
           new EventTypeOption("workspace_membership.added", "A member joined a Workspace."),
           new EventTypeOption(
               "workspace_membership.removed", "A member left or was removed from a Workspace."),

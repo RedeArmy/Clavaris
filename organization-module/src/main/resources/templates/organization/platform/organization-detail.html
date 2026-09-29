@@ -60,13 +60,69 @@
                             <td th:text="${workspace.name()}">Workspace name</td>
                             <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">Created at</td>
                             <td>
-                                <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                   th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()})}">View</a>
+                                <div class="clavaris-row-actions">
+                                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organization.id()},workspaceId=${workspace.id()})}">View</a>
+                                    <!-- Live UX request, 2026-09-28 (revised same day): a full, permanent delete
+                                         of the Workspace — cascades to its own memberships/teams
+                                         (DeleteWorkspaceService's own Javadoc has the full "what is/isn't erased"
+                                         reasoning), now gated behind a popup: states the deletion is permanent and
+                                         requires typing the Workspace's own current name, same "type the name to
+                                         confirm" idiom PlatformDeleteOrganizationController's own confirm page
+                                         uses — deliberately NOT that class's own single-use-token flow (reserved
+                                         for the strictly larger blast radius of an entire tenant's account pool),
+                                         a popup instead, matching every other dialog-gated mutation on this
+                                         dashboard (Create team, Create role, ...). One dialog per row (not a
+                                         single shared one, unlike team-assign-role-dialog): each needs its own
+                                         th:each-scoped workspace.id()/workspace.name(), so a shared dialog with a
+                                         dynamically-rewritten form action would need JS this table doesn't
+                                         otherwise require. -->
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                            th:attr="data-dialog-open=${'delete-workspace-dialog-' + workspace.id()}">Delete</button>
+                                </div>
                             </td>
                         </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <dialog th:each="workspace : ${workspaces}" th:id="${'delete-workspace-dialog-' + workspace.id()}" class="clavaris-dialog">
+                    <div class="clavaris-dialog__header">
+                        <div>
+                            <span class="clavaris-dialog__eyebrow">Workspace</span>
+                            <h2>Delete workspace</h2>
+                        </div>
+                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete workspace dialog">×</button>
+                    </div>
+                    <form method="post"
+                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
+                          hx-target="#workspaces-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <p class="clavaris-alert clavaris-alert--error">This will permanently delete
+                            <strong th:text="${workspace.name()}">Workspace</strong> — every team, role grouping,
+                            and member's role assignment in it. This cannot be undone.</p>
+                        <div class="clavaris-field">
+                            <!-- Static "for"/"id" fallback values below, both overridden by their own
+                                 th:for/th:id at render time with the real per-row unique id: a static
+                                 analyzer reading this template's raw source (not Thymeleaf's rendered
+                                 output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                                 alone, for this accessibility rule — same "SonarCloud finding" fix
+                                 already applied to the rename-team/add-role fields on workspace-detail.html. -->
+                            <label for="confirm-delete-workspace" th:for="${'confirm-delete-workspace-' + workspace.id()}">Type
+                                <strong th:text="${workspace.name()}">name</strong> to confirm</label>
+                            <input type="text" name="confirmedName" id="confirm-delete-workspace"
+                                   th:id="${'confirm-delete-workspace-' + workspace.id()}"
+                                   autocomplete="off" required/>
+                            <p class="clavaris-field-error" th:if="${deleteWorkspaceMismatchId == workspace.id()}"
+                               data-dialog-open-on-load>That doesn't match the Workspace's current name.</p>
+                        </div>
+                        <div class="clavaris-dialog__actions">
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Delete workspace</button>
+                        </div>
+                    </form>
+                </dialog>
 
                 <!-- TD-PERF-020 (keyset revision, 2026-09-14): same keyset pagination shape as
                      dashboard.html's own Organizations table — see

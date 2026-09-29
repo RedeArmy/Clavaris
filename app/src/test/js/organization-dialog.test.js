@@ -23,12 +23,21 @@ function loadScript(documentStub) {
 
 function documentHarness() {
   const listeners = {};
+  const bodyListeners = {};
   return {
     addEventListener(eventName, listener) {
       listeners[eventName] = listener;
     },
+    body: {
+      addEventListener(eventName, listener) {
+        bodyListeners[eventName] = listener;
+      },
+    },
     dispatch(eventName, event = {}) {
       listeners[eventName](event);
+    },
+    dispatchOnBody(eventName, event = {}) {
+      bodyListeners[eventName](event);
     },
     querySelector() {
       return null;
@@ -85,6 +94,26 @@ test("does nothing on load when the page has no validation error marker", () => 
   loadScript(documentStub);
 
   documentStub.dispatch("DOMContentLoaded");
+});
+
+test("reopens the dialog after an HTMX fragment swap returns a validation error", () => {
+  const documentStub = documentHarness();
+  let showModalCalls = 0;
+  const dialog = { showModal: () => { showModalCalls += 1; } };
+  documentStub.querySelector = (selector) =>
+    selector === "[data-dialog-open-on-load]" ? { closest: (target) => (target === "dialog" ? dialog : null) } : null;
+
+  loadScript(documentStub);
+  documentStub.dispatchOnBody("htmx:afterSwap");
+
+  assert.equal(showModalCalls, 1);
+});
+
+test("does nothing after an HTMX swap when the swapped content has no validation error marker", () => {
+  const documentStub = documentHarness();
+  loadScript(documentStub);
+
+  assert.doesNotThrow(() => documentStub.dispatchOnBody("htmx:afterSwap"));
 });
 
 test("closes any open dialog when a role is assigned elsewhere on the page", () => {

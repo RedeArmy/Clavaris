@@ -54,4 +54,13 @@ public interface WorkspaceTeamRepository {
    * team.
    */
   Set<UUID> findAllGroupedRoleIdsForWorkspace(UUID workspaceId);
+
+  /**
+   * True if {@code roleId} is grouped into any team OTHER than {@code excludedTeamId} — org-wide,
+   * deliberately NOT scoped to one Workspace: a role may be grouped differently (or not at all) in
+   * a different Workspace of the same Organization (ADR-0028 §2). Backs {@code
+   * DeleteWorkspaceTeamService}'s own "only fully delete a role this team's own deletion orphans,
+   * never one still grouped somewhere else" guard, live UX request 2026-09-28.
+   */
+  boolean isRoleGroupedInAnyOtherTeam(UUID roleId, UUID excludedTeamId);
 }

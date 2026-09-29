@@ -13,4 +13,10 @@ interface SpringDataWorkspaceTeamRoleJpaRepository
 
   List<WorkspaceTeamRoleEntity> findAllByWorkspaceRoleIdAndWorkspaceTeamIdIn(
       UUID workspaceRoleId, List<UUID> workspaceTeamIds);
+
+  // PMD.LongVariable: excludedWorkspaceTeamId names exactly what it is — same convention
+  // SpringDataOrganizationJpaRepository's own identical parameter-level suppressions already
+  // establish.
+  boolean existsByWorkspaceRoleIdAndWorkspaceTeamIdNot(
+      UUID workspaceRoleId, @SuppressWarnings("PMD.LongVariable") UUID excludedWorkspaceTeamId);
 }

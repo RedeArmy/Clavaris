@@ -56,7 +56,7 @@
             <select id="assignRoleTeamId" name="teamId">
                 <option value="ungrouped"
                         th:selected="${currentRoleId == null or roleTeamId.get(currentRoleId) == null}">
-                    — No team (ungrouped) —
+                    Without Team
                 </option>
                 <option th:each="team : ${teams}" th:value="${team.id()}" th:text="${team.name()}"
                         th:selected="${currentRoleId != null and team.id() == roleTeamId.get(currentRoleId)}">

@@ -13,6 +13,9 @@ import com.clavaris.organization.application.usecase.assignworkspaceroletoaccoun
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleCommand;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceCommand;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleCommand;
@@ -22,6 +25,8 @@ import com.clavaris.organization.application.usecase.createworkspaceteam.CreateW
 import com.clavaris.organization.application.usecase.createworkspaceteam.CreateWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamNotFoundException;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceCommand;
+import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
@@ -139,12 +144,24 @@ import org.springframework.web.server.ResponseStatusException;
 // and serves itself, not an external URI a deployment should be able to repoint — same "these are
 // code, not runtime config" reasoning SocialLoginAuthenticationSuccessHandler's own identical
 // suppression already documents.
+// PMD.CyclomaticComplexity ("Remove user from role"/"Delete role auto-unassign" live UX request,
+// 2026-09-28): same TooManyMethods rationale above — this controller's own per-handler complexity
+// stays low (deleteRole's own extra CannotDemoteLastAdminException branch is one more genuinely
+// distinct outcome, not tangled logic), it's the class TOTAL that crossed the threshold purely
+// from handler count, not from any one method being hard to follow.
+// PMD.GodClass ("Create role without a team" live UX request, 2026-09-28): same TooManyMethods/
+// CyclomaticComplexity rationale above, one metric further — WMC crossing PMD's threshold is a
+// restatement of "this controller owns many single-purpose handlers," not new tangled complexity
+// added by this pass; the resource-line split already called out above is still the real fix, for
+// a future pass.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.AvoidDuplicateLiterals",
   "PMD.TooManyMethods",
   "PMD.CouplingBetweenObjects",
+  "PMD.CyclomaticComplexity",
+  "PMD.GodClass",
   "java:S1075"
 })
 @Controller
@@ -171,6 +188,9 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACES_PATH_SEGMENT = "/workspaces/";
   private static final String CREATE_TEAM_FORM_ATTRIBUTE = "createTeamForm";
   private static final String CREATE_ROLE_FORM_ATTRIBUTE = "createRoleForm";
+  private static final String WORKSPACE_FORM_ATTRIBUTE = "workspaceForm";
+  private static final String CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE =
+      "cannotDemoteLastAdminError";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
   private static final String ORGANIZATIONS_REDIRECT_PREFIX =
       "redirect:/platform/dashboard/organizations/";
@@ -184,6 +204,7 @@ public class PlatformWorkspaceController {
   private final ListWorkspacesForOrganizationPagedUseCase listWorkspaces;
   private final ListWorkspaceRolesForOrganizationUseCase listRoles;
   private final CreateWorkspaceUseCase createWorkspace;
+  private final DeleteWorkspaceUseCase deleteWorkspaceUseCase;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
   private final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
@@ -197,6 +218,7 @@ public class PlatformWorkspaceController {
   private final ListWorkspaceMembersUseCase listMembersUseCase;
   private final OrganizationAccountDirectory accountDirectory;
   private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase;
+  private final ChangeWorkspaceMemberRoleUseCase changeMemberRoleUseCase;
 
   // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
   // as every other multi-collaborator constructor in this codebase; this controller's own Teams &
@@ -210,6 +232,7 @@ public class PlatformWorkspaceController {
       final ListWorkspacesForOrganizationPagedUseCase listWorkspaces,
       final ListWorkspaceRolesForOrganizationUseCase listRoles,
       final CreateWorkspaceUseCase createWorkspace,
+      final DeleteWorkspaceUseCase deleteWorkspaceUseCase,
       final CurrentPlatformAccountResolver currentPlatformAccount,
       final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
       final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds,
@@ -222,12 +245,14 @@ public class PlatformWorkspaceController {
       final DeleteWorkspaceRoleUseCase deleteRoleUseCase,
       final ListWorkspaceMembersUseCase listMembersUseCase,
       final OrganizationAccountDirectory accountDirectory,
-      final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase) {
+      final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase,
+      final ChangeWorkspaceMemberRoleUseCase changeMemberRoleUseCase) {
     this.getOrganization = getOrganization;
     this.getWorkspace = getWorkspace;
     this.listWorkspaces = listWorkspaces;
     this.listRoles = listRoles;
     this.createWorkspace = createWorkspace;
+    this.deleteWorkspaceUseCase = deleteWorkspaceUseCase;
     this.currentPlatformAccount = currentPlatformAccount;
     this.listTeams = listTeams;
     this.listTeamRoleIds = listTeamRoleIds;
@@ -241,6 +266,7 @@ public class PlatformWorkspaceController {
     this.listMembersUseCase = listMembersUseCase;
     this.accountDirectory = accountDirectory;
     this.assignRoleToAccountUseCase = assignRoleToAccountUseCase;
+    this.changeMemberRoleUseCase = changeMemberRoleUseCase;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -248,7 +274,7 @@ public class PlatformWorkspaceController {
   public String create(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @Valid @ModelAttribute("workspaceForm") final CreateWorkspaceForm form,
+      @Valid @ModelAttribute(WORKSPACE_FORM_ATTRIBUTE) final CreateWorkspaceForm form,
       final BindingResult bindingResult,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
@@ -276,7 +302,7 @@ public class PlatformWorkspaceController {
       // ordering), same reasoning PlatformOrganizationDashboardController's own identical
       // create() already documents.
       addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
-      model.addAttribute("workspaceForm", new CreateWorkspaceForm());
+      model.addAttribute(WORKSPACE_FORM_ATTRIBUTE, new CreateWorkspaceForm());
       return WORKSPACES_FRAGMENT;
     }
     return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
@@ -289,6 +315,56 @@ public class PlatformWorkspaceController {
             new ListWorkspacesForOrganizationPagedQuery(organizationId, pageRequest));
     model.addAttribute("workspaces", workspacesPage.content());
     model.addAttribute("workspacesPage", workspacesPage);
+  }
+
+  // Live UX request, 2026-09-28: "Delete" next to "View" on the Workspaces list, gated behind a
+  // popup that states the deletion is permanent and requires typing the Workspace's own current
+  // name — same "typed-name is a human-confidence guard only, not a security control" posture
+  // PlatformDeleteOrganizationController's own identical check documents (the real delete target
+  // always comes from the already-ownership-checked workspaceId path variable, never re-derived
+  // from confirmedName). Deliberately NOT that class's own single-use-confirmation-token flow:
+  // that ceremony is reserved for Organization deletion's strictly larger blast radius (an entire
+  // tenant's account pool), documented there as "the single most destructive action this
+  // dashboard exposes" — this is a popup, not a dedicated confirm page, matching every other
+  // dialog-gated mutation already on this dashboard.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  @PostMapping("/{workspaceId}/delete")
+  public String deleteWorkspace(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @RequestParam("confirmedName") final String confirmedName,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    if (!workspace.name().equals(confirmedName)) {
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
+      model.addAttribute(WORKSPACE_FORM_ATTRIBUTE, new CreateWorkspaceForm());
+      // Which row's own dialog should reopen with the error — see organization-detail.html's own
+      // per-row th:if on this attribute.
+      model.addAttribute("deleteWorkspaceMismatchId", workspaceId);
+      return isHtmxRequest(request) ? WORKSPACES_FRAGMENT : ORGANIZATION_DETAIL_VIEW;
+    }
+
+    deleteWorkspaceUseCase.handle(
+        new DeleteWorkspaceCommand(
+            workspaceId, AuditActor.platformAccount(ownerPlatformAccountId)));
+
+    if (isHtmxRequest(request)) {
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      addWorkspacesToModel(model, organizationId, KeysetPageRequest.first());
+      // The fragment's own "Create workspace" form at the bottom is th:object-bound to this
+      // attribute (th:field="*{name}") — every other HTMX-returning caller of WORKSPACES_FRAGMENT
+      // (create()'s own htmx branch) sets it too; a real bug, caught by
+      // htmxDeleteWorkspacePostReturnsTheWorkspacesFragment, not hypothetical.
+      model.addAttribute(WORKSPACE_FORM_ATTRIBUTE, new CreateWorkspaceForm());
+      return WORKSPACES_FRAGMENT;
+    }
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
   }
 
   @GetMapping("/{workspaceId}")
@@ -324,6 +400,38 @@ public class PlatformWorkspaceController {
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+    populateTeamsHierarchyModel(model, workspace);
+    return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
+  }
+
+  // Live UX request, 2026-09-28: "Remove" next to each member in the Teams hierarchy — unassigns
+  // just that one member's role (composes the existing ChangeWorkspaceMemberRoleUseCase with
+  // newRoleId=null, ADR-0027 §5's own explicitly-allowed "roleless member" state), the account and
+  // its WorkspaceMembership both survive untouched. Same ManageMembersGuard protection every other
+  // role-changing action already applies, surfaced here as CannotDemoteLastAdminException.
+  @PostMapping("/{workspaceId}/members/{accountId}/unassign-role")
+  public String unassignMemberFromRole(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @PathVariable final UUID accountId,
+      final Model model) {
+    final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
+    final Organization organization =
+        requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+
+    try {
+      changeMemberRoleUseCase.handle(
+          new ChangeWorkspaceMemberRoleCommand(
+              workspaceId, accountId, null, AuditActor.platformAccount(ownerPlatformAccountId)));
+    } catch (final WorkspaceMembershipNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final CannotDemoteLastAdminException _) {
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
+    }
+
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateTeamsHierarchyModel(model, workspace);
     return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
@@ -558,8 +666,8 @@ public class PlatformWorkspaceController {
     return afterTeamMutation(request, organization, workspace, model);
   }
 
-  // SDE-III redesign, 2026-09-27: creates a brand-new WorkspaceRole and assigns it to an existing
-  // team in one popup submit — composes CreateWorkspaceRoleUseCase with
+  // SDE-III redesign, 2026-09-27: creates a brand-new WorkspaceRole and, when a team was picked,
+  // assigns it in the same popup submit — composes CreateWorkspaceRoleUseCase with
   // AddRoleToWorkspaceTeamUseCase, same "two use cases, one form" shape addMember's own removed
   // Account+WorkspaceMembership composition used. parentRoleId/permissions are deliberately absent
   // from this popup's form (Set.of()/null) — those stay editable only from the full Configure >
@@ -567,6 +675,12 @@ public class PlatformWorkspaceController {
   // WorkspaceRoleAlreadyInAnotherTeamException isn't caught here: the role this popup just created
   // has a freshly-minted, never-before-seen id, so it cannot already belong to another team — not a
   // race this path can hit, unlike addRoleToTeam's own identical catch for a pre-existing role id.
+  //
+  // Live UX request, 2026-09-28: teamId is now optional — "Without Team" (CreateWorkspaceTeamRole
+  // Form's own Javadoc) is a fully supported first-class choice, not just something a role ends up
+  // in after its team is later deleted. form.getTeamId() == null skips
+  // AddRoleToWorkspaceTeamUseCase
+  // entirely; the role this popup just created is simply left ungrouped.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/roles")
   public String createRole(
@@ -603,17 +717,20 @@ public class PlatformWorkspaceController {
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
-    try {
-      addRoleToTeamUseCase.handle(
-          new AddRoleToWorkspaceTeamCommand(
-              workspaceId,
-              form.getTeamId(),
-              role.id(),
-              AuditActor.platformAccount(ownerPlatformAccountId)));
-    } catch (final WorkspaceTeamNotFoundException _) {
-      // The popup's own team <select> only ever offers this Workspace's own real teams — reaching
-      // this means the submitted teamId was tampered with, not a real user mistake.
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    if (form.getTeamId() != null) {
+      try {
+        addRoleToTeamUseCase.handle(
+            new AddRoleToWorkspaceTeamCommand(
+                workspaceId,
+                form.getTeamId(),
+                role.id(),
+                AuditActor.platformAccount(ownerPlatformAccountId)));
+      } catch (final WorkspaceTeamNotFoundException _) {
+        // The popup's own team <select> only ever offers this Workspace's own real teams or the
+        // synthetic "Without Team" (null) option — reaching this means the submitted teamId was
+        // tampered with, not a real user mistake.
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      }
     }
 
     return afterTeamMutation(request, organization, workspace, model);
@@ -643,7 +760,7 @@ public class PlatformWorkspaceController {
     try {
       deleteRoleUseCase.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              roleId, workspaceId, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDeleteReservedWorkspaceRoleException _) {
@@ -655,6 +772,14 @@ public class PlatformWorkspaceController {
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     } catch (final WorkspaceRoleHasChildRolesException _) {
       model.addAttribute("roleHasChildRolesError", true);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
+    } catch (final CannotDemoteLastAdminException _) {
+      // Live UX request, 2026-09-28: deleting this role now auto-unassigns every holder in this
+      // Workspace first (DeleteWorkspaceRoleService's own Javadoc) — this is that bulk unassign
+      // hitting the exact same ManageMembersGuard every other role-changing action already does.
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
@@ -730,6 +855,17 @@ public class PlatformWorkspaceController {
     model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
     model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
     model.addAttribute("accountIdsByRoleId", accountIdsByRoleId);
+    // Live UX request, 2026-09-28: the member list used to render a bare accountId — see
+    // OrganizationAccountDirectoryBridge's own Javadoc for why the label (name, or email as a
+    // fallback) can only be resolved through this cross-module port, never a local join.
+    model.addAttribute("accountLabelById", accountLabelById(workspace.organizationId()));
+  }
+
+  private Map<UUID, String> accountLabelById(final UUID organizationId) {
+    return accountDirectory.listAccountsForOrganization(organizationId).stream()
+        .collect(
+            Collectors.toMap(
+                OrganizationAccountSummary::accountId, OrganizationAccountSummary::label));
   }
 
   private record TeamsAndRoles(
@@ -873,7 +1009,7 @@ public class PlatformWorkspaceController {
     } catch (final AccountNotInOrganizationException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
-      model.addAttribute("cannotDemoteLastAdminError", true);
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
       populateAssignRoleModel(
           model,
           attempt.organizationId(),
