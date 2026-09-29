@@ -191,6 +191,11 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACE_FORM_ATTRIBUTE = "workspaceForm";
   private static final String CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE =
       "cannotDemoteLastAdminError";
+  // Live UX request, 2026-09-29: the literal word an operator must type into the "this would
+  // leave nobody able to manage members/roles" confirmation popup before the dashboard bypasses
+  // ManageMembersGuard — see ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc for why this
+  // override is safe here (dashboard-only, never REST-reachable) but not elsewhere.
+  private static final String FORCE_CONFIRMATION_WORD = "unassign";
   private static final String ORGANIZATION_ATTRIBUTE = "organization";
   private static final String ORGANIZATIONS_REDIRECT_PREFIX =
       "redirect:/platform/dashboard/organizations/";
@@ -408,28 +413,42 @@ public class PlatformWorkspaceController {
   // Live UX request, 2026-09-28: "Remove" next to each member in the Teams hierarchy — unassigns
   // just that one member's role (composes the existing ChangeWorkspaceMemberRoleUseCase with
   // newRoleId=null, ADR-0027 §5's own explicitly-allowed "roleless member" state), the account and
-  // its WorkspaceMembership both survive untouched. Same ManageMembersGuard protection every other
-  // role-changing action already applies, surfaced here as CannotDemoteLastAdminException.
+  // its WorkspaceMembership both survive untouched.
+  //
+  // Live UX request, 2026-09-29: the Clavaris platform dashboard is a strictly higher trust tier
+  // than the ManageMembersGuard invariant this used to unconditionally enforce — see
+  // ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc for the full reasoning. First attempt
+  // (confirmedAction absent) runs guarded, same as before; if it hits
+  // CannotDemoteLastAdminException,
+  // this re-renders with that same row now showing a "type UNASSIGN to confirm" inline form instead
+  // of the plain Remove button — submitting THAT retries with force=true.
   @PostMapping("/{workspaceId}/members/{accountId}/unassign-role")
   public String unassignMemberFromRole(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID accountId,
+      @RequestParam(required = false) final String confirmedAction,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    final boolean force = FORCE_CONFIRMATION_WORD.equals(confirmedAction);
 
     try {
       changeMemberRoleUseCase.handle(
           new ChangeWorkspaceMemberRoleCommand(
-              workspaceId, accountId, null, AuditActor.platformAccount(ownerPlatformAccountId)));
+              workspaceId,
+              accountId,
+              null,
+              force,
+              AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceMembershipNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
       model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
+      model.addAttribute("forceConfirmAccountId", accountId);
     }
 
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
@@ -610,24 +629,37 @@ public class PlatformWorkspaceController {
     return afterTeamMutation(request, organization, workspace, model);
   }
 
+  // Live UX request, 2026-09-29: unlike deleteRole/unassignMemberFromRole above, a
+  // CannotDemoteLastAdminException here means the WHOLE team deletion aborted (nothing was
+  // deleted, DeleteWorkspaceTeamService's own Javadoc explains why) — the confirm-and-retry
+  // popup asks to redo the entire action with force=true, not just one role's own unassign.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams/{teamId}/delete")
   public String deleteTeam(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID teamId,
+      @RequestParam(required = false) final String confirmedAction,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
+    final boolean force = FORCE_CONFIRMATION_WORD.equals(confirmedAction);
 
     try {
       deleteTeamUseCase.handle(
           new DeleteWorkspaceTeamCommand(
-              workspaceId, teamId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              workspaceId, teamId, force, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceTeamNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final CannotDemoteLastAdminException _) {
+      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
+      model.addAttribute("forceConfirmTeamId", teamId);
+      model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+      populateTeamsModel(model, workspace);
+      return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;
     }
 
     return afterTeamMutation(request, organization, workspace, model);
@@ -750,17 +782,19 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID roleId,
+      @RequestParam(required = false) final String confirmedAction,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     requireOwnedRole(organizationId, roleId);
+    final boolean force = FORCE_CONFIRMATION_WORD.equals(confirmedAction);
 
     try {
       deleteRoleUseCase.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, workspaceId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              roleId, workspaceId, force, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDeleteReservedWorkspaceRoleException _) {
@@ -779,7 +813,10 @@ public class PlatformWorkspaceController {
       // Live UX request, 2026-09-28: deleting this role now auto-unassigns every holder in this
       // Workspace first (DeleteWorkspaceRoleService's own Javadoc) — this is that bulk unassign
       // hitting the exact same ManageMembersGuard every other role-changing action already does.
+      // 2026-09-29: the dashboard may now bypass it on explicit "type UNASSIGN" confirmation —
+      // see ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc.
       model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
+      model.addAttribute("forceConfirmRoleId", roleId);
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       populateTeamsModel(model, workspace);
       return isHtmxRequest(request) ? TEAMS_FRAGMENT : WORKSPACE_DETAIL_VIEW;

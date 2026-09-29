@@ -26,11 +26,22 @@ import org.springframework.transaction.annotation.Transactional;
  * — a role may be grouped into a different team of a different Workspace of the same Organization,
  * ADR-0028 §2) decides whether an attempt is made at all; {@link DeleteWorkspaceRoleUseCase} itself
  * (given this team's own {@code workspaceId}, so it also auto-unassigns this Workspace's own
- * holders first — see its own Javadoc) decides whether the attempt actually succeeds. Any of its
- * guard exceptions (still assigned in a DIFFERENT Workspace, has child roles, is the reserved role
- * with no substitute, would leave zero {@code manage_members} holders here) is caught and treated
- * as "leave it ungrouped" — a role surviving is never a failure of THIS operation, which always
- * deletes the team regardless.
+ * holders first — see its own Javadoc) decides whether the attempt actually succeeds.
+ *
+ * <p><b>Three of its four guard exceptions</b> (still assigned in a DIFFERENT Workspace, has child
+ * roles, is the reserved role with no substitute) are caught and treated as "leave it ungrouped" —
+ * a role surviving is never a failure of THIS operation on its own.
+ *
+ * <p><b>{@link CannotDemoteLastAdminException} is different, live UX request 2026-09-29:</b> unlike
+ * the other three, this one is NOT silently swallowed — it propagates out of {@link #handle},
+ * aborting the WHOLE operation ({@code @Transactional} rolls back the team's own deletion too, not
+ * just the role's) unless {@link DeleteWorkspaceTeamCommand#force()} is set, in which case it's
+ * threaded into the nested {@link DeleteWorkspaceRoleCommand} so the guard is skipped and the
+ * exception never fires in the first place. Deliberately more disruptive than the other three: this
+ * is the one case where staying silent would strip a Workspace of anyone able to manage its own
+ * members/roles without the operator ever being told — see {@code PlatformWorkspaceController}'s
+ * own "type UNASSIGN to confirm" popup for the two-phase (attempt, then confirm-and-retry) flow
+ * this enables at the web layer.
  */
 public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
 
@@ -75,10 +86,12 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
     }
   }
 
-  // PMD.EmptyCatchBlock: deliberate — see this class's own Javadoc for why none of these guard
-  // exceptions should abort the team deletion itself; the role is simply left ungrouped, same
-  // "leave it as-is" outcome this codebase's other genuinely-intentional empty catches already
-  // establish (e.g. SupabaseS3ProfilePictureStorage's own identical suppression).
+  // PMD.EmptyCatchBlock: deliberate — see this class's own Javadoc for why these three (and only
+  // these three) guard exceptions should never abort the team deletion itself; the role is simply
+  // left ungrouped, same "leave it as-is" outcome this codebase's other genuinely-intentional
+  // empty catches already establish (e.g. SupabaseS3ProfilePictureStorage's own identical
+  // suppression). CannotDemoteLastAdminException is deliberately NOT caught here — see this
+  // class's own Javadoc for why it propagates instead.
   @SuppressWarnings("PMD.EmptyCatchBlock")
   private void deleteRoleIfNowOrphaned(
       final DeleteWorkspaceTeamCommand command, final UUID roleId) {
@@ -87,13 +100,13 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
     }
     try {
       deleteRole.handle(
-          new DeleteWorkspaceRoleCommand(roleId, command.workspaceId(), command.actor()));
+          new DeleteWorkspaceRoleCommand(
+              roleId, command.workspaceId(), command.force(), command.actor()));
     } catch (final WorkspaceRoleStillAssignedException
         | WorkspaceRoleHasChildRolesException
-        | CannotDeleteReservedWorkspaceRoleException
-        | CannotDemoteLastAdminException _) {
-      // Left ungrouped, same as today — see this class's own Javadoc for why none of these abort
-      // the team deletion itself.
+        | CannotDeleteReservedWorkspaceRoleException _) {
+      // Left ungrouped, same as today — see this class's own Javadoc for why these three never
+      // abort the team deletion itself.
     }
   }
 }

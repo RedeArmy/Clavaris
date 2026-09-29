@@ -96,7 +96,7 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
     }
 
     if (command.workspaceId() != null) {
-      unassignHoldersWithinWorkspace(command.workspaceId(), role, command.actor());
+      unassignHoldersWithinWorkspace(command.workspaceId(), role, command.force(), command.actor());
     }
 
     if (memberships.existsByRoleId(command.roleId())) {
@@ -130,20 +130,27 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
   }
 
   private void unassignHoldersWithinWorkspace(
-      final UUID workspaceId, final WorkspaceRole role, final AuditActor actor) {
+      final UUID workspaceId,
+      final WorkspaceRole role,
+      final boolean force,
+      final AuditActor actor) {
     final List<WorkspaceMembership> holders =
         memberships.findAllByWorkspaceId(workspaceId).stream()
             .filter(membership -> role.id().equals(membership.roleId()))
             .toList();
     for (final WorkspaceMembership membership : holders) {
-      ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
-          memberships,
-          roles,
-          workspaceId,
-          role.organizationId(),
-          membership.roleId(),
-          null,
-          () -> new CannotDemoteLastAdminException(workspaceId));
+      // Live UX request, 2026-09-29: force skips this guard — see
+      // DeleteWorkspaceRoleCommand#force()'s own Javadoc.
+      if (!force) {
+        ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
+            memberships,
+            roles,
+            workspaceId,
+            role.organizationId(),
+            membership.roleId(),
+            null,
+            () -> new CannotDemoteLastAdminException(workspaceId));
+      }
 
       final WorkspaceMembership updated = membership.withRoleId(null);
       memberships.save(updated);

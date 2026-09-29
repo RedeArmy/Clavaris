@@ -145,14 +145,58 @@ class DeleteWorkspaceTeamServiceTest {
     for (RuntimeException guardException :
         List.of(
             new WorkspaceRoleHasChildRolesException(roleId),
-            new CannotDeleteReservedWorkspaceRoleException(roleId),
-            new CannotDemoteLastAdminException(team.workspaceId()))) {
+            new CannotDeleteReservedWorkspaceRoleException(roleId))) {
       doThrow(guardException).when(deleteRole).handle(any());
 
       service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
     }
 
-    verify(teams, times(3)).deleteById(team.id());
+    verify(teams, times(2)).deleteById(team.id());
+  }
+
+  // Live UX request, 2026-09-29: unlike the other three guard exceptions,
+  // CannotDemoteLastAdminException now aborts the WHOLE operation instead of being silently
+  // tolerated — see DeleteWorkspaceTeamService's own Javadoc for why this one is different (the
+  // dashboard's own "type UNASSIGN to confirm" popup needs a real failure to react to).
+  //
+  // NOT asserted here: that teams.deleteById is never called — a mocked repository has no
+  // transaction to roll back, so it genuinely IS invoked earlier in this same method before the
+  // exception propagates (that's the whole bug this class's own Javadoc documents: without
+  // @Transactional(REQUIRES_NEW) on the nested DeleteWorkspaceRoleService call, this exact
+  // sequence used to silently corrupt the caller's transaction). The real "nothing was actually
+  // persisted" guarantee is a database-transaction concern a pure-Mockito test cannot observe —
+  // see DeleteWorkspaceTeamTransactionIntegrationTest's own real-Postgres coverage of this exact
+  // scenario instead.
+  @Test
+  void propagatesTheExceptionInsteadOfSwallowingIt() {
+    UUID roleId = UUID.randomUUID();
+    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
+    when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
+    doThrow(new CannotDemoteLastAdminException(team.workspaceId())).when(deleteRole).handle(any());
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR);
+
+    assertThatExceptionOfType(CannotDemoteLastAdminException.class)
+        .isThrownBy(() -> service.handle(command));
+  }
+
+  // force=true threads through to the nested DeleteWorkspaceRoleCommand, so the guard is skipped
+  // there and this exception never fires in the first place — the whole operation succeeds.
+  @Test
+  void forceThreadsThroughToTheNestedDeleteRoleCommand() {
+    UUID roleId = UUID.randomUUID();
+    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
+    when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), true, ACTOR);
+
+    service.handle(command);
+
+    ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
+        ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
+    verify(deleteRole).handle(captured.capture());
+    assertThat(captured.getValue().force()).isTrue();
+    verify(teams).deleteById(team.id());
   }
 
   private static void assertThatIsForRoleAndWorkspace(

@@ -42,7 +42,7 @@
                 <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateRoleNameError}">A role with that name already exists in this Organization.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleStillAssignedError}">That role is still assigned to at least one member — reassign or unassign them first.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleHasChildRolesError}">That role is still the parent of at least one other role — re-parent or clear them first.</p>
-                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">Deleting that role would leave nobody able to manage members or roles in this Workspace — reassign its last such member to another role first.</p>
+                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. If you're sure, type "unassign" in the field that replaced the Delete button below to confirm and proceed anyway.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
                     <p class="clavaris-empty-state">No teams yet — add the first one above.</p>
@@ -52,12 +52,26 @@
                     <div class="clavaris-page-header">
                         <h3 th:text="${team.name()}">Team name</h3>
                         <div class="clavaris-row-actions">
-                            <form method="post"
+                            <form th:unless="${forceConfirmTeamId == team.id()}" method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   hx-target="#teams-content" hx-swap="outerHTML">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete team</button>
+                            </form>
+                            <!-- Live UX request, 2026-09-29: deleting this team was aborted entirely —
+                                 orphaning one of its roles would have left nobody able to manage
+                                 members/roles in this Workspace. Confirming here retries the WHOLE
+                                 delete (team + that role, this time with its last holder unassigned). -->
+                            <form th:if="${forceConfirmTeamId == team.id()}" method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  hx-target="#teams-content" hx-swap="outerHTML">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <label class="clavaris-visually-hidden" for="confirm-delete-team" th:for="${'confirm-delete-team-' + team.id()}">Type "unassign" to confirm</label>
+                                <input type="text" name="confirmedAction" id="confirm-delete-team" th:id="${'confirm-delete-team-' + team.id()}"
+                                       placeholder="unassign" autocomplete="off" required/>
+                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
                             </form>
                         </div>
                     </div>
@@ -99,12 +113,25 @@
                                         <div class="clavaris-row-actions">
                                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                                                th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}">Modify</a>
-                                            <form method="post"
+                                            <form th:unless="${forceConfirmRoleId == role.id()}" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
                                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
                                                   hx-target="#teams-content" hx-swap="outerHTML">
                                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete</button>
+                                            </form>
+                                            <!-- Live UX request, 2026-09-29: this role's own delete just hit
+                                                 CannotDemoteLastAdminException — offer the same "type UNASSIGN to
+                                                 confirm" bypass the Teams tab's own Remove button already has. -->
+                                            <form th:if="${forceConfirmRoleId == role.id()}" class="clavaris-row-actions" method="post"
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                                  hx-target="#teams-content" hx-swap="outerHTML">
+                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <label class="clavaris-visually-hidden" for="confirm-delete-role" th:for="${'confirm-delete-role-' + role.id()}">Type "unassign" to confirm</label>
+                                                <input type="text" name="confirmedAction" id="confirm-delete-role" th:id="${'confirm-delete-role-' + role.id()}"
+                                                       placeholder="unassign" autocomplete="off" required/>
+                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
                                             </form>
                                         </div>
                                     </td>

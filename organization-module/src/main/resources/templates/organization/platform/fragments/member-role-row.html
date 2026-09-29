@@ -27,16 +27,36 @@ here (workspace-teams-hierarchy.html's own two call sites). Same "satisfy the ra
 directly, don't suppress it" posture the static for/id fallback pairs elsewhere in this module
 already establish. The <ul> wrapper below is never actually rendered: Thymeleaf's th:replace only
 ever extracts the element carrying th:fragment itself (the <li>), never its ancestors — this <ul>
-exists purely so a static analyzer reading the file in isolation sees valid structure. -->
+exists purely so a static analyzer reading the file in isolation sees valid structure.
+
+Live UX request, 2026-09-29: forceConfirmAccountId — when it equals this row's own memberAccountId
+(PlatformWorkspaceController#unassignMemberFromRole just caught CannotDemoteLastAdminException for
+THIS account), the plain "Remove" button is replaced by an inline "type unassign to confirm" form
+posting to the exact same URL with confirmedAction=unassign added — see
+ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc for why the dashboard is allowed to bypass
+that guard on explicit confirmation. null for every other row (the common case), same as before. -->
 <ul>
-<li class="clavaris-row-actions" th:fragment="row(organization, workspace, memberAccountId, label)">
+<li class="clavaris-row-actions"
+    th:fragment="row(organization, workspace, memberAccountId, label, forceConfirmAccountId)">
     <span th:text="${label}">Account name</span>
-    <form method="post"
+    <form th:unless="${forceConfirmAccountId == memberAccountId}" method="post"
           th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
           hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+    </form>
+    <form th:if="${forceConfirmAccountId == memberAccountId}" class="clavaris-row-actions" method="post"
+          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
+          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"
+          hx-target="#teams-hierarchy-content" hx-swap="outerHTML">
+        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <!-- Static "for"/"id" fallback below, overridden by th:for/th:id at render time — same
+             static-analyzer-blind-spot convention this module's other per-row fields document. -->
+        <label class="clavaris-visually-hidden" for="confirm-unassign" th:for="${'confirm-unassign-' + memberAccountId}">Type "unassign" to confirm</label>
+        <input type="text" name="confirmedAction" id="confirm-unassign" th:id="${'confirm-unassign-' + memberAccountId}"
+               placeholder="unassign" autocomplete="off" required/>
+        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
     </form>
 </li>
 </ul>

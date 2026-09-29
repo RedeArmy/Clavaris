@@ -2,9 +2,12 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
@@ -15,9 +18,12 @@ import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteW
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamService;
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.Workspace;
+import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +74,7 @@ class DeleteWorkspaceTeamTransactionIntegrationTest {
   @Autowired private WorkspaceRepository workspaces;
   @Autowired private WorkspaceRoleRepository roles;
   @Autowired private WorkspaceTeamRepository teams;
+  @Autowired private WorkspaceMembershipRepository memberships;
 
   // Reproduces the bug deterministically via CannotDeleteReservedWorkspaceRoleException (checked
   // first in DeleteWorkspaceRoleService#handle, before any membership/ManageMembersGuard
@@ -93,6 +100,41 @@ class DeleteWorkspaceTeamTransactionIntegrationTest {
 
     assertThat(teams.findById(team.id())).isEmpty();
     assertThat(roles.findById(reserved.id())).isPresent();
+  }
+
+  // Live UX request, 2026-09-29: proves the REAL rollback guarantee — unlike the reserved-role
+  // case above (a tolerated exception, team deletion still succeeds),
+  // CannotDemoteLastAdminException
+  // now aborts the whole operation (DeleteWorkspaceTeamService's own Javadoc). A pure-Mockito unit
+  // test can observe that teams.deleteById() gets *called* earlier in the method, but only a real
+  // transaction can prove nothing was actually persisted once that call is rolled back.
+  @Test
+  void rollsBackTheTeamDeletionWhenAnOrphanedRoleWouldStripTheLastManageMembersHolder() {
+    Organization organization = Organization.register("Acme", UUID.randomUUID());
+    organizations.save(organization);
+    Workspace workspace = Workspace.register(organization.id(), "Engineering");
+    workspaces.save(workspace);
+    WorkspaceRole manageMembersRole =
+        WorkspaceRole.define(
+            organization.id(), "Owner", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    roles.save(manageMembersRole);
+    UUID accountId = UUID.randomUUID();
+    memberships.save(WorkspaceMembership.join(workspace.id(), accountId, manageMembersRole.id()));
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    teams.save(team);
+    teams.addRoleToTeam(team.id(), manageMembersRole.id());
+
+    assertThatExceptionOfType(CannotDemoteLastAdminException.class)
+        .isThrownBy(
+            () ->
+                deleteWorkspaceTeam.handle(
+                    new DeleteWorkspaceTeamCommand(workspace.id(), team.id(), ACTOR)));
+
+    assertThat(teams.findById(team.id())).isPresent();
+    assertThat(roles.findById(manageMembersRole.id())).isPresent();
+    assertThat(memberships.findByWorkspaceIdAndAccountId(workspace.id(), accountId))
+        .hasValueSatisfying(
+            membership -> assertThat(membership.roleId()).isEqualTo(manageMembersRole.id()));
   }
 
   @Configuration

@@ -140,6 +140,24 @@ class ChangeWorkspaceMemberRoleServiceTest {
     verify(memberships, never()).save(any());
   }
 
+  // Live UX request, 2026-09-29: the Clavaris platform dashboard may explicitly bypass
+  // ManageMembersGuard — see ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc.
+  @Test
+  void forceUnassignsTheLastHolderAnyway() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, manageMembersRole.id());
+    ChangeWorkspaceMemberRoleCommand command =
+        new ChangeWorkspaceMemberRoleCommand(workspaceId, accountId, null, true, ACTOR);
+
+    WorkspaceMembership updated = service.handle(command);
+
+    assertThat(updated.roleId()).isNull();
+    verify(memberships).save(updated);
+    // force=true must skip the guard's own count query entirely — never even loaded.
+    verify(memberships, never()).findAllByWorkspaceId(any());
+  }
+
   @Test
   void recordsAnAuditEventAndAnOutboxEventOnSuccess() {
     UUID workspaceId = UUID.randomUUID();

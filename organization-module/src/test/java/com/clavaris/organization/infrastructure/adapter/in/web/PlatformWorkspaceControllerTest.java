@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -24,6 +25,7 @@ import com.clavaris.organization.application.usecase.assignworkspaceroletoaccoun
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
+import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleCommand;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.ChangeWorkspaceMemberRoleUseCase;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.WorkspaceMembershipNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.CreateWorkspaceUseCase;
@@ -33,9 +35,11 @@ import com.clavaris.organization.application.usecase.createworkspaceteam.CreateW
 import com.clavaris.organization.application.usecase.createworkspaceteam.DuplicateWorkspaceTeamNameException;
 import com.clavaris.organization.application.usecase.deleteworkspace.DeleteWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
+import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamCommand;
 import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
@@ -58,6 +62,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -497,7 +502,32 @@ class PlatformWorkspaceControllerTest {
                     + "/unassign-role"))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-teams-hierarchy"))
-        .andExpect(model().attribute("cannotDemoteLastAdminError", true));
+        .andExpect(model().attribute("cannotDemoteLastAdminError", true))
+        .andExpect(model().attribute("forceConfirmAccountId", accountId));
+  }
+
+  // Live UX request, 2026-09-29: typing "unassign" to confirm bypasses ManageMembersGuard —
+  // the Clavaris platform dashboard is a higher trust tier than that guard is meant to protect.
+  @Test
+  void unassignMemberFromRoleWithConfirmedActionForcesTheChange() throws Exception {
+    UUID accountId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(workspacesPath()
+                    + "/"
+                    + workspace.id()
+                    + "/members/"
+                    + accountId
+                    + "/unassign-role")
+                .param("confirmedAction", "unassign"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-teams-hierarchy"));
+
+    ArgumentCaptor<ChangeWorkspaceMemberRoleCommand> captured =
+        ArgumentCaptor.forClass(ChangeWorkspaceMemberRoleCommand.class);
+    verify(changeMemberRole).handle(captured.capture());
+    assertThat(captured.getValue().force()).isTrue();
   }
 
   @Test
@@ -746,6 +776,37 @@ class PlatformWorkspaceControllerTest {
     verify(deleteTeam).handle(any());
   }
 
+  // Live UX request, 2026-09-29: unlike deleteRole above, this aborts the WHOLE team deletion
+  // (DeleteWorkspaceTeamService's own Javadoc explains why) — same "type UNASSIGN to confirm"
+  // popup, this time retrying the entire delete, not just one role's own unassign.
+  @Test
+  void deleteTeamThatWouldLeaveNoManageMembersHolderRendersAnErrorInsteadOfPropagatingTheException()
+      throws Exception {
+    UUID teamId = UUID.randomUUID();
+    doThrow(new CannotDemoteLastAdminException(workspace.id())).when(deleteTeam).handle(any());
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/delete"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("organization/platform/workspace-detail"))
+        .andExpect(model().attribute("cannotDemoteLastAdminError", true))
+        .andExpect(model().attribute("forceConfirmTeamId", teamId));
+  }
+
+  @Test
+  void deleteTeamWithConfirmedActionForcesTheDeletion() throws Exception {
+    UUID teamId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/delete").param("confirmedAction", "unassign"))
+        .andExpect(status().is3xxRedirection());
+
+    ArgumentCaptor<DeleteWorkspaceTeamCommand> captured =
+        ArgumentCaptor.forClass(DeleteWorkspaceTeamCommand.class);
+    verify(deleteTeam).handle(captured.capture());
+    assertThat(captured.getValue().force()).isTrue();
+  }
+
   @Test
   void plainAddRoleToTeamPostRedirectsOnSuccess() throws Exception {
     UUID teamId = UUID.randomUUID();
@@ -922,6 +983,26 @@ class PlatformWorkspaceControllerTest {
         .perform(post(rolesPath() + "/" + plainRole.id() + "/delete"))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-detail"))
-        .andExpect(model().attribute("cannotDemoteLastAdminError", true));
+        .andExpect(model().attribute("cannotDemoteLastAdminError", true))
+        .andExpect(model().attribute("forceConfirmRoleId", plainRole.id()));
+  }
+
+  // Live UX request, 2026-09-29: typing "unassign" to confirm bypasses ManageMembersGuard —
+  // the Clavaris platform dashboard is a higher trust tier than that guard is meant to protect.
+  @Test
+  void deleteRoleWithConfirmedActionForcesTheDeletion() throws Exception {
+    WorkspaceRole plainRole = WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+    when(listRoles.handle(any())).thenReturn(List.of(role, plainRole));
+
+    mockMvc
+        .perform(
+            post(rolesPath() + "/" + plainRole.id() + "/delete")
+                .param("confirmedAction", "unassign"))
+        .andExpect(status().is3xxRedirection());
+
+    ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
+        ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
+    verify(deleteRole).handle(captured.capture());
+    assertThat(captured.getValue().force()).isTrue();
   }
 }

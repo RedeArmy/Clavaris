@@ -241,4 +241,30 @@ class DeleteWorkspaceRoleServiceTest {
     verify(memberships, never()).save(any());
     verify(roles, never()).deleteById(any());
   }
+
+  // Live UX request, 2026-09-29: the Clavaris platform dashboard may explicitly bypass this
+  // guard — see DeleteWorkspaceRoleCommand#force()'s own Javadoc.
+  @Test
+  void forceUnassignsTheLastManageMembersHolderAndDeletesTheRoleAnyway() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    WorkspaceRole manageMembersRole =
+        WorkspaceRole.define(
+            organizationId, "Owner", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceMembership onlyHolder =
+        WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id());
+    when(roles.findById(manageMembersRole.id())).thenReturn(Optional.of(manageMembersRole));
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(manageMembersRole));
+    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
+    when(memberships.existsByRoleId(manageMembersRole.id())).thenReturn(false);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(manageMembersRole.id(), workspaceId, true, ACTOR);
+
+    service.handle(command);
+
+    ArgumentCaptor<WorkspaceMembership> saved = ArgumentCaptor.forClass(WorkspaceMembership.class);
+    verify(memberships).save(saved.capture());
+    assertThat(saved.getValue().roleId()).isNull();
+    verify(roles).deleteById(manageMembersRole.id());
+  }
 }
