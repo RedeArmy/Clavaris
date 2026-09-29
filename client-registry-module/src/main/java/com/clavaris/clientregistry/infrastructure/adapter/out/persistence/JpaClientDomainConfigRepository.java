@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.DomainVerificationStatus;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -33,6 +34,13 @@ class JpaClientDomainConfigRepository implements ClientDomainConfigRepository {
   @Override
   public Optional<ClientDomainConfig> findByHostname(final String hostname) {
     return domainConfigs.findByHostname(hostname).map(this::toDomain);
+  }
+
+  @Override
+  public List<ClientDomainConfig> findAllVerified() {
+    return domainConfigs.findByVerificationStatus(DomainVerificationStatus.VERIFIED.name()).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   @Override

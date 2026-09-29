@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.application.usecase.requestclientdomainconfig;
 
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,6 +19,13 @@ public interface ClientDomainConfigRepository {
    * needs to find a claim by hostname alone, not scoped to one {@code OAuthClient}.
    */
   Optional<ClientDomainConfig> findByHostname(String hostname);
+
+  /**
+   * TD-SEC-058: every currently-{@code VERIFIED} config, org-unscoped — the periodic
+   * re-verification job (only real caller) sweeps across every tenant on a schedule, not per
+   * request.
+   */
+  List<ClientDomainConfig> findAllVerified();
 
   void save(ClientDomainConfig config);
 }
