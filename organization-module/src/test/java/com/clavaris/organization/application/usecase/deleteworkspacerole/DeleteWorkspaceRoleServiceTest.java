@@ -56,14 +56,14 @@ class DeleteWorkspaceRoleServiceTest {
 
   @Test
   void deletesAnUnassignedNonReservedRole() {
-    service.handle(new DeleteWorkspaceRoleCommand(role.id(), ACTOR));
+    service.handle(new DeleteWorkspaceRoleCommand(role.id(), organizationId, ACTOR));
 
     verify(roles).deleteById(role.id());
   }
 
   @Test
   void recordsAnAuditEventAndAnOutboxEvent() {
-    service.handle(new DeleteWorkspaceRoleCommand(role.id(), ACTOR));
+    service.handle(new DeleteWorkspaceRoleCommand(role.id(), organizationId, ACTOR));
 
     verify(auditEvents)
         .write(
@@ -85,7 +85,22 @@ class DeleteWorkspaceRoleServiceTest {
   void rejectsAnUnknownRoleId() {
     UUID unknownRoleId = UUID.randomUUID();
     when(roles.findById(unknownRoleId)).thenReturn(Optional.empty());
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(unknownRoleId, ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(unknownRoleId, organizationId, ACTOR);
+
+    assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(roles, never()).deleteById(any());
+  }
+
+  // TD-SEC-056: the role genuinely exists — just for a different Organization than the command
+  // claims. Must 404 identically to an unknown roleId, not silently delete another tenant's role.
+  @Test
+  void rejectsARoleBelongingToADifferentOrganization() {
+    UUID otherOrganizationId = UUID.randomUUID();
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(role.id(), otherOrganizationId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -97,7 +112,8 @@ class DeleteWorkspaceRoleServiceTest {
   void rejectsDeletingTheReservedRole() {
     WorkspaceRole reserved = WorkspaceRole.defineReserved(organizationId, "Admin");
     when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(reserved.id(), ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(reserved.id(), organizationId, ACTOR);
 
     assertThatExceptionOfType(CannotDeleteReservedWorkspaceRoleException.class)
         .isThrownBy(() -> service.handle(command));
@@ -117,7 +133,8 @@ class DeleteWorkspaceRoleServiceTest {
     when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(reserved, substitute));
     when(memberships.existsByRoleId(reserved.id())).thenReturn(false);
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(reserved.id(), ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(reserved.id(), organizationId, ACTOR);
 
     service.handle(command);
 
@@ -135,7 +152,8 @@ class DeleteWorkspaceRoleServiceTest {
     when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
     when(roles.findAllByOrganizationId(organizationId))
         .thenReturn(List.of(reserved, partialSubstitute));
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(reserved.id(), ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(reserved.id(), organizationId, ACTOR);
 
     assertThatExceptionOfType(CannotDeleteReservedWorkspaceRoleException.class)
         .isThrownBy(() -> service.handle(command));
@@ -146,7 +164,8 @@ class DeleteWorkspaceRoleServiceTest {
   @Test
   void rejectsDeletingARoleStillAssignedToAMember() {
     when(memberships.existsByRoleId(role.id())).thenReturn(true);
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(role.id(), ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(role.id(), organizationId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleStillAssignedException.class)
         .isThrownBy(() -> service.handle(command));
@@ -160,7 +179,8 @@ class DeleteWorkspaceRoleServiceTest {
   void rejectsDeletingARoleThatIsStillAnotherRolesParent() {
     WorkspaceRole childRole = WorkspaceRole.define(organizationId, "Child", role.id(), Set.of());
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role, childRole));
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(role.id(), ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(role.id(), organizationId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleHasChildRolesException.class)
         .isThrownBy(() -> service.handle(command));
@@ -174,7 +194,8 @@ class DeleteWorkspaceRoleServiceTest {
   // is auto-unassigned first, instead of unconditionally blocking the delete.
   @Test
   void doesNotAttemptToUnassignAnyoneWhenNoWorkspaceIdIsGiven() {
-    DeleteWorkspaceRoleCommand command = new DeleteWorkspaceRoleCommand(role.id(), ACTOR);
+    DeleteWorkspaceRoleCommand command =
+        new DeleteWorkspaceRoleCommand(role.id(), organizationId, ACTOR);
 
     service.handle(command);
 
@@ -190,7 +211,7 @@ class DeleteWorkspaceRoleServiceTest {
     when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(holder));
     when(memberships.existsByRoleId(role.id())).thenReturn(false);
     DeleteWorkspaceRoleCommand command =
-        new DeleteWorkspaceRoleCommand(role.id(), workspaceId, ACTOR);
+        new DeleteWorkspaceRoleCommand(role.id(), organizationId, workspaceId, ACTOR);
 
     service.handle(command);
 
@@ -210,7 +231,7 @@ class DeleteWorkspaceRoleServiceTest {
     when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of());
     when(memberships.existsByRoleId(role.id())).thenReturn(true);
     DeleteWorkspaceRoleCommand command =
-        new DeleteWorkspaceRoleCommand(role.id(), workspaceId, ACTOR);
+        new DeleteWorkspaceRoleCommand(role.id(), organizationId, workspaceId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleStillAssignedException.class)
         .isThrownBy(() -> service.handle(command));
@@ -233,7 +254,7 @@ class DeleteWorkspaceRoleServiceTest {
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(manageMembersRole));
     when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
     DeleteWorkspaceRoleCommand command =
-        new DeleteWorkspaceRoleCommand(manageMembersRole.id(), workspaceId, ACTOR);
+        new DeleteWorkspaceRoleCommand(manageMembersRole.id(), organizationId, workspaceId, ACTOR);
 
     assertThatExceptionOfType(CannotDemoteLastAdminException.class)
         .isThrownBy(() -> service.handle(command));
@@ -258,7 +279,8 @@ class DeleteWorkspaceRoleServiceTest {
     when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
     when(memberships.existsByRoleId(manageMembersRole.id())).thenReturn(false);
     DeleteWorkspaceRoleCommand command =
-        new DeleteWorkspaceRoleCommand(manageMembersRole.id(), workspaceId, true, ACTOR);
+        new DeleteWorkspaceRoleCommand(
+            manageMembersRole.id(), organizationId, workspaceId, true, ACTOR);
 
     service.handle(command);
 

@@ -32,9 +32,12 @@ public class UpdateWorkspaceRoleService implements UpdateWorkspaceRoleUseCase {
 
   @Override
   public WorkspaceRole handle(final UpdateWorkspaceRoleCommand command) {
+    // TD-SEC-056: same anti-enumeration filter DeleteWorkspaceRoleService's own identical fix
+    // applies.
     final WorkspaceRole existing =
         roles
             .findById(command.roleId())
+            .filter(candidate -> candidate.organizationId().equals(command.organizationId()))
             .orElseThrow(() -> new WorkspaceRoleNotFoundException(command.roleId()));
 
     final Map<UUID, WorkspaceRole> rolesById =

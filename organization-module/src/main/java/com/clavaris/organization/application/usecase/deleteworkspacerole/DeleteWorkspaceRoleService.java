@@ -77,9 +77,13 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
   @Override
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void handle(final DeleteWorkspaceRoleCommand command) {
+    // TD-SEC-056: anti-enumeration — a roleId belonging to a different Organization than
+    // command.organizationId() 404s identically to an unknown one, same posture
+    // RemoveAccessRestrictionEntryService's own identical filter already establishes.
     final WorkspaceRole role =
         roles
             .findById(command.roleId())
+            .filter(candidate -> candidate.organizationId().equals(command.organizationId()))
             .orElseThrow(() -> new WorkspaceRoleNotFoundException(command.roleId()));
 
     final Map<UUID, WorkspaceRole> rolesById =

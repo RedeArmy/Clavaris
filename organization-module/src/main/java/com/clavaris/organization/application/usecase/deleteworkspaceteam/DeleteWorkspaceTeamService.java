@@ -101,7 +101,11 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
     try {
       deleteRole.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, command.workspaceId(), command.force(), command.actor()));
+              roleId,
+              command.organizationId(),
+              command.workspaceId(),
+              command.force(),
+              command.actor()));
     } catch (final WorkspaceRoleStillAssignedException
         | WorkspaceRoleHasChildRolesException
         | CannotDeleteReservedWorkspaceRoleException _) {

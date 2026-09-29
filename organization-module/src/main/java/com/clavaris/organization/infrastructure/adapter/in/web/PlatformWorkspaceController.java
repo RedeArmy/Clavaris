@@ -651,7 +651,11 @@ public class PlatformWorkspaceController {
     try {
       deleteTeamUseCase.handle(
           new DeleteWorkspaceTeamCommand(
-              workspaceId, teamId, force, AuditActor.platformAccount(ownerPlatformAccountId)));
+              organizationId,
+              workspaceId,
+              teamId,
+              force,
+              AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceTeamNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDemoteLastAdminException _) {
@@ -794,7 +798,11 @@ public class PlatformWorkspaceController {
     try {
       deleteRoleUseCase.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, workspaceId, force, AuditActor.platformAccount(ownerPlatformAccountId)));
+              roleId,
+              organizationId,
+              workspaceId,
+              force,
+              AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDeleteReservedWorkspaceRoleException _) {

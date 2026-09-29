@@ -39,12 +39,14 @@ class DeleteWorkspaceTeamServiceTest {
   private DeleteWorkspaceTeamService service;
 
   private WorkspaceTeam team;
+  private UUID organizationId;
 
   @BeforeEach
   void setUp() {
     teams = mock(WorkspaceTeamRepository.class);
     deleteRole = mock(DeleteWorkspaceRoleUseCase.class);
     auditEvents = mock(AuditEventRecorder.class);
+    organizationId = UUID.randomUUID();
     team = WorkspaceTeam.define(UUID.randomUUID(), "QA");
     when(teams.findById(team.id())).thenReturn(Optional.of(team));
     service = new DeleteWorkspaceTeamService(teams, deleteRole, auditEvents);
@@ -52,14 +54,16 @@ class DeleteWorkspaceTeamServiceTest {
 
   @Test
   void deletesTheTeam() {
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(teams).deleteById(team.id());
   }
 
   @Test
   void recordsAnAuditEvent() {
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -75,7 +79,7 @@ class DeleteWorkspaceTeamServiceTest {
     UUID unknownTeamId = UUID.randomUUID();
     when(teams.findById(unknownTeamId)).thenReturn(Optional.empty());
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(team.workspaceId(), unknownTeamId, ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), unknownTeamId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -86,7 +90,7 @@ class DeleteWorkspaceTeamServiceTest {
   @Test
   void rejectsATeamBelongingToADifferentWorkspace() {
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(UUID.randomUUID(), team.id(), ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, UUID.randomUUID(), team.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -102,7 +106,8 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
 
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
         ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
@@ -116,7 +121,8 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(true);
 
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(deleteRole, never()).handle(any());
   }
@@ -131,7 +137,8 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
     doThrow(new WorkspaceRoleStillAssignedException(roleId)).when(deleteRole).handle(any());
 
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(teams).deleteById(team.id());
   }
@@ -148,7 +155,8 @@ class DeleteWorkspaceTeamServiceTest {
             new CannotDeleteReservedWorkspaceRoleException(roleId))) {
       doThrow(guardException).when(deleteRole).handle(any());
 
-      service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+      service.handle(
+          new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
     }
 
     verify(teams, times(2)).deleteById(team.id());
@@ -174,7 +182,7 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
     doThrow(new CannotDemoteLastAdminException(team.workspaceId())).when(deleteRole).handle(any());
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR);
 
     assertThatExceptionOfType(CannotDemoteLastAdminException.class)
         .isThrownBy(() -> service.handle(command));
@@ -188,7 +196,7 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), true, ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), true, ACTOR);
 
     service.handle(command);
 
