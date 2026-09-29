@@ -5,7 +5,9 @@ import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.service.WorkspaceRoleHierarchy;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -76,6 +78,66 @@ public final class ManageMembersGuard {
             .filter(roleId -> holdsManageMembers(roleId, rolesById))
             .count();
     if (remainingHolders <= 1) {
+      throw exceptionIfViolated.get();
+    }
+  }
+
+  /**
+   * TD-ARCH-023: the aggregate sibling of {@link #assertActionKeepsAtLeastOneHolder} — a single
+   * up-front check for "if every current holder of any role in {@code roleIdsBeingUnassigned} were
+   * unassigned all at once, would at least one {@code manage_members} holder remain?", rather than
+   * one check per individual membership change. Exists specifically for {@code
+   * DeleteWorkspaceTeamService}'s own multi-role cascade: deleting a team can orphan (and then
+   * delete) more than one role in the same operation, and {@link
+   * #assertActionKeepsAtLeastOneHolder}'s own per-membership, per-role checks — each isolated in
+   * its own {@code REQUIRES_NEW} transaction, {@code DeleteWorkspaceRoleService}'s own Javadoc
+   * explains why — cannot see across role boundaries: role A's own guard check has no way to know
+   * role B, deleted moments later in the SAME cascade, is about to remove the workspace's own last
+   * remaining holder too. Checking the whole cascade's combined impact ONCE, before any role in it
+   * is actually touched, is what lets the caller abort the entire operation up front (nothing
+   * touched, no already-committed partial cascade to somehow undo) instead of discovering the
+   * violation mid-cascade, after an earlier role's own isolated transaction has already committed.
+   */
+  @SuppressWarnings("PMD.LongVariable")
+  public static void assertUnassigningRolesKeepsAtLeastOneHolder(
+      final WorkspaceMembershipRepository memberships,
+      final WorkspaceRoleRepository roles,
+      final UUID workspaceId,
+      final UUID organizationId,
+      final Set<UUID> roleIdsBeingUnassigned,
+      final Supplier<? extends RuntimeException> exceptionIfViolated) {
+    memberships.lockForRoleChange(workspaceId);
+
+    final Map<UUID, WorkspaceRole> rolesById =
+        roles.findAllByOrganizationId(organizationId).stream()
+            .collect(Collectors.toMap(WorkspaceRole::id, Function.identity()));
+    final List<WorkspaceMembership> allMemberships = memberships.findAllByWorkspaceId(workspaceId);
+
+    // Short-circuit: a role can carry manage_members yet have ZERO current holders in this
+    // Workspace (e.g. a freshly-seeded reserved role never assigned to anyone) — unassigning
+    // nobody can never reduce the holder count, regardless of what the role itself is capable of
+    // granting. Checking roleIdsBeingUnassigned's own permissions alone (without confirming a real
+    // membership exists for one) would false-positive on exactly that case — caught live by
+    // DeleteWorkspaceTeamTransactionIntegrationTest's own real-Postgres reserved-role scenario.
+    final boolean anyRealHolderAmongRolesBeingUnassigned =
+        allMemberships.stream()
+            .anyMatch(
+                membership ->
+                    roleIdsBeingUnassigned.contains(membership.roleId())
+                        && holdsManageMembers(membership.roleId(), rolesById));
+    if (!anyRealHolderAmongRolesBeingUnassigned) {
+      return;
+    }
+
+    final long survivingHolders =
+        allMemberships.stream()
+            .map(WorkspaceMembership::roleId)
+            .filter(
+                roleId ->
+                    !roleIdsBeingUnassigned.contains(roleId)
+                        && holdsManageMembers(roleId, rolesById))
+            .count();
+    if (survivingHolders < 1) {
       throw exceptionIfViolated.get();
     }
   }
