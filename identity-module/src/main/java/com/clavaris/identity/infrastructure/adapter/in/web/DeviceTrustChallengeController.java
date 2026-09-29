@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Inv
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -106,6 +107,11 @@ public class DeviceTrustChallengeController {
         (String) session.getAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
     final String redirectUrl =
         (String) session.getAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
+    // TD-SEC-055: non-null only when factor == SOCIAL — see DeviceTrustPendingState's own Javadoc.
+    final String providerValue =
+        (String) session.getAttribute(DeviceTrustPendingState.PROVIDER_ATTRIBUTE);
+    final SocialProvider provider =
+        providerValue == null ? null : SocialProvider.valueOf(providerValue);
     clearPendingState(session);
 
     // Device trust only ever gates a sign-in (never sign-up completion, ADR-0024 §6) — the device
@@ -122,7 +128,9 @@ public class DeviceTrustChallengeController {
             accountId,
             factor,
             clientId,
-            redirectUrl);
+            redirectUrl,
+            null,
+            provider);
     return "redirect:" + redirectTarget;
   }
 
@@ -156,5 +164,6 @@ public class DeviceTrustChallengeController {
     session.removeAttribute(DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE);
     session.removeAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
     session.removeAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
+    session.removeAttribute(DeviceTrustPendingState.PROVIDER_ATTRIBUTE);
   }
 }

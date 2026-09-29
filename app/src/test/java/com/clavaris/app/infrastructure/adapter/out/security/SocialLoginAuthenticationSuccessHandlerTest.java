@@ -15,9 +15,16 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderResult;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
@@ -27,6 +34,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +55,10 @@ class SocialLoginAuthenticationSuccessHandlerTest {
   private PlatformAuthenticatedSessionEstablisher platformSessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private RedirectUrlResolver redirectUrlResolver;
+  private AccountRepository accounts;
+  private KnownDeviceRepository knownDevices;
+  private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private SocialLoginAuthenticationSuccessHandler handler;
 
   @BeforeEach
@@ -57,8 +69,17 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     platformSessions = mock(PlatformAuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
+    accounts = mock(AccountRepository.class);
+    knownDevices = mock(KnownDeviceRepository.class);
+    requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
+    authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     when(redirectUrlResolver.resolve(any(), any(), any(), any()))
         .thenReturn(java.util.Optional.empty());
+    // TD-SEC-055: neither gate fires by default — every pre-existing test in this class exercises
+    // the ordinary "no pause" path, same as before this fix. The two dedicated tests below
+    // override these stubs to prove the opposite.
+    when(authenticationPolicyProvider.policyFor(any()))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
     handler =
         new SocialLoginAuthenticationSuccessHandler(
             tenantUseCase,
@@ -66,7 +87,18 @@ class SocialLoginAuthenticationSuccessHandlerTest {
             tenantSessions,
             platformSessions,
             recordLoginDevice,
-            redirectUrlResolver);
+            redirectUrlResolver,
+            accounts,
+            knownDevices,
+            requestDeviceTrustChallenge,
+            authenticationPolicyProvider);
+  }
+
+  private Account stubAccount(final UUID organizationId, final AccountId accountId) {
+    Account account =
+        Account.register(new OrganizationId(organizationId), new Email("user@example.com"));
+    when(accounts.findById(accountId)).thenReturn(Optional.of(account));
+    return account;
   }
 
   private OAuth2AuthenticationToken googleToken(final String email, final boolean verified) {
@@ -106,6 +138,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
     when(tenantSessions.establishViaSocialLogin(any(), any(), eq(accountId.value()), any(), any()))
@@ -123,6 +156,76 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     verifyNoInteractions(platformUseCase);
     // New-device login email notification — fired after a successful social login too.
     verify(recordLoginDevice).handle(any());
+  }
+
+  // TD-SEC-055: the actual bug this fix closes — social login used to establish a session
+  // directly, through neither DeviceTrustGate nor SessionTaskGate.
+  @Test
+  void tenantLoginPausesForADeviceTrustChallengeOnAnUnrecognizedDeviceWhenPolicyEnabled()
+      throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
+    when(authenticationPolicyProvider.policyFor(any()))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                com.clavaris.identity.application.usecase.requestemailverification
+                    .EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true));
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    assertThat(response.getRedirectedUrl())
+        .isEqualTo("/o/" + organizationId + "/login/device-trust");
+    verify(requestDeviceTrustChallenge).handle(any());
+    verify(tenantSessions, never()).establishViaSocialLogin(any(), any(), any(), any(), any());
+    verifyNoInteractions(recordLoginDevice);
+  }
+
+  // TD-SEC-055: the second half of the same bug — an operator-forced password reset must also
+  // pause a social login, exactly as it already does for password/email-code/email-link.
+  @Test
+  void tenantLoginPausesForAForcedPasswordResetSessionTask() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    AccountId accountId = AccountId.newId();
+    Account account =
+        Account.register(new OrganizationId(organizationId), new Email("user@example.com"));
+    account.requirePasswordReset();
+    when(accounts.findById(accountId)).thenReturn(Optional.of(account));
+    when(tenantUseCase.handle(any()))
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    assertThat(response.getRedirectedUrl())
+        .isEqualTo("/o/" + organizationId + "/login/session-task/password-reset");
+    verify(tenantSessions, never()).establishViaSocialLogin(any(), any(), any(), any(), any());
+    verifyNoInteractions(recordLoginDevice);
   }
 
   @Test
@@ -198,6 +301,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
         new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "google");
 
     AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
     when(tenantSessions.establishViaSocialLogin(any(), any(), eq(accountId.value()), any(), any()))
@@ -328,8 +432,10 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     OAuth2AuthenticationToken token =
         new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "google");
 
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
-        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(AccountId.newId()));
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
 
     handler.onAuthenticationSuccess(request, response, token);
 
@@ -365,8 +471,10 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     OAuth2AuthenticationToken token =
         new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "github");
 
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
-        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(AccountId.newId()));
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
 
     handler.onAuthenticationSuccess(request, response, token);
 
@@ -401,8 +509,10 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     OAuth2AuthenticationToken token =
         new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "github");
 
+    AccountId accountId = AccountId.newId();
+    stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
-        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(AccountId.newId()));
+        .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
 
     handler.onAuthenticationSuccess(request, response, token);
 

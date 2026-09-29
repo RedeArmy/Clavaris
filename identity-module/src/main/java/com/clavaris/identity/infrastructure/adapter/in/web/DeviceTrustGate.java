@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.Req
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -30,8 +31,14 @@ import java.util.UUID;
  * deviceTrustEnabled} was turned on for this Organization stays recognized — this check only ever
  * challenges a genuinely new device going forward, never retroactively challenges an
  * already-trusted one the moment the policy flips on.
+ *
+ * <p><b>TD-SEC-055 (fixed):</b> now {@code public}, and {@link #intercept} takes an optional {@code
+ * SocialProvider}, so {@code app}'s own {@code SocialLoginAuthenticationSuccessHandler} can run
+ * this exact same check before establishing a social-login session — previously that handler lived
+ * in a different module/package and could never reach this package-private class at all, a real,
+ * live bypass of this whole control for any account with a linked social identity.
  */
-final class DeviceTrustGate {
+public final class DeviceTrustGate {
 
   private DeviceTrustGate() {
     // Static utility — not instantiable.
@@ -48,7 +55,7 @@ final class DeviceTrustGate {
   // AuthenticatedSessionCompletion's own identical suppression — the two extra params
   // (clientId/redirectUrl) are what pushed this over Sonar's own lower (7) threshold.
   @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107", "PMD.ExcessiveParameterList"})
-  /* package */ static Optional<String> intercept(
+  public static Optional<String> intercept(
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestChallenge,
       final AccountAuthenticationPolicySnapshot policy,
@@ -65,7 +72,11 @@ final class DeviceTrustGate {
       // Organization-level policy.deviceTrustEnabled() rather than replacing it — a legitimate
       // known-safe operator/service-style Account skips the challenge even while every other
       // Account in the same Organization still gets it.
-      final boolean bypassDeviceTrust) {
+      final boolean bypassDeviceTrust,
+      // TD-SEC-055: non-null only for factor == SOCIAL — carried across the pause so the resumed
+      // establishViaSocialLogin call (AuthenticatedSessionCompletion) knows which provider to mark
+      // the eventual Authentication with.
+      final SocialProvider provider) {
     if (!policy.deviceTrustEnabled()
         || bypassDeviceTrust
         || isRecognized(knownDevices, request, organizationId, accountId)) {
@@ -83,6 +94,9 @@ final class DeviceTrustGate {
     }
     if (redirectUrl != null) {
       session.setAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE, redirectUrl);
+    }
+    if (provider != null) {
+      session.setAttribute(DeviceTrustPendingState.PROVIDER_ATTRIBUTE, provider.name());
     }
 
     requestChallenge.handle(new RequestDeviceTrustChallengeCommand(accountId));

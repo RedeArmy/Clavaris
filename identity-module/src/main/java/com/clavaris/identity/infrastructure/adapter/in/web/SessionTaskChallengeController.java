@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -118,6 +119,11 @@ public class SessionTaskChallengeController {
         (String) session.getAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
     final String redirectUrl =
         (String) session.getAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
+    // TD-SEC-055: non-null only when factor == SOCIAL — see SessionTaskPendingState's own Javadoc.
+    final String providerValue =
+        (String) session.getAttribute(SessionTaskPendingState.PROVIDER_ATTRIBUTE);
+    final SocialProvider provider =
+        providerValue == null ? null : SocialProvider.valueOf(providerValue);
     clearPendingState(session);
 
     // This task's own completion is the actual moment the session finally gets established —
@@ -133,7 +139,9 @@ public class SessionTaskChallengeController {
             accountId,
             factor,
             clientId,
-            redirectUrl);
+            redirectUrl,
+            null,
+            provider);
     return "redirect:" + redirectTarget;
   }
 
@@ -166,5 +174,6 @@ public class SessionTaskChallengeController {
     session.removeAttribute(SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE);
     session.removeAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
     session.removeAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
+    session.removeAttribute(SessionTaskPendingState.PROVIDER_ATTRIBUTE);
   }
 }

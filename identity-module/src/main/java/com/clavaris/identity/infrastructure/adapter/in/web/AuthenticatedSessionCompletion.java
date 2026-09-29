@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlR
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
@@ -64,6 +65,7 @@ final class AuthenticatedSessionCompletion {
         factor,
         clientId,
         redirectUrl,
+        null,
         null);
   }
 
@@ -87,16 +89,57 @@ final class AuthenticatedSessionCompletion {
       final String clientId,
       final String redirectUrl,
       final Account preloadedAccount) {
+    return complete(
+        sessions,
+        recordLoginDevice,
+        redirectUrlResolver,
+        request,
+        response,
+        organizationId,
+        accountId,
+        factor,
+        clientId,
+        redirectUrl,
+        preloadedAccount,
+        null);
+  }
+
+  /**
+   * TD-SEC-055: same as the 11-argument {@link #complete} above, plus {@code socialProvider} — only
+   * ever non-null when {@code factor == SOCIAL} (a device-trust/session-task pause resumed for a
+   * social login), read back from {@code DeviceTrustPendingState}/{@code SessionTaskPendingState}'s
+   * own {@code PROVIDER_ATTRIBUTE} by the two challenge controllers. {@code null} for every other
+   * factor, same as {@code preloadedAccount} above.
+   */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList", "PMD.LongVariable"})
+  /* package */ static String complete(
+      final AuthenticatedSessionEstablisher sessions,
+      final RecordAccountLoginDeviceUseCase recordLoginDevice,
+      final RedirectUrlResolver redirectUrlResolver,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID organizationId,
+      final AccountId accountId,
+      final PendingAuthenticationFactor factor,
+      final String clientId,
+      final String redirectUrl,
+      final Account preloadedAccount,
+      final SocialProvider socialProvider) {
     final String fallbackUrl =
         redirectUrlResolver
             .resolve(
                 new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
             .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
-        factor == PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF
-            ? sessions.establishViaOneTimeEmailProof(
-                request, response, accountId.value(), fallbackUrl)
-            : sessions.establish(request, response, accountId.value(), fallbackUrl);
+        switch (factor) {
+          case ONE_TIME_EMAIL_PROOF ->
+              sessions.establishViaOneTimeEmailProof(
+                  request, response, accountId.value(), fallbackUrl);
+          case SOCIAL ->
+              sessions.establishViaSocialLogin(
+                  request, response, accountId.value(), socialProvider, fallbackUrl);
+          case PASSWORD -> sessions.establish(request, response, accountId.value(), fallbackUrl);
+        };
 
     // New-device login email notification — after establish(), same accountId/request already in
     // scope; see RecordAccountLoginDeviceService's own Javadoc for why this never throws. A

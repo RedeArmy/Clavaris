@@ -65,13 +65,15 @@ import java.util.UUID;
             factor,
             clientId,
             redirectUrl,
-            account.bypassesDeviceTrust());
+            account.bypassesDeviceTrust(),
+            null);
     if (challenge.isPresent()) {
       return REDIRECT_PREFIX + challenge.get();
     }
 
     final Optional<String> sessionTask =
-        SessionTaskGate.intercept(request, organizationId, account, factor, clientId, redirectUrl);
+        SessionTaskGate.intercept(
+            request, organizationId, account, factor, clientId, redirectUrl, null);
     if (sessionTask.isPresent()) {
       return REDIRECT_PREFIX + sessionTask.get();
     }

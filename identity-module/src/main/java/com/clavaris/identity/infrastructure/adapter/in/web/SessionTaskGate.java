@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.Optional;
@@ -34,8 +35,14 @@ import java.util.UUID;
  * shape, not a frontend-visible {@code pending} JWT the way Clerk's own SPA session model needs
  * (this redirect-based architecture has no equivalent state to expose, which is a deliberate,
  * documented divergence, not a gap).
+ *
+ * <p><b>TD-SEC-055 (fixed):</b> now {@code public}, and {@link #intercept} takes an optional {@code
+ * SocialProvider}, so {@code app}'s own {@code SocialLoginAuthenticationSuccessHandler} can run
+ * this exact same check before establishing a social-login session — previously that handler lived
+ * in a different module/package and could never reach this package-private class at all, a real,
+ * live bypass of an operator-forced password reset for any account with a linked social identity.
  */
-final class SessionTaskGate {
+public final class SessionTaskGate {
 
   private SessionTaskGate() {
     // Static utility — not instantiable, same shape as DeviceTrustGate.
@@ -48,7 +55,7 @@ final class SessionTaskGate {
   // Two genuinely distinct outcomes (must pause / may proceed) — same rationale as
   // DeviceTrustGate's own identical suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
-  /* package */ static Optional<String> intercept(
+  public static Optional<String> intercept(
       final HttpServletRequest request,
       final UUID organizationId,
       final Account account,
@@ -56,7 +63,10 @@ final class SessionTaskGate {
       // Clerk "customize redirect URLs" parity — both nullable, see DeviceTrustGate's own
       // identical parameters.
       final String clientId,
-      final String redirectUrl) {
+      final String redirectUrl,
+      // TD-SEC-055: non-null only for factor == SOCIAL — same rationale as DeviceTrustGate's own
+      // identical parameter.
+      final SocialProvider provider) {
     if (account.passwordResetRequiredAt().isEmpty()) {
       return Optional.empty();
     }
@@ -72,6 +82,9 @@ final class SessionTaskGate {
     }
     if (redirectUrl != null) {
       session.setAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE, redirectUrl);
+    }
+    if (provider != null) {
+      session.setAttribute(SessionTaskPendingState.PROVIDER_ATTRIBUTE, provider.name());
     }
 
     return Optional.of("/o/" + organizationId + "/login/session-task/password-reset");
