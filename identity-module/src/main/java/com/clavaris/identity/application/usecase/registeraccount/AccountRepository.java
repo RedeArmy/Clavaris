@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -65,6 +66,17 @@ public interface AccountRepository {
    * used to call {@link #findById} for exactly this one field.
    */
   Optional<OrganizationId> findOrganizationIdById(AccountId accountId);
+
+  /**
+   * TD-PERF-027: a batch-by-id lookup scoped to a bounded, caller-known set of ids — for a caller
+   * that needs display labels for a specific, already-determined set of accounts (e.g. the
+   * Workspace Teams Hierarchy dashboard's own member list), not {@code
+   * OrganizationAccountDirectory#listAccountsForOrganization}'s own "every account in the
+   * Organization" contract, which scales with the whole Organization regardless of how few are
+   * actually being rendered.
+   */
+  List<Account> findAllByOrganizationIdAndIds(
+      OrganizationId organizationId, Collection<AccountId> accountIds);
 
   /** Persists the account and its attached credential in one write. */
   void save(Account account);

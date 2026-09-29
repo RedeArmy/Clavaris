@@ -174,6 +174,46 @@ class JpaAccountRepositoryTest {
     assertThat(repository.findOrganizationIdById(AccountId.newId())).isEmpty();
   }
 
+  // TD-PERF-027: findAllByOrganizationIdAndIds exists specifically so a caller that already knows
+  // exactly which accounts it needs (the Workspace Teams Hierarchy dashboard's own member-label
+  // lookup) never pays for OrganizationAccountDirectory's own "every account in the Organization"
+  // contract — proven against real Postgres, not just inspected.
+  @Test
+  void findsOnlyTheRequestedAccountsAmongOthersInTheSameOrganization() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account requested = Account.register(organizationId, new Email("requested@example.com"));
+    Account notRequested = Account.register(organizationId, new Email("not-requested@example.com"));
+    repository.save(requested);
+    repository.save(notRequested);
+
+    List<Account> found =
+        repository.findAllByOrganizationIdAndIds(organizationId, List.of(requested.id()));
+
+    assertThat(found).extracting(Account::id).containsExactly(requested.id());
+  }
+
+  @Test
+  void findAllByOrganizationIdAndIdsIsScopedToOneOrganizationOnly() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    OrganizationId otherOrganizationId = new OrganizationId(UUID.randomUUID());
+    Account account = Account.register(organizationId, new Email("cross-org@example.com"));
+    repository.save(account);
+
+    List<Account> found =
+        repository.findAllByOrganizationIdAndIds(otherOrganizationId, List.of(account.id()));
+
+    assertThat(found).isEmpty();
+  }
+
+  @Test
+  void findAllByOrganizationIdAndIdsReturnsEmptyForAnEmptyIdSet() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+
+    List<Account> found = repository.findAllByOrganizationIdAndIds(organizationId, List.of());
+
+    assertThat(found).isEmpty();
+  }
+
   // TD-PERF-016: findAllAccountIdsByOrganizationId exists specifically so
   // OrganizationIdentityDataEraserBridge's own pre-bulk-delete session-revocation loop never pays
   // for the full findByOrganizationId()/toDomain() round trip, including its own separate

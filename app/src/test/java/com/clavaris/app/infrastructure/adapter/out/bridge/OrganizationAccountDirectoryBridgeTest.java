@@ -8,12 +8,14 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -26,8 +28,9 @@ class OrganizationAccountDirectoryBridgeTest {
 
   private final ListAccountsForOrganizationUseCase listAccounts =
       mock(ListAccountsForOrganizationUseCase.class);
+  private final AccountRepository accounts = mock(AccountRepository.class);
   private final OrganizationAccountDirectoryBridge bridge =
-      new OrganizationAccountDirectoryBridge(listAccounts);
+      new OrganizationAccountDirectoryBridge(listAccounts, accounts);
 
   @Test
   void returnsEveryAccountAcrossMultiplePages() {
@@ -72,6 +75,21 @@ class OrganizationAccountDirectoryBridgeTest {
     List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
 
     assertThat(summaries).isEmpty();
+  }
+
+  // TD-PERF-027: listAccountsByIds's own dedicated coverage — a batch-by-id lookup, not a loop
+  // over every page of the Organization's own account directory.
+  @Test
+  void listAccountsByIdsReturnsLabelsOnlyForTheRequestedIds() {
+    UUID organizationId = UUID.randomUUID();
+    Account requested = anAccount(organizationId, "ada@example.com");
+    when(accounts.findAllByOrganizationIdAndIds(any(), any())).thenReturn(List.of(requested));
+
+    List<OrganizationAccountSummary> summaries =
+        bridge.listAccountsByIds(organizationId, Set.of(requested.id().value()));
+
+    assertThat(summaries)
+        .containsExactly(new OrganizationAccountSummary(requested.id().value(), "ada@example.com"));
   }
 
   private static Account anAccount(final UUID organizationId, final String email) {

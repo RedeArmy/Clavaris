@@ -4,12 +4,15 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationQuery;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -40,10 +43,12 @@ import org.springframework.stereotype.Component;
 class OrganizationAccountDirectoryBridge implements OrganizationAccountDirectory {
 
   private final ListAccountsForOrganizationUseCase listAccounts;
+  private final AccountRepository accounts;
 
   /* package */ OrganizationAccountDirectoryBridge(
-      final ListAccountsForOrganizationUseCase listAccounts) {
+      final ListAccountsForOrganizationUseCase listAccounts, final AccountRepository accounts) {
     this.listAccounts = listAccounts;
+    this.accounts = accounts;
   }
 
   @Override
@@ -65,6 +70,16 @@ class OrganizationAccountDirectoryBridge implements OrganizationAccountDirectory
     }
 
     return List.copyOf(summaries);
+  }
+
+  @Override
+  public List<OrganizationAccountSummary> listAccountsByIds(
+      final UUID organizationId, final Set<UUID> accountIds) {
+    final OrganizationId orgId = new OrganizationId(organizationId);
+    final List<AccountId> ids = accountIds.stream().map(AccountId::new).toList();
+    return accounts.findAllByOrganizationIdAndIds(orgId, ids).stream()
+        .map(account -> new OrganizationAccountSummary(account.id().value(), labelFor(account)))
+        .toList();
   }
 
   private static String labelFor(final Account account) {

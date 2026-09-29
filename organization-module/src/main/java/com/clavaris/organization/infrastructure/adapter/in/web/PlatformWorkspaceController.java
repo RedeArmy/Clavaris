@@ -40,6 +40,8 @@ import com.clavaris.organization.application.usecase.getworkspacefororganization
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersQuery;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedQuery;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedQuery;
@@ -221,6 +223,7 @@ public class PlatformWorkspaceController {
   private final CreateWorkspaceRoleUseCase createRoleUseCase;
   private final DeleteWorkspaceRoleUseCase deleteRoleUseCase;
   private final ListWorkspaceMembersUseCase listMembersUseCase;
+  private final ListWorkspaceMembersPagedUseCase listMembersPagedUseCase;
   private final OrganizationAccountDirectory accountDirectory;
   private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase;
   private final ChangeWorkspaceMemberRoleUseCase changeMemberRoleUseCase;
@@ -249,6 +252,7 @@ public class PlatformWorkspaceController {
       final CreateWorkspaceRoleUseCase createRoleUseCase,
       final DeleteWorkspaceRoleUseCase deleteRoleUseCase,
       final ListWorkspaceMembersUseCase listMembersUseCase,
+      final ListWorkspaceMembersPagedUseCase listMembersPagedUseCase,
       final OrganizationAccountDirectory accountDirectory,
       final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase,
       final ChangeWorkspaceMemberRoleUseCase changeMemberRoleUseCase) {
@@ -269,6 +273,7 @@ public class PlatformWorkspaceController {
     this.createRoleUseCase = createRoleUseCase;
     this.deleteRoleUseCase = deleteRoleUseCase;
     this.listMembersUseCase = listMembersUseCase;
+    this.listMembersPagedUseCase = listMembersPagedUseCase;
     this.accountDirectory = accountDirectory;
     this.assignRoleToAccountUseCase = assignRoleToAccountUseCase;
     this.changeMemberRoleUseCase = changeMemberRoleUseCase;
@@ -400,13 +405,15 @@ public class PlatformWorkspaceController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
+      @RequestParam(required = false) final String after,
+      @RequestParam(required = false) final String before,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-    populateTeamsHierarchyModel(model, workspace);
+    populateTeamsHierarchyModel(model, workspace, KeysetPageRequest.fromCursors(after, before));
     return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
   }
 
@@ -452,7 +459,9 @@ public class PlatformWorkspaceController {
     }
 
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-    populateTeamsHierarchyModel(model, workspace);
+    // Resets to the first page — same "a mutation refresh starts over, not mid-list" convention
+    // this dashboard's other search/filter-affecting actions already establish.
+    populateTeamsHierarchyModel(model, workspace, KeysetPageRequest.first());
     return isHtmxRequest(request) ? TEAMS_HIERARCHY_FRAGMENT : TEAMS_HIERARCHY_VIEW;
   }
 
@@ -877,7 +886,12 @@ public class PlatformWorkspaceController {
   // (possibly empty) entry — never a missing map key — so the template never has to null-check
   // accountIdsByRoleId.get(...) the way it would if Collectors.groupingBy's own "only present keys
   // that had at least one match" behavior were used directly.
-  private void populateTeamsHierarchyModel(final Model model, final Workspace workspace) {
+  // TD-PERF-027 (fixed): this page used to read every membership in the Workspace (unbounded) and
+  // then resolve labels for every account in the whole ORGANIZATION (unbounded across a much wider
+  // scope than this one Workspace) on every single request. Now reads one keyset page of
+  // memberships and resolves labels only for the accountIds actually rendered on this page.
+  private void populateTeamsHierarchyModel(
+      final Model model, final Workspace workspace, final KeysetPageRequest pageRequest) {
     model.addAttribute("workspace", workspace);
     final TeamsAndRoles teamsAndRoles = loadTeamsAndRoles(workspace);
 
@@ -888,7 +902,10 @@ public class PlatformWorkspaceController {
     teamsAndRoles
         .ungroupedRoles()
         .forEach(role -> accountIdsByRoleId.put(role.id(), new ArrayList<>()));
-    listMembersUseCase.handle(new ListWorkspaceMembersQuery(workspace.id())).stream()
+    final KeysetPage<WorkspaceMembership> membersPage =
+        listMembersPagedUseCase.handle(
+            new ListWorkspaceMembersPagedQuery(workspace.id(), pageRequest));
+    membersPage.content().stream()
         .filter(membership -> membership.roleId() != null)
         .forEach(
             membership ->
@@ -900,10 +917,23 @@ public class PlatformWorkspaceController {
     model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
     model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
     model.addAttribute("accountIdsByRoleId", accountIdsByRoleId);
+    model.addAttribute("membersPage", membersPage);
     // Live UX request, 2026-09-28: the member list used to render a bare accountId — see
     // OrganizationAccountDirectoryBridge's own Javadoc for why the label (name, or email as a
     // fallback) can only be resolved through this cross-module port, never a local join.
-    model.addAttribute("accountLabelById", accountLabelById(workspace.organizationId()));
+    // TD-PERF-027: scoped to just this page's own accountIds, not accountLabelById's own
+    // whole-Organization variant below (still used by the "Assign role" picker, which genuinely
+    // needs the full directory).
+    final Set<UUID> renderedAccountIds =
+        membersPage.content().stream()
+            .map(WorkspaceMembership::accountId)
+            .collect(Collectors.toSet());
+    model.addAttribute(
+        "accountLabelById",
+        accountDirectory.listAccountsByIds(workspace.organizationId(), renderedAccountIds).stream()
+            .collect(
+                Collectors.toMap(
+                    OrganizationAccountSummary::accountId, OrganizationAccountSummary::label)));
   }
 
   private Map<UUID, String> accountLabelById(final UUID organizationId) {

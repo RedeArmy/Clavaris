@@ -1,6 +1,7 @@
 package com.clavaris.organization.application.usecase.assignworkspaceroletoaccount;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -14,8 +15,14 @@ import java.util.UUID;
  * page of them" — the Workspace-detail Teams tab's own "assign a role" picker needs the whole list
  * to filter against, not a paginated slice).
  */
-@FunctionalInterface
 public interface OrganizationAccountDirectory {
 
   List<OrganizationAccountSummary> listAccountsForOrganization(UUID organizationId);
+
+  /**
+   * TD-PERF-027: scoped to a bounded, caller-known set of ids — the Workspace Teams Hierarchy
+   * dashboard's own member-label lookup needs labels for a specific handful of accounts, not {@link
+   * #listAccountsForOrganization}'s own "every account in the Organization" contract.
+   */
+  List<OrganizationAccountSummary> listAccountsByIds(UUID organizationId, Set<UUID> accountIds);
 }

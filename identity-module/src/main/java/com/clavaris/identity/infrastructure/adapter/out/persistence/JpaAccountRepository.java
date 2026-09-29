@@ -13,8 +13,10 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import com.clavaris.identity.domain.model.Username;
 import jakarta.persistence.EntityManager;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
@@ -83,6 +85,15 @@ class JpaAccountRepository implements AccountRepository {
   @Override
   public Optional<OrganizationId> findOrganizationIdById(final AccountId accountId) {
     return accounts.findOrganizationIdById(accountId.value()).map(OrganizationId::new);
+  }
+
+  @Override
+  public List<Account> findAllByOrganizationIdAndIds(
+      final OrganizationId organizationId, final Collection<AccountId> accountIds) {
+    final List<UUID> ids = accountIds.stream().map(AccountId::value).toList();
+    return accounts.findByOrganizationIdAndIdIn(organizationId.value(), ids).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   private Account toDomain(final AccountEntity entity) {
