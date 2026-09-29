@@ -123,12 +123,11 @@ class DeleteWorkspaceTeamTransactionIntegrationTest {
     WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
     teams.save(team);
     teams.addRoleToTeam(team.id(), manageMembersRole.id());
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(workspace.id(), team.id(), ACTOR);
 
     assertThatExceptionOfType(CannotDemoteLastAdminException.class)
-        .isThrownBy(
-            () ->
-                deleteWorkspaceTeam.handle(
-                    new DeleteWorkspaceTeamCommand(workspace.id(), team.id(), ACTOR)));
+        .isThrownBy(() -> deleteWorkspaceTeam.handle(command));
 
     assertThat(teams.findById(team.id())).isPresent();
     assertThat(roles.findById(manageMembersRole.id())).isPresent();
