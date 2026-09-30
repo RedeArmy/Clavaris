@@ -11,6 +11,8 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationService;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.approveaccountregistration.ApproveAccountRegistrationService;
+import com.clavaris.identity.application.usecase.approveaccountregistration.ApproveAccountRegistrationUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeService;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkService;
@@ -81,6 +83,8 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationService;
+import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationUseCase;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureService;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeService;
@@ -455,6 +459,24 @@ class IdentityUseCaseConfig {
         accountSessionRevoker,
         auditEvents,
         eventOutboxWriter);
+  }
+
+  // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration.
+  @Bean
+  /* package */ ApproveAccountRegistrationUseCase approveAccountRegistrationUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new ApproveAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
+  }
+
+  // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration.
+  @Bean
+  /* package */ RejectAccountRegistrationUseCase rejectAccountRegistrationUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new RejectAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
   }
 
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View log" menu item.

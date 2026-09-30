@@ -28,7 +28,7 @@ class KnownWebhookEventTypeOptionsTest {
     assertThat(account.events())
         .extracting(EventTypeOption::value)
         .allMatch(v -> v.startsWith("account."));
-    assertThat(account.events()).hasSize(5);
+    assertThat(account.events()).hasSize(8);
   }
 
   @Test
