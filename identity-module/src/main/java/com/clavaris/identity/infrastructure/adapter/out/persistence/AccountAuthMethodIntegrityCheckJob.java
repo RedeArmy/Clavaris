@@ -1,6 +1,8 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
+import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,6 +32,11 @@ class AccountAuthMethodIntegrityCheckJob {
   private static final Logger LOG =
       LoggerFactory.getLogger(AccountAuthMethodIntegrityCheckJob.class);
 
+  // TD-PERF-001: bounds each chunk's own two queries (id-page fetch, orphan count within it) to a
+  // predictable size regardless of total account-count-system-wide — see
+  // SpringDataAccountJpaRepository#findAccountIdsForIntegrityCheckChunk's own Javadoc.
+  private static final int CHUNK_SIZE = 1000;
+
   private final SpringDataAccountJpaRepository accounts;
   private final PostgresAdvisoryJobLock jobLock;
 
@@ -53,13 +60,28 @@ class AccountAuthMethodIntegrityCheckJob {
         "account_auth_method_integrity_check", LOG, this::checkForOrphanedAccountsLocked);
   }
 
+  // TD-PERF-001 (closed): chunked, not one unscoped full-table scan — see
+  // SpringDataAccountJpaRepository#findAccountIdsForIntegrityCheckChunk's own Javadoc. A chunk
+  // smaller than CHUNK_SIZE means it was the last one; afterId seeks past the last id each page
+  // already returned, so every account is covered exactly once across however many chunks the
+  // current account-count-system-wide needs.
   private void checkForOrphanedAccountsLocked() {
-    final long orphanCount = accounts.countAccountsWithNoAuthMethod();
-    if (orphanCount > 0) {
+    long totalOrphanCount = 0;
+    UUID afterId = null;
+    List<UUID> chunkIds;
+    do {
+      chunkIds = accounts.findAccountIdsForIntegrityCheckChunk(afterId, CHUNK_SIZE);
+      if (!chunkIds.isEmpty()) {
+        totalOrphanCount += accounts.countOrphansAmongIds(chunkIds);
+        afterId = chunkIds.get(chunkIds.size() - 1);
+      }
+    } while (chunkIds.size() == CHUNK_SIZE);
+
+    if (totalOrphanCount > 0) {
       LOG.warn(
           "event=account_auth_method_integrity_violation orphanCount={} "
               + "reason=BR-ID-02_never_zero_auth_methods",
-          orphanCount);
+          totalOrphanCount);
     }
   }
 }
