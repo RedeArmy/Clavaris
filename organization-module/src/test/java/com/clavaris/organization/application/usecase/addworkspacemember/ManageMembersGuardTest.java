@@ -195,6 +195,11 @@ class ManageMembersGuardTest {
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
     when(memberships.findAllByWorkspaceId(workspaceId))
         .thenReturn(List.of(membershipWithRole(role.id())));
+    // Sonar S5778: the lambda below must contain only the one call actually expected to throw —
+    // built here, same convention this codebase's other tests already establish, rather than
+    // inline in the lambda where Set.of(...) itself would also count as a possibly-throwing
+    // invocation.
+    final Set<UUID> roleIdsBeingUnassigned = Set.of(role.id());
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
         .isThrownBy(
@@ -204,7 +209,7 @@ class ManageMembersGuardTest {
                     roles,
                     workspaceId,
                     organizationId,
-                    Set.of(role.id()),
+                    roleIdsBeingUnassigned,
                     CannotRemoveLastHolderExceptionForTest::new));
   }
 
@@ -219,6 +224,8 @@ class ManageMembersGuardTest {
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB));
     when(memberships.findAllByWorkspaceId(workspaceId))
         .thenReturn(List.of(membershipWithRole(roleA.id()), membershipWithRole(roleB.id())));
+    // Sonar S5778: same rationale as this class's own identical fix above.
+    final Set<UUID> roleIdsBeingUnassigned = Set.of(roleA.id(), roleB.id());
 
     assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
         .isThrownBy(
@@ -228,7 +235,7 @@ class ManageMembersGuardTest {
                     roles,
                     workspaceId,
                     organizationId,
-                    Set.of(roleA.id(), roleB.id()),
+                    roleIdsBeingUnassigned,
                     CannotRemoveLastHolderExceptionForTest::new));
   }
 

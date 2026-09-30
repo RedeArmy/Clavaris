@@ -1,8 +1,11 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -111,7 +114,7 @@ class WorkspaceRolesControllerTest {
                 .content("{\"name\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest());
 
-    org.mockito.Mockito.verifyNoInteractions(createRole);
+    verifyNoInteractions(createRole);
   }
 
   @Test
@@ -186,9 +189,8 @@ class WorkspaceRolesControllerTest {
 
     ArgumentCaptor<UpdateWorkspaceRoleCommand> captured =
         ArgumentCaptor.forClass(UpdateWorkspaceRoleCommand.class);
-    org.mockito.Mockito.verify(updateRole).handle(captured.capture());
-    org.assertj.core.api.Assertions.assertThat(captured.getValue().organizationId())
-        .isEqualTo(organizationId);
+    verify(updateRole).handle(captured.capture());
+    assertThat(captured.getValue().organizationId()).isEqualTo(organizationId);
   }
 
   @Test
@@ -245,7 +247,7 @@ class WorkspaceRolesControllerTest {
                 .content("{\"name\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest());
 
-    org.mockito.Mockito.verifyNoInteractions(updateRole);
+    verifyNoInteractions(updateRole);
   }
 
   @Test
@@ -280,9 +282,8 @@ class WorkspaceRolesControllerTest {
 
     ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
         ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
-    org.mockito.Mockito.verify(deleteRole).handle(captured.capture());
-    org.assertj.core.api.Assertions.assertThat(captured.getValue().organizationId())
-        .isEqualTo(organizationId);
+    verify(deleteRole).handle(captured.capture());
+    assertThat(captured.getValue().organizationId()).isEqualTo(organizationId);
   }
 
   @Test
