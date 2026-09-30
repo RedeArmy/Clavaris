@@ -219,6 +219,25 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
       return;
     }
 
+    if (!endpoint.get().active()) {
+      // TD-ARCH-025: DeactivateWebhookEndpointService only excludes an endpoint from NEW fan-out
+      // (findActiveByOrganizationId) — a delivery already claimed/queued before deactivation had
+      // nowhere that stopped it from still firing here, contradicting that service's own former
+      // "simply excluded from the dispatcher" claim. Terminal, not retried: an operator
+      // deactivated this endpoint on purpose: this delivery gets no more attempts unless the
+      // endpoint is reactivated and the delivery is explicitly replayed.
+      LOG.warn(
+          "event=webhook_delivery_endpoint_deactivated deliveryId={} endpointId={}"
+              + " organizationId={} outboxEventId={} traceId={}",
+          delivery.id(),
+          delivery.endpointId(),
+          delivery.organizationId(),
+          delivery.outboxEventId(),
+          delivery.traceId());
+      deliveries.save(delivery.recordFailure(null, "endpoint is deactivated", Instant.now(), null));
+      return;
+    }
+
     final Instant now = Instant.now();
     final List<String> rawSecrets =
         endpoint.get().activeSecretsEncrypted(now).stream().map(cipher::decrypt).toList();

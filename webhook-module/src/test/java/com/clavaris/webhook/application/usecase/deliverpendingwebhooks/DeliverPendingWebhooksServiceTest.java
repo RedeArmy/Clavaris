@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
@@ -177,6 +178,24 @@ class DeliverPendingWebhooksServiceTest {
 
     WebhookDelivery saved = captureSaved();
     assertThat(saved.status()).isEqualTo(WebhookDeliveryStatus.EXHAUSTED);
+  }
+
+  // TD-ARCH-025: a delivery already claimed before its own endpoint was deactivated used to still
+  // fire — DeactivateWebhookEndpointService's own former Javadoc claimed this was already
+  // impossible ("simply excluded from the dispatcher"), true only for NEW fan-out. This proves the
+  // fix: no HTTP call is made, and the delivery fails terminally rather than retrying.
+  @Test
+  void aDeactivatedEndpointFailsTheDeliveryWithoutSchedulingAFutureRetryOrCallingTheSender() {
+    WebhookEndpoint deactivatedEndpoint = registeredEndpoint().deactivate();
+    WebhookDelivery delivery = scheduledDelivery(deactivatedEndpoint.id());
+    when(deliveries.claimDueBatch(50)).thenReturn(List.of(delivery));
+    when(endpoints.findAllByIds(anyCollection())).thenReturn(List.of(deactivatedEndpoint));
+
+    service.deliverDueDeliveries();
+
+    WebhookDelivery saved = captureSaved();
+    assertThat(saved.status()).isEqualTo(WebhookDeliveryStatus.EXHAUSTED);
+    verifyNoInteractions(sender);
   }
 
   // SDE-III review, 2026-09-15 — real N+1 this test guards against: attemptOneDelivery used to
