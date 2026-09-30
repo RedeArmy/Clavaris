@@ -13,4 +13,15 @@ public final class DuplicateWorkspaceRoleNameException extends RuntimeException 
   public DuplicateWorkspaceRoleNameException(final String name) {
     super("A WorkspaceRole named '" + name + "' already exists in this Organization");
   }
+
+  /**
+   * TD-SEC-060: same message, plus the low-level exception that revealed the conflict (a lost race
+   * against {@code ux_workspace_roles_organization_id_name}, {@link
+   * com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleService})
+   * — preserves its stack trace instead of discarding it, same precedent {@code
+   * EmailAlreadyRegisteredException}'s own two-constructor shape already establishes.
+   */
+  public DuplicateWorkspaceRoleNameException(final String name, final Throwable cause) {
+    super("A WorkspaceRole named '" + name + "' already exists in this Organization", cause);
+  }
 }

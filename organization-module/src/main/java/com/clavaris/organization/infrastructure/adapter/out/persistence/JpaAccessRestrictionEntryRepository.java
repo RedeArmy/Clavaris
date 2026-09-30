@@ -28,13 +28,21 @@ class JpaAccessRestrictionEntryRepository implements AccessRestrictionEntryRepos
 
   @Override
   public void save(final AccessRestrictionEntry entry) {
-    entries.save(
-        new AccessRestrictionEntryEntity(
-            entry.id(),
-            entry.organizationId(),
-            entry.type().name(),
-            entry.identifier(),
-            entry.createdAt()));
+    entries.save(toEntity(entry));
+  }
+
+  @Override
+  public void saveAndFlush(final AccessRestrictionEntry entry) {
+    entries.saveAndFlush(toEntity(entry));
+  }
+
+  private static AccessRestrictionEntryEntity toEntity(final AccessRestrictionEntry entry) {
+    return new AccessRestrictionEntryEntity(
+        entry.id(),
+        entry.organizationId(),
+        entry.type().name(),
+        entry.identifier(),
+        entry.createdAt());
   }
 
   @Override

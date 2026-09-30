@@ -8,6 +8,7 @@ import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRo
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceRoleCreatedEvent;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -67,7 +68,7 @@ public class CreateWorkspaceRoleService implements CreateWorkspaceRoleUseCase {
             command.name(),
             command.parentRoleId(),
             command.permissions());
-    roles.save(role);
+    persistOrThrowOnDuplicate(role, command.name());
 
     auditEvents.write(
         command.actor(),
@@ -84,5 +85,20 @@ public class CreateWorkspaceRoleService implements CreateWorkspaceRoleUseCase {
         WorkspaceRoleCreatedEvent.from(role));
 
     return role;
+  }
+
+  // Extracted (PMD.CyclomaticComplexity — handle() was already at the default threshold):
+  // TD-SEC-060,
+  // saveAndFlush not save — the pre-check above already confirmed the name is free, but under
+  // genuine concurrent creation the loser of that race only finds out once
+  // ux_workspace_roles_organization_id_name fires, which must happen synchronously, inside this
+  // try, not deferred to the transaction's own commit — same reasoning RegisterAccountService's
+  // own identical fix documents for AccountRepository#insert.
+  private void persistOrThrowOnDuplicate(final WorkspaceRole role, final String name) {
+    try {
+      roles.saveAndFlush(role);
+    } catch (final DataIntegrityViolationException raceLost) {
+      throw new DuplicateWorkspaceRoleNameException(name, raceLost);
+    }
   }
 }

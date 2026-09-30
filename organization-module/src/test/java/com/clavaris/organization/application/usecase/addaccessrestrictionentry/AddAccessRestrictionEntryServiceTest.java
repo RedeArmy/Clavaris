@@ -38,7 +38,7 @@ class AddAccessRestrictionEntryServiceTest {
     assertThat(entry.organizationId()).isEqualTo(organizationId);
     assertThat(entry.type()).isEqualTo(RestrictionType.BLOCKLIST);
     assertThat(entry.identifier()).isEqualTo("blocked@example.com");
-    verify(entries).save(entry);
+    verify(entries).saveAndFlush(entry);
   }
 
   @Test
@@ -64,5 +64,22 @@ class AddAccessRestrictionEntryServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(entries, never()).save(any());
+  }
+
+  @Test
+  void translatesADataIntegrityViolationFromALostRaceIntoTheTypedException() {
+    // TD-SEC-060: the pre-check above passes (existsByOrganizationIdAndIdentifier defaults to
+    // false), but ux_access_restriction_entries_organization_id_identifier still fires at
+    // saveAndFlush time — simulating a concurrent request that added the same identifier first.
+    org.mockito.Mockito.doThrow(
+            new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+        .when(entries)
+        .saveAndFlush(any());
+    AddAccessRestrictionEntryCommand command =
+        new AddAccessRestrictionEntryCommand(
+            organizationId, RestrictionType.BLOCKLIST, "blocked@example.com");
+
+    assertThatExceptionOfType(DuplicateAccessRestrictionEntryException.class)
+        .isThrownBy(() -> service.handle(command));
   }
 }
