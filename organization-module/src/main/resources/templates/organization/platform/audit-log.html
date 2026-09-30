@@ -34,7 +34,16 @@
                  SDE-III refactor, 2026-09-22: clavaris-org-tab-content shares one fixed min-height
                  with Workspaces/Users/Configure's own content regions (clavaris.css's own comment)
                  so navigating between org-tabs.html's four tabs no longer resizes the page to match
-                 whichever tab's data happens to be shorter or taller. -->
+                 whichever tab's data happens to be shorter or taller.
+
+                 TD-FUT-037: the table below (When/Actor/Action/Target/Detail) is hand-duplicated in
+                 identity-module's own account-audit-log.html, one column narrower (no Target — an
+                 Account has no analogous "which resource" column). Same cross-module reasoning
+                 org-tabs.html's own comment already documents: no module here declares a Maven
+                 dependency on another, so a single shared fragment would only be reachable from the
+                 app module's aggregated runtime classpath, not from either module's own
+                 standalone-MockMvc controller tests — left duplicated deliberately, not an
+                 oversight. -->
             <div class="clavaris-section clavaris-org-tab-content">
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
                     <p class="clavaris-empty-state">No audit events recorded yet for this Organization.</p>
