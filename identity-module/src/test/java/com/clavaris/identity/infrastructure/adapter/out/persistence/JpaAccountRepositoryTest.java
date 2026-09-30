@@ -63,7 +63,10 @@ class JpaAccountRepositoryTest {
     Email email = new Email("stored-user@example.com");
     Account account = Account.register(organizationId, email);
     account.attachPasswordCredential("argon2id$stored-hash");
+    // TD-PERF-028: save() no longer persists the credential unconditionally — this test
+    // specifically asserts credential presence, so it needs the explicit write.
     repository.save(account);
+    repository.saveCredential(account);
 
     Optional<Account> found = repository.findByOrganizationIdAndEmail(organizationId, email);
 
@@ -282,7 +285,10 @@ class JpaAccountRepositoryTest {
     Email email = new Email("to-be-deleted@example.com");
     Account account = Account.register(organizationId, email);
     account.attachPasswordCredential("argon2id$stored-hash");
+    // TD-PERF-028: this test specifically asserts password_credentials is cascade-deleted, so it
+    // needs the credential actually persisted first.
     repository.save(account);
+    repository.saveCredential(account);
     AccountId accountId = account.id();
 
     UUID sessionId = UUID.randomUUID();

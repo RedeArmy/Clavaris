@@ -124,6 +124,9 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
         accounts.findById(token.accountId()).orElseThrow(InvalidVerificationTokenException::new);
     account.resetPasswordCredential(hasher.hash(command.newRawPassword()));
     accounts.save(account);
+    // TD-PERF-028: save() no longer persists the credential — this is the one real write that
+    // needs it, the other 20-odd callers of save() never touch it.
+    accounts.saveCredential(account);
 
     // BR-ID-04's revocation cascade — identical shape to BR-ID-03's reuse response, see this
     // class's own Javadoc.

@@ -134,23 +134,9 @@ class JpaAccountRepository implements AccountRepository {
         entity.isBypassesDeviceTrust());
   }
 
-  // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
-  // own deferred trigger started enforcing BR-ID-02 for real): this method's own two writes
-  // (accounts.saveAndFlush, then — if present — credentials.saveAndFlush) previously relied
-  // entirely on the CALLER already having an open @Transactional boundary spanning both. Every
-  // real production call site does (RegisterAccountService, AuthenticateWithSocialProviderService
-  // — both @Transactional), but test-fixture code calling this repository directly, with no
-  // surrounding transaction, does not: each saveAndFlush then becomes its own auto-committing
-  // unit of work (Spring Data's own default propagation on SimpleJpaRepository methods), so the
-  // account row's own commit — the deferred trigger's own firing point — happens before the
-  // credential row's separate, later commit ever runs, tripping the trigger even when the caller
-  // did everything else right. @Transactional here, not just at the caller, guarantees both writes
-  // always share one commit boundary regardless of caller — REQUIRED propagation (Spring's own
-  // default) joins an already-open transaction with zero behavior change for every real caller,
-  // and creates one for a bare caller that previously had none. A real correctness fix, not just a
-  // test-fixture accommodation: a bare caller crashing between the two previously-separate commits
-  // could have left a genuinely orphaned, permanently unauthenticatable Account row in production
-  // too, not only in a test.
+  // TD-PERF-028 (closed): no longer also writes the credential — see AccountRepository#save's own
+  // Javadoc for why (20 of 22 real callers never touch it) and #saveCredential for the separate
+  // write the two real mutating callers now use instead.
   @Override
   @Transactional
   public void save(final Account account) {
@@ -161,6 +147,19 @@ class JpaAccountRepository implements AccountRepository {
     // returns and the transaction commits, by which point the try/catch block has already
     // exited and the exception would surface somewhere the service never expects it.
     accounts.saveAndFlush(toEntity(account));
+  }
+
+  // TD-PERF-028: the credential half save() used to always do unconditionally — same
+  // saveAndFlush-for-synchronous-exception-surfacing reasoning as save() itself. Code review
+  // finding (SDE-III design, Phase 2 #8, migration V20260830110000's own deferred BR-ID-02
+  // trigger): a caller mutating both the account and its credential in one logical operation
+  // (ConfirmPasswordResetService, CompleteForcedPasswordResetService — both @Transactional) must
+  // call this in the same transaction as save() for the two writes to share one commit boundary;
+  // REQUIRED propagation (Spring's own default) joins that already-open transaction with zero
+  // behavior change, exactly like save()'s own identical propagation.
+  @Override
+  @Transactional
+  public void saveCredential(final Account account) {
     saveCredentialIfPresent(account, credentials::saveAndFlush);
   }
 
