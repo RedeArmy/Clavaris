@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -50,7 +51,8 @@ import com.clavaris.organization.application.usecase.listworkspacememberspaged.L
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
-import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
 import com.clavaris.organization.domain.model.Organization;
@@ -63,6 +65,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -89,7 +92,7 @@ class PlatformWorkspaceControllerTest {
   private DeleteWorkspaceUseCase deleteWorkspace;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private ListWorkspaceTeamsForWorkspaceUseCase listTeams;
-  private ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
+  private ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams;
   private ListGroupedWorkspaceRoleIdsUseCase listGroupedRoleIds;
   private CreateWorkspaceTeamUseCase createTeam;
   private RenameWorkspaceTeamUseCase renameTeam;
@@ -117,7 +120,7 @@ class PlatformWorkspaceControllerTest {
     deleteWorkspace = mock(DeleteWorkspaceUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     listTeams = mock(ListWorkspaceTeamsForWorkspaceUseCase.class);
-    listTeamRoleIds = mock(ListWorkspaceTeamRoleIdsUseCase.class);
+    listTeamRoleIdsForTeams = mock(ListWorkspaceTeamRoleIdsForTeamsUseCase.class);
     listGroupedRoleIds = mock(ListGroupedWorkspaceRoleIdsUseCase.class);
     createTeam = mock(CreateWorkspaceTeamUseCase.class);
     renameTeam = mock(RenameWorkspaceTeamUseCase.class);
@@ -141,7 +144,7 @@ class PlatformWorkspaceControllerTest {
     when(listWorkspaces.handle(any())).thenReturn(emptyWorkspacesPage());
     when(listRoles.handle(any())).thenReturn(List.of(role));
     when(listTeams.handle(any())).thenReturn(List.of());
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+    stubTeamRoleIds(List.of());
     when(listGroupedRoleIds.handle(any())).thenReturn(Set.of());
     when(listMembers.handle(any())).thenReturn(List.of());
     when(listMembersPaged.handle(any()))
@@ -174,7 +177,7 @@ class PlatformWorkspaceControllerTest {
                     deleteWorkspace,
                     currentPlatformAccount,
                     listTeams,
-                    listTeamRoleIds,
+                    listTeamRoleIdsForTeams,
                     listGroupedRoleIds,
                     createTeam,
                     renameTeam,
@@ -205,6 +208,26 @@ class PlatformWorkspaceControllerTest {
 
   private static KeysetPage<Workspace> emptyWorkspacesPage() {
     return new KeysetPage<>(List.of(), null, null, false, false);
+  }
+
+  // TD-PERF-030: every test here sets up exactly one WorkspaceTeam, so stubbing the same roleIds
+  // for every team named in a given call's own query is equivalent to the old per-team
+  // listTeamRoleIds.handle(any()) stub it replaces — never a hardcoded single teamId, so this
+  // still works correctly if a future test adds a second team. doAnswer().when(...), not
+  // when(...).thenAnswer(...): several tests call this twice (setUp's own default, then again to
+  // override) — re-stubbing via when(mock.handle(any())) re-invokes the mock through any
+  // already-registered stub as part of Mockito's own matcher-registration step, which would run
+  // the FIRST call's answer lambda against a null argument and NPE; doAnswer never re-invokes the
+  // mock, so it has no such side effect.
+  private void stubTeamRoleIds(final List<UUID> roleIds) {
+    doAnswer(
+            invocation -> {
+              ListWorkspaceTeamRoleIdsForTeamsQuery query = invocation.getArgument(0);
+              return query.teamIds().stream()
+                  .collect(Collectors.toMap(teamId -> teamId, teamId -> roleIds));
+            })
+        .when(listTeamRoleIdsForTeams)
+        .handle(any());
   }
 
   @Test
@@ -355,7 +378,7 @@ class PlatformWorkspaceControllerTest {
   void showsTheTeamsHierarchyPage() throws Exception {
     WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
 
     mockMvc
         .perform(get(teamsPath()))
@@ -617,7 +640,7 @@ class PlatformWorkspaceControllerTest {
     UUID teamId = UUID.randomUUID();
     WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
     OrganizationAccountSummary eligible =
         new OrganizationAccountSummary(UUID.randomUUID(), "eligible@example.com");
     OrganizationAccountSummary alreadyInTeam =
@@ -650,7 +673,7 @@ class PlatformWorkspaceControllerTest {
     UUID teamId = UUID.randomUUID();
     WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
     UUID accountId = UUID.randomUUID();
 
     mockMvc
@@ -669,7 +692,7 @@ class PlatformWorkspaceControllerTest {
     UUID teamId = UUID.randomUUID();
     WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
 
     mockMvc
         .perform(
@@ -690,7 +713,7 @@ class PlatformWorkspaceControllerTest {
     UUID teamId = UUID.randomUUID();
     WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+    stubTeamRoleIds(List.of());
     WorkspaceRole otherRole = WorkspaceRole.define(organization.id(), "Other", null, Set.of());
 
     mockMvc
@@ -708,7 +731,7 @@ class PlatformWorkspaceControllerTest {
     UUID teamId = UUID.randomUUID();
     WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
     doThrow(new CannotDemoteLastAdminException(workspace.id()))
         .when(assignRoleToAccount)
         .handle(any());
