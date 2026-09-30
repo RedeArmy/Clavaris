@@ -5,8 +5,14 @@ import com.clavaris.organization.application.usecase.createworkspaceteam.Duplica
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamRepository;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import org.springframework.transaction.annotation.Transactional;
 
-/** Orchestration for {@link RenameWorkspaceTeamUseCase}. */
+/**
+ * Orchestration for {@link RenameWorkspaceTeamUseCase}.
+ *
+ * <p>TD-ARCH-027 (closed): {@code @Transactional} below — same rationale
+ * CreateWorkspaceRoleService's own identical fix documents.
+ */
 public class RenameWorkspaceTeamService implements RenameWorkspaceTeamUseCase {
 
   private final WorkspaceTeamRepository teams;
@@ -19,6 +25,7 @@ public class RenameWorkspaceTeamService implements RenameWorkspaceTeamUseCase {
   }
 
   @Override
+  @Transactional
   public WorkspaceTeam handle(final RenameWorkspaceTeamCommand command) {
     final WorkspaceTeam existing =
         teams
