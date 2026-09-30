@@ -117,7 +117,11 @@ public class DeviceTrustChallengeController {
             DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE,
             DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE,
             DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE,
-            DeviceTrustPendingState.PROVIDER_ATTRIBUTE);
+            DeviceTrustPendingState.PROVIDER_ATTRIBUTE,
+            // TD-SEC-048: reaching this line at all means confirmUseCase.handle above succeeded —
+            // a genuine second authentication factor was just proven, so the resumed session's amr
+            // claim should compose it, not just replay the original primary factor.
+            true);
     return "redirect:" + redirectTarget;
   }
 

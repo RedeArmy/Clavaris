@@ -53,6 +53,11 @@ final class AuthenticatedSessionCompletion {
    * history above. Takes the caller's own six {@code *PendingState} attribute-key constants
    * directly rather than forcing a shared interface on {@code DeviceTrustPendingState}/ {@code
    * SessionTaskPendingState} neither class needs for any other reason.
+   *
+   * @param deviceTrustVerified TD-SEC-048: true only for {@link DeviceTrustChallengeController}'s
+   *     own resume — a genuine second authentication factor was just proven. {@link
+   *     SessionTaskChallengeController}'s own resume (an operator-forced password reset, not a
+   *     second factor) always passes {@code false}.
    */
   // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port/request value plus
   // the six session-attribute keys the caller's own pending-state class defines — same rationale
@@ -73,7 +78,8 @@ final class AuthenticatedSessionCompletion {
       final String organizationIdAttribute,
       final String clientIdAttribute,
       final String redirectUrlAttribute,
-      final String providerAttribute) {
+      final String providerAttribute,
+      final boolean deviceTrustVerified) {
     final PendingAuthenticationFactor factor =
         PendingAuthenticationFactor.valueOf((String) session.getAttribute(factorAttribute));
     final String clientId = (String) session.getAttribute(clientIdAttribute);
@@ -101,7 +107,8 @@ final class AuthenticatedSessionCompletion {
         clientId,
         redirectUrl,
         null,
-        provider);
+        provider,
+        deviceTrustVerified);
   }
 
   // One parameter per collaborating port/request value — same rationale as this package's own
@@ -132,7 +139,8 @@ final class AuthenticatedSessionCompletion {
         clientId,
         redirectUrl,
         null,
-        null);
+        null,
+        false);
   }
 
   /**
@@ -167,7 +175,8 @@ final class AuthenticatedSessionCompletion {
         clientId,
         redirectUrl,
         preloadedAccount,
-        null);
+        null,
+        false);
   }
 
   /**
@@ -176,6 +185,8 @@ final class AuthenticatedSessionCompletion {
    * social login), read back from {@code DeviceTrustPendingState}/{@code SessionTaskPendingState}'s
    * own {@code PROVIDER_ATTRIBUTE} by the two challenge controllers. {@code null} for every other
    * factor, same as {@code preloadedAccount} above.
+   *
+   * @param deviceTrustVerified TD-SEC-048: see {@link #completeFromPendingChallenge}'s own Javadoc.
    */
   @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList", "PMD.LongVariable"})
   /* package */ static String complete(
@@ -190,7 +201,8 @@ final class AuthenticatedSessionCompletion {
       final String clientId,
       final String redirectUrl,
       final Account preloadedAccount,
-      final SocialProvider socialProvider) {
+      final SocialProvider socialProvider,
+      final boolean deviceTrustVerified) {
     final String fallbackUrl =
         redirectUrlResolver
             .resolve(
@@ -200,11 +212,18 @@ final class AuthenticatedSessionCompletion {
         switch (factor) {
           case ONE_TIME_EMAIL_PROOF ->
               sessions.establishViaOneTimeEmailProof(
-                  request, response, accountId.value(), fallbackUrl);
+                  request, response, accountId.value(), deviceTrustVerified, fallbackUrl);
           case SOCIAL ->
               sessions.establishViaSocialLogin(
-                  request, response, accountId.value(), socialProvider, fallbackUrl);
-          case PASSWORD -> sessions.establish(request, response, accountId.value(), fallbackUrl);
+                  request,
+                  response,
+                  accountId.value(),
+                  socialProvider,
+                  deviceTrustVerified,
+                  fallbackUrl);
+          case PASSWORD ->
+              sessions.establish(
+                  request, response, accountId.value(), deviceTrustVerified, fallbackUrl);
         };
 
     // New-device login email notification — after establish(), same accountId/request already in

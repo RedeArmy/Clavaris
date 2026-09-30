@@ -20,16 +20,30 @@ import java.util.UUID;
  */
 // No longer @FunctionalInterface — ADR-0020 added establishViaSocialLogin as a second abstract
 // method, both implemented by the same SpringSecurityAuthenticatedSessionEstablisher class.
+// PMD.LongVariable: deviceTrustVerified (TD-SEC-048) names exactly what it is, same precedent
+// requestDeviceTrustChallenge/redirectUrlResolver's own identical suppressions already establish
+// elsewhere in this package.
+@SuppressWarnings("PMD.LongVariable")
 public interface AuthenticatedSessionEstablisher {
 
   /**
+   * @param deviceTrustVerified TD-SEC-048: true only when this session is resuming after a
+   *     successful Device Trust step-up ({@link DeviceTrustChallengeController}) — composes RFC
+   *     8176's registered {@code "mfa"} value alongside the primary factor's own AMR value, so
+   *     {@code AuthenticationContextClaimsCustomizer}'s {@code amr} claim reflects that two
+   *     distinct factors were actually proven, not just the original one. Always {@code false} for
+   *     an ordinary, non-paused login.
    * @param fallbackUrl where to send the browser if there was no in-flight protected request to
    *     return to (e.g. the user navigated to the login page directly, not via a redirect from
    *     {@code /oauth2/authorize}).
    * @return the URL the browser should be redirected to next.
    */
   String establish(
-      HttpServletRequest request, HttpServletResponse response, UUID accountId, String fallbackUrl);
+      HttpServletRequest request,
+      HttpServletResponse response,
+      UUID accountId,
+      boolean deviceTrustVerified,
+      String fallbackUrl);
 
   /**
    * ADR-0020: same contract as {@link #establish}, for a session established via {@code
@@ -37,12 +51,15 @@ public interface AuthenticatedSessionEstablisher {
    * the implementation mark the resulting {@code Authentication} with the actual mechanism used, so
    * {@code AuthenticationContextClaimsCustomizer} can compute a real OIDC {@code amr} claim instead
    * of always hardcoding {@code ["pwd"]}.
+   *
+   * @param deviceTrustVerified see {@link #establish}'s own Javadoc — identical TD-SEC-048 meaning.
    */
   String establishViaSocialLogin(
       HttpServletRequest request,
       HttpServletResponse response,
       UUID accountId,
       SocialProvider provider,
+      boolean deviceTrustVerified,
       String fallbackUrl);
 
   /**
@@ -51,7 +68,17 @@ public interface AuthenticatedSessionEstablisher {
    * this same method, since both represent the identical OIDC {@code amr=["otp"]} factor (a
    * single-use value proven once, never a stored, reusable credential) — see the implementation's
    * own Javadoc for the exact {@code FactorGrantedAuthority}/AMR authorities this adds.
+   *
+   * @param deviceTrustVerified see {@link #establish}'s own Javadoc — identical TD-SEC-048 meaning.
+   *     Deliberately still {@code "mfa"}, not a second {@code AMR_OTP}: composing {@code
+   *     ["otp","otp"]} for this factor's own device-trust step-up (itself an emailed one-time code)
+   *     would read to a naive downstream consumer as a duplicate-claim bug rather than the "two
+   *     distinct proofs" signal it actually is.
    */
   String establishViaOneTimeEmailProof(
-      HttpServletRequest request, HttpServletResponse response, UUID accountId, String fallbackUrl);
+      HttpServletRequest request,
+      HttpServletResponse response,
+      UUID accountId,
+      boolean deviceTrustVerified,
+      String fallbackUrl);
 }

@@ -80,6 +80,29 @@ class AuthenticationContextClaimsCustomizerTest {
     assertThat(built.getClaimAsStringList("amr")).containsExactly("google");
   }
 
+  // TD-SEC-048: this file's own two tests above each proved single-value amr; nothing proved
+  // composition before this. SpringSecurityAuthenticatedSessionEstablisherTest proves the
+  // establisher side actually emits a second AMR_ authority on a Device Trust step-up - this
+  // proves the claims customizer correctly folds two into one ordered list, deliberately in the
+  // order the authorities were attached (primary factor first, then the step-up marker).
+  @Test
+  void composesTwoAmrValuesWhenTwoAmrAuthoritiesArePresent() {
+    JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+    JwtEncodingContext context =
+        contextWithAuthorities(
+            new OAuth2TokenType("id_token"),
+            claims,
+            List.of(
+                new SimpleGrantedAuthority("ROLE_ACCOUNT"),
+                new SimpleGrantedAuthority("AMR_OTP"),
+                new SimpleGrantedAuthority("AMR_MFA")));
+
+    customizer.customize(context);
+
+    JwtClaimsSet built = claims.build();
+    assertThat(built.getClaimAsStringList("amr")).containsExactly("otp", "mfa");
+  }
+
   @Test
   void neverTouchesAnAccessToken() {
     // A seed claim, not asserted on — JwtClaimsSet.Builder#build() rejects an empty claim set

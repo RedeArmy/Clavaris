@@ -128,7 +128,11 @@ public class SessionTaskChallengeController {
             SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE,
             SessionTaskPendingState.CLIENT_ID_ATTRIBUTE,
             SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE,
-            SessionTaskPendingState.PROVIDER_ATTRIBUTE);
+            SessionTaskPendingState.PROVIDER_ATTRIBUTE,
+            // TD-SEC-048: an operator-forced password reset is not a second authentication
+            // factor — it proves the same credential type (a password) was reset, not that a
+            // distinct factor was added, so this resume never composes an "mfa" amr value.
+            false);
     return "redirect:" + redirectTarget;
   }
 

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -49,14 +50,24 @@ import org.springframework.stereotype.Component;
  * the concerns above — same CWE-384 fix, same manual {@link SecurityContext} population — with a
  * different {@code FactorGrantedAuthority}/AMR marker to reflect the real authentication mechanism.
  */
+// PMD.LongVariable: ROLE_ACCOUNT_AUTHORITY/DEVICE_TRUST_STEP_UP_AMR_AUTHORITY name exactly what
+// they hold, and every establish*/establishWithAuthorities method's own deviceTrustVerified
+// (TD-SEC-048) parameter names exactly what it is — same precedent
+// AuthenticatedSessionEstablisher's own identical class-level suppression already establishes for
+// this same parameter name.
+@SuppressWarnings("PMD.LongVariable")
 @Component
 public class SpringSecurityAuthenticatedSessionEstablisher
     implements AuthenticatedSessionEstablisher {
 
   // Every establishVia* method below grants this same tenant-Account authority regardless of
   // which factor authenticated the session — one constant, not three repeated literals.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String ROLE_ACCOUNT_AUTHORITY = "ROLE_ACCOUNT";
+
+  // TD-SEC-048: RFC 8176's registered "mfa" value ("used multiple factors") — see
+  // establishWithAuthorities' own comment for why this, not a second copy of the primary factor's
+  // own AMR value, is what a Device Trust step-up composes.
+  private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = "AMR_MFA";
 
   private final SecurityContextRepository contextRepository;
 
@@ -76,6 +87,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID accountId,
+      final boolean deviceTrustVerified,
       final String fallbackUrl) {
     // A FactorGrantedAuthority, not an empty authority list: SAS's own JwtGenerator computes the
     // OIDC auth_time claim by scanning the Authentication's authorities for one of these and
@@ -92,6 +104,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
                 .issuedAt(Instant.now())
                 .build(),
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY)),
+        deviceTrustVerified,
         fallbackUrl);
   }
 
@@ -101,6 +114,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final HttpServletResponse response,
       final UUID accountId,
       final SocialProvider provider,
+      final boolean deviceTrustVerified,
       final String fallbackUrl) {
     // ADR-0020: FACTOR_AUTHORIZATION_CODE — the standard Spring Security authority for "an OAuth2
     // Authorization Code exchange authenticated this session," exactly what a social login via
@@ -119,6 +133,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
                 .build(),
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_" + provider.name())),
+        deviceTrustVerified,
         fallbackUrl);
   }
 
@@ -127,6 +142,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID accountId,
+      final boolean deviceTrustVerified,
       final String fallbackUrl) {
     // ADR-0024 §3: FACTOR_OTT (Spring Security's own standard authority for a one-time-token-style
     // login, exactly what both the email code and email link mechanisms are structurally — a
@@ -145,6 +161,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
                 .build(),
             new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
             new SimpleGrantedAuthority("AMR_OTP")),
+        deviceTrustVerified,
         fallbackUrl);
   }
 
@@ -152,8 +169,19 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID accountId,
-      final List<GrantedAuthority> authorities,
+      final List<GrantedAuthority> baseAuthorities,
+      final boolean deviceTrustVerified,
       final String fallbackUrl) {
+    // TD-SEC-048: composed here, in the one place every establishVia* method already funnels
+    // through, rather than duplicated in each of the 3 callers above — deliberately RFC 8176's
+    // "mfa" ("used multiple factors"), not a second copy of the primary factor's own AMR value
+    // (e.g. a second AMR_OTP for an ONE_TIME_EMAIL_PROOF-then-step-up session), which would read to
+    // a naive downstream consumer as a duplicate-claim bug rather than the "two distinct factors
+    // proven" signal it actually is — see AuthenticatedSessionEstablisher's own Javadoc.
+    final List<GrantedAuthority> authorities = new ArrayList<>(baseAuthorities);
+    if (deviceTrustVerified) {
+      authorities.add(new SimpleGrantedAuthority(DEVICE_TRUST_STEP_UP_AMR_AUTHORITY));
+    }
     // CWE-384 fix: rotate the session ID before the SecurityContext is attached to it, exactly as
     // ChangeSessionIdAuthenticationStrategy does for the standard filter-based login path. Only a
     // pre-existing session is at risk of fixation — request.getSession(false) never creates one, so

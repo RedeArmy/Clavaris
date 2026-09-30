@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -119,7 +120,7 @@ class UsernameSignInControllerTest {
   void validCredentialsEstablishASessionAndRedirectToWhatItReturns() throws Exception {
     Account account = newAccount();
     when(useCase.handle(any())).thenReturn(account);
-    when(sessions.establish(any(), any(), eq(account.id().value()), any()))
+    when(sessions.establish(any(), any(), eq(account.id().value()), eq(false), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -164,7 +165,7 @@ class UsernameSignInControllerTest {
         .andExpect(view().name("identity/login-username"))
         .andExpect(model().attribute("loginError", true));
 
-    verify(sessions, never()).establish(any(), any(), any(), any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -197,7 +198,7 @@ class UsernameSignInControllerTest {
         .andExpect(view().name("identity/login-username"))
         .andExpect(model().attribute("emailNotVerifiedError", true));
 
-    verify(sessions, never()).establish(any(), any(), any(), any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -218,7 +219,7 @@ class UsernameSignInControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login/device-trust"));
 
-    verify(sessions, never()).establish(any(), any(), any(), any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
     verify(requestDeviceTrustChallenge).handle(any());
   }
 
@@ -244,6 +245,6 @@ class UsernameSignInControllerTest {
         .andExpect(view().name("identity/login-username"))
         .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
 
-    verify(sessions, never()).establish(any(), any(), any(), any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
   }
 }

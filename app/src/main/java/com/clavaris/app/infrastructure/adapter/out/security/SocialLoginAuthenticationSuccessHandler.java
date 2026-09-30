@@ -305,7 +305,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
               .orElse(TENANT_PATH_PREFIX + organizationId + "/login?authenticated");
       final String target =
           tenantSessions.establishViaSocialLogin(
-              request, response, accountId.value(), provider, fallbackUrl);
+              request, response, accountId.value(), provider, false, fallbackUrl);
       // New-device login email notification — same call LoginController's own password-login
       // path makes, right after establishing the session; see
       // RecordAccountLoginDeviceService's own Javadoc for why this never throws. A present

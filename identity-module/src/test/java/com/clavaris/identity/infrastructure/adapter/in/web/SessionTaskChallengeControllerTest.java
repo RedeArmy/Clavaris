@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -166,14 +167,14 @@ class SessionTaskChallengeControllerTest {
         .andExpect(
             content().string(containsString("Password must be between 8 and 128 characters")));
 
-    verify(sessions, never()).establish(any(), any(), any(), any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
   void postWithAValidPasswordAndAPasswordFactorEstablishesViaEstablish() throws Exception {
     AccountId accountId = AccountId.newId();
     MockHttpSession session = pendingSessionFor(accountId, "PASSWORD");
-    when(sessions.establish(any(), any(), eq(accountId.value()), any()))
+    when(sessions.establish(any(), any(), eq(accountId.value()), eq(false), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -185,8 +186,11 @@ class SessionTaskChallengeControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc"));
 
-    verify(sessions).establish(any(), any(), eq(accountId.value()), any());
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    // TD-SEC-048: eq(false), not any() — a forced password reset is not a second authentication
+    // factor, so this resume must never compose an "mfa" amr value.
+    verify(sessions).establish(any(), any(), eq(accountId.value()), eq(false), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
     verify(recordLoginDevice).handle(any());
     assertPendingStateCleared(session);
   }
@@ -196,7 +200,8 @@ class SessionTaskChallengeControllerTest {
       throws Exception {
     AccountId accountId = AccountId.newId();
     MockHttpSession session = pendingSessionFor(accountId, "ONE_TIME_EMAIL_PROOF");
-    when(sessions.establishViaOneTimeEmailProof(any(), any(), eq(accountId.value()), any()))
+    when(sessions.establishViaOneTimeEmailProof(
+            any(), any(), eq(accountId.value()), eq(false), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/login?authenticated");
 
     mockMvc
@@ -208,8 +213,10 @@ class SessionTaskChallengeControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login?authenticated"));
 
-    verify(sessions).establishViaOneTimeEmailProof(any(), any(), eq(accountId.value()), any());
-    verify(sessions, never()).establish(any(), any(), any(), any());
+    // TD-SEC-048: eq(false), not any() — see the password-factor test's own identical comment.
+    verify(sessions)
+        .establishViaOneTimeEmailProof(any(), any(), eq(accountId.value()), eq(false), any());
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
     assertPendingStateCleared(session);
   }
 

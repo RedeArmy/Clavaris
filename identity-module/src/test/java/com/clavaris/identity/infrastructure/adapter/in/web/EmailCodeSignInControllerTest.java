@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -203,7 +204,8 @@ class EmailCodeSignInControllerTest {
   void postConfirmWithAValidCodeEstablishesASessionAndRedirectsToWhatItReturns() throws Exception {
     Account account = newAccount();
     when(authenticateUseCase.handle(any())).thenReturn(account);
-    when(sessions.establishViaOneTimeEmailProof(any(), any(), eq(account.id().value()), any()))
+    when(sessions.establishViaOneTimeEmailProof(
+            any(), any(), eq(account.id().value()), eq(false), any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -233,7 +235,11 @@ class EmailCodeSignInControllerTest {
             new OrganizationId(ORGANIZATION_ID), "test_client", null, RedirectAction.SIGN_IN))
         .thenReturn(Optional.of("https://app.example.com/dashboard"));
     when(sessions.establishViaOneTimeEmailProof(
-            any(), any(), eq(account.id().value()), eq("https://app.example.com/dashboard")))
+            any(),
+            any(),
+            eq(account.id().value()),
+            eq(false),
+            eq("https://app.example.com/dashboard")))
         .thenReturn("https://app.example.com/dashboard");
 
     mockMvc
@@ -259,7 +265,8 @@ class EmailCodeSignInControllerTest {
         .andExpect(view().name("identity/login-email-code-confirm"))
         .andExpect(model().attribute("codeError", true));
 
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -280,7 +287,8 @@ class EmailCodeSignInControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login/device-trust"));
 
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
     verify(requestDeviceTrustChallenge).handle(any());
   }
 
@@ -307,6 +315,7 @@ class EmailCodeSignInControllerTest {
         .andExpect(view().name("identity/login-email-code-confirm"))
         .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
 
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
   }
 }
