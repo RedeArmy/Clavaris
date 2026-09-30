@@ -229,6 +229,19 @@ class AdminApiSecurityConfig {
                     // WORKSPACE_MEMBERS_WRITE, same defence-in-depth reasoning as ACCOUNTS_DELETE.
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/workspaces/*/members/*:remove")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_MEMBERS_REMOVE)
+                    // TD-SEC-059: create/update/delete on WorkspaceRolesController had no
+                    // dedicated scope check at all before this fix, falling through to the
+                    // blanket .anyRequest().authenticated() below — every other mutating
+                    // admin-API resource here already has one.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/organizations/*/workspace-roles")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_ROLES_WRITE)
+                    .requestMatchers(
+                        HttpMethod.PATCH, "/api/v1/admin/organizations/*/workspace-roles/*")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_ROLES_WRITE)
+                    .requestMatchers(
+                        HttpMethod.DELETE, "/api/v1/admin/organizations/*/workspace-roles/*")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.WORKSPACE_ROLES_WRITE)
                     // ADR-0020 Decision 3, BR-ID-12: turning per-Organization social login on/off
                     // and choosing its providers — its own scope, same defence-in-depth reasoning
                     // as every other admin-API rule above.
@@ -348,6 +361,18 @@ class AdminApiSecurityConfig {
                     new RateLimitRule(
                         "admin-api-put:client",
                         HttpMethod.PUT,
+                        ADMIN_API_PATH_PATTERN,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        adminApiPerClientLimit,
+                        Duration.ofMinutes(1)),
+                    // TD-SEC-062: every write verb on this chain had blanket + endpoint-specific
+                    // rate-limit coverage except DELETE — a real, previously-unguarded gap (e.g.
+                    // DELETE /api/v1/admin/organizations/*/social-credentials/*), same ceiling as
+                    // the two blanket rules above.
+                    new RateLimitRule(
+                        "admin-api-delete:client",
+                        HttpMethod.DELETE,
                         ADMIN_API_PATH_PATTERN,
                         RateLimitRule.always(),
                         RateLimitIdentifiers::authenticatedPlatformClientId,

@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -36,14 +37,32 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   private final SpringDataWebhookEndpointJpaRepository endpoints;
   private final ObjectMapper objectMapper;
   private final EntityManager entityManager;
+  private final JdbcTemplate jdbcTemplate;
 
   /* package */ JpaWebhookEndpointRepository(
       final SpringDataWebhookEndpointJpaRepository endpoints,
       final ObjectMapper objectMapper,
-      final EntityManager entityManager) {
+      final EntityManager entityManager,
+      final JdbcTemplate jdbcTemplate) {
     this.endpoints = endpoints;
     this.objectMapper = objectMapper;
     this.entityManager = entityManager;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  // See WebhookEndpointRepository#lockForRegistration's own Javadoc. Plain JdbcTemplate, not a
+  // Spring Data native @Query method — same reasoning
+  // JpaWorkspaceMembershipRepository#lockForRoleChange's own identical comment documents: a
+  // void-returning native SELECT without @Modifying is never sent to Postgres, and @Modifying
+  // forces Hibernate through executeUpdate(), which rejects a SELECT-shaped statement.
+  @Override
+  public void lockForRegistration(final UUID organizationId) {
+    jdbcTemplate.query(
+        "SELECT pg_advisory_xact_lock(hashtext(?))",
+        resultSet -> {
+          /* side-effecting call — the lock itself is the point, not this row */
+        },
+        organizationId.toString());
   }
 
   @Override

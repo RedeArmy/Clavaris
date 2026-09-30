@@ -72,6 +72,44 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
       HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
   private final ObjectMapper objectMapper = new ObjectMapper();
 
+  // TD-SEC-059 (closed): WorkspaceRolesController create/update/delete had no dedicated scope
+  // check at all before this fix — any valid platform token could mutate roles regardless of
+  // granted scope. Proves both halves against the real AdminApiSecurityConfig filter chain, not
+  // just that the scope constant exists: a token missing platform:workspace-roles:write is
+  // rejected, and one holding it succeeds.
+  @Test
+  void createWorkspaceRoleRequiresItsOwnScope() throws Exception {
+    String platformToken = requestPlatformAccessToken(FULL_SCOPE);
+    UUID organizationId = createOrganization(platformToken, "Workspace Roles Scope Co");
+
+    String tokenWithoutRoleScope =
+        requestPlatformAccessToken("platform:organizations:write platform:workspaces:write");
+    HttpResponse<String> forbidden =
+        createWorkspaceRoleRaw(tokenWithoutRoleScope, organizationId, "Support");
+    assertThat(forbidden.statusCode()).isEqualTo(403);
+
+    String tokenWithRoleScope =
+        requestPlatformAccessToken(
+            "platform:organizations:write platform:workspaces:write"
+                + " platform:workspace-roles:write");
+    HttpResponse<String> created =
+        createWorkspaceRoleRaw(tokenWithRoleScope, organizationId, "Support");
+    assertThat(created.statusCode()).isEqualTo(201);
+  }
+
+  private HttpResponse<String> createWorkspaceRoleRaw(
+      String platformToken, UUID organizationId, String name)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                baseUri("/api/v1/admin/organizations/" + organizationId + "/workspace-roles"))
+            .header("Authorization", "Bearer " + platformToken)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + name + "\"}"))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
   @Test
   void addingAMemberProvisionsARealAccountAndTriggersTheirOwnPasswordResetEmail() throws Exception {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
@@ -155,13 +193,19 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(1);
   }
 
-  // TD-WS-002 mitigation (2026-09-06): the real fix this pass adds, end to end against a real
+  // TD-WS-002 (closed): the 2026-09-06 refresh-token mitigation, end to end against a real
   // Postgres row — not just the mocked-repository proof in RemoveWorkspaceMemberServiceTest. A
   // refresh_tokens row is inserted directly (no need to drive a full interactive login just to
   // mint one) since RemoveWorkspaceMemberService's own new revocation call only needs a real
-  // accountId to act on, exactly like BR-ID-03's own reuse-detection cascade this reuses.
+  // accountId to act on, exactly like BR-ID-03's own reuse-detection cascade this reuses. The
+  // companion sessions row proves the 2026-09-29 WorkspaceMemberAccountRevoker half too — the
+  // access-token (oauth2_authorization delete) and browser-session (SessionRegistry.expireNow())
+  // halves aren't practical to assert against a real row here without driving a full interactive
+  // login just for this test, and are already covered by WorkspaceMemberAccountRevokerBridgeTest's
+  // own delegation proof plus AccountTokenRevokerBridge/AccountSessionRevokerBridge's own existing
+  // suites.
   @Test
-  void removingAMemberRevokesTheirActiveRefreshTokens() throws Exception {
+  void removingAMemberRevokesTheirActiveRefreshTokensAndSessions() throws Exception {
     String platformToken = requestPlatformAccessToken(FULL_SCOPE);
     UUID organizationId = createOrganization(platformToken, "Refresh Token Revocation Co");
     UUID workspaceId = createWorkspace(platformToken, organizationId, "Support");
@@ -196,6 +240,11 @@ class WorkspaceIntegrationTest extends RedisBackedIntegrationTest {
         jdbcTemplate.queryForObject(
             "select revoked_at from refresh_tokens where id = ?", Timestamp.class, refreshTokenId);
     assertThat(revokedAt).as("the removed member's refresh token must be revoked").isNotNull();
+
+    Timestamp sessionRevokedAt =
+        jdbcTemplate.queryForObject(
+            "select revoked_at from sessions where id = ?", Timestamp.class, sessionId);
+    assertThat(sessionRevokedAt).as("the removed member's session must be revoked").isNotNull();
   }
 
   @Test

@@ -1,11 +1,16 @@
 package com.clavaris.organization.application.usecase.deleteworkspace;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
+import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberAccountRevoker;
+import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberRefreshTokenRevoker;
 import com.clavaris.organization.domain.event.WorkspaceDeletedEvent;
 import com.clavaris.organization.domain.model.Workspace;
+import com.clavaris.organization.domain.model.WorkspaceMembership;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,22 +37,50 @@ import org.springframework.transaction.annotation.Transactional;
  * exactly as {@code DeleteWorkspaceTeamService} already establishes for "delete a team, the roles
  * in it survive, ungrouped" at the single-team scale. Cascading a role delete here would silently
  * corrupt any other Workspace of this Organization still relying on that same role.
+ *
+ * <p><b>TD-WS-004 (closed): every member's own live access is now revoked too</b>, not just their
+ * {@code WorkspaceMembership} row — this Workspace's own membership list is loaded before the
+ * cascade delete below erases it, and each member gets the exact same revocation cascade {@link
+ * WorkspaceMemberRefreshTokenRevoker}/{@link WorkspaceMemberAccountRevoker} {@code
+ * RemoveWorkspaceMemberService} already runs for a single-member removal. Deleting an entire
+ * Workspace is a strictly larger membership-loss event than removing one member — it had no
+ * business getting a *weaker* revocation guarantee than that single-member path.
  */
 public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeleteWorkspaceService.class);
 
   private final WorkspaceRepository workspaces;
+  private final WorkspaceMembershipRepository memberships;
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
+  // PMD.LongVariable: refreshTokenRevoker names exactly what it is — same convention
+  // RemoveWorkspaceMemberService's own identical field documents.
+  @SuppressWarnings("PMD.LongVariable")
+  private final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
+
+  private final WorkspaceMemberAccountRevoker accountRevoker;
+
+  // java:S107: one parameter per collaborating port — same rationale as
+  // RemoveWorkspaceMemberService's own identical suppression; TD-WS-004's own closure added the
+  // three new ports (memberships, refreshTokenRevoker, accountRevoker) needed to mirror that
+  // service's own revocation cascade.
+  @SuppressWarnings("java:S107")
   public DeleteWorkspaceService(
       final WorkspaceRepository workspaces,
+      final WorkspaceMembershipRepository memberships,
       final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      @SuppressWarnings("PMD.LongVariable")
+          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberAccountRevoker accountRevoker) {
     this.workspaces = workspaces;
+    this.memberships = memberships;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
+    this.refreshTokenRevoker = refreshTokenRevoker;
+    this.accountRevoker = accountRevoker;
   }
 
   // PMD.GuardLogStatement false positive — same rationale as every other logging call site in
@@ -63,6 +96,15 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
         workspaces
             .findById(command.workspaceId())
             .orElseThrow(() -> new WorkspaceNotFoundException(command.workspaceId()));
+
+    // TD-WS-004: loaded before the cascade delete below erases every one of this Workspace's own
+    // WorkspaceMembership rows — this is the only chance to know who needs their own access
+    // revoked.
+    // PMD.LongVariable: workspaceMemberships names exactly what it is — same convention this
+    // codebase's other descriptively-named local variables already follow.
+    @SuppressWarnings("PMD.LongVariable")
+    final List<WorkspaceMembership> workspaceMemberships =
+        memberships.findAllByWorkspaceId(workspace.id());
 
     auditEvents.write(
         command.actor(),
@@ -84,5 +126,13 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
         workspace.organizationId());
 
     workspaces.deleteById(workspace.id());
+
+    // TD-WS-004: same "same transaction, no crash risk" reasoning RemoveWorkspaceMemberService's
+    // own identical cascade documents — every revoked row and the cascade delete above live in
+    // this one deployable's own single persistence unit.
+    for (final WorkspaceMembership membership : workspaceMemberships) {
+      refreshTokenRevoker.revokeAllRefreshTokensFor(membership.accountId());
+      accountRevoker.revokeAllAccessFor(membership.accountId());
+    }
   }
 }

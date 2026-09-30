@@ -120,6 +120,25 @@ class OrganizationClientOwnershipFilterTest {
     assertThat(response.getStatus()).isEqualTo(200);
   }
 
+  // TD-SEC-061 (closed): the read equivalent of the three write routes on this same resource was
+  // missing from the allowlist — this filter fails closed, so an OrganizationClient token with
+  // write access here got an inexplicable 403 on the one read of an otherwise complete CRUD set.
+  @Test
+  void allowsAOneHopWorkspaceGetMembersRouteWhenTheResolvedOwnerMatchesTheClaim() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    UUID workspaceId = UUID.randomUUID();
+    when(workspaces.findOrganizationIdById(workspaceId)).thenReturn(Optional.of(organizationId));
+    authenticateWithClaims(
+        java.util.Map.of("sub", "sk_test_x", "organization_id", organizationId.toString()));
+    MockHttpServletRequest request = get("/api/v1/admin/workspaces/" + workspaceId + "/members");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
   @Test
   void rejectsAOneHopAccountRouteWhenTheResolvedOwnerIsADifferentOrganization() throws Exception {
     UUID accountOrganizationId = UUID.randomUUID();
@@ -148,6 +167,12 @@ class OrganizationClientOwnershipFilterTest {
 
   private static MockHttpServletRequest post(final String uri) {
     MockHttpServletRequest request = new MockHttpServletRequest("POST", uri);
+    request.setRequestURI(uri);
+    return request;
+  }
+
+  private static MockHttpServletRequest get(final String uri) {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
     request.setRequestURI(uri);
     return request;
   }

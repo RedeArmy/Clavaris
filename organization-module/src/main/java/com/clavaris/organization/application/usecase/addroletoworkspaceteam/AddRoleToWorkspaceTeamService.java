@@ -12,12 +12,22 @@ import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link AddRoleToWorkspaceTeamUseCase}. ADR-0028 §2: a role may belong to at
  * most one team per Workspace — enforced here (the application layer), not the database, since
  * {@code workspace_team_roles} alone can't express "at most one team within this Workspace" without
  * also carrying {@code workspace_id} redundantly.
+ *
+ * <p>TD-ARCH-026 (closed): the check-then-insert below ({@link
+ * WorkspaceTeamRepository#findTeamIdForRoleInWorkspace} then {@link
+ * WorkspaceTeamRepository#addRoleToTeam}) is now serialized by {@link
+ * WorkspaceTeamRepository#lockForTeamRoleChange} — see that method's own Javadoc for the race it
+ * closes. {@code @Transactional} is load-bearing here, not incidental: {@code
+ * pg_advisory_xact_lock} is transaction-scoped and auto-releases at commit/rollback, so without a
+ * real transaction spanning the lock and the insert, the lock would release almost immediately and
+ * serialize nothing.
  */
 public class AddRoleToWorkspaceTeamService implements AddRoleToWorkspaceTeamUseCase {
 
@@ -38,6 +48,7 @@ public class AddRoleToWorkspaceTeamService implements AddRoleToWorkspaceTeamUseC
   }
 
   @Override
+  @Transactional
   public void handle(final AddRoleToWorkspaceTeamCommand command) {
     final WorkspaceTeam team =
         teams
@@ -56,6 +67,10 @@ public class AddRoleToWorkspaceTeamService implements AddRoleToWorkspaceTeamUseC
             .filter(candidate -> candidate.organizationId().equals(workspace.organizationId()))
             .orElseThrow(() -> new WorkspaceRoleNotFoundException(command.roleId()));
 
+    // TD-ARCH-026: serializes every concurrent attempt to group this exact (workspaceId, roleId)
+    // pair before the check below is even read — see WorkspaceTeamRepository#lockForTeamRoleChange
+    // for the race this closes.
+    teams.lockForTeamRoleChange(team.workspaceId(), role.id());
     final Optional<UUID> existingTeamId =
         teams.findTeamIdForRoleInWorkspace(team.workspaceId(), role.id());
     if (existingTeamId.isPresent()) {

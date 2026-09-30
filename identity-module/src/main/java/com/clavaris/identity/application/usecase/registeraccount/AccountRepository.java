@@ -78,8 +78,27 @@ public interface AccountRepository {
   List<Account> findAllByOrganizationIdAndIds(
       OrganizationId organizationId, Collection<AccountId> accountIds);
 
-  /** Persists the account and its attached credential in one write. */
+  /**
+   * TD-PERF-028 (closed): persists the account row only, no longer the attached credential too —
+   * see {@link #saveCredential} for that separate, explicit write. Was previously "persists the
+   * account and its attached credential in one write," unconditionally, on every call — 20 of the
+   * 22 real call sites never touch the credential at all (bans/suspends/profile updates/every
+   * {@code AuthenticateWith*Service} via {@code recordSignIn()}), yet each one paid for a wasted
+   * {@code SELECT} + write against {@code password_credentials} anyway, on the highest-write-volume
+   * path in the system (every login). Only {@code ConfirmPasswordResetService} and {@code
+   * CompleteForcedPasswordResetService} genuinely mutate the credential — they alone now also call
+   * {@link #saveCredential}.
+   */
   void save(Account account);
+
+  /**
+   * TD-PERF-028: the credential half of what {@link #save} used to always do unconditionally — see
+   * that method's own Javadoc for which two call sites need this. A no-op if {@code account} has no
+   * {@code passwordCredential} attached (same {@code Optional}-based skip {@link #save}'s own
+   * former behavior already had), so a caller with a password-optional {@code Account} never needs
+   * its own presence check first.
+   */
+  void saveCredential(Account account);
 
   /**
    * TD-PERF-019: same write as {@link #save}, for the two call sites that know for a fact this

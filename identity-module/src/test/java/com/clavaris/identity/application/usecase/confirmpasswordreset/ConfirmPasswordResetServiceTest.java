@@ -99,6 +99,7 @@ class ConfirmPasswordResetServiceTest {
     verify(tokens).consumeIfActive(eq(token.id()), any()); // the atomic consume
     verify(tokens, never()).save(any()); // no plain save — the conditional update did it
     verify(accounts).save(account);
+    verify(accounts).saveCredential(account);
     verify(sessions).revokeAllActiveForAccount(account.id());
     verify(refreshTokens).revokeAllActiveForAccount(account.id());
     verify(accountTokenRevoker).revokeAllTokensFor(account.id());

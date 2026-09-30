@@ -64,6 +64,7 @@ class CompleteForcedPasswordResetServiceTest {
         .isEqualTo("argon2id$new-hash");
     assertThat(account.passwordResetRequiredAt()).isEmpty();
     verify(accounts).save(account);
+    verify(accounts).saveCredential(account);
     verify(sessions).revokeAllActiveForAccount(account.id());
     verify(refreshTokens).revokeAllActiveForAccount(account.id());
     verify(accountTokenRevoker).revokeAllTokensFor(account.id());

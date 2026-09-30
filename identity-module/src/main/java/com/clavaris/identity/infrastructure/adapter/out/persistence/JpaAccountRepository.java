@@ -15,9 +15,12 @@ import com.clavaris.identity.domain.model.Username;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -101,18 +104,26 @@ class JpaAccountRepository implements AccountRepository {
   }
 
   private Account toDomain(final AccountEntity entity) {
+    return toDomain(entity, credentials.findByAccountId(entity.getId()).orElse(null));
+  }
+
+  // TD-PERF-029: the batch half of toDomain — findKeysetPageByOrganizationId's own list view never
+  // renders PasswordCredential at all, so paying for a per-row findByAccountId query on every page
+  // was pure waste even before this fix; now it's one findByAccountIdIn per page.
+  private Account toDomain(
+      final AccountEntity entity, final PasswordCredentialEntity credentialRow) {
     final AccountId accountId = new AccountId(entity.getId());
     // A password-only login attempt against an account that only has a social identity attached
     // (ADR-0020) is exactly the case reconstitute's own Javadoc calls out — absent here is not a
     // bug, AuthenticateWithPasswordService treats it as "no password credential to check".
     final PasswordCredential credential =
-        credentials
-            .findByAccountId(entity.getId())
-            .map(
-                row ->
-                    PasswordCredential.reconstitute(
-                        row.getId(), accountId, row.getPasswordHash(), row.getUpdatedAt()))
-            .orElse(null);
+        credentialRow == null
+            ? null
+            : PasswordCredential.reconstitute(
+                credentialRow.getId(),
+                accountId,
+                credentialRow.getPasswordHash(),
+                credentialRow.getUpdatedAt());
     final Username username =
         entity.getUsername() == null ? null : new Username(entity.getUsername());
     return Account.reconstitute(
@@ -134,23 +145,9 @@ class JpaAccountRepository implements AccountRepository {
         entity.isBypassesDeviceTrust());
   }
 
-  // Code review finding (SDE-III design, Phase 2 #8, found live once migration V20260830110000's
-  // own deferred trigger started enforcing BR-ID-02 for real): this method's own two writes
-  // (accounts.saveAndFlush, then — if present — credentials.saveAndFlush) previously relied
-  // entirely on the CALLER already having an open @Transactional boundary spanning both. Every
-  // real production call site does (RegisterAccountService, AuthenticateWithSocialProviderService
-  // — both @Transactional), but test-fixture code calling this repository directly, with no
-  // surrounding transaction, does not: each saveAndFlush then becomes its own auto-committing
-  // unit of work (Spring Data's own default propagation on SimpleJpaRepository methods), so the
-  // account row's own commit — the deferred trigger's own firing point — happens before the
-  // credential row's separate, later commit ever runs, tripping the trigger even when the caller
-  // did everything else right. @Transactional here, not just at the caller, guarantees both writes
-  // always share one commit boundary regardless of caller — REQUIRED propagation (Spring's own
-  // default) joins an already-open transaction with zero behavior change for every real caller,
-  // and creates one for a bare caller that previously had none. A real correctness fix, not just a
-  // test-fixture accommodation: a bare caller crashing between the two previously-separate commits
-  // could have left a genuinely orphaned, permanently unauthenticatable Account row in production
-  // too, not only in a test.
+  // TD-PERF-028 (closed): no longer also writes the credential — see AccountRepository#save's own
+  // Javadoc for why (20 of 22 real callers never touch it) and #saveCredential for the separate
+  // write the two real mutating callers now use instead.
   @Override
   @Transactional
   public void save(final Account account) {
@@ -161,6 +158,21 @@ class JpaAccountRepository implements AccountRepository {
     // returns and the transaction commits, by which point the try/catch block has already
     // exited and the exception would surface somewhere the service never expects it.
     accounts.saveAndFlush(toEntity(account));
+  }
+
+  // TD-PERF-028: the credential half save() used to always do unconditionally — same
+  // saveAndFlush-for-synchronous-exception-surfacing reasoning as save() itself.
+  //
+  // Sonar S125 false positive (reworded, not NOSONAR'd — same convention
+  // RateLimitingIntegrationTest's own identical fix documents): the account and credential
+  // writes must share one commit boundary. Both real mutating callers — ConfirmPasswordResetService
+  // and CompleteForcedPasswordResetService — are themselves transactional (a code review finding,
+  // SDE-III design Phase 2 #8, migration V20260830110000's own deferred BR-ID-02 trigger), and
+  // Spring's default REQUIRED propagation joins that already-open transaction here with zero
+  // behavior change, the same way it does for save() above.
+  @Override
+  @Transactional
+  public void saveCredential(final Account account) {
     saveCredentialIfPresent(account, credentials::saveAndFlush);
   }
 
@@ -277,29 +289,36 @@ class JpaAccountRepository implements AccountRepository {
     final PageRequest limit = PageRequest.of(0, pageRequest.size() + 1);
     if (pageRequest.after() != null) {
       final KeysetCursor cursor = pageRequest.after();
-      return SpringDataKeysetPageMapper.forward(
+      final List<AccountEntity> fetched =
           accounts.findPageByOrganizationIdAfter(
-              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit),
-          pageRequest.size(),
-          true,
-          this::toDomain,
-          this::cursorOf);
+              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit);
+      return SpringDataKeysetPageMapper.forward(
+          fetched, pageRequest.size(), true, toDomainBatched(fetched), this::cursorOf);
     }
     if (pageRequest.before() != null) {
       final KeysetCursor cursor = pageRequest.before();
-      return SpringDataKeysetPageMapper.backward(
+      final List<AccountEntity> fetched =
           accounts.findPageByOrganizationIdBefore(
-              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit),
-          pageRequest.size(),
-          this::toDomain,
-          this::cursorOf);
+              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit);
+      return SpringDataKeysetPageMapper.backward(
+          fetched, pageRequest.size(), toDomainBatched(fetched), this::cursorOf);
     }
+    final List<AccountEntity> fetched =
+        accounts.findFirstPageByOrganizationId(organizationId.value(), normalizedSearchTerm, limit);
     return SpringDataKeysetPageMapper.forward(
-        accounts.findFirstPageByOrganizationId(organizationId.value(), normalizedSearchTerm, limit),
-        pageRequest.size(),
-        false,
-        this::toDomain,
-        this::cursorOf);
+        fetched, pageRequest.size(), false, toDomainBatched(fetched), this::cursorOf);
+  }
+
+  // TD-PERF-029: one findByAccountIdIn call for the whole page, instead of one findByAccountId
+  // per row inside toDomain — see that method's own Javadoc.
+  // PMD.LongVariable: credentialsByAccountId names exactly what it is — same convention this
+  // codebase's other descriptively-named local variables already follow.
+  @SuppressWarnings("PMD.LongVariable")
+  private Function<AccountEntity, Account> toDomainBatched(final List<AccountEntity> entities) {
+    final Map<UUID, PasswordCredentialEntity> credentialsByAccountId =
+        credentials.findByAccountIdIn(entities.stream().map(AccountEntity::getId).toList()).stream()
+            .collect(Collectors.toMap(PasswordCredentialEntity::getAccountId, Function.identity()));
+    return entity -> toDomain(entity, credentialsByAccountId.get(entity.getId()));
   }
 
   private KeysetCursor cursorOf(final AccountEntity entity) {

@@ -4,8 +4,14 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import org.springframework.transaction.annotation.Transactional;
 
-/** Orchestration for {@link CreateWorkspaceTeamUseCase}. */
+/**
+ * Orchestration for {@link CreateWorkspaceTeamUseCase}.
+ *
+ * <p>TD-ARCH-027 (closed): {@code @Transactional} below — same rationale
+ * CreateWorkspaceRoleService's own identical fix documents.
+ */
 public class CreateWorkspaceTeamService implements CreateWorkspaceTeamUseCase {
 
   private final WorkspaceTeamRepository teams;
@@ -22,6 +28,7 @@ public class CreateWorkspaceTeamService implements CreateWorkspaceTeamUseCase {
   }
 
   @Override
+  @Transactional
   public WorkspaceTeam handle(final CreateWorkspaceTeamCommand command) {
     if (workspaces.findById(command.workspaceId()).isEmpty()) {
       throw new WorkspaceNotFoundException(command.workspaceId());

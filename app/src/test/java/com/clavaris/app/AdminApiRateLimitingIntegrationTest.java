@@ -52,6 +52,15 @@ import tools.jackson.databind.ObjectMapper;
  * The blanket test itself uses a generous, no-fixed-bound safety margin instead of assuming a
  * pristine counter — same defensive pattern {@code PlatformTierRateLimitingIntegrationTest}'s own
  * per-IP login test already established for identical shared-Redis-state reasons.
+ *
+ * <p>TD-SEC-062 (closed): {@code @Order(4)} proves the new {@code admin-api-delete:client} blanket
+ * rule the same way {@code @Order(3)} proves its POST sibling, against a DELETE endpoint (social
+ * credentials) with no path-specific rule of its own. Each rule's {@code name} is its own
+ * independent Redis key namespace ({@link
+ * com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule}'s own Javadoc) — the two
+ * path-specific rules above key on POST, so this test's own counter starts fresh regardless of
+ * ordering; the generous no-fixed-bound safety margin is kept anyway, same defensive posture as
+ * every other test in this class.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)
@@ -155,6 +164,41 @@ class AdminApiRateLimitingIntegrationTest extends RedisBackedIntegrationTest {
         .isTrue();
   }
 
+  // TD-SEC-062 (closed): DELETE .../social-credentials/{provider} is the exact real endpoint the
+  // register row itself cites — has no path-specific admin-api rate-limit rule of its own, so only
+  // the new blanket admin-api-delete:client ceiling this test exists to prove can ever produce the
+  // 429 observed. Same no-fixed-loop-bound shape as the POST blanket test above, same reason.
+  @Test
+  @Order(4)
+  void blocksTheBlanketDeleteCeilingRegardlessOfWhichAdminEndpointIsCalled() throws Exception {
+    String platformToken = requestPlatformToken("platform:social-credentials:write");
+    // admin-api-delete:client is its own independent Redis key namespace, untouched by any POST
+    // request the earlier-ordered tests above made — no shared-counter safety margin needed, just
+    // a small buffer in case a retry/flake already consumed one attempt in a prior run.
+    int safetyMargin = 5;
+
+    boolean sawTooManyRequests = false;
+    for (int attempt = 0;
+        attempt < adminApiPerClientLimit + safetyMargin && !sawTooManyRequests;
+        attempt++) {
+      HttpResponse<String> response = deleteSocialCredential(platformToken, UUID.randomUUID());
+      // DeleteOrganizationSocialCredentialController is deliberately idempotent (ADR-0022's own
+      // Javadoc: "deleting a row that never existed is a safe no-op, not an error") — 204, not
+      // 404, is the real "allowed" signal here, unlike every other endpoint in this class.
+      assertThat(response.statusCode())
+          .as("every attempt must be either 204 (allowed, idempotent no-op) or 429 (blocked)")
+          .isIn(204, 429);
+      sawTooManyRequests = response.statusCode() == 429;
+    }
+
+    assertThat(sawTooManyRequests)
+        .as(
+            "admin-api-delete:client must eventually block a real request on this real chain —"
+                + " DELETE was the one write verb TD-SEC-062 found with zero rate-limit coverage,"
+                + " blanket or path-specific")
+        .isTrue();
+  }
+
   private String requestPlatformToken(final String scope) throws IOException, InterruptedException {
     String basicAuth =
         Base64.getEncoder()
@@ -188,6 +232,19 @@ class AdminApiRateLimitingIntegrationTest extends RedisBackedIntegrationTest {
         HttpRequest.newBuilder(baseUri("/api/v1/admin/accounts/" + id + ":delete"))
             .header("Authorization", "Bearer " + platformToken)
             .POST(HttpRequest.BodyPublishers.noBody())
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> deleteSocialCredential(
+      final String platformToken, final UUID organizationId)
+      throws IOException, InterruptedException {
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                baseUri(
+                    "/api/v1/admin/organizations/" + organizationId + "/social-credentials/GOOGLE"))
+            .header("Authorization", "Bearer " + platformToken)
+            .DELETE()
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }

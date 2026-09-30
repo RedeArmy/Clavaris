@@ -63,7 +63,10 @@ class JpaAccountRepositoryTest {
     Email email = new Email("stored-user@example.com");
     Account account = Account.register(organizationId, email);
     account.attachPasswordCredential("argon2id$stored-hash");
+    // TD-PERF-028: save() no longer persists the credential unconditionally — this test
+    // specifically asserts credential presence, so it needs the explicit write.
     repository.save(account);
+    repository.saveCredential(account);
 
     Optional<Account> found = repository.findByOrganizationIdAndEmail(organizationId, email);
 
@@ -282,7 +285,10 @@ class JpaAccountRepositoryTest {
     Email email = new Email("to-be-deleted@example.com");
     Account account = Account.register(organizationId, email);
     account.attachPasswordCredential("argon2id$stored-hash");
+    // TD-PERF-028: this test specifically asserts password_credentials is cascade-deleted, so it
+    // needs the credential actually persisted first.
     repository.save(account);
+    repository.saveCredential(account);
     AccountId accountId = account.id();
 
     UUID sessionId = UUID.randomUUID();
@@ -500,6 +506,38 @@ class JpaAccountRepositoryTest {
             organizationId, new KeysetPageRequest(null, null, 10), "   ");
 
     assertThat(found.content()).hasSize(2);
+  }
+
+  // TD-PERF-029: proves the batched credential lookup (findByAccountIdIn, one call for the whole
+  // page) attaches the right credential to the right account and correctly leaves a
+  // credential-less account's own passwordCredential empty — not just that it compiles/runs, but
+  // that per-row identity survives being resolved via a shared Map instead of a per-row query.
+  @Test
+  void findKeysetPageByOrganizationIdAttachesTheCorrectCredentialPerAccountViaTheBatchedLookup() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account withCredential = Account.register(organizationId, new Email("has-cred@example.com"));
+    withCredential.attachPasswordCredential("argon2id$has-cred-hash");
+    Account withoutCredential = Account.register(organizationId, new Email("no-cred@example.com"));
+    repository.insert(withCredential);
+    repository.insert(withoutCredential);
+
+    KeysetPage<Account> page =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 10), null);
+
+    Account foundWithCredential =
+        page.content().stream()
+            .filter(account -> account.id().equals(withCredential.id()))
+            .findFirst()
+            .orElseThrow();
+    Account foundWithoutCredential =
+        page.content().stream()
+            .filter(account -> account.id().equals(withoutCredential.id()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(foundWithCredential.passwordCredential().orElseThrow().passwordHash())
+        .isEqualTo("argon2id$has-cred-hash");
+    assertThat(foundWithoutCredential.passwordCredential()).isEmpty();
   }
 
   private static Account reconstituteAt(

@@ -209,6 +209,25 @@ class JpaWorkspaceTeamRepositoryTest {
     assertThat(repository.isRoleGroupedInAnyOtherTeam(roleId, UUID.randomUUID())).isFalse();
   }
 
+  // TD-ARCH-026: proves lockForTeamRoleChange is a real, callable Postgres advisory-lock query
+  // (not a typo'd native SQL string that would only surface at first real use), same rationale
+  // JpaSigningKeyRepositoryTest's own identical lockForRotation smoke test documents. Postgres
+  // advisory locks are re-entrant within the same session/transaction, so a second call here must
+  // not deadlock against the first.
+  @Test
+  void
+      lockForTeamRoleChangeCompletesWithoutErrorAndDoesNotBlockASubsequentCallInTheSameTransaction() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID roleId = UUID.randomUUID();
+
+    org.assertj.core.api.Assertions.assertThatCode(
+            () -> {
+              repository.lockForTeamRoleChange(workspaceId, roleId);
+              repository.lockForTeamRoleChange(workspaceId, roleId);
+            })
+        .doesNotThrowAnyException();
+  }
+
   @Configuration
   @EnableAutoConfiguration
   @EnableJpaRepositories(

@@ -8,8 +8,16 @@ import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRo
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
 import com.clavaris.organization.domain.event.WorkspaceRoleCreatedEvent;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import org.springframework.transaction.annotation.Transactional;
 
-/** Orchestration for {@link CreateWorkspaceRoleUseCase}. */
+/**
+ * Orchestration for {@link CreateWorkspaceRoleUseCase}.
+ *
+ * <p>TD-ARCH-027 (closed): {@code @Transactional} below — this method's own save + audit-event
+ * write + outbox write were three separate, unguarded steps; a failure after the role row already
+ * committed would leave a silent, permanent audit/outbox gap, same shape TD-SEC-057 already fixed
+ * for client-registry-module/webhook-module.
+ */
 public class CreateWorkspaceRoleService implements CreateWorkspaceRoleUseCase {
 
   private final WorkspaceRoleRepository roles;
@@ -29,6 +37,7 @@ public class CreateWorkspaceRoleService implements CreateWorkspaceRoleUseCase {
   }
 
   @Override
+  @Transactional
   public WorkspaceRole handle(final CreateWorkspaceRoleCommand command) {
     if (!organizations.existsById(command.organizationId())) {
       throw new OrganizationNotFoundException(command.organizationId());

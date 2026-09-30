@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -27,12 +28,31 @@ class JpaWorkspaceTeamRepository implements WorkspaceTeamRepository {
 
   private final SpringDataWorkspaceTeamJpaRepository teams;
   private final SpringDataWorkspaceTeamRoleJpaRepository teamRoles;
+  private final JdbcTemplate jdbcTemplate;
 
   /* package */ JpaWorkspaceTeamRepository(
       final SpringDataWorkspaceTeamJpaRepository teams,
-      final SpringDataWorkspaceTeamRoleJpaRepository teamRoles) {
+      final SpringDataWorkspaceTeamRoleJpaRepository teamRoles,
+      final JdbcTemplate jdbcTemplate) {
     this.teams = teams;
     this.teamRoles = teamRoles;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  // See WorkspaceTeamRepository#lockForTeamRoleChange's own Javadoc. Plain JdbcTemplate, not a
+  // Spring Data native @Query method — same reasoning
+  // JpaWorkspaceMembershipRepository#lockForRoleChange's own identical comment documents. The two
+  // ids are combined into one string key (rather than two separate hashtext(?) calls combined
+  // with a bitwise op) — the simplest way to get one lock keyed on the pair, no established
+  // composite-key precedent existed yet to follow instead.
+  @Override
+  public void lockForTeamRoleChange(final UUID workspaceId, final UUID roleId) {
+    jdbcTemplate.query(
+        "SELECT pg_advisory_xact_lock(hashtext(?))",
+        resultSet -> {
+          /* side-effecting call — the lock itself is the point, not this row */
+        },
+        workspaceId + ":" + roleId);
   }
 
   @Override

@@ -101,6 +101,20 @@ public interface WebhookEndpointRepository {
   long countByOrganizationId(UUID organizationId);
 
   /**
+   * TD-ARCH-024: {@link RegisterWebhookEndpointService}'s own BR-WEBHOOK-08 cap check ({@link
+   * #countByOrganizationId} then, once the SSRF DNS check passes, {@link #insert}) was a plain
+   * check-then-act with no unique constraint or lock in between — two concurrent registrations near
+   * the ceiling could each pass the count check and both insert, overshooting the cap the
+   * dispatcher's own per-tick fan-out cost budget relies on. A transaction-scoped Postgres advisory
+   * lock ({@code pg_advisory_xact_lock}, keyed on {@code organizationId}, auto-released at commit
+   * or rollback) serializes every registration attempt for the same Organization — same mechanism,
+   * same reasoning, as {@code WorkspaceMembershipRepository#lockForRoleChange}'s own identical fix
+   * for an analogous count-based race. Must be invoked before {@link #countByOrganizationId}, not
+   * after.
+   */
+  void lockForRegistration(UUID organizationId);
+
+  /**
    * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
    * #findAllByOrganizationId} — used only by {@code
    * ListWebhookEndpointsForOrganizationPagedService}'s own display query. {@link

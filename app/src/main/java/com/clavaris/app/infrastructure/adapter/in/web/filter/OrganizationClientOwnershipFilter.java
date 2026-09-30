@@ -103,6 +103,11 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
             direct(
                 HttpMethod.POST, "/api/v1/admin/organizations/{organizationId}/webhook-endpoints"),
             oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:impersonate"),
+            // TD-SEC-061: the read equivalent of the three write routes below was missing —
+            // this filter fails closed, so an OrganizationClient token with write access to
+            // this exact resource got an inexplicable 403 on the one read of an otherwise
+            // complete CRUD set.
+            oneHopWorkspace(HttpMethod.GET, "/api/v1/admin/workspaces/{workspaceId}/members"),
             oneHopWorkspace(HttpMethod.POST, "/api/v1/admin/workspaces/{workspaceId}/members"),
             oneHopWorkspace(
                 HttpMethod.PUT, "/api/v1/admin/workspaces/{workspaceId}/members/{accountId}/role"),

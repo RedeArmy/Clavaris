@@ -76,6 +76,9 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       account.attachPasswordCredential(hash);
     }
     accounts.save(account);
+    // TD-PERF-028: save() no longer persists the credential — this is the one real write that
+    // needs it, same rationale ConfirmPasswordResetService's own identical addition documents.
+    accounts.saveCredential(account);
 
     // BR-ID-04's revocation cascade — identical shape to ConfirmPasswordResetService's own,
     // deliberately not the hosted-login HttpSession itself (there is no established session yet

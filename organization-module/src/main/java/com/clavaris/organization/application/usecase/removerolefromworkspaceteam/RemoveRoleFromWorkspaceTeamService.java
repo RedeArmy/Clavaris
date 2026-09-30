@@ -4,11 +4,15 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamRepository;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link RemoveRoleFromWorkspaceTeamUseCase}. Idempotent — removing a role that
  * isn't actually in this team is not an error, same "the end state is what matters" reasoning a
  * plain {@code DELETE} on a non-existent row already gives for free.
+ *
+ * <p>TD-ARCH-027 (closed): {@code @Transactional} below — same rationale
+ * CreateWorkspaceRoleService's own identical fix documents.
  */
 public class RemoveRoleFromWorkspaceTeamService implements RemoveRoleFromWorkspaceTeamUseCase {
 
@@ -22,6 +26,7 @@ public class RemoveRoleFromWorkspaceTeamService implements RemoveRoleFromWorkspa
   }
 
   @Override
+  @Transactional
   public void handle(final RemoveRoleFromWorkspaceTeamCommand command) {
     final WorkspaceTeam team =
         teams

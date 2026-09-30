@@ -9,10 +9,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Reversible — no hard delete, same "reversible over permanent where the semantics allow it"
  * precedent identity-module's own {@code SuspendAccount}/{@code ReactivateAccount} pair already
- * establishes. A deactivated endpoint is simply excluded from the dispatcher's own fan-out lookup
- * ({@code WebhookEndpointRepository#findActiveByOrganizationIdAndEventType}) — no deliveries are
- * scheduled to it while inactive, but its own configuration/history is untouched and reactivation
- * ({@code ActivateWebhookEndpointService}) needs no re-registration.
+ * establishes. A deactivated endpoint is excluded from the dispatcher's own fan-out lookup ({@code
+ * WebhookEndpointRepository#findActiveByOrganizationIdAndEventType}) — no <b>new</b> deliveries are
+ * scheduled to it while inactive — and, since TD-ARCH-025, {@code
+ * DeliverPendingWebhooksService#attemptOneDelivery} also refuses to fire any delivery already
+ * claimed/queued before deactivation, terminally failing it instead. Either way, this endpoint's
+ * own configuration/history is untouched and reactivation ({@code ActivateWebhookEndpointService})
+ * needs no re-registration.
  */
 public class DeactivateWebhookEndpointService implements DeactivateWebhookEndpointUseCase {
 
