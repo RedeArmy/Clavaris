@@ -18,6 +18,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab Lock/Ban/Delete menu items. Each action
@@ -116,13 +118,30 @@ public class PlatformAccountLifecycleController {
     return redirectToUsers(organizationId);
   }
 
+  // TD-FUT-036 (closed): a hard, irreversible delete ("every session and token is revoked
+  // immediately," this dialog's own copy) used to need only a single click-through — weaker
+  // confirmation than Delete-workspace, despite comparable-or-greater blast radius. Strengthened
+  // to match, not Delete-workspace weakened: typing the account's own exact current email is the
+  // same "type the value on screen to confirm" tier PlatformWorkspaceController#deleteWorkspace
+  // already establishes for workspace name. A mismatch redirects back to the Users list with a
+  // flash-carried id (this controller always redirects, never renders — see class Javadoc — so a
+  // flash attribute, not a model attribute, is what survives the redirect) instead of deleting.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/delete")
   public String delete(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @PathVariable final UUID accountId) {
+      @PathVariable final UUID accountId,
+      @RequestParam("confirmedEmail") final String confirmedEmail,
+      final RedirectAttributes redirectAttributes) {
     final PlatformAccountOrganizationAccess.ResolvedAccountAccess access =
         organizationAccess.requireOwnedAccount(request, organizationId, accountId, getAccount);
+
+    if (!access.account().email().value().equals(confirmedEmail)) {
+      redirectAttributes.addFlashAttribute("deleteUserMismatchId", accountId);
+      return redirectToUsers(organizationId);
+    }
+
     deleteAccount.handle(new DeleteAccountCommand(access.account().id(), actorFor(access)));
     return redirectToUsers(organizationId);
   }
