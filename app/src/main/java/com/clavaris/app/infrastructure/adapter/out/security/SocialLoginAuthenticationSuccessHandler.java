@@ -83,12 +83,17 @@ import org.springframework.stereotype.Component;
 // the record-pattern accountId/platformAccountId types the code review's own record-pattern fix
 // added — same "wiring together many distinct types is the job" reasoning
 // RefreshTokenRotationAuthenticationProvider's own identical suppression already documents.
+// PMD.CouplingBetweenObjects: TD-SEC-055's own four new collaborators (accounts, knownDevices,
+// requestDeviceTrustChallenge, authenticationPolicyProvider) pushed this class's own count past
+// the threshold — same "wiring, not sprawl" reasoning as PMD.ExcessiveImports above, on the same
+// class, for the same reason.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.LawOfDemeter",
   "PMD.OnlyOneReturn",
   "java:S1075",
-  "PMD.ExcessiveImports"
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects"
 })
 @Component
 public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
@@ -110,10 +115,12 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
-  // AuthenticateWithSocialProviderService's own identical suppression: this handler genuinely
-  // orchestrates both tiers' own use case + session-establishment pairs, plus (TD-SEC-055) the
-  // same device-trust/session-task collaborators every primary-factor controller already needs.
+  // one parameter per collaborating port — same rationale as
+  // AuthenticateWithSocialProviderService's
+  // own identical suppression: this handler genuinely orchestrates both tiers' own use case +
+  // session-establishment pairs, plus (TD-SEC-055) the same device-trust/session-task collaborators
+  // every primary-factor controller already needs.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public SocialLoginAuthenticationSuccessHandler(
       final AuthenticateWithSocialProviderUseCase tenantUseCase,
       final AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase,

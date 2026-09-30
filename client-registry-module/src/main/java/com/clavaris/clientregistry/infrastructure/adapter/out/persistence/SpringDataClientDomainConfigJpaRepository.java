@@ -12,5 +12,8 @@ interface SpringDataClientDomainConfigJpaRepository
 
   Optional<ClientDomainConfigEntity> findByHostname(String hostname);
 
-  List<ClientDomainConfigEntity> findByVerificationStatus(String verificationStatus);
+  // PMD.LongVariable: verificationStatus names exactly what it is — same convention
+  // SpringDataWorkspaceTeamRoleJpaRepository's own identical suppression documents.
+  List<ClientDomainConfigEntity> findByVerificationStatus(
+      @SuppressWarnings("PMD.LongVariable") String verificationStatus);
 }

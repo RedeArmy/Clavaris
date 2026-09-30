@@ -6,7 +6,6 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Inv
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
-import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -99,38 +98,26 @@ public class DeviceTrustChallengeController {
       return FORM_VIEW;
     }
 
-    final HttpSession session = request.getSession(true);
-    final PendingAuthenticationFactor factor =
-        PendingAuthenticationFactor.valueOf(
-            (String) session.getAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE));
-    final String clientId =
-        (String) session.getAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
-    final String redirectUrl =
-        (String) session.getAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
-    // TD-SEC-055: non-null only when factor == SOCIAL — see DeviceTrustPendingState's own Javadoc.
-    final String providerValue =
-        (String) session.getAttribute(DeviceTrustPendingState.PROVIDER_ATTRIBUTE);
-    final SocialProvider provider =
-        providerValue == null ? null : SocialProvider.valueOf(providerValue);
-    clearPendingState(session);
-
     // Device trust only ever gates a sign-in (never sign-up completion, ADR-0024 §6) — the device
     // is recorded as known only now, after the challenge actually succeeded, never at the moment
     // the challenge was merely issued (both handled inside AuthenticatedSessionCompletion).
+    final HttpSession session = request.getSession(true);
     final String redirectTarget =
-        AuthenticatedSessionCompletion.complete(
+        AuthenticatedSessionCompletion.completeFromPendingChallenge(
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
             request,
             response,
+            session,
             organizationId,
             accountId,
-            factor,
-            clientId,
-            redirectUrl,
-            null,
-            provider);
+            DeviceTrustPendingState.ACCOUNT_ID_ATTRIBUTE,
+            DeviceTrustPendingState.FACTOR_ATTRIBUTE,
+            DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE,
+            DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE,
+            DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE,
+            DeviceTrustPendingState.PROVIDER_ATTRIBUTE);
     return "redirect:" + redirectTarget;
   }
 
@@ -156,14 +143,5 @@ public class DeviceTrustChallengeController {
       return Optional.empty();
     }
     return Optional.of(new AccountId(UUID.fromString((String) rawAccountId)));
-  }
-
-  private void clearPendingState(final HttpSession session) {
-    session.removeAttribute(DeviceTrustPendingState.ACCOUNT_ID_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.FACTOR_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.ORGANIZATION_ID_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.CLIENT_ID_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.REDIRECT_URL_ATTRIBUTE);
-    session.removeAttribute(DeviceTrustPendingState.PROVIDER_ATTRIBUTE);
   }
 }

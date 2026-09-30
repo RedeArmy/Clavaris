@@ -6,7 +6,6 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
-import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -111,37 +110,25 @@ public class SessionTaskChallengeController {
       return FORM_VIEW;
     }
 
-    final HttpSession session = request.getSession(true);
-    final PendingAuthenticationFactor factor =
-        PendingAuthenticationFactor.valueOf(
-            (String) session.getAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE));
-    final String clientId =
-        (String) session.getAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
-    final String redirectUrl =
-        (String) session.getAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
-    // TD-SEC-055: non-null only when factor == SOCIAL — see SessionTaskPendingState's own Javadoc.
-    final String providerValue =
-        (String) session.getAttribute(SessionTaskPendingState.PROVIDER_ATTRIBUTE);
-    final SocialProvider provider =
-        providerValue == null ? null : SocialProvider.valueOf(providerValue);
-    clearPendingState(session);
-
     // This task's own completion is the actual moment the session finally gets established —
     // AuthenticatedSessionCompletion's own device-recording step reflects that.
+    final HttpSession session = request.getSession(true);
     final String redirectTarget =
-        AuthenticatedSessionCompletion.complete(
+        AuthenticatedSessionCompletion.completeFromPendingChallenge(
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
             request,
             response,
+            session,
             organizationId,
             accountId,
-            factor,
-            clientId,
-            redirectUrl,
-            null,
-            provider);
+            SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE,
+            SessionTaskPendingState.FACTOR_ATTRIBUTE,
+            SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE,
+            SessionTaskPendingState.CLIENT_ID_ATTRIBUTE,
+            SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE,
+            SessionTaskPendingState.PROVIDER_ATTRIBUTE);
     return "redirect:" + redirectTarget;
   }
 
@@ -166,14 +153,5 @@ public class SessionTaskChallengeController {
       return Optional.empty();
     }
     return Optional.of(new AccountId(UUID.fromString((String) rawAccountId)));
-  }
-
-  private void clearPendingState(final HttpSession session) {
-    session.removeAttribute(SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.PROVIDER_ATTRIBUTE);
   }
 }

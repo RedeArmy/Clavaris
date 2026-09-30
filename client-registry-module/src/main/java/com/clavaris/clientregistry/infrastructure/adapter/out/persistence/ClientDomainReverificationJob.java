@@ -37,6 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
  * WebhookDeliveryRetentionJob} already establishes (TD-FUT-033), not a literal "every N days" cron
  * — simpler, and idempotent if a tick is ever missed.
  */
+// PMD.LongVariable: reverificationDays names exactly what it is — same convention
+// WebhookDeliveryRetentionJob's own analogous retentionDays field falls under (shorter here only
+// because "reverification" itself is a longer word than "retention", not a naming inconsistency).
+@SuppressWarnings("PMD.LongVariable")
 @Component
 class ClientDomainReverificationJob {
 
@@ -79,6 +83,10 @@ class ClientDomainReverificationJob {
         "client_domain_reverification", LOG, this::reverifyStaleDomainsLocked);
   }
 
+  // PMD.GuardLogStatement: stale.size() below is a cheap accessor on an already-built List, not a
+  // method worth guarding against — same rationale TokenIssuanceEventLogger's own identical
+  // suppression documents.
+  @SuppressWarnings("PMD.GuardLogStatement")
   private void reverifyStaleDomainsLocked() {
     final Instant cutoff = Instant.now().minus(reverificationDays, ChronoUnit.DAYS);
     final List<ClientDomainConfig> stale =
@@ -95,6 +103,10 @@ class ClientDomainReverificationJob {
     }
   }
 
+  // PMD.GuardLogStatement: config.oauthClientId() below is a cheap accessor on an already-built
+  // domain object, not a method worth guarding against — same rationale as
+  // reverifyStaleDomainsLocked's own identical suppression above.
+  @SuppressWarnings("PMD.GuardLogStatement")
   private void reverifyOne(final ClientDomainConfig config) {
     final String hostname = config.hostname().orElseThrow();
     final String expectedToken = config.dnsTxtChallengeToken().orElseThrow();
