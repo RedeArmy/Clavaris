@@ -81,6 +81,18 @@ class AddRoleToWorkspaceTeamServiceTest {
             any());
   }
 
+  // TD-ARCH-026: the advisory lock must be acquired before the check it's meant to serialize
+  // against — same rationale ActivateSigningKeyForOrganizationServiceTest's own identical
+  // locksForRotationBeforeReadingTheCurrentlyActiveKey test documents for its analogous fix.
+  @Test
+  void locksForTeamRoleChangeBeforeCheckingWhereTheRoleIsAlreadyGrouped() {
+    service.handle(new AddRoleToWorkspaceTeamCommand(workspace.id(), team.id(), role.id(), ACTOR));
+
+    org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(teams);
+    inOrder.verify(teams).lockForTeamRoleChange(workspace.id(), role.id());
+    inOrder.verify(teams).findTeamIdForRoleInWorkspace(workspace.id(), role.id());
+  }
+
   @Test
   void isIdempotentWhenTheRoleIsAlreadyInThisSameTeam() {
     when(teams.findTeamIdForRoleInWorkspace(workspace.id(), role.id()))

@@ -49,6 +49,22 @@ public interface WorkspaceTeamRepository {
   Optional<UUID> findTeamIdForRoleInWorkspace(UUID workspaceId, UUID roleId);
 
   /**
+   * TD-ARCH-026: ADR-0028 §2's "at most one team per role per Workspace" invariant is enforced only
+   * at the application layer ({@link
+   * com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamService}'s
+   * own check-then-insert against {@link #findTeamIdForRoleInWorkspace}, then {@link
+   * #addRoleToTeam}) — {@code workspace_team_roles}'s own migration explicitly documents this as
+   * app-layer-only, not DB-enforced. Two concurrent {@code addRoleToTeam} calls for the same role
+   * but different teams could both pass the "not already grouped" check and both insert. A
+   * transaction-scoped Postgres advisory lock ({@code pg_advisory_xact_lock}, keyed on {@code
+   * workspaceId} and {@code roleId} together, auto-released at commit or rollback) serializes every
+   * caller attempting to group the same role within the same Workspace — same mechanism, same
+   * reasoning, as {@code WorkspaceMembershipRepository#lockForRoleChange}'s own identical fix for
+   * an analogous race. Must be invoked before {@link #findTeamIdForRoleInWorkspace}, not after.
+   */
+  void lockForTeamRoleChange(UUID workspaceId, UUID roleId);
+
+  /**
    * Every roleId grouped into any team belonging to this Workspace — the complement of "ungrouped
    * roles" the Workspace-detail page's own Teams section needs to render, without an N+1 query per
    * team.
