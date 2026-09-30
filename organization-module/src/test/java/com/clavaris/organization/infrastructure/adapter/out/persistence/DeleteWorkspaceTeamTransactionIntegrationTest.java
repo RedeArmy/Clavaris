@@ -59,6 +59,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * the real, package-private {@code Jpa*Repository}/{@code SpringData*JpaRepository} adapters — same
  * "concrete adapters, not the outbound ports, only reachable from their own package" constraint
  * {@code JpaWorkspaceTeamRepositoryTest}'s own placement already establishes.
+ *
+ * <p><b>TD-ARCH-023, 2026-09-29:</b> the single-orphaned-role rollback test below proved the
+ * mechanism worked for exactly one role — it did not cover a team orphaning 2+ roles in the same
+ * cascade, the case where the original {@code REQUIRES_NEW}-per-role design could still commit an
+ * earlier role's own deletion before a later role's guard check aborted the rest (see {@code
+ * DeleteWorkspaceTeamService}'s own Javadoc for the full mechanism). {@link
+ * #rollsBackTheWholeCascadeWhenTwoOrphanedRolesTogetherStripTheLastManageMembersHolder} closes that
+ * gap with a real, multi-role, real-Postgres reproduction.
  */
 @SpringBootTest(classes = DeleteWorkspaceTeamTransactionIntegrationTest.TestConfig.class)
 @Testcontainers
@@ -95,7 +103,8 @@ class DeleteWorkspaceTeamTransactionIntegrationTest {
     assertThatCode(
             () ->
                 deleteWorkspaceTeam.handle(
-                    new DeleteWorkspaceTeamCommand(workspace.id(), team.id(), ACTOR)))
+                    new DeleteWorkspaceTeamCommand(
+                        organization.id(), workspace.id(), team.id(), ACTOR)))
         .doesNotThrowAnyException();
 
     assertThat(teams.findById(team.id())).isEmpty();
@@ -124,7 +133,7 @@ class DeleteWorkspaceTeamTransactionIntegrationTest {
     teams.save(team);
     teams.addRoleToTeam(team.id(), manageMembersRole.id());
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(workspace.id(), team.id(), ACTOR);
+        new DeleteWorkspaceTeamCommand(organization.id(), workspace.id(), team.id(), ACTOR);
 
     assertThatExceptionOfType(CannotDemoteLastAdminException.class)
         .isThrownBy(() -> deleteWorkspaceTeam.handle(command));
@@ -134,6 +143,56 @@ class DeleteWorkspaceTeamTransactionIntegrationTest {
     assertThat(memberships.findByWorkspaceIdAndAccountId(workspace.id(), accountId))
         .hasValueSatisfying(
             membership -> assertThat(membership.roleId()).isEqualTo(manageMembersRole.id()));
+  }
+
+  // TD-ARCH-023: the actual bug this fix closes — neither role ALONE would strip the last
+  // manage_members holder, but deleting BOTH in the same team-delete cascade would. Under the old
+  // REQUIRES_NEW-per-role design, roleA's own isolated transaction could commit before roleB's own
+  // guard check aborted the rest, permanently deleting roleA anyway even though the whole operation
+  // was reported as failed. Proves the real, database-level guarantee: with the fix, NOTHING is
+  // persisted — not the team, not either role, not the memberships — when the pre-check catches the
+  // combined impact before either role is ever touched.
+  @Test
+  void rollsBackTheWholeCascadeWhenTwoOrphanedRolesTogetherStripTheLastManageMembersHolder() {
+    Organization organization = Organization.register("Acme", UUID.randomUUID());
+    organizations.save(organization);
+    Workspace workspace = Workspace.register(organization.id(), "Engineering");
+    workspaces.save(workspace);
+    WorkspaceRole roleA =
+        WorkspaceRole.define(
+            organization.id(),
+            "Owner A",
+            null,
+            Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceRole roleB =
+        WorkspaceRole.define(
+            organization.id(),
+            "Owner B",
+            null,
+            Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    roles.save(roleA);
+    roles.save(roleB);
+    UUID accountIdA = UUID.randomUUID();
+    UUID accountIdB = UUID.randomUUID();
+    memberships.save(WorkspaceMembership.join(workspace.id(), accountIdA, roleA.id()));
+    memberships.save(WorkspaceMembership.join(workspace.id(), accountIdB, roleB.id()));
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    teams.save(team);
+    teams.addRoleToTeam(team.id(), roleA.id());
+    teams.addRoleToTeam(team.id(), roleB.id());
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(organization.id(), workspace.id(), team.id(), ACTOR);
+
+    assertThatExceptionOfType(CannotDemoteLastAdminException.class)
+        .isThrownBy(() -> deleteWorkspaceTeam.handle(command));
+
+    assertThat(teams.findById(team.id())).isPresent();
+    assertThat(roles.findById(roleA.id())).isPresent();
+    assertThat(roles.findById(roleB.id())).isPresent();
+    assertThat(memberships.findByWorkspaceIdAndAccountId(workspace.id(), accountIdA))
+        .hasValueSatisfying(membership -> assertThat(membership.roleId()).isEqualTo(roleA.id()));
+    assertThat(memberships.findByWorkspaceIdAndAccountId(workspace.id(), accountIdB))
+        .hasValueSatisfying(membership -> assertThat(membership.roleId()).isEqualTo(roleB.id()));
   }
 
   @Configuration

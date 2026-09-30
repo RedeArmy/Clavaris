@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.security.SecureRandom;
 import java.util.Base64;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link RegisterWebhookEndpointUseCase}. Generates the raw signing secret
@@ -60,6 +61,7 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
   }
 
   @Override
+  @Transactional
   public RegisterWebhookEndpointResult handle(final RegisterWebhookEndpointCommand command) {
     // BR-ORG-02 (this module's own equivalent): never let an endpoint be registered under a
     // non-existent Organization — same reasoning RegisterOAuthClientService's own identical check

@@ -6,6 +6,7 @@ import com.clavaris.clientregistry.application.usecase.createorganizationclient.
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientSecretGenerator;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Same rationale as {@code rotateplatformclientsecret.RotatePlatformClientSecretService} — the
@@ -32,6 +33,7 @@ public class RotateOrganizationClientSecretService
   }
 
   @Override
+  @Transactional
   public RotateOrganizationClientSecretResult handle(
       final RotateOrganizationClientSecretCommand command) {
     final OrganizationClient existing =

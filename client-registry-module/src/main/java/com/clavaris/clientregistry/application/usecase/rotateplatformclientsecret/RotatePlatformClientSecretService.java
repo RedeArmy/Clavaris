@@ -5,6 +5,7 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.P
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
 import com.clavaris.clientregistry.domain.model.PlatformClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * TD-SEC-018: the first real, code-driven way to rotate the single highest-value credential in the
@@ -33,6 +34,7 @@ public class RotatePlatformClientSecretService implements RotatePlatformClientSe
   }
 
   @Override
+  @Transactional
   public RotatePlatformClientSecretResult handle(final RotatePlatformClientSecretCommand command) {
     final PlatformClient existing =
         platformClients

@@ -137,6 +137,7 @@ class WorkspaceRolesController {
           updateRole.handle(
               new UpdateWorkspaceRoleCommand(
                   roleId,
+                  organizationId,
                   request.name(),
                   request.parentRoleId(),
                   request.permissions(),
@@ -171,7 +172,7 @@ class WorkspaceRolesController {
     try {
       deleteRole.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, AuditActor.platformClient(authentication.getName())));
+              roleId, organizationId, AuditActor.platformClient(authentication.getName())));
     } catch (final WorkspaceRoleNotFoundException _) {
       return ResponseEntity.notFound().build();
     } catch (final CannotDeleteReservedWorkspaceRoleException

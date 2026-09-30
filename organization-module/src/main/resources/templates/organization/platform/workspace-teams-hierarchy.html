@@ -96,6 +96,26 @@
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
                     </div>
                 </div>
+
+                <!-- TD-PERF-027: membersPage is one keyset page of this Workspace's own
+                     memberships, not every membership at once — the team/role structure above is
+                     always rendered in full, only which member usernames show under each role is
+                     paginated. Same clavaris-pagination shape organization-users.html's own
+                     Previous/Next controls already establish. -->
+                <nav class="clavaris-pagination"
+                     th:if="${membersPage.hasPrevious() or membersPage.hasNext()}"
+                     aria-label="Team members pages">
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${membersPage.hasPrevious()}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()},before=${membersPage.startCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()},before=${membersPage.startCursor().encode()})}"
+                       hx-target="#teams-hierarchy-content" hx-swap="outerHTML">Previous</a>
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:if="${membersPage.hasNext()}"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()},after=${membersPage.endCursor().encode()})}"
+                       th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organization.id()},workspaceId=${workspace.id()},after=${membersPage.endCursor().encode()})}"
+                       hx-target="#teams-hierarchy-content" hx-swap="outerHTML">Next</a>
+                </nav>
             </div>
 
             <dialog id="team-assign-role-dialog" class="clavaris-dialog">

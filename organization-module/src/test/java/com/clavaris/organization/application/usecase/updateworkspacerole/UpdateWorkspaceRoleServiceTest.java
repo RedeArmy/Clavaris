@@ -50,7 +50,8 @@ class UpdateWorkspaceRoleServiceTest {
   void renamesAndChangesPermissions() {
     WorkspaceRole updated =
         service.handle(
-            new UpdateWorkspaceRoleCommand(role.id(), "Renamed", null, Set.of("b"), ACTOR));
+            new UpdateWorkspaceRoleCommand(
+                role.id(), organizationId, "Renamed", null, Set.of("b"), ACTOR));
 
     assertThat(updated.name()).isEqualTo("Renamed");
     assertThat(updated.permissions()).containsExactly("b");
@@ -60,7 +61,9 @@ class UpdateWorkspaceRoleServiceTest {
   @Test
   void recordsAnAuditEventAndAnOutboxEvent() {
     WorkspaceRole updated =
-        service.handle(new UpdateWorkspaceRoleCommand(role.id(), "Renamed", null, Set.of(), ACTOR));
+        service.handle(
+            new UpdateWorkspaceRoleCommand(
+                role.id(), organizationId, "Renamed", null, Set.of(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -83,7 +86,23 @@ class UpdateWorkspaceRoleServiceTest {
     UUID unknownRoleId = UUID.randomUUID();
     when(roles.findById(unknownRoleId)).thenReturn(Optional.empty());
     UpdateWorkspaceRoleCommand command =
-        new UpdateWorkspaceRoleCommand(unknownRoleId, "Renamed", null, Set.of(), ACTOR);
+        new UpdateWorkspaceRoleCommand(
+            unknownRoleId, organizationId, "Renamed", null, Set.of(), ACTOR);
+
+    assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(roles, never()).save(any());
+  }
+
+  // TD-SEC-056: the role genuinely exists — just for a different Organization than the command
+  // claims. Must 404 identically to an unknown roleId, not silently mutate another tenant's role.
+  @Test
+  void rejectsARoleBelongingToADifferentOrganization() {
+    UUID otherOrganizationId = UUID.randomUUID();
+    UpdateWorkspaceRoleCommand command =
+        new UpdateWorkspaceRoleCommand(
+            role.id(), otherOrganizationId, "Renamed", null, Set.of(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -96,7 +115,7 @@ class UpdateWorkspaceRoleServiceTest {
     WorkspaceRole other = WorkspaceRole.define(organizationId, "Taken", null, Set.of());
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role, other));
     UpdateWorkspaceRoleCommand command =
-        new UpdateWorkspaceRoleCommand(role.id(), "Taken", null, Set.of(), ACTOR);
+        new UpdateWorkspaceRoleCommand(role.id(), organizationId, "Taken", null, Set.of(), ACTOR);
 
     assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
         .isThrownBy(() -> service.handle(command));
@@ -108,7 +127,8 @@ class UpdateWorkspaceRoleServiceTest {
   void allowsKeepingItsOwnCurrentNameUnchanged() {
     WorkspaceRole updated =
         service.handle(
-            new UpdateWorkspaceRoleCommand(role.id(), role.name(), null, Set.of("x"), ACTOR));
+            new UpdateWorkspaceRoleCommand(
+                role.id(), organizationId, role.name(), null, Set.of("x"), ACTOR));
 
     assertThat(updated.name()).isEqualTo(role.name());
   }
@@ -117,7 +137,8 @@ class UpdateWorkspaceRoleServiceTest {
   void rejectsAnUnknownParentRoleId() {
     UUID unknownParentId = UUID.randomUUID();
     UpdateWorkspaceRoleCommand command =
-        new UpdateWorkspaceRoleCommand(role.id(), role.name(), unknownParentId, Set.of(), ACTOR);
+        new UpdateWorkspaceRoleCommand(
+            role.id(), organizationId, role.name(), unknownParentId, Set.of(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -132,7 +153,8 @@ class UpdateWorkspaceRoleServiceTest {
     when(roles.findById(role.id())).thenReturn(Optional.of(role));
     // Setting role's own parent to child would create role -> child -> role.
     UpdateWorkspaceRoleCommand command =
-        new UpdateWorkspaceRoleCommand(role.id(), role.name(), child.id(), Set.of("a"), ACTOR);
+        new UpdateWorkspaceRoleCommand(
+            role.id(), organizationId, role.name(), child.id(), Set.of("a"), ACTOR);
 
     assertThatExceptionOfType(WorkspaceRoleCycleException.class)
         .isThrownBy(() -> service.handle(command));
@@ -150,7 +172,7 @@ class UpdateWorkspaceRoleServiceTest {
     WorkspaceRole updated =
         service.handle(
             new UpdateWorkspaceRoleCommand(
-                child.id(), child.name(), parent.id(), Set.of("b"), ACTOR));
+                child.id(), organizationId, child.name(), parent.id(), Set.of("b"), ACTOR));
 
     assertThat(updated.parentRoleId()).isEqualTo(parent.id());
   }
@@ -161,7 +183,8 @@ class UpdateWorkspaceRoleServiceTest {
     when(roles.findById(reserved.id())).thenReturn(Optional.of(reserved));
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(reserved));
     UpdateWorkspaceRoleCommand command =
-        new UpdateWorkspaceRoleCommand(reserved.id(), reserved.name(), null, Set.of(), ACTOR);
+        new UpdateWorkspaceRoleCommand(
+            reserved.id(), organizationId, reserved.name(), null, Set.of(), ACTOR);
 
     assertThatExceptionOfType(CannotStripReservedWorkspaceRolePermissionsException.class)
         .isThrownBy(() -> service.handle(command));
@@ -176,7 +199,7 @@ class UpdateWorkspaceRoleServiceTest {
     when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(reserved));
     UpdateWorkspaceRoleCommand command =
         new UpdateWorkspaceRoleCommand(
-            reserved.id(), "Renamed Admin", null, reserved.permissions(), ACTOR);
+            reserved.id(), organizationId, "Renamed Admin", null, reserved.permissions(), ACTOR);
 
     WorkspaceRole updated = service.handle(command);
 

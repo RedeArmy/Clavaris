@@ -110,30 +110,25 @@ public class SessionTaskChallengeController {
       return FORM_VIEW;
     }
 
-    final HttpSession session = request.getSession(true);
-    final PendingAuthenticationFactor factor =
-        PendingAuthenticationFactor.valueOf(
-            (String) session.getAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE));
-    final String clientId =
-        (String) session.getAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
-    final String redirectUrl =
-        (String) session.getAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
-    clearPendingState(session);
-
     // This task's own completion is the actual moment the session finally gets established —
     // AuthenticatedSessionCompletion's own device-recording step reflects that.
+    final HttpSession session = request.getSession(true);
     final String redirectTarget =
-        AuthenticatedSessionCompletion.complete(
+        AuthenticatedSessionCompletion.completeFromPendingChallenge(
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
             request,
             response,
+            session,
             organizationId,
             accountId,
-            factor,
-            clientId,
-            redirectUrl);
+            SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE,
+            SessionTaskPendingState.FACTOR_ATTRIBUTE,
+            SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE,
+            SessionTaskPendingState.CLIENT_ID_ATTRIBUTE,
+            SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE,
+            SessionTaskPendingState.PROVIDER_ATTRIBUTE);
     return "redirect:" + redirectTarget;
   }
 
@@ -158,13 +153,5 @@ public class SessionTaskChallengeController {
       return Optional.empty();
     }
     return Optional.of(new AccountId(UUID.fromString((String) rawAccountId)));
-  }
-
-  private void clearPendingState(final HttpSession session) {
-    session.removeAttribute(SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.CLIENT_ID_ATTRIBUTE);
-    session.removeAttribute(SessionTaskPendingState.REDIRECT_URL_ATTRIBUTE);
   }
 }

@@ -38,6 +38,13 @@ final class DeviceTrustPendingState {
   /* package */ static final String REDIRECT_URL_ATTRIBUTE =
       "clavaris.deviceTrust.pendingRedirectUrl";
 
+  /**
+   * TD-SEC-055: the {@code SocialProvider} enum name, present only when {@code factor == SOCIAL} —
+   * {@link DeviceTrustChallengeController#confirm} needs it to call {@code establishViaSocialLogin}
+   * rather than {@code establish}/{@code establishViaOneTimeEmailProof} on resume.
+   */
+  /* package */ static final String PROVIDER_ATTRIBUTE = "clavaris.deviceTrust.pendingProvider";
+
   private DeviceTrustPendingState() {
     // Constants only.
   }

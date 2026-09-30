@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.createorganizationclient.
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Same rationale as {@code deactivateplatformclient.DeactivatePlatformClientService}. */
 @SuppressWarnings("PMD.LongVariable")
@@ -20,6 +21,7 @@ public class DeactivateOrganizationClientService implements DeactivateOrganizati
   }
 
   @Override
+  @Transactional
   public void handle(final DeactivateOrganizationClientCommand command) {
     final OrganizationClient existing =
         organizationClients

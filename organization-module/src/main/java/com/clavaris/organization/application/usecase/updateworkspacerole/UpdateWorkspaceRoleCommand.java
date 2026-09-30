@@ -12,7 +12,16 @@ import java.util.UUID;
  * field's own absence-vs-null ambiguity in a true partial patch isn't worth resolving for a v1
  * management-API resource this small.
  *
+ * @param organizationId TD-SEC-056 (fixed): same anti-enumeration check {@code
+ *     DeleteWorkspaceRoleCommand}'s own identical field documents in full — previously absent, so
+ *     {@code WorkspaceRolesController}'s {@code organizationId} path variable was purely decorative
+ *     for this verb too.
  * @param parentRoleId nullable — {@code null} clears the parent (ADR-0027 §3).
  */
 public record UpdateWorkspaceRoleCommand(
-    UUID roleId, String name, UUID parentRoleId, Set<String> permissions, AuditActor actor) {}
+    UUID roleId,
+    UUID organizationId,
+    String name,
+    UUID parentRoleId,
+    Set<String> permissions,
+    AuditActor actor) {}

@@ -227,6 +227,7 @@ public class PlatformWorkspaceRoleController {
           updateRole.handle(
               new UpdateWorkspaceRoleCommand(
                   roleId,
+                  organizationId,
                   form.getName(),
                   form.getParentRoleId(),
                   parsePermissions(form.getPermissionsText()),
@@ -269,7 +270,7 @@ public class PlatformWorkspaceRoleController {
     try {
       deleteRole.handle(
           new DeleteWorkspaceRoleCommand(
-              roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+              roleId, organizationId, AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final CannotDeleteReservedWorkspaceRoleException _) {

@@ -9,11 +9,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
+import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
+import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamRepository;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
@@ -21,9 +24,13 @@ import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteW
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
+import com.clavaris.organization.domain.model.WorkspaceMembership;
+import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,30 +43,42 @@ class DeleteWorkspaceTeamServiceTest {
   private WorkspaceTeamRepository teams;
   private DeleteWorkspaceRoleUseCase deleteRole;
   private AuditEventRecorder auditEvents;
+  private WorkspaceMembershipRepository memberships;
+  private WorkspaceRoleRepository roles;
   private DeleteWorkspaceTeamService service;
 
   private WorkspaceTeam team;
+  private UUID organizationId;
 
   @BeforeEach
   void setUp() {
     teams = mock(WorkspaceTeamRepository.class);
     deleteRole = mock(DeleteWorkspaceRoleUseCase.class);
     auditEvents = mock(AuditEventRecorder.class);
+    memberships = mock(WorkspaceMembershipRepository.class);
+    roles = mock(WorkspaceRoleRepository.class);
+    organizationId = UUID.randomUUID();
     team = WorkspaceTeam.define(UUID.randomUUID(), "QA");
     when(teams.findById(team.id())).thenReturn(Optional.of(team));
-    service = new DeleteWorkspaceTeamService(teams, deleteRole, auditEvents);
+    // No manage_members holder among the roles this cascade would delete, by default — every
+    // existing test below keeps this shape unless it explicitly overrides roles/memberships to
+    // exercise the aggregate guard itself.
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of());
+    service = new DeleteWorkspaceTeamService(teams, deleteRole, auditEvents, memberships, roles);
   }
 
   @Test
   void deletesTheTeam() {
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(teams).deleteById(team.id());
   }
 
   @Test
   void recordsAnAuditEvent() {
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(auditEvents)
         .write(
@@ -75,7 +94,7 @@ class DeleteWorkspaceTeamServiceTest {
     UUID unknownTeamId = UUID.randomUUID();
     when(teams.findById(unknownTeamId)).thenReturn(Optional.empty());
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(team.workspaceId(), unknownTeamId, ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), unknownTeamId, ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -86,7 +105,7 @@ class DeleteWorkspaceTeamServiceTest {
   @Test
   void rejectsATeamBelongingToADifferentWorkspace() {
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(UUID.randomUUID(), team.id(), ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, UUID.randomUUID(), team.id(), ACTOR);
 
     assertThatExceptionOfType(WorkspaceTeamNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
@@ -102,7 +121,8 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
 
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
         ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
@@ -116,7 +136,8 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(true);
 
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(deleteRole, never()).handle(any());
   }
@@ -131,7 +152,8 @@ class DeleteWorkspaceTeamServiceTest {
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
     doThrow(new WorkspaceRoleStillAssignedException(roleId)).when(deleteRole).handle(any());
 
-    service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+    service.handle(
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
 
     verify(teams).deleteById(team.id());
   }
@@ -148,47 +170,125 @@ class DeleteWorkspaceTeamServiceTest {
             new CannotDeleteReservedWorkspaceRoleException(roleId))) {
       doThrow(guardException).when(deleteRole).handle(any());
 
-      service.handle(new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR));
+      service.handle(
+          new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR));
     }
 
     verify(teams, times(2)).deleteById(team.id());
   }
 
-  // Live UX request, 2026-09-29: unlike the other three guard exceptions,
-  // CannotDemoteLastAdminException now aborts the WHOLE operation instead of being silently
-  // tolerated — see DeleteWorkspaceTeamService's own Javadoc for why this one is different (the
-  // dashboard's own "type UNASSIGN to confirm" popup needs a real failure to react to).
-  //
-  // NOT asserted here: that teams.deleteById is never called — a mocked repository has no
-  // transaction to roll back, so it genuinely IS invoked earlier in this same method before the
-  // exception propagates (that's the whole bug this class's own Javadoc documents: without
-  // @Transactional(REQUIRES_NEW) on the nested DeleteWorkspaceRoleService call, this exact
-  // sequence used to silently corrupt the caller's transaction). The real "nothing was actually
-  // persisted" guarantee is a database-transaction concern a pure-Mockito test cannot observe —
-  // see DeleteWorkspaceTeamTransactionIntegrationTest's own real-Postgres coverage of this exact
-  // scenario instead.
+  // TD-ARCH-023 (fixed): CannotDemoteLastAdminException now aborts the WHOLE operation via a
+  // single up-front aggregate check
+  // (ManageMembersGuard#assertUnassigningRolesKeepsAtLeastOneHolder)
+  // BEFORE the team row is ever touched — unlike the old REQUIRES_NEW-per-role design, this is now
+  // genuinely provable in a pure-Mockito test: teams.deleteById() is asserted never called, not
+  // merely "called but rolled back by a transaction this test can't see."
   @Test
-  void propagatesTheExceptionInsteadOfSwallowingIt() {
-    UUID roleId = UUID.randomUUID();
-    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
-    when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
-    doThrow(new CannotDemoteLastAdminException(team.workspaceId())).when(deleteRole).handle(any());
+  void
+      abortsTheWholeOperationWhenDeletingTheOnlyOrphanedRoleWouldStripTheLastManageMembersHolder() {
+    UUID workspaceId = team.workspaceId();
+    UUID accountId = UUID.randomUUID();
+    WorkspaceRole manageMembersRole =
+        WorkspaceRole.define(
+            organizationId, "Owner", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceMembership onlyHolder =
+        WorkspaceMembership.join(workspaceId, accountId, manageMembersRole.id());
+    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(manageMembersRole.id()));
+    when(teams.isRoleGroupedInAnyOtherTeam(manageMembersRole.id(), team.id())).thenReturn(false);
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(manageMembersRole));
+    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(onlyHolder));
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, workspaceId, team.id(), ACTOR);
 
     assertThatExceptionOfType(CannotDemoteLastAdminException.class)
         .isThrownBy(() -> service.handle(command));
+
+    verify(teams, never()).deleteById(any());
+    verify(deleteRole, never()).handle(any());
+    verifyNoInteractions(auditEvents);
   }
 
-  // force=true threads through to the nested DeleteWorkspaceRoleCommand, so the guard is skipped
-  // there and this exception never fires in the first place — the whole operation succeeds.
+  // TD-ARCH-023's own actual bug scenario: neither role ALONE would strip the last holder, but
+  // deleting BOTH in the same cascade would — the aggregate check must see the combined impact
+  // across role boundaries, which per-role isolated checks (the old REQUIRES_NEW design) never
+  // could. Both roles hold manage_members; each has its own distinct holder; removing both leaves
+  // zero survivors.
   @Test
-  void forceThreadsThroughToTheNestedDeleteRoleCommand() {
+  void abortsWhenTwoOrphanedRolesTogetherWouldStripTheLastManageMembersHolder() {
+    UUID workspaceId = team.workspaceId();
+    WorkspaceRole roleA =
+        WorkspaceRole.define(
+            organizationId, "Owner A", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceRole roleB =
+        WorkspaceRole.define(
+            organizationId, "Owner B", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceMembership holderA =
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), roleA.id());
+    WorkspaceMembership holderB =
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), roleB.id());
+    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleA.id(), roleB.id()));
+    when(teams.isRoleGroupedInAnyOtherTeam(roleA.id(), team.id())).thenReturn(false);
+    when(teams.isRoleGroupedInAnyOtherTeam(roleB.id(), team.id())).thenReturn(false);
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB));
+    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(holderA, holderB));
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(organizationId, workspaceId, team.id(), ACTOR);
+
+    assertThatExceptionOfType(CannotDemoteLastAdminException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(teams, never()).deleteById(any());
+    verify(deleteRole, never()).handle(any());
+  }
+
+  // Same two-role setup as above, but with a THIRD role's holder surviving untouched — the
+  // aggregate check must correctly allow this, not over-block just because manage_members roles
+  // are involved at all.
+  @Test
+  void allowsTwoOrphanedRolesWhenAThirdSurvivingHolderRemains() {
+    UUID workspaceId = team.workspaceId();
+    WorkspaceRole roleA =
+        WorkspaceRole.define(
+            organizationId, "Owner A", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceRole roleB =
+        WorkspaceRole.define(
+            organizationId, "Owner B", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceRole survivingRole =
+        WorkspaceRole.define(
+            organizationId, "Owner C", null, Set.of(ReservedWorkspacePermissions.MANAGE_MEMBERS));
+    WorkspaceMembership holderA =
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), roleA.id());
+    WorkspaceMembership holderB =
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), roleB.id());
+    WorkspaceMembership survivingHolder =
+        WorkspaceMembership.join(workspaceId, UUID.randomUUID(), survivingRole.id());
+    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleA.id(), roleB.id()));
+    when(teams.isRoleGroupedInAnyOtherTeam(roleA.id(), team.id())).thenReturn(false);
+    when(teams.isRoleGroupedInAnyOtherTeam(roleB.id(), team.id())).thenReturn(false);
+    when(roles.findAllByOrganizationId(organizationId))
+        .thenReturn(List.of(roleA, roleB, survivingRole));
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(List.of(holderA, holderB, survivingHolder));
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(organizationId, workspaceId, team.id(), ACTOR);
+
+    service.handle(command);
+
+    verify(teams).deleteById(team.id());
+    verify(deleteRole, times(2)).handle(any());
+  }
+
+  // force=true skips the aggregate pre-check entirely — the whole operation proceeds, and every
+  // nested DeleteWorkspaceRoleCommand this cascade builds is force=true too (the guard would be
+  // redundant there in every case, since either the pre-check already validated safety, or the
+  // caller explicitly asked to skip it).
+  @Test
+  void forceSkipsTheAggregateCheckAndThreadsForceIntoEveryNestedCommand() {
     UUID roleId = UUID.randomUUID();
     when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
     when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
     DeleteWorkspaceTeamCommand command =
-        new DeleteWorkspaceTeamCommand(team.workspaceId(), team.id(), true, ACTOR);
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), true, ACTOR);
 
     service.handle(command);
 
@@ -197,6 +297,27 @@ class DeleteWorkspaceTeamServiceTest {
     verify(deleteRole).handle(captured.capture());
     assertThat(captured.getValue().force()).isTrue();
     verify(teams).deleteById(team.id());
+    verifyNoInteractions(memberships);
+    verifyNoInteractions(roles);
+  }
+
+  // Every nested DeleteWorkspaceRoleCommand this cascade builds is force=true unconditionally,
+  // even without the caller's own command.force() being set — the aggregate pre-check above
+  // already established aggregate safety, so the nested per-role guard would be redundant.
+  @Test
+  void alwaysForcesTheNestedDeleteRoleCommandOnceThePreCheckPasses() {
+    UUID roleId = UUID.randomUUID();
+    when(teams.findRoleIdsByTeamId(team.id())).thenReturn(List.of(roleId));
+    when(teams.isRoleGroupedInAnyOtherTeam(roleId, team.id())).thenReturn(false);
+    DeleteWorkspaceTeamCommand command =
+        new DeleteWorkspaceTeamCommand(organizationId, team.workspaceId(), team.id(), ACTOR);
+
+    service.handle(command);
+
+    ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
+        ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
+    verify(deleteRole).handle(captured.capture());
+    assertThat(captured.getValue().force()).isTrue();
   }
 
   private static void assertThatIsForRoleAndWorkspace(

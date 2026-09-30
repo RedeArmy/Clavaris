@@ -4,6 +4,7 @@ import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.P
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
 import com.clavaris.clientregistry.domain.model.PlatformClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * TD-SEC-018: the self-service half of PlatformClient compromise recovery this codebase didn't have
@@ -26,6 +27,7 @@ public class DeactivatePlatformClientService implements DeactivatePlatformClient
   }
 
   @Override
+  @Transactional
   public void handle(final DeactivatePlatformClientCommand command) {
     final PlatformClient existing =
         platformClients

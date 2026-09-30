@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.List;
@@ -165,6 +166,100 @@ class ManageMembersGuardTest {
         organizationId,
         child.id(),
         null,
+        IllegalStateException::new);
+  }
+
+  // TD-ARCH-023: assertUnassigningRolesKeepsAtLeastOneHolder's own dedicated coverage.
+
+  // The exact bug a real-Postgres integration test caught: a role can carry manage_members
+  // (e.g. a freshly-seeded reserved role) while having ZERO current holders in this Workspace —
+  // unassigning nobody can never reduce the holder count, so this must never throw.
+  @Test
+  void aggregateCheckDoesNotThrowWhenTheRoleBeingUnassignedHasNoCurrentHolders() {
+    final WorkspaceRole role = manageMembersRole();
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
+    when(memberships.findAllByWorkspaceId(workspaceId)).thenReturn(List.of());
+
+    ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
+        memberships,
+        roles,
+        workspaceId,
+        organizationId,
+        Set.of(role.id()),
+        IllegalStateException::new);
+  }
+
+  @Test
+  void aggregateCheckThrowsWhenUnassigningTheOnlyRoleWithARealHolderStripsTheLastOne() {
+    final WorkspaceRole role = manageMembersRole();
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(role));
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(List.of(membershipWithRole(role.id())));
+    // Sonar S5778: the lambda below must contain only the one call actually expected to throw —
+    // built here, same convention this codebase's other tests already establish, rather than
+    // inline in the lambda where Set.of(...) itself would also count as a possibly-throwing
+    // invocation.
+    final Set<UUID> roleIdsBeingUnassigned = Set.of(role.id());
+
+    assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
+        .isThrownBy(
+            () ->
+                ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
+                    memberships,
+                    roles,
+                    workspaceId,
+                    organizationId,
+                    roleIdsBeingUnassigned,
+                    CannotRemoveLastHolderExceptionForTest::new));
+  }
+
+  // The actual multi-role scenario TD-ARCH-023 is about: neither role alone holds the LAST
+  // holder, but together they do — a per-role check could never see this, the aggregate one must.
+  @Test
+  void aggregateCheckThrowsWhenTwoRolesTogetherStripTheLastHolderEvenThoughNeitherAloneWould() {
+    final WorkspaceRole roleA =
+        WorkspaceRole.define(organizationId, "Owner A", null, ReservedWorkspacePermissions.ALL);
+    final WorkspaceRole roleB =
+        WorkspaceRole.define(organizationId, "Owner B", null, ReservedWorkspacePermissions.ALL);
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB));
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(List.of(membershipWithRole(roleA.id()), membershipWithRole(roleB.id())));
+    // Sonar S5778: same rationale as this class's own identical fix above.
+    final Set<UUID> roleIdsBeingUnassigned = Set.of(roleA.id(), roleB.id());
+
+    assertThatExceptionOfType(CannotRemoveLastHolderExceptionForTest.class)
+        .isThrownBy(
+            () ->
+                ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
+                    memberships,
+                    roles,
+                    workspaceId,
+                    organizationId,
+                    roleIdsBeingUnassigned,
+                    CannotRemoveLastHolderExceptionForTest::new));
+  }
+
+  @Test
+  void aggregateCheckDoesNotThrowWhenAThirdRolesHolderSurvives() {
+    final WorkspaceRole roleA =
+        WorkspaceRole.define(organizationId, "Owner A", null, ReservedWorkspacePermissions.ALL);
+    final WorkspaceRole roleB =
+        WorkspaceRole.define(organizationId, "Owner B", null, ReservedWorkspacePermissions.ALL);
+    final WorkspaceRole survivor = manageMembersRole();
+    when(roles.findAllByOrganizationId(organizationId)).thenReturn(List.of(roleA, roleB, survivor));
+    when(memberships.findAllByWorkspaceId(workspaceId))
+        .thenReturn(
+            List.of(
+                membershipWithRole(roleA.id()),
+                membershipWithRole(roleB.id()),
+                membershipWithRole(survivor.id())));
+
+    ManageMembersGuard.assertUnassigningRolesKeepsAtLeastOneHolder(
+        memberships,
+        roles,
+        workspaceId,
+        organizationId,
+        Set.of(roleA.id(), roleB.id()),
         IllegalStateException::new);
   }
 

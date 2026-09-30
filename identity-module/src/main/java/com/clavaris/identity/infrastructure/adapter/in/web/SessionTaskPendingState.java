@@ -29,6 +29,12 @@ final class SessionTaskPendingState {
   /* package */ static final String REDIRECT_URL_ATTRIBUTE =
       "clavaris.sessionTask.pendingRedirectUrl";
 
+  /**
+   * TD-SEC-055: same rationale as {@code DeviceTrustPendingState}'s own identical attribute —
+   * present only when {@code factor == SOCIAL}.
+   */
+  /* package */ static final String PROVIDER_ATTRIBUTE = "clavaris.sessionTask.pendingProvider";
+
   private SessionTaskPendingState() {
     // Constants only.
   }

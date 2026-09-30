@@ -434,8 +434,11 @@ class OrganizationUseCaseConfig {
       final WorkspaceTeamRepository teams,
       @SuppressWarnings("PMD.LongVariable")
           final DeleteWorkspaceRoleUseCase deleteWorkspaceRoleUseCase,
-      final AuditEventRecorder auditEvents) {
-    return new DeleteWorkspaceTeamService(teams, deleteWorkspaceRoleUseCase, auditEvents);
+      final AuditEventRecorder auditEvents,
+      final WorkspaceMembershipRepository memberships,
+      final WorkspaceRoleRepository roles) {
+    return new DeleteWorkspaceTeamService(
+        teams, deleteWorkspaceRoleUseCase, auditEvents, memberships, roles);
   }
 
   @Bean

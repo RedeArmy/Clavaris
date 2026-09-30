@@ -13,8 +13,10 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import com.clavaris.identity.domain.model.Username;
 import jakarta.persistence.EntityManager;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
@@ -23,11 +25,15 @@ import org.springframework.transaction.annotation.Transactional;
 // PMD.TooManyMethods: ADR-0024 §4 added two more methods (username lookup) to a repository
 // implementing the one AccountRepository port — same "wiring, not sprawl" reasoning every other
 // growing outbound-port implementation in this codebase already documents for an identical case.
+// PMD.CouplingBetweenObjects: TD-PERF-027's new findAllByOrganizationIdAndIds (one more mapped
+// domain/entity type in its signature) pushed this class's own count from 20 to 21 — the same
+// "wiring, not sprawl" shape as TooManyMethods above, on the same class, for the same reason: one
+// repository implementing one growing outbound port collaborates with every type that port needs.
 /**
  * Implements the outbound port; maps between {@code domain.model} (framework-free) and the
  * {@code @Entity} classes in this package.
  */
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @Repository
 class JpaAccountRepository implements AccountRepository {
 
@@ -83,6 +89,15 @@ class JpaAccountRepository implements AccountRepository {
   @Override
   public Optional<OrganizationId> findOrganizationIdById(final AccountId accountId) {
     return accounts.findOrganizationIdById(accountId.value()).map(OrganizationId::new);
+  }
+
+  @Override
+  public List<Account> findAllByOrganizationIdAndIds(
+      final OrganizationId organizationId, final Collection<AccountId> accountIds) {
+    final List<UUID> ids = accountIds.stream().map(AccountId::value).toList();
+    return accounts.findByOrganizationIdAndIdIn(organizationId.value(), ids).stream()
+        .map(this::toDomain)
+        .toList();
   }
 
   private Account toDomain(final AccountEntity entity) {

@@ -3,6 +3,7 @@ package com.clavaris.clientregistry.application.usecase.updateoauthclientredirec
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Same ownership-verification/audit shape as {@code
@@ -21,6 +22,7 @@ public class UpdateOAuthClientRedirectSettingsService
   }
 
   @Override
+  @Transactional
   public void handle(final UpdateOAuthClientRedirectSettingsCommand command) {
     final OAuthClient existing =
         oauthClients

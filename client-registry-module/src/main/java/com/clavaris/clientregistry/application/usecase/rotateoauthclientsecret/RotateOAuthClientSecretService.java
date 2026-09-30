@@ -5,6 +5,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuth
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Same rationale as {@code rotateorganizationclientsecret.RotateOrganizationClientSecretService} —
@@ -31,6 +32,7 @@ public class RotateOAuthClientSecretService implements RotateOAuthClientSecretUs
   }
 
   @Override
+  @Transactional
   public RotateOAuthClientSecretResult handle(final RotateOAuthClientSecretCommand command) {
     final OAuthClient existing =
         oauthClients

@@ -8,6 +8,7 @@ import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link RotateWebhookEndpointSecretUseCase} — ADR-0007's own first open question
@@ -38,6 +39,7 @@ public class RotateWebhookEndpointSecretService implements RotateWebhookEndpoint
   }
 
   @Override
+  @Transactional
   public RotateWebhookEndpointSecretResult handle(
       final RotateWebhookEndpointSecretCommand command) {
     final WebhookEndpoint existing =

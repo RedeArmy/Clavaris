@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -17,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.AddRoleToWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.addroletoworkspaceteam.WorkspaceRoleAlreadyInAnotherTeamException;
@@ -44,6 +46,7 @@ import com.clavaris.organization.application.usecase.deleteworkspaceteam.DeleteW
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
+import com.clavaris.organization.application.usecase.listworkspacememberspaged.ListWorkspaceMembersPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
@@ -95,6 +98,7 @@ class PlatformWorkspaceControllerTest {
   private CreateWorkspaceRoleUseCase createRole;
   private DeleteWorkspaceRoleUseCase deleteRole;
   private ListWorkspaceMembersUseCase listMembers;
+  private ListWorkspaceMembersPagedUseCase listMembersPaged;
   private OrganizationAccountDirectory accountDirectory;
   private AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private ChangeWorkspaceMemberRoleUseCase changeMemberRole;
@@ -122,6 +126,7 @@ class PlatformWorkspaceControllerTest {
     createRole = mock(CreateWorkspaceRoleUseCase.class);
     deleteRole = mock(DeleteWorkspaceRoleUseCase.class);
     listMembers = mock(ListWorkspaceMembersUseCase.class);
+    listMembersPaged = mock(ListWorkspaceMembersPagedUseCase.class);
     accountDirectory = mock(OrganizationAccountDirectory.class);
     assignRoleToAccount = mock(AssignWorkspaceRoleToAccountUseCase.class);
     changeMemberRole = mock(ChangeWorkspaceMemberRoleUseCase.class);
@@ -139,7 +144,10 @@ class PlatformWorkspaceControllerTest {
     when(listTeamRoleIds.handle(any())).thenReturn(List.of());
     when(listGroupedRoleIds.handle(any())).thenReturn(Set.of());
     when(listMembers.handle(any())).thenReturn(List.of());
+    when(listMembersPaged.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(), null, null, false, false));
     when(accountDirectory.listAccountsForOrganization(any())).thenReturn(List.of());
+    when(accountDirectory.listAccountsByIds(any(), any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -175,6 +183,7 @@ class PlatformWorkspaceControllerTest {
                     createRole,
                     deleteRole,
                     listMembers,
+                    listMembersPaged,
                     accountDirectory,
                     assignRoleToAccount,
                     changeMemberRole))
@@ -360,9 +369,15 @@ class PlatformWorkspaceControllerTest {
   @Test
   void showsEveryMemberHoldingARoleInTheHierarchyByNameNotId() throws Exception {
     UUID accountId = UUID.randomUUID();
-    when(listMembers.handle(any()))
-        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));
-    when(accountDirectory.listAccountsForOrganization(any()))
+    when(listMembersPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(
+                List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())),
+                null,
+                null,
+                false,
+                false));
+    when(accountDirectory.listAccountsByIds(any(), any()))
         .thenReturn(List.of(new OrganizationAccountSummary(accountId, "Jane Doe")));
 
     // The raw accountId still legitimately appears in the "Remove" button's own form action URL
@@ -381,8 +396,14 @@ class PlatformWorkspaceControllerTest {
   @Test
   void fallsBackToTheRawAccountIdWhenItIsMissingFromTheDirectory() throws Exception {
     UUID accountId = UUID.randomUUID();
-    when(listMembers.handle(any()))
-        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())));
+    when(listMembersPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(
+                List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())),
+                null,
+                null,
+                false,
+                false));
 
     mockMvc
         .perform(get(teamsPath()))
@@ -394,10 +415,49 @@ class PlatformWorkspaceControllerTest {
   // per-role grouping (its accountId simply never appears under any role).
   @Test
   void doesNotBlowUpOnARolelessMembership() throws Exception {
-    when(listMembers.handle(any()))
-        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), null)));
+    when(listMembersPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(
+                List.of(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), null)),
+                null,
+                null,
+                false,
+                false));
 
     mockMvc.perform(get(teamsPath())).andExpect(status().isOk());
+  }
+
+  // TD-PERF-027: the pagination nav must actually render (and only) when there's a real next/
+  // previous page — proves the fix isn't cosmetic (a membersPage model attribute nobody reads).
+  @Test
+  void rendersTheNextLinkWhenAFurtherPageOfMembersExists() throws Exception {
+    KeysetCursor cursor = new KeysetCursor(Instant.now(), UUID.randomUUID());
+    when(listMembersPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(
+                List.of(WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), role.id())),
+                cursor,
+                cursor,
+                true,
+                false));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("nav class=\"clavaris-pagination\"")))
+        .andExpect(content().string(containsString(">Next<")))
+        .andExpect(content().string(not(containsString(">Previous<"))));
+  }
+
+  @Test
+  void rendersNoPaginationNavWhenEverythingFitsOnOnePage() throws Exception {
+    when(listMembersPaged.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(), null, null, false, false));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("nav class=\"clavaris-pagination\""))));
   }
 
   @Test

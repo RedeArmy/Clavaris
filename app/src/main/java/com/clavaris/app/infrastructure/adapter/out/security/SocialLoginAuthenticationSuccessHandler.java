@@ -8,10 +8,15 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.UnverifiedProviderEmailException;
+import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
+import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -19,13 +24,17 @@ import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.identity.infrastructure.adapter.in.web.AuthenticatedSessionEstablisher;
 import com.clavaris.identity.infrastructure.adapter.in.web.DeviceCookie;
+import com.clavaris.identity.infrastructure.adapter.in.web.DeviceTrustGate;
+import com.clavaris.identity.infrastructure.adapter.in.web.PendingAuthenticationFactor;
 import com.clavaris.identity.infrastructure.adapter.in.web.PlatformAuthenticatedSessionEstablisher;
+import com.clavaris.identity.infrastructure.adapter.in.web.SessionTaskGate;
 import com.clavaris.identity.infrastructure.adapter.in.web.SocialLoginRedirectController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -74,12 +83,17 @@ import org.springframework.stereotype.Component;
 // the record-pattern accountId/platformAccountId types the code review's own record-pattern fix
 // added — same "wiring together many distinct types is the job" reasoning
 // RefreshTokenRotationAuthenticationProvider's own identical suppression already documents.
+// PMD.CouplingBetweenObjects: TD-SEC-055's own four new collaborators (accounts, knownDevices,
+// requestDeviceTrustChallenge, authenticationPolicyProvider) pushed this class's own count past
+// the threshold — same "wiring, not sprawl" reasoning as PMD.ExcessiveImports above, on the same
+// class, for the same reason.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.LawOfDemeter",
   "PMD.OnlyOneReturn",
   "java:S1075",
-  "PMD.ExcessiveImports"
+  "PMD.ExcessiveImports",
+  "PMD.CouplingBetweenObjects"
 })
 @Component
 public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
@@ -92,24 +106,42 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
   private final PlatformAuthenticatedSessionEstablisher platformSessions;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
+  // TD-SEC-055: the same four collaborators the four password/email-code/email-link controllers
+  // already thread through DeviceTrustGate/SessionTaskGate — this handler never had them before,
+  // which is exactly why social login could establish a session without either check running.
+  private final AccountRepository accounts;
+  private final KnownDeviceRepository knownDevices;
+  private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
-  // AuthenticateWithSocialProviderService's own identical suppression: this handler genuinely
-  // orchestrates both tiers' own use case + session-establishment pairs.
+  // one parameter per collaborating port — same rationale as
+  // AuthenticateWithSocialProviderService's
+  // own identical suppression: this handler genuinely orchestrates both tiers' own use case +
+  // session-establishment pairs, plus (TD-SEC-055) the same device-trust/session-task collaborators
+  // every primary-factor controller already needs.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public SocialLoginAuthenticationSuccessHandler(
       final AuthenticateWithSocialProviderUseCase tenantUseCase,
       final AuthenticatePlatformAccountWithSocialProviderUseCase platformUseCase,
       final AuthenticatedSessionEstablisher tenantSessions,
       final PlatformAuthenticatedSessionEstablisher platformSessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
-      final RedirectUrlResolver redirectUrlResolver) {
+      final RedirectUrlResolver redirectUrlResolver,
+      final AccountRepository accounts,
+      final KnownDeviceRepository knownDevices,
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
+      final AccountAuthenticationPolicyProvider authenticationPolicyProvider) {
     this.tenantUseCase = tenantUseCase;
     this.platformUseCase = platformUseCase;
     this.tenantSessions = tenantSessions;
     this.platformSessions = platformSessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
+    this.accounts = accounts;
+    this.knownDevices = knownDevices;
+    this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
+    this.authenticationPolicyProvider = authenticationPolicyProvider;
   }
 
   @Override
@@ -217,6 +249,55 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     }
 
     if (result instanceof AuthenticateWithSocialProviderResult.LoggedIn(AccountId accountId)) {
+      // TD-SEC-055: same DeviceTrustGate/SessionTaskGate sequence PrimaryFactorLoginCompletion
+      // already runs for password/email-code/email-link logins — social login used to establish a
+      // session directly below, through neither check, a live bypass of both a device-trust
+      // step-up and an operator-forced password reset for any account with a linked social
+      // identity. account is fetched once here (moments after tenantUseCase.handle(...) itself
+      // just loaded/created the same row) rather than threading it back out of
+      // AuthenticateWithSocialProviderResult.LoggedIn — a narrower, lower-blast-radius change than
+      // widening that sealed result's own shape for every other caller.
+      final Account account =
+          accounts
+              .findById(accountId)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "Account vanished immediately after its own successful login: "
+                              + accountId));
+
+      final Optional<String> deviceChallenge =
+          DeviceTrustGate.intercept(
+              knownDevices,
+              requestDeviceTrustChallenge,
+              authenticationPolicyProvider.policyFor(new OrganizationId(organizationId)),
+              request,
+              organizationId,
+              accountId,
+              PendingAuthenticationFactor.SOCIAL,
+              clientId,
+              redirectUrl,
+              account.bypassesDeviceTrust(),
+              provider);
+      if (deviceChallenge.isPresent()) {
+        redirectStrategy.sendRedirect(request, response, deviceChallenge.get());
+        return;
+      }
+
+      final Optional<String> sessionTask =
+          SessionTaskGate.intercept(
+              request,
+              organizationId,
+              account,
+              PendingAuthenticationFactor.SOCIAL,
+              clientId,
+              redirectUrl,
+              provider);
+      if (sessionTask.isPresent()) {
+        redirectStrategy.sendRedirect(request, response, sessionTask.get());
+        return;
+      }
+
       final String fallbackUrl =
           redirectUrlResolver
               .resolve(

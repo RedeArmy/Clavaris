@@ -1,8 +1,11 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -16,11 +19,13 @@ import com.clavaris.organization.application.usecase.createworkspace.Organizatio
 import com.clavaris.organization.application.usecase.createworkspacerole.CreateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.createworkspacerole.DuplicateWorkspaceRoleNameException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.CannotDeleteReservedWorkspaceRoleException;
+import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.DeleteWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleHasChildRolesException;
 import com.clavaris.organization.application.usecase.deleteworkspacerole.WorkspaceRoleStillAssignedException;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.CannotStripReservedWorkspaceRolePermissionsException;
+import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
 import com.clavaris.organization.domain.model.WorkspaceRole;
@@ -30,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -108,7 +114,7 @@ class WorkspaceRolesControllerTest {
                 .content("{\"name\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest());
 
-    org.mockito.Mockito.verifyNoInteractions(createRole);
+    verifyNoInteractions(createRole);
   }
 
   @Test
@@ -166,6 +172,27 @@ class WorkspaceRolesControllerTest {
         .andExpect(jsonPath("$.name").value("Renamed"));
   }
 
+  // TD-SEC-056: the controller must actually thread the path's own organizationId into the
+  // command — previously it never did, making the path segment purely decorative for this verb.
+  @Test
+  void updateThreadsThePathsOrganizationIdIntoTheCommand() throws Exception {
+    WorkspaceRole role = WorkspaceRole.define(organizationId, "Renamed", null, Set.of());
+    when(updateRole.handle(any())).thenReturn(role);
+
+    mockMvc
+        .perform(
+            patch(path() + "/" + role.id())
+                .principal(ACTING_PLATFORM_CLIENT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Renamed\"}"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<UpdateWorkspaceRoleCommand> captured =
+        ArgumentCaptor.forClass(UpdateWorkspaceRoleCommand.class);
+    verify(updateRole).handle(captured.capture());
+    assertThat(captured.getValue().organizationId()).isEqualTo(organizationId);
+  }
+
   @Test
   void updateReturns404WhenTheRoleDoesNotExist() throws Exception {
     UUID unknownRoleId = UUID.randomUUID();
@@ -220,7 +247,7 @@ class WorkspaceRolesControllerTest {
                 .content("{\"name\":\"" + tooLong + "\"}"))
         .andExpect(status().isBadRequest());
 
-    org.mockito.Mockito.verifyNoInteractions(updateRole);
+    verifyNoInteractions(updateRole);
   }
 
   @Test
@@ -242,6 +269,21 @@ class WorkspaceRolesControllerTest {
     mockMvc
         .perform(delete(path() + "/" + UUID.randomUUID()).principal(ACTING_PLATFORM_CLIENT))
         .andExpect(status().isNoContent());
+  }
+
+  // TD-SEC-056: same fix as update's own identical test above.
+  @Test
+  void deleteThreadsThePathsOrganizationIdIntoTheCommand() throws Exception {
+    UUID roleId = UUID.randomUUID();
+
+    mockMvc
+        .perform(delete(path() + "/" + roleId).principal(ACTING_PLATFORM_CLIENT))
+        .andExpect(status().isNoContent());
+
+    ArgumentCaptor<DeleteWorkspaceRoleCommand> captured =
+        ArgumentCaptor.forClass(DeleteWorkspaceRoleCommand.class);
+    verify(deleteRole).handle(captured.capture());
+    assertThat(captured.getValue().organizationId()).isEqualTo(organizationId);
   }
 
   @Test

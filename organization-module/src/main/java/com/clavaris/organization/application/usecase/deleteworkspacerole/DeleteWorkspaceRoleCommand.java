@@ -4,6 +4,15 @@ import com.clavaris.common.domain.model.AuditActor;
 import java.util.UUID;
 
 /**
+ * @param organizationId TD-SEC-056 (fixed): the caller's own already-ownership-verified
+ *     Organization — {@link DeleteWorkspaceRoleService} rejects a {@code roleId} whose real {@code
+ *     organizationId} doesn't match it, the same anti-enumeration check {@code
+ *     DeleteWorkspaceTeamCommand}'s own {@code workspaceId} already established for an identical
+ *     gap. Previously absent entirely: {@code WorkspaceRolesController} (REST) accepted {@code
+ *     organizationId} as a path variable but never threaded it any further, so any caller who knew
+ *     (or guessed) a {@code roleId} could mutate or delete a role belonging to a completely
+ *     different Organization by simply putting the "right" id in the URL — the path segment was
+ *     purely decorative.
  * @param workspaceId Live UX request, 2026-09-28: optional — when present, {@link
  *     DeleteWorkspaceRoleService} first auto-unassigns every member holding this role WITHIN this
  *     one Workspace before checking whether it's still assigned anywhere (a role also held in a
@@ -25,14 +34,18 @@ import java.util.UUID;
  *     strip the last manage_members holder in THIS Workspace" case is ever forceable.
  */
 public record DeleteWorkspaceRoleCommand(
-    UUID roleId, UUID workspaceId, boolean force, AuditActor actor) {
+    UUID roleId, UUID organizationId, UUID workspaceId, boolean force, AuditActor actor) {
 
   public DeleteWorkspaceRoleCommand(
-      final UUID roleId, final UUID workspaceId, final AuditActor actor) {
-    this(roleId, workspaceId, false, actor);
+      final UUID roleId,
+      final UUID organizationId,
+      final UUID workspaceId,
+      final AuditActor actor) {
+    this(roleId, organizationId, workspaceId, false, actor);
   }
 
-  public DeleteWorkspaceRoleCommand(final UUID roleId, final AuditActor actor) {
-    this(roleId, null, false, actor);
+  public DeleteWorkspaceRoleCommand(
+      final UUID roleId, final UUID organizationId, final AuditActor actor) {
+    this(roleId, organizationId, null, false, actor);
   }
 }

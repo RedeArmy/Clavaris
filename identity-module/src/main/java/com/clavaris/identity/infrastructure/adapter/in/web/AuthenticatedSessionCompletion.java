@@ -7,8 +7,10 @@ import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlR
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
 
 /**
@@ -31,10 +33,75 @@ import java.util.UUID;
  * session, never a full {@link Account} in hand) — see the new overload's own Javadoc for the one
  * real caller that does.
  */
+// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, applied on four
+// separate @SuppressWarnings within this file — same precedent
+// SpringDataOrganizationJpaRepository's
+// own identical suppression already documents for this exact shape.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 final class AuthenticatedSessionCompletion {
 
   private AuthenticatedSessionCompletion() {
     // Static utility — not instantiable, same shape as DeviceTrustGate/SessionTaskGate.
+  }
+
+  /**
+   * {@link DeviceTrustChallengeController#confirm} and {@link
+   * SessionTaskChallengeController#confirm} independently resolved this exact same "read the paused
+   * login's session attributes, clear them, then complete" tail — real, PMD-CPD-flagged duplication
+   * (caught by {@code mvn verify} on this branch), not a style nitpick. Extracted here once, same
+   * "found and fixed in the same pass" precedent as this class's own SonarCloud- duplication
+   * history above. Takes the caller's own six {@code *PendingState} attribute-key constants
+   * directly rather than forcing a shared interface on {@code DeviceTrustPendingState}/ {@code
+   * SessionTaskPendingState} neither class needs for any other reason.
+   */
+  // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port/request value plus
+  // the six session-attribute keys the caller's own pending-state class defines — same rationale
+  // as this file's own complete() overloads below. PMD.LongVariable: the *Attribute parameter
+  // names spell out exactly which session attribute each one reads.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList", "PMD.LongVariable"})
+  /* package */ static String completeFromPendingChallenge(
+      final AuthenticatedSessionEstablisher sessions,
+      final RecordAccountLoginDeviceUseCase recordLoginDevice,
+      final RedirectUrlResolver redirectUrlResolver,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final HttpSession session,
+      final UUID organizationId,
+      final AccountId accountId,
+      final String accountIdAttribute,
+      final String factorAttribute,
+      final String organizationIdAttribute,
+      final String clientIdAttribute,
+      final String redirectUrlAttribute,
+      final String providerAttribute) {
+    final PendingAuthenticationFactor factor =
+        PendingAuthenticationFactor.valueOf((String) session.getAttribute(factorAttribute));
+    final String clientId = (String) session.getAttribute(clientIdAttribute);
+    final String redirectUrl = (String) session.getAttribute(redirectUrlAttribute);
+    final String providerValue = (String) session.getAttribute(providerAttribute);
+    final SocialProvider provider =
+        providerValue == null ? null : SocialProvider.valueOf(providerValue);
+
+    session.removeAttribute(accountIdAttribute);
+    session.removeAttribute(factorAttribute);
+    session.removeAttribute(organizationIdAttribute);
+    session.removeAttribute(clientIdAttribute);
+    session.removeAttribute(redirectUrlAttribute);
+    session.removeAttribute(providerAttribute);
+
+    return complete(
+        sessions,
+        recordLoginDevice,
+        redirectUrlResolver,
+        request,
+        response,
+        organizationId,
+        accountId,
+        factor,
+        clientId,
+        redirectUrl,
+        null,
+        provider);
   }
 
   // One parameter per collaborating port/request value — same rationale as this package's own
@@ -64,6 +131,7 @@ final class AuthenticatedSessionCompletion {
         factor,
         clientId,
         redirectUrl,
+        null,
         null);
   }
 
@@ -87,16 +155,57 @@ final class AuthenticatedSessionCompletion {
       final String clientId,
       final String redirectUrl,
       final Account preloadedAccount) {
+    return complete(
+        sessions,
+        recordLoginDevice,
+        redirectUrlResolver,
+        request,
+        response,
+        organizationId,
+        accountId,
+        factor,
+        clientId,
+        redirectUrl,
+        preloadedAccount,
+        null);
+  }
+
+  /**
+   * TD-SEC-055: same as the 11-argument {@link #complete} above, plus {@code socialProvider} — only
+   * ever non-null when {@code factor == SOCIAL} (a device-trust/session-task pause resumed for a
+   * social login), read back from {@code DeviceTrustPendingState}/{@code SessionTaskPendingState}'s
+   * own {@code PROVIDER_ATTRIBUTE} by the two challenge controllers. {@code null} for every other
+   * factor, same as {@code preloadedAccount} above.
+   */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList", "PMD.LongVariable"})
+  /* package */ static String complete(
+      final AuthenticatedSessionEstablisher sessions,
+      final RecordAccountLoginDeviceUseCase recordLoginDevice,
+      final RedirectUrlResolver redirectUrlResolver,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID organizationId,
+      final AccountId accountId,
+      final PendingAuthenticationFactor factor,
+      final String clientId,
+      final String redirectUrl,
+      final Account preloadedAccount,
+      final SocialProvider socialProvider) {
     final String fallbackUrl =
         redirectUrlResolver
             .resolve(
                 new OrganizationId(organizationId), clientId, redirectUrl, RedirectAction.SIGN_IN)
             .orElse("/o/" + organizationId + "/login?authenticated");
     final String redirectTarget =
-        factor == PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF
-            ? sessions.establishViaOneTimeEmailProof(
-                request, response, accountId.value(), fallbackUrl)
-            : sessions.establish(request, response, accountId.value(), fallbackUrl);
+        switch (factor) {
+          case ONE_TIME_EMAIL_PROOF ->
+              sessions.establishViaOneTimeEmailProof(
+                  request, response, accountId.value(), fallbackUrl);
+          case SOCIAL ->
+              sessions.establishViaSocialLogin(
+                  request, response, accountId.value(), socialProvider, fallbackUrl);
+          case PASSWORD -> sessions.establish(request, response, accountId.value(), fallbackUrl);
+        };
 
     // New-device login email notification — after establish(), same accountId/request already in
     // scope; see RecordAccountLoginDeviceService's own Javadoc for why this never throws. A

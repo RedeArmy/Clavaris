@@ -6,6 +6,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.Organ
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link CreateOrganizationClientUseCase} — ADR-0023's own core write path.
@@ -46,6 +47,7 @@ public class CreateOrganizationClientService implements CreateOrganizationClient
   }
 
   @Override
+  @Transactional
   public CreateOrganizationClientResult handle(final CreateOrganizationClientCommand command) {
     // BR-ORG-02's own precedent (RegisterOAuthClientService): never let a credential be created
     // under a non-existent Organization — the FK-less column (this table's own migration comment)

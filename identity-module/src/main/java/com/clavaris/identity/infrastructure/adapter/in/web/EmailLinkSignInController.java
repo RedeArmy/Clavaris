@@ -161,7 +161,8 @@ public class EmailLinkSignInController {
               // pass, not silently dropped — see RequestEmailSignInLinkService's own package.
               null,
               null,
-              account.bypassesDeviceTrust());
+              account.bypassesDeviceTrust(),
+              null);
     } catch (final MailDeliveryException _) {
       // Same rationale as LoginController's own identical catch block, with one difference: the
       // link this POST just authenticated with is already single-use-consumed (see
@@ -183,6 +184,7 @@ public class EmailLinkSignInController {
             organizationId,
             account,
             PendingAuthenticationFactor.ONE_TIME_EMAIL_PROOF,
+            null,
             null,
             null);
     if (sessionTask.isPresent()) {

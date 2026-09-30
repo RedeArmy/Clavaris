@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointNotFoundException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Live UX request, 2026-09-25: the first single-entity (not cascade-from-Organization-delete) hard
@@ -25,6 +26,7 @@ public class DeleteWebhookEndpointService implements DeleteWebhookEndpointUseCas
   }
 
   @Override
+  @Transactional
   public void handle(final DeleteWebhookEndpointCommand command) {
     final WebhookEndpoint existing =
         endpoints

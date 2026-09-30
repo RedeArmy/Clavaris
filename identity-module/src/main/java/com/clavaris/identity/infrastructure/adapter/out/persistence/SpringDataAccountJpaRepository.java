@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,6 +56,10 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   // level (migration V20260826100000) to password_credentials/sessions/refresh_tokens/
   // verification_tokens for every Account this removes.
   void deleteAllByOrganizationId(UUID organizationId);
+
+  // TD-PERF-027: bounded, caller-known id set — see AccountRepository#findAllByOrganizationIdAndIds
+  // own Javadoc for why this exists alongside OrganizationAccountDirectory's own unbounded variant.
+  List<AccountEntity> findByOrganizationIdAndIdIn(UUID organizationId, Collection<UUID> ids);
 
   // BR-ID-02 ("never zero auth methods") integrity check, code review finding — see
   // AccountAuthMethodIntegrityCheckJob's own Javadoc for why this can only be a periodic sweep,

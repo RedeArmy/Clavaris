@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointNotFoundException;
 import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookEndpointRepository;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Reverses {@code DeactivateWebhookEndpointService} — see its own Javadoc. */
 public class ActivateWebhookEndpointService implements ActivateWebhookEndpointUseCase {
@@ -18,6 +19,7 @@ public class ActivateWebhookEndpointService implements ActivateWebhookEndpointUs
   }
 
   @Override
+  @Transactional
   public WebhookEndpoint handle(final ActivateWebhookEndpointCommand command) {
     final WebhookEndpoint existing =
         endpoints
