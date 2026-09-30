@@ -25,11 +25,15 @@ import org.springframework.transaction.annotation.Transactional;
 // PMD.TooManyMethods: ADR-0024 §4 added two more methods (username lookup) to a repository
 // implementing the one AccountRepository port — same "wiring, not sprawl" reasoning every other
 // growing outbound-port implementation in this codebase already documents for an identical case.
+// PMD.CouplingBetweenObjects: TD-PERF-027's new findAllByOrganizationIdAndIds (one more mapped
+// domain/entity type in its signature) pushed this class's own count from 20 to 21 — the same
+// "wiring, not sprawl" shape as TooManyMethods above, on the same class, for the same reason: one
+// repository implementing one growing outbound port collaborates with every type that port needs.
 /**
  * Implements the outbound port; maps between {@code domain.model} (framework-free) and the
  * {@code @Entity} classes in this package.
  */
-@SuppressWarnings("PMD.TooManyMethods")
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @Repository
 class JpaAccountRepository implements AccountRepository {
 

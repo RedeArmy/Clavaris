@@ -921,9 +921,8 @@ public class PlatformWorkspaceController {
     // Live UX request, 2026-09-28: the member list used to render a bare accountId — see
     // OrganizationAccountDirectoryBridge's own Javadoc for why the label (name, or email as a
     // fallback) can only be resolved through this cross-module port, never a local join.
-    // TD-PERF-027: scoped to just this page's own accountIds, not accountLabelById's own
-    // whole-Organization variant below (still used by the "Assign role" picker, which genuinely
-    // needs the full directory).
+    // TD-PERF-027: scoped to just this page's own accountIds — the old whole-Organization
+    // accountLabelById helper this replaced had no other caller and was removed.
     final Set<UUID> renderedAccountIds =
         membersPage.content().stream()
             .map(WorkspaceMembership::accountId)
@@ -934,13 +933,6 @@ public class PlatformWorkspaceController {
             .collect(
                 Collectors.toMap(
                     OrganizationAccountSummary::accountId, OrganizationAccountSummary::label)));
-  }
-
-  private Map<UUID, String> accountLabelById(final UUID organizationId) {
-    return accountDirectory.listAccountsForOrganization(organizationId).stream()
-        .collect(
-            Collectors.toMap(
-                OrganizationAccountSummary::accountId, OrganizationAccountSummary::label));
   }
 
   private record TeamsAndRoles(

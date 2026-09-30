@@ -98,7 +98,10 @@ public final class ManageMembersGuard {
    * touched, no already-committed partial cascade to somehow undo) instead of discovering the
    * violation mid-cascade, after an earlier role's own isolated transaction has already committed.
    */
-  @SuppressWarnings("PMD.LongVariable")
+  // PMD.AvoidLiteralsInIfCondition: the threshold of one is BR-WS-01's own invariant spelled out
+  // literally (at least one holder must remain) — same rationale this class's own
+  // assertActionKeepsAtLeastOneHolder already documents for its identical check.
+  @SuppressWarnings({"PMD.LongVariable", "PMD.AvoidLiteralsInIfCondition"})
   public static void assertUnassigningRolesKeepsAtLeastOneHolder(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRoleRepository roles,
