@@ -150,13 +150,15 @@ class JpaAccountRepository implements AccountRepository {
   }
 
   // TD-PERF-028: the credential half save() used to always do unconditionally — same
-  // saveAndFlush-for-synchronous-exception-surfacing reasoning as save() itself. Code review
-  // finding (SDE-III design, Phase 2 #8, migration V20260830110000's own deferred BR-ID-02
-  // trigger): a caller mutating both the account and its credential in one logical operation
-  // (ConfirmPasswordResetService, CompleteForcedPasswordResetService — both @Transactional) must
-  // call this in the same transaction as save() for the two writes to share one commit boundary;
-  // REQUIRED propagation (Spring's own default) joins that already-open transaction with zero
-  // behavior change, exactly like save()'s own identical propagation.
+  // saveAndFlush-for-synchronous-exception-surfacing reasoning as save() itself.
+  //
+  // Sonar S125 false positive (reworded, not NOSONAR'd — same convention
+  // RateLimitingIntegrationTest's own identical fix documents): the account and credential
+  // writes must share one commit boundary. Both real mutating callers — ConfirmPasswordResetService
+  // and CompleteForcedPasswordResetService — are themselves transactional (a code review finding,
+  // SDE-III design Phase 2 #8, migration V20260830110000's own deferred BR-ID-02 trigger), and
+  // Spring's default REQUIRED propagation joins that already-open transaction here with zero
+  // behavior change, the same way it does for save() above.
   @Override
   @Transactional
   public void saveCredential(final Account account) {
