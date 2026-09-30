@@ -57,6 +57,9 @@ public class AccountAuthenticationPolicyEntity {
   @Column(name = "device_trust_enabled", nullable = false)
   private boolean deviceTrustEnabled;
 
+  @Column(name = "self_registration_requires_approval", nullable = false)
+  private boolean selfRegistrationRequiresApproval;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -78,6 +81,7 @@ public class AccountAuthenticationPolicyEntity {
       final boolean usernameSignInEnabled,
       final boolean passwordAtSignUpEnabled,
       final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = id;
@@ -91,6 +95,7 @@ public class AccountAuthenticationPolicyEntity {
     this.usernameSignInEnabled = usernameSignInEnabled;
     this.passwordAtSignUpEnabled = passwordAtSignUpEnabled;
     this.deviceTrustEnabled = deviceTrustEnabled;
+    this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -137,6 +142,10 @@ public class AccountAuthenticationPolicyEntity {
 
   public boolean isDeviceTrustEnabled() {
     return deviceTrustEnabled;
+  }
+
+  public boolean isSelfRegistrationRequiresApproval() {
+    return selfRegistrationRequiresApproval;
   }
 
   public Instant getCreatedAt() {

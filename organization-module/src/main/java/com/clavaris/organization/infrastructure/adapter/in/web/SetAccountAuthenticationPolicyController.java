@@ -68,6 +68,7 @@ class SetAccountAuthenticationPolicyController {
                   request.usernameSignInEnabled(),
                   request.passwordAtSignUpEnabled(),
                   request.deviceTrustEnabled(),
+                  request.selfRegistrationRequiresApproval(),
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();

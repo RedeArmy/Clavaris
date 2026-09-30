@@ -39,7 +39,8 @@ class AccountAuthenticationPolicyTest {
             true,
             true,
             false,
-            true);
+            true,
+            false);
 
     assertThat(policy.id()).isNotNull();
     assertThat(policy.organizationId()).isEqualTo(organizationId);
@@ -65,7 +66,7 @@ class AccountAuthenticationPolicyTest {
 
     AccountAuthenticationPolicy updated =
         original.withPolicy(
-            true, EmailVerificationMethod.BOTH, true, false, true, false, true, true, true);
+            true, EmailVerificationMethod.BOTH, true, false, true, false, true, true, true, false);
 
     assertThat(updated.id()).isEqualTo(original.id());
     assertThat(updated.organizationId()).isEqualTo(original.organizationId());
@@ -94,6 +95,7 @@ class AccountAuthenticationPolicyTest {
             false,
             false,
             true,
+            false,
             false,
             persistedCreatedAt,
             persistedUpdatedAt);

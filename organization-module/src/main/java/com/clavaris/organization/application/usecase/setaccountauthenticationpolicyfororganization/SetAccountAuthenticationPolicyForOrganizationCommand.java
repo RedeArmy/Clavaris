@@ -22,4 +22,5 @@ public record SetAccountAuthenticationPolicyForOrganizationCommand(
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
     boolean deviceTrustEnabled,
+    boolean selfRegistrationRequiresApproval,
     AuditActor actor) {}

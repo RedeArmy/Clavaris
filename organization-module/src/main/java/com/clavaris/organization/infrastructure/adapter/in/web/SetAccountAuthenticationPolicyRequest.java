@@ -19,4 +19,5 @@ public record SetAccountAuthenticationPolicyRequest(
     boolean usernameRequired,
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
-    boolean deviceTrustEnabled) {}
+    boolean deviceTrustEnabled,
+    boolean selfRegistrationRequiresApproval) {}

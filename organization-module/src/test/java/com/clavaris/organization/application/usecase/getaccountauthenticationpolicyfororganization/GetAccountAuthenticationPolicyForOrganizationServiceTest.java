@@ -29,6 +29,7 @@ class GetAccountAuthenticationPolicyForOrganizationServiceTest {
             false,
             false,
             true,
+            false,
             false);
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.of(stored));
     GetAccountAuthenticationPolicyForOrganizationService service =
