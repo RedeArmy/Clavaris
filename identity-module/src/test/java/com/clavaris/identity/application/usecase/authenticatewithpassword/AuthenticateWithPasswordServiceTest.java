@@ -268,6 +268,7 @@ class AuthenticateWithPasswordServiceTest {
                 false,
                 false,
                 true,
+                false,
                 false));
     AuthenticateWithPasswordCommand command =
         new AuthenticateWithPasswordCommand(organizationId, email, RAW_PASSWORD);
@@ -299,6 +300,7 @@ class AuthenticateWithPasswordServiceTest {
                 false,
                 false,
                 true,
+                false,
                 false));
 
     Account result =

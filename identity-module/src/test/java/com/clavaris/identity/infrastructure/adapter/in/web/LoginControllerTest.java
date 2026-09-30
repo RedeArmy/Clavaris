@@ -349,7 +349,8 @@ class LoginControllerTest {
                 false,
                 false,
                 true,
-                true));
+                true,
+                false));
     when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
     doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
 

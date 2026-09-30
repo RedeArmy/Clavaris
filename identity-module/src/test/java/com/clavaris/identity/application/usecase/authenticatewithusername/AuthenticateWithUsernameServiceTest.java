@@ -173,6 +173,7 @@ class AuthenticateWithUsernameServiceTest {
                 false,
                 false,
                 true,
+                false,
                 false));
     AuthenticateWithUsernameCommand command =
         new AuthenticateWithUsernameCommand(organizationId, username, RAW_PASSWORD);

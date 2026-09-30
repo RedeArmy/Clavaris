@@ -52,7 +52,7 @@ class RequestEmailSignInCodeServiceTest {
 
   private static AccountAuthenticationPolicySnapshot enabledPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, true, false, false, false, false, true, false);
+        false, EmailVerificationMethod.LINK, true, false, false, false, false, true, false, false);
   }
 
   @Test
