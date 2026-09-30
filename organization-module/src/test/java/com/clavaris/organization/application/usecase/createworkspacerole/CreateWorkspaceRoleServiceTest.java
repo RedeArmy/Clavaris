@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.createworkspacerole;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -113,8 +114,7 @@ class CreateWorkspaceRoleServiceTest {
     // TD-SEC-060: the pre-check above passes (no existing row yet, per setUp's own stub), but
     // ux_workspace_roles_organization_id_name still fires at saveAndFlush time — simulating a
     // concurrent request that created the same name first.
-    org.mockito.Mockito.doThrow(
-            new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+    doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
         .when(roles)
         .saveAndFlush(any());
     CreateWorkspaceRoleCommand command =

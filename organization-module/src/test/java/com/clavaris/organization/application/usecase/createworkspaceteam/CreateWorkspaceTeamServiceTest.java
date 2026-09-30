@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.createworkspaceteam;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -95,8 +96,7 @@ class CreateWorkspaceTeamServiceTest {
     // TD-SEC-060: the pre-check above passes (no existing row yet, per setUp's own stub), but
     // ux_workspace_teams_workspace_id_name still fires at saveAndFlush time — simulating a
     // concurrent request that created the same name first.
-    org.mockito.Mockito.doThrow(
-            new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+    doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
         .when(teams)
         .saveAndFlush(any());
     CreateWorkspaceTeamCommand command = new CreateWorkspaceTeamCommand(workspaceId, "QA", ACTOR);
