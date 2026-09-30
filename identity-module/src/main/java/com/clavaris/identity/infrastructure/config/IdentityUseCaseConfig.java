@@ -118,6 +118,8 @@ import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountSe
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountService;
 import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountUseCase;
+import com.clavaris.identity.application.usecase.updateaccountmetadata.UpdateAccountMetadataService;
+import com.clavaris.identity.application.usecase.updateaccountmetadata.UpdateAccountMetadataUseCase;
 import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsService;
 import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileService;
@@ -136,6 +138,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Wires application-layer use cases to Spring's context. Deliberately kept out of {@code
@@ -562,6 +565,15 @@ class IdentityUseCaseConfig {
   /* package */ UpdateAccountPermissionsUseCase updateAccountPermissionsUseCase(
       final AccountRepository accounts, final AuditEventRecorder auditEvents) {
     return new UpdateAccountPermissionsService(accounts, auditEvents);
+  }
+
+  // TD-FUT-034, Clerk "Metadata" parity.
+  @Bean
+  /* package */ UpdateAccountMetadataUseCase updateAccountMetadataUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final ObjectMapper objectMapper) {
+    return new UpdateAccountMetadataService(accounts, auditEvents, objectMapper);
   }
 
   // Clerk "OAuth" tab parity (ADR-0026).

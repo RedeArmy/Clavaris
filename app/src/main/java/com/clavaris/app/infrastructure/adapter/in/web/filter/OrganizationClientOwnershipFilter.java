@@ -111,6 +111,9 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
                 HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:approve-registration"),
             oneHopAccount(
                 HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:reject-registration"),
+            // TD-FUT-034, Clerk "Metadata" parity — same dual-authority rationale as the two
+            // routes above.
+            oneHopAccount(HttpMethod.PUT, "/api/v1/admin/accounts/{accountId}/metadata"),
             // TD-SEC-061: the read equivalent of the three write routes below was missing —
             // this filter fails closed, so an OrganizationClient token with write access to
             // this exact resource got an inexplicable 403 on the one read of an otherwise

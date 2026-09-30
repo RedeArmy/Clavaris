@@ -207,6 +207,10 @@ class AdminApiSecurityConfig {
                         HttpMethod.POST, "/api/v1/admin/accounts/*:reject-registration")
                     .hasAuthority(
                         SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_REVIEW_REGISTRATION)
+                    // TD-FUT-034, Clerk "Metadata" parity — reachable by an OrganizationClient
+                    // too (not OPERATOR_ONLY), same rationale as the two routes above.
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/admin/accounts/*/metadata")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_METADATA_WRITE)
                     // Clerk "session tasks" parity: forcing a future password reset — its own
                     // scope, deliberately separate from ACCOUNTS_SUSPEND (see
                     // PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET's own Javadoc for why).

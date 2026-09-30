@@ -27,7 +27,11 @@ import java.util.Optional;
   // rejectRegistration, plus the new reconstitute overload) pushed this class past the default
   // threshold — same "one mutator per use case that touches this aggregate is growth in the
   // right place" reasoning this class's own Javadoc already documents for PMD.TooManyMethods.
-  "PMD.ExcessivePublicCount"
+  "PMD.ExcessivePublicCount",
+  // TD-FUT-034's own 3 new metadata fields pushed this class past the default field-count
+  // threshold too - same "growth in the right place, not a signal to split the class" rationale
+  // this class's own Javadoc already documents.
+  "PMD.TooManyFields"
 })
 public final class Account {
 
@@ -87,6 +91,23 @@ public final class Account {
   // is only ever non-null alongside a REJECTED status; an approved account never sets it.
   private Instant registrationDecidedAt;
   private String registrationRejectionReason;
+
+  // TD-FUT-034 (Clerk "Metadata" parity): three raw-JSON-text tiers Clavaris never interprets,
+  // same "opaque, consumer-defined" posture OAuthClient.allowedScopes/WorkspaceRole.permissions
+  // already establish — the shape is entirely the consuming application's own business. null means
+  // never set, same convention as this class's other optional text fields.
+  // publicMetadata: admin/backend-writable only (this codebase has no self-service metadata
+  // endpoint), but semantically readable by anyone who can read this Account — never something
+  // Clavaris itself must keep secret.
+  // privateMetadata: admin/backend-writable AND admin/backend-readable only — never exposed
+  // through any account-holder-facing surface.
+  // unsafeMetadata: admin/backend-writable here (no end-user self-service surface exists yet) —
+  // named "unsafe" per Clerk's own convention because a future self-service write path would let
+  // the account holder set it directly, so no caller may ever treat its contents as trustworthy
+  // for an authorization decision.
+  private String publicMetadata;
+  private String privateMetadata;
+  private String unsafeMetadata;
 
   private Account(
       final AccountId id,
@@ -378,6 +399,62 @@ public final class Account {
     return account;
   }
 
+  /**
+   * Full reconstitution including {@code publicMetadata}/{@code privateMetadata}/{@code
+   * unsafeMetadata} (TD-FUT-034) — the persistence adapter's own rehydration path. The 18-arg
+   * overload above is kept, not replaced, same "every existing caller that never touches the new
+   * fields stays unchanged" precedent that overload's own Javadoc already documents for the one
+   * below it.
+   */
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  public static Account reconstitute(
+      final AccountId id,
+      final OrganizationId organizationId,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PasswordCredential passwordCredential,
+      final Username username,
+      final Instant passwordResetRequiredAt,
+      final String firstName,
+      final String lastName,
+      final String phoneNumber,
+      final Instant lastSignedInAt,
+      final String pictureUrl,
+      final boolean canDeleteOwnAccount,
+      final boolean bypassesDeviceTrust,
+      final Instant registrationDecidedAt,
+      final String registrationRejectionReason,
+      final String publicMetadata,
+      final String privateMetadata,
+      final String unsafeMetadata) {
+    final Account account =
+        reconstitute(
+            id,
+            organizationId,
+            email,
+            createdAt,
+            emailVerifiedAt,
+            status,
+            passwordCredential,
+            username,
+            passwordResetRequiredAt,
+            firstName,
+            lastName,
+            phoneNumber,
+            lastSignedInAt,
+            pictureUrl,
+            canDeleteOwnAccount,
+            bypassesDeviceTrust,
+            registrationDecidedAt,
+            registrationRejectionReason);
+    account.publicMetadata = publicMetadata;
+    account.privateMetadata = privateMetadata;
+    account.unsafeMetadata = unsafeMetadata;
+    return account;
+  }
+
   public AccountId id() {
     return id;
   }
@@ -448,6 +525,18 @@ public final class Account {
 
   public Optional<String> registrationRejectionReason() {
     return Optional.ofNullable(registrationRejectionReason);
+  }
+
+  public Optional<String> publicMetadata() {
+    return Optional.ofNullable(publicMetadata);
+  }
+
+  public Optional<String> privateMetadata() {
+    return Optional.ofNullable(privateMetadata);
+  }
+
+  public Optional<String> unsafeMetadata() {
+    return Optional.ofNullable(unsafeMetadata);
   }
 
   /**
@@ -662,5 +751,23 @@ public final class Account {
   /** Reverses {@link #enableDeviceTrustBypass()}. */
   public void disableDeviceTrustBypass() {
     this.bypassesDeviceTrust = false;
+  }
+
+  /**
+   * TD-FUT-034 (Clerk "Metadata" parity) — replaces all three tiers at once, always a full replace,
+   * never a partial update, same "whole-object PUT" convention every other multi-field admin
+   * mutation in this codebase already follows (e.g. {@code
+   * SetAccountAuthenticationPolicyController}) rather than trying to distinguish "leave this tier
+   * alone" from "clear it" for a given argument. {@code null} means empty/cleared for that tier,
+   * same convention this class's own nullable text fields already use. Syntactic JSON validity is
+   * the caller's own job (the web/use-case layer, before this method ever runs) — this class stays
+   * free of a JSON library dependency, same "domain/ depends on nothing" rule every other method
+   * here already follows.
+   */
+  public void setMetadata(
+      final String publicMetadata, final String privateMetadata, final String unsafeMetadata) {
+    this.publicMetadata = publicMetadata;
+    this.privateMetadata = privateMetadata;
+    this.unsafeMetadata = unsafeMetadata;
   }
 }

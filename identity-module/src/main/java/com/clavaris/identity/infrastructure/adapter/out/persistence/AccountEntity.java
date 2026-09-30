@@ -88,6 +88,18 @@ public class AccountEntity {
   @Column(name = "registration_rejection_reason")
   private String registrationRejectionReason;
 
+  // TD-FUT-034: plain text columns, not native jsonb — same convention SessionEntity.scopes
+  // already establishes for this codebase's own JPA entities (see that field's own comment).
+  // Syntactic JSON validity is enforced in UpdateAccountMetadataService, not by the database.
+  @Column(name = "public_metadata")
+  private String publicMetadata;
+
+  @Column(name = "private_metadata")
+  private String privateMetadata;
+
+  @Column(name = "unsafe_metadata")
+  private String unsafeMetadata;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
@@ -109,7 +121,10 @@ public class AccountEntity {
       final boolean canDeleteOwnAccount,
       final boolean bypassesDeviceTrust,
       final Instant registrationDecidedAt,
-      final String registrationRejectionReason) {
+      final String registrationRejectionReason,
+      final String publicMetadata,
+      final String privateMetadata,
+      final String unsafeMetadata) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
@@ -127,6 +142,9 @@ public class AccountEntity {
     this.bypassesDeviceTrust = bypassesDeviceTrust;
     this.registrationDecidedAt = registrationDecidedAt;
     this.registrationRejectionReason = registrationRejectionReason;
+    this.publicMetadata = publicMetadata;
+    this.privateMetadata = privateMetadata;
+    this.unsafeMetadata = unsafeMetadata;
   }
 
   public UUID getId() {
@@ -195,5 +213,17 @@ public class AccountEntity {
 
   public String getRegistrationRejectionReason() {
     return registrationRejectionReason;
+  }
+
+  public String getPublicMetadata() {
+    return publicMetadata;
+  }
+
+  public String getPrivateMetadata() {
+    return privateMetadata;
+  }
+
+  public String getUnsafeMetadata() {
+    return unsafeMetadata;
   }
 }
