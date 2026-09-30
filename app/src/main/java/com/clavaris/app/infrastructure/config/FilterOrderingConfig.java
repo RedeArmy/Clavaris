@@ -6,6 +6,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.Ordered;
 import org.springframework.web.servlet.resource.ResourceUrlEncodingFilter;
 
@@ -38,9 +39,22 @@ public class FilterOrderingConfig {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
   }
 
+  // SDE-III review, 2026-09-30 — real bug found and closed: ServletContextInitializerBeans
+  // resolves every ServletContextInitializer bean (this filter included) during
+  // ServletWebServerApplicationContext.onRefresh(), which runs BEFORE
+  // finishBeanFactoryInitialization() — i.e. before JPA's own entityManagerFactory bean has
+  // necessarily been created. Eagerly injecting a JPA-backed repository here forced Spring Data
+  // JPA's repository factory machinery to resolve at that earlier phase, which failed outright
+  // (UnsatisfiedDependencyException: "Cannot resolve reference to bean
+  // 'jpaSharedEM_entityManagerFactory'") and broke every RANDOM_PORT integration test in the
+  // module. @Lazy injects a proxy instead of the real repository — actual resolution (and
+  // therefore entityManagerFactory creation, if it hasn't happened yet by then) is deferred to
+  // the first real request this filter handles, well after the full context has finished
+  // initializing.
   @Bean
   public FilterRegistrationBean<CustomDomainRequestRewriteFilter> customDomainRequestRewriteFilter(
-      final ClientDomainConfigRepository domainConfigs, final OAuthClientRepository oauthClients) {
+      @Lazy final ClientDomainConfigRepository domainConfigs,
+      @Lazy final OAuthClientRepository oauthClients) {
     final FilterRegistrationBean<CustomDomainRequestRewriteFilter> registration =
         new FilterRegistrationBean<>(
             new CustomDomainRequestRewriteFilter(domainConfigs, oauthClients));
