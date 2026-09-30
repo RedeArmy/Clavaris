@@ -57,7 +57,7 @@
                         <td th:text="${delivery.eventType()}">event type</td>
                         <td>
                             <span class="clavaris-badge"
-                                  th:classappend="${delivery.status().name() == 'SUCCEEDED'} ? 'clavaris-badge--success' : (${delivery.status().name() == 'FAILED' or delivery.status().name() == 'EXHAUSTED'} ? 'clavaris-badge--error' : 'clavaris-badge--muted')"
+                                  th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forDeliveryStatus(delivery.status().name())}"
                                   th:text="${delivery.status().name()}">status</span>
                         </td>
                         <td th:text="${delivery.attemptCount()}">attempts</td>

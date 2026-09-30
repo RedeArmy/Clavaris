@@ -15,7 +15,7 @@
                     <h1 th:text="${organization.name()}">Organization name</h1>
                     <p>
                         <span class="clavaris-badge"
-                              th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                              th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organization.environment().name() == 'PRODUCTION')}"
                               th:text="${organization.environment()}">DEVELOPMENT</span>
                         &#183; Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organization.createdAt())}">date</span>
                     </p>
