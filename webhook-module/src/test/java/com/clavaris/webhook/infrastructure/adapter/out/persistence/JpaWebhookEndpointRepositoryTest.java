@@ -1,6 +1,7 @@
 package com.clavaris.webhook.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.clavaris.common.domain.model.KeysetPage;
@@ -327,6 +328,24 @@ class JpaWebhookEndpointRepositoryTest {
         .containsExactly(third.id(), second.id());
     assertThat(backToFirstPage.hasNext()).isTrue();
     assertThat(backToFirstPage.hasPrevious()).isFalse();
+  }
+
+  // TD-ARCH-024: proves lockForRegistration is a real, callable Postgres advisory-lock query (not
+  // a typo'd native SQL string that would only surface at first real use), same rationale
+  // JpaSigningKeyRepositoryTest's own identical lockForRotation smoke test documents. Postgres
+  // advisory locks are re-entrant within the same session/transaction, so a second call here must
+  // not deadlock against the first.
+  @Test
+  void
+      lockForRegistrationCompletesWithoutErrorAndDoesNotBlockASubsequentCallInTheSameTransaction() {
+    UUID organizationId = UUID.randomUUID();
+
+    assertThatCode(
+            () -> {
+              repository.lockForRegistration(organizationId);
+              repository.lockForRegistration(organizationId);
+            })
+        .doesNotThrowAnyException();
   }
 
   @Test

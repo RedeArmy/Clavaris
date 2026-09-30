@@ -70,6 +70,10 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
     if (!orgExistsChecker.exists(command.organizationId())) {
       throw new OrganizationNotFoundException(command.organizationId());
     }
+    // TD-ARCH-024: serializes every concurrent registration attempt for this Organization before
+    // the count below is even read — see WebhookEndpointRepository#lockForRegistration's own
+    // Javadoc for the check-then-act race this closes.
+    endpoints.lockForRegistration(command.organizationId());
     // BR-WEBHOOK-08: cheapest remaining check first, same "reject before doing real work" ordering
     // as the Organization check above — no point consulting the SSRF guard (a DNS resolution) for a
     // registration that's going to be rejected on count alone.

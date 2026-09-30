@@ -204,5 +204,25 @@ class RegisterWebhookEndpointServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(endpoints, never()).countByOrganizationId(any());
+    verify(endpoints, never()).lockForRegistration(any());
+  }
+
+  // TD-ARCH-024: the advisory lock must be acquired before the count it's meant to serialize
+  // against — same rationale ActivateSigningKeyForOrganizationServiceTest's own identical
+  // locksForRotationBeforeReadingTheCurrentlyActiveKey test documents for its analogous fix.
+  @Test
+  void locksForRegistrationBeforeCheckingTheCap() {
+    UUID organizationId = UUID.randomUUID();
+    when(orgExistsChecker.exists(organizationId)).thenReturn(true);
+    when(cipher.encrypt(any())).thenReturn("encrypted-secret");
+    RegisterWebhookEndpointCommand command =
+        new RegisterWebhookEndpointCommand(
+            organizationId, "https://example.com/hooks", null, List.of("x"), ACTOR);
+
+    service.handle(command);
+
+    org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(endpoints);
+    inOrder.verify(endpoints).lockForRegistration(organizationId);
+    inOrder.verify(endpoints).countByOrganizationId(organizationId);
   }
 }
