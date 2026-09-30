@@ -366,6 +366,18 @@ class AdminApiSecurityConfig {
                         RateLimitIdentifiers::authenticatedPlatformClientId,
                         adminApiPerClientLimit,
                         Duration.ofMinutes(1)),
+                    // TD-SEC-062: every write verb on this chain had blanket + endpoint-specific
+                    // rate-limit coverage except DELETE — a real, previously-unguarded gap (e.g.
+                    // DELETE /api/v1/admin/organizations/*/social-credentials/*), same ceiling as
+                    // the two blanket rules above.
+                    new RateLimitRule(
+                        "admin-api-delete:client",
+                        HttpMethod.DELETE,
+                        ADMIN_API_PATH_PATTERN,
+                        RateLimitRule.always(),
+                        RateLimitIdentifiers::authenticatedPlatformClientId,
+                        adminApiPerClientLimit,
+                        Duration.ofMinutes(1)),
                     // BR-DATA-02: individual accounts — a routine call for a consuming
                     // application's own backend (e.g. per-user deletion requests), so this ceiling
                     // stays well above the blanket rule above rather than redundantly tighter.
