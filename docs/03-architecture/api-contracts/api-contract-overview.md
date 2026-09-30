@@ -70,24 +70,31 @@ Every management API call requires a valid access token issued via the `client_c
 
 Standard OAuth2 error responses (`error`, `error_description`) for the OIDC surface, per RFC 6749 §5.2. Management API errors follow a consistent JSON problem-detail shape (`type`, `title`, `status`, `detail`) — exact schema to be finalized alongside `docs/05-engineering/coding-standards.md`.
 
-## 6. Workspace membership changes are not instant token revocation (TD-WS-002)
+## 6. Workspace membership changes and token revocation (TD-WS-002)
 
 **Read this before gating any of your own application's authorization decisions on Workspace
 membership.** Clavaris tokens (access/ID/refresh) are `Account`-scoped per `Organization`
-(ADR-0010) — **never** `Workspace`-scoped. There is no per-Workspace grant for Clavaris to revoke,
-by design (BR-WS-03): v1 deliberately has no workspace-scoped token/authorization concept at all.
-Concretely, this means:
+(ADR-0010) — **never** `Workspace`-scoped. There is no per-Workspace grant for Clavaris to revoke
+surgically, by design (BR-WS-03): v1 deliberately has no workspace-scoped token/authorization
+concept at all. Concretely, this means:
 
-- Removing a member from a `Workspace` (`POST /api/v1/admin/workspaces/{id}/members/{accountId}:remove`)
-  or changing their role (`PUT .../role`) updates the `Workspace`'s own membership list
-  immediately and fires a `workspace_membership.removed`/`workspace_membership.role_changed` event
+- **Removing** a member (`POST /api/v1/admin/workspaces/{id}/members/{accountId}:remove`) updates
+  the `Workspace`'s own membership list immediately, fires a `workspace_membership.removed` event
   (outbox row, and — once you register a `WebhookEndpoint`, ADR-0007 — a real signed webhook
-  delivery) synchronously with the change.
-- It does **not** invalidate any access/ID/refresh token already issued to that `Account`. A
-  still-valid token remains cryptographically valid, and any `workspace_id`/`workspace_role` claim
-  it carries (BR-WS-06) reflects membership as of the moment that token/claim was minted, not
-  necessarily right now — the claim is refreshed on the account's *next* login or token refresh,
-  not pushed out to tokens that already exist.
+  delivery) synchronously with the change, **and** (TD-WS-002, closed 2026-09-29) revokes that
+  Account's entire refresh-token chain, domain `Session` row, SAS-managed access/ID token, and
+  hosted-login browser session, in the same transaction as the membership delete. This is a real,
+  full revocation today — not merely bounded exposure — because an Account can only ever belong to
+  one Workspace in v1 (removing it from its one and only Workspace really does mean it has no more
+  standing anywhere in this Organization right now). It is **not** a true workspace-scoped
+  revocation architecturally: once v1.1 ships multi-workspace membership, this same call will need
+  to become membership-aware before it can keep doing this safely (tracked as TD-WS-005) — a future
+  reader should not assume today's "revoke everything" behavior is permanent.
+- **Changing a member's role** (`PUT .../role`) updates the membership list and fires
+  `workspace_membership.role_changed` the same way, but does **not** revoke or reissue any token —
+  any `workspace_id`/`workspace_role` claim already minted (BR-WS-06) still reflects the role as of
+  the moment it was minted, not necessarily right now; the claim only refreshes on the account's
+  *next* login or token refresh, not pushed out to a token that already exists.
 
 **What your application must do if it gates authorization by Workspace membership:**
 

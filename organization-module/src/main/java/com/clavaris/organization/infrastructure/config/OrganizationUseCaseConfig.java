@@ -97,6 +97,7 @@ import com.clavaris.organization.application.usecase.removerolefromworkspaceteam
 import com.clavaris.organization.application.usecase.removerolefromworkspaceteam.RemoveRoleFromWorkspaceTeamUseCase;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberService;
 import com.clavaris.organization.application.usecase.removeworkspacemember.RemoveWorkspaceMemberUseCase;
+import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberAccountRevoker;
 import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberRefreshTokenRevoker;
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamService;
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
@@ -369,11 +370,19 @@ class OrganizationUseCaseConfig {
       final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter,
-      // TD-WS-002 mitigation: see WorkspaceMemberRefreshTokenRevoker's own Javadoc.
+      // TD-WS-002 (closed): see WorkspaceMemberRefreshTokenRevoker/WorkspaceMemberAccountRevoker's
+      // own Javadoc.
       @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker) {
+          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberAccountRevoker accountRevoker) {
     return new RemoveWorkspaceMemberService(
-        memberships, workspaces, roles, auditEvents, eventOutboxWriter, refreshTokenRevoker);
+        memberships,
+        workspaces,
+        roles,
+        auditEvents,
+        eventOutboxWriter,
+        refreshTokenRevoker,
+        accountRevoker);
   }
 
   @Bean

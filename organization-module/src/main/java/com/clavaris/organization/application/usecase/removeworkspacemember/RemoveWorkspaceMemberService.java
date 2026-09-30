@@ -22,13 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
  * membership must still re-check membership itself (or subscribe to this event) — documented as a
  * forward-looking limitation, not silently glossed over.
  *
- * <p><b>TD-WS-002 mitigation (2026-09-06):</b> this method now also revokes every active {@code
- * RefreshToken} for the removed member's Account — see {@link WorkspaceMemberRefreshTokenRevoker}'s
- * own Javadoc for exactly why this is a real, measurable exposure-window reduction (bounds it to
- * one access-token TTL instead of the token's full refresh lifetime) and deliberately not the full
- * workspace-scoped-token architecture BR-WS-03's own text still correctly names as out of v1 scope.
- * A currently-live access token is deliberately left to expire naturally, not force-revoked
- * alongside it — same reasoning that port's own Javadoc documents in full.
+ * <p><b>TD-WS-002 (closed, 2026-09-29):</b> this method revokes every active {@code RefreshToken}
+ * for the removed member's Account ({@link WorkspaceMemberRefreshTokenRevoker}, 2026-09-06) and now
+ * also the domain {@code Session} row, the SAS-managed access/ID token, and the hosted-login page's
+ * own browser session ({@link WorkspaceMemberAccountRevoker}, 2026-09-29) — see that port's own
+ * Javadoc for exactly why the second half is safe to do unconditionally today (the real
+ * Account-Workspace 1:1 invariant) and what changes the moment that invariant doesn't hold anymore
+ * (TD-WS-005). Together this is the same "full BR-ID-03-shaped cascade" {@code
+ * RotateRefreshTokenService}'s own reuse response already runs, not the full workspace-scoped-token
+ * architecture BR-WS-03's own text still correctly names as out of v1 scope — that remains a
+ * separate, larger gap (a consuming application still can't get a webhook-driven live revocation of
+ * a *different* Workspace's own resources this Account might still legitimately access).
  */
 public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCase {
 
@@ -44,8 +48,12 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
   @SuppressWarnings("PMD.LongVariable")
   private final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
-  // AddWorkspaceMemberService's own identical suppression.
+  private final WorkspaceMemberAccountRevoker accountRevoker;
+
+  // java:S107: one parameter per collaborating port — same rationale as AddWorkspaceMemberService's
+  // own identical suppression; TD-WS-002's own closure added the one new port (accountRevoker) to
+  // an already-wide constructor rather than inventing a narrower one.
+  @SuppressWarnings("java:S107")
   public RemoveWorkspaceMemberService(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRepository workspaces,
@@ -53,13 +61,15 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
       @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker) {
+          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberAccountRevoker accountRevoker) {
     this.memberships = memberships;
     this.workspaces = workspaces;
     this.roles = roles;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
     this.refreshTokenRevoker = refreshTokenRevoker;
+    this.accountRevoker = accountRevoker;
   }
 
   @Override
@@ -101,13 +111,13 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
 
     memberships.deleteById(membership.id());
 
-    // TD-WS-002 mitigation: same transaction as the membership delete above — both RefreshToken
-    // (identity-module) and WorkspaceMembership (organization-module) rows live in this one
+    // TD-WS-002 (closed): same transaction as the membership delete above — every revoked row
+    // (identity-module) and the WorkspaceMembership delete (organization-module) live in this one
     // deployable's own single persistence unit, so there is no cross-database atomicity concern
     // here, unlike AccountProvisioner's own deliberately-outside-the-transaction network call. A
-    // crash between the two writes is not a real risk this way — either both commit or neither
-    // does.
+    // crash between the writes is not a real risk this way — either all commit or none do.
     refreshTokenRevoker.revokeAllRefreshTokensFor(command.accountId());
+    accountRevoker.revokeAllAccessFor(command.accountId());
 
     auditEvents.write(
         command.actor(),

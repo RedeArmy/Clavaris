@@ -78,14 +78,22 @@ substitute role exists (was "can never be deleted at all").
   BR-WS-04 for the v1 mechanism (direct provisioning). Kept as a placeholder ID so a future
   `WorkspaceInvitation` doesn't have to renumber anything else in this section.
 - **BR-WS-03** — Removing a member revokes that member's access to the workspace's resources
-  immediately, **stated honestly for v1**: there is no workspace-scoped token/authorization concept
-  in Clavaris yet (tokens are Account/OAuthClient-scoped per Organization, not per-Workspace) — in
-  v1, "immediate" means the admin-API listing and the corresponding outbox event fire synchronously
-  with the removal, not that a live token is invalidated (none exists to invalidate). A consuming
-  application that gates its own authorization by workspace membership must re-check membership
-  itself, or subscribe to the corresponding webhook event (`workspace_membership.removed`/
-  `.role_changed`, now real — `webhook-module`, ADR-0007, shipped 2026-09-02) — see
-  `api-contract-overview.md` §6 (TD-WS-002) for the full, concrete integration guidance.
+  immediately. **TD-WS-002 (closed, 2026-09-29):** there is still no workspace-scoped
+  token/authorization concept in Clavaris (tokens are Account/OAuthClient-scoped per Organization,
+  not per-Workspace) — but `RemoveWorkspaceMemberService` now revokes, in the same transaction as
+  the membership delete, every active `RefreshToken`, the domain `Session` row, the SAS-managed
+  access/ID token, and the hosted-login page's own browser session for the removed member's
+  Account, not merely the refresh tokens a 2026-09-06 mitigation first closed. Because an Account
+  can only ever belong to one Workspace today (`AddWorkspaceMemberService`'s own Javadoc), killing
+  the whole account-scoped session/token set on removal is observably identical to a true
+  workspace-scoped revocation — a real, practical closure of this rule's stated gap, not merely a
+  narrower mitigation. **TD-WS-005** (new) tracks the one thing this doesn't future-proof: once
+  v1.1 ships multi-workspace membership, this same call would need to first check for other
+  surviving memberships before revoking, or a member removed from one Workspace would lose access
+  to every other Workspace they still legitimately belong to. A consuming application that also
+  gates its *own* authorization by workspace membership should still subscribe to
+  `workspace_membership.removed`/`.role_changed` (`webhook-module`, ADR-0007) rather than rely on
+  Clavaris's own session revocation for that — see `api-contract-overview.md` §6.
 - **BR-WS-04** — A workspace member is provisioned directly: adding a member creates a real
   `Account` (identity-module) scoped to the workspace's own Organization and immediately triggers
   that Organization's existing password-reset-request flow, so the new member sets their own

@@ -34,6 +34,7 @@ class RemoveWorkspaceMemberServiceTest {
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
   private WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
+  private WorkspaceMemberAccountRevoker accountRevoker;
   private RemoveWorkspaceMemberService service;
 
   private UUID organizationId;
@@ -56,9 +57,16 @@ class RemoveWorkspaceMemberServiceTest {
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
     refreshTokenRevoker = mock(WorkspaceMemberRefreshTokenRevoker.class);
+    accountRevoker = mock(WorkspaceMemberAccountRevoker.class);
     service =
         new RemoveWorkspaceMemberService(
-            memberships, workspaces, roles, auditEvents, outbox, refreshTokenRevoker);
+            memberships,
+            workspaces,
+            roles,
+            auditEvents,
+            outbox,
+            refreshTokenRevoker,
+            accountRevoker);
   }
 
   private WorkspaceMembership existingMembership(
@@ -114,10 +122,11 @@ class RemoveWorkspaceMemberServiceTest {
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
     verifyNoInteractions(refreshTokenRevoker);
+    verifyNoInteractions(accountRevoker);
   }
 
-  // TD-WS-002 mitigation: the actual fix this pass adds — see WorkspaceMemberRefreshTokenRevoker's
-  // own Javadoc for why this is deliberately narrower than a full session/access-token revocation.
+  // TD-WS-002 (closed, 2026-09-06 mitigation): see WorkspaceMemberRefreshTokenRevoker's own
+  // Javadoc.
   @Test
   void revokesEveryRefreshTokenForTheRemovedMembersAccountOnSuccess() {
     UUID workspaceId = UUID.randomUUID();
@@ -127,6 +136,19 @@ class RemoveWorkspaceMemberServiceTest {
     service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
 
     verify(refreshTokenRevoker).revokeAllRefreshTokensFor(accountId);
+  }
+
+  // TD-WS-002 (closed): the rest of the cascade — see WorkspaceMemberAccountRevoker's own Javadoc
+  // for why this is safe to run unconditionally under today's real Account-Workspace 1:1 invariant.
+  @Test
+  void revokesTheRemovedMembersAccountAccessOnSuccess() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, plainRole.id());
+
+    service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
+
+    verify(accountRevoker).revokeAllAccessFor(accountId);
   }
 
   @Test
@@ -169,6 +191,7 @@ class RemoveWorkspaceMemberServiceTest {
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
     verifyNoInteractions(refreshTokenRevoker);
+    verifyNoInteractions(accountRevoker);
   }
 
   @Test
@@ -187,5 +210,6 @@ class RemoveWorkspaceMemberServiceTest {
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
     verifyNoInteractions(refreshTokenRevoker);
+    verifyNoInteractions(accountRevoker);
   }
 }
