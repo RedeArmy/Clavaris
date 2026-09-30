@@ -19,4 +19,14 @@ public sealed interface AuthenticateWithSocialProviderResult {
    * record — the caller must show a "check your email" response, never a session/token.
    */
   record ConfirmationRequired() implements AuthenticateWithSocialProviderResult {}
+
+  /**
+   * TD-FUT-019: the owning Organization's {@code
+   * AccountAuthenticationPolicy.selfRegistrationRequiresApproval()} was on — either a brand-new
+   * gated signup, or a returning login against an account still waiting on a decision. Never a
+   * session/token either way, same "must show a non-authenticated response" posture {@link
+   * ConfirmationRequired} already establishes, for a structurally different reason (nothing is
+   * unconfirmed here, the account just isn't approved yet).
+   */
+  record PendingApproval() implements AuthenticateWithSocialProviderResult {}
 }

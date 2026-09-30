@@ -14,7 +14,6 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
@@ -61,10 +60,12 @@ class RegisterAccountServiceTest {
   void registersAndReturnsANewAccountId() {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
-    AccountId id =
-        service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
+    RegisterAccountResult result =
+        service.handle(
+            new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true));
 
-    assertThat(id).isNotNull();
+    assertThat(result.accountId()).isNotNull();
+    assertThat(result.pendingApproval()).isFalse();
     verify(accounts).insert(any());
   }
 
@@ -73,7 +74,7 @@ class RegisterAccountServiceTest {
     // BR-ID-01
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
-    service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
+    service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true));
 
     verify(hasher).hash(VALID_PASSWORD);
   }
@@ -82,10 +83,11 @@ class RegisterAccountServiceTest {
   void writesExactlyOneAccountCreatedEventOnSuccess() {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
-    AccountId id =
-        service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null));
+    RegisterAccountResult result =
+        service.handle(
+            new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true));
 
-    verify(outbox).write(eq("account.created"), eq(id), any(), any());
+    verify(outbox).write(eq("account.created"), eq(result.accountId()), any(), any());
   }
 
   @Test
@@ -95,7 +97,7 @@ class RegisterAccountServiceTest {
     // ambiguous which one static analysis — and a future reader — should credit for the
     // exception. A single invocation in the lambda keeps the assertion unambiguous.
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, "short", null);
+        new RegisterAccountCommand(organizationId, email, "short", null, true);
 
     assertThatExceptionOfType(WeakPasswordException.class)
         .isThrownBy(() -> service.handle(command));
@@ -108,7 +110,7 @@ class RegisterAccountServiceTest {
   void rejectsRegistrationWhenThePreCheckFindsTheEmailAlreadyTaken() {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(true);
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true);
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
@@ -125,7 +127,7 @@ class RegisterAccountServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
     doThrow(new DataIntegrityViolationException("duplicate key")).when(accounts).insert(any());
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true);
 
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
@@ -139,7 +141,8 @@ class RegisterAccountServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
     when(accounts.existsByOrganizationIdAndUsername(eq(organizationId), any())).thenReturn(false);
 
-    service.handle(new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, "flowuser"));
+    service.handle(
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, "flowuser", true));
 
     org.mockito.ArgumentCaptor<com.clavaris.identity.domain.model.Account> accountCaptor =
         org.mockito.ArgumentCaptor.forClass(com.clavaris.identity.domain.model.Account.class);
@@ -151,7 +154,7 @@ class RegisterAccountServiceTest {
   void rejectsRegistrationWhenTheOrganizationRequiresAUsernameAndNoneWasSubmitted() {
     when(policyProvider.policyFor(organizationId)).thenReturn(usernameRequiredPolicy());
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true);
 
     assertThatExceptionOfType(UsernameRequiredException.class)
         .isThrownBy(() -> service.handle(command));
@@ -165,7 +168,7 @@ class RegisterAccountServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
     when(accounts.existsByOrganizationIdAndUsername(eq(organizationId), any())).thenReturn(true);
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, "taken");
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, "taken", true);
 
     assertThatExceptionOfType(UsernameAlreadyRegisteredException.class)
         .isThrownBy(() -> service.handle(command));
@@ -178,7 +181,7 @@ class RegisterAccountServiceTest {
     when(policyProvider.policyFor(organizationId)).thenReturn(passwordOptionalPolicy());
     when(accounts.existsByOrganizationIdAndEmail(organizationId, email)).thenReturn(false);
 
-    service.handle(new RegisterAccountCommand(organizationId, email, null, null));
+    service.handle(new RegisterAccountCommand(organizationId, email, null, null, true));
 
     // ADR-0024 §5: never the raw submitted value (there wasn't one) — a real, hashed credential
     // still gets attached, just never the literal null/blank the caller sent.
@@ -188,7 +191,8 @@ class RegisterAccountServiceTest {
 
   @Test
   void rejectsMissingPasswordWhenTheOrganizationStillRequiresOneAtSignUp() {
-    RegisterAccountCommand command = new RegisterAccountCommand(organizationId, email, null, null);
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, null, null, true);
 
     assertThatExceptionOfType(WeakPasswordException.class)
         .isThrownBy(() -> service.handle(command));
@@ -201,7 +205,7 @@ class RegisterAccountServiceTest {
   void rejectsRegistrationWhenTheAccessRestrictionPolicyDisallowsTheEmail() {
     when(accessRestrictions.isAllowed(organizationId, email)).thenReturn(false);
     RegisterAccountCommand command =
-        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null);
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true);
 
     assertThatExceptionOfType(AccessRestrictedException.class)
         .isThrownBy(() -> service.handle(command));
@@ -211,17 +215,17 @@ class RegisterAccountServiceTest {
 
   private static AccountAuthenticationPolicySnapshot usernameOptionalPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, true, false, false, true, false);
+        false, EmailVerificationMethod.LINK, false, false, true, false, false, true, false, false);
   }
 
   private static AccountAuthenticationPolicySnapshot usernameRequiredPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, true, true, false, true, false);
+        false, EmailVerificationMethod.LINK, false, false, true, true, false, true, false, false);
   }
 
   private static AccountAuthenticationPolicySnapshot passwordOptionalPolicy() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, true, false, false, false, false, false, false);
+        false, EmailVerificationMethod.LINK, true, false, false, false, false, false, false, false);
   }
 
   private static String argThat(final java.util.function.Predicate<String> predicate) {

@@ -188,7 +188,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
                 false,
                 false,
                 true,
-                true));
+                true,
+                false));
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
 

@@ -15,10 +15,27 @@ package com.clavaris.identity.domain.model;
  * revoke live sessions/tokens identically (see {@code Account#ban()}'s own Javadoc). No database
  * migration needed for this addition — {@code accounts.status} is a plain {@code varchar(20)}, no
  * CHECK constraint restricting its values.
+ *
+ * <p>{@code PENDING_APPROVAL}/{@code REJECTED} (TD-FUT-019, gated self-registration): a genuinely
+ * different shape of "not yet usable" than the {@code PENDING_VERIFICATION} state this class's own
+ * opening paragraph explicitly declines to have — this gates the account's very existence as a
+ * usable identity (an operator or the consuming application's own backend must approve it first),
+ * not merely whether its email is confirmed. Set only by {@code RegisterAccountService}/{@code
+ * AuthenticateWithSocialProviderService} when the owning Organization's {@code
+ * AccountAuthenticationPolicy.selfRegistrationRequiresApproval()} is on — every other registration
+ * path (admin-created, Workspace-provisioned) is unaffected and stays {@code ACTIVE} immediately.
+ * Blocks sign-in the same unconditional "reject any non-{@code ACTIVE} account" way {@code
+ * SUSPENDED}/{@code BANNED} already do at every {@code AuthenticateWith*Service} that checks
+ * status. {@code REJECTED} is terminal (no further transition back to {@code PENDING_APPROVAL}) but
+ * deliberately distinct from {@code BANNED} — a rejected signup was never live, so it carries none
+ * of {@code BANNED}'s "this account did something wrong" connotation. No database migration needed
+ * for either value, same reasoning as {@code BANNED}'s own addition.
  */
 public enum AccountStatus {
   ACTIVE,
   SUSPENDED,
   BANNED,
-  DELETED
+  DELETED,
+  PENDING_APPROVAL,
+  REJECTED
 }

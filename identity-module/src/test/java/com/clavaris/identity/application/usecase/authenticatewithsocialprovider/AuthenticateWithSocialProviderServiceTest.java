@@ -15,6 +15,8 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -46,6 +48,10 @@ class AuthenticateWithSocialProviderServiceTest {
   private EventOutboxWriter outbox;
   private SecurityMetricsRecorder metrics;
   private PasswordHasher hasher;
+
+  @SuppressWarnings("PMD.LongVariable")
+  private AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider;
+
   private AuthenticateWithSocialProviderService service;
 
   @BeforeEach
@@ -62,6 +68,11 @@ class AuthenticateWithSocialProviderServiceTest {
     // about the linking decision, not password hashing itself (Argon2PasswordHasherTest already
     // covers the real implementation).
     when(hasher.hash(org.mockito.ArgumentMatchers.anyString())).thenReturn("$argon2id$fake-hash");
+    accountAuthenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    // TD-FUT-019: not gated by default — every existing test in this suite assumes the pre-TD-
+    // FUT-019 ungated behavior unless it explicitly overrides this stub.
+    when(accountAuthenticationPolicyProvider.policyFor(ORGANIZATION_ID))
+        .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
 
     when(policyProvider.isProviderAllowed(ORGANIZATION_ID, SocialProvider.GOOGLE)).thenReturn(true);
 
@@ -87,7 +98,8 @@ class AuthenticateWithSocialProviderServiceTest {
             outbox,
             metrics,
             fakeTransactionTemplate,
-            hasher);
+            hasher,
+            accountAuthenticationPolicyProvider);
   }
 
   private AuthenticateWithSocialProviderCommand command() {

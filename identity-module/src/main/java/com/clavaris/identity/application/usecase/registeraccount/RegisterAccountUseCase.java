@@ -1,7 +1,5 @@
 package com.clavaris.identity.application.usecase.registeraccount;
 
-import com.clavaris.identity.domain.model.AccountId;
-
 /**
  * Inbound port — the web adapter depends on this interface, never on {@link RegisterAccountService}
  * directly.
@@ -15,5 +13,5 @@ public interface RegisterAccountUseCase {
    * @throws EmailAlreadyRegisteredException if the email is already registered in this organization
    *     (BR-ORG-01 scoping)
    */
-  AccountId handle(RegisterAccountCommand command);
+  RegisterAccountResult handle(RegisterAccountCommand command);
 }

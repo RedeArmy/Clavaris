@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
+import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameRequiredException;
@@ -17,7 +18,6 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
@@ -151,7 +151,9 @@ public class RegisterAccountController {
   // nested branching for the several independent failure modes (validation, password required,
   // password mismatch, username required, taken email, taken username, weak password) that each
   // need their own field error — PMD.OnlyOneReturn would make this harder to follow, not easier.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+  // PMD.CognitiveComplexity: TD-FUT-019's own pendingApproval early return is one more genuinely
+  // distinct outcome on the same "each needs its own exit" list above.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
   @PostMapping
   public String register(
       @PathVariable final UUID organizationId,
@@ -188,12 +190,12 @@ public class RegisterAccountController {
       return FORM_VIEW;
     }
 
-    final AccountId accountId;
+    final RegisterAccountResult result;
     try {
-      accountId =
+      result =
           useCase.handle(
               new RegisterAccountCommand(
-                  orgId, new Email(form.getEmail()), form.getPassword(), form.getUsername()));
+                  orgId, new Email(form.getEmail()), form.getPassword(), form.getUsername(), true));
     } catch (EmailAlreadyRegisteredException _) {
       // Never leaks the low-level exception message (which includes the raw organizationId
       // UUID) to the rendered page — a generic, field-scoped error only.
@@ -246,6 +248,21 @@ public class RegisterAccountController {
       return FORM_VIEW;
     }
 
+    if (result.pendingApproval()) {
+      // TD-FUT-019: a gated signup — no credential was proven wrong here, there's just genuinely
+      // nothing to sign in to yet (AuthenticateWith*Service rejects any non-ACTIVE account
+      // unconditionally). Never sends the verification email at this point: it would only
+      // encourage a return visit to a login page that will keep rejecting the account anyway
+      // until an operator or the consuming application's own backend approves it — the same
+      // "don't kick off an irrelevant side effect" restraint completePasswordlessSignUp's own
+      // policy branch already exercises below.
+      String pendingApprovalTarget =
+          REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-approval";
+      pendingApprovalTarget =
+          RedirectQueryParams.appendIfPresent(pendingApprovalTarget, EMAIL, form.getEmail());
+      return pendingApprovalTarget;
+    }
+
     if (!passwordSubmitted) {
       // ADR-0024 §5: no password credential the account holder actually knows — completing sign-up
       // means completing whichever passwordless method the policy enabled, reusing §3's own
@@ -259,7 +276,7 @@ public class RegisterAccountController {
     // language, for exactly that reason). See this class's own Javadoc addendum for the real,
     // live-found bug the surrounding try/catch guards.
     try {
-      requestEmailVerification.handle(new RequestEmailVerificationCommand(accountId));
+      requestEmailVerification.handle(new RequestEmailVerificationCommand(result.accountId()));
     } catch (final MailDeliveryException e) {
       LOG.warn("event=account_registered_verification_email_send_failed", e);
     }
@@ -322,6 +339,14 @@ public class RegisterAccountController {
       @RequestParam(required = false) final String email, final Model model) {
     model.addAttribute(EMAIL, email);
     return "identity/register-pending-verification";
+  }
+
+  // TD-FUT-019: same optional-query-param-for-display-only shape as pendingVerification above.
+  @GetMapping("/pending-approval")
+  public String pendingApproval(
+      @RequestParam(required = false) final String email, final Model model) {
+    model.addAttribute(EMAIL, email);
+    return "identity/register-pending-approval";
   }
 
   private void addSignUpOptions(final UUID organizationId, final Model model) {

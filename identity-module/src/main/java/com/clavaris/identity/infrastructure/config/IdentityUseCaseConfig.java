@@ -595,7 +595,9 @@ class IdentityUseCaseConfig {
   // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for
   // exactly the reason AddWorkspaceMemberUseCase's own @Bean method already documents — one branch
   // of this flow needs an atomic multi-write, another needs a write followed by a real mail send.
-  @SuppressWarnings("java:S107")
+  // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
+  // PMD.ExcessiveParameterList threshold too — same "wiring, not sprawl" reasoning.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   @Bean
   /* package */ AuthenticateWithSocialProviderUseCase authenticateWithSocialProviderUseCase(
       final AccountRepository accounts,
@@ -606,7 +608,9 @@ class IdentityUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter,
       final SecurityMetricsRecorder securityMetrics,
       @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
-      final PasswordHasher hasher) {
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable")
+          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
     return new AuthenticateWithSocialProviderService(
         accounts,
         socialIdentities,
@@ -616,7 +620,8 @@ class IdentityUseCaseConfig {
         eventOutboxWriter,
         securityMetrics,
         new TransactionTemplate(transactionManager),
-        hasher);
+        hasher,
+        accountAuthenticationPolicyProvider);
   }
 
   @Bean

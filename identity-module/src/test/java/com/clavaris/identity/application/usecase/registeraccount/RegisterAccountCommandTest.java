@@ -22,7 +22,8 @@ class RegisterAccountCommandTest {
             new OrganizationId(UUID.randomUUID()),
             new Email("someone@example.com"),
             rawPassword,
-            null);
+            null,
+            true);
 
     assertThat(command.toString()).doesNotContain(rawPassword).contains("REDACTED");
   }
