@@ -31,6 +31,7 @@ class PlatformClientTest {
             PlatformScopes.WORKSPACES_WRITE,
             PlatformScopes.WORKSPACE_MEMBERS_WRITE,
             PlatformScopes.WORKSPACE_MEMBERS_REMOVE,
+            PlatformScopes.WORKSPACE_ROLES_WRITE,
             PlatformScopes.ACCOUNTS_SUSPEND,
             PlatformScopes.SOCIAL_LOGIN_POLICY_WRITE,
             PlatformScopes.WEBHOOK_ENDPOINTS_WRITE,

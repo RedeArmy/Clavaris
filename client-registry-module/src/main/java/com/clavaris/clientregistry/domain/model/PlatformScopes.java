@@ -100,6 +100,17 @@ public final class PlatformScopes {
   public static final String WORKSPACE_MEMBERS_REMOVE = "platform:workspace-members:remove";
 
   /**
+   * TD-SEC-059: create/update/delete on {@code WorkspaceRolesController} (a {@code WorkspaceRole}
+   * governs what {@code manage_members}/{@code manage_roles} means for a whole Organization, not
+   * one Workspace) — its own scope, deliberately separate from {@link #WORKSPACE_MEMBERS_WRITE} (a
+   * token that can add/promote members doesn't automatically get to also redefine what a role
+   * grants in the first place), same defence-in-depth reasoning as every other admin-API rule here.
+   * Grouped under one scope for create/update/delete, same "same risk tier" precedent {@link
+   * #WORKSPACE_MEMBERS_WRITE} already establishes for its own two verbs.
+   */
+  public static final String WORKSPACE_ROLES_WRITE = "platform:workspace-roles:write";
+
+  /**
    * Reversible ban/unban ({@code SuspendAccountController}/{@code ReactivateAccountController}) —
    * one shared scope for both directions, same "grouped under one scope for same-risk-tier actions"
    * precedent {@link #WORKSPACE_MEMBERS_WRITE} already establishes: suspend and reactivate are
@@ -229,6 +240,7 @@ public final class PlatformScopes {
           WORKSPACES_WRITE,
           WORKSPACE_MEMBERS_WRITE,
           WORKSPACE_MEMBERS_REMOVE,
+          WORKSPACE_ROLES_WRITE,
           ACCOUNTS_SUSPEND,
           SOCIAL_LOGIN_POLICY_WRITE,
           WEBHOOK_ENDPOINTS_WRITE,
