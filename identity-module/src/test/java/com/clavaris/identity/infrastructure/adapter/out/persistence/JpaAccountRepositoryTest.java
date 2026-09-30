@@ -508,6 +508,38 @@ class JpaAccountRepositoryTest {
     assertThat(found.content()).hasSize(2);
   }
 
+  // TD-PERF-029: proves the batched credential lookup (findByAccountIdIn, one call for the whole
+  // page) attaches the right credential to the right account and correctly leaves a
+  // credential-less account's own passwordCredential empty — not just that it compiles/runs, but
+  // that per-row identity survives being resolved via a shared Map instead of a per-row query.
+  @Test
+  void findKeysetPageByOrganizationIdAttachesTheCorrectCredentialPerAccountViaTheBatchedLookup() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account withCredential = Account.register(organizationId, new Email("has-cred@example.com"));
+    withCredential.attachPasswordCredential("argon2id$has-cred-hash");
+    Account withoutCredential = Account.register(organizationId, new Email("no-cred@example.com"));
+    repository.insert(withCredential);
+    repository.insert(withoutCredential);
+
+    KeysetPage<Account> page =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 10), null);
+
+    Account foundWithCredential =
+        page.content().stream()
+            .filter(account -> account.id().equals(withCredential.id()))
+            .findFirst()
+            .orElseThrow();
+    Account foundWithoutCredential =
+        page.content().stream()
+            .filter(account -> account.id().equals(withoutCredential.id()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(foundWithCredential.passwordCredential().orElseThrow().passwordHash())
+        .isEqualTo("argon2id$has-cred-hash");
+    assertThat(foundWithoutCredential.passwordCredential()).isEmpty();
+  }
+
   private static Account reconstituteAt(
       final OrganizationId organizationId, final String email, final Instant createdAt) {
     return Account.reconstitute(
