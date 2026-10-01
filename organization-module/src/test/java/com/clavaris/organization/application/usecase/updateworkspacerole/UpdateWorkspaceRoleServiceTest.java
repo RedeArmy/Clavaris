@@ -55,7 +55,7 @@ class UpdateWorkspaceRoleServiceTest {
 
     assertThat(updated.name()).isEqualTo("Renamed");
     assertThat(updated.permissions()).containsExactly("b");
-    verify(roles).save(updated);
+    verify(roles).saveAndFlush(updated);
   }
 
   @Test
@@ -92,7 +92,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   // TD-SEC-056: the role genuinely exists — just for a different Organization than the command
@@ -107,7 +107,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
@@ -120,7 +120,26 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void translatesADataIntegrityViolationFromALostRaceIntoTheTypedException() {
+    // TD-ARCH-029: the pre-check above passes (no existing row with this name yet, per setUp's
+    // own stub), but ux_workspace_roles_organization_id_name still fires at saveAndFlush time —
+    // simulating a concurrent request that renamed another role to the same name first.
+    org.mockito.Mockito.doThrow(
+            new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+        .when(roles)
+        .saveAndFlush(any());
+    UpdateWorkspaceRoleCommand command =
+        new UpdateWorkspaceRoleCommand(role.id(), organizationId, "Renamed", null, Set.of(), ACTOR);
+
+    assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(auditEvents, org.mockito.Mockito.never()).write(any(), any(), any(), any(), any());
+    verify(outbox, org.mockito.Mockito.never()).write(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -143,7 +162,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
@@ -159,7 +178,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleCycleException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
@@ -189,7 +208,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(CannotStripReservedWorkspaceRolePermissionsException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
