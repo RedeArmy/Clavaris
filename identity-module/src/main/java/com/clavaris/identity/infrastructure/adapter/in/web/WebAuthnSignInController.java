@@ -12,6 +12,8 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.yubico.webauthn.AssertionRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -85,6 +87,10 @@ public class WebAuthnSignInController {
             recordLoginEvent);
   }
 
+  @Operation(summary = "Start a discoverable (usernameless) WebAuthn passkey sign-in (TD-FUT-034)")
+  @ApiResponse(
+      responseCode = "200",
+      description = "WebAuthn assertion request, as JSON for navigator.credentials.get()")
   @PostMapping(value = "/start", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<String> start(
       @PathVariable final UUID organizationId, final HttpServletRequest request)
@@ -96,6 +102,11 @@ public class WebAuthnSignInController {
     return ResponseEntity.ok(assertionRequest.toCredentialsGetJson());
   }
 
+  @Operation(summary = "Complete a WebAuthn passkey sign-in with the browser's own assertion")
+  @ApiResponse(responseCode = "200", description = "Signed in — body carries the next redirect URL")
+  @ApiResponse(
+      responseCode = "400",
+      description = "No pending sign-in, or an invalid/expired assertion")
   @PostMapping("/finish")
   public ResponseEntity<Map<String, String>> finish(
       @PathVariable final UUID organizationId,
