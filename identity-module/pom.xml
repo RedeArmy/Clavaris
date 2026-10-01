@@ -119,6 +119,35 @@
             <artifactId>s3</artifactId>
         </dependency>
 
+        <!-- TD-FUT-034 (WebAuthn/passkeys, Clerk "View Profile" parity, confirmed scope: real
+             self-service registration + sign-in, not a stub): the FIDO2/WebAuthn reference
+             implementation for the JVM, used the same way Nimbus JOSE+JWT already is here — a
+             protocol/crypto library the use-case layer calls directly, never Spring Security's own
+             newer spring-security-webauthn filter-chain module (that couples the ceremony to a
+             form-login-shaped filter this codebase deliberately doesn't use for any other factor
+             either, same ADR-0024 §3 reasoning establishWithAuthorities' own Javadoc documents).
+             2.7.0 confirmed as the latest non-RC/non-alpha release on Maven Central at the time this
+             was pinned. Its own BOM manages jackson-databind/guava/cbor/httpclient5/slf4j-api at
+             runtime scope — the root pom's own direct jackson-2-bom import (2.21.7, see its
+             CVE-2026-91776/91777 comment on jackson-2-bom.version) wins over that transitive BOM,
+             confirmed via `mvn dependency:tree`. -->
+        <dependency>
+            <groupId>com.yubico</groupId>
+            <artifactId>webauthn-server-core</artifactId>
+            <version>2.7.0</version>
+        </dependency>
+        <!-- webauthn-server-core's own ceremony methods (toJson/fromJson/finishRegistration/
+             finishAssertion) declare a checked com.fasterxml.jackson.core.JsonProcessingException —
+             javac needs that class file on the compile classpath to verify it's an IOException
+             subtype even when calling code only ever catches/declares the supertype, which Yubico's
+             own runtime-scope-only jackson-databind pull above doesn't provide at compile time.
+             Explicit compile-scope declaration here, version still governed by the root pom's own
+             jackson-2-bom pin (2.21.7) — not a new, separately-tracked Jackson 2 usage. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

@@ -27,6 +27,10 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameService;
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithwebauthn.AuthenticateWithWebAuthnService;
+import com.clavaris.identity.application.usecase.authenticatewithwebauthn.AuthenticateWithWebAuthnUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithwebauthn.StartWebAuthnAuthenticationService;
+import com.clavaris.identity.application.usecase.authenticatewithwebauthn.StartWebAuthnAuthenticationUseCase;
 import com.clavaris.identity.application.usecase.banaccount.BanAccountService;
 import com.clavaris.identity.application.usecase.banaccount.BanAccountUseCase;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetService;
@@ -46,6 +50,8 @@ import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseC
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountService;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
+import com.clavaris.identity.application.usecase.deletewebauthncredential.DeleteWebAuthnCredentialService;
+import com.clavaris.identity.application.usecase.deletewebauthncredential.DeleteWebAuthnCredentialUseCase;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountService;
 import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
 import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarService;
@@ -72,6 +78,8 @@ import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListO
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.OAuthGrantsRepository;
 import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationService;
 import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountService;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountUseCase;
 import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationService;
 import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountService;
@@ -88,6 +96,11 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationService;
+import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationUseCase;
+import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationService;
+import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationUseCase;
+import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
 import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationService;
 import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationUseCase;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureService;
@@ -132,6 +145,7 @@ import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAcco
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorage;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureService;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureUseCase;
+import com.yubico.webauthn.RelyingParty;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
@@ -755,6 +769,50 @@ class IdentityUseCaseConfig {
   /* package */ GetLoginActivityForAccountUseCase getLoginActivityForAccountUseCase(
       final LoginEventRepository loginEvents) {
     return new GetLoginActivityForAccountService(loginEvents);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" passkeys parity.
+  @Bean
+  /* package */ StartWebAuthnRegistrationUseCase startWebAuthnRegistrationUseCase(
+      final RelyingParty relyingParty) {
+    return new StartWebAuthnRegistrationService(relyingParty);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" passkeys parity.
+  @Bean
+  /* package */ CompleteWebAuthnRegistrationUseCase completeWebAuthnRegistrationUseCase(
+      final RelyingParty relyingParty, final WebAuthnCredentialRepository credentials) {
+    return new CompleteWebAuthnRegistrationService(relyingParty, credentials);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" passkeys parity.
+  @Bean
+  /* package */ StartWebAuthnAuthenticationUseCase startWebAuthnAuthenticationUseCase(
+      final RelyingParty relyingParty) {
+    return new StartWebAuthnAuthenticationService(relyingParty);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" passkeys parity.
+  @Bean
+  /* package */ AuthenticateWithWebAuthnUseCase authenticateWithWebAuthnUseCase(
+      final RelyingParty relyingParty,
+      final WebAuthnCredentialRepository credentials,
+      final AccountRepository accounts) {
+    return new AuthenticateWithWebAuthnService(relyingParty, credentials, accounts);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" passkeys parity.
+  @Bean
+  /* package */ ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentialsForAccountUseCase(
+      final WebAuthnCredentialRepository credentials) {
+    return new ListWebAuthnCredentialsForAccountService(credentials);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" passkeys parity.
+  @Bean
+  /* package */ DeleteWebAuthnCredentialUseCase deleteWebAuthnCredentialUseCase(
+      final WebAuthnCredentialRepository credentials, final AuditEventRecorder auditEvents) {
+    return new DeleteWebAuthnCredentialService(credentials, auditEvents);
   }
 
   // TD-FUT-025: the "this wasn't me" half of the new-device login alert — see
