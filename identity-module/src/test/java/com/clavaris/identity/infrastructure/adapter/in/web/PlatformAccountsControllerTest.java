@@ -25,6 +25,7 @@ import com.clavaris.identity.application.usecase.listaccountsfororganization.Lis
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplay;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplayReader;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
@@ -272,6 +273,20 @@ class PlatformAccountsControllerTest {
 
     mockMvc
         .perform(post(basePath()).param("email", "new-user@example.com").param("password", "short"))
+        .andExpect(status().isOk())
+        .andExpect(model().attributeHasFieldErrors("createForm", "password"));
+  }
+
+  @Test
+  void createRendersAFieldErrorWhenThePasswordIsBreached() throws Exception {
+    // BR-ID-07
+    doThrow(new BreachedPasswordException()).when(createAccount).handle(any());
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password"))
         .andExpect(status().isOk())
         .andExpect(model().attributeHasFieldErrors("createForm", "password"));
   }

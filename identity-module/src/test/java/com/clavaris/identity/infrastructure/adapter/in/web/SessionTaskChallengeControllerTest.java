@@ -21,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
@@ -173,6 +174,31 @@ class SessionTaskChallengeControllerTest {
         // Same rationale as RegisterAccountControllerTest's own identical assertion.
         .andExpect(
             content().string(containsString("Password must be between 8 and 128 characters")));
+
+    verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
+  }
+
+  @Test
+  void postWithABreachedPasswordRerendersTheFormWithAGenericFieldError() throws Exception {
+    // BR-ID-07
+    MockHttpSession session = pendingSessionFor(AccountId.newId(), "PASSWORD");
+    doThrow(new BreachedPasswordException()).when(completeUseCase).handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/session-task/password-reset", ORGANIZATION_ID)
+                .session(session)
+                .param("newPassword", "a-Str0ng-Password!")
+                .param("confirmPassword", "a-Str0ng-Password!"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/session-task-password-reset"))
+        .andExpect(model().attributeHasFieldErrors("form", "newPassword"))
+        // Deliberately generic — never mentions a breach/source (BR-ID-07's own wording).
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "This password cannot be used - please choose a different one")));
 
     verify(sessions, never()).establish(any(), any(), any(), anyBoolean(), any());
   }

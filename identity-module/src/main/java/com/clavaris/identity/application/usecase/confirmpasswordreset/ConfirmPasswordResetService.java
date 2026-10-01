@@ -3,6 +3,8 @@ package com.clavaris.identity.application.usecase.confirmpasswordreset;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
@@ -70,6 +72,10 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
   private final PasswordHasher hasher;
   private final EventOutboxWriter outbox;
 
+  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
+  // accountTokenRevoker/accountSessionRevoker above.
+  private final BreachedPasswordChecker breachedPasswordChecker;
+
   @SuppressWarnings("java:S107") // one parameter per collaborating port — see RefreshToken's own
   // rationale for the same suppression on a rehydration factory; here it's a use case wiring
   // together every port BR-ID-04's cascade genuinely needs, not excess complexity to hide.
@@ -81,7 +87,8 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessions = sessions;
@@ -90,11 +97,14 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     this.accountSessionRevoker = accountSessionRevoker;
     this.hasher = hasher;
     this.outbox = outbox;
+    this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
   // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
-  // own identical suppression.
-  @SuppressWarnings("PMD.GuardLogStatement")
+  // own identical suppression. PMD.CyclomaticComplexity: BR-ID-07's new breach-check branch is one
+  // more genuinely distinct precondition on top of the real BR-ID-04 cascade already here — same
+  // "wiring, not sprawl" reasoning RegisterAccountService's own identical suppression documents.
+  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public void handle(final ConfirmPasswordResetCommand command) {
@@ -103,6 +113,11 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
     // presented token anyway.
     if (!PasswordPolicy.isSatisfiedBy(command.newRawPassword())) {
       throw new WeakPasswordException();
+    }
+    // BR-ID-07: same "reject before consuming the token" ordering as the policy check above — a
+    // rejected breached password must not consume the presented reset token either.
+    if (breachedPasswordChecker.isBreached(command.newRawPassword())) {
+      throw new BreachedPasswordException();
     }
 
     final String presentedHash = RefreshTokenSecret.hash(command.presentedRawToken());

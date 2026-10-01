@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
@@ -220,6 +221,15 @@ public class RegisterAccountController {
               + " and "
               + PasswordPolicy.MAX_LENGTH
               + " characters");
+      addSignUpOptions(organizationId, model);
+      return FORM_VIEW;
+    } catch (BreachedPasswordException _) {
+      // BR-ID-07: deliberately NOT the WeakPasswordException message slot above — generic wording
+      // only, never mentioning a breach/source (same exception's own Javadoc).
+      bindingResult.rejectValue(
+          "password",
+          "password.breached",
+          "This password cannot be used - please choose a different one");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     } catch (UsernameRequiredException _) {

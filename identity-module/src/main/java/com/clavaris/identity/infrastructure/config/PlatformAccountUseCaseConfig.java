@@ -28,6 +28,7 @@ import com.clavaris.identity.application.usecase.listconnectedaccountsforplatfor
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.PlatformKnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceService;
 import com.clavaris.identity.application.usecase.recordplatformaccountlogindevice.RecordPlatformAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountService;
@@ -82,8 +83,10 @@ class PlatformAccountUseCaseConfig {
 
   @Bean
   /* package */ RegisterPlatformAccountUseCase registerPlatformAccountUseCase(
-      final PlatformAccountRepository accounts, final PasswordHasher passwordHasher) {
-    return new RegisterPlatformAccountService(accounts, passwordHasher);
+      final PlatformAccountRepository accounts,
+      final PasswordHasher passwordHasher,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+    return new RegisterPlatformAccountService(accounts, passwordHasher, breachedPasswordChecker);
   }
 
   @Bean
@@ -133,9 +136,11 @@ class PlatformAccountUseCaseConfig {
               final PlatformVerificationTokenRepository verificationTokens,
           final PlatformAccountRepository accounts,
           final PlatformAccountSessionRevoker sessionRevoker,
-          final PasswordHasher passwordHasher) {
+          final PasswordHasher passwordHasher,
+          @SuppressWarnings("PMD.LongVariable")
+              final BreachedPasswordChecker breachedPasswordChecker) {
     return new ConfirmPlatformAccountPasswordResetService(
-        verificationTokens, accounts, sessionRevoker, passwordHasher);
+        verificationTokens, accounts, sessionRevoker, passwordHasher, breachedPasswordChecker);
   }
 
   // ADR-0020 Decision 1/2: same TransactionTemplate rationale as the tenant-tier sibling's own

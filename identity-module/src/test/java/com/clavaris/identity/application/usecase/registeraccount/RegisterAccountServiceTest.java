@@ -34,6 +34,7 @@ class RegisterAccountServiceTest {
   private EventOutboxWriter outbox;
   private AccountAuthenticationPolicyProvider policyProvider;
   private AccessRestrictionPolicyProvider accessRestrictions;
+  private BreachedPasswordChecker breachedPasswordChecker;
   private RegisterAccountService service;
 
   @BeforeEach
@@ -50,8 +51,14 @@ class RegisterAccountServiceTest {
     // yet) — every existing test below predates this policy, same precedent policyProvider's own
     // default-stubbing comment above already establishes.
     when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
+    breachedPasswordChecker = mock(BreachedPasswordChecker.class);
+    // BR-ID-07: matches today's real default (no corpus match) — every existing test below
+    // predates this check, same precedent accessRestrictions' own default-stubbing comment above
+    // already establishes.
+    when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
-        new RegisterAccountService(accounts, hasher, outbox, policyProvider, accessRestrictions);
+        new RegisterAccountService(
+            accounts, hasher, outbox, policyProvider, accessRestrictions, breachedPasswordChecker);
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }
@@ -100,6 +107,20 @@ class RegisterAccountServiceTest {
         new RegisterAccountCommand(organizationId, email, "short", null, true);
 
     assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).insert(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  @Test
+  void rejectsAPasswordTheCorpusReportsAsBreached_beforeTouchingTheRepository() {
+    // BR-ID-07
+    when(breachedPasswordChecker.isBreached(VALID_PASSWORD)).thenReturn(true);
+    RegisterAccountCommand command =
+        new RegisterAccountCommand(organizationId, email, VALID_PASSWORD, null, true);
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).insert(any());

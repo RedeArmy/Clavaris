@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
@@ -352,6 +353,31 @@ class RegisterAccountControllerTest {
         // minimum requirements" the user has to guess at.
         .andExpect(
             content().string(containsString("Password must be between 8 and 128 characters")));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void breachedPasswordRejectedByTheUseCaseRerendersTheFormWithAGenericFieldError()
+      throws Exception {
+    // BR-ID-07
+    when(useCase.handle(any())).thenThrow(new BreachedPasswordException());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "password"))
+        // Deliberately generic — never mentions a breach/source (BR-ID-07's own wording).
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "This password cannot be used - please choose a different one")));
 
     verifyNoInteractions(requestEmailVerification);
   }

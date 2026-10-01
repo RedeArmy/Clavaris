@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountEmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountCommand;
@@ -221,6 +222,31 @@ class RegisterPlatformAccountControllerTest {
         // Same rationale as RegisterAccountControllerTest's own identical assertion.
         .andExpect(
             content().string(containsString("Password must be between 8 and 128 characters")));
+
+    verifyNoInteractions(requestEmailVerification);
+  }
+
+  @Test
+  void breachedPasswordRejectedByTheUseCaseRerendersTheFormWithAGenericFieldError()
+      throws Exception {
+    // BR-ID-07
+    when(useCase.handle(any())).thenThrow(new BreachedPasswordException());
+
+    mockMvc
+        .perform(
+            post("/platform/register")
+                .param("email", "founder@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/register"))
+        .andExpect(model().attributeHasFieldErrors("form", "password"))
+        // Deliberately generic — never mentions a breach/source (BR-ID-07's own wording).
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "This password cannot be used - please choose a different one")));
 
     verifyNoInteractions(requestEmailVerification);
   }

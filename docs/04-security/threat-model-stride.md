@@ -8,7 +8,7 @@ STRIDE analysis across the highest-value attack surfaces: authentication, token 
 
 | Threat | Scenario | Mitigation |
 |---|---|---|
-| **S**poofing | Credential stuffing against `/login` using leaked password lists | Rate limiting tuned specifically against credential stuffing (BR-ID-06), account lockout/backoff after repeated failures |
+| **S**poofing | Credential stuffing against `/login` using leaked password lists | Rate limiting tuned specifically against credential stuffing (BR-ID-06), account lockout/backoff after repeated failures; breached-password check at registration/password-change rejects a known-leaked password before it can ever be set (BR-ID-07, HIBP Pwned Passwords k-anonymity range query, fail-open on the third-party API's own unavailability) |
 | **S**poofing | Social login account takeover via unverified email pre-registration | Flagged open question, `prd-mvp.md` §5 — resolution required before social login ships |
 | **T**ampering | Password reset token guessed or brute-forced | Cryptographically random, sufficiently long token; hashed at rest (`data-model.md` §2); single-use; time-limited (BR-ID-04) |
 | **R**epudiation | User disputes having requested a password change | Structured audit log of every auth event (NFR §5), without ever logging the credential itself |

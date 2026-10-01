@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetCommand;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.InvalidVerificationTokenException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -129,6 +130,31 @@ class ResetPlatformAccountPasswordControllerTest {
         // Same rationale as RegisterAccountControllerTest's own identical assertion.
         .andExpect(
             content().string(containsString("Password must be between 8 and 128 characters")));
+  }
+
+  @Test
+  void aBreachedPasswordRejectedByTheUseCaseRerendersTheFormWithAGenericFieldError()
+      throws Exception {
+    // BR-ID-07
+    doThrow(new BreachedPasswordException())
+        .when(useCase)
+        .handle(new ConfirmPlatformAccountPasswordResetCommand("a-token", "a-Str0ng-Password!"));
+
+    mockMvc
+        .perform(
+            post("/platform/reset-password")
+                .param("token", "a-token")
+                .param("newPassword", "a-Str0ng-Password!")
+                .param("confirmPassword", "a-Str0ng-Password!"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/reset-password"))
+        .andExpect(model().attributeHasFieldErrors("form", "newPassword"))
+        // Deliberately generic — never mentions a breach/source (BR-ID-07's own wording).
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "This password cannot be used - please choose a different one")));
   }
 
   @Test

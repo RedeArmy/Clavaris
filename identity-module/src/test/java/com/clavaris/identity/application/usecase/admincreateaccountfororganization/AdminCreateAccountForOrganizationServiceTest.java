@@ -12,6 +12,8 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
@@ -36,6 +38,7 @@ class AdminCreateAccountForOrganizationServiceTest {
   private AccountRepository accounts;
   private PasswordHasher hasher;
   private AccessRestrictionPolicyProvider accessRestrictions;
+  private BreachedPasswordChecker breachedPasswordChecker;
   private AdminCreateAccountForOrganizationService service;
 
   @BeforeEach
@@ -44,8 +47,15 @@ class AdminCreateAccountForOrganizationServiceTest {
     hasher = mock(PasswordHasher.class);
     accessRestrictions = mock(AccessRestrictionPolicyProvider.class);
     when(accessRestrictions.isAllowed(any(), any())).thenReturn(true);
+    breachedPasswordChecker = mock(BreachedPasswordChecker.class);
+    // BR-ID-07: matches today's real default (no corpus match) — every existing test below
+    // predates this check, same precedent accessRestrictions' own default-stubbing comment above
+    // already establishes.
+    when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     when(hasher.hash(anyString())).thenReturn("hashed-password");
-    service = new AdminCreateAccountForOrganizationService(accounts, hasher, accessRestrictions);
+    service =
+        new AdminCreateAccountForOrganizationService(
+            accounts, hasher, accessRestrictions, breachedPasswordChecker);
   }
 
   private AdminCreateAccountForOrganizationCommand command() {
@@ -180,5 +190,32 @@ class AdminCreateAccountForOrganizationServiceTest {
     service.handle(command);
 
     verify(accounts).insert(any());
+  }
+
+  @Test
+  void rejectsAPasswordTheCorpusReportsAsBreached() {
+    // BR-ID-07
+    when(breachedPasswordChecker.isBreached(VALID_PASSWORD)).thenReturn(true);
+    AdminCreateAccountForOrganizationCommand command = command();
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).insert(any());
+  }
+
+  @Test
+  void ignorePasswordPolicyDoesNotSkipTheBreachCheck() {
+    // BR-ID-07: deliberately NOT gated by ignorePasswordPolicy — see
+    // AdminCreateAccountForOrganizationService's own Javadoc.
+    when(breachedPasswordChecker.isBreached(VALID_PASSWORD)).thenReturn(true);
+    AdminCreateAccountForOrganizationCommand command =
+        new AdminCreateAccountForOrganizationCommand(
+            organizationId, email, VALID_PASSWORD, null, null, null, null, true, false);
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).insert(any());
   }
 }

@@ -10,6 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.domain.model.Email;
@@ -26,13 +28,18 @@ class RegisterPlatformAccountServiceTest {
 
   private PlatformAccountRepository accounts;
   private PasswordHasher hasher;
+  private BreachedPasswordChecker breachedPasswordChecker;
   private RegisterPlatformAccountService service;
 
   @BeforeEach
   void setUp() {
     accounts = mock(PlatformAccountRepository.class);
     hasher = mock(PasswordHasher.class);
-    service = new RegisterPlatformAccountService(accounts, hasher);
+    breachedPasswordChecker = mock(BreachedPasswordChecker.class);
+    // BR-ID-07: matches today's real default (no corpus match) — every existing test below
+    // predates this check.
+    when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
+    service = new RegisterPlatformAccountService(accounts, hasher, breachedPasswordChecker);
 
     when(hasher.hash(anyString())).thenReturn("hashed-password");
   }
@@ -62,6 +69,19 @@ class RegisterPlatformAccountServiceTest {
     RegisterPlatformAccountCommand command = new RegisterPlatformAccountCommand(email, "short");
 
     assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).insert(any());
+  }
+
+  @Test
+  void rejectsAPasswordTheCorpusReportsAsBreached_beforeTouchingTheRepository() {
+    // BR-ID-07
+    when(breachedPasswordChecker.isBreached(VALID_PASSWORD)).thenReturn(true);
+    RegisterPlatformAccountCommand command =
+        new RegisterPlatformAccountCommand(email, VALID_PASSWORD);
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).insert(any());

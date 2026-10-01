@@ -92,6 +92,7 @@ import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEve
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
@@ -203,13 +204,15 @@ class IdentityUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter,
       final AccountAuthenticationPolicyProvider policyProvider,
       @SuppressWarnings("PMD.LongVariable")
-          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider) {
+          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     return new RegisterAccountService(
         accountRepository,
         passwordHasher,
         eventOutboxWriter,
         policyProvider,
-        accessRestrictionPolicyProvider);
+        accessRestrictionPolicyProvider,
+        breachedPasswordChecker);
   }
 
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity.
@@ -218,9 +221,13 @@ class IdentityUseCaseConfig {
       final AccountRepository accountRepository,
       final PasswordHasher passwordHasher,
       @SuppressWarnings("PMD.LongVariable")
-          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider) {
+          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     return new AdminCreateAccountForOrganizationService(
-        accountRepository, passwordHasher, accessRestrictionPolicyProvider);
+        accountRepository,
+        passwordHasher,
+        accessRestrictionPolicyProvider,
+        breachedPasswordChecker);
   }
 
   @Bean
@@ -364,7 +371,8 @@ class IdentityUseCaseConfig {
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher passwordHasher,
-      final EventOutboxWriter eventOutboxWriter) {
+      final EventOutboxWriter eventOutboxWriter,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     return new ConfirmPasswordResetService(
         verificationTokens,
         accounts,
@@ -373,7 +381,8 @@ class IdentityUseCaseConfig {
         accountTokenRevoker,
         accountSessionRevoker,
         passwordHasher,
-        eventOutboxWriter);
+        eventOutboxWriter,
+        breachedPasswordChecker);
   }
 
   // ADR-0024 §3 — passwordless email sign-in
@@ -523,9 +532,16 @@ class IdentityUseCaseConfig {
       final RefreshTokenRepository refreshTokens,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final PasswordHasher hasher) {
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     return new CompleteForcedPasswordResetService(
-        accounts, sessions, refreshTokens, accountTokenRevoker, accountSessionRevoker, hasher);
+        accounts,
+        sessions,
+        refreshTokens,
+        accountTokenRevoker,
+        accountSessionRevoker,
+        hasher,
+        breachedPasswordChecker);
   }
 
   // SDE-III feature build, 2026-09-03: support/operator impersonation — see

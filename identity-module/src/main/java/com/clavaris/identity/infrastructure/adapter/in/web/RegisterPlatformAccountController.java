@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountEmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.RegisterPlatformAccountCommand;
@@ -144,6 +145,14 @@ public class RegisterPlatformAccountController {
               + " and "
               + PasswordPolicy.MAX_LENGTH
               + " characters");
+      return FORM_VIEW;
+    } catch (BreachedPasswordException _) {
+      // BR-ID-07, CLAUDE.md §5: deliberately NOT the WeakPasswordException message slot above —
+      // generic wording only, never mentioning a breach/source (same exception's own Javadoc).
+      bindingResult.rejectValue(
+          "password",
+          "password.breached",
+          "This password cannot be used - please choose a different one");
       return FORM_VIEW;
     }
 

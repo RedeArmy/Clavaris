@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.completeforcedpasswordreset.Com
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
@@ -111,6 +112,14 @@ public class SessionTaskChallengeController {
               + " and "
               + PasswordPolicy.MAX_LENGTH
               + " characters");
+      return FORM_VIEW;
+    } catch (final BreachedPasswordException _) {
+      // BR-ID-07: deliberately NOT the WeakPasswordException message slot above — generic wording
+      // only, never mentioning a breach/source (same exception's own Javadoc).
+      bindingResult.rejectValue(
+          "newPassword",
+          "newPassword.breached",
+          "This password cannot be used - please choose a different one");
       return FORM_VIEW;
     }
 

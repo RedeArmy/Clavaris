@@ -40,18 +40,24 @@ public class RegisterAccountService implements RegisterAccountUseCase {
   private final EventOutboxWriter outbox;
   private final AccountAuthenticationPolicyProvider policyProvider;
   private final AccessRestrictionPolicyProvider accessRestrictions;
+  private final BreachedPasswordChecker breachedPasswordChecker;
 
+  @SuppressWarnings("java:S107") // one parameter per collaborating port — BR-ID-07's own new
+  // BreachedPasswordChecker is one more, same "wiring, not sprawl" rationale as every other
+  // multi-collaborator constructor in this codebase.
   public RegisterAccountService(
       final AccountRepository accounts,
       final PasswordHasher hasher,
       final EventOutboxWriter outbox,
       final AccountAuthenticationPolicyProvider policyProvider,
-      final AccessRestrictionPolicyProvider accessRestrictions) {
+      final AccessRestrictionPolicyProvider accessRestrictions,
+      final BreachedPasswordChecker breachedPasswordChecker) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.outbox = outbox;
     this.policyProvider = policyProvider;
     this.accessRestrictions = accessRestrictions;
+    this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
   @Override
@@ -164,6 +170,12 @@ public class RegisterAccountService implements RegisterAccountUseCase {
     if (submitted) {
       if (!PasswordPolicy.isSatisfiedBy(command.rawPassword())) {
         throw new WeakPasswordException();
+      }
+      // BR-ID-07: only on the genuinely-submitted branch — a RandomPasswordGenerator-minted value
+      // below can't meaningfully be "breached," and checking it would be wasted I/O on every
+      // passwordless signup.
+      if (breachedPasswordChecker.isBreached(command.rawPassword())) {
+        throw new BreachedPasswordException();
       }
       return command.rawPassword();
     }

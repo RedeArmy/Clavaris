@@ -3,6 +3,8 @@ package com.clavaris.identity.application.usecase.admincreateaccountfororganizat
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
@@ -47,14 +49,17 @@ public class AdminCreateAccountForOrganizationService
   private final AccountRepository accounts;
   private final PasswordHasher hasher;
   private final AccessRestrictionPolicyProvider accessRestrictions;
+  private final BreachedPasswordChecker breachedPasswordChecker;
 
   public AdminCreateAccountForOrganizationService(
       final AccountRepository accounts,
       final PasswordHasher hasher,
-      final AccessRestrictionPolicyProvider accessRestrictions) {
+      final AccessRestrictionPolicyProvider accessRestrictions,
+      final BreachedPasswordChecker breachedPasswordChecker) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.accessRestrictions = accessRestrictions;
+    this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
   @Override
@@ -68,6 +73,12 @@ public class AdminCreateAccountForOrganizationService
     }
     if (!command.ignorePasswordPolicy() && !PasswordPolicy.isSatisfiedBy(command.rawPassword())) {
       throw new WeakPasswordException();
+    }
+    // BR-ID-07: deliberately NOT gated by ignorePasswordPolicy — that flag's own scope is the
+    // length policy specifically (see this class's own Javadoc), never a license to create a
+    // known-compromised-credential account.
+    if (breachedPasswordChecker.isBreached(command.rawPassword())) {
+      throw new BreachedPasswordException();
     }
 
     final Username username = validateUsername(command);
