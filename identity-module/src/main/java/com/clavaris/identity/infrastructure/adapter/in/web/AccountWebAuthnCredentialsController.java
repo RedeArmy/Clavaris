@@ -139,7 +139,7 @@ public class AccountWebAuthnCredentialsController {
               options,
               body.credential(),
               body.nickname()));
-    } catch (final InvalidWebAuthnRegistrationException e) {
+    } catch (final InvalidWebAuthnRegistrationException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .body(Map.of("error", "Passkey registration failed"));
     }

@@ -131,7 +131,7 @@ public class WebAuthnSignInController {
       account =
           authenticate.handle(
               new AuthenticateWithWebAuthnCommand(assertionRequest, body.credential()));
-    } catch (final InvalidWebAuthnAssertionException e) {
+    } catch (final InvalidWebAuthnAssertionException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .body(Map.of("error", "Invalid or expired passkey sign-in attempt"));
     }

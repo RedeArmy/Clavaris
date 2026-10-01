@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.updateworkspacerole;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class UpdateWorkspaceRoleServiceTest {
 
@@ -128,18 +130,15 @@ class UpdateWorkspaceRoleServiceTest {
     // TD-ARCH-029: the pre-check above passes (no existing row with this name yet, per setUp's
     // own stub), but ux_workspace_roles_organization_id_name still fires at saveAndFlush time —
     // simulating a concurrent request that renamed another role to the same name first.
-    org.mockito.Mockito.doThrow(
-            new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
-        .when(roles)
-        .saveAndFlush(any());
+    doThrow(new DataIntegrityViolationException("duplicate key")).when(roles).saveAndFlush(any());
     UpdateWorkspaceRoleCommand command =
         new UpdateWorkspaceRoleCommand(role.id(), organizationId, "Renamed", null, Set.of(), ACTOR);
 
     assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(auditEvents, org.mockito.Mockito.never()).write(any(), any(), any(), any(), any());
-    verify(outbox, org.mockito.Mockito.never()).write(any(), any(), any(), any(), any());
+    verify(auditEvents, never()).write(any(), any(), any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any(), any());
   }
 
   @Test

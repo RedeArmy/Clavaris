@@ -1,7 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.breachcheck;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -20,7 +19,7 @@ class PwnedPasswordsBreachedPasswordCheckerTest {
   @Test
   void aMatchingSuffixInTheRangeResponseIsReportedAsBreached() {
     PwnedPasswordsHttpClient httpClient = mock(PwnedPasswordsHttpClient.class);
-    when(httpClient.lookupRange(eq(KNOWN_PASSWORD_PREFIX)))
+    when(httpClient.lookupRange(KNOWN_PASSWORD_PREFIX))
         .thenReturn(
             List.of("0000000000000000000000000000000000:1", KNOWN_PASSWORD_SUFFIX + ":3730330"));
     PwnedPasswordsBreachedPasswordChecker checker =
@@ -32,7 +31,7 @@ class PwnedPasswordsBreachedPasswordCheckerTest {
   @Test
   void matchingIsCaseInsensitiveOnTheReturnedSuffix() {
     PwnedPasswordsHttpClient httpClient = mock(PwnedPasswordsHttpClient.class);
-    when(httpClient.lookupRange(eq(KNOWN_PASSWORD_PREFIX)))
+    when(httpClient.lookupRange(KNOWN_PASSWORD_PREFIX))
         .thenReturn(List.of(KNOWN_PASSWORD_SUFFIX.toLowerCase(java.util.Locale.ROOT) + ":1"));
     PwnedPasswordsBreachedPasswordChecker checker =
         new PwnedPasswordsBreachedPasswordChecker(httpClient);
@@ -43,7 +42,7 @@ class PwnedPasswordsBreachedPasswordCheckerTest {
   @Test
   void noMatchingSuffixInTheRangeResponseIsReportedAsNotBreached() {
     PwnedPasswordsHttpClient httpClient = mock(PwnedPasswordsHttpClient.class);
-    when(httpClient.lookupRange(eq(KNOWN_PASSWORD_PREFIX)))
+    when(httpClient.lookupRange(KNOWN_PASSWORD_PREFIX))
         .thenReturn(List.of("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:1"));
     PwnedPasswordsBreachedPasswordChecker checker =
         new PwnedPasswordsBreachedPasswordChecker(httpClient);
@@ -54,7 +53,7 @@ class PwnedPasswordsBreachedPasswordCheckerTest {
   @Test
   void anEmptyRangeResponseIsReportedAsNotBreached() {
     PwnedPasswordsHttpClient httpClient = mock(PwnedPasswordsHttpClient.class);
-    when(httpClient.lookupRange(eq(KNOWN_PASSWORD_PREFIX))).thenReturn(List.of());
+    when(httpClient.lookupRange(KNOWN_PASSWORD_PREFIX)).thenReturn(List.of());
     PwnedPasswordsBreachedPasswordChecker checker =
         new PwnedPasswordsBreachedPasswordChecker(httpClient);
 
@@ -68,7 +67,7 @@ class PwnedPasswordsBreachedPasswordCheckerTest {
   @Test
   void aLookupFailureNeverPropagatesAndIsTreatedAsNotBreached() {
     PwnedPasswordsHttpClient httpClient = mock(PwnedPasswordsHttpClient.class);
-    when(httpClient.lookupRange(eq(KNOWN_PASSWORD_PREFIX)))
+    when(httpClient.lookupRange(KNOWN_PASSWORD_PREFIX))
         .thenThrow(new PwnedPasswordsLookupException("simulated outage"));
     PwnedPasswordsBreachedPasswordChecker checker =
         new PwnedPasswordsBreachedPasswordChecker(httpClient);
@@ -82,7 +81,7 @@ class PwnedPasswordsBreachedPasswordCheckerTest {
   @Test
   void aSuffixThatIsOnlyAPartialPrefixMatchIsNotReportedAsBreached() {
     PwnedPasswordsHttpClient httpClient = mock(PwnedPasswordsHttpClient.class);
-    when(httpClient.lookupRange(eq(KNOWN_PASSWORD_PREFIX)))
+    when(httpClient.lookupRange(KNOWN_PASSWORD_PREFIX))
         .thenReturn(List.of(KNOWN_PASSWORD_SUFFIX.substring(0, 10) + "EXTRA:1"));
     PwnedPasswordsBreachedPasswordChecker checker =
         new PwnedPasswordsBreachedPasswordChecker(httpClient);

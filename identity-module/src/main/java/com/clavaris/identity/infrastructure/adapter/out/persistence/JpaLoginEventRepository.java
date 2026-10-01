@@ -43,24 +43,19 @@ class JpaLoginEventRepository implements LoginEventRepository {
             event.occurredAt()));
   }
 
+  // Real bug found live by JpaLoginEventRepositoryTest's own first run, not assumed: this
+  // native-query ::date projection's row[0] comes back as a plain java.time.LocalDate on this
+  // project's own pinned Hibernate/JDBC driver versions, not the legacy java.sql.Date a
+  // ResultSet#getDate call would return — a real, previously-uncaught ClassCastException on every
+  // single call, invisible to GetLoginActivityForAccountServiceTest's own mocked-repository-port
+  // tests. Cast directly, not defended against the other shape too — pom.xml pins exact versions
+  // for this whole reactor, so which type Hibernate returns here is a fixed fact for this stack,
+  // not a scenario to hedge against (same "trust the locked dependency graph" posture every other
+  // native-query row mapping in this codebase already takes).
   @Override
   public List<LoginActivityDay> countsByDaySince(final AccountId accountId, final Instant since) {
     return events.countsByDaySince(accountId.value(), since).stream()
-        .map(row -> new LoginActivityDay(toLocalDate(row[0]), ((Number) row[1]).longValue()))
+        .map(row -> new LoginActivityDay((LocalDate) row[0], ((Number) row[1]).longValue()))
         .toList();
-  }
-
-  // Real bug found live by JpaLoginEventRepositoryTest's own first run, not assumed: this
-  // native-query ::date projection's row[0] came back as a plain java.time.LocalDate on this
-  // stack's actual Hibernate/JDBC driver combination, not the java.sql.Date this method originally
-  // assumed (the legacy JDBC type a ResultSet#getDate call would return) — a real, previously-
-  // uncaught ClassCastException on every single call, invisible to
-  // GetLoginActivityForAccountServiceTest's
-  // own mocked-repository-port tests. Handles both shapes defensively since this mapping is a
-  // documented cross-version Hibernate/driver inconsistency, not a single guaranteed type.
-  private static LocalDate toLocalDate(final Object column) {
-    return column instanceof LocalDate localDate
-        ? localDate
-        : ((java.sql.Date) column).toLocalDate();
   }
 }

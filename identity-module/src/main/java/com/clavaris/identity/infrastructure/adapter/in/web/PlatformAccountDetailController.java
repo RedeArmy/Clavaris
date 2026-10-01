@@ -20,6 +20,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -168,7 +169,10 @@ public class PlatformAccountDetailController {
     final Map<LocalDate, Long> countsByDay =
         activity.stream()
             .collect(Collectors.toMap(LoginActivityDay::date, LoginActivityDay::count));
-    final LocalDate today = LocalDate.now();
+    // Explicit UTC, not the JVM's own default zone — same "the database's own session time zone
+    // — UTC, same as every other timestamptz column" convention GetLoginActivityForAccountUseCase's
+    // own Javadoc already establishes for the day-bucketing this grid renders.
+    final LocalDate today = LocalDate.now(ZoneOffset.UTC);
     final LocalDate windowStart =
         today.minusDays(GetLoginActivityForAccountService.WINDOW_DAYS - 1L);
     final LocalDate gridStart =
@@ -211,14 +215,22 @@ public class PlatformAccountDetailController {
 
   // Fixed thresholds, same "a few named buckets, not a continuous scale" posture GitHub's own
   // contribution graph uses — no config surface, since nothing in this feature's scope needs one.
-  // A ternary chain, not if/else: PMD.OnlyOneReturn (every other method in this class already
-  // follows single-exit) is naturally satisfied by one expression rather than earning its own
-  // suppression.
+  // An if/else chain assigning one local, not a nested ternary (SonarCloud flagged the original
+  // nested-ternary form): still a single exit point, satisfying PMD.OnlyOneReturn the same way
+  // every other method in this class already does, without the readability cost of nesting.
   private static int heatmapLevel(final long count) {
-    return count <= 0
-        ? 0
-        : count <= HEATMAP_LEVEL_1_MAX_COUNT
-            ? 1
-            : count <= HEATMAP_LEVEL_2_MAX_COUNT ? 2 : count <= HEATMAP_LEVEL_3_MAX_COUNT ? 3 : 4;
+    final int level;
+    if (count <= 0) {
+      level = 0;
+    } else if (count <= HEATMAP_LEVEL_1_MAX_COUNT) {
+      level = 1;
+    } else if (count <= HEATMAP_LEVEL_2_MAX_COUNT) {
+      level = 2;
+    } else if (count <= HEATMAP_LEVEL_3_MAX_COUNT) {
+      level = 3;
+    } else {
+      level = 4;
+    }
+    return level;
   }
 }

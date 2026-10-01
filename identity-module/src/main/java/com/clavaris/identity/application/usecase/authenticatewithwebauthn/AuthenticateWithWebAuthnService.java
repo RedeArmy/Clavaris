@@ -29,16 +29,18 @@ import org.slf4j.LoggerFactory;
  * Account} is resolved: the WebAuthn "user handle" {@link RelyingParty#finishAssertion} returns,
  * not an email/username lookup.
  */
-// PMD.PreserveStackTrace: deliberate — same anti-enumeration collapsing rationale as
-// InvalidCredentialsException's own no-arg, no-cause shape: a parse failure, a failed assertion
-// verification, an unresolvable Account, and an inactive Account must all be indistinguishable to
-// the caller, including via a leaked stack trace that could hint at which one actually happened.
+// Anti-enumeration collapsing (deliberate, same rationale InvalidCredentialsException's own
+// no-arg, no-cause shape establishes): a parse failure, a failed assertion verification, an
+// unresolvable Account, and an inactive Account must all be indistinguishable to the caller —
+// every catch below uses an unnamed `_` pattern (SonarCloud java:S1481-adjacent) rather than a
+// named-but-unused exception variable, which also means PMD.PreserveStackTrace no longer has
+// anything to flag (there is no longer a variable it could suggest passing as a cause).
 // PMD.GuardLogStatement: same precedent AuthenticateWithUsernameService's own identical
 // suppression documents — these are INFO-level security/audit log lines, not a hot path. PMD.
 // LawOfDemeter: reading fields off Yubico's own AssertionResult/RegisteredCredential DTOs is the
 // entire point of this class — same "working with a vetted library's own result type" rationale
 // CompleteWebAuthnRegistrationService's own identical suppression documents.
-@SuppressWarnings({"PMD.PreserveStackTrace", "PMD.GuardLogStatement", "PMD.LawOfDemeter"})
+@SuppressWarnings({"PMD.GuardLogStatement", "PMD.LawOfDemeter"})
 public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthnUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticateWithWebAuthnService.class);
@@ -62,7 +64,7 @@ public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthn
         response;
     try {
       response = PublicKeyCredential.parseAssertionResponseJson(command.credentialJson());
-    } catch (final IOException e) {
+    } catch (final IOException _) {
       LOG.info("event=login_failure reason=malformed_webauthn_assertion");
       throw new InvalidWebAuthnAssertionException();
     }
@@ -75,7 +77,7 @@ public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthn
                   .request(command.request())
                   .response(response)
                   .build());
-    } catch (final AssertionFailedException e) {
+    } catch (final AssertionFailedException _) {
       LOG.info("event=login_failure reason=webauthn_assertion_failed");
       throw new InvalidWebAuthnAssertionException();
     }
@@ -115,7 +117,7 @@ public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthn
   private static AccountId toAccountId(final byte[] userHandle) {
     try {
       return new AccountId(UUID.fromString(new String(userHandle, StandardCharsets.UTF_8)));
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       LOG.info("event=login_failure reason=malformed_webauthn_user_handle");
       throw new InvalidWebAuthnAssertionException();
     }

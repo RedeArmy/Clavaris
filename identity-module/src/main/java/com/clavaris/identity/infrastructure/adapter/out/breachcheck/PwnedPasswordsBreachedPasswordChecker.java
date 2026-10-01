@@ -111,6 +111,11 @@ class PwnedPasswordsBreachedPasswordChecker implements BreachedPasswordChecker {
         && responseLine.regionMatches(true, 0, suffix, 0, separator);
   }
 
+  // java:S4790: SHA-1 is correct here, not a weak-hash mistake — see this class's own Javadoc.
+  // This is never a security control (that remains Argon2id, BR-ID-01) — it's the exact algorithm
+  // HIBP's own Pwned Passwords corpus is indexed by, mandated by the k-anonymity protocol itself,
+  // not a choice this codebase made.
+  @SuppressWarnings("java:S4790")
   private static String sha1Hex(final String rawPassword) {
     try {
       final MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
