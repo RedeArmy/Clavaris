@@ -93,6 +93,11 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
     tokens.save(token);
 
     account.verifyEmail();
+    // SDE-III review, 2026-09-30 — real bug found and closed: this method never called
+    // account.recordSignIn() — same gap AuthenticateWithUsernameService's own identical fix just
+    // closed. The dashboard's "Last signed In" column (and, since TD-FUT-034, the activity
+    // heatmap's own login_events write) both depend on this having actually happened.
+    account.recordSignIn();
     accounts.save(account);
 
     LOG.info(
