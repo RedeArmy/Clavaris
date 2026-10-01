@@ -475,6 +475,41 @@
                             </div>
                         </div>
 
+                        <!-- TD-FUT-034, Clerk "View Profile" passkeys parity — read-only here; the
+                             delete form posts to PlatformAccountWebAuthnCredentialsAdminController,
+                             a separate controller from the self-service one, same split
+                             sessions/OAuth grants already establish on this page. -->
+                        <div class="clavaris-section-card">
+                            <h2>Passkeys</h2>
+                            <p th:if="${#lists.isEmpty(webAuthnCredentials)}" class="clavaris-empty-state">No passkeys registered.</p>
+                            <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(webAuthnCredentials)}">
+                                <table class="clavaris-table">
+                                    <thead>
+                                    <tr>
+                                        <th scope="col">Name</th>
+                                        <th scope="col">Added</th>
+                                        <th scope="col">Last used</th>
+                                        <th scope="col"></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="credential : ${webAuthnCredentials}">
+                                        <td th:text="${credential.nickname()} ?: 'Unnamed passkey'">nickname</td>
+                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.createdAt())}">added</td>
+                                        <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
+                                        <td>
+                                            <form method="post"
+                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/passkeys/{credentialId}/delete(organizationId=${organizationId},accountId=${account.id().value()},credentialId=${credential.id()})}">
+                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Delete</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <div class="clavaris-section-card">
                             <h2>Social accounts</h2>
                             <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>

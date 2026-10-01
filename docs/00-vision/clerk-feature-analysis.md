@@ -12,7 +12,7 @@ Web research conducted 2026-08-12 against Clerk's own docs/changelog/blog, plus 
 
 | Category | Clerk feature | Clavaris today (post ADR-0007/0008) |
 |---|---|---|
-| **Auth methods** | Password, email/SMS OTP, magic links, social login (30+ providers), passkeys (primary factor, paid tiers) | Password + Google/GitHub social (`prd-mvp.md` §2.1). No magic links, no passkeys yet |
+| **Auth methods** | Password, email/SMS OTP, magic links, social login (30+ providers), passkeys (primary factor, paid tiers) | Password + Google/GitHub social + email code/link + passkeys (`prd-mvp.md` §2.1, TD-FUT-034 shipped 2026-09-30) |
 | **MFA** | TOTP, SMS, backup codes, WebAuthn (Pro plan) | Backlog (`prd-mvp.md` §2.1) — real gap, already flagged |
 | **Attack protection** | Bot sign-up detection (CDN-signal based, interactive challenge), device/network fingerprinting, "Client Trust" (forces 2nd factor on new device even with correct password), credential-stuffing rate limiting | Rate limiting only (BR-ID-06). No bot detection, no new-device step-up, no breached-password check |
 | **Sessions** | Hybrid model: long-lived `__client` cookie + 60-second `__session` JWT, auto-refreshed every 50s, server-side redirect "handshake" for SSR apps | Standard OIDC access/ID token + rotating refresh token (ADR-0002, BR-ID-03) — simpler, fully standard, no Clerk-proprietary handshake protocol |
@@ -56,7 +56,7 @@ Clavaris doesn't have that problem in the same way — it *is* the identity prov
 
 | Clerk capability | Decision for Clavaris | Rationale |
 |---|---|---|
-| Passkeys (WebAuthn) | **Adopt, v1.1** | Passwordless is a real security and UX improvement; not v1-blocking since password + social already covers launch |
+| Passkeys (WebAuthn) | **Adopted, shipped 2026-09-30** | Passwordless is a real security and UX improvement — built ahead of the original v1.1 target as TD-FUT-034's own WebAuthn sub-feature |
 | Breached-password check (k-anonymity API, e.g. HIBP-style) | **Adopt, v1.1** | Directly closes a real attack class (credential stuffing with known-leaked passwords) that rate limiting alone doesn't address |
 | Bot/device-fingerprint sign-up protection | **Adopt, v1.1, scoped down** | Full ML-based bot detection is disproportionate for this project's scale; a simpler CAPTCHA-on-suspicion + step-up-MFA-on-new-device (BR-ID-06 extension) captures most of the value |
 | User impersonation (admin support tool) | **Adopt, v1.1** | Directly reuses the "no audit-logging design" gap already flagged in `threat-model-stride.md` §5 — building this and the audit log together is more coherent than sequencing them apart |

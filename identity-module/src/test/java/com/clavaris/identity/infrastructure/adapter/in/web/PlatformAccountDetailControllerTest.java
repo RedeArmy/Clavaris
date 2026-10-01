@@ -18,6 +18,7 @@ import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetL
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -47,6 +48,7 @@ class PlatformAccountDetailControllerTest {
   private ListActiveSessionsForAccountUseCase listSessions;
   private ListOAuthGrantsForAccountUseCase listOAuthGrants;
   private GetLoginActivityForAccountUseCase getLoginActivity;
+  private ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -62,6 +64,7 @@ class PlatformAccountDetailControllerTest {
     listSessions = mock(ListActiveSessionsForAccountUseCase.class);
     listOAuthGrants = mock(ListOAuthGrantsForAccountUseCase.class);
     getLoginActivity = mock(GetLoginActivityForAccountUseCase.class);
+    listWebAuthnCredentials = mock(ListWebAuthnCredentialsForAccountUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -83,6 +86,7 @@ class PlatformAccountDetailControllerTest {
     when(listSessions.handle(any())).thenReturn(List.of());
     when(listOAuthGrants.handle(any())).thenReturn(List.of());
     when(getLoginActivity.handle(any())).thenReturn(List.of());
+    when(listWebAuthnCredentials.handle(any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -108,6 +112,7 @@ class PlatformAccountDetailControllerTest {
                     listSessions,
                     listOAuthGrants,
                     getLoginActivity,
+                    listWebAuthnCredentials,
                     organizationResolver,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)

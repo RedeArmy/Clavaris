@@ -12,6 +12,8 @@ import com.clavaris.identity.application.usecase.listactivesessionsforaccount.Li
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountQuery;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountQuery;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -32,21 +34,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item: a read-only
- * Account detail page (identity fields, known devices, linked social providers). Metadata and the
- * activity heatmap now shipped (TD-FUT-034 — its own {@code PlatformAccountMetadataController}
- * handles the Metadata tab's write side; {@code loginActivity} below feeds the heatmap) —
- * biometric/WebAuthn credentials remain out of scope, still tracked under the same TD-FUT-034 row
- * (`technical-debt-register.md`).
+ * Account detail page (identity fields, known devices, linked social providers). Metadata, the
+ * activity heatmap, and passkeys are all shipped now (TD-FUT-034, fully closed — its own {@code
+ * PlatformAccountMetadataController} handles the Metadata tab's write side; {@code loginActivity}
+ * feeds the heatmap; {@code webAuthnCredentials} below is read-only here, with delete handled by
+ * {@code PlatformAccountWebAuthnCredentialsAdminController}).
  *
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver}, same
  * anti-enumeration posture as {@link PlatformAccountsController}; a mismatched {@code accountId}
  * (wrong Organization, or none at all) 404s identically via {@link
  * GetAccountForOrganizationUseCase}'s own Organization-scoped lookup.
  */
-// PMD.CouplingBetweenObjects: TD-FUT-034's own new GetLoginActivityForAccountUseCase collaborator
-// pushed this class's own count past the threshold — same "wiring, not sprawl" reasoning as
-// SocialLoginAuthenticationSuccessHandler's own identical suppression already documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.CouplingBetweenObjects"})
+// PMD.CouplingBetweenObjects: TD-FUT-034's own new GetLoginActivityForAccountUseCase/
+// ListWebAuthnCredentialsForAccountUseCase collaborators pushed this class's own count past the
+// threshold — same "wiring, not sprawl" reasoning as SocialLoginAuthenticationSuccessHandler's own
+// identical suppression already documents. PMD.ExcessiveImports: one import per collaborating
+// type is inherent to a read-only aggregate page like this one, not a code smell.
+@SuppressWarnings({"PMD.LongVariable", "PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountDetailController {
@@ -66,9 +70,10 @@ public class PlatformAccountDetailController {
   private final ListActiveSessionsForAccountUseCase listSessions;
   private final ListOAuthGrantsForAccountUseCase listOAuthGrants;
   private final GetLoginActivityForAccountUseCase getLoginActivity;
+  private final ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings("java:S107")
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public PlatformAccountDetailController(
       final GetAccountForOrganizationUseCase getAccount,
       final KnownDeviceRepository knownDevices,
@@ -77,6 +82,7 @@ public class PlatformAccountDetailController {
       final ListActiveSessionsForAccountUseCase listSessions,
       final ListOAuthGrantsForAccountUseCase listOAuthGrants,
       final GetLoginActivityForAccountUseCase getLoginActivity,
+      final ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getAccount = getAccount;
@@ -86,6 +92,7 @@ public class PlatformAccountDetailController {
     this.listSessions = listSessions;
     this.listOAuthGrants = listOAuthGrants;
     this.getLoginActivity = getLoginActivity;
+    this.listWebAuthnCredentials = listWebAuthnCredentials;
     this.organizationAccess =
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
@@ -140,6 +147,14 @@ public class PlatformAccountDetailController {
         "loginActivityWeeks",
         buildHeatmapWeeks(
             getLoginActivity.handle(new GetLoginActivityForAccountQuery(targetAccountId))));
+
+    // TD-FUT-034, Clerk "View Profile" passkeys parity — read-only; delete is a separate admin
+    // controller (PlatformAccountWebAuthnCredentialsAdminController), same split sessions/OAuth
+    // grants already use on this same page.
+    model.addAttribute(
+        "webAuthnCredentials",
+        listWebAuthnCredentials.handle(
+            new ListWebAuthnCredentialsForAccountQuery(targetAccountId)));
     return PROFILE_VIEW;
   }
 
