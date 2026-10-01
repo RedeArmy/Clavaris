@@ -77,10 +77,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # TD-PROC-011: buildx, not the classic `docker build`, is what actually makes app/Dockerfile's
+      # own RUN --mount=type=cache,target=/root/.m2 mean anything across separate CI runs on an
+      # otherwise-ephemeral runner — cache-from/cache-to: type=gha persists that mount's contents
+      # into GitHub's own Actions cache storage between runs, closing the "every run does a full,
+      # cold Maven dependency resolution inside the image build" gap. A bare Dockerfile cache
+      # mount alone would only help within a single build, never across runs, since each run starts
+      # on a fresh VM with no local BuildKit cache of its own.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
       # Tagged clavaris-app:ci first (untagged for a registry) so the Trivy scan below and every
       # existing step keep working unchanged regardless of whether this run pushes anywhere.
+      # load: true loads the built image into the local Docker daemon (not a registry) — every
+      # downstream step here (Trivy, docker tag/push to GHCR) still addresses it by that same tag.
       - name: Build app image
-        run: docker build -f app/Dockerfile -t clavaris-app:ci .
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: app/Dockerfile
+          tags: clavaris-app:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # TD-SEC-021: distinct from dependency-scan below (Java/Maven dependencies only) — this
       # scans the actual OS-level packages inside the built image (eclipse-temurin:25-jre's own

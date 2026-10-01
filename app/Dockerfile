@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Multi-stage build — the build stage's Maven cache/JDK never ships in the
 # final image, keeping the runtime image small and free of build tooling
 # (smaller image = smaller attack surface, consistent with this project's
@@ -24,7 +25,15 @@ COPY app ./app
 # from Apache's own repo, and cached in the build stage's own layer) — the same guarantee this
 # project already applies to the JDK (eclipse-temurin:25-*) and every Maven dependency (a pinned
 # version in pom.xml), now applied to the build tool itself.
-RUN chmod +x mvnw && ./mvnw -B -pl app -am -DskipTests package
+# TD-PROC-011: the build stage's own ~/.m2 (Maven's default local repo) is a BuildKit cache
+# mount, not a plain layer — ci.yml's own docker-build job already builds this image via
+# docker/build-push-action with the GHA cache backend (cache-from/cache-to: type=gha), which
+# persists this mount's contents across CI runs on an otherwise-ephemeral runner, closing the
+# "every CI run does a full, cold Maven dependency resolution inside the image build, completely
+# isolated from build-and-test's own actions/setup-java cache" gap that row names. Build-stage
+# only — never ships in the final image either way.
+RUN --mount=type=cache,target=/root/.m2 \
+    chmod +x mvnw && ./mvnw -B -pl app -am -DskipTests package
 
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
