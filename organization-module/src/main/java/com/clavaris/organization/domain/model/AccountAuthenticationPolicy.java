@@ -59,6 +59,10 @@ public final class AccountAuthenticationPolicy {
   private final boolean usernameSignInEnabled;
   private final boolean passwordAtSignUpEnabled;
   private final boolean deviceTrustEnabled;
+  // TD-FUT-019: gates RegisterAccountService/AuthenticateWithSocialProviderService's own signup
+  // path — off by default (opt-in, zero regression), same posture deviceTrustEnabled already
+  // establishes for this same aggregate.
+  private final boolean selfRegistrationRequiresApproval;
   private final Instant createdAt;
   private final Instant updatedAt;
 
@@ -77,6 +81,7 @@ public final class AccountAuthenticationPolicy {
       final boolean usernameSignInEnabled,
       final boolean passwordAtSignUpEnabled,
       final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
@@ -91,6 +96,7 @@ public final class AccountAuthenticationPolicy {
     this.usernameSignInEnabled = usernameSignInEnabled;
     this.passwordAtSignUpEnabled = passwordAtSignUpEnabled;
     this.deviceTrustEnabled = deviceTrustEnabled;
+    this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -107,6 +113,7 @@ public final class AccountAuthenticationPolicy {
         false,
         false,
         true,
+        false,
         false);
   }
 
@@ -122,7 +129,8 @@ public final class AccountAuthenticationPolicy {
       final boolean usernameRequired,
       final boolean usernameSignInEnabled,
       final boolean passwordAtSignUpEnabled,
-      final boolean deviceTrustEnabled) {
+      final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval) {
     final Instant now = Instant.now();
     return new AccountAuthenticationPolicy(
         UUID.randomUUID(),
@@ -136,6 +144,7 @@ public final class AccountAuthenticationPolicy {
         usernameSignInEnabled,
         passwordAtSignUpEnabled,
         deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
         now,
         now);
   }
@@ -155,7 +164,8 @@ public final class AccountAuthenticationPolicy {
       final boolean newUsernameRequired,
       final boolean newUsernameSignInEnabled,
       final boolean newPasswordAtSignUpEnabled,
-      final boolean newDeviceTrustEnabled) {
+      final boolean newDeviceTrustEnabled,
+      final boolean newSelfRegistrationRequiresApproval) {
     return new AccountAuthenticationPolicy(
         id,
         organizationId,
@@ -168,6 +178,7 @@ public final class AccountAuthenticationPolicy {
         newUsernameSignInEnabled,
         newPasswordAtSignUpEnabled,
         newDeviceTrustEnabled,
+        newSelfRegistrationRequiresApproval,
         createdAt,
         Instant.now());
   }
@@ -185,6 +196,7 @@ public final class AccountAuthenticationPolicy {
       final boolean usernameSignInEnabled,
       final boolean passwordAtSignUpEnabled,
       final boolean deviceTrustEnabled,
+      final boolean selfRegistrationRequiresApproval,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
@@ -199,6 +211,7 @@ public final class AccountAuthenticationPolicy {
         usernameSignInEnabled,
         passwordAtSignUpEnabled,
         deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
         createdAt,
         updatedAt);
   }
@@ -245,6 +258,10 @@ public final class AccountAuthenticationPolicy {
 
   public boolean deviceTrustEnabled() {
     return deviceTrustEnabled;
+  }
+
+  public boolean selfRegistrationRequiresApproval() {
+    return selfRegistrationRequiresApproval;
   }
 
   public Instant createdAt() {

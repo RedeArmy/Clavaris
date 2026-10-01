@@ -4,10 +4,13 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
+import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.domain.event.AccountRegisteredEvent;
+import com.clavaris.identity.domain.event.AccountRegistrationPendingApprovalEvent;
 import com.clavaris.identity.domain.event.SocialIdentityLinkedEvent;
 import com.clavaris.identity.domain.model.Account;
+import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.Username;
@@ -96,8 +99,16 @@ public class AuthenticateWithSocialProviderService
   private final TransactionTemplate transactionTemplate;
   private final PasswordHasher hasher;
 
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
-  // AddWorkspaceMemberService's own identical suppression: this flow genuinely needs every one.
+  // TD-FUT-019: gates linkBrandNewAccount's own signup path, and the returning-identity branch's
+  // status check — a second, differently-shaped policy from policyProvider above (which one is
+  // OrganizationSocialLoginPolicyProvider (that field's own name), governs allowed providers,
+  // nothing to do with approval gating).
+  @SuppressWarnings("PMD.LongVariable")
+  private final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider;
+
+  // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
+  // PMD.ExcessiveParameterList threshold too — same "one parameter per collaborating port" shape.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public AuthenticateWithSocialProviderService(
       final AccountRepository accounts,
       final SocialIdentityRepository socialIdentities,
@@ -107,7 +118,9 @@ public class AuthenticateWithSocialProviderService
       final EventOutboxWriter outbox,
       final SecurityMetricsRecorder metrics,
       final TransactionTemplate transactionTemplate,
-      final PasswordHasher hasher) {
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable")
+          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
     this.accounts = accounts;
     this.socialIdentities = socialIdentities;
     this.pendingLinks = pendingLinks;
@@ -117,6 +130,7 @@ public class AuthenticateWithSocialProviderService
     this.metrics = metrics;
     this.transactionTemplate = transactionTemplate;
     this.hasher = hasher;
+    this.accountAuthenticationPolicyProvider = accountAuthenticationPolicyProvider;
   }
 
   @Override
@@ -149,17 +163,34 @@ public class AuthenticateWithSocialProviderService
             command.organizationId(), command.provider(), command.providerUserId());
     if (existingIdentity.isPresent()) {
       final SocialIdentity identity = existingIdentity.get();
+      // TD-FUT-019: a returning social login against an account still PENDING_APPROVAL/REJECTED —
+      // a real, previously-latent gap this feature closes, not a pre-existing check being
+      // relaxed: before this feature, every Account this branch could ever resolve was already
+      // ACTIVE by construction, so there was nothing here to check. Checked before recordSignIn/
+      // save below, same "never touch the aggregate at all if login must be refused" posture the
+      // password/username/email-code Authenticate*Services already establish for their own status
+      // checks.
+      final Optional<Account> existingForIdentity = accounts.findById(identity.accountId());
+      if (existingForIdentity.isPresent()
+          && isGatedAndUndecided(existingForIdentity.get().status())) {
+        LOG.info(
+            "event=social_login_failure organizationId={} accountId={} provider={}"
+                + " reason=registration_not_approved",
+            command.organizationId(),
+            identity.accountId(),
+            command.provider());
+        recordFailure("registration_not_approved");
+        return new AuthenticateWithSocialProviderResult.PendingApproval();
+      }
       // Clerk dashboard "Users" tab parity (SDE-III review, 2026-09-19) — same recordSignIn()
       // write AuthenticateWithPasswordService's own success path makes. A returning social login
       // only ever resolved an accountId until now, never the full aggregate — this is the one
       // path here that needs it loaded at all.
-      accounts
-          .findById(identity.accountId())
-          .ifPresent(
-              account -> {
-                account.recordSignIn();
-                accounts.save(account);
-              });
+      existingForIdentity.ifPresent(
+          account -> {
+            account.recordSignIn();
+            accounts.save(account);
+          });
       LOG.info(
           "event=social_login_success organizationId={} accountId={} provider={} outcome=returning",
           command.organizationId(),
@@ -180,12 +211,24 @@ public class AuthenticateWithSocialProviderService
 
   private AuthenticateWithSocialProviderResult linkBrandNewAccount(
       final AuthenticateWithSocialProviderCommand command) {
+    // TD-FUT-019: read once, outside the transaction below — same "policy read is a plain query,
+    // no reason to hold it inside the write transaction" posture every other policy-gated write
+    // in this codebase already follows.
+    final boolean pendingApproval =
+        accountAuthenticationPolicyProvider
+            .policyFor(command.organizationId())
+            .selfRegistrationRequiresApproval();
     try {
       return transactionTemplate.execute(
           status -> {
-            final Account account = Account.register(command.organizationId(), command.email());
+            final Account account =
+                pendingApproval
+                    ? Account.registerPendingApproval(command.organizationId(), command.email())
+                    : Account.register(command.organizationId(), command.email());
             // The provider already proved control of this email (guarded above) — no reason to
-            // make a brand-new social signup go through email verification a second time.
+            // make a brand-new social signup go through email verification a second time. Email
+            // ownership and approval gating are orthogonal: verified-but-still-pending is a
+            // legitimate, real state.
             account.verifyEmail();
             // ADR-0026: captured once, right here — never re-synced on a later returning login
             // (this method only ever runs for a brand-new signup). applySocialProviderProfile is
@@ -204,8 +247,11 @@ public class AuthenticateWithSocialProviderService
             // resetPasswordCredential requires one to already exist).
             account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
             // Clerk dashboard "Users" tab parity — a brand-new social signup is also its own
-            // first sign-in.
-            account.recordSignIn();
+            // first sign-in. TD-FUT-019: skipped when gated — there is no session to establish
+            // yet, so nothing actually "signed in" for this to record.
+            if (!pendingApproval) {
+              account.recordSignIn();
+            }
             // TD-PERF-019: insert, not save — Account.register two lines above guarantees this is
             // a brand-new aggregate, never persisted before. See AccountRepository#insert's own
             // Javadoc for why that matters.
@@ -229,6 +275,25 @@ public class AuthenticateWithSocialProviderService
                 account.id(),
                 command.organizationId(),
                 SocialIdentityLinkedEvent.from(identity, command.organizationId()));
+            if (pendingApproval) {
+              outbox.write(
+                  "account.registration.pending_approval",
+                  account.id(),
+                  command.organizationId(),
+                  AccountRegistrationPendingApprovalEvent.from(account));
+              LOG.info(
+                  "event=social_login_pending_approval organizationId={} accountId={} provider={}",
+                  command.organizationId(),
+                  account.id(),
+                  command.provider());
+              metrics.increment(
+                  LOGIN_METRIC,
+                  PROVIDER_TAG,
+                  command.provider().name(),
+                  OUTCOME_TAG,
+                  "pending_approval");
+              return new AuthenticateWithSocialProviderResult.PendingApproval();
+            }
 
             LOG.info(
                 "event=social_login_success organizationId={} accountId={} provider={}"
@@ -319,5 +384,16 @@ public class AuthenticateWithSocialProviderService
 
   private void recordFailure(final String reason) {
     metrics.increment(LOGIN_METRIC, OUTCOME_TAG, "failure", "reason", reason);
+  }
+
+  // TD-FUT-019: both statuses gated self-registration can ever produce, treated identically here
+  // — REJECTED reuses the same PendingApproval() result as genuinely-still-pending rather than a
+  // dedicated fourth sealed variant; a rejected signup trying the same social provider again gets
+  // the same "not available yet" response, not a session either way, which is the only property
+  // that actually matters at this call site. SUSPENDED/BANNED are a separate, pre-existing gap
+  // this method's own class Javadoc does not claim to close (see AuthenticateWithPasswordService
+  // for the equivalent check on that login path).
+  private static boolean isGatedAndUndecided(final AccountStatus status) {
+    return status == AccountStatus.PENDING_APPROVAL || status == AccountStatus.REJECTED;
   }
 }

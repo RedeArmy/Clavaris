@@ -32,6 +32,14 @@ public final class KnownWebhookEventTypeOptions {
           new EventTypeOption("account.deleted", "An Account was permanently deleted."),
           new EventTypeOption("account.email_verified", "An Account's email address was verified."),
           new EventTypeOption("account.reactivated", "A suspended Account was reactivated."),
+          new EventTypeOption(
+              "account.registration.pending_approval",
+              "A new self-registration requires approval before the Account can sign in."),
+          new EventTypeOption(
+              "account.registration_approved",
+              "A pending self-registration was approved — the Account is now active."),
+          new EventTypeOption(
+              "account.registration_rejected", "A pending self-registration was rejected."),
           new EventTypeOption("account.suspended", "An Account was suspended."),
           new EventTypeOption("organization.deleted", "An Organization was permanently deleted."),
           new EventTypeOption(

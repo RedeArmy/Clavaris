@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -141,7 +142,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
-    when(tenantSessions.establishViaSocialLogin(any(), any(), eq(accountId.value()), any(), any()))
+    when(tenantSessions.establishViaSocialLogin(
+            any(), any(), eq(accountId.value()), any(), anyBoolean(), any()))
         .thenReturn("/o/" + organizationId + "/oauth2/authorize?client_id=abc");
 
     handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
@@ -186,7 +188,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
                 false,
                 false,
                 true,
-                true));
+                true,
+                false));
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
 
@@ -195,7 +198,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/o/" + organizationId + "/login/device-trust");
     verify(requestDeviceTrustChallenge).handle(any());
-    verify(tenantSessions, never()).establishViaSocialLogin(any(), any(), any(), any(), any());
+    verify(tenantSessions, never())
+        .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
   }
 
@@ -224,7 +228,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
 
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/o/" + organizationId + "/login/session-task/password-reset");
-    verify(tenantSessions, never()).establishViaSocialLogin(any(), any(), any(), any(), any());
+    verify(tenantSessions, never())
+        .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
   }
 
@@ -246,7 +251,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
 
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/o/" + organizationId + "/login/social/confirmation-required");
-    verify(tenantSessions, never()).establishViaSocialLogin(any(), any(), any(), any(), any());
+    verify(tenantSessions, never())
+        .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
   }
 
@@ -304,7 +310,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     stubAccount(organizationId, accountId);
     when(tenantUseCase.handle(any()))
         .thenReturn(new AuthenticateWithSocialProviderResult.LoggedIn(accountId));
-    when(tenantSessions.establishViaSocialLogin(any(), any(), eq(accountId.value()), any(), any()))
+    when(tenantSessions.establishViaSocialLogin(
+            any(), any(), eq(accountId.value()), any(), anyBoolean(), any()))
         .thenReturn("/o/" + organizationId + "/oauth2/authorize?client_id=abc");
 
     handler.onAuthenticationSuccess(request, response, token);

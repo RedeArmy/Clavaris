@@ -194,6 +194,23 @@ class AdminApiSecurityConfig {
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/accounts/*:reactivate")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_SUSPEND)
+                    // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration — one
+                    // shared scope for both directions, see
+                    // PlatformScopes.ACCOUNTS_REVIEW_REGISTRATION's own Javadoc for why. Reachable
+                    // by an OrganizationClient too (not OPERATOR_ONLY) via
+                    // OrganizationClientOwnershipFilter's own allowlist for these two routes.
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/accounts/*:approve-registration")
+                    .hasAuthority(
+                        SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_REVIEW_REGISTRATION)
+                    .requestMatchers(
+                        HttpMethod.POST, "/api/v1/admin/accounts/*:reject-registration")
+                    .hasAuthority(
+                        SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_REVIEW_REGISTRATION)
+                    // TD-FUT-034, Clerk "Metadata" parity — reachable by an OrganizationClient
+                    // too (not OPERATOR_ONLY), same rationale as the two routes above.
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/admin/accounts/*/metadata")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_METADATA_WRITE)
                     // Clerk "session tasks" parity: forcing a future password reset — its own
                     // scope, deliberately separate from ACCOUNTS_SUSPEND (see
                     // PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET's own Javadoc for why).

@@ -61,19 +61,35 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   // own Javadoc for why this exists alongside OrganizationAccountDirectory's own unbounded variant.
   List<AccountEntity> findByOrganizationIdAndIdIn(UUID organizationId, Collection<UUID> ids);
 
-  // BR-ID-02 ("never zero auth methods") integrity check, code review finding — see
-  // AccountAuthMethodIntegrityCheckJob's own Javadoc for why this can only be a periodic sweep,
-  // not a synchronous save()-time guard. A native cross-table query, not a derived one:
-  // social_identities belongs to a sibling repository/aggregate, and this is read-only,
-  // low-frequency (daily), diagnostic-only SQL — not a hot path this codebase's own
-  // toDomain()-mapping convention needs to apply to.
+  // TD-PERF-001 (closed): BR-ID-02 ("never zero auth methods") integrity check, code review
+  // finding — see AccountAuthMethodIntegrityCheckJob's own Javadoc for why this can only be a
+  // periodic sweep, not a synchronous save()-time guard. Chunked in two queries per page (this one
+  // resolves the page's own id boundaries; countOrphansAmongIds below counts within them) rather
+  // than one unscoped full-table scan — accounts.id (a UUID) gives no meaningful ordering, but any
+  // stable total order covers every row exactly once across chunks, which is all a bounded,
+  // resumable sweep needs. afterId is null for the very first chunk — the (:afterId IS NULL OR
+  // ...) form lets one query serve both the first and every following page, rather than a separate
+  // "first page" query. A native cross-table query, not a derived one: social_identities belongs
+  // to a sibling repository/aggregate, and this is read-only, low-frequency (daily),
+  // diagnostic-only SQL — not a hot path this codebase's own toDomain()-mapping convention needs
+  // to apply to.
   @Query(
       value =
-          "SELECT COUNT(*) FROM accounts a "
-              + "WHERE NOT EXISTS (SELECT 1 FROM password_credentials pc WHERE pc.account_id = a.id) "
+          "SELECT a.id FROM accounts a WHERE (:afterId IS NULL OR a.id > :afterId) "
+              + "ORDER BY a.id LIMIT :chunkSize",
+      nativeQuery = true)
+  List<UUID> findAccountIdsForIntegrityCheckChunk(
+      @Param("afterId") UUID afterId, @Param("chunkSize") int chunkSize);
+
+  // TD-PERF-001: the orphan count within one chunk's own id set, resolved by
+  // findAccountIdsForIntegrityCheckChunk above — see that method's own Javadoc.
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM accounts a WHERE a.id IN (:ids) "
+              + "AND NOT EXISTS (SELECT 1 FROM password_credentials pc WHERE pc.account_id = a.id) "
               + "AND NOT EXISTS (SELECT 1 FROM social_identities si WHERE si.account_id = a.id)",
       nativeQuery = true)
-  long countAccountsWithNoAuthMethod();
+  long countOrphansAmongIds(@Param("ids") Collection<UUID> ids);
 
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: backs
   // AccountRepository#findKeysetPageByOrganizationId, same three-@Query keyset-pagination shape

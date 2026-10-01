@@ -194,7 +194,7 @@ public class EmailLinkSignInController {
     final String fallbackUrl = "/o/" + organizationId + "/login?authenticated";
     final String redirectTarget =
         sessions.establishViaOneTimeEmailProof(
-            request, response, account.id().value(), fallbackUrl);
+            request, response, account.id().value(), false, fallbackUrl);
 
     recordLoginDevice
         .handle(

@@ -2,7 +2,11 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import com.clavaris.organization.application.usecase.createworkspaceteam.WorkspaceTeamRepository;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -62,6 +66,12 @@ class JpaWorkspaceTeamRepository implements WorkspaceTeamRepository {
   }
 
   @Override
+  public void saveAndFlush(final WorkspaceTeam team) {
+    teams.saveAndFlush(
+        new WorkspaceTeamEntity(team.id(), team.workspaceId(), team.name(), team.createdAt()));
+  }
+
+  @Override
   public Optional<WorkspaceTeam> findById(final UUID teamId) {
     return teams.findById(teamId).map(JpaWorkspaceTeamRepository::toDomain);
   }
@@ -93,6 +103,21 @@ class JpaWorkspaceTeamRepository implements WorkspaceTeamRepository {
     return teamRoles.findAllByWorkspaceTeamId(teamId).stream()
         .map(WorkspaceTeamRoleEntity::getWorkspaceRoleId)
         .toList();
+  }
+
+  // TD-PERF-030: one findAllByWorkspaceTeamIdIn call for every team in teamIds, instead of one
+  // findAllByWorkspaceTeamId per team — see WorkspaceTeamRepository#findRoleIdsByTeamIds' own
+  // Javadoc for the N+1 this closes.
+  @Override
+  public Map<UUID, List<UUID>> findRoleIdsByTeamIds(final Collection<UUID> teamIds) {
+    final Map<UUID, List<UUID>> roleIdsByTeamId = new LinkedHashMap<>();
+    teamIds.forEach(teamId -> roleIdsByTeamId.put(teamId, new ArrayList<>()));
+    teamRoles
+        .findAllByWorkspaceTeamIdIn(List.copyOf(teamIds))
+        .forEach(
+            entity ->
+                roleIdsByTeamId.get(entity.getWorkspaceTeamId()).add(entity.getWorkspaceRoleId()));
+    return roleIdsByTeamId;
   }
 
   @Override

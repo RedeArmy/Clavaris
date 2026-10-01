@@ -16,6 +16,7 @@ import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountComm
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
+import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetCommand;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
@@ -42,7 +43,7 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
   void registersTheAccountThenTriggersThePasswordResetEmail_inThatOrder() {
     UUID organizationId = UUID.randomUUID();
     AccountId newAccountId = AccountId.newId();
-    when(registerAccount.handle(any())).thenReturn(newAccountId);
+    when(registerAccount.handle(any())).thenReturn(new RegisterAccountResult(newAccountId, false));
 
     AccountProvisioner.ProvisionedAccount result =
         bridge.provisionAndSendWelcome(organizationId, "new@example.com");
@@ -56,7 +57,8 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
   @Test
   void registersWithARandomPasswordThatSatisfiesPasswordPolicyAndIsNeverPredictable() {
     UUID organizationId = UUID.randomUUID();
-    when(registerAccount.handle(any())).thenReturn(AccountId.newId());
+    when(registerAccount.handle(any()))
+        .thenReturn(new RegisterAccountResult(AccountId.newId(), false));
 
     bridge.provisionAndSendWelcome(organizationId, "new@example.com");
     bridge.provisionAndSendWelcome(organizationId, "second@example.com");
@@ -76,7 +78,8 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
   @Test
   void passesThroughTheGivenOrganizationAndEmailToBothCalls() {
     UUID organizationId = UUID.randomUUID();
-    when(registerAccount.handle(any())).thenReturn(AccountId.newId());
+    when(registerAccount.handle(any()))
+        .thenReturn(new RegisterAccountResult(AccountId.newId(), false));
 
     bridge.provisionAndSendWelcome(organizationId, "new@example.com");
 

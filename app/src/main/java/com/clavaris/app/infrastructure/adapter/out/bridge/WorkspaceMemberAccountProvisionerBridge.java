@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountComm
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
+import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetCommand;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
@@ -61,11 +62,15 @@ class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final Email memberEmail = new Email(email);
 
-    final AccountId accountId;
+    final RegisterAccountResult result;
     try {
-      accountId =
+      // TD-FUT-019: publicSelfRegistration=false — a Workspace member is admin-provisioned, never
+      // subject to the unrelated self-registration-approval policy regardless of its value on
+      // this Organization. See RegisterAccountCommand#publicSelfRegistration's own Javadoc.
+      result =
           registerAccount.handle(
-              new RegisterAccountCommand(orgId, memberEmail, generateRandomPassword(), null));
+              new RegisterAccountCommand(
+                  orgId, memberEmail, generateRandomPassword(), null, false));
     } catch (final EmailAlreadyRegisteredException alreadyRegistered) {
       // Never let identity-module's own exception type cross the module boundary — see this
       // port's own Javadoc. Cause preserved, not discarded, same precedent
@@ -79,7 +84,7 @@ class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
     // "set your first password" onboarding step.
     requestPasswordReset.handle(new RequestPasswordResetCommand(orgId, memberEmail));
 
-    return new ProvisionedAccount(accountId.value());
+    return new ProvisionedAccount(result.accountId().value());
   }
 
   // TD-WS-001: 100% reuse of the already-built, already-tested admin-API hard-delete use case —

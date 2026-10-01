@@ -11,6 +11,8 @@ import com.clavaris.identity.application.usecase.activatesigningkeyfororganizati
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationService;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.approveaccountregistration.ApproveAccountRegistrationService;
+import com.clavaris.identity.application.usecase.approveaccountregistration.ApproveAccountRegistrationUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeService;
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkService;
@@ -81,6 +83,8 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
+import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationService;
+import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationUseCase;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureService;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeService;
@@ -114,6 +118,8 @@ import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountSe
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountService;
 import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountUseCase;
+import com.clavaris.identity.application.usecase.updateaccountmetadata.UpdateAccountMetadataService;
+import com.clavaris.identity.application.usecase.updateaccountmetadata.UpdateAccountMetadataUseCase;
 import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsService;
 import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileService;
@@ -132,6 +138,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Wires application-layer use cases to Spring's context. Deliberately kept out of {@code
@@ -457,6 +464,24 @@ class IdentityUseCaseConfig {
         eventOutboxWriter);
   }
 
+  // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration.
+  @Bean
+  /* package */ ApproveAccountRegistrationUseCase approveAccountRegistrationUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new ApproveAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
+  }
+
+  // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration.
+  @Bean
+  /* package */ RejectAccountRegistrationUseCase rejectAccountRegistrationUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter eventOutboxWriter) {
+    return new RejectAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
+  }
+
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View log" menu item.
   @Bean
   /* package */ GetAuditLogForAccountUseCase getAuditLogForAccountUseCase(
@@ -542,6 +567,15 @@ class IdentityUseCaseConfig {
     return new UpdateAccountPermissionsService(accounts, auditEvents);
   }
 
+  // TD-FUT-034, Clerk "Metadata" parity.
+  @Bean
+  /* package */ UpdateAccountMetadataUseCase updateAccountMetadataUseCase(
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final ObjectMapper objectMapper) {
+    return new UpdateAccountMetadataService(accounts, auditEvents, objectMapper);
+  }
+
   // Clerk "OAuth" tab parity (ADR-0026).
   @Bean
   /* package */ ListOAuthGrantsForAccountUseCase listOAuthGrantsForAccountUseCase(
@@ -595,7 +629,9 @@ class IdentityUseCaseConfig {
   // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for
   // exactly the reason AddWorkspaceMemberUseCase's own @Bean method already documents — one branch
   // of this flow needs an atomic multi-write, another needs a write followed by a real mail send.
-  @SuppressWarnings("java:S107")
+  // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
+  // PMD.ExcessiveParameterList threshold too — same "wiring, not sprawl" reasoning.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   @Bean
   /* package */ AuthenticateWithSocialProviderUseCase authenticateWithSocialProviderUseCase(
       final AccountRepository accounts,
@@ -606,7 +642,9 @@ class IdentityUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter,
       final SecurityMetricsRecorder securityMetrics,
       @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
-      final PasswordHasher hasher) {
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable")
+          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
     return new AuthenticateWithSocialProviderService(
         accounts,
         socialIdentities,
@@ -616,7 +654,8 @@ class IdentityUseCaseConfig {
         eventOutboxWriter,
         securityMetrics,
         new TransactionTemplate(transactionManager),
-        hasher);
+        hasher,
+        accountAuthenticationPolicyProvider);
   }
 
   @Bean

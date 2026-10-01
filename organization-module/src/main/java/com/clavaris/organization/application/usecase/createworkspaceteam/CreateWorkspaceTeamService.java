@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -42,7 +43,13 @@ public class CreateWorkspaceTeamService implements CreateWorkspaceTeamUseCase {
     }
 
     final WorkspaceTeam team = WorkspaceTeam.define(command.workspaceId(), command.name());
-    teams.save(team);
+    try {
+      // TD-SEC-060: saveAndFlush, not save — see CreateWorkspaceRoleService's own identical fix
+      // for why the ux_workspace_teams_workspace_id_name violation must surface synchronously here.
+      teams.saveAndFlush(team);
+    } catch (final DataIntegrityViolationException raceLost) {
+      throw new DuplicateWorkspaceTeamNameException(command.name(), raceLost);
+    }
 
     auditEvents.write(
         command.actor(),

@@ -19,6 +19,10 @@
   // Generous relative to a real login round trip, not a real user's own wait between clicks — only
   // needs to outlive "browser has sent the request, hasn't yet navigated or re-rendered".
   var LOCK_TTL_MS = 5000;
+  // TD-FUT-038: a blocked submit used to fail with nothing but event.preventDefault() — no error,
+  // no spinner change, no aria-live announcement, indistinguishable from a hung request. This id
+  // matches login.html's own hidden-by-default <p>, revealed by showBlockedNotice() below.
+  var NOTICE_ELEMENT_ID = "login-submit-guard-notice";
 
   function lockIsHeld() {
     var raw;
@@ -44,6 +48,13 @@
     }
   }
 
+  function showBlockedNotice() {
+    var notice = document.getElementById(NOTICE_ELEMENT_ID);
+    if (notice) {
+      notice.hidden = false;
+    }
+  }
+
   function releaseStaleLock() {
     // This page just (re)loaded — a fresh visit, or the server-rendered re-render after a failed
     // attempt — either way, whatever race this lock was guarding against is already over.
@@ -65,6 +76,7 @@
     form.addEventListener("submit", function (event) {
       if (lockIsHeld()) {
         event.preventDefault();
+        showBlockedNotice();
         return;
       }
       acquireLock();

@@ -19,6 +19,7 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
+import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameRequiredException;
@@ -155,7 +156,7 @@ class RegisterAccountControllerTest {
   void validSubmissionRegistersTriggersVerificationEmailAndRedirectsToPendingVerification()
       throws Exception {
     AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
+    when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
 
     mockMvc
         .perform(
@@ -176,7 +177,8 @@ class RegisterAccountControllerTest {
                 new OrganizationId(ORGANIZATION_ID),
                 new Email("new-user@example.com"),
                 "a-valid-password",
-                null));
+                null,
+                true));
     // TD-SEC-004: registration must actually trigger the verification email it promises on the
     // page it redirects to, not just claim to have.
     verify(requestEmailVerification).handle(new RequestEmailVerificationCommand(accountId));
@@ -189,7 +191,7 @@ class RegisterAccountControllerTest {
   @Test
   void stillRedirectsToPendingVerificationWhenTheVerificationEmailFailsToSend() throws Exception {
     AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
+    when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
     doThrow(new MailDeliveryException("Resend responded with status 401"))
         .when(requestEmailVerification)
         .handle(any());
@@ -413,6 +415,7 @@ class RegisterAccountControllerTest {
                 false,
                 false,
                 true,
+                false,
                 false));
 
     mockMvc
@@ -462,9 +465,10 @@ class RegisterAccountControllerTest {
                 false,
                 false,
                 false,
+                false,
                 false));
     AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
+    when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
 
     mockMvc
         .perform(
@@ -502,9 +506,10 @@ class RegisterAccountControllerTest {
                 false,
                 false,
                 false,
+                false,
                 false));
     AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
+    when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
 
     mockMvc
         .perform(
@@ -531,9 +536,10 @@ class RegisterAccountControllerTest {
                 false,
                 false,
                 false,
+                false,
                 false));
     AccountId accountId = AccountId.newId();
-    when(useCase.handle(any())).thenReturn(accountId);
+    when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
 
     mockMvc
         .perform(

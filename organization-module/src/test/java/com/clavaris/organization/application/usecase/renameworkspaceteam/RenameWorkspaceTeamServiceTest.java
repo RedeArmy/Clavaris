@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.renameworkspaceteam;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,7 +50,7 @@ class RenameWorkspaceTeamServiceTest {
             new RenameWorkspaceTeamCommand(workspaceId, team.id(), "Quality Assurance", ACTOR));
 
     assertThat(renamed.name()).isEqualTo("Quality Assurance");
-    verify(teams).save(renamed);
+    verify(teams).saveAndFlush(renamed);
   }
 
   @Test
@@ -109,5 +110,22 @@ class RenameWorkspaceTeamServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(teams, never()).save(any());
+  }
+
+  @Test
+  void translatesADataIntegrityViolationFromALostRaceIntoTheTypedException() {
+    // TD-SEC-060: the pre-check above passes (no other team named "Quality Assurance" yet, per
+    // setUp's own stub), but ux_workspace_teams_workspace_id_name still fires at saveAndFlush
+    // time — simulating a concurrent rename that landed on the same name first.
+    doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+        .when(teams)
+        .saveAndFlush(any());
+    RenameWorkspaceTeamCommand command =
+        new RenameWorkspaceTeamCommand(workspaceId, team.id(), "Quality Assurance", ACTOR);
+
+    assertThatExceptionOfType(DuplicateWorkspaceTeamNameException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    org.mockito.Mockito.verifyNoInteractions(auditEvents);
   }
 }

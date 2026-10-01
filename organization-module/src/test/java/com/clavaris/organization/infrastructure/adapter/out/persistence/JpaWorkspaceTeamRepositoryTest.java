@@ -11,6 +11,7 @@ import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -131,6 +132,26 @@ class JpaWorkspaceTeamRepositoryTest {
     repository.removeRoleFromTeam(team.id(), roleId);
 
     assertThat(repository.findRoleIdsByTeamId(team.id())).isEmpty();
+  }
+
+  @Test
+  void findRoleIdsByTeamIdsReturnsEveryRequestedTeamsOwnRolesInOneCall() {
+    UUID workspaceId = newPersistedWorkspaceId();
+    Organization organization = Organization.register("Role Org", UUID.randomUUID());
+    organizations.save(organization);
+    UUID roleId = newPersistedRoleIdFor(organization.id());
+    WorkspaceTeam teamWithRole = WorkspaceTeam.define(workspaceId, "QA");
+    repository.save(teamWithRole);
+    repository.addRoleToTeam(teamWithRole.id(), roleId);
+    WorkspaceTeam teamWithoutRole = WorkspaceTeam.define(workspaceId, "Support");
+    repository.save(teamWithoutRole);
+
+    Map<UUID, List<UUID>> found =
+        repository.findRoleIdsByTeamIds(List.of(teamWithRole.id(), teamWithoutRole.id()));
+
+    assertThat(found)
+        .containsEntry(teamWithRole.id(), List.of(roleId))
+        .containsEntry(teamWithoutRole.id(), List.of());
   }
 
   @Test

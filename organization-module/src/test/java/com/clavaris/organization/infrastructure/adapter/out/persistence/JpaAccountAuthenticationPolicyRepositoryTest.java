@@ -52,7 +52,8 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
             false,
             true,
             false,
-            true);
+            true,
+            false);
 
     policies.save(policy);
 
@@ -87,7 +88,7 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
 
     AccountAuthenticationPolicy updated =
         original.withPolicy(
-            true, EmailVerificationMethod.BOTH, true, true, true, true, true, false, true);
+            true, EmailVerificationMethod.BOTH, true, true, true, true, true, false, true, false);
     policies.save(updated);
 
     assertThat(springDataRepository.count())

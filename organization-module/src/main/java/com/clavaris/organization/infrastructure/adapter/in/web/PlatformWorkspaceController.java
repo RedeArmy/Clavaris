@@ -48,8 +48,8 @@ import com.clavaris.organization.application.usecase.listworkspacesfororganizati
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsQuery;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
-import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsQuery;
-import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceQuery;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamCommand;
@@ -214,7 +214,7 @@ public class PlatformWorkspaceController {
   private final DeleteWorkspaceUseCase deleteWorkspaceUseCase;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
-  private final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
+  private final ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams;
   private final ListGroupedWorkspaceRoleIdsUseCase listGroupedRoleIds;
   private final CreateWorkspaceTeamUseCase createTeamUseCase;
   private final RenameWorkspaceTeamUseCase renameTeamUseCase;
@@ -243,7 +243,7 @@ public class PlatformWorkspaceController {
       final DeleteWorkspaceUseCase deleteWorkspaceUseCase,
       final CurrentPlatformAccountResolver currentPlatformAccount,
       final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
-      final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds,
+      final ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams,
       final ListGroupedWorkspaceRoleIdsUseCase listGroupedRoleIds,
       final CreateWorkspaceTeamUseCase createTeamUseCase,
       final RenameWorkspaceTeamUseCase renameTeamUseCase,
@@ -264,7 +264,7 @@ public class PlatformWorkspaceController {
     this.deleteWorkspaceUseCase = deleteWorkspaceUseCase;
     this.currentPlatformAccount = currentPlatformAccount;
     this.listTeams = listTeams;
-    this.listTeamRoleIds = listTeamRoleIds;
+    this.listTeamRoleIdsForTeams = listTeamRoleIdsForTeams;
     this.listGroupedRoleIds = listGroupedRoleIds;
     this.createTeamUseCase = createTeamUseCase;
     this.renameTeamUseCase = renameTeamUseCase;
@@ -949,10 +949,16 @@ public class PlatformWorkspaceController {
 
     final List<WorkspaceTeam> teams =
         listTeams.handle(new ListWorkspaceTeamsForWorkspaceQuery(workspace.id()));
+    // TD-PERF-030: one batched call for every team's own roleIds, instead of one
+    // listTeamRoleIds.handle call per team in this loop.
+    final Map<UUID, List<UUID>> roleIdsByTeamId =
+        listTeamRoleIdsForTeams.handle(
+            new ListWorkspaceTeamRoleIdsForTeamsQuery(
+                teams.stream().map(WorkspaceTeam::id).toList()));
     final Map<UUID, List<WorkspaceRole>> rolesByTeamId = new LinkedHashMap<>();
     for (final WorkspaceTeam team : teams) {
       final List<WorkspaceRole> teamRoles =
-          listTeamRoleIds.handle(new ListWorkspaceTeamRoleIdsQuery(team.id())).stream()
+          roleIdsByTeamId.get(team.id()).stream()
               .map(rolesById::get)
               .filter(Objects::nonNull)
               .sorted(Comparator.comparing(WorkspaceRole::name))

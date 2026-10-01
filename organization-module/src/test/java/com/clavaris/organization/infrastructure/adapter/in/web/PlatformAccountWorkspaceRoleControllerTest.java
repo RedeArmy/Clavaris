@@ -3,6 +3,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -22,7 +23,8 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.Workspace;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
@@ -52,7 +55,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
   private FindWorkspaceMembershipForAccountUseCase findMembership;
   private ListWorkspacesForOrganizationUseCase listWorkspaces;
   private ListWorkspaceTeamsForWorkspaceUseCase listTeams;
-  private ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
+  private ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams;
   private ListWorkspaceRolesForOrganizationUseCase listRoles;
   private AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private CurrentPlatformAccountResolver currentPlatformAccount;
@@ -69,7 +72,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     findMembership = mock(FindWorkspaceMembershipForAccountUseCase.class);
     listWorkspaces = mock(ListWorkspacesForOrganizationUseCase.class);
     listTeams = mock(ListWorkspaceTeamsForWorkspaceUseCase.class);
-    listTeamRoleIds = mock(ListWorkspaceTeamRoleIdsUseCase.class);
+    listTeamRoleIdsForTeams = mock(ListWorkspaceTeamRoleIdsForTeamsUseCase.class);
     listRoles = mock(ListWorkspaceRolesForOrganizationUseCase.class);
     assignRoleToAccount = mock(AssignWorkspaceRoleToAccountUseCase.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
@@ -84,7 +87,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     when(getWorkspace.handle(any())).thenReturn(Optional.of(workspace));
     when(listWorkspaces.handle(any())).thenReturn(List.of(workspace));
     when(listTeams.handle(any())).thenReturn(List.of());
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+    stubTeamRoleIds(List.of());
     when(listRoles.handle(any())).thenReturn(List.of(role));
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
@@ -109,7 +112,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
                     findMembership,
                     listWorkspaces,
                     listTeams,
-                    listTeamRoleIds,
+                    listTeamRoleIdsForTeams,
                     listRoles,
                     assignRoleToAccount,
                     currentPlatformAccount))
@@ -123,6 +126,20 @@ class PlatformAccountWorkspaceRoleControllerTest {
         + "/accounts/"
         + accountId
         + "/assign-role";
+  }
+
+  // TD-PERF-030: same rationale PlatformWorkspaceControllerTest's own identical helper documents
+  // — every test here sets up exactly one WorkspaceTeam, and doAnswer (not
+  // when(...).thenAnswer(...)) avoids the re-stubbing NPE that method's own comment explains.
+  private void stubTeamRoleIds(final List<UUID> roleIds) {
+    doAnswer(
+            invocation -> {
+              ListWorkspaceTeamRoleIdsForTeamsQuery query = invocation.getArgument(0);
+              return query.teamIds().stream()
+                  .collect(Collectors.toMap(teamId -> teamId, teamId -> roleIds));
+            })
+        .when(listTeamRoleIdsForTeams)
+        .handle(any());
   }
 
   @Test
@@ -161,7 +178,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     when(listRoles.handle(any())).thenReturn(List.of(role, ungroupedRole));
     WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
 
     mockMvc
         .perform(get(assignRolePath()))
@@ -179,7 +196,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     when(findMembership.handle(any())).thenReturn(Optional.of(membership));
     WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
     when(listTeams.handle(any())).thenReturn(List.of(team));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of(role.id()));
+    stubTeamRoleIds(List.of(role.id()));
 
     mockMvc
         .perform(get(assignRolePath()))
@@ -195,7 +212,7 @@ class PlatformAccountWorkspaceRoleControllerTest {
     when(findMembership.handle(any())).thenReturn(Optional.of(membership));
     WorkspaceTeam emptyTeam = WorkspaceTeam.define(workspace.id(), "EmptyTeam");
     when(listTeams.handle(any())).thenReturn(List.of(emptyTeam));
-    when(listTeamRoleIds.handle(any())).thenReturn(List.of());
+    stubTeamRoleIds(List.of());
 
     mockMvc
         .perform(get(assignRolePath()))

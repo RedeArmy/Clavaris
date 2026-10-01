@@ -25,9 +25,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item: a read-only
- * Account detail page (identity fields, known devices, linked social providers). Metadata,
- * biometric/WebAuthn credentials, and an activity heatmap are deliberately out of scope — see
- * TD-FUT-034 (`technical-debt-register.md`).
+ * Account detail page (identity fields, known devices, linked social providers). Metadata now
+ * shipped (TD-FUT-034, its own {@code PlatformAccountMetadataController} handles the tab's write
+ * side) — biometric/WebAuthn credentials and an activity heatmap remain out of scope, still tracked
+ * under the same TD-FUT-034 row (`technical-debt-register.md`).
  *
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver}, same
  * anti-enumeration posture as {@link PlatformAccountsController}; a mismatched {@code accountId}

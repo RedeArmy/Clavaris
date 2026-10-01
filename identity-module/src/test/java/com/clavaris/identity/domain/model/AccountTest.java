@@ -469,4 +469,46 @@ class AccountTest {
     assertThat(account.lastName()).contains("Hopper");
     assertThat(account.pictureUrl()).contains("https://example.com/manual-upload.png");
   }
+
+  @Test
+  void newAccountHasNoMetadata() {
+    Account account = Account.register(organizationId, email);
+
+    assertThat(account.publicMetadata()).isEmpty();
+    assertThat(account.privateMetadata()).isEmpty();
+    assertThat(account.unsafeMetadata()).isEmpty();
+  }
+
+  @Test
+  void setMetadataReplacesAllThreeTiersAtOnce() {
+    Account account = Account.register(organizationId, email);
+
+    account.setMetadata("{\"plan\":\"pro\"}", "{\"internalId\":42}", "{\"onboarded\":true}");
+
+    assertThat(account.publicMetadata()).contains("{\"plan\":\"pro\"}");
+    assertThat(account.privateMetadata()).contains("{\"internalId\":42}");
+    assertThat(account.unsafeMetadata()).contains("{\"onboarded\":true}");
+  }
+
+  @Test
+  void setMetadataOverwritesAPreviousValue_deliberateReplace() {
+    Account account = Account.register(organizationId, email);
+    account.setMetadata("{\"plan\":\"free\"}", null, null);
+
+    account.setMetadata("{\"plan\":\"pro\"}", null, null);
+
+    assertThat(account.publicMetadata()).contains("{\"plan\":\"pro\"}");
+  }
+
+  @Test
+  void setMetadataWithNullClearsATier() {
+    Account account = Account.register(organizationId, email);
+    account.setMetadata("{\"plan\":\"pro\"}", "{\"x\":1}", "{\"y\":2}");
+
+    account.setMetadata(null, null, null);
+
+    assertThat(account.publicMetadata()).isEmpty();
+    assertThat(account.privateMetadata()).isEmpty();
+    assertThat(account.unsafeMetadata()).isEmpty();
+  }
 }

@@ -17,11 +17,12 @@ public record AccountAuthenticationPolicySnapshot(
     boolean usernameRequired,
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
-    boolean deviceTrustEnabled) {
+    boolean deviceTrustEnabled,
+    boolean selfRegistrationRequiresApproval) {
 
   /** The same fixed defaults {@code AccountAuthenticationPolicy.defaults()} establishes. */
   public static AccountAuthenticationPolicySnapshot defaults() {
     return new AccountAuthenticationPolicySnapshot(
-        false, EmailVerificationMethod.LINK, false, false, false, false, false, true, false);
+        false, EmailVerificationMethod.LINK, false, false, false, false, false, true, false, false);
   }
 }

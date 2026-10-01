@@ -17,8 +17,8 @@ import com.clavaris.organization.application.usecase.listworkspacerolesfororgani
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsQuery;
-import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceQuery;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.domain.model.Workspace;
@@ -109,7 +109,7 @@ public class PlatformAccountWorkspaceRoleController {
   private final FindWorkspaceMembershipForAccountUseCase findMembership;
   private final ListWorkspacesForOrganizationUseCase listWorkspaces;
   private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
-  private final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds;
+  private final ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams;
   private final ListWorkspaceRolesForOrganizationUseCase listRoles;
   private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccount;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
@@ -122,7 +122,7 @@ public class PlatformAccountWorkspaceRoleController {
       final FindWorkspaceMembershipForAccountUseCase findMembership,
       final ListWorkspacesForOrganizationUseCase listWorkspaces,
       final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
-      final ListWorkspaceTeamRoleIdsUseCase listTeamRoleIds,
+      final ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams,
       final ListWorkspaceRolesForOrganizationUseCase listRoles,
       final AssignWorkspaceRoleToAccountUseCase assignRoleToAccount,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
@@ -131,7 +131,7 @@ public class PlatformAccountWorkspaceRoleController {
     this.findMembership = findMembership;
     this.listWorkspaces = listWorkspaces;
     this.listTeams = listTeams;
-    this.listTeamRoleIds = listTeamRoleIds;
+    this.listTeamRoleIdsForTeams = listTeamRoleIdsForTeams;
     this.listRoles = listRoles;
     this.assignRoleToAccount = assignRoleToAccount;
     this.currentPlatformAccount = currentPlatformAccount;
@@ -284,11 +284,16 @@ public class PlatformAccountWorkspaceRoleController {
     final List<WorkspaceTeam> allTeams =
         listTeams.handle(new ListWorkspaceTeamsForWorkspaceQuery(workspaceId));
 
+    // TD-PERF-030: one batched call for every team's own roleIds, instead of one
+    // listTeamRoleIds.handle call per team in this loop.
+    final Map<UUID, List<UUID>> roleIdsByTeamId =
+        listTeamRoleIdsForTeams.handle(
+            new ListWorkspaceTeamRoleIdsForTeamsQuery(
+                allTeams.stream().map(WorkspaceTeam::id).toList()));
     final Map<UUID, UUID> roleTeamId = new HashMap<>();
     final List<WorkspaceTeam> teamsWithRoles = new ArrayList<>();
     for (final WorkspaceTeam team : allTeams) {
-      final List<UUID> teamRoleIds =
-          listTeamRoleIds.handle(new ListWorkspaceTeamRoleIdsQuery(team.id()));
+      final List<UUID> teamRoleIds = roleIdsByTeamId.get(team.id());
       if (teamRoleIds.isEmpty()) {
         continue;
       }

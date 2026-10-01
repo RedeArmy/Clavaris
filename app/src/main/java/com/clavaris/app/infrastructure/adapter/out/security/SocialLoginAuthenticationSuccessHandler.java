@@ -305,7 +305,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
               .orElse(TENANT_PATH_PREFIX + organizationId + "/login?authenticated");
       final String target =
           tenantSessions.establishViaSocialLogin(
-              request, response, accountId.value(), provider, fallbackUrl);
+              request, response, accountId.value(), provider, false, fallbackUrl);
       // New-device login email notification — same call LoginController's own password-login
       // path makes, right after establishing the session; see
       // RecordAccountLoginDeviceService's own Javadoc for why this never throws. A present
@@ -322,6 +322,12 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
               rawDeviceToken ->
                   DeviceCookie.write(request, response, organizationId, rawDeviceToken));
       redirectStrategy.sendRedirect(request, response, target);
+    } else if (result instanceof AuthenticateWithSocialProviderResult.PendingApproval) {
+      // TD-FUT-019: same informational page RegisterAccountController's own gated signup redirect
+      // targets — no email is known at this point to carry across the redirect (unlike that
+      // controller's own form-submission path), so the page falls back to its generic copy.
+      redirectStrategy.sendRedirect(
+          request, response, TENANT_PATH_PREFIX + organizationId + "/register/pending-approval");
     } else {
       redirectStrategy.sendRedirect(
           request,

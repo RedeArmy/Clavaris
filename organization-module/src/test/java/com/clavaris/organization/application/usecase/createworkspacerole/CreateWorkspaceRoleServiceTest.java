@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.createworkspacerole;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -57,7 +58,7 @@ class CreateWorkspaceRoleServiceTest {
     assertThat(role.name()).isEqualTo("Supervisor");
     assertThat(role.organizationId()).isEqualTo(organizationId);
     assertThat(role.permissions()).containsExactly("org:posts:create");
-    verify(roles).save(role);
+    verify(roles).saveAndFlush(role);
   }
 
   @Test
@@ -106,6 +107,24 @@ class CreateWorkspaceRoleServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(roles, never()).save(any());
+  }
+
+  @Test
+  void translatesADataIntegrityViolationFromALostRaceIntoTheTypedException() {
+    // TD-SEC-060: the pre-check above passes (no existing row yet, per setUp's own stub), but
+    // ux_workspace_roles_organization_id_name still fires at saveAndFlush time — simulating a
+    // concurrent request that created the same name first.
+    doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+        .when(roles)
+        .saveAndFlush(any());
+    CreateWorkspaceRoleCommand command =
+        new CreateWorkspaceRoleCommand(organizationId, "Supervisor", null, Set.of(), ACTOR);
+
+    assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
   }
 
   @Test

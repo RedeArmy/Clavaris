@@ -25,7 +25,7 @@
                         <div class="clavaris-organization-card__header">
                             <span class="clavaris-organization-card__mark" aria-hidden="true">◈</span>
                             <span class="clavaris-badge"
-                                  th:classappend="${organization.environment().name() == 'PRODUCTION'} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organization.environment().name() == 'PRODUCTION')}"
                                   th:text="${organization.environment()}">DEVELOPMENT</span>
                         </div>
                         <h2 th:text="${organization.name()}">Organization name</h2>

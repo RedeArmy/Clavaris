@@ -15,7 +15,8 @@ public record AccountAuthenticationPolicyResponse(
     boolean usernameRequired,
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
-    boolean deviceTrustEnabled) {
+    boolean deviceTrustEnabled,
+    boolean selfRegistrationRequiresApproval) {
 
   public static AccountAuthenticationPolicyResponse from(final AccountAuthenticationPolicy policy) {
     return new AccountAuthenticationPolicyResponse(
@@ -28,6 +29,7 @@ public record AccountAuthenticationPolicyResponse(
         policy.usernameRequired(),
         policy.usernameSignInEnabled(),
         policy.passwordAtSignUpEnabled(),
-        policy.deviceTrustEnabled());
+        policy.deviceTrustEnabled(),
+        policy.selfRegistrationRequiresApproval());
   }
 }

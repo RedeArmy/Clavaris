@@ -19,6 +19,17 @@ public interface AccessRestrictionEntryRepository {
 
   void save(AccessRestrictionEntry entry);
 
+  /**
+   * TD-SEC-060: same write as {@link #save}, but flushed immediately rather than deferred to the
+   * enclosing transaction's own commit — {@code AddAccessRestrictionEntryService} needs the {@code
+   * ux_access_restriction_entries_organization_id_identifier} constraint violation to surface
+   * synchronously, catchable right where it's thrown, not at a commit boundary the calling method
+   * has already returned past — same "a dedicated flushed write for the race-sensitive caller,
+   * plain {@link #save} everywhere else" precedent {@code WorkspaceRoleRepository#saveAndFlush}
+   * already establishes for an identical shape of race.
+   */
+  void saveAndFlush(AccessRestrictionEntry entry);
+
   Optional<AccessRestrictionEntry> findById(UUID id);
 
   void deleteById(UUID id);

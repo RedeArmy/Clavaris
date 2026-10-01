@@ -73,7 +73,9 @@ public class SetAccountAuthenticationPolicyForOrganizationService
             + " passwordAtSignUpEnabled="
             + command.passwordAtSignUpEnabled()
             + " deviceTrustEnabled="
-            + command.deviceTrustEnabled());
+            + command.deviceTrustEnabled()
+            + " selfRegistrationRequiresApproval="
+            + command.selfRegistrationRequiresApproval());
 
     return new SetAccountAuthenticationPolicyForOrganizationResult(policy);
   }
@@ -90,7 +92,8 @@ public class SetAccountAuthenticationPolicyForOrganizationService
         command.usernameRequired(),
         command.usernameSignInEnabled(),
         command.passwordAtSignUpEnabled(),
-        command.deviceTrustEnabled());
+        command.deviceTrustEnabled(),
+        command.selfRegistrationRequiresApproval());
   }
 
   private AccountAuthenticationPolicy defineFromCommand(
@@ -105,6 +108,7 @@ public class SetAccountAuthenticationPolicyForOrganizationService
         command.usernameRequired(),
         command.usernameSignInEnabled(),
         command.passwordAtSignUpEnabled(),
-        command.deviceTrustEnabled());
+        command.deviceTrustEnabled(),
+        command.selfRegistrationRequiresApproval());
   }
 }

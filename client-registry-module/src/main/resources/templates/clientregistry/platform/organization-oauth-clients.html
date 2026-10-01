@@ -79,7 +79,7 @@
                         </td>
                         <td>
                             <span class="clavaris-badge"
-                                  th:classappend="${client.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                  th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(client.active())}"
                                   th:text="${client.active()} ? 'Active' : 'Inactive'">Active</span>
                         </td>
                         <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(client.createdAt())}">Created at</td>

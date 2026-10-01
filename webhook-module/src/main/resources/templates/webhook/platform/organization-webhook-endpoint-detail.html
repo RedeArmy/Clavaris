@@ -32,7 +32,7 @@
                             <h1>Webhook Endpoint</h1>
                             <p>
                                 <span class="clavaris-badge"
-                                      th:classappend="${endpoint.active()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
+                                      th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(endpoint.active())}"
                                       th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
                                 &#183; Registered <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(endpoint.createdAt())}">date</span>
                             </p>

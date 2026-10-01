@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.clavaris.common.infrastructure.adapter.out.persistence.PostgresAdvisoryJobLock;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +41,7 @@ class AccountAuthMethodIntegrityCheckJobTest {
   void countsAnAccountWithNeitherAPasswordCredentialNorASocialIdentity() {
     insertAccount();
 
-    assertThat(accounts.countAccountsWithNoAuthMethod()).isEqualTo(1L);
+    assertThat(totalOrphanCount()).isEqualTo(1L);
     // Doesn't throw — this job's own contract is "log a warning," never a hard failure.
     job.checkForOrphanedAccounts();
   }
@@ -55,7 +56,7 @@ class AccountAuthMethodIntegrityCheckJobTest {
         accountId,
         "argon2id$hash");
 
-    assertThat(accounts.countAccountsWithNoAuthMethod()).isZero();
+    assertThat(totalOrphanCount()).isZero();
   }
 
   @Test
@@ -69,7 +70,41 @@ class AccountAuthMethodIntegrityCheckJobTest {
         accountId,
         UUID.randomUUID());
 
-    assertThat(accounts.countAccountsWithNoAuthMethod()).isZero();
+    assertThat(totalOrphanCount()).isZero();
+  }
+
+  // TD-PERF-001 (closed): proves the chunked sweep itself, not just each chunk's own query —
+  // orphans distributed across more than one chunk (a deliberately tiny chunkSize, 2, against 3
+  // orphaned accounts) must all still be found, the same way checkForOrphanedAccountsLocked's own
+  // afterId-seeking loop walks every real chunk at its actual CHUNK_SIZE (1000).
+  @Test
+  void findsOrphansSpreadAcrossMoreThanOneChunk() {
+    insertAccount();
+    insertAccount();
+    insertAccount();
+
+    long totalOrphanCount = 0;
+    UUID afterId = null;
+    List<UUID> chunkIds;
+    int chunkCount = 0;
+    do {
+      chunkIds = accounts.findAccountIdsForIntegrityCheckChunk(afterId, 2);
+      if (!chunkIds.isEmpty()) {
+        totalOrphanCount += accounts.countOrphansAmongIds(chunkIds);
+        afterId = chunkIds.get(chunkIds.size() - 1);
+        chunkCount++;
+      }
+    } while (chunkIds.size() == 2);
+
+    assertThat(totalOrphanCount).isEqualTo(3L);
+    assertThat(chunkCount)
+        .as("3 accounts at chunkSize 2 must take more than one chunk")
+        .isEqualTo(2);
+  }
+
+  private long totalOrphanCount() {
+    List<UUID> ids = accounts.findAccountIdsForIntegrityCheckChunk(null, 1000);
+    return accounts.countOrphansAmongIds(ids);
   }
 
   private UUID insertAccount() {

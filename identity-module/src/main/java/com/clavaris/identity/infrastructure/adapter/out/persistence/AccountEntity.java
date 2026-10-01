@@ -18,7 +18,10 @@ import java.util.UUID;
  * to be a plain persistence-mapping data holder by hexagonal design — the real behaviour lives in
  * {@code domain.model.Account}, deliberately not here.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable"})
+// PMD.TooManyFields: TD-FUT-019's own 2 new nullable columns pushed this past the default
+// threshold — same "a JPA entity is supposed to be a plain persistence-mapping data holder"
+// rationale this class's own Javadoc already documents for PMD.DataClass.
+@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable", "PMD.TooManyFields"})
 @Entity
 @Table(name = "accounts")
 public class AccountEntity {
@@ -77,6 +80,26 @@ public class AccountEntity {
   @Column(name = "bypasses_device_trust", nullable = false)
   private boolean bypassesDeviceTrust;
 
+  // TD-FUT-019: nullable, same "just add the scalar column" precedent as every field above —
+  // absence means this account was never gated by self-registration approval in the first place.
+  @Column(name = "registration_decided_at")
+  private Instant registrationDecidedAt;
+
+  @Column(name = "registration_rejection_reason")
+  private String registrationRejectionReason;
+
+  // TD-FUT-034: plain text columns, not native jsonb — same convention SessionEntity.scopes
+  // already establishes for this codebase's own JPA entities (see that field's own comment).
+  // Syntactic JSON validity is enforced in UpdateAccountMetadataService, not by the database.
+  @Column(name = "public_metadata")
+  private String publicMetadata;
+
+  @Column(name = "private_metadata")
+  private String privateMetadata;
+
+  @Column(name = "unsafe_metadata")
+  private String unsafeMetadata;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
@@ -96,7 +119,12 @@ public class AccountEntity {
       final Instant lastSignedInAt,
       final String pictureUrl,
       final boolean canDeleteOwnAccount,
-      final boolean bypassesDeviceTrust) {
+      final boolean bypassesDeviceTrust,
+      final Instant registrationDecidedAt,
+      final String registrationRejectionReason,
+      final String publicMetadata,
+      final String privateMetadata,
+      final String unsafeMetadata) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
@@ -112,6 +140,11 @@ public class AccountEntity {
     this.pictureUrl = pictureUrl;
     this.canDeleteOwnAccount = canDeleteOwnAccount;
     this.bypassesDeviceTrust = bypassesDeviceTrust;
+    this.registrationDecidedAt = registrationDecidedAt;
+    this.registrationRejectionReason = registrationRejectionReason;
+    this.publicMetadata = publicMetadata;
+    this.privateMetadata = privateMetadata;
+    this.unsafeMetadata = unsafeMetadata;
   }
 
   public UUID getId() {
@@ -172,5 +205,25 @@ public class AccountEntity {
 
   public boolean isBypassesDeviceTrust() {
     return bypassesDeviceTrust;
+  }
+
+  public Instant getRegistrationDecidedAt() {
+    return registrationDecidedAt;
+  }
+
+  public String getRegistrationRejectionReason() {
+    return registrationRejectionReason;
+  }
+
+  public String getPublicMetadata() {
+    return publicMetadata;
+  }
+
+  public String getPrivateMetadata() {
+    return privateMetadata;
+  }
+
+  public String getUnsafeMetadata() {
+    return unsafeMetadata;
   }
 }

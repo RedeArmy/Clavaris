@@ -56,8 +56,10 @@ class RegisterAccountIntegrationTest extends RedisBackedIntegrationTest {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
     Email email = new Email("real-flow@example.com");
 
-    var accountId =
-        useCase.handle(new RegisterAccountCommand(organizationId, email, "a-valid-password", null));
+    var result =
+        useCase.handle(
+            new RegisterAccountCommand(organizationId, email, "a-valid-password", null, true));
+    var accountId = result.accountId();
 
     assertThat(
             jdbcTemplate.queryForObject(
@@ -86,11 +88,19 @@ class RegisterAccountIntegrationTest extends RedisBackedIntegrationTest {
     var firstAccountId =
         useCase.handle(
             new RegisterAccountCommand(
-                new OrganizationId(UUID.randomUUID()), sharedEmail, "a-valid-password", null));
+                new OrganizationId(UUID.randomUUID()),
+                sharedEmail,
+                "a-valid-password",
+                null,
+                true));
     var secondAccountId =
         useCase.handle(
             new RegisterAccountCommand(
-                new OrganizationId(UUID.randomUUID()), sharedEmail, "a-different-password", null));
+                new OrganizationId(UUID.randomUUID()),
+                sharedEmail,
+                "a-different-password",
+                null,
+                true));
 
     assertThat(firstAccountId).isNotEqualTo(secondAccountId);
   }
@@ -153,7 +163,7 @@ class RegisterAccountIntegrationTest extends RedisBackedIntegrationTest {
     bothReady.countDown();
     go.await(5, TimeUnit.SECONDS);
     try {
-      useCase.handle(new RegisterAccountCommand(organizationId, email, password, null));
+      useCase.handle(new RegisterAccountCommand(organizationId, email, password, null, true));
       return true;
     } catch (EmailAlreadyRegisteredException _) {
       return false;

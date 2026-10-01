@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -163,7 +164,11 @@ class EmailLinkSignInControllerTest {
     Account account = newAccount();
     when(authenticateUseCase.handle(any())).thenReturn(account);
     when(sessions.establishViaOneTimeEmailProof(
-            any(), any(), org.mockito.ArgumentMatchers.eq(account.id().value()), any()))
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.eq(account.id().value()),
+            org.mockito.ArgumentMatchers.eq(false),
+            any()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -205,7 +210,8 @@ class EmailLinkSignInControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/verification-link-invalid"));
 
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -215,7 +221,16 @@ class EmailLinkSignInControllerTest {
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(
-                false, EmailVerificationMethod.LINK, false, true, false, false, false, true, true));
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                true,
+                false,
+                false,
+                false,
+                true,
+                true,
+                false));
     when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
 
     mockMvc
@@ -225,7 +240,8 @@ class EmailLinkSignInControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login/device-trust"));
 
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
     verify(requestDeviceTrustChallenge).handle(any());
   }
 
@@ -241,7 +257,16 @@ class EmailLinkSignInControllerTest {
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(
-                false, EmailVerificationMethod.LINK, false, true, false, false, false, true, true));
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                true,
+                false,
+                false,
+                false,
+                true,
+                true,
+                false));
     when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
     doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
 
@@ -253,6 +278,7 @@ class EmailLinkSignInControllerTest {
         .andExpect(view().name("identity/login-email-link-request"))
         .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
 
-    verify(sessions, never()).establishViaOneTimeEmailProof(any(), any(), any(), any());
+    verify(sessions, never())
+        .establishViaOneTimeEmailProof(any(), any(), any(), anyBoolean(), any());
   }
 }

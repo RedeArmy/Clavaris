@@ -52,6 +52,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
         false,
         true,
         false,
+        false,
         ACTOR);
   }
 
@@ -87,6 +88,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
                 false,
                 false,
                 true,
+                false,
                 false,
                 ACTOR));
 
@@ -142,6 +144,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             false,
             true,
             false,
+            false,
             ACTOR);
 
     assertThatExceptionOfType(UsernameRequiredWithoutSignUpException.class)
@@ -165,6 +168,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             true,
             true,
             false,
+            false,
             ACTOR);
 
     assertThatExceptionOfType(UsernameRequiredWithoutSignUpException.class)
@@ -179,6 +183,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             organizationId,
             false,
             EmailVerificationMethod.LINK,
+            false,
             false,
             false,
             false,
@@ -205,6 +210,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
             false,
             EmailVerificationMethod.LINK,
             true,
+            false,
             false,
             false,
             false,

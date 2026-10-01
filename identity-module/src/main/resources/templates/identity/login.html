@@ -29,6 +29,14 @@
             <div th:replace="~{identity/fragments/email-password-fields :: fields}"></div>
 
             <button class="clavaris-button" type="submit">Sign in</button>
+            <!-- TD-FUT-038: hidden by default, revealed by login-submit-guard.js's own blocked-submit
+                 path — the cross-tab lock used to fail an already-in-flight submit from a second tab
+                 with nothing but a silent event.preventDefault(), indistinguishable from a hung
+                 request. <output> carries an implicit role="status" (and therefore implicit
+                 aria-live="polite") on its own — announced to assistive tech the moment it's shown,
+                 without needing focus to move there or a manually-set ARIA role. -->
+            <output id="login-submit-guard-notice" class="clavaris-alert clavaris-alert--error"
+                    hidden>Already signing in from another tab — please wait a moment.</output>
         </form>
 
         <!-- ADR-0020 Decision 3, BR-ID-12: only ever the providers this Organization has actually

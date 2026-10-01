@@ -142,7 +142,12 @@ class JpaAccountRepository implements AccountRepository {
         entity.getLastSignedInAt(),
         entity.getPictureUrl(),
         entity.isCanDeleteOwnAccount(),
-        entity.isBypassesDeviceTrust());
+        entity.isBypassesDeviceTrust(),
+        entity.getRegistrationDecidedAt(),
+        entity.getRegistrationRejectionReason(),
+        entity.getPublicMetadata(),
+        entity.getPrivateMetadata(),
+        entity.getUnsafeMetadata());
   }
 
   // TD-PERF-028 (closed): no longer also writes the credential — see AccountRepository#save's own
@@ -207,7 +212,12 @@ class JpaAccountRepository implements AccountRepository {
         account.lastSignedInAt().orElse(null),
         account.pictureUrl().orElse(null),
         account.canDeleteOwnAccount(),
-        account.bypassesDeviceTrust());
+        account.bypassesDeviceTrust(),
+        account.registrationDecidedAt().orElse(null),
+        account.registrationRejectionReason().orElse(null),
+        account.publicMetadata().orElse(null),
+        account.privateMetadata().orElse(null),
+        account.unsafeMetadata().orElse(null));
   }
 
   // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider

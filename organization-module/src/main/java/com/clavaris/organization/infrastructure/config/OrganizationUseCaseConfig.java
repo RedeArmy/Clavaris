@@ -87,6 +87,8 @@ import com.clavaris.organization.application.usecase.listworkspacesfororganizati
 import com.clavaris.organization.application.usecase.listworkspacesfororganizationpaged.ListWorkspacesForOrganizationPagedUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsService;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListGroupedWorkspaceRoleIdsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsService;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsService;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsUseCase;
 import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceService;
@@ -486,6 +488,12 @@ class OrganizationUseCaseConfig {
   /* package */ ListWorkspaceTeamRoleIdsUseCase listWorkspaceTeamRoleIdsUseCase(
       final WorkspaceTeamRepository teams) {
     return new ListWorkspaceTeamRoleIdsService(teams);
+  }
+
+  @Bean
+  /* package */ ListWorkspaceTeamRoleIdsForTeamsUseCase listWorkspaceTeamRoleIdsForTeamsUseCase(
+      final WorkspaceTeamRepository teams) {
+    return new ListWorkspaceTeamRoleIdsForTeamsService(teams);
   }
 
   @Bean

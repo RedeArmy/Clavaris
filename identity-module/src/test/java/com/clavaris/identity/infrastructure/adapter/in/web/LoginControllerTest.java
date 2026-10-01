@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -177,7 +178,8 @@ class LoginControllerTest {
   void validCredentialsEstablishASessionAndRedirectToWhatItReturns() throws Exception {
     Account account = newAccount();
     when(useCase.handle(any())).thenReturn(account);
-    when(sessionEstablisher.establish(any(), any(), eq(account.id().value()), anyString()))
+    when(sessionEstablisher.establish(
+            any(), any(), eq(account.id().value()), eq(false), anyString()))
         .thenReturn("/o/" + ORGANIZATION_ID + "/oauth2/authorize?client_id=abc");
 
     mockMvc
@@ -213,7 +215,7 @@ class LoginControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login/session-task/password-reset"));
 
-    verify(sessionEstablisher, never()).establish(any(), any(), any(), any());
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
   }
 
@@ -230,7 +232,11 @@ class LoginControllerTest {
             new OrganizationId(ORGANIZATION_ID), "test_client", null, RedirectAction.SIGN_IN))
         .thenReturn(Optional.of("https://app.example.com/dashboard"));
     when(sessionEstablisher.establish(
-            any(), any(), eq(account.id().value()), eq("https://app.example.com/dashboard")))
+            any(),
+            any(),
+            eq(account.id().value()),
+            eq(false),
+            eq("https://app.example.com/dashboard")))
         .thenReturn("https://app.example.com/dashboard");
 
     mockMvc
@@ -243,7 +249,12 @@ class LoginControllerTest {
         .andExpect(redirectedUrl("https://app.example.com/dashboard"));
 
     verify(sessionEstablisher)
-        .establish(any(), any(), eq(account.id().value()), eq("https://app.example.com/dashboard"));
+        .establish(
+            any(),
+            any(),
+            eq(account.id().value()),
+            eq(false),
+            eq("https://app.example.com/dashboard"));
   }
 
   @Test
@@ -292,7 +303,7 @@ class LoginControllerTest {
         // field-scoped error would itself leak which field was the actual problem.
         .andExpect(model().attributeHasNoErrors("form"));
 
-    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyBoolean(), anyString());
     verifyNoInteractions(recordLoginDevice);
   }
 
@@ -313,7 +324,7 @@ class LoginControllerTest {
         .andExpect(model().attribute("emailNotVerifiedError", true))
         .andExpect(model().attributeHasNoErrors("form"));
 
-    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyBoolean(), anyString());
     verifyNoInteractions(recordLoginDevice);
   }
 
@@ -338,7 +349,8 @@ class LoginControllerTest {
                 false,
                 false,
                 true,
-                true));
+                true,
+                false));
     when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
     doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
 
@@ -351,7 +363,7 @@ class LoginControllerTest {
         .andExpect(view().name("identity/login"))
         .andExpect(model().attribute("deviceTrustChallengeUnavailable", true));
 
-    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyString());
+    verify(sessionEstablisher, never()).establish(any(), any(), any(), anyBoolean(), anyString());
     verifyNoInteractions(recordLoginDevice);
   }
 }

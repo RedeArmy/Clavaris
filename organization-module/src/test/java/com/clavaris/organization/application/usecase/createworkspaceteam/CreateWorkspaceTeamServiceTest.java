@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.createworkspaceteam;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,7 +50,7 @@ class CreateWorkspaceTeamServiceTest {
 
     assertThat(team.name()).isEqualTo("QA");
     assertThat(team.workspaceId()).isEqualTo(workspaceId);
-    verify(teams).save(team);
+    verify(teams).saveAndFlush(team);
   }
 
   @Test
@@ -88,5 +89,21 @@ class CreateWorkspaceTeamServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(teams, never()).save(any());
+  }
+
+  @Test
+  void translatesADataIntegrityViolationFromALostRaceIntoTheTypedException() {
+    // TD-SEC-060: the pre-check above passes (no existing row yet, per setUp's own stub), but
+    // ux_workspace_teams_workspace_id_name still fires at saveAndFlush time — simulating a
+    // concurrent request that created the same name first.
+    doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+        .when(teams)
+        .saveAndFlush(any());
+    CreateWorkspaceTeamCommand command = new CreateWorkspaceTeamCommand(workspaceId, "QA", ACTOR);
+
+    assertThatExceptionOfType(DuplicateWorkspaceTeamNameException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    org.mockito.Mockito.verifyNoInteractions(auditEvents);
   }
 }

@@ -106,7 +106,8 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "usernameRequired": false,
           "usernameSignInEnabled": true,
           "passwordAtSignUpEnabled": true,
-          "deviceTrustEnabled": false
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
         }
         """);
     registerAccountWithUsername(
@@ -145,7 +146,8 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "usernameRequired": false,
           "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,
-          "deviceTrustEnabled": false
+          "deviceTrustEnabled": false,
+          "selfRegistrationRequiresApproval": false
         }
         """);
     String email = "email-code-flow@example.com";
@@ -203,7 +205,8 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "usernameRequired": false,
           "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,
-          "deviceTrustEnabled": true
+          "deviceTrustEnabled": true,
+          "selfRegistrationRequiresApproval": false
         }
         """);
     String email = "device-trust-flow@example.com";

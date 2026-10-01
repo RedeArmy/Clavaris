@@ -56,21 +56,27 @@
             <p class="clavaris-alert clavaris-alert--success" th:if="${param.pictureRemoved}">Profile picture was removed.</p>
             <p class="clavaris-alert clavaris-alert--success" th:if="${param.passwordResetSent}">A password reset link was sent to this Account's email.</p>
             <p class="clavaris-alert clavaris-alert--success" th:if="${param.settingsUpdated}">Settings were updated.</p>
+            <p class="clavaris-alert clavaris-alert--success" th:if="${param.metadataUpdated}">Metadata was updated.</p>
+            <p class="clavaris-alert clavaris-alert--error" th:if="${param.metadataError}">
+                <span th:text="${param.metadataError}">publicMetadata</span> is not valid JSON, or is too long.
+            </p>
             <p class="clavaris-alert clavaris-alert--error" th:if="${param.pictureError}" th:text="${param.pictureError}">Upload error</p>
 
-            <!-- SDE-III review, 2026-09-21 — Clerk dashboard "View Profile" parity: three tabs
-                 (Profile/Settings/OAuth), zero-JS radio-button switching — see clavaris.css's own
-                 .clavaris-manage-account rules (shared with the operator's own "Manage account"
-                 dialog, never loaded on the same page at once). -->
+            <!-- SDE-III review, 2026-09-21 — Clerk dashboard "View Profile" parity: four tabs
+                 (Profile/Settings/OAuth/Metadata), zero-JS radio-button switching — see clavaris.css's
+                 own .clavaris-manage-account rules (shared with the operator's own "Manage account"
+                 dialog, never loaded on the same page at once). Metadata tab added TD-FUT-034. -->
             <div class="clavaris-manage-account">
                 <input type="radio" id="clavaris-tab-profile" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input" checked="checked"/>
                 <input type="radio" id="clavaris-tab-settings" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
                 <input type="radio" id="clavaris-tab-oauth" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
+                <input type="radio" id="clavaris-tab-metadata" name="clavaris-view-profile-tab" class="clavaris-manage-account__tab-input"/>
 
                 <nav class="clavaris-manage-account__nav">
                     <label for="clavaris-tab-profile">Profile</label>
                     <label for="clavaris-tab-settings">Settings</label>
                     <label for="clavaris-tab-oauth">OAuth</label>
+                    <label for="clavaris-tab-metadata">Metadata</label>
                 </nav>
 
                 <div class="clavaris-manage-account__body">
@@ -550,6 +556,37 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </section>
+
+                    <!-- TD-FUT-034, Clerk "Metadata" parity — three raw-JSON-text tiers, plain
+                         textareas (no client-side JSON validation: UpdateAccountMetadataService
+                         is the one source of truth for "is this valid," re-rendering an error
+                         here would just duplicate and risk drifting from that check). -->
+                    <section id="clavaris-panel-metadata" class="clavaris-manage-account__panel">
+                        <div class="clavaris-section-card">
+                            <h2>Metadata</h2>
+                            <p class="clavaris-field-hint">Arbitrary JSON this consuming application defines and Clavaris never interprets. Each tier replaces its previous value entirely on save.</p>
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/metadata(organizationId=${organizationId},accountId=${account.id().value()})}">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <div class="clavaris-field">
+                                    <label for="account-public-metadata">Public metadata</label>
+                                    <textarea id="account-public-metadata" name="publicMetadata" rows="6" th:text="${account.publicMetadata().orElse('')}"></textarea>
+                                    <p class="clavaris-field-hint">Readable by anyone who can read this Account — never a place for secrets.</p>
+                                </div>
+                                <div class="clavaris-field">
+                                    <label for="account-private-metadata">Private metadata</label>
+                                    <textarea id="account-private-metadata" name="privateMetadata" rows="6" th:text="${account.privateMetadata().orElse('')}"></textarea>
+                                    <p class="clavaris-field-hint">Admin/backend-only — never exposed through any account-holder-facing surface.</p>
+                                </div>
+                                <div class="clavaris-field">
+                                    <label for="account-unsafe-metadata">Unsafe metadata</label>
+                                    <textarea id="account-unsafe-metadata" name="unsafeMetadata" rows="6" th:text="${account.unsafeMetadata().orElse('')}"></textarea>
+                                    <p class="clavaris-field-hint">Named "unsafe" per Clerk's own convention — never trust its contents for an authorization decision.</p>
+                                </div>
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
+                            </form>
                         </div>
                     </section>
                 </div>

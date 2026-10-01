@@ -103,6 +103,17 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
             direct(
                 HttpMethod.POST, "/api/v1/admin/organizations/{organizationId}/webhook-endpoints"),
             oneHopAccount(HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:impersonate"),
+            // TD-FUT-019: lets a tenant's own consuming-application backend decide approval of a
+            // PENDING_APPROVAL self-registration through its own OrganizationClient ("Secret
+            // Key"), scoped to its own Organization only — see
+            // ApproveAccountRegistrationCommand's own Javadoc for the dual-caller rationale.
+            oneHopAccount(
+                HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:approve-registration"),
+            oneHopAccount(
+                HttpMethod.POST, "/api/v1/admin/accounts/{accountId}:reject-registration"),
+            // TD-FUT-034, Clerk "Metadata" parity — same dual-authority rationale as the two
+            // routes above.
+            oneHopAccount(HttpMethod.PUT, "/api/v1/admin/accounts/{accountId}/metadata"),
             // TD-SEC-061: the read equivalent of the three write routes below was missing —
             // this filter fails closed, so an OrganizationClient token with write access to
             // this exact resource got an inexplicable 403 on the one read of an otherwise

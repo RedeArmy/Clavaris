@@ -28,7 +28,16 @@
             <!-- SDE-III review, 2026-09-19 — same read-only, plain-bounded-list shape as
                  PlatformAuditLogController's own Organization-wide view (ADR-0025); the complement
                  to that view's own explicitly documented "Account events out of scope" limitation,
-                 see GetAuditLogForAccountUseCase's own Javadoc. -->
+                 see GetAuditLogForAccountUseCase's own Javadoc.
+
+                 TD-FUT-037: the table below (When/Actor/Action/Detail) is hand-duplicated in
+                 organization-module's own audit-log.html, one column narrower here (no Target — an
+                 Account has no analogous "which resource" column). Same cross-module reasoning
+                 org-tabs.html's own comment already documents: no module here declares a Maven
+                 dependency on another, so a single shared fragment would only be reachable from the
+                 app module's aggregated runtime classpath, not from either module's own
+                 standalone-MockMvc controller tests — left duplicated deliberately, not an
+                 oversight. -->
             <div class="clavaris-section">
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
                     <p class="clavaris-empty-state">No audit events recorded yet for this Account.</p>

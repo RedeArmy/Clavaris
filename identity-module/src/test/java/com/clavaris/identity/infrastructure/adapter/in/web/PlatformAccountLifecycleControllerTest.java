@@ -3,8 +3,10 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -136,11 +138,25 @@ class PlatformAccountLifecycleControllerTest {
   @Test
   void deleteCallsTheUseCaseAndRedirectsToTheUsersList() throws Exception {
     mockMvc
-        .perform(post(path("delete")))
+        .perform(post(path("delete")).param("confirmedEmail", "ada@example.com"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(usersListRedirect()));
 
     verify(deleteAccount).handle(new DeleteAccountCommand(account.id(), platformAccountActor()));
+  }
+
+  // TD-FUT-036: same "type the current value to confirm" tier
+  // PlatformWorkspaceController#deleteWorkspace already establishes for workspace name — a
+  // mismatched email must never delete the account.
+  @Test
+  void deleteRejectsAMismatchedConfirmedEmailWithoutDeletingAnything() throws Exception {
+    mockMvc
+        .perform(post(path("delete")).param("confirmedEmail", "not-ada@example.com"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(usersListRedirect()))
+        .andExpect(flash().attribute("deleteUserMismatchId", account.id().value()));
+
+    verifyNoInteractions(deleteAccount);
   }
 
   @Test
@@ -154,7 +170,9 @@ class PlatformAccountLifecycleControllerTest {
   void returnsNotFoundWhenTheOrganizationIsUnknownOrNotOwnedByTheCurrentAccount() throws Exception {
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.empty());
 
-    mockMvc.perform(post(path("delete"))).andExpect(status().isNotFound());
+    mockMvc
+        .perform(post(path("delete")).param("confirmedEmail", "ada@example.com"))
+        .andExpect(status().isNotFound());
   }
 
   private static com.clavaris.common.domain.model.AuditActor platformAccountActor() {

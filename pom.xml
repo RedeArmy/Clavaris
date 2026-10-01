@@ -17,8 +17,8 @@
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Bump to the latest 3.4.x patch at implementation time — pinned
-             here only so the module tree resolves, not a deliberate patch choice. -->
+        <!-- TD-PROC-005/CLAUDE.md §3: locked at Spring Boot 4.1 — bump to the latest 4.1.x patch
+             at implementation time, not a deliberate patch-version choice of its own. -->
         <spring-boot.version>4.1.1</spring-boot.version>
         <!-- Overrides the Spring Boot BOM's own managed Testcontainers version:
              an old 1.20.4 default hardcoded Docker API 1.32 in its
@@ -79,14 +79,11 @@
         <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
         <!-- CVE overrides (security-architecture.md §8 — zero critical/high
              findings open, non-negotiable): spring-boot-
-             dependencies 4.1.0 manages versions with real, live CVSS ≥ 7
-             CVEs — confirmed by OWASP Dependency-Check actually failing the
-             build on these, not a hypothetical. No Spring Boot patch release
-             newer than 4.1.0 exists yet to pull the fix in the normal way
-             (confirmed: 4.1.1 doesn't exist on Maven Central as of this
-             writing), so each is pinned explicitly below until one does.
-             CVE-2026-56820/-56817/-56745/etc. (netty, up to CVSS 9.1) — fixed
-             in netty 4.2.16.Final. -->
+             dependencies 4.1.1 (the pinned spring-boot.version above) still manages a netty
+             version with real, live CVSS ≥ 7 CVEs — confirmed by OWASP Dependency-Check actually
+             failing the build on these, not a hypothetical — so it's pinned explicitly below until
+             a Spring Boot patch release pulls the fix in the normal way. CVE-2026-56820/-56817/
+             -56745/etc. (netty, up to CVSS 9.1) — fixed in netty 4.2.16.Final. -->
         <netty.version>4.2.18.Final</netty.version>
         <!-- CVE-2026-54291 (pgjdbc, CVSS 8.2 — silent SCRAM channel-binding
              downgrade, defeats MITM protection) — fixed in 42.7.12+. -->
@@ -112,9 +109,19 @@
              vulnerable version simultaneously. Fixed versions confirmed present on Maven Central
              before pinning (not assumed): 2.21.6/2.22.2 for jackson-2-bom, 3.1.6/3.2.2 for
              jackson-bom — the smaller same-minor-line bump chosen for each, same "smallest safe
-             fix" precedent tomcat.version's own comment above already establishes. -->
-        <jackson-2-bom.version>2.21.6</jackson-2-bom.version>
-        <jackson-bom.version>3.1.6</jackson-bom.version>
+             fix" precedent tomcat.version's own comment above already establishes.
+
+             2026-09-30: CVE-2026-91776/CVE-2026-91777 (jackson-databind, HIGH — both lines again),
+             a real CI Trivy gate failure this time (not a silent one), caught by scanning
+             trivy-report.txt (the uploaded artifact — exit-code 1 on the console log alone gives
+             no CVE detail, same reason the first incident above needed a local repro). Same two
+             affected coordinates as before (com.fasterxml.jackson:jackson-bom and
+             tools.jackson:jackson-bom), both present in the built app.jar simultaneously, same
+             underlying cause. Fixed versions confirmed present on Maven Central before pinning:
+             2.18.11/2.21.7/2.22.3 for jackson-2-bom, 3.1.7/3.2.3 for jackson-bom — again the
+             smaller same-minor-line bump chosen for each. -->
+        <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+        <jackson-bom.version>3.1.7</jackson-bom.version>
         <!-- ADR-0026: identity-module's own SupabaseS3ProfilePictureStorage adapter talks to
              Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
              Supabase SDK dependency needed, same "build on vetted foundations" posture as every

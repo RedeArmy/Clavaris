@@ -3,8 +3,8 @@ package com.clavaris.identity.application.usecase.registeraccount;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.domain.event.AccountRegisteredEvent;
+import com.clavaris.identity.domain.event.AccountRegistrationPendingApprovalEvent;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import com.clavaris.identity.domain.service.RandomPasswordGenerator;
@@ -29,7 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 // vs. resolved), same "one exit per distinct outcome" rationale this codebase's own guard-clause-
 // heavy resolution logic already documents elsewhere (e.g. LoginController's own identical
 // suppression).
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
+// PMD.CyclomaticComplexity: TD-FUT-019's own gating branch is one more genuinely distinct
+// outcome on top of the real validation guards already here — same "wiring, not sprawl"
+// reasoning this codebase's own comparably-shaped orchestration methods already document.
+@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
 public class RegisterAccountService implements RegisterAccountUseCase {
 
   private final AccountRepository accounts;
@@ -53,7 +56,7 @@ public class RegisterAccountService implements RegisterAccountUseCase {
 
   @Override
   @Transactional
-  public AccountId handle(final RegisterAccountCommand command) {
+  public RegisterAccountResult handle(final RegisterAccountCommand command) {
     // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: checked before anything else,
     // same "reject before doing any real work" posture as every other precondition below.
     if (!accessRestrictions.isAllowed(command.organizationId(), command.email())) {
@@ -75,7 +78,19 @@ public class RegisterAccountService implements RegisterAccountUseCase {
       throw new EmailAlreadyRegisteredException(command.organizationId());
     }
 
-    final Account account = Account.register(command.organizationId(), command.email());
+    // TD-FUT-019: gated self-registration — an Organization that turned this on gets a
+    // PENDING_APPROVAL account instead of an immediately-usable one, but only for a genuine
+    // public signup (command.publicSelfRegistration()) — see that field's own Javadoc for why an
+    // admin-provisioned caller (e.g. Workspace member creation) must never be gated by this same
+    // policy regardless of its value. Every other step below (credential/username attachment, the
+    // unique-constraint race handling, account.created) is unchanged and unconditional — only the
+    // initial status differs.
+    final boolean pendingApproval =
+        command.publicSelfRegistration() && policy.selfRegistrationRequiresApproval();
+    final Account account =
+        pendingApproval
+            ? Account.registerPendingApproval(command.organizationId(), command.email())
+            : Account.register(command.organizationId(), command.email());
     account.attachPasswordCredential(hasher.hash(rawPasswordToAttach)); // BR-ID-01/BR-ID-02
     if (username != null) {
       account.assignUsername(username);
@@ -106,14 +121,24 @@ public class RegisterAccountService implements RegisterAccountUseCase {
 
     // ADR-0007 §1: outbox row written in the SAME transaction as the account insert —
     // @Transactional above covers both, so a crash between the two is impossible; either both
-    // commit or neither does.
+    // commit or neither does. account.created is unconditional — a consuming application that
+    // only cares "a row was created" must never lose that signal just because this one was
+    // gated — TD-FUT-019's own pending-approval event is a second, additional signal, not a
+    // replacement.
     outbox.write(
         "account.created",
         account.id(),
         account.organizationId(),
         AccountRegisteredEvent.from(account));
+    if (pendingApproval) {
+      outbox.write(
+          "account.registration.pending_approval",
+          account.id(),
+          account.organizationId(),
+          AccountRegistrationPendingApprovalEvent.from(account));
+    }
 
-    return account.id();
+    return new RegisterAccountResult(account.id(), pendingApproval);
   }
 
   private Username validateUsername(

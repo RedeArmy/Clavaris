@@ -224,6 +224,29 @@ public final class PlatformScopes {
   public static final String CLIENT_DOMAIN_WRITE = "platform:client-domain:write";
 
   /**
+   * TD-FUT-019: approve/reject a {@code PENDING_APPROVAL} self-registration — one shared scope for
+   * both directions, same "grouped under one scope for same-risk-tier actions" precedent {@link
+   * #WORKSPACE_MEMBERS_WRITE} already establishes (approve and reject are symmetric, reversible
+   * only via a fresh registration, not independently destructive the way {@link #ACCOUNTS_DELETE}
+   * is). Deliberately NOT in {@link #OPERATOR_ONLY} — TD-FUT-019's confirmed scope is that a
+   * tenant's own consuming application backend, not only the Clavaris operator dashboard, may
+   * decide approval, via its own {@code OrganizationClient} ("Secret Key") and {@code
+   * OrganizationClientOwnershipFilter}'s allowlisted route for this same action, scoped to that
+   * tenant's own Organization only.
+   */
+  public static final String ACCOUNTS_REVIEW_REGISTRATION = "platform:accounts:review-registration";
+
+  /**
+   * TD-FUT-034, Clerk "Metadata" parity: replacing an Account's public/private/unsafe metadata —
+   * its own scope, same defence-in-depth reasoning as every other admin-API rule here. Deliberately
+   * NOT in {@link #OPERATOR_ONLY}, same rationale {@link #ACCOUNTS_REVIEW_REGISTRATION}'s own
+   * Javadoc already establishes: a consuming application's own backend routinely tagging its own
+   * Accounts with application-defined data is the primary real-world use for this feature, not a
+   * Clavaris-operator-only action.
+   */
+  public static final String ACCOUNTS_METADATA_WRITE = "platform:accounts:metadata:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -253,7 +276,9 @@ public final class PlatformScopes {
           REDIRECT_POLICY_WRITE,
           ACCOUNTS_FORCE_PASSWORD_RESET,
           CLIENT_BRANDING_WRITE,
-          CLIENT_DOMAIN_WRITE);
+          CLIENT_DOMAIN_WRITE,
+          ACCOUNTS_REVIEW_REGISTRATION,
+          ACCOUNTS_METADATA_WRITE);
 
   /**
    * SDE-III review, 2026-09-15 — real gap found and closed: every scope above whose own Javadoc

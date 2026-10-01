@@ -117,6 +117,7 @@ class RequestEmailVerificationServiceTest {
                 false,
                 false,
                 true,
+                false,
                 false));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
@@ -142,6 +143,7 @@ class RequestEmailVerificationServiceTest {
                 false,
                 false,
                 true,
+                false,
                 false));
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
