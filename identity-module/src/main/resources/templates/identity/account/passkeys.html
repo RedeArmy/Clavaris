@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{identity/fragments/head :: head('Your passkeys — Clavaris')}">
+    <title>Your passkeys — Clavaris</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card clavaris-card--wide">
+        <p class="clavaris-breadcrumb">
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
+        </p>
+        <h1>Your Passkeys</h1>
+        <p>Passkeys let you sign in without typing a password, using your device's own screen lock,
+            fingerprint, or a hardware security key.</p>
+
+        <p id="passkey-unsupported-notice" class="clavaris-alert clavaris-alert--error" hidden>
+            This browser doesn't support passkeys.</p>
+
+        <p th:if="${#lists.isEmpty(credentials)}" class="clavaris-empty-state">No passkeys registered yet.</p>
+        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(credentials)}">
+            <table class="clavaris-table">
+                <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Added</th>
+                    <th scope="col">Last used</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="credential : ${credentials}">
+                    <td th:text="${credential.nickname()} ?: 'Unnamed passkey'">nickname</td>
+                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.createdAt())}">added</td>
+                    <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
+                    <td>
+                        <form method="post"
+                              th:action="@{/o/{organizationId}/account/passkeys/{credentialId}/delete(organizationId=${organizationId},credentialId=${credential.id()})}">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="clavaris-section-card">
+            <h2>Add a passkey</h2>
+            <input type="hidden" id="webauthn-csrf-token" th:if="${_csrf}" th:value="${_csrf.token}"/>
+            <input type="hidden" id="webauthn-csrf-header" th:if="${_csrf}" th:value="${_csrf.headerName}"/>
+            <div class="clavaris-field">
+                <label for="passkey-nickname">Name (optional)</label>
+                <input id="passkey-nickname" type="text" placeholder="e.g. MacBook Touch ID"/>
+            </div>
+            <button id="register-passkey-button" type="button" class="clavaris-button" hidden>Register a new passkey</button>
+            <p id="passkey-registration-error" class="clavaris-alert clavaris-alert--error" hidden></p>
+        </div>
+    </div>
+</main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/webauthn-register.js') : '/js/webauthn-register.js'}" defer></script>
+</body>
+</html>

@@ -73,6 +73,19 @@
             <a th:href="@{login/username}">Sign in with a username</a>
         </div>
 
+        <!-- TD-FUT-034, Clerk "View Profile" passkeys parity — hidden by default, revealed by
+             webauthn-login.js only when the browser actually supports the WebAuthn APIs this needs
+             (feature detection, not a server-side policy flag: see that script's own header
+             comment for why there is no org-level toggle for this). clientId/redirectUrl ride as
+             data attributes, same Clerk "customize redirect URLs" values every other sign-in method
+             already carries, read by the script rather than a hidden form field since this is a
+             plain button, not a form submission. -->
+        <input type="hidden" id="webauthn-csrf-token" th:if="${_csrf}" th:value="${_csrf.token}"/>
+        <input type="hidden" id="webauthn-csrf-header" th:if="${_csrf}" th:value="${_csrf.headerName}"/>
+        <button id="passkey-signin-button" type="button" class="clavaris-button clavaris-button--secondary" hidden
+                th:attr="data-client-id=${clientId},data-redirect-url=${redirectUrl}">Sign in with a passkey</button>
+        <p id="passkey-signin-error" class="clavaris-alert clavaris-alert--error" hidden></p>
+
         <p class="clavaris-links"><a th:href="@{forgot-password}">Forgot your password?</a></p>
     </div>
 </main>
@@ -84,5 +97,8 @@
      header comment for why social-provider links need window.open() treatment inside an iframe,
      and for the consumer-side postMessage snippet this page's own popup flow depends on. -->
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/embedded-login-popup.js') : '/js/embedded-login-popup.js'}" defer></script>
+<!-- TD-FUT-034: no-op (button stays hidden) when the browser lacks the WebAuthn APIs this script
+     needs — see its own header comment. -->
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/webauthn-login.js') : '/js/webauthn-login.js'}" defer></script>
 </body>
 </html>

@@ -239,6 +239,9 @@ final class AuthenticatedSessionCompletion {
           case PASSWORD ->
               sessions.establish(
                   request, response, accountId.value(), deviceTrustVerified, fallbackUrl);
+          case PASSKEY ->
+              sessions.establishViaPasskey(
+                  request, response, accountId.value(), deviceTrustVerified, fallbackUrl);
         };
 
     // New-device login email notification — after establish(), same accountId/request already in

@@ -29,5 +29,10 @@ public enum PendingAuthenticationFactor {
   ONE_TIME_EMAIL_PROOF,
 
   /** {@code app}'s {@code SocialLoginAuthenticationSuccessHandler} (Google/GitHub, ADR-0020). */
-  SOCIAL
+  SOCIAL,
+
+  /**
+   * TD-FUT-034: {@code WebAuthnSignInController} (passkey sign-in, discoverable-credential flow).
+   */
+  PASSKEY
 }
