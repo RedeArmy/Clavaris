@@ -89,8 +89,9 @@ class CompleteWebAuthnRegistrationServiceTest {
   void aFailedCeremonyNeverReachesTheRepository() throws RegistrationFailedException {
     when(relyingParty.finishRegistration(any()))
         .thenThrow(new RegistrationFailedException(new IllegalArgumentException("rejected")));
+    CompleteWebAuthnRegistrationCommand command = commandWithNickname(null);
 
-    assertThatThrownBy(() -> service.handle(commandWithNickname(null)))
+    assertThatThrownBy(() -> service.handle(command))
         .isInstanceOf(InvalidWebAuthnRegistrationException.class);
 
     verifyNoInteractions(credentials);

@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.within;
 
 import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
@@ -126,8 +127,7 @@ class JpaWebAuthnCredentialRepositoryTest {
 
     List<WebAuthnCredential> found = repository.findAllByAccountId(accountId);
 
-    assertThat(found).hasSize(2);
-    assertThat(found).allMatch(c -> c.accountId().equals(accountId));
+    assertThat(found).hasSize(2).allMatch(c -> c.accountId().equals(accountId));
   }
 
   @Test
@@ -148,7 +148,8 @@ class JpaWebAuthnCredentialRepositoryTest {
   void updateSignatureCountIsANoOpForAnUnknownRowId() {
     // entityManager.find returns null for an unknown id — the method must not throw, it simply
     // does nothing, same "no row to update" outcome a real caller can't distinguish from a race.
-    repository.updateSignatureCount(UUID.randomUUID(), 1L, Instant.now());
+    assertThatCode(() -> repository.updateSignatureCount(UUID.randomUUID(), 1L, Instant.now()))
+        .doesNotThrowAnyException();
   }
 
   @Test

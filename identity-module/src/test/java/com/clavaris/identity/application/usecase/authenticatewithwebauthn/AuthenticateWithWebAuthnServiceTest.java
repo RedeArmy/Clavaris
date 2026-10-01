@@ -97,8 +97,9 @@ class AuthenticateWithWebAuthnServiceTest {
   @Test
   void aFailedCeremonyNeverReachesAnyRepository() throws AssertionFailedException {
     when(relyingParty.finishAssertion(any())).thenThrow(new AssertionFailedException("rejected"));
+    AuthenticateWithWebAuthnCommand command = validCommand();
 
-    assertThatThrownBy(() -> service.handle(validCommand()))
+    assertThatThrownBy(() -> service.handle(command))
         .isInstanceOf(InvalidWebAuthnAssertionException.class);
 
     verifyNoInteractions(credentials, accounts);
@@ -110,8 +111,9 @@ class AuthenticateWithWebAuthnServiceTest {
     when(result.getUserHandle())
         .thenReturn(new ByteArray("not-a-uuid".getBytes(StandardCharsets.UTF_8)));
     when(relyingParty.finishAssertion(any())).thenReturn(result);
+    AuthenticateWithWebAuthnCommand command = validCommand();
 
-    assertThatThrownBy(() -> service.handle(validCommand()))
+    assertThatThrownBy(() -> service.handle(command))
         .isInstanceOf(InvalidWebAuthnAssertionException.class);
 
     verifyNoInteractions(credentials, accounts);
@@ -125,8 +127,9 @@ class AuthenticateWithWebAuthnServiceTest {
     AssertionResult result = assertionResultFor(accountId);
     when(relyingParty.finishAssertion(any())).thenReturn(result);
     when(accounts.findById(accountId)).thenReturn(Optional.empty());
+    AuthenticateWithWebAuthnCommand command = validCommand();
 
-    assertThatThrownBy(() -> service.handle(validCommand()))
+    assertThatThrownBy(() -> service.handle(command))
         .isInstanceOf(InvalidWebAuthnAssertionException.class);
 
     verifyNoInteractions(credentials);
@@ -141,8 +144,9 @@ class AuthenticateWithWebAuthnServiceTest {
     AssertionResult result = assertionResultFor(accountId);
     when(relyingParty.finishAssertion(any())).thenReturn(result);
     when(accounts.findById(accountId)).thenReturn(Optional.of(suspended));
+    AuthenticateWithWebAuthnCommand command = validCommand();
 
-    assertThatThrownBy(() -> service.handle(validCommand()))
+    assertThatThrownBy(() -> service.handle(command))
         .isInstanceOf(InvalidWebAuthnAssertionException.class);
 
     verifyNoInteractions(credentials);

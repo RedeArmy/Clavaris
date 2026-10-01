@@ -153,12 +153,14 @@ public class RegisterAccountController {
   // Early return per rejection reason is clearer here than accumulating a single exit through
   // nested branching for the several independent failure modes (validation, password required,
   // password mismatch, pending-approval, passwordless completion) that each need their own exit
-  // — PMD.OnlyOneReturn would make this harder to follow, not easier. SonarCloud's own cognitive-
-  // complexity rule (java:S3776) pushed past its threshold once BreachedPasswordException's own
-  // catch joined the others below — fixed by extracting the use-case call + its seven catches into
-  // their own registerOrRejectAndPopulateModel, which this method now treats as one logical step;
-  // PMD's own Cyclomatic/CognitiveComplexity dropped below their own thresholds as a result (no
-  // longer suppressed here, PMD itself now flags the unused suppression if left in).
+  // — PMD.OnlyOneReturn would make this harder to follow, not easier.
+  //
+  // SonarCloud's own cognitive-complexity rule (java:S3776) pushed past its threshold once
+  // BreachedPasswordException's own catch joined the others below. The fix moved the use-case call
+  // and its seven catches out into a separate helper method below, so this method now treats that
+  // whole step as a single logical unit instead of nesting every branch inline. PMD's own
+  // Cyclomatic and Cognitive Complexity checks dropped below their own thresholds as a direct
+  // result of that same extraction.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String register(
