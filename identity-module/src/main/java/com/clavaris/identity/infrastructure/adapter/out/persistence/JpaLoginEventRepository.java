@@ -5,8 +5,8 @@ import com.clavaris.identity.application.usecase.recordloginevent.LoginEventRepo
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.LoginEvent;
 import jakarta.persistence.EntityManager;
-import java.sql.Date;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,9 +46,21 @@ class JpaLoginEventRepository implements LoginEventRepository {
   @Override
   public List<LoginActivityDay> countsByDaySince(final AccountId accountId, final Instant since) {
     return events.countsByDaySince(accountId.value(), since).stream()
-        .map(
-            row ->
-                new LoginActivityDay(((Date) row[0]).toLocalDate(), ((Number) row[1]).longValue()))
+        .map(row -> new LoginActivityDay(toLocalDate(row[0]), ((Number) row[1]).longValue()))
         .toList();
+  }
+
+  // Real bug found live by JpaLoginEventRepositoryTest's own first run, not assumed: this
+  // native-query ::date projection's row[0] came back as a plain java.time.LocalDate on this
+  // stack's actual Hibernate/JDBC driver combination, not the java.sql.Date this method originally
+  // assumed (the legacy JDBC type a ResultSet#getDate call would return) — a real, previously-
+  // uncaught ClassCastException on every single call, invisible to
+  // GetLoginActivityForAccountServiceTest's
+  // own mocked-repository-port tests. Handles both shapes defensively since this mapping is a
+  // documented cross-version Hibernate/driver inconsistency, not a single guaranteed type.
+  private static LocalDate toLocalDate(final Object column) {
+    return column instanceof LocalDate localDate
+        ? localDate
+        : ((java.sql.Date) column).toLocalDate();
   }
 }
