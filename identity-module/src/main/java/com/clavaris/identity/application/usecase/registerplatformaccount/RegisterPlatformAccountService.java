@@ -1,5 +1,7 @@
 package com.clavaris.identity.application.usecase.registerplatformaccount;
 
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.domain.model.PlatformAccount;
@@ -24,10 +26,17 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
   private final PlatformAccountRepository accounts;
   private final PasswordHasher hasher;
 
+  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
+  // RegisterAccountService's own identical field for the tenant-tier equivalent.
+  private final BreachedPasswordChecker breachedPasswordChecker;
+
   public RegisterPlatformAccountService(
-      final PlatformAccountRepository accounts, final PasswordHasher hasher) {
+      final PlatformAccountRepository accounts,
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     this.accounts = accounts;
     this.hasher = hasher;
+    this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
   @SuppressWarnings("PMD.GuardLogStatement") // same false-positive rationale as
@@ -37,6 +46,11 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
   public PlatformAccountId handle(final RegisterPlatformAccountCommand command) {
     if (!PasswordPolicy.isSatisfiedBy(command.rawPassword())) {
       throw new WeakPasswordException();
+    }
+    // BR-ID-07, CLAUDE.md §5: the platform tier is the single highest-value target in the whole
+    // system — this check applies here unconditionally, same as every other tier.
+    if (breachedPasswordChecker.isBreached(command.rawPassword())) {
+      throw new BreachedPasswordException();
     }
 
     if (accounts.existsByEmail(command.email())) {

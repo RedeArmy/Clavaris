@@ -65,6 +65,20 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
         organizationId.toString());
   }
 
+  // See WebhookEndpointRepository#lockForRotation's own Javadoc. Same plain JdbcTemplate shape as
+  // lockForRegistration above — a void-returning native SELECT without @Modifying is never sent
+  // to Postgres, and @Modifying forces Hibernate through executeUpdate(), which rejects a
+  // SELECT-shaped statement.
+  @Override
+  public void lockForRotation(final UUID endpointId) {
+    jdbcTemplate.query(
+        "SELECT pg_advisory_xact_lock(hashtext(?))",
+        resultSet -> {
+          /* side-effecting call — the lock itself is the point, not this row */
+        },
+        endpointId.toString());
+  }
+
   @Override
   public void save(final WebhookEndpoint endpoint) {
     endpoints.save(toEntity(endpoint));

@@ -165,6 +165,35 @@ public class SpringSecurityAuthenticatedSessionEstablisher
         fallbackUrl);
   }
 
+  @Override
+  public String establishViaPasskey(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID accountId,
+      final boolean deviceTrustVerified,
+      final String fallbackUrl) {
+    // TD-FUT-034: FACTOR_WEBAUTHN (Spring Security's own standard authority for a WebAuthn
+    // ceremony, already present in spring-security-core even though this codebase never uses that
+    // library's own filter-chain machinery to perform the ceremony itself — see WebAuthnConfig's
+    // own Javadoc for why Yubico's library, not Spring Security's own WebAuthn module, does the
+    // actual verification). AMR_HWK is RFC 8176's registered "hardware key" value — the closest
+    // real registry entry to a WebAuthn authenticator; deliberately not distinguishing a synced
+    // passkey from a physical security key, same level of precision AMR_OTP already applies
+    // uniformly to both the email-code and email-link factors above.
+    return establishWithAuthorities(
+        request,
+        response,
+        accountId,
+        List.of(
+            FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.WEBAUTHN_AUTHORITY)
+                .issuedAt(Instant.now())
+                .build(),
+            new SimpleGrantedAuthority(ROLE_ACCOUNT_AUTHORITY),
+            new SimpleGrantedAuthority("AMR_HWK")),
+        deviceTrustVerified,
+        fallbackUrl);
+  }
+
   private String establishWithAuthorities(
       final HttpServletRequest request,
       final HttpServletResponse response,

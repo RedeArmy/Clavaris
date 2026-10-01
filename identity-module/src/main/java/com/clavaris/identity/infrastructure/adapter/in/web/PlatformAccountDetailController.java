@@ -2,18 +2,28 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountQuery;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountService;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountUseCase;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.LoginActivityDay;
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ActiveAccountSession;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountQuery;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountQuery;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountQuery;
+import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Controller;
@@ -25,17 +35,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item: a read-only
- * Account detail page (identity fields, known devices, linked social providers). Metadata now
- * shipped (TD-FUT-034, its own {@code PlatformAccountMetadataController} handles the tab's write
- * side) — biometric/WebAuthn credentials and an activity heatmap remain out of scope, still tracked
- * under the same TD-FUT-034 row (`technical-debt-register.md`).
+ * Account detail page (identity fields, known devices, linked social providers). Metadata, the
+ * activity heatmap, and passkeys are all shipped now (TD-FUT-034, fully closed — its own {@code
+ * PlatformAccountMetadataController} handles the Metadata tab's write side; {@code loginActivity}
+ * feeds the heatmap; {@code webAuthnCredentials} below is read-only here, with delete handled by
+ * {@code PlatformAccountWebAuthnCredentialsAdminController}).
  *
  * <p>{@code organizationId} resolves through {@link OrganizationForPlatformAccountResolver}, same
  * anti-enumeration posture as {@link PlatformAccountsController}; a mismatched {@code accountId}
  * (wrong Organization, or none at all) 404s identically via {@link
  * GetAccountForOrganizationUseCase}'s own Organization-scoped lookup.
  */
-@SuppressWarnings("PMD.LongVariable")
+// PMD.CouplingBetweenObjects: TD-FUT-034's own new GetLoginActivityForAccountUseCase/
+// ListWebAuthnCredentialsForAccountUseCase collaborators pushed this class's own count past the
+// threshold — same "wiring, not sprawl" reasoning as SocialLoginAuthenticationSuccessHandler's own
+// identical suppression already documents. PMD.ExcessiveImports: one import per collaborating
+// type is inherent to a read-only aggregate page like this one, not a code smell.
+@SuppressWarnings({"PMD.LongVariable", "PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountDetailController {
@@ -43,6 +59,10 @@ public class PlatformAccountDetailController {
   private static final String PROFILE_VIEW = "identity/platform/account-profile";
   private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
+  private static final int DAYS_PER_WEEK = 7;
+  private static final long HEATMAP_LEVEL_1_MAX_COUNT = 1;
+  private static final long HEATMAP_LEVEL_2_MAX_COUNT = 3;
+  private static final long HEATMAP_LEVEL_3_MAX_COUNT = 6;
 
   private final GetAccountForOrganizationUseCase getAccount;
   private final KnownDeviceRepository knownDevices;
@@ -50,9 +70,11 @@ public class PlatformAccountDetailController {
   private final OAuthClientsForOrganizationProvider oauthClientsProvider;
   private final ListActiveSessionsForAccountUseCase listSessions;
   private final ListOAuthGrantsForAccountUseCase listOAuthGrants;
+  private final GetLoginActivityForAccountUseCase getLoginActivity;
+  private final ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials;
   private final PlatformAccountOrganizationAccess organizationAccess;
 
-  @SuppressWarnings("java:S107")
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public PlatformAccountDetailController(
       final GetAccountForOrganizationUseCase getAccount,
       final KnownDeviceRepository knownDevices,
@@ -60,6 +82,8 @@ public class PlatformAccountDetailController {
       final OAuthClientsForOrganizationProvider oauthClientsProvider,
       final ListActiveSessionsForAccountUseCase listSessions,
       final ListOAuthGrantsForAccountUseCase listOAuthGrants,
+      final GetLoginActivityForAccountUseCase getLoginActivity,
+      final ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentials,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getAccount = getAccount;
@@ -68,6 +92,8 @@ public class PlatformAccountDetailController {
     this.oauthClientsProvider = oauthClientsProvider;
     this.listSessions = listSessions;
     this.listOAuthGrants = listOAuthGrants;
+    this.getLoginActivity = getLoginActivity;
+    this.listWebAuthnCredentials = listWebAuthnCredentials;
     this.organizationAccess =
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
@@ -116,6 +142,95 @@ public class PlatformAccountDetailController {
     // Clerk "View Profile" > OAuth tab parity (ADR-0026).
     model.addAttribute(
         "oauthGrants", listOAuthGrants.handle(new ListOAuthGrantsForAccountQuery(targetAccountId)));
+
+    // TD-FUT-034, Clerk "View Profile" activity heatmap parity.
+    model.addAttribute(
+        "loginActivityWeeks",
+        buildHeatmapWeeks(
+            getLoginActivity.handle(new GetLoginActivityForAccountQuery(targetAccountId))));
+
+    // TD-FUT-034, Clerk "View Profile" passkeys parity — read-only; delete is a separate admin
+    // controller (PlatformAccountWebAuthnCredentialsAdminController), same split sessions/OAuth
+    // grants already use on this same page.
+    model.addAttribute(
+        "webAuthnCredentials",
+        listWebAuthnCredentials.handle(
+            new ListWebAuthnCredentialsForAccountQuery(targetAccountId)));
     return PROFILE_VIEW;
+  }
+
+  // TD-FUT-034: turns the sparse day-count list GetLoginActivityForAccountUseCase returns into a
+  // dense, Sunday-aligned calendar grid (same convention GitHub's own contribution graph uses) —
+  // purely a rendering concern, so it lives here rather than in the use case itself. Grid padding
+  // cells (outside the actual GetLoginActivityForAccountService.WINDOW_DAYS trailing window, needed
+  // only to complete a partial first/last week) carry a null date and level 0.
+  private static List<List<HeatmapDayCell>> buildHeatmapWeeks(
+      final List<LoginActivityDay> activity) {
+    final Map<LocalDate, Long> countsByDay =
+        activity.stream()
+            .collect(Collectors.toMap(LoginActivityDay::date, LoginActivityDay::count));
+    // Explicit UTC, not the JVM's own default zone — same "the database's own session time zone
+    // — UTC, same as every other timestamptz column" convention GetLoginActivityForAccountUseCase's
+    // own Javadoc already establishes for the day-bucketing this grid renders.
+    final LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    final LocalDate windowStart =
+        today.minusDays(GetLoginActivityForAccountService.WINDOW_DAYS - 1L);
+    final LocalDate gridStart =
+        windowStart.minusDays(windowStart.getDayOfWeek().getValue() % DAYS_PER_WEEK);
+
+    final List<List<HeatmapDayCell>> weeks = new ArrayList<>();
+    List<HeatmapDayCell> currentWeek = new ArrayList<>();
+    for (LocalDate cursor = gridStart; !cursor.isAfter(today); cursor = cursor.plusDays(1)) {
+      final boolean inWindow = !cursor.isBefore(windowStart);
+      final long count = inWindow ? countsByDay.getOrDefault(cursor, 0L) : 0L;
+      currentWeek.add(inWindow ? heatmapDayCell(cursor, count) : emptyHeatmapDayCell());
+      if (currentWeek.size() == DAYS_PER_WEEK) {
+        weeks.add(currentWeek);
+        currentWeek = new ArrayList<>();
+      }
+    }
+    if (!currentWeek.isEmpty()) {
+      while (currentWeek.size() < DAYS_PER_WEEK) {
+        currentWeek.add(emptyHeatmapDayCell());
+      }
+      weeks.add(currentWeek);
+    }
+    return weeks;
+  }
+
+  private static HeatmapDayCell heatmapDayCell(final LocalDate date, final long count) {
+    final int level = heatmapLevel(count);
+    return new HeatmapDayCell(
+        date,
+        count,
+        level,
+        "clavaris-heatmap__day clavaris-heatmap__day--level-" + level,
+        date + ": " + count + " sign-in(s)");
+  }
+
+  private static HeatmapDayCell emptyHeatmapDayCell() {
+    return new HeatmapDayCell(
+        null, 0L, 0, "clavaris-heatmap__day clavaris-heatmap__day--empty", null);
+  }
+
+  // Fixed thresholds, same "a few named buckets, not a continuous scale" posture GitHub's own
+  // contribution graph uses — no config surface, since nothing in this feature's scope needs one.
+  // An if/else chain assigning one local, not a nested ternary (SonarCloud flagged the original
+  // nested-ternary form): still a single exit point, satisfying PMD.OnlyOneReturn the same way
+  // every other method in this class already does, without the readability cost of nesting.
+  private static int heatmapLevel(final long count) {
+    final int level;
+    if (count <= 0) {
+      level = 0;
+    } else if (count <= HEATMAP_LEVEL_1_MAX_COUNT) {
+      level = 1;
+    } else if (count <= HEATMAP_LEVEL_2_MAX_COUNT) {
+      level = 2;
+    } else if (count <= HEATMAP_LEVEL_3_MAX_COUNT) {
+      level = 3;
+    } else {
+      level = 4;
+    }
+    return level;
   }
 }

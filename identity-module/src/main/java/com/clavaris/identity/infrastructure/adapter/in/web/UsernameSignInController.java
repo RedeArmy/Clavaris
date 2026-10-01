@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.authenticatewithusername.Authen
 import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
@@ -47,10 +48,10 @@ public class UsernameSignInController {
   private final AuthenticateWithUsernameUseCase useCase;
 
   // TD-ARCH-016: sessions/recordLoginDevice/knownDevices/authenticationPolicyProvider/
-  // requestDeviceTrustChallenge/redirectUrlResolver are never read as bare fields anywhere in this
-  // class — they exist solely to build this one record, once, here, not per-request. Kept as
-  // constructor parameters (not folded away) so Spring still autowires each of them individually,
-  // the same as before this extraction.
+  // requestDeviceTrustChallenge/redirectUrlResolver/recordLoginEvent are never read as bare fields
+  // anywhere in this class — they exist solely to build this one record, once, here, not
+  // per-request. Kept as constructor parameters (not folded away) so Spring still autowires each
+  // of them individually, the same as before this extraction.
   private final PrimaryFactorLoginPorts loginPorts;
 
   @SuppressWarnings("java:S107")
@@ -61,7 +62,8 @@ public class UsernameSignInController {
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final RedirectUrlResolver redirectUrlResolver) {
+      final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.useCase = useCase;
     this.loginPorts =
         new PrimaryFactorLoginPorts(
@@ -70,7 +72,8 @@ public class UsernameSignInController {
             authenticationPolicyProvider,
             sessions,
             recordLoginDevice,
-            redirectUrlResolver);
+            redirectUrlResolver,
+            recordLoginEvent);
   }
 
   @GetMapping

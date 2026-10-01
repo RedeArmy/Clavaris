@@ -4,6 +4,7 @@ import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.Con
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,16 +44,19 @@ public class DeviceTrustChallengeController {
   private final AuthenticatedSessionEstablisher sessions;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
+  private final RecordLoginEventUseCase recordLoginEvent;
 
   public DeviceTrustChallengeController(
       final ConfirmDeviceTrustChallengeUseCase confirmUseCase,
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
-      final RedirectUrlResolver redirectUrlResolver) {
+      final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.confirmUseCase = confirmUseCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
+    this.recordLoginEvent = recordLoginEvent;
   }
 
   // Two genuinely distinct exits (no pending challenge / render the form) — same "each outcome
@@ -107,6 +111,7 @@ public class DeviceTrustChallengeController {
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
+            recordLoginEvent,
             request,
             response,
             session,

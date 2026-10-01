@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.authenticatewithemailcode.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.InvalidOneTimeCodeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
@@ -59,6 +60,7 @@ public class EmailCodeSignInController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final RedirectUrlResolver redirectUrlResolver;
+  private final RecordLoginEventUseCase recordLoginEvent;
 
   @SuppressWarnings("java:S107")
   public EmailCodeSignInController(
@@ -69,7 +71,8 @@ public class EmailCodeSignInController {
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final RedirectUrlResolver redirectUrlResolver) {
+      final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -78,6 +81,7 @@ public class EmailCodeSignInController {
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.redirectUrlResolver = redirectUrlResolver;
+    this.recordLoginEvent = recordLoginEvent;
   }
 
   @GetMapping
@@ -210,6 +214,7 @@ public class EmailCodeSignInController {
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
+            recordLoginEvent,
             request,
             response,
             organizationId,

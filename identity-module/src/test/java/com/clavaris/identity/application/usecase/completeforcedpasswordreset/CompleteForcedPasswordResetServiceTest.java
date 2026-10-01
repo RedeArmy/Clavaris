@@ -12,6 +12,8 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
@@ -35,6 +37,7 @@ class CompleteForcedPasswordResetServiceTest {
   private AccountTokenRevoker accountTokenRevoker;
   private AccountSessionRevoker accountSessionRevoker;
   private PasswordHasher hasher;
+  private BreachedPasswordChecker breachedPasswordChecker;
   private CompleteForcedPasswordResetService service;
 
   @BeforeEach
@@ -45,9 +48,19 @@ class CompleteForcedPasswordResetServiceTest {
     accountTokenRevoker = mock(AccountTokenRevoker.class);
     accountSessionRevoker = mock(AccountSessionRevoker.class);
     hasher = mock(PasswordHasher.class);
+    breachedPasswordChecker = mock(BreachedPasswordChecker.class);
+    // BR-ID-07: matches today's real default (no corpus match) — every existing test below
+    // predates this check.
+    when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
         new CompleteForcedPasswordResetService(
-            accounts, sessions, refreshTokens, accountTokenRevoker, accountSessionRevoker, hasher);
+            accounts,
+            sessions,
+            refreshTokens,
+            accountTokenRevoker,
+            accountSessionRevoker,
+            hasher,
+            breachedPasswordChecker);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
   }
 
@@ -91,6 +104,20 @@ class CompleteForcedPasswordResetServiceTest {
         new CompleteForcedPasswordResetCommand(AccountId.newId(), "weak");
 
     assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(accounts, never()).findById(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+  }
+
+  @Test
+  void rejectsANewPasswordTheCorpusReportsAsBreached_withoutTouchingTheAccount() {
+    // BR-ID-07
+    when(breachedPasswordChecker.isBreached("a-Str0ng-Password!")).thenReturn(true);
+    CompleteForcedPasswordResetCommand command =
+        new CompleteForcedPasswordResetCommand(AccountId.newId(), "a-Str0ng-Password!");
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).findById(any());

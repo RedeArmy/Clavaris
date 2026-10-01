@@ -21,6 +21,7 @@ import com.clavaris.identity.application.usecase.authenticatewithemailcode.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemailcode.InvalidOneTimeCodeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeCommand;
 import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
@@ -52,6 +53,7 @@ class EmailCodeSignInControllerTest {
   private AuthenticateWithEmailCodeUseCase authenticateUseCase;
   private AuthenticatedSessionEstablisher sessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private RecordLoginEventUseCase recordLoginEvent;
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
@@ -64,6 +66,7 @@ class EmailCodeSignInControllerTest {
     authenticateUseCase = mock(AuthenticateWithEmailCodeUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
+    recordLoginEvent = mock(RecordLoginEventUseCase.class);
     knownDevices = mock(KnownDeviceRepository.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
@@ -97,7 +100,8 @@ class EmailCodeSignInControllerTest {
                     knownDevices,
                     authenticationPolicyProvider,
                     requestDeviceTrustChallenge,
-                    redirectUrlResolver))
+                    redirectUrlResolver,
+                    recordLoginEvent))
             .setViewResolvers(viewResolver)
             .build();
   }

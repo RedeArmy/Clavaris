@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
@@ -44,6 +46,7 @@ class ConfirmPasswordResetServiceTest {
   private AccountSessionRevoker accountSessionRevoker;
   private PasswordHasher hasher;
   private EventOutboxWriter outbox;
+  private BreachedPasswordChecker breachedPasswordChecker;
   private ConfirmPasswordResetService service;
 
   @BeforeEach
@@ -56,6 +59,10 @@ class ConfirmPasswordResetServiceTest {
     accountSessionRevoker = mock(AccountSessionRevoker.class);
     hasher = mock(PasswordHasher.class);
     outbox = mock(EventOutboxWriter.class);
+    breachedPasswordChecker = mock(BreachedPasswordChecker.class);
+    // BR-ID-07: matches today's real default (no corpus match) — every existing test below
+    // predates this check.
+    when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
         new ConfirmPasswordResetService(
             tokens,
@@ -65,7 +72,8 @@ class ConfirmPasswordResetServiceTest {
             accountTokenRevoker,
             accountSessionRevoker,
             hasher,
-            outbox);
+            outbox,
+            breachedPasswordChecker);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
@@ -112,6 +120,20 @@ class ConfirmPasswordResetServiceTest {
     ConfirmPasswordResetCommand command = new ConfirmPasswordResetCommand("any-token", "weak");
 
     assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(tokens, never()).findByTokenHash(any());
+    verify(sessions, never()).revokeAllActiveForAccount(any());
+  }
+
+  @Test
+  void rejectsANewPasswordTheCorpusReportsAsBreached_beforeConsumingTheToken() {
+    // BR-ID-07
+    when(breachedPasswordChecker.isBreached("a-Str0ng-Password!")).thenReturn(true);
+    ConfirmPasswordResetCommand command =
+        new ConfirmPasswordResetCommand("any-token", "a-Str0ng-Password!");
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).findByTokenHash(any());

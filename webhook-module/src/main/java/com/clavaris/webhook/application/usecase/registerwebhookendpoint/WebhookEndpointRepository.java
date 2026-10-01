@@ -115,6 +115,22 @@ public interface WebhookEndpointRepository {
   void lockForRegistration(UUID organizationId);
 
   /**
+   * TD-ARCH-030 (SDE-III review, 2026-10-01): {@link
+   * com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretService}'s
+   * own plain find→mutate→save was a lost-update race — two concurrent rotations of the same
+   * endpoint both read the same row, both compute a new secret, last {@link #save} silently wins,
+   * the other caller's own newly-generated raw secret is returned to it as if persisted but is
+   * never actually active. A transaction-scoped Postgres advisory lock ({@code
+   * pg_advisory_xact_lock}, keyed on {@code endpointId}, auto-released at commit or rollback), same
+   * mechanism {@code identity-module}'s own {@code
+   * activatesigningkeyfororganization.SigningKeyRepository#lockForRotation} already establishes for
+   * an identical shape of race — serializes every rotation attempt for the same endpoint, so the
+   * second caller's {@link #findById} genuinely observes the first caller's already-committed
+   * rotation rather than racing against it. Must be invoked before {@link #findById}, not after.
+   */
+  void lockForRotation(UUID endpointId);
+
+  /**
    * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
    * #findAllByOrganizationId} — used only by {@code
    * ListWebhookEndpointsForOrganizationPagedService}'s own display query. {@link

@@ -1,5 +1,7 @@
 package com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset;
 
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
@@ -36,23 +38,36 @@ public class ConfirmPlatformAccountPasswordResetService
   private final PlatformAccountSessionRevoker sessionRevoker;
   private final PasswordHasher hasher;
 
+  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
+  // ConfirmPasswordResetService's own identical field for the tenant-tier equivalent.
+  private final BreachedPasswordChecker breachedPasswordChecker;
+
+  @SuppressWarnings("java:S107")
   public ConfirmPlatformAccountPasswordResetService(
       final PlatformVerificationTokenRepository tokens,
       final PlatformAccountRepository accounts,
       final PlatformAccountSessionRevoker sessionRevoker,
-      final PasswordHasher hasher) {
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessionRevoker = sessionRevoker;
     this.hasher = hasher;
+    this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
+  // PMD.CyclomaticComplexity: BR-ID-07's new breach-check branch is one more genuinely distinct
+  // precondition on top of the real reset flow already here — same "wiring, not sprawl" reasoning
+  // ConfirmPasswordResetService's own identical suppression documents for the tenant tier.
+  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public void handle(final ConfirmPlatformAccountPasswordResetCommand command) {
     if (!PasswordPolicy.isSatisfiedBy(command.newRawPassword())) {
       throw new WeakPasswordException();
+    }
+    if (breachedPasswordChecker.isBreached(command.newRawPassword())) {
+      throw new BreachedPasswordException();
     }
 
     final String presentedHash = RefreshTokenSecret.hash(command.presentedRawToken());

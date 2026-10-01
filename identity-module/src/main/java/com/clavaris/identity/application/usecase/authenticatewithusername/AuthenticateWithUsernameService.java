@@ -97,6 +97,15 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
       throw new EmailNotVerifiedException();
     }
 
+    // SDE-III review, 2026-09-30 — real bug found and closed: this method never called
+    // account.recordSignIn()/accounts.save(account) at all, unlike its own "structural twin"
+    // AuthenticateWithPasswordService — the dashboard's "Last signed In" column (and, since
+    // TD-FUT-034, the activity heatmap's own login_events write in AuthenticatedSessionCompletion)
+    // both depend on this call having actually happened; username-only sign-ins silently never
+    // updated either.
+    account.recordSignIn();
+    accounts.save(account);
+
     LOG.info(
         "event=login_success organizationId={} accountId={}",
         command.organizationId(),

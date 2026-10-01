@@ -159,9 +159,14 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   // TD-SEC-009 addendum, see this class's own Javadoc: the one project-owned template that now
   // loads a real, same-origin script.
+  //
+  // connect-src 'self', not 'none' (TD-FUT-034, same DASHBOARD_PAGE_POLICY bug class found live
+  // 2026-09-16, now repeated here deliberately): webauthn-login.js's own "Sign in with a passkey"
+  // button issues fetch() calls to /login/webauthn/start and /login/webauthn/finish — governed by
+  // connect-src, never script-src. script-src 'self' only permits loading the script file itself.
   private static final String LOGIN_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
   // Matches only LoginController's own GET/POST /o/{organizationId}/login — never
@@ -192,6 +197,23 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // forgot-password" on that same chain, not re-enforce authentication itself.
   @SuppressWarnings("PMD.LongVariable")
   private static final Pattern DASHBOARD_PAGE_PATH = Pattern.compile("^/platform/dashboard(/.*)?$");
+
+  // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs both
+  // script-src 'self' (to load at all — every other page outside the three named patterns here
+  // falls through to STRICT_POLICY's own script-src 'none', which would block the script entirely)
+  // and connect-src 'self' (its registration/start and registration/finish fetch() calls) — same
+  // two-directive fix LOGIN_PAGE_POLICY's own identical comment documents, scoped to just this one
+  // new page rather than widening to all of /o/*/account/** (no sibling self-service page uses a
+  // script today).
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String ACCOUNT_PASSKEYS_PAGE_POLICY =
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+          + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+
+  @SuppressWarnings("PMD.LongVariable")
+  private static final Pattern ACCOUNT_PASSKEYS_PAGE_PATH =
+      Pattern.compile("^/o/[^/]+/account/passkeys$");
 
   private final EmbeddingEligibilityChecker embeddingChecker;
 
@@ -245,6 +267,9 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     }
     if (DASHBOARD_PAGE_PATH.matcher(requestUri).matches()) {
       return DASHBOARD_PAGE_POLICY;
+    }
+    if (ACCOUNT_PASSKEYS_PAGE_PATH.matcher(requestUri).matches()) {
+      return ACCOUNT_PASSKEYS_PAGE_POLICY;
     }
     return STRICT_POLICY;
   }

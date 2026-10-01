@@ -11,6 +11,8 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventCommand;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
@@ -113,6 +115,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
   private final KnownDeviceRepository knownDevices;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
+  private final RecordLoginEventUseCase recordLoginEvent;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
   // one parameter per collaborating port — same rationale as
@@ -131,7 +134,8 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
       final AccountRepository accounts,
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
-      final AccountAuthenticationPolicyProvider authenticationPolicyProvider) {
+      final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.tenantUseCase = tenantUseCase;
     this.platformUseCase = platformUseCase;
     this.tenantSessions = tenantSessions;
@@ -142,6 +146,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     this.knownDevices = knownDevices;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
+    this.recordLoginEvent = recordLoginEvent;
   }
 
   @Override
@@ -321,6 +326,14 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
           .ifPresent(
               rawDeviceToken ->
                   DeviceCookie.write(request, response, organizationId, rawDeviceToken));
+
+      // TD-FUT-034: this handler never goes through AuthenticatedSessionCompletion (it owns both
+      // the tenant and platform social-login branches directly) — same direct call
+      // EmailLinkSignInController's own confirm() already makes. Tenant-tier branch only: the
+      // "View Profile" activity heatmap this feeds is scoped to tenant Accounts, never the
+      // platform tier below.
+      recordLoginEvent.handle(
+          new RecordLoginEventCommand(accountId, new OrganizationId(organizationId)));
       redirectStrategy.sendRedirect(request, response, target);
     } else if (result instanceof AuthenticateWithSocialProviderResult.PendingApproval) {
       // TD-FUT-019: same informational page RegisterAccountController's own gated signup redirect

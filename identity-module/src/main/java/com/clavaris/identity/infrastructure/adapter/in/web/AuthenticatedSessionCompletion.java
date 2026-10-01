@@ -2,6 +2,8 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventCommand;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -32,6 +34,12 @@ import java.util.UUID;
  * both challenge controllers (a resumed login has only an {@link AccountId} recovered from the
  * session, never a full {@link Account} in hand) — see the new overload's own Javadoc for the one
  * real caller that does.
+ *
+ * <p>TD-FUT-034 (Clerk activity heatmap parity): {@code recordLoginEvent} joined every overload the
+ * same way {@code recordLoginDevice} already had — this class's own four-controller chokepoint
+ * (plus {@code EmailLinkSignInController}/{@code SocialLoginAuthenticationSuccessHandler}'s own two
+ * direct calls, which never went through this class in the first place and call it independently)
+ * is where every tenant sign-in this heatmap needs to count actually converges.
  */
 // PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, applied on four
 // separate @SuppressWarnings within this file — same precedent
@@ -68,6 +76,7 @@ final class AuthenticatedSessionCompletion {
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent,
       final HttpServletRequest request,
       final HttpServletResponse response,
       final HttpSession session,
@@ -99,6 +108,7 @@ final class AuthenticatedSessionCompletion {
         sessions,
         recordLoginDevice,
         redirectUrlResolver,
+        recordLoginEvent,
         request,
         response,
         organizationId,
@@ -120,6 +130,7 @@ final class AuthenticatedSessionCompletion {
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent,
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID organizationId,
@@ -131,6 +142,7 @@ final class AuthenticatedSessionCompletion {
         sessions,
         recordLoginDevice,
         redirectUrlResolver,
+        recordLoginEvent,
         request,
         response,
         organizationId,
@@ -144,7 +156,7 @@ final class AuthenticatedSessionCompletion {
   }
 
   /**
-   * TD-PERF-015: same as the 10-argument {@link #complete} above, plus {@code preloadedAccount} —
+   * TD-PERF-015: same as the 11-argument {@link #complete} above, plus {@code preloadedAccount} —
    * the {@link Account} row matching {@code accountId}, when the caller already has it (every
    * primary-factor controller, moments after its own {@code Authenticate*UseCase} already loaded
    * it) — threaded into {@link RecordAccountLoginDeviceCommand} so it never has to re-fetch what
@@ -155,6 +167,7 @@ final class AuthenticatedSessionCompletion {
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent,
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID organizationId,
@@ -167,6 +180,7 @@ final class AuthenticatedSessionCompletion {
         sessions,
         recordLoginDevice,
         redirectUrlResolver,
+        recordLoginEvent,
         request,
         response,
         organizationId,
@@ -180,7 +194,7 @@ final class AuthenticatedSessionCompletion {
   }
 
   /**
-   * TD-SEC-055: same as the 11-argument {@link #complete} above, plus {@code socialProvider} — only
+   * TD-SEC-055: same as the 12-argument {@link #complete} above, plus {@code socialProvider} — only
    * ever non-null when {@code factor == SOCIAL} (a device-trust/session-task pause resumed for a
    * social login), read back from {@code DeviceTrustPendingState}/{@code SessionTaskPendingState}'s
    * own {@code PROVIDER_ATTRIBUTE} by the two challenge controllers. {@code null} for every other
@@ -193,6 +207,7 @@ final class AuthenticatedSessionCompletion {
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent,
       final HttpServletRequest request,
       final HttpServletResponse response,
       final UUID organizationId,
@@ -224,6 +239,9 @@ final class AuthenticatedSessionCompletion {
           case PASSWORD ->
               sessions.establish(
                   request, response, accountId.value(), deviceTrustVerified, fallbackUrl);
+          case PASSKEY ->
+              sessions.establishViaPasskey(
+                  request, response, accountId.value(), deviceTrustVerified, fallbackUrl);
         };
 
     // New-device login email notification — after establish(), same accountId/request already in
@@ -241,6 +259,11 @@ final class AuthenticatedSessionCompletion {
         .ifPresent(
             rawDeviceToken ->
                 DeviceCookie.write(request, response, organizationId, rawDeviceToken));
+
+    // TD-FUT-034: one row per completed tenant sign-in, for the "View Profile" activity heatmap —
+    // see RecordLoginEventService's own Javadoc for why this never throws either.
+    recordLoginEvent.handle(
+        new RecordLoginEventCommand(accountId, new OrganizationId(organizationId)));
 
     return redirectTarget;
   }

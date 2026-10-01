@@ -81,4 +81,17 @@ public interface AuthenticatedSessionEstablisher {
       UUID accountId,
       boolean deviceTrustVerified,
       String fallbackUrl);
+
+  /**
+   * TD-FUT-034: same contract as {@link #establish}, for a session established via a WebAuthn/
+   * passkey assertion — {@code WebAuthnSignInController} is the sole caller.
+   *
+   * @param deviceTrustVerified see {@link #establish}'s own Javadoc — identical TD-SEC-048 meaning.
+   */
+  String establishViaPasskey(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      UUID accountId,
+      boolean deviceTrustVerified,
+      String fallbackUrl);
 }

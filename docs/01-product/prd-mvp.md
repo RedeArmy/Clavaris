@@ -20,8 +20,8 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 | Session management (list/revoke active sessions) | ✅ | Minimal UI, functional not polished |
 | Refresh token issuance + rotation | ✅ | Single-use, reuse-detection revokes all active tokens for the account (BR-ID-03) |
 | MFA (TOTP) | ❌ backlog | Real gap, not silently dropped — flagged in roadmap as first post-v1 priority |
-| Passkeys (WebAuthn, passwordless primary login) | ❌ v1.1 | `clerk-feature-analysis.md` §6 — real UX/security upgrade, not launch-blocking |
-| Breached-password check at registration/password-change | ❌ v1.1 | BR-ID-07; k-anonymity-style check (e.g. HIBP range query, no plaintext password ever leaves the server) — `clerk-feature-analysis.md` §7 item 1 |
+| Passkeys (WebAuthn, passwordless primary login) | ✅ Shipped 2026-09-30 | Self-service registration + discoverable-credential sign-in, TD-FUT-034 (`technical-debt-register.md`) — originally planned v1.1 per `clerk-feature-analysis.md` §6, pulled forward and built ahead of schedule |
+| Breached-password check at registration/password-change | ✅ Shipped 2026-10-01 | BR-ID-07; k-anonymity-style check (HIBP Pwned Passwords range query, no plaintext password ever leaves the server) — `clerk-feature-analysis.md` §6 |
 | New-device step-up MFA (force 2nd factor on unrecognized device even with correct password) | ❌ v1.1 | Scoped-down version of Clerk's "Client Trust" — `clerk-feature-analysis.md` §6 |
 | User impersonation (admin support tool) | ❌ v1.1 | `BR-ADMIN-01`; bundled with the management-API audit-logging gap already flagged in `threat-model-stride.md` §5 — building both together, not sequenced apart |
 

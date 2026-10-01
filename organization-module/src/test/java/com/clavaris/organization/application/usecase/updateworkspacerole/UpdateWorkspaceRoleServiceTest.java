@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.updateworkspacerole;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class UpdateWorkspaceRoleServiceTest {
 
@@ -55,7 +57,7 @@ class UpdateWorkspaceRoleServiceTest {
 
     assertThat(updated.name()).isEqualTo("Renamed");
     assertThat(updated.permissions()).containsExactly("b");
-    verify(roles).save(updated);
+    verify(roles).saveAndFlush(updated);
   }
 
   @Test
@@ -92,7 +94,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   // TD-SEC-056: the role genuinely exists — just for a different Organization than the command
@@ -107,7 +109,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
@@ -120,7 +122,23 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void translatesADataIntegrityViolationFromALostRaceIntoTheTypedException() {
+    // TD-ARCH-029: the pre-check above passes (no existing row with this name yet, per setUp's
+    // own stub), but ux_workspace_roles_organization_id_name still fires at saveAndFlush time —
+    // simulating a concurrent request that renamed another role to the same name first.
+    doThrow(new DataIntegrityViolationException("duplicate key")).when(roles).saveAndFlush(any());
+    UpdateWorkspaceRoleCommand command =
+        new UpdateWorkspaceRoleCommand(role.id(), organizationId, "Renamed", null, Set.of(), ACTOR);
+
+    assertThatExceptionOfType(DuplicateWorkspaceRoleNameException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(auditEvents, never()).write(any(), any(), any(), any(), any());
+    verify(outbox, never()).write(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -143,7 +161,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleNotFoundException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
@@ -159,7 +177,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(WorkspaceRoleCycleException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test
@@ -189,7 +207,7 @@ class UpdateWorkspaceRoleServiceTest {
     assertThatExceptionOfType(CannotStripReservedWorkspaceRolePermissionsException.class)
         .isThrownBy(() -> service.handle(command));
 
-    verify(roles, never()).save(any());
+    verify(roles, never()).saveAndFlush(any());
   }
 
   @Test

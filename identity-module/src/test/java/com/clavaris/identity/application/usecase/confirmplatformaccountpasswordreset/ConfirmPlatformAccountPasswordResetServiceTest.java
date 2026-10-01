@@ -10,6 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
@@ -31,6 +33,7 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
   private PlatformAccountRepository accounts;
   private PlatformAccountSessionRevoker sessionRevoker;
   private PasswordHasher hasher;
+  private BreachedPasswordChecker breachedPasswordChecker;
   private ConfirmPlatformAccountPasswordResetService service;
 
   @BeforeEach
@@ -39,8 +42,13 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
     accounts = mock(PlatformAccountRepository.class);
     sessionRevoker = mock(PlatformAccountSessionRevoker.class);
     hasher = mock(PasswordHasher.class);
+    breachedPasswordChecker = mock(BreachedPasswordChecker.class);
+    // BR-ID-07: matches today's real default (no corpus match) — every existing test below
+    // predates this check.
+    when(breachedPasswordChecker.isBreached(any())).thenReturn(false);
     service =
-        new ConfirmPlatformAccountPasswordResetService(tokens, accounts, sessionRevoker, hasher);
+        new ConfirmPlatformAccountPasswordResetService(
+            tokens, accounts, sessionRevoker, hasher, breachedPasswordChecker);
     when(hasher.hash(anyString())).thenReturn("argon2id$new-hash");
     // Default: this call "wins" the conditional-consume race (SDE-III review, 2026-09-15) — every
     // test below exercises the ordinary, uncontested reset path unless it deliberately overrides
@@ -83,6 +91,20 @@ class ConfirmPlatformAccountPasswordResetServiceTest {
         new ConfirmPlatformAccountPasswordResetCommand("any-token", "weak");
 
     assertThatExceptionOfType(WeakPasswordException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(tokens, never()).findByTokenHash(any());
+    verify(sessionRevoker, never()).revokeAllSessionsFor(any());
+  }
+
+  @Test
+  void rejectsANewPasswordTheCorpusReportsAsBreached_beforeConsumingTheToken() {
+    // BR-ID-07
+    when(breachedPasswordChecker.isBreached("a-Str0ng-Password!")).thenReturn(true);
+    ConfirmPlatformAccountPasswordResetCommand command =
+        new ConfirmPlatformAccountPasswordResetCommand("any-token", "a-Str0ng-Password!");
+
+    assertThatExceptionOfType(BreachedPasswordException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(tokens, never()).findByTokenHash(any());

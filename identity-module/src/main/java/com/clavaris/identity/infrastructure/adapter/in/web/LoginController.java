@@ -8,6 +8,7 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Verifi
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
@@ -62,8 +63,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 // to the design, not a code smell" rationale as OrganizationAuthorizationServerConfig's own
 // identical suppression. TD-PERF-015 dropped AccountRepository (SessionTaskGate now takes the
 // already-loaded Account directly), bringing parameter count/coupling back under PMD's own
-// threshold — ExcessiveParameterList/CouplingBetweenObjects removed accordingly.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// threshold; TD-FUT-034's own new RecordLoginEventUseCase pushed CouplingBetweenObjects back over
+// it — same rationale, one more real collaborating port, not sprawl.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Controller
 @RequestMapping("/o/{organizationId}/login")
 public class LoginController {
@@ -75,14 +77,17 @@ public class LoginController {
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final ClientBrandingProvider clientBrandingProvider;
 
-  // TD-ARCH-016: the other 5 constructor params below (knownDevices, requestDeviceTrustChallenge,
-  // sessions, recordLoginDevice, redirectUrlResolver) are never read as bare fields anywhere in
-  // this class — they exist solely to build this one record, once, here, not per-request. Kept as
-  // constructor parameters (not folded away) so Spring still autowires each of them individually,
-  // the same as before this extraction.
+  // TD-ARCH-016: the other constructor params below (knownDevices, requestDeviceTrustChallenge,
+  // sessions, recordLoginDevice, redirectUrlResolver, recordLoginEvent) are never read as bare
+  // fields anywhere in this class — they exist solely to build this one record, once, here, not
+  // per-request. Kept as constructor parameters (not folded away) so Spring still autowires each
+  // of them individually, the same as before this extraction.
   private final PrimaryFactorLoginPorts loginPorts;
 
-  @SuppressWarnings("java:S107")
+  // PMD.ExcessiveParameterList: one parameter per collaborating port — TD-FUT-034's own
+  // recordLoginEvent is one more, same "wiring, not sprawl" rationale this class's own
+  // class-level suppressions already establish.
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public LoginController(
       final AuthenticateWithPasswordUseCase useCase,
       final AuthenticatedSessionEstablisher sessions,
@@ -92,7 +97,8 @@ public class LoginController {
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final RedirectUrlResolver redirectUrlResolver,
-      final ClientBrandingProvider clientBrandingProvider) {
+      final ClientBrandingProvider clientBrandingProvider,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.useCase = useCase;
     this.policyProvider = policyProvider;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
@@ -104,7 +110,8 @@ public class LoginController {
             authenticationPolicyProvider,
             sessions,
             recordLoginDevice,
-            redirectUrlResolver);
+            redirectUrlResolver,
+            recordLoginEvent);
   }
 
   @GetMapping

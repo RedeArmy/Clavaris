@@ -83,6 +83,7 @@ import java.util.UUID;
             ports.sessions(),
             ports.recordLoginDevice(),
             ports.redirectUrlResolver(),
+            ports.recordLoginEvent(),
             request,
             response,
             organizationId,

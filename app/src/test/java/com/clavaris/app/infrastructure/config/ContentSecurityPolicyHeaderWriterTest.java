@@ -75,6 +75,9 @@ class ContentSecurityPolicyHeaderWriterTest {
   // Code review finding (2026-09-01): identity/login.html now loads its own real, same-origin
   // script (login-submit-guard.js) — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
   // this earns its own policy, distinct from both the strict default and the consent page's.
+  //
+  // TD-FUT-034 (SDE-III review, 2026-09-30): connect-src is now 'self', not 'none' — same
+  // DASHBOARD_PAGE_POLICY bug class, this time for webauthn-login.js's own fetch() calls.
   @Test
   void setsTheLoginPagePolicyOnlyForTheLoginPagePathItself() {
     HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
@@ -86,6 +89,43 @@ class ContentSecurityPolicyHeaderWriterTest {
         .setHeader(
             HEADER_NAME,
             "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+                + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs the same
+  // script-src 'self' + connect-src 'self' pair the login page and dashboard already carve out —
+  // see ContentSecurityPolicyHeaderWriter's own ACCOUNT_PASSKEYS_PAGE_POLICY comment.
+  @Test
+  void setsTheAccountPasskeysPagePolicyWithScriptAndConnectSrcSelf() {
+    HttpServletRequest request =
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/passkeys");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+                + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // A sibling path under the same /o/{organizationId}/account/** prefix — e.g. the profile page —
+  // must not be swept into this carve-out; it has no script of its own and should stay strict.
+  @Test
+  void doesNotWidenThePolicyForOtherAccountPages() {
+    HttpServletRequest request =
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
                 + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }

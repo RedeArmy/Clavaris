@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountCommand;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountResult;
@@ -25,6 +26,7 @@ import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,6 +113,7 @@ public class RegisterAccountController {
   // longer match to the right input).
   private static final String EMAIL = "email";
   private static final String USERNAME = "username";
+  private static final String PASSWORD = "password";
 
   private final RegisterAccountUseCase useCase;
   private final RequestEmailVerificationUseCase requestEmailVerification;
@@ -149,11 +152,16 @@ public class RegisterAccountController {
 
   // Early return per rejection reason is clearer here than accumulating a single exit through
   // nested branching for the several independent failure modes (validation, password required,
-  // password mismatch, username required, taken email, taken username, weak password) that each
-  // need their own field error — PMD.OnlyOneReturn would make this harder to follow, not easier.
-  // PMD.CognitiveComplexity: TD-FUT-019's own pendingApproval early return is one more genuinely
-  // distinct outcome on the same "each needs its own exit" list above.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity", "PMD.CognitiveComplexity"})
+  // password mismatch, pending-approval, passwordless completion) that each need their own exit
+  // — PMD.OnlyOneReturn would make this harder to follow, not easier.
+  //
+  // SonarCloud's own cognitive-complexity rule (java:S3776) pushed past its threshold once
+  // BreachedPasswordException's own catch joined the others below. The fix moved the use-case call
+  // and its seven catches out into a separate helper method below, so this method now treats that
+  // whole step as a single logical unit instead of nesting every branch inline. PMD's own
+  // Cyclomatic and Cognitive Complexity checks dropped below their own thresholds as a direct
+  // result of that same extraction.
+  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String register(
       @PathVariable final UUID organizationId,
@@ -185,68 +193,17 @@ public class RegisterAccountController {
         return FORM_VIEW;
       }
     } else if (policy.passwordAtSignUpEnabled()) {
-      bindingResult.rejectValue("password", "password.required", "Password is required");
+      bindingResult.rejectValue(PASSWORD, "password.required", "Password is required");
       addSignUpOptions(organizationId, model);
       return FORM_VIEW;
     }
 
-    final RegisterAccountResult result;
-    try {
-      result =
-          useCase.handle(
-              new RegisterAccountCommand(
-                  orgId, new Email(form.getEmail()), form.getPassword(), form.getUsername(), true));
-    } catch (EmailAlreadyRegisteredException _) {
-      // Never leaks the low-level exception message (which includes the raw organizationId
-      // UUID) to the rendered page — a generic, field-scoped error only.
-      bindingResult.rejectValue(
-          EMAIL, "email.alreadyRegistered", "This email is already registered");
-      addSignUpOptions(organizationId, model);
-      return FORM_VIEW;
-    } catch (AccessRestrictedException _) {
-      // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: same anti-enumeration posture
-      // as EmailAlreadyRegisteredException above, never states which list/entry matched.
-      bindingResult.rejectValue(EMAIL, "email.restricted", "This email is not allowed to register");
-      addSignUpOptions(organizationId, model);
-      return FORM_VIEW;
-    } catch (WeakPasswordException _) {
-      // SDE-III review, 2026-09-16: same rationale as ResetPasswordController's own identical
-      // fix — states the actual rule instead of a vague "doesn't meet the minimum requirements".
-      bindingResult.rejectValue(
-          "password",
-          "password.tooWeak",
-          "Password must be between "
-              + PasswordPolicy.MIN_LENGTH
-              + " and "
-              + PasswordPolicy.MAX_LENGTH
-              + " characters");
-      addSignUpOptions(organizationId, model);
-      return FORM_VIEW;
-    } catch (UsernameRequiredException _) {
-      bindingResult.rejectValue(USERNAME, "username.required", "Username is required");
-      addSignUpOptions(organizationId, model);
-      return FORM_VIEW;
-    } catch (UsernameAlreadyRegisteredException _) {
-      bindingResult.rejectValue(
-          USERNAME, "username.alreadyRegistered", "This username is already taken");
-      addSignUpOptions(organizationId, model);
-      return FORM_VIEW;
-    } catch (final IllegalArgumentException _) {
-      // SDE-III review, 2026-09-16: real gap found live. Username's own domain constructor
-      // rejects a shape the form's own maximum-length check alone does not catch, such as a
-      // too-short value or one containing anything besides letters, digits, underscore, or
-      // hyphen. That form field's own comment already explains why the shape check is
-      // deliberately not duplicated there. Nothing here caught this exception, so it used to
-      // reach this method as an unhandled server error on sign-up instead of a field-level
-      // message. UsernameSignInController already had the matching catch on the sign-in side.
-      // This closes the same gap on the sign-up side.
-      bindingResult.rejectValue(
-          USERNAME,
-          "username.invalid",
-          "Username must be 3-32 characters (letters, digits, underscore, hyphen only)");
-      addSignUpOptions(organizationId, model);
+    final Optional<RegisterAccountResult> maybeResult =
+        registerOrRejectAndPopulateModel(organizationId, orgId, form, bindingResult, model);
+    if (maybeResult.isEmpty()) {
       return FORM_VIEW;
     }
+    final RegisterAccountResult result = maybeResult.get();
 
     if (result.pendingApproval()) {
       // TD-FUT-019: a gated signup — no credential was proven wrong here, there's just genuinely
@@ -289,6 +246,89 @@ public class RegisterAccountController {
         REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
     target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
     return target;
+  }
+
+  // Extracted from register() (SonarCloud java:S3776, cognitive complexity) — one method per
+  // logical step: this one owns the use-case call and every one of its seven distinct rejection
+  // reasons, register() itself only needs to know "did this succeed." Empty means an error was
+  // already written into bindingResult/model and the caller should return FORM_VIEW as-is — same
+  // "one exit per distinct outcome" rationale every catch below already followed inline.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private Optional<RegisterAccountResult> registerOrRejectAndPopulateModel(
+      final UUID organizationId,
+      final OrganizationId orgId,
+      final RegisterAccountForm form,
+      final BindingResult bindingResult,
+      final Model model) {
+    try {
+      return Optional.of(
+          useCase.handle(
+              new RegisterAccountCommand(
+                  orgId,
+                  new Email(form.getEmail()),
+                  form.getPassword(),
+                  form.getUsername(),
+                  true)));
+    } catch (EmailAlreadyRegisteredException _) {
+      // Never leaks the low-level exception message (which includes the raw organizationId
+      // UUID) to the rendered page — a generic, field-scoped error only.
+      bindingResult.rejectValue(
+          EMAIL, "email.alreadyRegistered", "This email is already registered");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    } catch (AccessRestrictedException _) {
+      // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: same anti-enumeration posture
+      // as EmailAlreadyRegisteredException above, never states which list/entry matched.
+      bindingResult.rejectValue(EMAIL, "email.restricted", "This email is not allowed to register");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    } catch (WeakPasswordException _) {
+      // SDE-III review, 2026-09-16: same rationale as ResetPasswordController's own identical
+      // fix — states the actual rule instead of a vague "doesn't meet the minimum requirements".
+      bindingResult.rejectValue(
+          PASSWORD,
+          "password.tooWeak",
+          "Password must be between "
+              + PasswordPolicy.MIN_LENGTH
+              + " and "
+              + PasswordPolicy.MAX_LENGTH
+              + " characters");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    } catch (BreachedPasswordException _) {
+      // BR-ID-07: deliberately NOT the WeakPasswordException message slot above — generic wording
+      // only, never mentioning a breach/source (same exception's own Javadoc).
+      bindingResult.rejectValue(
+          PASSWORD,
+          "password.breached",
+          "This password cannot be used - please choose a different one");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    } catch (UsernameRequiredException _) {
+      bindingResult.rejectValue(USERNAME, "username.required", "Username is required");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    } catch (UsernameAlreadyRegisteredException _) {
+      bindingResult.rejectValue(
+          USERNAME, "username.alreadyRegistered", "This username is already taken");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    } catch (final IllegalArgumentException _) {
+      // SDE-III review, 2026-09-16: real gap found live. Username's own domain constructor
+      // rejects a shape the form's own maximum-length check alone does not catch, such as a
+      // too-short value or one containing anything besides letters, digits, underscore, or
+      // hyphen. That form field's own comment already explains why the shape check is
+      // deliberately not duplicated there. Nothing here caught this exception, so it used to
+      // reach this method as an unhandled server error on sign-up instead of a field-level
+      // message. UsernameSignInController already had the matching catch on the sign-in side.
+      // This closes the same gap on the sign-up side.
+      bindingResult.rejectValue(
+          USERNAME,
+          "username.invalid",
+          "Username must be 3-32 characters (letters, digits, underscore, hyphen only)");
+      addSignUpOptions(organizationId, model);
+      return Optional.empty();
+    }
   }
 
   // Two genuinely distinct exits (email-code vs. email-link completion) — same "one exit per

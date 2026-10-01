@@ -3,6 +3,8 @@ package com.clavaris.identity.application.usecase.completeforcedpasswordreset;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
@@ -40,6 +42,9 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
 
   private final PasswordHasher hasher;
 
+  @SuppressWarnings("PMD.LongVariable")
+  private final BreachedPasswordChecker breachedPasswordChecker;
+
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // ConfirmPasswordResetService's own identical suppression for the same BR-ID-04-shaped cascade.
   public CompleteForcedPasswordResetService(
@@ -48,13 +53,15 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       final RefreshTokenRepository refreshTokens,
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final PasswordHasher hasher) {
+      final PasswordHasher hasher,
+      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
     this.accounts = accounts;
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
     this.accountTokenRevoker = accountTokenRevoker;
     this.accountSessionRevoker = accountSessionRevoker;
     this.hasher = hasher;
+    this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
   @Override
@@ -62,6 +69,9 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
   public void handle(final CompleteForcedPasswordResetCommand command) {
     if (!PasswordPolicy.isSatisfiedBy(command.newRawPassword())) {
       throw new WeakPasswordException();
+    }
+    if (breachedPasswordChecker.isBreached(command.newRawPassword())) {
+      throw new BreachedPasswordException();
     }
 
     final Account account =

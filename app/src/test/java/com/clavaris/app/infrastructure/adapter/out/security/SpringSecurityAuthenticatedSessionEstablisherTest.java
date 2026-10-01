@@ -112,6 +112,75 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
   }
 
   @Test
+  void establishViaOneTimeEmailProofSetsTheOttAuthorityAndTheOtpAmrMarker() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    UUID accountId = UUID.randomUUID();
+
+    String redirectTarget =
+        establisher.establishViaOneTimeEmailProof(
+            request, response, accountId, false, "/o/x/login?authenticated");
+
+    assertThat(redirectTarget).isEqualTo("/o/x/login?authenticated");
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getName())
+        .isEqualTo(accountId.toString());
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .contains("ROLE_ACCOUNT", "FACTOR_OTT", "AMR_OTP")
+        .noneMatch(authority -> authority.equals("AMR_MFA"));
+    verify(contextRepository).saveContext(any(), any(), any());
+  }
+
+  @Test
+  void establishViaOneTimeEmailProofComposesTheMfaAmrMarkerOnADeviceTrustStepUp() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    UUID accountId = UUID.randomUUID();
+
+    establisher.establishViaOneTimeEmailProof(
+        request, response, accountId, true, "/o/x/login?authenticated");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .contains("ROLE_ACCOUNT", "FACTOR_OTT", "AMR_OTP", "AMR_MFA");
+  }
+
+  // TD-FUT-034: same coverage shape as establishViaSocialLogin's own pair — no dedicated test
+  // existed for this method at all before now.
+  @Test
+  void establishViaPasskeySetsTheWebAuthnAuthorityAndTheHwkAmrMarker() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    UUID accountId = UUID.randomUUID();
+
+    String redirectTarget =
+        establisher.establishViaPasskey(
+            request, response, accountId, false, "/o/x/login?authenticated");
+
+    assertThat(redirectTarget).isEqualTo("/o/x/login?authenticated");
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getName())
+        .isEqualTo(accountId.toString());
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .contains("ROLE_ACCOUNT", "FACTOR_WEBAUTHN", "AMR_HWK")
+        .noneMatch(authority -> authority.equals("AMR_MFA"));
+    verify(contextRepository).saveContext(any(), any(), any());
+  }
+
+  @Test
+  void establishViaPasskeyComposesTheMfaAmrMarkerOnADeviceTrustStepUp() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    UUID accountId = UUID.randomUUID();
+
+    establisher.establishViaPasskey(request, response, accountId, true, "/o/x/login?authenticated");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .contains("ROLE_ACCOUNT", "FACTOR_WEBAUTHN", "AMR_HWK", "AMR_MFA");
+  }
+
+  @Test
   void changesTheSessionIdWhenARequestAlreadyCarriesOneToPreventSessionFixation() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();

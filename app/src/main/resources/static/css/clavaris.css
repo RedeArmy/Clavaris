@@ -921,6 +921,52 @@ code {
   font-size: 0.875rem;
 }
 
+/* TD-FUT-034, Clerk "View Profile" activity heatmap parity — one column per calendar week
+   (PlatformAccountDetailController's own buildHeatmapWeeks), scrollable on narrow viewports since
+   53 weeks never fits a phone-width column. Level 0-4 shades scale off --clavaris-brand-color
+   rather than a hardcoded green, same per-tenant override point every other accent use already
+   reads from (ADR-0009 §3) — an empty padding cell (outside the real 365-day window) stays fully
+   transparent, never a 0-activity color, so it reads as "not a day" rather than "no sign-ins." */
+.clavaris-heatmap {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+.clavaris-heatmap__week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+.clavaris-heatmap__day {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--clavaris-bg);
+  border: 1px solid var(--clavaris-border);
+}
+.clavaris-heatmap__day--empty {
+  background: transparent;
+  border-color: transparent;
+}
+.clavaris-heatmap__day--level-1 {
+  background: color-mix(in srgb, var(--clavaris-brand-color) 25%, var(--clavaris-surface));
+  border-color: transparent;
+}
+.clavaris-heatmap__day--level-2 {
+  background: color-mix(in srgb, var(--clavaris-brand-color) 50%, var(--clavaris-surface));
+  border-color: transparent;
+}
+.clavaris-heatmap__day--level-3 {
+  background: color-mix(in srgb, var(--clavaris-brand-color) 75%, var(--clavaris-surface));
+  border-color: transparent;
+}
+.clavaris-heatmap__day--level-4 {
+  background: var(--clavaris-brand-color);
+  border-color: transparent;
+}
+
 /* Status pills — Organization.environment (DEVELOPMENT/PRODUCTION) today, reusable for any future
    enum-shaped status field on the dashboard. */
 .clavaris-badge {

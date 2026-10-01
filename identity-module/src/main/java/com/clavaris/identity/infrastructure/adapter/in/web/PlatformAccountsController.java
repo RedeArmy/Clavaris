@@ -9,6 +9,7 @@ import com.clavaris.identity.application.usecase.listaccountsfororganization.Lis
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplay;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.WorkspaceRoleDisplayReader;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictedException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
@@ -149,6 +150,13 @@ public class PlatformAccountsController {
       } catch (final WeakPasswordException _) {
         bindingResult.rejectValue(
             "password", "password.tooWeak", "Password does not meet the minimum requirements");
+      } catch (final BreachedPasswordException _) {
+        // BR-ID-07: deliberately NOT the WeakPasswordException message slot above — generic
+        // wording only, never mentioning a breach/source (same exception's own Javadoc).
+        bindingResult.rejectValue(
+            "password",
+            "password.breached",
+            "This password cannot be used - please choose a different one");
       } catch (final AccessRestrictedException _) {
         bindingResult.rejectValue(
             EMAIL, "email.restricted", "This email is not allowed to register");

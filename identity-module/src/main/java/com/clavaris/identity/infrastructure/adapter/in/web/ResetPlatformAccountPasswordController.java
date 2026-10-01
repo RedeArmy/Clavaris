@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetCommand;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.ConfirmPlatformAccountPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.confirmplatformaccountpasswordreset.InvalidVerificationTokenException;
+import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.validation.Valid;
@@ -70,6 +71,14 @@ public class ResetPlatformAccountPasswordController {
               + " and "
               + PasswordPolicy.MAX_LENGTH
               + " characters");
+      return FORM_VIEW;
+    } catch (final BreachedPasswordException _) {
+      // BR-ID-07: deliberately NOT the WeakPasswordException message slot above — generic wording
+      // only, never mentioning a breach/source (same exception's own Javadoc).
+      bindingResult.rejectValue(
+          "newPassword",
+          "newPassword.breached",
+          "This password cannot be used - please choose a different one");
       return FORM_VIEW;
     }
 
