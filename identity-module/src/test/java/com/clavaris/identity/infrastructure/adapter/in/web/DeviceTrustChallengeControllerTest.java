@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.InvalidDeviceTrustChallengeException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import java.util.Optional;
@@ -42,6 +43,7 @@ class DeviceTrustChallengeControllerTest {
   private AuthenticatedSessionEstablisher sessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private RedirectUrlResolver redirectUrlResolver;
+  private RecordLoginEventUseCase recordLoginEvent;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -50,6 +52,7 @@ class DeviceTrustChallengeControllerTest {
     sessions = mock(AuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
+    recordLoginEvent = mock(RecordLoginEventUseCase.class);
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
 
@@ -70,7 +73,11 @@ class DeviceTrustChallengeControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new DeviceTrustChallengeController(
-                    confirmUseCase, sessions, recordLoginDevice, redirectUrlResolver))
+                    confirmUseCase,
+                    sessions,
+                    recordLoginDevice,
+                    redirectUrlResolver,
+                    recordLoginEvent))
             .setViewResolvers(viewResolver)
             .build();
   }

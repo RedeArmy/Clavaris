@@ -20,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
@@ -44,6 +45,7 @@ class SessionTaskChallengeControllerTest {
   private AuthenticatedSessionEstablisher sessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
   private RedirectUrlResolver redirectUrlResolver;
+  private RecordLoginEventUseCase recordLoginEvent;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -52,6 +54,7 @@ class SessionTaskChallengeControllerTest {
     sessions = mock(AuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
+    recordLoginEvent = mock(RecordLoginEventUseCase.class);
     when(recordLoginDevice.handle(any())).thenReturn(Optional.empty());
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
 
@@ -72,7 +75,11 @@ class SessionTaskChallengeControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new SessionTaskChallengeController(
-                    completeUseCase, sessions, recordLoginDevice, redirectUrlResolver))
+                    completeUseCase,
+                    sessions,
+                    recordLoginDevice,
+                    redirectUrlResolver,
+                    recordLoginEvent))
             .setViewResolvers(viewResolver)
             .build();
   }

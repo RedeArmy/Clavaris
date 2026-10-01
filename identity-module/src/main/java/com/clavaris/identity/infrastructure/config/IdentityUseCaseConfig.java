@@ -54,6 +54,8 @@ import com.clavaris.identity.application.usecase.getaccountfororganization.GetAc
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountService;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountUseCase;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountService;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountService;
 import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
@@ -77,6 +79,9 @@ import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAcc
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceService;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.LoginEventRepository;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventService;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
@@ -736,6 +741,20 @@ class IdentityUseCaseConfig {
         deviceCookieMigrationCutoverAt,
         newDeviceNotificationExecutor,
         verificationTokens);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" activity heatmap parity.
+  @Bean
+  /* package */ RecordLoginEventUseCase recordLoginEventUseCase(
+      final LoginEventRepository loginEvents) {
+    return new RecordLoginEventService(loginEvents);
+  }
+
+  // TD-FUT-034, Clerk "View Profile" activity heatmap parity.
+  @Bean
+  /* package */ GetLoginActivityForAccountUseCase getLoginActivityForAccountUseCase(
+      final LoginEventRepository loginEvents) {
+    return new GetLoginActivityForAccountService(loginEvents);
   }
 
   // TD-FUT-025: the "this wasn't me" half of the new-device login alert — see

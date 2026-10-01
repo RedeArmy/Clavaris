@@ -6,6 +6,8 @@ import com.clavaris.identity.application.usecase.authenticatewithemaillink.Inval
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceCommand;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventCommand;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
@@ -43,7 +45,11 @@ import org.springframework.web.bind.annotation.RequestParam;
  * different, but structurally identical, class of one-click-link risk.
  */
 // Same rationale as EmailCodeSignInController's own identical class-level suppression.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals"})
+// PMD.ExcessiveImports: TD-FUT-034's own new RecordLoginEventCommand/RecordLoginEventUseCase
+// imports pushed this past the default threshold — same "one import per collaborating type is
+// inherent to the design, not a code smell" rationale LoginController's own identical suppression
+// already establishes.
+@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-link")
 public class EmailLinkSignInController {
@@ -59,6 +65,7 @@ public class EmailLinkSignInController {
   private final KnownDeviceRepository knownDevices;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
+  private final RecordLoginEventUseCase recordLoginEvent;
 
   @SuppressWarnings("java:S107")
   public EmailLinkSignInController(
@@ -68,7 +75,8 @@ public class EmailLinkSignInController {
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
       final KnownDeviceRepository knownDevices,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge) {
+      final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.requestUseCase = requestUseCase;
     this.authenticateUseCase = authenticateUseCase;
     this.sessions = sessions;
@@ -76,6 +84,7 @@ public class EmailLinkSignInController {
     this.knownDevices = knownDevices;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
+    this.recordLoginEvent = recordLoginEvent;
   }
 
   @GetMapping
@@ -207,6 +216,12 @@ public class EmailLinkSignInController {
         .ifPresent(
             rawDeviceToken ->
                 DeviceCookie.write(request, response, organizationId, rawDeviceToken));
+
+    // TD-FUT-034: this controller never goes through AuthenticatedSessionCompletion (see this
+    // class's own Javadoc for why) — same direct call its own recordLoginDevice.handle above
+    // already makes.
+    recordLoginEvent.handle(
+        new RecordLoginEventCommand(account.id(), new OrganizationId(organizationId)));
 
     return REDIRECT_PREFIX + redirectTarget;
   }

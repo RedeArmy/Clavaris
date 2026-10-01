@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountUseCase;
 import com.clavaris.identity.application.usecase.impersonateaccount.OAuthClientsForOrganizationProvider;
 import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
 import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
@@ -44,6 +46,7 @@ class PlatformAccountDetailControllerTest {
   private OAuthClientsForOrganizationProvider oauthClientsProvider;
   private ListActiveSessionsForAccountUseCase listSessions;
   private ListOAuthGrantsForAccountUseCase listOAuthGrants;
+  private GetLoginActivityForAccountUseCase getLoginActivity;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
@@ -58,6 +61,7 @@ class PlatformAccountDetailControllerTest {
     oauthClientsProvider = mock(OAuthClientsForOrganizationProvider.class);
     listSessions = mock(ListActiveSessionsForAccountUseCase.class);
     listOAuthGrants = mock(ListOAuthGrantsForAccountUseCase.class);
+    getLoginActivity = mock(GetLoginActivityForAccountUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
 
@@ -78,6 +82,7 @@ class PlatformAccountDetailControllerTest {
     when(oauthClientsProvider.forOrganization(any())).thenReturn(List.of());
     when(listSessions.handle(any())).thenReturn(List.of());
     when(listOAuthGrants.handle(any())).thenReturn(List.of());
+    when(getLoginActivity.handle(any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -102,6 +107,7 @@ class PlatformAccountDetailControllerTest {
                     oauthClientsProvider,
                     listSessions,
                     listOAuthGrants,
+                    getLoginActivity,
                     organizationResolver,
                     currentPlatformAccount))
             .setViewResolvers(viewResolver)
@@ -190,5 +196,37 @@ class PlatformAccountDetailControllerTest {
     when(organizationResolver.resolveName(any(), any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(path())).andExpect(status().isNotFound());
+  }
+
+  // TD-FUT-034, Clerk "View Profile" activity heatmap parity — proves
+  // PlatformAccountDetailController's own grid-building turns a sparse day-count list into a
+  // dense, exactly-365-real-day calendar, with today's own cell carrying the stubbed count/level.
+  @Test
+  @SuppressWarnings("unchecked")
+  void buildsAHeatmapGridWithTodaysActivityAtTheCorrectLevel() throws Exception {
+    java.time.LocalDate today = java.time.LocalDate.now();
+    when(getLoginActivity.handle(any()))
+        .thenReturn(
+            List.of(
+                new com.clavaris.identity.application.usecase.getloginactivityforaccount
+                    .LoginActivityDay(today, 2)));
+
+    org.springframework.test.web.servlet.MvcResult result =
+        mockMvc.perform(get(path())).andExpect(status().isOk()).andReturn();
+
+    List<List<HeatmapDayCell>> weeks =
+        (List<List<HeatmapDayCell>>) result.getModelAndView().getModel().get("loginActivityWeeks");
+    List<HeatmapDayCell> allCells = weeks.stream().flatMap(List::stream).toList();
+
+    long realDayCount = allCells.stream().filter(cell -> cell.date() != null).count();
+    assertThat(realDayCount)
+        .isEqualTo(
+            com.clavaris.identity.application.usecase.getloginactivityforaccount
+                .GetLoginActivityForAccountService.WINDOW_DAYS);
+
+    HeatmapDayCell todayCell =
+        allCells.stream().filter(cell -> today.equals(cell.date())).findFirst().orElseThrow();
+    assertThat(todayCell.count()).isEqualTo(2);
+    assertThat(todayCell.level()).isEqualTo(2);
   }
 }

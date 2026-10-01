@@ -461,6 +461,20 @@
                             </div>
                         </div>
 
+                        <!-- TD-FUT-034, Clerk "View Profile" activity heatmap parity — one GitHub-style
+                             Sunday-aligned grid (PlatformAccountDetailController's own buildHeatmapWeeks),
+                             53 columns of 7 cells each. A null-date cell is a padding cell outside the
+                             actual trailing window and renders as an empty placeholder, never a real day. -->
+                        <div class="clavaris-section-card">
+                            <h2>Activity</h2>
+                            <p class="clavaris-field-hint">Sign-ins over the last 365 days.</p>
+                            <div class="clavaris-heatmap">
+                                <div class="clavaris-heatmap__week" th:each="week : ${loginActivityWeeks}">
+                                    <div th:each="day : ${week}" th:class="${day.cssClass()}" th:title="${day.title()}"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="clavaris-section-card">
                             <h2>Social accounts</h2>
                             <p th:if="${#lists.isEmpty(socialIdentities)}" class="clavaris-empty-state">No linked social accounts.</p>

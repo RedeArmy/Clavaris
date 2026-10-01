@@ -18,6 +18,7 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
@@ -60,6 +61,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
   private KnownDeviceRepository knownDevices;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
+  private RecordLoginEventUseCase recordLoginEvent;
   private SocialLoginAuthenticationSuccessHandler handler;
 
   @BeforeEach
@@ -74,6 +76,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     knownDevices = mock(KnownDeviceRepository.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
+    recordLoginEvent = mock(RecordLoginEventUseCase.class);
     when(redirectUrlResolver.resolve(any(), any(), any(), any()))
         .thenReturn(java.util.Optional.empty());
     // TD-SEC-055: neither gate fires by default — every pre-existing test in this class exercises
@@ -92,7 +95,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
             accounts,
             knownDevices,
             requestDeviceTrustChallenge,
-            authenticationPolicyProvider);
+            authenticationPolicyProvider,
+            recordLoginEvent);
   }
 
   private Account stubAccount(final UUID organizationId, final AccountId accountId) {
@@ -158,6 +162,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     verifyNoInteractions(platformUseCase);
     // New-device login email notification — fired after a successful social login too.
     verify(recordLoginDevice).handle(any());
+    // TD-FUT-034: the heatmap write, same tenant-only branch as recordLoginDevice above.
+    verify(recordLoginEvent).handle(any());
   }
 
   // TD-SEC-055: the actual bug this fix closes — social login used to establish a session
@@ -201,6 +207,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     verify(tenantSessions, never())
         .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
+    verifyNoInteractions(recordLoginEvent);
   }
 
   // TD-SEC-055: the second half of the same bug — an operator-forced password reset must also
@@ -231,6 +238,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     verify(tenantSessions, never())
         .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
+    verifyNoInteractions(recordLoginEvent);
   }
 
   @Test
@@ -254,6 +262,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     verify(tenantSessions, never())
         .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
     verifyNoInteractions(recordLoginDevice);
+    verifyNoInteractions(recordLoginEvent);
   }
 
   @Test

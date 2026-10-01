@@ -20,6 +20,7 @@ import com.clavaris.identity.application.usecase.authenticatewithemaillink.Authe
 import com.clavaris.identity.application.usecase.authenticatewithemaillink.InvalidSignInLinkException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkCommand;
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
@@ -48,6 +49,7 @@ class EmailLinkSignInControllerTest {
   private AuthenticateWithEmailLinkUseCase authenticateUseCase;
   private AuthenticatedSessionEstablisher sessions;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
+  private RecordLoginEventUseCase recordLoginEvent;
   private KnownDeviceRepository knownDevices;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
@@ -59,6 +61,7 @@ class EmailLinkSignInControllerTest {
     authenticateUseCase = mock(AuthenticateWithEmailLinkUseCase.class);
     sessions = mock(AuthenticatedSessionEstablisher.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
+    recordLoginEvent = mock(RecordLoginEventUseCase.class);
     knownDevices = mock(KnownDeviceRepository.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
@@ -89,7 +92,8 @@ class EmailLinkSignInControllerTest {
                     recordLoginDevice,
                     knownDevices,
                     authenticationPolicyProvider,
-                    requestDeviceTrustChallenge))
+                    requestDeviceTrustChallenge,
+                    recordLoginEvent))
             .setViewResolvers(viewResolver)
             .build();
   }

@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetCommand;
 import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
+import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
@@ -41,16 +42,19 @@ public class SessionTaskChallengeController {
   private final AuthenticatedSessionEstablisher sessions;
   private final RecordAccountLoginDeviceUseCase recordLoginDevice;
   private final RedirectUrlResolver redirectUrlResolver;
+  private final RecordLoginEventUseCase recordLoginEvent;
 
   public SessionTaskChallengeController(
       final CompleteForcedPasswordResetUseCase completeUseCase,
       final AuthenticatedSessionEstablisher sessions,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
-      final RedirectUrlResolver redirectUrlResolver) {
+      final RedirectUrlResolver redirectUrlResolver,
+      final RecordLoginEventUseCase recordLoginEvent) {
     this.completeUseCase = completeUseCase;
     this.sessions = sessions;
     this.recordLoginDevice = recordLoginDevice;
     this.redirectUrlResolver = redirectUrlResolver;
+    this.recordLoginEvent = recordLoginEvent;
   }
 
   // Two genuinely distinct exits (no pending task / render the form) — same rationale as
@@ -118,6 +122,7 @@ public class SessionTaskChallengeController {
             sessions,
             recordLoginDevice,
             redirectUrlResolver,
+            recordLoginEvent,
             request,
             response,
             session,
