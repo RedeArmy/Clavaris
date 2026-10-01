@@ -63,6 +63,14 @@ public class RegisterAccountService implements RegisterAccountUseCase {
   @Override
   @Transactional
   public RegisterAccountResult handle(final RegisterAccountCommand command) {
+    // TD-PERF-031 (SDE-III review, 2026-10-01): the breached-password check is a real outbound
+    // HTTP call — validated first, before accessRestrictions/policyProvider below (both real
+    // repository reads), so this @Transactional method's pooled connection — acquired lazily on
+    // Hibernate's own first actual statement, not at method entry — is never checked out while
+    // waiting on it. Depends only on the raw submitted password, never on the Organization's own
+    // policy, so it can run standalone here, ahead of everything else.
+    validateSubmittedPasswordIfPresent(command);
+
     // SDE-III review, 2026-09-19 — Clerk "Restrictions" parity: checked before anything else,
     // same "reject before doing any real work" posture as every other precondition below.
     if (!accessRestrictions.isAllowed(command.organizationId(), command.email())) {
@@ -164,19 +172,29 @@ public class RegisterAccountService implements RegisterAccountUseCase {
     return username;
   }
 
+  // TD-PERF-031: weak-password + breach validation moved to validateSubmittedPasswordIfPresent,
+  // called standalone at the top of handle() — already validated by the time this runs, never
+  // re-checked here.
+  private void validateSubmittedPasswordIfPresent(final RegisterAccountCommand command) {
+    final boolean submitted = command.rawPassword() != null && !command.rawPassword().isBlank();
+    if (!submitted) {
+      return;
+    }
+    if (!PasswordPolicy.isSatisfiedBy(command.rawPassword())) {
+      throw new WeakPasswordException();
+    }
+    // BR-ID-07: only on the genuinely-submitted branch — a RandomPasswordGenerator-minted value
+    // (resolveRawPassword below) can't meaningfully be "breached," and checking it would be
+    // wasted I/O on every passwordless signup.
+    if (breachedPasswordChecker.isBreached(command.rawPassword())) {
+      throw new BreachedPasswordException();
+    }
+  }
+
   private String resolveRawPassword(
       final RegisterAccountCommand command, final AccountAuthenticationPolicySnapshot policy) {
     final boolean submitted = command.rawPassword() != null && !command.rawPassword().isBlank();
     if (submitted) {
-      if (!PasswordPolicy.isSatisfiedBy(command.rawPassword())) {
-        throw new WeakPasswordException();
-      }
-      // BR-ID-07: only on the genuinely-submitted branch — a RandomPasswordGenerator-minted value
-      // below can't meaningfully be "breached," and checking it would be wasted I/O on every
-      // passwordless signup.
-      if (breachedPasswordChecker.isBreached(command.rawPassword())) {
-        throw new BreachedPasswordException();
-      }
       return command.rawPassword();
     }
     if (policy.passwordAtSignUpEnabled()) {
