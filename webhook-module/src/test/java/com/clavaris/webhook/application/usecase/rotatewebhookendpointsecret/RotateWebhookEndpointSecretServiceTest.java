@@ -45,6 +45,9 @@ class RotateWebhookEndpointSecretServiceTest {
     assertThat(result.endpoint().previousSecretEncrypted()).isEqualTo("old-encrypted");
     assertThat(result.rawNewSigningSecret()).isNotBlank();
     verify(endpoints).save(result.endpoint());
+    // TD-ARCH-030: must be acquired before findById, closing the lost-update race on two
+    // concurrent rotations of the same endpoint.
+    verify(endpoints).lockForRotation(existing.id());
     verify(auditEvents)
         .write(
             ACTOR,

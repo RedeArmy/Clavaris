@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Orchestration for {@link RotateWebhookEndpointSecretUseCase} — ADR-0007's own first open question
  * (signing secret rotation), resolved. See {@code WebhookEndpoint.rotateSecret}'s own Javadoc for
  * the dual-secret overlap-window mechanism this delegates to.
+ *
+ * <p>TD-ARCH-030 (closed): the find→mutate→save sequence below is guarded by {@link
+ * WebhookEndpointRepository#lockForRotation}, a Postgres advisory lock closing a lost-update race
+ * on two concurrent rotations of the same endpoint.
  */
 public class RotateWebhookEndpointSecretService implements RotateWebhookEndpointSecretUseCase {
 
@@ -42,6 +46,11 @@ public class RotateWebhookEndpointSecretService implements RotateWebhookEndpoint
   @Transactional
   public RotateWebhookEndpointSecretResult handle(
       final RotateWebhookEndpointSecretCommand command) {
+    // TD-ARCH-030: closes the lost-update race on two concurrent rotations of the same endpoint
+    // — see WebhookEndpointRepository#lockForRotation's own Javadoc. Must run before findById
+    // below, not after.
+    endpoints.lockForRotation(command.endpointId());
+
     final WebhookEndpoint existing =
         endpoints
             .findById(command.endpointId())

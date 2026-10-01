@@ -348,6 +348,20 @@ class JpaWebhookEndpointRepositoryTest {
         .doesNotThrowAnyException();
   }
 
+  // TD-ARCH-030: proves lockForRotation is a real, callable Postgres advisory-lock query — same
+  // smoke-test shape as lockForRegistration above.
+  @Test
+  void lockForRotationCompletesWithoutErrorAndDoesNotBlockASubsequentCallInTheSameTransaction() {
+    UUID endpointId = UUID.randomUUID();
+
+    assertThatCode(
+            () -> {
+              repository.lockForRotation(endpointId);
+              repository.lockForRotation(endpointId);
+            })
+        .doesNotThrowAnyException();
+  }
+
   @Test
   void deleteRemovesTheRowPermanently() {
     WebhookEndpoint endpoint =
