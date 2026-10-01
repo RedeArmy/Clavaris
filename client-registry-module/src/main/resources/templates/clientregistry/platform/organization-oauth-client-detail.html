@@ -394,12 +394,12 @@
                                             <label for="scope" th:for="${'scope' + rowStat.index}" class="clavaris-visually-hidden" th:text="'Scope ' + (rowStat.index + 1)">Scope</label>
                                             <input type="text" id="scope" th:id="${'scope' + rowStat.index}" name="allowedScopes" th:value="${scope}"/>
                                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
-                                                    onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
+                                                    data-action="remove-scope-row">Remove</button>
                                         </div>
                                     </div>
                                 </fieldset>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
-                                        onclick="addScopeRow()">+ Add scope</button>
+                                        data-action="add-scope-row">+ Add scope</button>
                             </div>
                             <div class="clavaris-dialog__actions">
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
@@ -411,37 +411,35 @@
                              replace this <dialog>'s ancestor content and silently close it, since
                              <dialog>'s open state lives in the browser, not the server. <template>
                              keeps the row markup in exactly one place instead of an escaped HTML
-                             string inside an onclick attribute. The label/id pair below is a static
-                             fallback only (a static HTML analyzer reads this raw source, not the
-                             DOM after cloning) — addScopeRow() below overwrites both with a real,
-                             unique value on every clone, so two added rows never collide. Its own
-                             id/for ("scope-template") is deliberately distinct from the
-                             server-rendered rows' own static fallback ("scope") above, so a raw-
-                             source analyzer never sees the same id declared twice. -->
+                             string. The label/id pair below is a static fallback only (a static
+                             HTML analyzer reads this raw source, not the DOM after cloning) —
+                             oauth-client-scope-row.js overwrites both with a real, unique value on
+                             every clone, so two added rows never collide. Its own id/for
+                             ("scope-template") is deliberately distinct from the server-rendered
+                             rows' own static fallback ("scope") above, so a raw-source analyzer
+                             never sees the same id declared twice.
+
+                             TD-ARCH-031 (SDE-III review, 2026-10-01): this dialog's add/remove
+                             buttons used to wire via inline onclick="..." attributes plus an inline
+                             <script> block below — both silently blocked by
+                             ContentSecurityPolicyHeaderWriter's own DASHBOARD_PAGE_POLICY
+                             (script-src 'self', never 'unsafe-inline') the same way
+                             event-type-picker.html's own identical bug class was found and fixed
+                             2026-09-26 (see that fragment's own comment). MockMvc content-assertion
+                             tests render the markup but never execute JS or enforce CSP, so this
+                             passed every automated check while doing nothing in a real browser.
+                             Now wired by /js/oauth-client-scope-row.js via document-level event
+                             delegation on data-action, matching event-type-picker.js's own shape —
+                             this template carries no script and no inline event-handler attributes
+                             at all now. -->
                         <template id="scope-row-template">
                             <div class="clavaris-uri-row">
                                 <label for="scope-template" class="clavaris-visually-hidden">Scope</label>
                                 <input type="text" id="scope-template" name="allowedScopes"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
-                                        onclick="this.closest('.clavaris-uri-row').remove()">Remove</button>
+                                        data-action="remove-scope-row">Remove</button>
                             </div>
                         </template>
-                        <script>
-                            // Live UX request, 2026-09-25 (SonarCloud accessibility fix): each
-                            // cloned row needs its own unique id/for pair, not the template's own
-                            // static fallback repeated — a growing counter, seeded past every
-                            // server-rendered row's own rowStat.index, guarantees no collision.
-                            (function () {
-                                var scopeRowCounter = document.querySelectorAll('#scopes-rows .clavaris-uri-row').length;
-                                window.addScopeRow = function () {
-                                    var clone = document.getElementById('scope-row-template').content.cloneNode(true);
-                                    var id = 'scope' + scopeRowCounter++;
-                                    clone.querySelector('input').id = id;
-                                    clone.querySelector('label').setAttribute('for', id);
-                                    document.getElementById('scopes-rows').appendChild(clone);
-                                };
-                            })();
-                        </script>
                     </dialog>
 
                     <dialog id="consent-dialog" class="clavaris-dialog" th:if="${client.active()}">
@@ -471,5 +469,6 @@
         </div>
     </main>
 </div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/oauth-client-scope-row.js') : '/js/oauth-client-scope-row.js'}" defer></script>
 </body>
 </html>
