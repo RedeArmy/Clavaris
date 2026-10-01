@@ -40,8 +40,17 @@ WORKDIR /app
 # path, leaving that install's own 7 accepted CVEs (TD-SEC-024) and its gnupg/apt-transport-https
 # apt-repo prerequisites paid on every image build for a path no real deployment ever exercised.
 # See ADR-0019 for the full removal reasoning.
+# CVE-2026-84782 (openssl, HIGH — information disclosure via DTLS handshake retransmission),
+# caught by CI's own Trivy gate against the base image's bundled libssl3t64/openssl/
+# openssl-provider-legacy (3.5.5-1ubuntu3.5, fixed in 3.5.5-1ubuntu3.6) — not a package this
+# Dockerfile installs itself, Ubuntu 26.04's own base image ships it. --only-upgrade targets
+# exactly these three packages against the apt lists already freshly fetched by the update
+# above, rather than a blanket dist-upgrade that could pull in unrelated, unverified package
+# changes — same "smallest safe fix" precedent pom.xml's own CVE comments already establish.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl ca-certificates \
+    && apt-get install -y --only-upgrade \
+        libssl3t64 openssl openssl-provider-legacy \
     && rm -rf /var/lib/apt/lists/*
 
 # TD-SEC-021: the base Ubuntu 26.04 image (eclipse-temurin:25-jre's own base, confirmed by pulling

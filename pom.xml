@@ -109,9 +109,19 @@
              vulnerable version simultaneously. Fixed versions confirmed present on Maven Central
              before pinning (not assumed): 2.21.6/2.22.2 for jackson-2-bom, 3.1.6/3.2.2 for
              jackson-bom — the smaller same-minor-line bump chosen for each, same "smallest safe
-             fix" precedent tomcat.version's own comment above already establishes. -->
-        <jackson-2-bom.version>2.21.6</jackson-2-bom.version>
-        <jackson-bom.version>3.1.6</jackson-bom.version>
+             fix" precedent tomcat.version's own comment above already establishes.
+
+             2026-09-30: CVE-2026-91776/CVE-2026-91777 (jackson-databind, HIGH — both lines again),
+             a real CI Trivy gate failure this time (not a silent one), caught by scanning
+             trivy-report.txt (the uploaded artifact — exit-code 1 on the console log alone gives
+             no CVE detail, same reason the first incident above needed a local repro). Same two
+             affected coordinates as before (com.fasterxml.jackson:jackson-bom and
+             tools.jackson:jackson-bom), both present in the built app.jar simultaneously, same
+             underlying cause. Fixed versions confirmed present on Maven Central before pinning:
+             2.18.11/2.21.7/2.22.3 for jackson-2-bom, 3.1.7/3.2.3 for jackson-bom — again the
+             smaller same-minor-line bump chosen for each. -->
+        <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+        <jackson-bom.version>3.1.7</jackson-bom.version>
         <!-- ADR-0026: identity-module's own SupabaseS3ProfilePictureStorage adapter talks to
              Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
              Supabase SDK dependency needed, same "build on vetted foundations" posture as every
