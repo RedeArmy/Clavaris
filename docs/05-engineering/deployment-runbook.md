@@ -419,3 +419,160 @@ Environment with a required reviewer (unlike `pre-production`'s own unattended-b
   file never passed via `-f` is never parsed at all) — bring it up alongside this one explicitly
   if this host should page on the alert rules `infra/observability/alert-rules.yml` already
   defines.
+
+## 9. Per-client custom domains for embedded/branded login (ADR-0009, TD-FUT-028)
+
+`ADR-0009` is the "why" (embedded-modal login needs a same-site cookie, which needs a custom
+domain scoped to the consumer's own registrable domain); this section is the "how" — the one real
+gap that ADR's own "Open questions" section and `technical-debt-register.md` TD-FUT-028 both named:
+nothing previously explained what an operator actually runs. Everything referenced below
+(`ClientBranding`, `ClientDomainConfig`, `CustomDomainRequestRewriteFilter`, the CSP
+`frame-ancestors` relaxation, the modal-aware session cookie) is already real, shipped, tested
+application code — this section only documents how to drive it.
+
+### 9a. When this applies
+
+A `SHARED`-mode client (today's default — no custom domain at all) is fine for the plain,
+full-page-redirect hosted login with zero setup. This section only matters for a production
+`OAuthClient` that wants the embedded-iframe-modal experience (`display=modal`) — BR-CLIENT-04
+requires a verified custom domain for that specific experience, not for ordinary redirect-based
+login.
+
+### 9b. Set branding (optional, usually done alongside the domain)
+
+```bash
+curl -X PUT "{CLAVARIS_BASE_URL}/api/v1/admin/organizations/{organizationId}/clients/{oauthClientId}/branding" \
+  -H "Authorization: Bearer {platform-client-access-token}" \
+  -H "Content-Type: application/json" \
+  -d '{"logoUrl": "https://example.com/logo.svg", "primaryColor": "#1A73E8", "applicationDisplayName": "Example Inc."}'
+```
+
+Same `client_credentials`-gated management API every other admin action here already uses — see
+`SetClientBrandingController.java` (`client-registry-module`). `logoUrl` must be an absolute
+`https` URL, `primaryColor` a `#RGB`/`#RRGGBB` hex value, `applicationDisplayName` non-blank and
+≤100 characters — a `400` means one of the three failed that validation.
+
+### 9c. Request the domain (`CNAME` or `PROXY`)
+
+```bash
+curl -X PUT "{CLAVARIS_BASE_URL}/api/v1/admin/organizations/{organizationId}/clients/{oauthClientId}/domain-config" \
+  -H "Authorization: Bearer {platform-client-access-token}" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "CNAME", "hostname": "login.example.com", "embeddingOrigin": "https://example.com"}'
+```
+
+(`RequestClientDomainConfigController.java`.) `embeddingOrigin` is the consumer's own top-level
+page origin that will embed the login iframe — deliberately separate from `redirectUris`, since the
+embedding page isn't necessarily one of the client's own OAuth2 callback URLs. A `409` means
+`hostname` is already claimed by a different `OAuthClient` (real cross-tenant conflict, not a bug —
+ownership verification exists specifically to prevent this). The response carries a
+`dnsTxtChallengeToken` — copy its exact value for the next step; it's never a secret (knowing it
+grants no capability beyond what publishing a DNS record for a domain you already control already
+requires).
+
+Publish a DNS `TXT` record:
+
+```
+_clavaris-challenge.login.example.com.   TXT   "<dnsTxtChallengeToken from the response above>"
+```
+
+(The `_clavaris-challenge.` prefix is `VerifyClientDomainOwnershipService`'s own
+`CHALLENGE_PREFIX` constant — this exact value, not an approximation.)
+
+### 9d. Verify ownership
+
+```bash
+curl -X POST "{CLAVARIS_BASE_URL}/api/v1/admin/organizations/{organizationId}/clients/{oauthClientId}/domain-config:verify-ownership" \
+  -H "Authorization: Bearer {platform-client-access-token}"
+```
+
+Admin-triggered, not a background poller — same "manually-triggered, audited operation" posture
+CLAUDE.md §6 already establishes for signing-key rotation. A `200` with
+`"verificationStatus": "FAILED"` is a normal, retryable outcome (DNS hasn't propagated yet, a
+typo'd record) — fix/wait, then call this again; it is not an error response. Only a `VERIFIED`
+`ClientDomainConfig` is ever eligible for the CSP `frame-ancestors` relaxation (§9g) or custom-domain
+routing (`CustomDomainRequestRewriteFilter`).
+
+### 9e. `CNAME` mode — standing up TLS (the actual gap this section closes)
+
+Clavaris never issues or terminates TLS itself for a custom domain (ADR-0009 §2, a confirmed
+scoping decision, not an oversight) — an operator stands up TLS termination in front of it. Two
+options, both reusing this runbook's own existing Caddy choice (§1, ADR-0018) rather than
+introducing a second tool:
+
+**Option 1 — a second Caddy site block, same container (recommended at today's scale).** Add to
+the production `Caddyfile`, alongside the existing `{$CLAVARIS_DOMAIN}` block:
+
+```caddyfile
+login.example.com {
+    reverse_proxy app:8080
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+}
+```
+
+This mirrors the primary domain's own block exactly — Caddy requests and renews its own Let's
+Encrypt certificate for this hostname automatically, same zero-manual-cert-management property §1
+already cites for `{$CLAVARIS_DOMAIN}`. Before adding this block, confirm the consumer's own DNS
+`CNAME` record (`login.example.com → {CLAVARIS_DOMAIN}`) already resolves — exactly the same
+prerequisite §2 already states for the primary domain's own ACME HTTP-01 challenge, now repeated
+per custom domain. Apply with `docker compose restart caddy` (or an in-place reload) — this is a
+real, named manual step per new client domain, not automated; acceptable at the "single-digit
+consuming applications" scale `nfr-quality-attributes.md` §3 already scopes v1 to.
+
+**Option 2 — a separate reverse proxy or managed certificate** (Traefik, nginx+certbot, a cloud
+load balancer with managed TLS) — equally valid per ADR-0009 §2's own wording. Forward to
+`app:8080` over the same Docker network (or a reachable internal address, if that proxy runs
+outside this compose stack) — the operator's own tool choice; this runbook doesn't walk through
+every option, only the Caddy path this deployment actually runs.
+
+**Named future improvement, not built in this pass**: Caddy's own `on_demand_tls` feature (dynamic
+per-domain certificates gated by an "ask" callback) would remove the manual Caddyfile-edit step per
+client. Not done here because it needs a new, small Clavaris-side verification endpoint for Caddy's
+`ask` directive to call — real new code, not documentation — worth revisiting if the number of
+custom domains ever grows past "a Caddyfile edit per client" being reasonable.
+
+### 9f. `PROXY` mode
+
+The consumer runs their own reverse proxy on their own infrastructure — their TLS, their tool
+choice, their job to keep the certificate renewed. Clavaris-side steps are identical to `CNAME`
+(§9c/§9d, just `"mode": "PROXY"`) — the DNS TXT ownership-verification model is shared between both
+modes (ADR-0009 §2's own resolved "Open questions"). The one real difference: the consumer's proxy
+forwards to Clavaris's own real, public base URL (`{CLAVARIS_BASE_URL}` — the production domain
+this same runbook's §1-§8 already stood up), not to an internal `app:8080` address they have no
+network path to. Representative forwarding config (nginx):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name login.example.com;
+    # ... the consumer's own certificate/key directives ...
+    location / {
+        proxy_pass https://{CLAVARIS_BASE_URL};
+        proxy_set_header Host $host;
+    }
+}
+```
+
+### 9g. Confirming it actually works
+
+- `curl -H "Host: login.example.com" https://{server-ip}/o/{organizationId}/login` (or the real DNS
+  name, once it resolves) should route to that Organization's own login page —
+  `CustomDomainRequestRewriteFilter`'s internal forward, not a 404.
+- Open `https://login.example.com/o/{organizationId}/login?display=modal&client_id={clientId}` in a
+  browser, check the response's own `Content-Security-Policy` header in devtools' Network tab —
+  `frame-ancestors` should now name the registered `embeddingOrigin`, not `'none'`. This only
+  activates for a `VERIFIED` `ClientDomainConfig` with a real `embeddingOrigin` set
+  (`EmbeddingEligibilityChecker`) — a `DEVELOPMENT`-tier Organization's client gets a wildcard
+  (`*`) instead, with a warning logged, a deliberate testing convenience never used in production.
+- Confirm the session cookie's own `Set-Cookie` header shows `SameSite=None; Secure` on this same
+  flow (`ModalAwareSessionCookieSerializer`) — `SameSite=Lax` here means the embedded/iframe flow
+  will silently drop the session on its first cross-site navigation back to the parent page.
+
+### 9h. Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `verificationStatus: "FAILED"` after §9d | DNS TXT record not yet propagated, or published with the wrong value | Re-check the exact `TXT` record value against the `dnsTxtChallengeToken` from §9c, wait for propagation, re-run §9d |
+| `409` on §9c | `hostname` already claimed by a different `OAuthClient` (a different tenant, or a stale leftover from this same client under a different id) | Pick a different hostname, or resolve the conflicting claim first — this is ownership verification working as intended, not a bug |
+| `frame-ancestors` still `'none'` after a `VERIFIED` domain | No `embeddingOrigin` was set on the domain-config request (§9c), or the client belongs to a different Organization than the one in the URL | Re-check the `embeddingOrigin` field on `GET .../domain-config`; confirm `organizationId` in the request matches the client's own owning Organization |
+| TLS handshake fails on the custom domain | Caddy's own ACME challenge couldn't complete (DNS not pointed at this host yet, port 80 not reachable) | `docker compose logs caddy` — same pointer §1/§2 already give for the primary domain's own ACME flow |
