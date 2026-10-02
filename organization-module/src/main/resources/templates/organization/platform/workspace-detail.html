@@ -224,7 +224,7 @@
                                         <input type="checkbox" name="roleIds" th:value="${roleOption.id()}"/>
                                         <span th:text="${roleOption.name()}">Role name</span>
                                     </label>
-                                    <nav class="clavaris-pagination" th:if="${#lists.size(ungroupedRoles) > 10}">
+                                    <nav class="clavaris-pagination" th:if="${#lists.size(ungroupedRoles) > 10}" aria-label="Available roles pages">
                                         <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-role-picker-prev>Previous</button>
                                         <span class="clavaris-role-picker__page-indicator">Page 1</span>
                                         <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-role-picker-next>Next</button>
@@ -296,8 +296,14 @@
                                               th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
                                               hx-target="#teams-content" hx-swap="outerHTML">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                            <label class="clavaris-visually-hidden" for="confirm-delete-role" th:for="${'confirm-delete-role-' + entry.role().id()}">Type "unassign" to confirm</label>
-                                            <input type="text" name="confirmedAction" id="confirm-delete-role" th:id="${'confirm-delete-role-' + entry.role().id()}"
+                                            <!-- SonarCloud finding: "confirm-delete-role" (no suffix) is already the Teams
+                                                 section's own static fallback id above — both are always overridden by their
+                                                 own th:for/th:id at render time, but the raw, pre-Thymeleaf source now has
+                                                 this exact form twice (Teams section + this unified Roles table), which a
+                                                 static analyzer reads as a genuine duplicate id. A distinct static fallback
+                                                 ("-roles-table" suffix) resolves that without changing anything at runtime. -->
+                                            <label class="clavaris-visually-hidden" for="confirm-delete-role-roles-table" th:for="${'confirm-delete-role-' + entry.role().id()}">Type "unassign" to confirm</label>
+                                            <input type="text" name="confirmedAction" id="confirm-delete-role-roles-table" th:id="${'confirm-delete-role-' + entry.role().id()}"
                                                    placeholder="unassign" autocomplete="off" required/>
                                             <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
                                         </form>
@@ -309,7 +315,7 @@
                     </div>
                     <p class="clavaris-empty-state" data-roles-empty hidden>No roles match your search.</p>
 
-                    <nav class="clavaris-pagination" data-roles-pagination>
+                    <nav class="clavaris-pagination" data-roles-pagination aria-label="Roles pages">
                         <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-roles-prev>Previous</button>
                         <span class="clavaris-role-picker__page-indicator" data-roles-page-indicator>Page 1</span>
                         <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-roles-next>Next</button>

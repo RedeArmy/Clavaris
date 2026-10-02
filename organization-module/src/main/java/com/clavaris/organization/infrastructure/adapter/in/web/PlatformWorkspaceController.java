@@ -72,6 +72,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -901,17 +902,17 @@ public class PlatformWorkspaceController {
   private record RoleWithTeamName(WorkspaceRole role, UUID teamId, String teamName) {}
 
   private List<RoleWithTeamName> flattenRolesWithTeam(final TeamsAndRoles teamsAndRoles) {
-    final List<RoleWithTeamName> flattened = new ArrayList<>();
-    for (final WorkspaceTeam team : teamsAndRoles.teams()) {
-      for (final WorkspaceRole role : teamsAndRoles.rolesByTeamId().get(team.id())) {
-        flattened.add(new RoleWithTeamName(role, team.id(), team.name()));
-      }
-    }
-    for (final WorkspaceRole role : teamsAndRoles.ungroupedRoles()) {
-      flattened.add(new RoleWithTeamName(role, null, null));
-    }
-    flattened.sort(Comparator.comparing(entry -> entry.role().name()));
-    return flattened;
+    final Stream<RoleWithTeamName> grouped =
+        teamsAndRoles.teams().stream()
+            .flatMap(
+                team ->
+                    teamsAndRoles.rolesByTeamId().get(team.id()).stream()
+                        .map(role -> new RoleWithTeamName(role, team.id(), team.name())));
+    final Stream<RoleWithTeamName> ungrouped =
+        teamsAndRoles.ungroupedRoles().stream().map(role -> new RoleWithTeamName(role, null, null));
+    return Stream.concat(grouped, ungrouped)
+        .sorted(Comparator.comparing(entry -> entry.role().name()))
+        .toList();
   }
 
   // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy — same
