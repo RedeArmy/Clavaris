@@ -6,7 +6,6 @@ import com.clavaris.organization.application.usecase.addworkspacemember.Workspac
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AccountNotInOrganizationException;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountCommand;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountQuery;
 import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
@@ -189,7 +188,6 @@ public class PlatformAccountWorkspaceRoleController {
     return ASSIGN_ROLE_FORM_FRAGMENT;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String save(
       final HttpServletRequest request,
@@ -226,28 +224,10 @@ public class PlatformAccountWorkspaceRoleController {
         | WorkspaceRoleNotFoundException
         | AccountNotInOrganizationException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-    } catch (final CannotDemoteLastAdminException _) {
-      model.addAttribute("organizationId", organizationId);
-      model.addAttribute("accountId", accountId);
-      model.addAttribute("membership", membership.orElse(null));
-      model.addAttribute("cannotDemoteLastAdminError", true);
-      // Same "always set, never leave unset" fix showForm's own identical attribute documents —
-      // workspaceId was already validated to exist above, so this path can never actually hit
-      // "no workspaces," but the template still needs a real boolean here, not a missing one.
-      model.addAttribute(NO_WORKSPACES_YET_ATTRIBUTE, false);
-      if (membership.isPresent()) {
-        populateRoleOptions(
-            model, organizationId, membership.get().workspaceId(), membership.get().roleId());
-      } else {
-        final List<Workspace> allWorkspaces =
-            listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
-        model.addAttribute("workspaces", allWorkspaces);
-        model.addAttribute("showWorkspaceSelector", allWorkspaces.size() > 1);
-        model.addAttribute("activeWorkspaceId", workspaceId);
-        populateRoleOptions(model, organizationId, workspaceId, null);
-      }
-      return ASSIGN_ROLE_FORM_FRAGMENT;
     }
+    // No CannotDemoteLastAdminException catch here (confirmed with the user, 2026-10-01):
+    // AssignWorkspaceRoleToAccountService deliberately no longer enforces that guard for this
+    // operator-driven dashboard action — see that service's own Javadoc.
 
     response.setHeader("HX-Trigger", ROLE_ASSIGNED_EVENT);
     return ASSIGN_ROLE_SAVED_FRAGMENT;

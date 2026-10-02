@@ -726,27 +726,6 @@ class PlatformWorkspaceControllerTest {
     verify(assignRoleToAccount, never()).handle(any());
   }
 
-  @Test
-  void assignRoleForTeamRendersAnErrorInsteadOfPropagatingTheException() throws Exception {
-    UUID teamId = UUID.randomUUID();
-    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
-    when(listTeams.handle(any())).thenReturn(List.of(team));
-    stubTeamRoleIds(List.of(role.id()));
-    doThrow(new CannotDemoteLastAdminException(workspace.id()))
-        .when(assignRoleToAccount)
-        .handle(any());
-
-    mockMvc
-        .perform(
-            post(teamsPath() + "/" + teamId + "/assign-role")
-                .param("accountId", UUID.randomUUID().toString())
-                .param("roleId", role.id().toString()))
-        .andExpect(status().isOk())
-        .andExpect(
-            view().name("organization/platform/fragments/team-assign-role-form :: assignRoleForm"))
-        .andExpect(model().attribute("cannotDemoteLastAdminError", true));
-  }
-
   // SDE-III addition, 2026-09-27: the synthetic "No team" group's own "Assign role" popup.
   @Test
   void showsTheAssignRoleFormForTheNoTeamGroup() throws Exception {
