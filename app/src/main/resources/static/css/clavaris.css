@@ -1654,7 +1654,7 @@ code {
 .clavaris-menu__item:hover { background: var(--clavaris-bg); }
 .clavaris-menu__item--danger { color: var(--clavaris-danger); }
 .clavaris-menu__item--danger:hover { background: var(--clavaris-danger-bg); }
-.clavaris-menu__header { margin: 0; padding: 6px 10px; color: var(--clavaris-text-muted); font-size: .75rem; font-weight: 600; word-break: break-word; }
+.clavaris-menu__header { margin: 0; padding: 6px 10px; color: var(--clavaris-text-muted); font-size: .75rem; font-weight: 600; overflow-wrap: anywhere; }
 .clavaris-menu__divider { margin: 4px 0; border: none; border-top: 1px solid var(--clavaris-border); }
 
 /* SDE-III review, 2026-09-19 — Clerk-style Organization detail navigation: a top-level tab bar
