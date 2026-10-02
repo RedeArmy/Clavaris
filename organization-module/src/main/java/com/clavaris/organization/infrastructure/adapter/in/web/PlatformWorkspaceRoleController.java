@@ -15,16 +15,26 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
+import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamRoleIdsForTeamsUseCase;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceQuery;
+import com.clavaris.organization.application.usecase.listworkspaceteamsforworkspace.ListWorkspaceTeamsForWorkspaceUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.CannotStripReservedWorkspaceRolePermissionsException;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleCommand;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceRole;
+import com.clavaris.organization.domain.model.WorkspaceTeam;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +51,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -74,14 +85,26 @@ import org.springframework.web.server.ResponseStatusException;
  * this UI (the detail page never renders a delete control for a reserved role) — a loud 409 is
  * safer than assuming that can never race with a concurrent tamper of the submitted form.
  */
-// PMD.ExcessiveImports/PMD.CouplingBetweenObjects: every import backs a real, distinct collaborator
-// or exception this controller genuinely needs — same "wiring, not sprawl" reasoning this
-// codebase's own comparable controllers already document.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.TooManyMethods"})
+// PMD.ExcessiveImports/PMD.CouplingBetweenObjects/PMD.GodClass: every import/collaborator backs a
+// real, distinct port or exception this controller genuinely needs — same "wiring, not sprawl"
+// reasoning this codebase's own comparable controllers already document. GodClass/
+// CouplingBetweenObjects both crossed their own threshold 2026-10-02 once buildRoleRows/
+// teamLabelsByRoleId (the "Team" column) added two more real collaborating use cases
+// (ListWorkspacesForOrganizationUseCase, ListWorkspaceTeamsForWorkspaceUseCase,
+// ListWorkspaceTeamRoleIdsForTeamsUseCase) — the same composition-over-a-new-repository-query
+// tradeoff those two methods' own Javadoc already explains, not scope creep.
+@SuppressWarnings({
+  "PMD.LongVariable",
+  "PMD.ExcessiveImports",
+  "PMD.TooManyMethods",
+  "PMD.CouplingBetweenObjects",
+  "PMD.GodClass"
+})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspace-roles")
 public class PlatformWorkspaceRoleController {
 
+  private static final String LIST_VIEW = "organization/platform/workspace-roles";
   private static final String CREATE_VIEW = "organization/platform/create-workspace-role";
   private static final String DETAIL_VIEW = "organization/platform/workspace-role-detail";
   private static final String CREATE_FORM_ATTRIBUTE = "createForm";
@@ -90,11 +113,17 @@ public class PlatformWorkspaceRoleController {
   private static final String ROLES_ATTRIBUTE = "roles";
   private static final String ROLES_BY_ID_ATTRIBUTE = "rolesById";
   private static final String ROLE_ATTRIBUTE = "role";
+  private static final String BACK_TARGET_ATTRIBUTE = "backTarget";
+  private static final String BACK_LABEL_ATTRIBUTE = "backLabel";
   private static final String ORGANIZATIONS_REDIRECT_PREFIX =
       "redirect:/platform/dashboard/organizations/";
+  private static final String ORGANIZATIONS_PATH_PREFIX = "/platform/dashboard/organizations/";
 
   private final GetOrganizationForPlatformAccountUseCase getOrganization;
   private final ListWorkspaceRolesForOrganizationUseCase listRoles;
+  private final ListWorkspacesForOrganizationUseCase listWorkspaces;
+  private final ListWorkspaceTeamsForWorkspaceUseCase listTeams;
+  private final ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams;
   private final CreateWorkspaceRoleUseCase createRole;
   private final UpdateWorkspaceRoleUseCase updateRole;
   private final DeleteWorkspaceRoleUseCase deleteRole;
@@ -106,26 +135,107 @@ public class PlatformWorkspaceRoleController {
   public PlatformWorkspaceRoleController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
       final ListWorkspaceRolesForOrganizationUseCase listRoles,
+      final ListWorkspacesForOrganizationUseCase listWorkspaces,
+      final ListWorkspaceTeamsForWorkspaceUseCase listTeams,
+      final ListWorkspaceTeamRoleIdsForTeamsUseCase listTeamRoleIdsForTeams,
       final CreateWorkspaceRoleUseCase createRole,
       final UpdateWorkspaceRoleUseCase updateRole,
       final DeleteWorkspaceRoleUseCase deleteRole,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.getOrganization = getOrganization;
     this.listRoles = listRoles;
+    this.listWorkspaces = listWorkspaces;
+    this.listTeams = listTeams;
+    this.listTeamRoleIdsForTeams = listTeamRoleIdsForTeams;
     this.createRole = createRole;
     this.updateRole = updateRole;
     this.deleteRole = deleteRole;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  @GetMapping("/new")
-  public String showCreateForm(
+  // Live UX request, 2026-10-02: restores this controller's own list page (Configure >
+  // Workspace Roles) — removed 2026-10-02 in favor of the Teams & Roles "Roles" section's own
+  // unified table, now restored alongside it rather than replaced by it. That table's own "Modify"/
+  // "Advanced create" links still point into this same create/detail pair, now carrying their own
+  // workspaceId so the Back/Cancel button below knows to return there instead of here.
+  @GetMapping
+  public String showList(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       final Model model) {
     final Organization organization = requireOwnedOrganization(request, organizationId);
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateRolesModel(model, organizationId);
+    model.addAttribute("roleRows", buildRoleRows(organizationId));
+    return LIST_VIEW;
+  }
+
+  // Live UX request, 2026-10-02 (corrects an earlier same-day "Members count" version of this
+  // column): the "Team" column — a WorkspaceRole is Organization-scoped (ADR-0027), reusable
+  // across every Workspace that Organization owns, and ADR-0028 §2 only caps it at ONE team
+  // PER Workspace — the same role can still be independently grouped into a DIFFERENT team in a
+  // DIFFERENT Workspace of this same Organization. Rather than squeezing every grouping into one
+  // cell, each (role, team-in-Workspace) pairing gets its OWN row — a role grouped in two
+  // Workspaces appears twice, each row's own Team column naming both the team and its Workspace
+  // (two same-named teams in different Workspaces are still two distinct WorkspaceTeam rows, so
+  // the Workspace name is what actually disambiguates them). A role with no grouping anywhere
+  // still gets exactly one row, with an empty Team cell.
+  private record RoleRow(WorkspaceRole role, String teamLabel) {}
+
+  private List<RoleRow> buildRoleRows(final UUID organizationId) {
+    final Map<UUID, WorkspaceRole> rolesById = loadRolesById(organizationId);
+    final Map<UUID, List<String>> teamLabelsByRoleId = teamLabelsByRoleId(organizationId);
+    final List<RoleRow> rows = new ArrayList<>();
+    for (final WorkspaceRole role :
+        rolesById.values().stream().sorted(Comparator.comparing(WorkspaceRole::name)).toList()) {
+      final List<String> labels = teamLabelsByRoleId.get(role.id());
+      if (labels == null || labels.isEmpty()) {
+        rows.add(new RoleRow(role, null));
+      } else {
+        labels.forEach(label -> rows.add(new RoleRow(role, label)));
+      }
+    }
+    return rows;
+  }
+
+  // Composes ListWorkspacesForOrganizationUseCase + the same ListWorkspaceTeamsForWorkspaceUseCase/
+  // ListWorkspaceTeamRoleIdsForTeamsUseCase pair PlatformWorkspaceController's own
+  // loadTeamsAndRoles already uses for one Workspace, just run once per Workspace this
+  // Organization owns — a low-traffic admin page, same "a small, deliberate redundant read"
+  // tradeoff that method's own Javadoc already accepts, not a reason to add a new repository
+  // query.
+  private Map<UUID, List<String>> teamLabelsByRoleId(final UUID organizationId) {
+    final List<Workspace> workspaces =
+        listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId));
+    final Map<UUID, List<String>> labels = new HashMap<>();
+    for (final Workspace workspace : workspaces) {
+      final List<WorkspaceTeam> teams =
+          listTeams.handle(new ListWorkspaceTeamsForWorkspaceQuery(workspace.id()));
+      final Map<UUID, List<UUID>> roleIdsByTeamId =
+          listTeamRoleIdsForTeams.handle(
+              new ListWorkspaceTeamRoleIdsForTeamsQuery(
+                  teams.stream().map(WorkspaceTeam::id).toList()));
+      for (final WorkspaceTeam team : teams) {
+        for (final UUID roleId : roleIdsByTeamId.getOrDefault(team.id(), List.of())) {
+          labels
+              .computeIfAbsent(roleId, key -> new ArrayList<>())
+              .add(team.name() + " - " + workspace.name());
+        }
+      }
+    }
+    return labels;
+  }
+
+  @GetMapping("/new")
+  public String showCreateForm(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @RequestParam(required = false) final UUID workspaceId,
+      final Model model) {
+    final Organization organization = requireOwnedOrganization(request, organizationId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
+    populateRolesModel(model, organizationId);
+    populateBackTarget(model, organizationId, workspaceId);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new CreateWorkspaceRoleForm());
     return CREATE_VIEW;
   }
@@ -137,6 +247,7 @@ public class PlatformWorkspaceRoleController {
       @PathVariable final UUID organizationId,
       @Valid @ModelAttribute(CREATE_FORM_ATTRIBUTE) final CreateWorkspaceRoleForm form,
       final BindingResult bindingResult,
+      @RequestParam(required = false) final UUID workspaceId,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
@@ -144,19 +255,18 @@ public class PlatformWorkspaceRoleController {
     if (bindingResult.hasErrors()) {
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       populateRolesModel(model, organizationId);
+      populateBackTarget(model, organizationId, workspaceId);
       return CREATE_VIEW;
     }
 
-    final WorkspaceRole created;
     try {
-      created =
-          createRole.handle(
-              new CreateWorkspaceRoleCommand(
-                  organizationId,
-                  form.getName(),
-                  form.getParentRoleId(),
-                  parsePermissions(form.getPermissionsText()),
-                  AuditActor.platformAccount(ownerPlatformAccountId)));
+      createRole.handle(
+          new CreateWorkspaceRoleCommand(
+              organizationId,
+              form.getName(),
+              form.getParentRoleId(),
+              parsePermissions(form.getPermissionsText()),
+              AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final OrganizationNotFoundException _) {
       // Not expected on this path — requireOwnedOrganization above already confirmed
       // organizationId exists — but a loud 404 is still safer than assuming that can never race
@@ -166,6 +276,7 @@ public class PlatformWorkspaceRoleController {
       model.addAttribute("duplicateNameError", true);
       model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
       populateRolesModel(model, organizationId);
+      populateBackTarget(model, organizationId, workspaceId);
       return CREATE_VIEW;
     } catch (final WorkspaceRoleNotFoundException _) {
       // The parent-role dropdown only ever offers this Organization's own real roles — reaching
@@ -173,12 +284,7 @@ public class PlatformWorkspaceRoleController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
 
-    // Live UX request, 2026-10-02: used to redirect to this controller's own list page — removed
-    // (ADR-0027 Slice 5's own listing now lives in the Teams & Roles "Roles" section instead, see
-    // workspace-detail.html). The role's own detail page is a self-contained destination that
-    // needs no workspace context, unlike that section (this controller has none — WorkspaceRole is
-    // Organization-scoped, not tied to any one Workspace).
-    return redirectToDetail(organizationId, created.id());
+    return redirectToList(organizationId);
   }
 
   @GetMapping("/{roleId}")
@@ -186,18 +292,23 @@ public class PlatformWorkspaceRoleController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID roleId,
+      @RequestParam(required = false) final UUID workspaceId,
       final Model model) {
     final Organization organization = requireOwnedOrganization(request, organizationId);
     final Map<UUID, WorkspaceRole> rolesById = loadRolesById(organizationId);
     final WorkspaceRole role = requireOwnedRole(rolesById, roleId);
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateRolesModel(model, rolesById);
+    populateBackTarget(model, organizationId, workspaceId);
     model.addAttribute(ROLE_ATTRIBUTE, role);
     model.addAttribute(EDIT_FORM_ATTRIBUTE, formFor(role));
     return DETAIL_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // java:S107: one parameter per real, distinct input this handler genuinely needs (request
+  // context, path/form/binding, and now workspaceId for the Back button's own return target) —
+  // same "wiring, not sprawl" posture this class's own constructor already documents.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
   @PostMapping("/{roleId}")
   public String update(
       final HttpServletRequest request,
@@ -205,6 +316,7 @@ public class PlatformWorkspaceRoleController {
       @PathVariable final UUID roleId,
       @Valid @ModelAttribute(EDIT_FORM_ATTRIBUTE) final UpdateWorkspaceRoleForm form,
       final BindingResult bindingResult,
+      @RequestParam(required = false) final UUID workspaceId,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
@@ -213,7 +325,7 @@ public class PlatformWorkspaceRoleController {
     final WorkspaceRole existing = requireOwnedRole(rolesById, roleId);
 
     if (bindingResult.hasErrors()) {
-      return redisplayDetail(model, organization, rolesById, existing, null);
+      return redisplayDetail(model, organization, rolesById, existing, null, workspaceId);
     }
 
     final WorkspaceRole updated;
@@ -228,9 +340,11 @@ public class PlatformWorkspaceRoleController {
                   parsePermissions(form.getPermissionsText()),
                   AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final DuplicateWorkspaceRoleNameException _) {
-      return redisplayDetail(model, organization, rolesById, existing, "duplicateNameError");
+      return redisplayDetail(
+          model, organization, rolesById, existing, "duplicateNameError", workspaceId);
     } catch (final WorkspaceRoleCycleException _) {
-      return redisplayDetail(model, organization, rolesById, existing, "parentCycleError");
+      return redisplayDetail(
+          model, organization, rolesById, existing, "parentCycleError", workspaceId);
     } catch (final WorkspaceRoleNotFoundException _) {
       // Not expected on this path — requireOwnedRole above already confirmed roleId exists, and
       // the parent-role dropdown only ever offers this Organization's own real roles — but a loud
@@ -255,6 +369,7 @@ public class PlatformWorkspaceRoleController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @PathVariable final UUID roleId,
+      @RequestParam(required = false) final UUID workspaceId,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
@@ -272,31 +387,64 @@ public class PlatformWorkspaceRoleController {
       // Not reachable through this UI — see this class's own Javadoc.
       throw new ResponseStatusException(HttpStatus.CONFLICT);
     } catch (final WorkspaceRoleStillAssignedException _) {
-      return redisplayDetail(model, organization, rolesById, existing, "stillAssignedError");
+      return redisplayDetail(
+          model, organization, rolesById, existing, "stillAssignedError", workspaceId);
     } catch (final WorkspaceRoleHasChildRolesException _) {
-      return redisplayDetail(model, organization, rolesById, existing, "hasChildRolesError");
+      return redisplayDetail(
+          model, organization, rolesById, existing, "hasChildRolesError", workspaceId);
     }
 
-    // Live UX request, 2026-10-02: used to redirect to this controller's own list page — removed
-    // (see create()'s own identical note above). Unlike create()'s own redirect, there's no
-    // surviving role to land on here, and this controller has no single Workspace of its own to
-    // fall back to (WorkspaceRole is Organization-scoped) — the Organization's own detail page is
-    // the nearest always-valid destination.
-    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
+    return redirectToList(organizationId);
+  }
+
+  private String redirectToList(final UUID organizationId) {
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId + "/workspace-roles";
   }
 
   private String redirectToDetail(final UUID organizationId, final UUID roleId) {
-    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId + "/workspace-roles/" + roleId;
+    return redirectToList(organizationId) + "/" + roleId;
   }
 
+  // Live UX request, 2026-10-02: Back/Cancel on the create and detail pages return to wherever the
+  // operator came from — Teams & Roles' own "Advanced create"/"Modify" links (workspace-
+  // detail.html) thread their own workspaceId through (a query param on GET, a hidden form field on
+  // POST so it survives a validation-error redisplay) specifically so this works; absent, the
+  // default is this controller's own Workspace Roles list. Deliberately not validated against this
+  // Organization's own real Workspaces — the worst a tampered workspaceId can do is link to a 404
+  // (PlatformWorkspaceController's own requireOwnedWorkspace re-validates independently when that
+  // link is actually followed), never an open redirect — the target is always built from this
+  // fixed, same-origin path template, never from an arbitrary caller-supplied URL.
+  private void populateBackTarget(
+      final Model model, final UUID organizationId, final UUID workspaceId) {
+    // Exposed as its own attribute too — the create/detail forms thread it back through as a
+    // hidden field so it survives a validation-error redisplay (a GET query param alone wouldn't
+    // survive the POST).
+    model.addAttribute("workspaceId", workspaceId);
+    if (workspaceId != null) {
+      model.addAttribute(
+          BACK_TARGET_ATTRIBUTE,
+          ORGANIZATIONS_PATH_PREFIX + organizationId + "/workspaces/" + workspaceId);
+      model.addAttribute(BACK_LABEL_ATTRIBUTE, "Back to Teams & Roles");
+    } else {
+      model.addAttribute(
+          BACK_TARGET_ATTRIBUTE, ORGANIZATIONS_PATH_PREFIX + organizationId + "/workspace-roles");
+      model.addAttribute(BACK_LABEL_ATTRIBUTE, "Back to Workspace Roles");
+    }
+  }
+
+  // java:S107: one parameter per real, distinct input — same "wiring, not sprawl" posture this
+  // class's own constructor already documents.
+  @SuppressWarnings("java:S107")
   private String redisplayDetail(
       final Model model,
       final Organization organization,
       final Map<UUID, WorkspaceRole> rolesById,
       final WorkspaceRole existing,
-      final String errorAttribute) {
+      final String errorAttribute,
+      final UUID workspaceId) {
     model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
     populateRolesModel(model, rolesById);
+    populateBackTarget(model, organization.id(), workspaceId);
     model.addAttribute(ROLE_ATTRIBUTE, existing);
     if (!model.containsAttribute(EDIT_FORM_ATTRIBUTE)) {
       model.addAttribute(EDIT_FORM_ATTRIBUTE, formFor(existing));

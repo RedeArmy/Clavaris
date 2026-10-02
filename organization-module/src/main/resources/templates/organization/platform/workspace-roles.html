@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Workspace Roles — Clavaris')}">
+    <title>Workspace Roles — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> /
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <span>Workspace Roles</span>
+            </p>
+
+            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
+
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organization.id()}, 'workspace-roles')}"></div>
+
+                <!-- ADR-0027 Slice 5: a WorkspaceRole is Organization-scoped, shared across every
+                     Workspace this Organization owns — a Configure sub-page, not a Workspace-detail
+                     section, same reasoning PlatformWorkspaceRoleController's own Javadoc documents. -->
+                <div class="clavaris-configure-content">
+                    <div class="clavaris-page-header">
+                        <div>
+                            <h1>Workspace Roles</h1>
+                            <p>Named bundles of opaque, consumer-defined permission strings members can
+                                be assigned within any Workspace this Organization owns. Every Organization
+                                keeps one reserved role that can never be renamed away from its own
+                                management permissions or deleted.</p>
+                        </div>
+                        <a class="clavaris-button clavaris-button--inline"
+                           th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/new(organizationId=${organization.id()})}">+ New Role</a>
+                    </div>
+
+                    <div class="clavaris-section-card" th:if="${#lists.isEmpty(roleRows)}">
+                        <p class="clavaris-empty-state">No workspace roles yet.</p>
+                    </div>
+                    <!-- Live UX request, 2026-10-02: the Team column — a WorkspaceRole is
+                         Organization-scoped (ADR-0027), reusable across every Workspace, and
+                         ADR-0028 §2 only caps it at one team PER Workspace — the same role can
+                         still be grouped into a DIFFERENT team in a DIFFERENT Workspace. roleRows
+                         (PlatformWorkspaceRoleController's own buildRoleRows) already expands each
+                         such grouping into its own row — a role grouped in two Workspaces appears
+                         here twice, each row naming that team and its own Workspace. Empty when a
+                         role has no grouping anywhere, same "if it doesn't have one, show empty"
+                         convention the Parent column's own badge-vs-blank already follows. -->
+                    <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(roleRows)}">
+                        <table class="clavaris-table">
+                            <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Parent</th>
+                                <th scope="col">Permissions</th>
+                                <th scope="col">Team</th>
+                                <th scope="col">Created</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${roleRows}">
+                                <td>
+                                    <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${row.role().id()})}"
+                                       th:text="${row.role().name()}">Role name</a>
+                                    <span class="clavaris-badge clavaris-badge--success" th:if="${row.role().reserved()}">Reserved</span>
+                                </td>
+                                <td>
+                                    <span th:if="${row.role().parentRoleId() != null and rolesById.get(row.role().parentRoleId()) != null}"
+                                          th:text="${rolesById.get(row.role().parentRoleId()).name()}">Parent role</span>
+                                    <span class="clavaris-badge clavaris-badge--muted" th:unless="${row.role().parentRoleId() != null and rolesById.get(row.role().parentRoleId()) != null}">None</span>
+                                </td>
+                                <td th:text="${row.role().permissions().size()} + ' permission' + (${row.role().permissions().size()} == 1 ? '' : 's')">N permissions</td>
+                                <td th:text="${row.teamLabel()} ?: ''"></td>
+                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(row.role().createdAt())}">Created at</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

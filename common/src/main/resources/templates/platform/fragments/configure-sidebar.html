@@ -25,11 +25,13 @@ most owners configure right after checking their API Keys/issuer, ahead of Secre
 management-API credential, a less common first step for a brand-new Organization).
 
 Workspace Roles added 2026-09-26 (ADR-0027 Slice 5, PlatformWorkspaceRoleController,
-organization-module), removed again 2026-10-02 (live UX request) — its own listing was redundant
-with, and narrower than, the Teams & Roles "Roles" section's own table (workspace-detail.html),
-which now shows every Organization role across every Workspace team, not just this one. The
-controller's own create/detail/delete routes are untouched — only this list page and its nav
-entry are gone; "Modify" and "Advanced create" both still link into it directly.
+organization-module), removed 2026-10-02 (live UX request) in favor of the Teams & Roles "Roles"
+section's own table (workspace-detail.html), restored again the same day (live UX request) — both
+now coexist: this list stays the Configure-level, Workspace-independent view of every Organization
+role, while that table additionally shows each role's own Team within one specific Workspace.
+"Modify" and "Advanced create" there link into this controller's own create/detail pages too, now
+carrying their own workspaceId so those pages' own Back/Cancel button returns there instead of
+here (PlatformWorkspaceRoleController#populateBackTarget's own Javadoc).
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
@@ -43,6 +45,8 @@ entry are gone; "Modify" and "Advanced create" both still link into it directly.
        th:classappend="${active == 'signing-keys'} ? 'active'">Signing Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
        th:classappend="${active == 'webhook-endpoints'} ? 'active'">Webhook Endpoints</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/workspace-roles(id=${organizationId})}"
+       th:classappend="${active == 'workspace-roles'} ? 'active'">Workspace Roles</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
        th:classappend="${active == 'rate-limit'} ? 'active'">Rate Limit</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/danger-zone(id=${organizationId})}"
