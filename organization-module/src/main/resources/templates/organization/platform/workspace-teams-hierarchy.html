@@ -58,24 +58,55 @@
                     <p class="clavaris-empty-state">No teams or roles yet.</p>
                 </div>
 
-                <div class="clavaris-section-card" th:each="team : ${teams}">
-                    <div class="clavaris-page-header">
-                        <h3 th:text="${team.name()}">Team name</h3>
-                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
-                                data-dialog-open="team-assign-role-dialog"
-                                th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/assign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                                hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
+                <!-- Live UX request, 2026-10-02: team-level search (by name) + pagination (5/page),
+                     both client-side — teams-hierarchy-filter.js, same role-picker.js/
+                     roles-table-filter.js convention: every team is already rendered in full
+                     either way (this fragment's own loadTeamsAndRoles call reloads the whole
+                     catalog regardless), so paging/filtering teams again server-side would only add
+                     round trips. Deliberately independent of membersPage below (that one paginates
+                     WHICH MEMBERS show under whatever team/role is rendered — a real keyset query,
+                     TD-PERF-027 — this paginates WHICH TEAMS show at all); the two layers don't
+                     conflict, they just both happen to live on the same page. "Without Team" is a
+                     synthetic group, not a real named team to search for, so it's deliberately
+                     outside this pagination — always shown, unaffected by the team search/page. -->
+                <div data-teams-hierarchy th:unless="${#lists.isEmpty(teams)}">
+                    <div class="clavaris-search-form">
+                        <input type="search" placeholder="Search teams by name" aria-label="Search teams by name" data-teams-search/>
                     </div>
-                    <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
-                    <div class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
-                        <h4 th:text="${role.name()}">Role name</h4>
-                        <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
-                            <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
-                                <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId}, ${forceConfirmAccountId})}"></li>
-                            </th:block>
-                        </ul>
-                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
+
+                    <div class="clavaris-section-card" th:each="team : ${teams}" data-team-row
+                         th:attr="data-team-name=${team.name()}">
+                        <div class="clavaris-page-header">
+                            <h3 th:text="${team.name()}">Team name</h3>
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                    data-dialog-open="team-assign-role-dialog"
+                                    th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/assign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                    hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
+                        </div>
+                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
+                        <!-- Live UX request, 2026-10-02: each role used to always show its own member
+                             list — now a native <details>/<summary> disclosure (zero JS), closed by
+                             default, same "click the label, reveal the list underneath" convention
+                             this codebase already uses elsewhere (e.g. .clavaris-event-category-
+                             details). The member count in the summary gives a preview before
+                             expanding. -->
+                        <details class="clavaris-hierarchy-role" th:each="role : ${teamRoles.get(team.id())}">
+                            <summary th:text="${role.name()} + ' (' + ${#lists.size(accountIdsByRoleId.get(role.id()))} + ')'">Role name</summary>
+                            <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
+                                <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
+                                    <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId}, ${forceConfirmAccountId})}"></li>
+                                </th:block>
+                            </ul>
+                            <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
+                        </details>
                     </div>
+
+                    <p class="clavaris-empty-state" data-teams-empty hidden>No teams match your search.</p>
+                    <nav class="clavaris-pagination" data-teams-pagination aria-label="Teams pages">
+                        <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-teams-prev>Previous</button>
+                        <span class="clavaris-role-picker__page-indicator" data-teams-page-indicator>Page 1</span>
+                        <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-teams-next>Next</button>
+                    </nav>
                 </div>
 
                 <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
@@ -86,15 +117,15 @@
                                 th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/assign-role(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                                 hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
                     </div>
-                    <div class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
-                        <h4 th:text="${role.name()}">Role name</h4>
+                    <details class="clavaris-hierarchy-role" th:each="role : ${ungroupedRoles}">
+                        <summary th:text="${role.name()} + ' (' + ${#lists.size(accountIdsByRoleId.get(role.id()))} + ')'">Role name</summary>
                         <ul th:unless="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">
                             <th:block th:each="accountId : ${accountIdsByRoleId.get(role.id())}">
                                 <li th:replace="~{organization/platform/fragments/member-role-row :: row(${organization}, ${workspace}, ${accountId}, ${accountLabelById.get(accountId) ?: accountId}, ${forceConfirmAccountId})}"></li>
                             </th:block>
                         </ul>
                         <p class="clavaris-empty-state" th:if="${#lists.isEmpty(accountIdsByRoleId.get(role.id()))}">No members with this role.</p>
-                    </div>
+                    </details>
                 </div>
 
                 <!-- TD-PERF-027: membersPage is one keyset page of this Workspace's own
@@ -131,5 +162,6 @@
         </div>
     </main>
 </div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/teams-hierarchy-filter.js') : '/js/teams-hierarchy-filter.js'}" defer></script>
 </body>
 </html>

@@ -8,10 +8,12 @@
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
+            <!-- Live UX request, 2026-10-02: same removed-list note as create-workspace-role.html's
+                 own breadcrumb — the "Workspace Roles" segment this used to link to is gone, no
+                 replacement page takes its place in this hierarchy. -->
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> /
                 <span th:text="${role.name()}">Role</span>
             </p>
 
@@ -77,8 +79,9 @@
                             </div>
 
                             <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
+                            <!-- Same removed-list note as this page's own breadcrumb above. -->
                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                               th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Cancel</a>
+                               th:href="@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()})}">Cancel</a>
                         </form>
                     </div>
 

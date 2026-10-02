@@ -72,6 +72,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -193,6 +194,10 @@ public class PlatformWorkspaceController {
   private static final String WORKSPACE_FORM_ATTRIBUTE = "workspaceForm";
   private static final String CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE =
       "cannotDemoteLastAdminError";
+  // Live UX request, 2026-10-02: Team hierarchy's own "one role at a time, workspace-wide" rule —
+  // see populateAssignRoleModel's own Javadoc.
+  private static final String ACCOUNT_ALREADY_HAS_A_ROLE_ERROR_ATTRIBUTE =
+      "accountAlreadyHasRoleError";
   // Live UX request, 2026-09-29: the literal word an operator must type into the "this would
   // leave nobody able to manage members/roles" confirmation popup before the dashboard bypasses
   // ManageMembersGuard — see ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc for why this
@@ -499,7 +504,8 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID teamId,
       @RequestParam final UUID accountId,
-      @RequestParam final UUID roleId) {
+      @RequestParam final UUID roleId,
+      final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
@@ -514,7 +520,8 @@ public class PlatformWorkspaceController {
             roleId,
             teamRoles,
             ownerPlatformAccountId,
-            assignRoleToTeamAction(organizationId, workspaceId, teamId)));
+            assignRoleToTeamAction(organizationId, workspaceId, teamId)),
+        model);
   }
 
   // Live UX request, 2026-09-27: the synthetic "No team" group's own "Assign role" popup — same
@@ -547,7 +554,8 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @RequestParam final UUID accountId,
-      @RequestParam final UUID roleId) {
+      @RequestParam final UUID roleId,
+      final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
@@ -562,7 +570,8 @@ public class PlatformWorkspaceController {
             roleId,
             ungroupedRoles,
             ownerPlatformAccountId,
-            assignRoleToNoTeamAction(organizationId, workspaceId)));
+            assignRoleToNoTeamAction(organizationId, workspaceId)),
+        model);
   }
 
   // ADR-0028: the Workspace-detail page's own Teams & Roles section — create/rename/delete a team,
@@ -879,8 +888,31 @@ public class PlatformWorkspaceController {
     model.addAttribute("teams", teamsAndRoles.teams());
     model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
     model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
+    model.addAttribute("allRolesWithTeam", flattenRolesWithTeam(teamsAndRoles));
     model.addAttribute(CREATE_TEAM_FORM_ATTRIBUTE, new CreateWorkspaceTeamForm());
     model.addAttribute(CREATE_ROLE_FORM_ATTRIBUTE, new CreateWorkspaceTeamRoleForm());
+  }
+
+  // Live UX request, 2026-10-02: the Roles section used to only ever show ungroupedRoles (team-
+  // grouped roles were only visible nested inside their own team's own accordion row above) —
+  // flattens teamsAndRoles' own two separate collections into one list, every role exactly once,
+  // each carrying its own team's name (null for Without Team) so the Roles section's own table can
+  // show every role with a Team column, searchable/filterable/paginated, instead of just the
+  // ungrouped subset.
+  private record RoleWithTeamName(WorkspaceRole role, UUID teamId, String teamName) {}
+
+  private List<RoleWithTeamName> flattenRolesWithTeam(final TeamsAndRoles teamsAndRoles) {
+    final Stream<RoleWithTeamName> grouped =
+        teamsAndRoles.teams().stream()
+            .flatMap(
+                team ->
+                    teamsAndRoles.rolesByTeamId().get(team.id()).stream()
+                        .map(role -> new RoleWithTeamName(role, team.id(), team.name())));
+    final Stream<RoleWithTeamName> ungrouped =
+        teamsAndRoles.ungroupedRoles().stream().map(role -> new RoleWithTeamName(role, null, null));
+    return Stream.concat(grouped, ungrouped)
+        .sorted(Comparator.comparing(entry -> entry.role().name()))
+        .toList();
   }
 
   // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy — same
@@ -1013,34 +1045,41 @@ public class PlatformWorkspaceController {
         + "/roles/assign-role";
   }
 
-  // Live UX request, 2026-09-27: eligibleAccounts is every account in this Organization
-  // (OrganizationAccountDirectory) EXCLUDING one that already holds a role within this specific
-  // group (groupRoles — one team's own roles, or the ungrouped set for the "No team" group) — an
-  // account with a role in a DIFFERENT group, or no role at all, is still eligible here.
+  // Live UX request, 2026-10-02 (supersedes the 2026-09-27 version of this same comment): one role
+  // at a time, workspace-wide — eligibleAccounts is every account in this Organization
+  // (OrganizationAccountDirectory) EXCLUDING one that already holds ANY role ANYWHERE in this
+  // Workspace, not just within this specific group (groupRoles — one team's own roles, or the
+  // ungrouped set for the "No team" group) as before. An account already holding role QA in Team A
+  // can no longer be assigned role Tester in Team A itself or any other team/group in this
+  // Workspace — "Remove" (this page's own per-member action) must leave them roleless first. Only
+  // Team hierarchy's own "Assign role" works this way: PlatformAccountWorkspaceRoleController's own
+  // identical-shaped Users-tab action deliberately keeps replacing a role in place (that
+  // controller's own Javadoc) — this is a workflow restriction specific to this one dashboard
+  // entry point, not a domain invariant, so it isn't enforced inside
+  // AssignWorkspaceRoleToAccountService itself.
   private void populateAssignRoleModel(
       final Model model,
       final UUID organizationId,
       final Workspace workspace,
       final List<WorkspaceRole> groupRoles,
       final String assignRoleAction) {
-    final Set<UUID> groupRoleIds =
-        groupRoles.stream().map(WorkspaceRole::id).collect(Collectors.toSet());
-    final Set<UUID> accountsAlreadyInGroup =
-        listMembersUseCase.handle(new ListWorkspaceMembersQuery(workspace.id())).stream()
-            .filter(
-                membership ->
-                    membership.roleId() != null && groupRoleIds.contains(membership.roleId()))
-            .map(WorkspaceMembership::accountId)
-            .collect(Collectors.toSet());
+    final Set<UUID> accountsWithARole = accountsWithAnyRole(workspace);
     final List<OrganizationAccountSummary> eligibleAccounts =
         accountDirectory.listAccountsForOrganization(organizationId).stream()
-            .filter(account -> !accountsAlreadyInGroup.contains(account.accountId()))
+            .filter(account -> !accountsWithARole.contains(account.accountId()))
             .sorted(Comparator.comparing(OrganizationAccountSummary::label))
             .toList();
 
     model.addAttribute("eligibleAccounts", eligibleAccounts);
     model.addAttribute("groupRoles", groupRoles);
     model.addAttribute("assignRoleAction", assignRoleAction);
+  }
+
+  private Set<UUID> accountsWithAnyRole(final Workspace workspace) {
+    return listMembersUseCase.handle(new ListWorkspaceMembersQuery(workspace.id())).stream()
+        .filter(membership -> membership.roleId() != null)
+        .map(WorkspaceMembership::accountId)
+        .collect(Collectors.toSet());
   }
 
   // SonarCloud finding, 2026-09-28: processAssignRole's own 7 context values (organizationId,
@@ -1066,13 +1105,31 @@ public class PlatformWorkspaceController {
   private String processAssignRole(
       final HttpServletRequest request,
       final HttpServletResponse response,
-      final AssignRoleAttempt attempt) {
+      final AssignRoleAttempt attempt,
+      final Model model) {
     final boolean roleBelongsToThisGroup =
         attempt.groupRoles().stream().anyMatch(role -> role.id().equals(attempt.roleId()));
     if (!roleBelongsToThisGroup) {
       // The popup's own Role <select> only ever offers this group's own roles — reaching this
       // means the submitted roleId was tampered with, not a real user mistake.
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+    }
+
+    // Live UX request, 2026-10-02: Team hierarchy's own "one role at a time, workspace-wide" rule
+    // — see populateAssignRoleModel's own Javadoc for the full reasoning. The popup's own User
+    // <select> already excludes every account this would reject, so reaching this normally means
+    // a stale form (someone else assigned this account a role elsewhere while this popup was
+    // open), not a real user mistake — re-rendered as a form error, not a raw 400, since it's a
+    // real, reachable outcome rather than tampering.
+    if (accountsWithAnyRole(attempt.workspace()).contains(attempt.accountId())) {
+      model.addAttribute(ACCOUNT_ALREADY_HAS_A_ROLE_ERROR_ATTRIBUTE, true);
+      populateAssignRoleModel(
+          model,
+          attempt.organizationId(),
+          attempt.workspace(),
+          attempt.groupRoles(),
+          attempt.assignRoleAction());
+      return ASSIGN_ROLE_FORM_FRAGMENT;
     }
 
     try {

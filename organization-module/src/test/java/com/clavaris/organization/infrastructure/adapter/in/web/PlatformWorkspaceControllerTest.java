@@ -388,6 +388,24 @@ class PlatformWorkspaceControllerTest {
         .andExpect(model().attribute("teams", List.of(team)));
   }
 
+  // Live UX request, 2026-10-02: team-level search/pagination markup (teams-hierarchy-filter.js)
+  // and each role as a <details>/<summary> disclosure carrying its own member count.
+  @Test
+  void rendersTeamSearchMarkupAndEachRolesOwnMemberCount() throws Exception {
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    stubTeamRoleIds(List.of(role.id()));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-teams-hierarchy")))
+        .andExpect(content().string(containsString("data-teams-search")))
+        .andExpect(content().string(containsString("data-team-row")))
+        .andExpect(content().string(containsString("data-team-name=\"QA\"")))
+        .andExpect(content().string(containsString(role.name() + " (0)")));
+  }
+
   // Live UX request, 2026-09-28: a bare accountId used to render here — real gap, closed via
   // OrganizationAccountDirectory (same cross-module port the "Assign role" picker already uses).
   @Test
@@ -411,6 +429,33 @@ class PlatformWorkspaceControllerTest {
         .perform(get(teamsPath()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Jane Doe")));
+  }
+
+  // Live UX request, 2026-10-02: "Remove" used to be a bare single-click submit for every member
+  // except the one edge case already gated behind a confirm — now every member's own Remove opens
+  // a real confirm popup first, same TD-FUT-035 shape Delete team/Delete role already use.
+  @Test
+  void rendersAConfirmPopupForEveryMembersOwnRemoveButton() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    when(listMembersPaged.handle(any()))
+        .thenReturn(
+            new KeysetPage<>(
+                List.of(WorkspaceMembership.join(workspace.id(), accountId, role.id())),
+                null,
+                null,
+                false,
+                false));
+    when(accountDirectory.listAccountsByIds(any(), any()))
+        .thenReturn(List.of(new OrganizationAccountSummary(accountId, "Jane Doe")));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("data-dialog-open=\"remove-member-dialog-" + accountId)))
+        .andExpect(
+            content().string(containsString("id=\"remove-member-dialog-" + accountId + "\"")));
   }
 
   // Defensive only — every real accountId here comes from a WorkspaceMembership, which is only
@@ -662,6 +707,33 @@ class PlatformWorkspaceControllerTest {
         .andExpect(model().attribute("groupRoles", List.of(role)));
   }
 
+  // Live UX request, 2026-10-02: one role at a time, workspace-wide — an account already holding a
+  // role in a DIFFERENT team (not just one already holding a role in THIS team) is excluded too.
+  @Test
+  void excludesAnAccountAlreadyHoldingARoleInADifferentTeamAsNotEligible() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    stubTeamRoleIds(List.of(role.id()));
+    OrganizationAccountSummary eligible =
+        new OrganizationAccountSummary(UUID.randomUUID(), "eligible@example.com");
+    OrganizationAccountSummary inAnotherTeam =
+        new OrganizationAccountSummary(UUID.randomUUID(), "elsewhere@example.com");
+    WorkspaceRole otherTeamRole = WorkspaceRole.define(organization.id(), "Other", null, Set.of());
+    when(accountDirectory.listAccountsForOrganization(organization.id()))
+        .thenReturn(List.of(eligible, inAnotherTeam));
+    when(listMembers.handle(any()))
+        .thenReturn(
+            List.of(
+                WorkspaceMembership.join(
+                    workspace.id(), inAnotherTeam.accountId(), otherTeamRole.id())));
+
+    mockMvc
+        .perform(get(teamsPath() + "/" + teamId + "/assign-role"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("eligibleAccounts", List.of(eligible)));
+  }
+
   @Test
   void assignRoleFormForAnUnknownTeamReturnsNotFound() throws Exception {
     mockMvc
@@ -723,6 +795,35 @@ class PlatformWorkspaceControllerTest {
                 .param("accountId", UUID.randomUUID().toString())
                 .param("roleId", otherRole.id().toString()))
         .andExpect(status().isBadRequest());
+
+    verify(assignRoleToAccount, never()).handle(any());
+  }
+
+  // Live UX request, 2026-10-02: defense in depth — the popup's own User <select> already
+  // excludes an account like this one, so reaching this normally means a stale form (someone else
+  // assigned the account a role elsewhere while the popup was still open), not tampering; re-
+  // rendered as a form error rather than a raw 400.
+  @Test
+  void assignRoleForTeamPostRejectsAnAccountThatAlreadyHasARoleElsewhereInThisWorkspace()
+      throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    stubTeamRoleIds(List.of(role.id()));
+    UUID accountId = UUID.randomUUID();
+    WorkspaceRole otherRole = WorkspaceRole.define(organization.id(), "Other", null, Set.of());
+    when(listMembers.handle(any()))
+        .thenReturn(List.of(WorkspaceMembership.join(workspace.id(), accountId, otherRole.id())));
+
+    mockMvc
+        .perform(
+            post(teamsPath() + "/" + teamId + "/assign-role")
+                .param("accountId", accountId.toString())
+                .param("roleId", role.id().toString()))
+        .andExpect(status().isOk())
+        .andExpect(
+            view().name("organization/platform/fragments/team-assign-role-form :: assignRoleForm"))
+        .andExpect(model().attribute("accountAlreadyHasRoleError", true));
 
     verify(assignRoleToAccount, never()).handle(any());
   }

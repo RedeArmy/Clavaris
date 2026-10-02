@@ -106,21 +106,6 @@ class PlatformWorkspaceRoleControllerTest {
   }
 
   @Test
-  void showListRendersEveryRole() throws Exception {
-    mockMvc
-        .perform(get(rolesPath()))
-        .andExpect(status().isOk())
-        .andExpect(view().name("organization/platform/workspace-roles"))
-        .andExpect(
-            model()
-                .attribute(
-                    "roles",
-                    List.of(reservedRole, customRole).stream()
-                        .sorted(java.util.Comparator.comparing(WorkspaceRole::name))
-                        .toList()));
-  }
-
-  @Test
   void showCreateFormRenders() throws Exception {
     mockMvc
         .perform(get(rolesPath() + "/new"))
@@ -128,14 +113,17 @@ class PlatformWorkspaceRoleControllerTest {
         .andExpect(view().name("organization/platform/create-workspace-role"));
   }
 
+  // Live UX request, 2026-10-02: the list page this used to redirect to is gone (Teams & Roles'
+  // own unified table is the new entry point) — redirects to the newly created role's own detail
+  // page instead, a self-contained destination that needs no further list to bounce through.
   @Test
-  void createPostRedirectsToTheListOnSuccess() throws Exception {
+  void createPostRedirectsToTheNewRolesDetailPageOnSuccess() throws Exception {
     when(createRole.handle(any())).thenReturn(customRole);
 
     mockMvc
         .perform(post(rolesPath()).param("name", "Interviewer").param("permissionsText", "a\nb"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl(rolesPath()));
+        .andExpect(redirectedUrl(rolesPath() + "/" + customRole.id()));
 
     verify(createRole).handle(any());
   }
@@ -231,12 +219,16 @@ class PlatformWorkspaceRoleControllerTest {
     verify(updateRole, never()).handle(any());
   }
 
+  // Live UX request, 2026-10-02: the list page this used to redirect to is gone — there's no
+  // single Workspace this Organization-scoped controller could redirect into instead (a
+  // WorkspaceRole isn't owned by any one Workspace), so the Organization's own detail page is the
+  // nearest always-valid destination.
   @Test
-  void deletePostRedirectsToTheListOnSuccess() throws Exception {
+  void deletePostRedirectsToTheOrganizationDetailPageOnSuccess() throws Exception {
     mockMvc
         .perform(post(rolesPath() + "/" + customRole.id() + "/delete"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl(rolesPath()));
+        .andExpect(redirectedUrl("/platform/dashboard/organizations/" + organization.id()));
 
     verify(deleteRole).handle(any());
   }

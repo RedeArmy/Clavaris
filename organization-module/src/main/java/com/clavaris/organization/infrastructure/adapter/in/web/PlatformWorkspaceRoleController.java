@@ -82,7 +82,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspace-roles")
 public class PlatformWorkspaceRoleController {
 
-  private static final String LIST_VIEW = "organization/platform/workspace-roles";
   private static final String CREATE_VIEW = "organization/platform/create-workspace-role";
   private static final String DETAIL_VIEW = "organization/platform/workspace-role-detail";
   private static final String CREATE_FORM_ATTRIBUTE = "createForm";
@@ -119,17 +118,6 @@ public class PlatformWorkspaceRoleController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  @GetMapping
-  public String showList(
-      final HttpServletRequest request,
-      @PathVariable final UUID organizationId,
-      final Model model) {
-    final Organization organization = requireOwnedOrganization(request, organizationId);
-    model.addAttribute(ORGANIZATION_ATTRIBUTE, organization);
-    populateRolesModel(model, organizationId);
-    return LIST_VIEW;
-  }
-
   @GetMapping("/new")
   public String showCreateForm(
       final HttpServletRequest request,
@@ -159,14 +147,16 @@ public class PlatformWorkspaceRoleController {
       return CREATE_VIEW;
     }
 
+    final WorkspaceRole created;
     try {
-      createRole.handle(
-          new CreateWorkspaceRoleCommand(
-              organizationId,
-              form.getName(),
-              form.getParentRoleId(),
-              parsePermissions(form.getPermissionsText()),
-              AuditActor.platformAccount(ownerPlatformAccountId)));
+      created =
+          createRole.handle(
+              new CreateWorkspaceRoleCommand(
+                  organizationId,
+                  form.getName(),
+                  form.getParentRoleId(),
+                  parsePermissions(form.getPermissionsText()),
+                  AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final OrganizationNotFoundException _) {
       // Not expected on this path — requireOwnedOrganization above already confirmed
       // organizationId exists — but a loud 404 is still safer than assuming that can never race
@@ -183,7 +173,12 @@ public class PlatformWorkspaceRoleController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
 
-    return redirectToList(organizationId);
+    // Live UX request, 2026-10-02: used to redirect to this controller's own list page — removed
+    // (ADR-0027 Slice 5's own listing now lives in the Teams & Roles "Roles" section instead, see
+    // workspace-detail.html). The role's own detail page is a self-contained destination that
+    // needs no workspace context, unlike that section (this controller has none — WorkspaceRole is
+    // Organization-scoped, not tied to any one Workspace).
+    return redirectToDetail(organizationId, created.id());
   }
 
   @GetMapping("/{roleId}")
@@ -282,15 +277,16 @@ public class PlatformWorkspaceRoleController {
       return redisplayDetail(model, organization, rolesById, existing, "hasChildRolesError");
     }
 
-    return redirectToList(organizationId);
-  }
-
-  private String redirectToList(final UUID organizationId) {
-    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId + "/workspace-roles";
+    // Live UX request, 2026-10-02: used to redirect to this controller's own list page — removed
+    // (see create()'s own identical note above). Unlike create()'s own redirect, there's no
+    // surviving role to land on here, and this controller has no single Workspace of its own to
+    // fall back to (WorkspaceRole is Organization-scoped) — the Organization's own detail page is
+    // the nearest always-valid destination.
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId;
   }
 
   private String redirectToDetail(final UUID organizationId, final UUID roleId) {
-    return redirectToList(organizationId) + "/" + roleId;
+    return ORGANIZATIONS_REDIRECT_PREFIX + organizationId + "/workspace-roles/" + roleId;
   }
 
   private String redisplayDetail(
