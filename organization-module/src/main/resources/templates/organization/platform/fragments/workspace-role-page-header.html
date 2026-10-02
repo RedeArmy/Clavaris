@@ -1,0 +1,16 @@
+<!--
+SonarCloud duplication fix, 2026-10-02: create-workspace-role.html and workspace-role-detail.html
+had hand-duplicated this exact back-link + breadcrumb block (only the final breadcrumb segment
+differs: a literal "New Role" vs. the role's own name). Same "one shared fragment is fine, both
+callers live in this module" rationale workspace-page-header.html's own identical situation already
+documents.
+-->
+<div th:fragment="header(organization, backTarget, backLabel, currentLabel)">
+    <div th:replace="~{organization/platform/fragments/back-link :: back(${backTarget}, ${backLabel})}"></div>
+    <p class="clavaris-breadcrumb">
+        <a th:href="@{/platform/dashboard}">Organizations</a> /
+        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+        <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> /
+        <span th:text="${currentLabel}">Current</span>
+    </p>
+</div>

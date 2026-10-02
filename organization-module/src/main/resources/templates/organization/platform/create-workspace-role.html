@@ -12,13 +12,7 @@
                  Configure > Workspace Roles by default, or Teams & Roles when "Advanced create"
                  there linked in with its own workspaceId (backTarget/backLabel, populateBackTarget's
                  own Javadoc). -->
-            <div th:replace="~{organization/platform/fragments/back-link :: back(${backTarget}, ${backLabel})}"></div>
-            <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> /
-                <span>New Role</span>
-            </p>
+            <div th:replace="~{organization/platform/fragments/workspace-role-page-header :: header(${organization}, ${backTarget}, ${backLabel}, 'New Role')}"></div>
 
             <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
 

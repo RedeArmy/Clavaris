@@ -11,13 +11,7 @@
             <!-- Live UX request, 2026-10-02: same Back convention as create-workspace-role.html's
                  own breadcrumb — returns to Configure > Workspace Roles by default, or Teams &
                  Roles when "Modify" there linked in with its own workspaceId. -->
-            <div th:replace="~{organization/platform/fragments/back-link :: back(${backTarget}, ${backLabel})}"></div>
-            <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> /
-                <span th:text="${role.name()}">Role</span>
-            </p>
+            <div th:replace="~{organization/platform/fragments/workspace-role-page-header :: header(${organization}, ${backTarget}, ${backLabel}, ${role.name()})}"></div>
 
             <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
 

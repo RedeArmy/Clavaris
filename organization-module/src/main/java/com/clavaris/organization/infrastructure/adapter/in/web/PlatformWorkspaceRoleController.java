@@ -93,12 +93,17 @@ import org.springframework.web.server.ResponseStatusException;
 // (ListWorkspacesForOrganizationUseCase, ListWorkspaceTeamsForWorkspaceUseCase,
 // ListWorkspaceTeamRoleIdsForTeamsUseCase) — the same composition-over-a-new-repository-query
 // tradeoff those two methods' own Javadoc already explains, not scope creep.
+// java:S1075: ORGANIZATIONS_PATH_PREFIX/ORGANIZATIONS_REDIRECT_PREFIX are routes this server-
+// rendered app owns and serves itself, not an external URI a deployment should be able to repoint
+// — same "these are code, not runtime config" reasoning PlatformWorkspaceController's own
+// identical suppression (WORKSPACES_PATH_SEGMENT) already documents.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.TooManyMethods",
   "PMD.CouplingBetweenObjects",
-  "PMD.GodClass"
+  "PMD.GodClass",
+  "java:S1075"
 })
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspace-roles")
