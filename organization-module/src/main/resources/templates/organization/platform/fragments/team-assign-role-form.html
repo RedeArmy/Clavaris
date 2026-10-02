@@ -3,12 +3,13 @@
      convention ADR-0029's own assign-role-form.html already establishes, just for the Teams tab's
      own per-team/per-"No team" trigger instead of a per-account one. No <!DOCTYPE html>/<html>/
      <body> wrapper — same fragment-file convention every sibling under */fragments/ already
-     follows. eligibleAccounts already excludes every account that already holds a role in this
-     specific team/group (PlatformWorkspaceController's own populateAssignRoleModel) — this fragment
-     never re-filters, it only renders whatever the controller already resolved. -->
+     follows. eligibleAccounts already excludes every account that holds ANY role anywhere in this
+     Workspace, not just this specific team/group (live UX request, 2026-10-02 — one role at a
+     time, workspace-wide; PlatformWorkspaceController's own populateAssignRoleModel) — this
+     fragment never re-filters, it only renders whatever the controller already resolved. -->
 <div th:fragment="assignRoleForm">
     <div th:if="${#lists.isEmpty(eligibleAccounts)}">
-        <p class="clavaris-empty-state">Every account in this Organization already has a role here.</p>
+        <p class="clavaris-empty-state">Every account in this Organization already has a role somewhere in this Workspace — remove one from their current role first (this page's own "Remove" button) to make them eligible here.</p>
     </div>
     <div th:if="${#lists.isEmpty(groupRoles)}">
         <p class="clavaris-empty-state">This group has no roles yet.</p>
@@ -24,9 +25,14 @@
           hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
-        <p class="clavaris-field-error" th:if="${cannotDemoteLastAdminError}">
-            This would leave the Workspace with no one able to manage its own members — assign a
-            different substitute first.
+        <!-- Live UX request, 2026-10-02: replaces a dead check — cannotDemoteLastAdminError was
+             never actually set by this form's own POST handler even before this date (that guard
+             was removed from the dashboard's assign-role path entirely, 2026-10-01,
+             AssignWorkspaceRoleToAccountService's own Javadoc); this fragment's own copy of that
+             now-unreachable check was simply never cleaned up until now. -->
+        <p class="clavaris-field-error" th:if="${accountAlreadyHasRoleError}">
+            This account already holds a role somewhere in this Workspace — remove it from their
+            current role first (this page's own "Remove" button).
         </p>
 
         <div class="clavaris-field">
