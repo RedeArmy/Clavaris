@@ -75,8 +75,9 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="account : ${users}">
-                            <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}">
+                        <tr th:each="account : ${users}"
+                            th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}">
+                            <td>
                                 <div class="clavaris-row-identity">
                                     <img class="clavaris-row-avatar"
                                          th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}"
@@ -111,7 +112,8 @@
                                 <details class="clavaris-menu">
                                     <summary class="clavaris-menu__trigger" aria-label="Open actions menu for this user">⋮</summary>
                                     <div class="clavaris-menu__panel">
-                                        <p class="clavaris-menu__id">ID: <code th:text="${account.id().value()}">account id</code></p>
+                                        <p class="clavaris-menu__header"
+                                           th:text="${#strings.isEmpty(fullName)} ? ${account.email().value()} : ${fullName}">user name</p>
                                         <hr class="clavaris-menu__divider"/>
                                         <a class="clavaris-menu__item"
                                            th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}">View profile</a>
