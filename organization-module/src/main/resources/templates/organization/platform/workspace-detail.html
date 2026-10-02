@@ -44,19 +44,134 @@
                 <p class="clavaris-alert clavaris-alert--error" th:if="${roleHasChildRolesError}">That role is still the parent of at least one other role — re-parent or clear them first.</p>
                 <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. If you're sure, type "unassign" in the field that replaced the Delete button below to confirm and proceed anyway.</p>
 
+                <h3 class="clavaris-section-subtitle">Teams</h3>
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams)}">
                     <p class="clavaris-empty-state">No teams yet — add the first one above.</p>
                 </div>
 
-                <div class="clavaris-section-card" th:each="team : ${teams}">
-                    <div class="clavaris-page-header">
-                        <h3 th:text="${team.name()}">Team name</h3>
-                        <div class="clavaris-row-actions">
-                            <!-- TD-FUT-035: this used to be a bare single-click submit — every other
-                                 destructive action on this dashboard already gates behind at least a
-                                 click-through confirm dialog. Cancel/Delete only (not a typed-name
-                                 confirm like Delete workspace) — same severity tier as Delete user,
-                                 not the tenant-wide blast radius a whole Workspace carries. -->
+                <!-- SDE-III redesign, 2026-10-01 (live UX request): every team used to be its own
+                     full-width .clavaris-section-card, each with an always-visible rename <input>
+                     that read as a form left mid-edit — now one card holds every team as a row.
+                     Each row's own name is the native <details>/<summary> trigger for its roles
+                     (name="workspace-teams-accordion", shared across every row — a literal, not
+                     Thymeleaf-templated, value: the one case a <details> needs the SAME name on
+                     purpose, so the browser treats the whole group as mutually exclusive, zero JS).
+                     Rename/Delete sit outside that <summary> (clavaris-team-row__actions), so
+                     clicking either never also toggles the roles disclosure underneath it. -->
+                <div class="clavaris-section-card clavaris-team-accordion" th:unless="${#lists.isEmpty(teams)}">
+                    <div class="clavaris-team-row" th:each="team : ${teams}">
+                        <details class="clavaris-team-row__disclosure" name="workspace-teams-accordion">
+                            <summary class="clavaris-team-row__summary">
+                                <span class="clavaris-team-row__chevron" aria-hidden="true">⌄</span>
+                                <span class="clavaris-team-row__name" th:text="${team.name()}">Team name</span>
+                                <span class="clavaris-team-row__count" th:text="'(' + ${#lists.size(teamRoles.get(team.id()))} + ')'">(0)</span>
+                            </summary>
+
+                            <div class="clavaris-team-row__body">
+                                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(teamRoles.get(team.id()))}">
+                                    <table class="clavaris-table">
+                                        <thead>
+                                        <tr>
+                                            <th scope="col">Role</th>
+                                            <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="role : ${teamRoles.get(team.id())}">
+                                            <td th:text="${role.name()}">Role name</td>
+                                            <td>
+                                                <div class="clavaris-row-actions">
+                                                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}">Modify</a>
+                                                    <!-- TD-FUT-035: same click-through confirm dialog as Delete
+                                                         team below — a <dialog> can't legally live inside a
+                                                         <table>, so the dialog itself is rendered in a second
+                                                         th:each just below this table, keyed by the same
+                                                         role.id(). -->
+                                                    <button th:unless="${forceConfirmRoleId == role.id()}"
+                                                            class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                                            th:attr="data-dialog-open=${'delete-role-dialog-' + role.id()}">Delete</button>
+                                                    <!-- Live UX request, 2026-09-29: this role's own delete just hit
+                                                         CannotDemoteLastAdminException — offer the same "type UNASSIGN to
+                                                         confirm" bypass the Teams tab's own Remove button already has. -->
+                                                    <form th:if="${forceConfirmRoleId == role.id()}" class="clavaris-row-actions" method="post"
+                                                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                                          hx-target="#teams-content" hx-swap="outerHTML">
+                                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                        <label class="clavaris-visually-hidden" for="confirm-delete-role" th:for="${'confirm-delete-role-' + role.id()}">Type "unassign" to confirm</label>
+                                                        <input type="text" name="confirmedAction" id="confirm-delete-role" th:id="${'confirm-delete-role-' + role.id()}"
+                                                               placeholder="unassign" autocomplete="off" required/>
+                                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- TD-FUT-035: one dialog per role, kept OUTSIDE the <table> above (a
+                                     <dialog> can't legally live inside one) but still inside this
+                                     th:each="team : ${teams}" iteration, so each role's own delete form
+                                     keeps the right organizationId/workspaceId/teamId context. -->
+                                <dialog th:each="role : ${teamRoles.get(team.id())}"
+                                        th:id="${'delete-role-dialog-' + role.id()}" class="clavaris-dialog">
+                                    <div class="clavaris-dialog__header">
+                                        <div>
+                                            <span class="clavaris-dialog__eyebrow">Role</span>
+                                            <h2>Delete role</h2>
+                                            <p>Permanently deletes <strong th:text="${role.name()}">role</strong>. This cannot be undone.</p>
+                                        </div>
+                                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete role dialog">×</button>
+                                    </div>
+                                    <form method="post"
+                                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                          hx-target="#teams-content" hx-swap="outerHTML">
+                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <div class="clavaris-dialog__actions">
+                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                            <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete role</button>
+                                        </div>
+                                    </form>
+                                </dialog>
+                                <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
+
+                                <button th:unless="${#lists.isEmpty(ungroupedRoles)}"
+                                        class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                        th:attr="data-dialog-open=${'add-role-dialog-' + team.id()}">Add existing role</button>
+                            </div>
+                        </details>
+
+                        <div class="clavaris-team-row__actions">
+                            <!-- "Rename" — pencil icon, a second native disclosure (zero JS): click reveals a
+                                 small Save form next to it; clicking the pencil again collapses it, which
+                                 doubles as Cancel since nothing was submitted. Deliberately its own sibling
+                                 <details>, not nested inside clavaris-team-row__disclosure's own <summary>
+                                 above — a button inside a <summary> would also toggle THAT disclosure on
+                                 every click, opening/closing the roles table as an unwanted side effect. -->
+                            <details class="clavaris-inline-edit">
+                                <summary class="clavaris-icon-button" aria-label="Rename team">✎</summary>
+                                <form class="clavaris-inline-edit__form" method="post"
+                                      th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                      th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                      hx-target="#teams-content" hx-swap="outerHTML">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <!-- Static "for"/"id" fallback values below, both overridden by their own
+                                         th:for/th:id at render time with the real per-row unique id: a static
+                                         analyzer reading this template's raw source (not Thymeleaf's rendered
+                                         output) only recognizes a literal HTML for/id pair, never th:for/th:id
+                                         alone, for this accessibility rule. -->
+                                    <label class="clavaris-visually-hidden" for="rename-team" th:for="${'rename-team-' + team.id()}">Rename <span th:text="${team.name()}">team</span></label>
+                                    <input type="text" name="name" id="rename-team" th:id="${'rename-team-' + team.id()}" th:value="${team.name()}" required/>
+                                    <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
+                                </form>
+                            </details>
+
+                            <!-- TD-FUT-035: every other destructive action on this dashboard already gates
+                                 behind at least a click-through confirm dialog. Cancel/Delete only (not a
+                                 typed-name confirm like Delete workspace) — same severity tier as Delete
+                                 user, not the tenant-wide blast radius a whole Workspace carries. -->
                             <button th:unless="${forceConfirmTeamId == team.id()}"
                                     class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
                                     th:attr="data-dialog-open=${'delete-team-dialog-' + team.id()}">Delete team</button>
@@ -75,147 +190,76 @@
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
                             </form>
                         </div>
-                    </div>
 
-                    <dialog th:id="${'delete-team-dialog-' + team.id()}" class="clavaris-dialog">
-                        <div class="clavaris-dialog__header">
-                            <div>
-                                <span class="clavaris-dialog__eyebrow">Team</span>
-                                <h2>Delete team</h2>
-                                <p>Permanently deletes <strong th:text="${team.name()}">team</strong>. Any role
-                                    grouped only into this team, and not still assigned to anyone, is deleted
-                                    along with it. This cannot be undone.</p>
-                            </div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete team dialog">×</button>
-                        </div>
-                        <form method="post"
-                              th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                              hx-target="#teams-content" hx-swap="outerHTML">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <div class="clavaris-dialog__actions">
-                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
-                                <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete team</button>
-                            </div>
-                        </form>
-                    </dialog>
-
-                    <form method="post"
-                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/rename(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                          hx-target="#teams-content" hx-swap="outerHTML">
-                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <!-- Static "for"/"id" fallback values below, both overridden by their own
-                             th:for/th:id at render time with the real per-row unique id: a static
-                             analyzer reading this template's raw source (not Thymeleaf's rendered
-                             output) only recognizes a literal HTML for/id pair, never th:for/th:id
-                             alone, for this accessibility rule. -->
-                        <label class="clavaris-visually-hidden" for="rename-team" th:for="${'rename-team-' + team.id()}">Rename <span th:text="${team.name()}">team</span></label>
-                        <input type="text" name="name" id="rename-team" th:id="${'rename-team-' + team.id()}" th:value="${team.name()}" required/>
-                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rename</button>
-                    </form>
-
-                    <!-- "A dropdown showing the roles" — a native <details>/<summary> disclosure,
-                         closed by default, same clavaris-event-category-details styling
-                         webhook-event-catalog.html's own per-category roster already establishes
-                         for an identically-shaped "click the label, reveal a table underneath". -->
-                    <details class="clavaris-event-category-details">
-                        <summary th:text="'Roles (' + ${#lists.size(teamRoles.get(team.id()))} + ')'">Roles</summary>
-
-                        <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(teamRoles.get(team.id()))}">
-                            <table class="clavaris-table">
-                                <thead>
-                                <tr>
-                                    <th scope="col">Role</th>
-                                    <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr th:each="role : ${teamRoles.get(team.id())}">
-                                    <td th:text="${role.name()}">Role name</td>
-                                    <td>
-                                        <div class="clavaris-row-actions">
-                                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                               th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}">Modify</a>
-                                            <!-- TD-FUT-035: same click-through confirm dialog as Delete
-                                                 team above — a <dialog> can't legally live inside a
-                                                 <table>, so the dialog itself is rendered in a second
-                                                 th:each just below this table, keyed by the same
-                                                 role.id(). -->
-                                            <button th:unless="${forceConfirmRoleId == role.id()}"
-                                                    class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
-                                                    th:attr="data-dialog-open=${'delete-role-dialog-' + role.id()}">Delete</button>
-                                            <!-- Live UX request, 2026-09-29: this role's own delete just hit
-                                                 CannotDemoteLastAdminException — offer the same "type UNASSIGN to
-                                                 confirm" bypass the Teams tab's own Remove button already has. -->
-                                            <form th:if="${forceConfirmRoleId == role.id()}" class="clavaris-row-actions" method="post"
-                                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
-                                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
-                                                  hx-target="#teams-content" hx-swap="outerHTML">
-                                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                                <label class="clavaris-visually-hidden" for="confirm-delete-role" th:for="${'confirm-delete-role-' + role.id()}">Type "unassign" to confirm</label>
-                                                <input type="text" name="confirmedAction" id="confirm-delete-role" th:id="${'confirm-delete-role-' + role.id()}"
-                                                       placeholder="unassign" autocomplete="off" required/>
-                                                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <!-- TD-FUT-035: one dialog per role, kept OUTSIDE the <table> above (a
-                             <dialog> can't legally live inside one) but still inside this
-                             th:each="team : ${teams}" iteration, so each role's own delete form
-                             keeps the right organizationId/workspaceId/teamId context. -->
-                        <dialog th:each="role : ${teamRoles.get(team.id())}"
-                                th:id="${'delete-role-dialog-' + role.id()}" class="clavaris-dialog">
+                        <dialog th:id="${'delete-team-dialog-' + team.id()}" class="clavaris-dialog">
                             <div class="clavaris-dialog__header">
                                 <div>
-                                    <span class="clavaris-dialog__eyebrow">Role</span>
-                                    <h2>Delete role</h2>
-                                    <p>Permanently deletes <strong th:text="${role.name()}">role</strong>. This cannot be undone.</p>
+                                    <span class="clavaris-dialog__eyebrow">Team</span>
+                                    <h2>Delete team</h2>
+                                    <p>Permanently deletes <strong th:text="${team.name()}">team</strong>. Any role
+                                        grouped only into this team, and not still assigned to anyone, is deleted
+                                        along with it. This cannot be undone.</p>
                                 </div>
-                                <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete role dialog">×</button>
+                                <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete team dialog">×</button>
                             </div>
                             <form method="post"
-                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
-                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
                                   hx-target="#teams-content" hx-swap="outerHTML">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <div class="clavaris-dialog__actions">
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
-                                    <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete role</button>
+                                    <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete team</button>
                                 </div>
                             </form>
                         </dialog>
-                        <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
 
-                        <form method="post" th:if="${!#lists.isEmpty(ungroupedRoles)}"
-                              th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
-                              hx-target="#teams-content" hx-swap="outerHTML">
-                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <!-- Static "for"/"id" fallback values below, both overridden by their own
-                                 th:for/th:id at render time with the real per-row unique id: a static
-                                 analyzer reading this template's raw source (not Thymeleaf's rendered
-                                 output) only recognizes a literal HTML for/id pair, never th:for/th:id
-                                 alone, for this accessibility rule. -->
-                            <label class="clavaris-visually-hidden" for="add-role" th:for="${'add-role-' + team.id()}">Add an existing role to <span th:text="${team.name()}">team</span></label>
-                            <!-- ADR-0028 §2: only this Organization's own ungrouped roles are offered — a
-                                 role already in a different team in this Workspace must be removed from
-                                 it first (AddRoleToWorkspaceTeamService's own guard). -->
-                            <select id="add-role" th:id="${'add-role-' + team.id()}" name="roleId">
-                                <option th:each="roleOption : ${ungroupedRoles}"
-                                        th:value="${roleOption.id()}" th:text="${roleOption.name()}"></option>
-                            </select>
-                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Add existing role</button>
-                        </form>
-                    </details>
+                        <!-- The old single-select <select> + "Add existing role" pair couldn't offer more
+                             than one role per submit and, with more than a handful, became a long scroll of
+                             role names. This popup paginates the same ungroupedRoles list (10/page, client-
+                             side — role-picker.js's own Javadoc) as checkboxes, letting the operator pick
+                             several and add them all in one submit. ADR-0028 §2: only this Organization's
+                             own ungrouped roles are ever offered — a role already in a different team must be
+                             removed from it first (AddRoleToWorkspaceTeamService's own guard). -->
+                        <dialog th:unless="${#lists.isEmpty(ungroupedRoles)}"
+                                th:id="${'add-role-dialog-' + team.id()}" class="clavaris-dialog">
+                            <div class="clavaris-dialog__header">
+                                <div>
+                                    <span class="clavaris-dialog__eyebrow">Role</span>
+                                    <h2>Add existing role</h2>
+                                    <p>Select one or more roles to add to <strong th:text="${team.name()}">team</strong>.</p>
+                                </div>
+                                <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close add existing role dialog">×</button>
+                            </div>
+                            <form method="post"
+                                  th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams/{teamId}/roles(organizationId=${organization.id()},workspaceId=${workspace.id()},teamId=${team.id()})}"
+                                  hx-target="#teams-content" hx-swap="outerHTML">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <fieldset class="clavaris-uri-fieldset clavaris-role-picker" data-role-picker>
+                                    <legend class="clavaris-visually-hidden">Roles</legend>
+                                    <label class="clavaris-role-picker__option" th:each="roleOption : ${ungroupedRoles}">
+                                        <input type="checkbox" name="roleIds" th:value="${roleOption.id()}"/>
+                                        <span th:text="${roleOption.name()}">Role name</span>
+                                    </label>
+                                    <nav class="clavaris-pagination" th:if="${#lists.size(ungroupedRoles) > 10}">
+                                        <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-role-picker-prev>Previous</button>
+                                        <span class="clavaris-role-picker__page-indicator">Page 1</span>
+                                        <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-role-picker-next>Next</button>
+                                    </nav>
+                                </fieldset>
+                                <div class="clavaris-dialog__actions">
+                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                                    <button class="clavaris-button clavaris-button--inline" type="submit">Add selected roles</button>
+                                </div>
+                            </form>
+                        </dialog>
+                    </div>
                 </div>
 
+                <h3 class="clavaris-section-subtitle">Roles</h3>
                 <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
-                    <h3>Without Team</h3>
+                    <h4>Without Team</h4>
                     <p>Every role defined for this Organization that isn't grouped into a team in this Workspace —
                         a fully supported state, not a leftover (the reserved Admin role starts here too).</p>
                     <ul>
@@ -301,5 +345,6 @@
         </div>
     </main>
 </div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/role-picker.js') : '/js/role-picker.js'}" defer></script>
 </body>
 </html>
