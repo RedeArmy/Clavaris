@@ -913,6 +913,15 @@ code {
   margin: 0;
   padding-left: var(--space-4);
 }
+/* Live UX request, 2026-10-02: each role became a <details>/<summary> disclosure — same weight as
+   the h4 it replaced, native disclosure marker kept (same "don't hide it" convention
+   .clavaris-event-category-details summary already follows), just not shrunk/uppercased the way
+   that one's own muted category label is — a role name is the primary content here, not a label. */
+.clavaris-hierarchy-role summary {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+  cursor: pointer;
+}
 
 /* Live UX request, 2026-10-01 — workspace-detail.html's own Teams & Roles redesign: "Teams" and
    "Roles" as two titled subsections under the page's own h2, one tier down from .clavaris-section

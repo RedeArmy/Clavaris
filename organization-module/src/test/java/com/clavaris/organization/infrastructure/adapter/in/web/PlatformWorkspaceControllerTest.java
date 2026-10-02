@@ -388,6 +388,24 @@ class PlatformWorkspaceControllerTest {
         .andExpect(model().attribute("teams", List.of(team)));
   }
 
+  // Live UX request, 2026-10-02: team-level search/pagination markup (teams-hierarchy-filter.js)
+  // and each role as a <details>/<summary> disclosure carrying its own member count.
+  @Test
+  void rendersTeamSearchMarkupAndEachRolesOwnMemberCount() throws Exception {
+    WorkspaceTeam team = WorkspaceTeam.define(workspace.id(), "QA");
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    stubTeamRoleIds(List.of(role.id()));
+
+    mockMvc
+        .perform(get(teamsPath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-teams-hierarchy")))
+        .andExpect(content().string(containsString("data-teams-search")))
+        .andExpect(content().string(containsString("data-team-row")))
+        .andExpect(content().string(containsString("data-team-name=\"QA\"")))
+        .andExpect(content().string(containsString(role.name() + " (0)")));
+  }
+
   // Live UX request, 2026-09-28: a bare accountId used to render here — real gap, closed via
   // OrganizationAccountDirectory (same cross-module port the "Assign role" picker already uses).
   @Test
