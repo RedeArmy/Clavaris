@@ -1072,6 +1072,44 @@ code {
   font-size: .8rem;
 }
 
+/* The unified Roles table's own search + team-filter row — same input/select treatment
+   .clavaris-search-form's own text input and .clavaris-row-actions' own select already give their
+   respective widgets, combined in one row above the table instead of a single search-only bar. */
+.clavaris-roles-table__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.clavaris-roles-table__search {
+  flex: 1;
+  min-width: 200px;
+  padding: var(--space-3);
+  font: inherit;
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+.clavaris-roles-table__search:focus {
+  outline: none;
+  border-color: var(--clavaris-brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
+}
+.clavaris-roles-table__team-filter {
+  font: inherit;
+  padding: var(--space-3);
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+.clavaris-roles-table__team-filter:focus-visible {
+  outline: none;
+  border-color: var(--clavaris-brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clavaris-brand-color) 25%, transparent);
+}
+
 .clavaris-empty-state {
   padding: var(--space-6);
   text-align: center;

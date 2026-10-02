@@ -879,8 +879,31 @@ public class PlatformWorkspaceController {
     model.addAttribute("teams", teamsAndRoles.teams());
     model.addAttribute("teamRoles", teamsAndRoles.rolesByTeamId());
     model.addAttribute("ungroupedRoles", teamsAndRoles.ungroupedRoles());
+    model.addAttribute("allRolesWithTeam", flattenRolesWithTeam(teamsAndRoles));
     model.addAttribute(CREATE_TEAM_FORM_ATTRIBUTE, new CreateWorkspaceTeamForm());
     model.addAttribute(CREATE_ROLE_FORM_ATTRIBUTE, new CreateWorkspaceTeamRoleForm());
+  }
+
+  // Live UX request, 2026-10-02: the Roles section used to only ever show ungroupedRoles (team-
+  // grouped roles were only visible nested inside their own team's own accordion row above) —
+  // flattens teamsAndRoles' own two separate collections into one list, every role exactly once,
+  // each carrying its own team's name (null for Without Team) so the Roles section's own table can
+  // show every role with a Team column, searchable/filterable/paginated, instead of just the
+  // ungrouped subset.
+  private record RoleWithTeamName(WorkspaceRole role, UUID teamId, String teamName) {}
+
+  private List<RoleWithTeamName> flattenRolesWithTeam(final TeamsAndRoles teamsAndRoles) {
+    final List<RoleWithTeamName> flattened = new ArrayList<>();
+    for (final WorkspaceTeam team : teamsAndRoles.teams()) {
+      for (final WorkspaceRole role : teamsAndRoles.rolesByTeamId().get(team.id())) {
+        flattened.add(new RoleWithTeamName(role, team.id(), team.name()));
+      }
+    }
+    for (final WorkspaceRole role : teamsAndRoles.ungroupedRoles()) {
+      flattened.add(new RoleWithTeamName(role, null, null));
+    }
+    flattened.sort(Comparator.comparing(entry -> entry.role().name()));
+    return flattened;
   }
 
   // SDE-III addition, 2026-09-27: the Teams tab's own read-only hierarchy — same

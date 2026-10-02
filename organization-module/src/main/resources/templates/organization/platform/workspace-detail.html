@@ -110,31 +110,13 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <!-- TD-FUT-035: one dialog per role, kept OUTSIDE the <table> above (a
-                                     <dialog> can't legally live inside one) but still inside this
-                                     th:each="team : ${teams}" iteration, so each role's own delete form
-                                     keeps the right organizationId/workspaceId/teamId context. -->
-                                <dialog th:each="role : ${teamRoles.get(team.id())}"
-                                        th:id="${'delete-role-dialog-' + role.id()}" class="clavaris-dialog">
-                                    <div class="clavaris-dialog__header">
-                                        <div>
-                                            <span class="clavaris-dialog__eyebrow">Role</span>
-                                            <h2>Delete role</h2>
-                                            <p>Permanently deletes <strong th:text="${role.name()}">role</strong>. This cannot be undone.</p>
-                                        </div>
-                                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete role dialog">×</button>
-                                    </div>
-                                    <form method="post"
-                                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
-                                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${role.id()})}"
-                                          hx-target="#teams-content" hx-swap="outerHTML">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <div class="clavaris-dialog__actions">
-                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
-                                            <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete role</button>
-                                        </div>
-                                    </form>
-                                </dialog>
+                                <!-- Each role's own delete-role-dialog-{roleId} is rendered once,
+                                     globally, in the Roles section below (th:each over
+                                     allRolesWithTeam covers every role exactly once, grouped and
+                                     ungrouped alike) — this Delete button only ever references that
+                                     id by data-dialog-open, never renders a second <dialog> with the
+                                     same id itself (duplicate ids would make only the first one in
+                                     document order ever reachable by getElementById). -->
                                 <p class="clavaris-empty-state" th:if="${#lists.isEmpty(teamRoles.get(team.id()))}">No roles in this team yet.</p>
 
                                 <button th:unless="${#lists.isEmpty(ungroupedRoles)}"
@@ -257,22 +239,123 @@
                     </div>
                 </div>
 
+                <!-- Live UX request, 2026-10-02: this section used to only ever show ungroupedRoles
+                     ("Without Team") — every team-grouped role was only visible nested inside its
+                     own team's own accordion row above. Now a single searchable/filterable/
+                     paginated table covers every role this Organization has, each with its own
+                     Team column (allRolesWithTeam's own Javadoc, PlatformWorkspaceController) —
+                     "Without Team" roles show that literal text in the Team column instead of their
+                     own separate card. Filtering/pagination (10/page) is client-side, same
+                     roles-table-filter.js convention role-picker.js already establishes for the Add
+                     existing role popup — the full list is already loaded for this page either way
+                     (loadTeamsAndRoles's own comment), so paging it server-side would only add
+                     round trips, not reduce any real query cost. -->
                 <h3 class="clavaris-section-subtitle">Roles</h3>
-                <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
-                    <h4>Without Team</h4>
-                    <p>Every role defined for this Organization that isn't grouped into a team in this Workspace —
-                        a fully supported state, not a leftover (the reserved Admin role starts here too).</p>
-                    <ul>
-                        <li th:each="role : ${ungroupedRoles}" th:text="${role.name()}">Role name</li>
-                    </ul>
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(allRolesWithTeam)}">
+                    <p class="clavaris-empty-state">No roles yet — create the first one below.</p>
+                </div>
+                <div class="clavaris-section-card" th:unless="${#lists.isEmpty(allRolesWithTeam)}" data-roles-table>
+                    <div class="clavaris-roles-table__controls">
+                        <input type="search" class="clavaris-roles-table__search" placeholder="Search roles by name"
+                               aria-label="Search roles by name" data-roles-search/>
+                        <label class="clavaris-visually-hidden" for="roles-team-filter">Filter by team</label>
+                        <select id="roles-team-filter" class="clavaris-roles-table__team-filter" data-roles-team-filter>
+                            <option value="">All teams</option>
+                            <option value="__none__">Without Team</option>
+                            <option th:each="teamOption : ${teams}"
+                                    th:value="${teamOption.id()}" th:text="${teamOption.name()}"></option>
+                        </select>
+                    </div>
+
+                    <div class="clavaris-table-wrapper">
+                        <table class="clavaris-table">
+                            <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Team</th>
+                                <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="entry : ${allRolesWithTeam}" data-roles-row
+                                th:attr="data-roles-team-id=${entry.teamId() != null ? entry.teamId() : '__none__'}">
+                                <td data-roles-name th:text="${entry.role().name()}">Role name</td>
+                                <td th:text="${entry.teamName() != null ? entry.teamName() : 'Without Team'}">Team</td>
+                                <td>
+                                    <div class="clavaris-row-actions">
+                                        <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${entry.role().id()})}">Modify</a>
+                                        <button th:unless="${forceConfirmRoleId == entry.role().id()}"
+                                                class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
+                                                th:attr="data-dialog-open=${'delete-role-dialog-' + entry.role().id()}">Delete</button>
+                                        <!-- Live UX request, 2026-09-29: this role's own delete just hit
+                                             CannotDemoteLastAdminException — offer the same "type UNASSIGN to
+                                             confirm" bypass the Teams section's own per-team table already has. -->
+                                        <form th:if="${forceConfirmRoleId == entry.role().id()}" class="clavaris-row-actions" method="post"
+                                              th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
+                                              th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
+                                              hx-target="#teams-content" hx-swap="outerHTML">
+                                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <label class="clavaris-visually-hidden" for="confirm-delete-role" th:for="${'confirm-delete-role-' + entry.role().id()}">Type "unassign" to confirm</label>
+                                            <input type="text" name="confirmedAction" id="confirm-delete-role" th:id="${'confirm-delete-role-' + entry.role().id()}"
+                                                   placeholder="unassign" autocomplete="off" required/>
+                                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Confirm</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="clavaris-empty-state" data-roles-empty hidden>No roles match your search.</p>
+
+                    <nav class="clavaris-pagination" data-roles-pagination>
+                        <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-roles-prev>Previous</button>
+                        <span class="clavaris-role-picker__page-indicator" data-roles-page-indicator>Page 1</span>
+                        <button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-roles-next>Next</button>
+                    </nav>
                 </div>
 
-                <!-- "Create a new role" — a button below the roles listing, opening a popup for the
-                     role's name and, optionally, an existing team to put it in. Live UX request,
-                     2026-09-28: always available now — "Without Team" (the popup's own default
-                     <select> option) is a first-class choice, not something that only happens later
-                     when a role's own team gets deleted. -->
-                <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-role-dialog">Create a new role</button>
+                <!-- One dialog per role, every role exactly once (grouped and ungrouped alike) —
+                     see this section's own header comment and the Teams section's own Delete
+                     button above for why this isn't duplicated per-team anymore. -->
+                <dialog th:each="entry : ${allRolesWithTeam}"
+                        th:id="${'delete-role-dialog-' + entry.role().id()}" class="clavaris-dialog">
+                    <div class="clavaris-dialog__header">
+                        <div>
+                            <span class="clavaris-dialog__eyebrow">Role</span>
+                            <h2>Delete role</h2>
+                            <p>Permanently deletes <strong th:text="${entry.role().name()}">role</strong>. This cannot be undone.</p>
+                        </div>
+                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete role dialog">×</button>
+                    </div>
+                    <form method="post"
+                          th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
+                          th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/{roleId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()},roleId=${entry.role().id()})}"
+                          hx-target="#teams-content" hx-swap="outerHTML">
+                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <div class="clavaris-dialog__actions">
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                            <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete role</button>
+                        </div>
+                    </form>
+                </dialog>
+
+                <div class="clavaris-row-actions">
+                    <!-- "Create a new role" — a button opening a popup for the role's name and,
+                         optionally, an existing team to put it in. Live UX request, 2026-09-28:
+                         always available now — "Without Team" (the popup's own default <select>
+                         option) is a first-class choice, not something that only happens later when
+                         a role's own team gets deleted. -->
+                    <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-role-dialog">Create a new role</button>
+                    <!-- Live UX request, 2026-10-02: the Configure > Workspace Roles list page this
+                         linked from is gone (its own listing was redundant with the table above) —
+                         this is now the one remaining entry point into that advanced create form,
+                         the only one that lets permissions/a parent role be set at creation time
+                         instead of afterwards from the role's own detail page. -->
+                    <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/new(organizationId=${organization.id()})}">Advanced create</a>
+                </div>
             </div>
 
             <dialog id="create-team-dialog" class="clavaris-dialog">
@@ -346,5 +429,6 @@
     </main>
 </div>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/role-picker.js') : '/js/role-picker.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/roles-table-filter.js') : '/js/roles-table-filter.js'}" defer></script>
 </body>
 </html>
