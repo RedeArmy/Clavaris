@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
@@ -15,7 +14,6 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -122,8 +120,14 @@ class AssignWorkspaceRoleToAccountServiceTest {
             any());
   }
 
+  // Confirmed with the user, 2026-10-01: unlike ChangeWorkspaceMemberRoleService (the REST
+  // admin-API sibling a consuming application's own OrganizationClient can call), this
+  // dashboard-only use case deliberately does NOT enforce BR-WS-01's "at least one
+  // manage_members holder" invariant — see this service's own Javadoc for the full reasoning.
+  // The platform operator, acting through Clavaris's own admin surface, may leave a Workspace in
+  // this state.
   @Test
-  void rejectsDemotingTheLastManageMembersHolderWithoutSavingAnything() {
+  void allowsDemotingTheLastManageMembersHolderSinceThisIsAnOperatorDrivenDashboardAction() {
     WorkspaceMembership existing =
         WorkspaceMembership.join(workspace.id(), accountId, manageMembersRole.id());
     when(memberships.findByWorkspaceIdAndAccountId(workspace.id(), accountId))
@@ -132,12 +136,10 @@ class AssignWorkspaceRoleToAccountServiceTest {
     AssignWorkspaceRoleToAccountCommand command =
         new AssignWorkspaceRoleToAccountCommand(workspace.id(), accountId, plainRole.id(), ACTOR);
 
-    assertThatExceptionOfType(CannotDemoteLastAdminException.class)
-        .isThrownBy(() -> service.handle(command));
+    WorkspaceMembership updated = service.handle(command);
 
-    verify(memberships, never()).save(any());
-    verifyNoInteractions(auditEvents);
-    verifyNoInteractions(outbox);
+    assertThat(updated.roleId()).isEqualTo(plainRole.id());
+    verify(memberships).save(updated);
   }
 
   @Test

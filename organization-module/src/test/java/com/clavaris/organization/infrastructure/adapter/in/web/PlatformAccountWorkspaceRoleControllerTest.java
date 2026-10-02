@@ -17,7 +17,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AccountNotInOrganizationException;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.findworkspacemembershipforaccount.FindWorkspaceMembershipForAccountUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
@@ -235,24 +234,6 @@ class PlatformAccountWorkspaceRoleControllerTest {
         .andExpect(header().string("HX-Trigger", "workspace-role-assigned"));
 
     verify(assignRoleToAccount).handle(any());
-  }
-
-  @Test
-  void postWithCannotDemoteLastAdminReRendersTheFormInsteadOfPropagatingTheException()
-      throws Exception {
-    WorkspaceMembership membership = WorkspaceMembership.join(workspace.id(), accountId, role.id());
-    when(findMembership.handle(any())).thenReturn(Optional.of(membership));
-    doThrow(new CannotDemoteLastAdminException(workspace.id()))
-        .when(assignRoleToAccount)
-        .handle(any());
-
-    mockMvc
-        .perform(
-            post(assignRolePath())
-                .param("workspaceId", workspace.id().toString())
-                .param("newRoleId", UUID.randomUUID().toString()))
-        .andExpect(status().isOk())
-        .andExpect(header().doesNotExist("HX-Trigger"));
   }
 
   // SDE-III redesign, 2026-09-27 ("Way 2"): this used to 404 — the whole point of this redesign is

@@ -499,8 +499,7 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID teamId,
       @RequestParam final UUID accountId,
-      @RequestParam final UUID roleId,
-      final Model model) {
+      @RequestParam final UUID roleId) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
@@ -515,8 +514,7 @@ public class PlatformWorkspaceController {
             roleId,
             teamRoles,
             ownerPlatformAccountId,
-            assignRoleToTeamAction(organizationId, workspaceId, teamId)),
-        model);
+            assignRoleToTeamAction(organizationId, workspaceId, teamId)));
   }
 
   // Live UX request, 2026-09-27: the synthetic "No team" group's own "Assign role" popup — same
@@ -549,8 +547,7 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @RequestParam final UUID accountId,
-      @RequestParam final UUID roleId,
-      final Model model) {
+      @RequestParam final UUID roleId) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     requireOwnedOrganization(organizationId, ownerPlatformAccountId);
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
@@ -565,8 +562,7 @@ public class PlatformWorkspaceController {
             roleId,
             ungroupedRoles,
             ownerPlatformAccountId,
-            assignRoleToNoTeamAction(organizationId, workspaceId)),
-        model);
+            assignRoleToNoTeamAction(organizationId, workspaceId)));
   }
 
   // ADR-0028: the Workspace-detail page's own Teams & Roles section — create/rename/delete a team,
@@ -1062,8 +1058,7 @@ public class PlatformWorkspaceController {
   private String processAssignRole(
       final HttpServletRequest request,
       final HttpServletResponse response,
-      final AssignRoleAttempt attempt,
-      final Model model) {
+      final AssignRoleAttempt attempt) {
     final boolean roleBelongsToThisGroup =
         attempt.groupRoles().stream().anyMatch(role -> role.id().equals(attempt.roleId()));
     if (!roleBelongsToThisGroup) {
@@ -1081,16 +1076,12 @@ public class PlatformWorkspaceController {
               AuditActor.platformAccount(attempt.ownerPlatformAccountId())));
     } catch (final AccountNotInOrganizationException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-    } catch (final CannotDemoteLastAdminException _) {
-      model.addAttribute(CANNOT_DEMOTE_LAST_ADMIN_ERROR_ATTRIBUTE, true);
-      populateAssignRoleModel(
-          model,
-          attempt.organizationId(),
-          attempt.workspace(),
-          attempt.groupRoles(),
-          attempt.assignRoleAction());
-      return ASSIGN_ROLE_FORM_FRAGMENT;
     }
+    // No CannotDemoteLastAdminException catch here (confirmed with the user, 2026-10-01):
+    // AssignWorkspaceRoleToAccountService deliberately no longer enforces that guard for this
+    // operator-driven dashboard action — see that service's own Javadoc. The other
+    // CannotDemoteLastAdminException catch blocks in this class (delete role / delete team /
+    // remove member) are untouched and keep enforcing it.
 
     // Real bug found live, 2026-09-27: this used to always return the bare HTML fragment,
     // breaking "every action here works identically with JavaScript disabled" (this class's own

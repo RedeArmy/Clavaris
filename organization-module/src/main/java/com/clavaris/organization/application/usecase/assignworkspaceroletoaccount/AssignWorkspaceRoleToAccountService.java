@@ -1,11 +1,9 @@
 package com.clavaris.organization.application.usecase.assignworkspaceroletoaccount;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
-import com.clavaris.organization.application.usecase.addworkspacemember.ManageMembersGuard;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
-import com.clavaris.organization.application.usecase.changeworkspacememberrole.CannotDemoteLastAdminException;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.deleteorganization.EventOutboxWriter;
@@ -85,19 +83,20 @@ public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleT
         memberships.findByWorkspaceIdAndAccountId(command.workspaceId(), command.accountId());
     final UUID previousRoleId = existing.map(WorkspaceMembership::roleId).orElse(null);
 
-    // ADR-0027 §2: same ManageMembersGuard every other role-changing use case already applies —
-    // reassigning someone away from a manage_members-holding role can't leave zero holders. A
-    // brand-new membership (existing is empty) always has a null previousRoleId, so this
-    // short-circuits immediately (they held nothing before, so there's nothing to protect).
-    ManageMembersGuard.assertActionKeepsAtLeastOneHolder(
-        memberships,
-        roles,
-        command.workspaceId(),
-        workspace.organizationId(),
-        previousRoleId,
-        command.roleId(),
-        () -> new CannotDemoteLastAdminException(command.workspaceId()));
-
+    // Deliberately NOT ManageMembersGuard here, unlike ChangeWorkspaceMemberRoleService (the REST
+    // admin-API sibling a consuming application's own OrganizationClient can call). This use case
+    // is reachable only from the platform operator's own dashboard session
+    // (PlatformWorkspaceController
+    // / PlatformAccountWorkspaceRoleController, both @Controller under /platform/dashboard/**,
+    // never a consumer-facing endpoint) — BR-WS-01's own invariant ("a Workspace always has at
+    // least one clavaris:workspace:manage_members holder") exists so the *consuming application's*
+    // own logic (WorkspaceRoleClaimsCustomizer's own workspace_permissions claim is what it reads)
+    // never finds itself with zero admins, not because Clavaris's own authorization logic depends
+    // on it — Clavaris never gates any of its own endpoints on this permission string. The platform
+    // operator, acting through Clavaris's own admin surface, is a deliberately higher trust tier
+    // than a consuming application's own backend and may leave a Workspace in this state — the
+    // operator made the call, not a generic tenant-reachable write path. Confirmed with the user,
+    // 2026-10-01: ChangeWorkspaceMemberRoleService keeps enforcing this invariant unchanged.
     final WorkspaceMembership updated =
         existing
             .map(membership -> membership.withRoleId(command.roleId()))
