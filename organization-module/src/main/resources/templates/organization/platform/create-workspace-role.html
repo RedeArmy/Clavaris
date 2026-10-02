@@ -8,17 +8,11 @@
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <!-- Live UX request, 2026-10-02: the "Workspace Roles" breadcrumb segment used to link
-                 to this controller's own list page — removed (its listing moved into Teams &
-                 Roles' own unified table, workspace-detail.html). No page replaces it in this
-                 breadcrumb's own hierarchy, so the segment is gone rather than pointed at a 404 or
-                 a page this controller has no way to resolve (it has no Workspace context of its
-                 own to redirect into). -->
-            <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-                <span>New Role</span>
-            </p>
+            <!-- Live UX request, 2026-10-02: Back returns to wherever this page was opened from —
+                 Configure > Workspace Roles by default, or Teams & Roles when "Advanced create"
+                 there linked in with its own workspaceId (backTarget/backLabel, populateBackTarget's
+                 own Javadoc). -->
+            <div th:replace="~{organization/platform/fragments/workspace-role-page-header :: header(${organization}, ${backTarget}, ${backLabel}, 'New Role')}"></div>
 
             <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
 
@@ -41,12 +35,12 @@
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}"
                               th:object="${createForm}" method="post">
                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <!-- Carries workspaceId through a validation-error redisplay (a GET query
+                                 param alone wouldn't survive this POST) so Back/Cancel still returns
+                                 to Teams & Roles instead of silently falling back to the list. -->
+                            <input type="hidden" name="workspaceId" th:if="${workspaceId != null}" th:value="${workspaceId}"/>
 
-                            <div class="clavaris-field">
-                                <label for="role-name">Name</label>
-                                <input id="role-name" type="text" th:field="*{name}" required/>
-                                <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
-                            </div>
+                            <div th:replace="~{organization/platform/fragments/workspace-role-name-field :: nameField}"></div>
 
                             <div class="clavaris-field">
                                 <label for="role-parent">Parent role (optional)</label>
@@ -66,12 +60,8 @@
                             </div>
 
                             <button class="clavaris-button clavaris-button--inline" type="submit">Create role</button>
-                            <!-- Same removed-list note as this page's own breadcrumb above — this
-                                 controller has no single Workspace to send Cancel back into, so the
-                                 Organization's own detail page is the nearest always-valid
-                                 destination, same as create()'s own catch-all redirect target. -->
                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                               th:href="@{/platform/dashboard/organizations/{organizationId}(organizationId=${organization.id()})}">Cancel</a>
+                               th:href="${backTarget}">Cancel</a>
                         </form>
                     </div>
                 </div>

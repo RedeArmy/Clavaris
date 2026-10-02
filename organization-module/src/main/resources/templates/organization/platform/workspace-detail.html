@@ -82,7 +82,7 @@
                                             <td>
                                                 <div class="clavaris-row-actions">
                                                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()})}">Modify</a>
+                                                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${role.id()},workspaceId=${workspace.id()})}">Modify</a>
                                                     <!-- TD-FUT-035: same click-through confirm dialog as Delete
                                                          team below — a <dialog> can't legally live inside a
                                                          <table>, so the dialog itself is rendered in a second
@@ -284,7 +284,7 @@
                                 <td>
                                     <div class="clavaris-row-actions">
                                         <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                                           th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${entry.role().id()})}">Modify</a>
+                                           th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}(organizationId=${organization.id()},roleId=${entry.role().id()},workspaceId=${workspace.id()})}">Modify</a>
                                         <button th:unless="${forceConfirmRoleId == entry.role().id()}"
                                                 class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
                                                 th:attr="data-dialog-open=${'delete-role-dialog-' + entry.role().id()}">Delete</button>
@@ -354,13 +354,14 @@
                          option) is a first-class choice, not something that only happens later when
                          a role's own team gets deleted. -->
                     <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-role-dialog">Create a new role</button>
-                    <!-- Live UX request, 2026-10-02: the Configure > Workspace Roles list page this
-                         linked from is gone (its own listing was redundant with the table above) —
-                         this is now the one remaining entry point into that advanced create form,
-                         the only one that lets permissions/a parent role be set at creation time
-                         instead of afterwards from the role's own detail page. -->
+                    <!-- Live UX request, 2026-10-02: the one entry point into that advanced create
+                         form from this page — the only one that lets permissions/a parent role be
+                         set at creation time instead of afterwards from the role's own detail page.
+                         Carries this Workspace's own id so that form's own Back/Cancel button
+                         returns here instead of the Configure > Workspace Roles list
+                         (PlatformWorkspaceRoleController#populateBackTarget's own Javadoc). -->
                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
-                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/new(organizationId=${organization.id()})}">Advanced create</a>
+                       th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/new(organizationId=${organization.id()},workspaceId=${workspace.id()})}">Advanced create</a>
                 </div>
             </div>
 
