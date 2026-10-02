@@ -40,11 +40,7 @@
                                  to Teams & Roles instead of silently falling back to the list. -->
                             <input type="hidden" name="workspaceId" th:if="${workspaceId != null}" th:value="${workspaceId}"/>
 
-                            <div class="clavaris-field">
-                                <label for="role-name">Name</label>
-                                <input id="role-name" type="text" th:field="*{name}" required/>
-                                <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
-                            </div>
+                            <div th:replace="~{organization/platform/fragments/workspace-role-name-field :: nameField}"></div>
 
                             <div class="clavaris-field">
                                 <label for="role-parent">Parent role (optional)</label>
