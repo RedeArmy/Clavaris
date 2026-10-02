@@ -914,6 +914,164 @@ code {
   padding-left: var(--space-4);
 }
 
+/* Live UX request, 2026-10-01 — workspace-detail.html's own Teams & Roles redesign: "Teams" and
+   "Roles" as two titled subsections under the page's own h2, one tier down from .clavaris-section
+   h2 (that one's already used by "Teams & Roles" itself above this). */
+.clavaris-section-subtitle {
+  margin: 0 0 var(--space-3);
+  font-size: .95rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--clavaris-text-primary);
+}
+.clavaris-section-subtitle:not(:first-child) {
+  margin-top: var(--space-6);
+}
+
+/* Every team used to be its own full-width .clavaris-section-card — with more than a couple of
+   teams, that read as a wall of near-identical white boxes, and the always-visible rename
+   <input>+button inside each one looked like a form left mid-edit, not a label. Teams now live as
+   rows inside ONE card (this class), each a native <details> whose own name="" attribute (shared
+   across every row — intentionally the same literal string, not Thymeleaf-templated per row) makes
+   the whole group a browser-native exclusive accordion: opening one row closes whichever other was
+   open, no JS required (same "zero JS by default" convention .clavaris-profile's own [open]
+   chevron-rotate rule already establishes below). */
+.clavaris-team-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+.clavaris-team-row + .clavaris-team-row {
+  border-top: 1px solid color-mix(in srgb, var(--clavaris-border) 70%, transparent);
+}
+.clavaris-team-row__disclosure {
+  flex: 1;
+  min-width: 0;
+}
+.clavaris-team-row__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+.clavaris-team-row__summary::-webkit-details-marker {
+  display: none;
+}
+.clavaris-team-row__chevron {
+  flex: 0 0 auto;
+  color: var(--clavaris-text-muted);
+  transition: transform 160ms ease;
+}
+.clavaris-team-row__disclosure[open] .clavaris-team-row__chevron {
+  transform: rotate(180deg);
+}
+.clavaris-team-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clavaris-team-row__count {
+  flex: 0 0 auto;
+  margin-left: var(--space-2);
+  color: var(--clavaris-text-muted);
+  font-size: .78rem;
+  font-weight: 500;
+}
+.clavaris-team-row__body {
+  margin-top: var(--space-3);
+  padding-left: calc(1rem + var(--space-2));
+}
+.clavaris-team-row__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Small circular icon-only trigger — same treatment .clavaris-dialog__close/.clavaris-menu__trigger
+   already give a compact icon button, reused here for "Rename team"'s own pencil. */
+.clavaris-icon-button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  color: var(--clavaris-text-muted);
+  font-size: .95rem;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+  background: var(--clavaris-bg);
+  border: 1px solid var(--clavaris-border);
+  border-radius: 50%;
+}
+.clavaris-icon-button::-webkit-details-marker {
+  display: none;
+}
+.clavaris-icon-button:hover {
+  color: var(--clavaris-text-primary);
+}
+
+/* Rename's own pencil-icon disclosure: click to reveal a small inline Save form next to the icon,
+   click the pencil again to collapse (no changes were submitted, so this doubles as Cancel) — zero
+   JS, same native <details> convention the row's own roles-disclosure above already uses. */
+.clavaris-inline-edit {
+  position: relative;
+}
+.clavaris-inline-edit__form {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: max-content;
+  padding: var(--space-3);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+}
+.clavaris-inline-edit__form input[type="text"] {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-sm);
+}
+
+/* The old "Add existing role" <select> only ever showed role NAMES one at a time and couldn't
+   multi-select — replaced by a paginated (10/page), checkbox-based picker inside this team's own
+   dialog. Plain checkboxes, not the .clavaris-toggle track/thumb switch above: that component is
+   deliberately reserved for true on/off settings (its own header comment), never a "pick N of many"
+   list — same distinction .clavaris-event-option's own checkboxes already draw for the webhook
+   event-type picker, reused here. */
+.clavaris-role-picker {
+  margin-bottom: var(--space-4);
+  max-height: 340px;
+  overflow-y: auto;
+}
+.clavaris-role-picker__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+.clavaris-role-picker__option input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+}
+.clavaris-role-picker__page-indicator {
+  color: var(--clavaris-text-muted);
+  font-size: .8rem;
+}
+
 .clavaris-empty-state {
   padding: var(--space-6);
   text-align: center;

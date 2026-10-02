@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -874,11 +875,40 @@ class PlatformWorkspaceControllerTest {
     UUID teamId = UUID.randomUUID();
 
     mockMvc
-        .perform(post(teamsPath() + "/" + teamId + "/roles").param("roleId", role.id().toString()))
+        .perform(post(teamsPath() + "/" + teamId + "/roles").param("roleIds", role.id().toString()))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
 
     verify(addRoleToTeam).handle(any());
+  }
+
+  // Live UX request, 2026-10-01: the picker popup is multi-select — one submit carries several
+  // roleIds, each added through its own AddRoleToWorkspaceTeamUseCase#handle call.
+  @Test
+  void addRoleToTeamPostWithMultipleRoleIdsHandlesEachOneIndividually() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceRole secondRole = WorkspaceRole.define(organization.id(), "Reviewer", null, Set.of());
+
+    mockMvc
+        .perform(
+            post(teamsPath() + "/" + teamId + "/roles")
+                .param("roleIds", role.id().toString(), secondRole.id().toString()))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(addRoleToTeam, times(2)).handle(any());
+  }
+
+  @Test
+  void addRoleToTeamPostWithNoRoleIdsSelectedIsANoOp() throws Exception {
+    UUID teamId = UUID.randomUUID();
+
+    mockMvc
+        .perform(post(teamsPath() + "/" + teamId + "/roles"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(workspacesPath() + "/" + workspace.id()));
+
+    verify(addRoleToTeam, never()).handle(any());
   }
 
   @Test
@@ -890,7 +920,7 @@ class PlatformWorkspaceControllerTest {
         .handle(any());
 
     mockMvc
-        .perform(post(teamsPath() + "/" + teamId + "/roles").param("roleId", role.id().toString()))
+        .perform(post(teamsPath() + "/" + teamId + "/roles").param("roleIds", role.id().toString()))
         .andExpect(status().isOk())
         .andExpect(view().name("organization/platform/workspace-detail"))
         .andExpect(model().attribute("roleAlreadyInAnotherTeamError", true));

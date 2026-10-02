@@ -677,6 +677,12 @@ public class PlatformWorkspaceController {
   // Attaches one of this Organization's already-existing, currently-ungrouped roles to a team —
   // kept alongside the "create a new role" popup below for the case where a role was created (or
   // left ungrouped after its own team was deleted) via Configure > Workspace Roles without one.
+  // Live UX request, 2026-10-01: the single-select <select> + "Add existing role" pair became a
+  // paginated, multi-select checkbox popup — one submit can now carry several roleIds at once.
+  // Each is still added through the same one-role-at-a-time AddRoleToWorkspaceTeamUseCase (its own
+  // Javadoc: idempotent per role, its own @Transactional boundary) — a failure partway through this
+  // loop leaves whatever was added before it committed, same end state as if the operator had
+  // submitted them one at a time.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams/{teamId}/roles")
   public String addRoleToTeam(
@@ -684,7 +690,7 @@ public class PlatformWorkspaceController {
       @PathVariable final UUID organizationId,
       @PathVariable final UUID workspaceId,
       @PathVariable final UUID teamId,
-      @RequestParam final UUID roleId,
+      @RequestParam(required = false) final List<UUID> roleIds,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
@@ -692,9 +698,11 @@ public class PlatformWorkspaceController {
     final Workspace workspace = requireOwnedWorkspace(organizationId, workspaceId);
 
     try {
-      addRoleToTeamUseCase.handle(
-          new AddRoleToWorkspaceTeamCommand(
-              workspaceId, teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+      for (final UUID roleId : roleIds == null ? List.<UUID>of() : roleIds) {
+        addRoleToTeamUseCase.handle(
+            new AddRoleToWorkspaceTeamCommand(
+                workspaceId, teamId, roleId, AuditActor.platformAccount(ownerPlatformAccountId)));
+      }
     } catch (final WorkspaceTeamNotFoundException | WorkspaceRoleNotFoundException _) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     } catch (final WorkspaceRoleAlreadyInAnotherTeamException _) {
