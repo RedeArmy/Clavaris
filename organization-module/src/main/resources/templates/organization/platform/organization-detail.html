@@ -10,26 +10,6 @@
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> / <span th:text="${organization.name()}">Organization</span></p>
 
-            <div class="clavaris-page-header">
-                <div>
-                    <h1 th:text="${organization.name()}">Organization name</h1>
-                    <p>
-                        <span class="clavaris-badge"
-                              th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organization.environment().name() == 'PRODUCTION')}"
-                              th:text="${organization.environment()}">DEVELOPMENT</span>
-                        &#183; Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organization.createdAt())}">date</span>
-                    </p>
-                    <!-- SDE-III review, 2026-09-18: previously shown nowhere as text on this whole
-                         dashboard — only ever implicit in every sub-page's own URL — despite every
-                         REST admin API call and OAuth Client setup instructions needing it typed in
-                         by hand. Plain selectable <code>, same convention this page's own OAuth
-                         Client/Secret Key/Signing Key screens already use for copyable values;
-                         no clipboard JS added (none exists anywhere in this codebase today, and one
-                         value doesn't earn introducing that infrastructure). -->
-                    <p>Organization ID: <code th:text="${organization.id()}">organization id</code></p>
-                </div>
-            </div>
-
             <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'workspaces')}"></div>
 
             <!-- ADR-0025: same HTMX-fragment shape as dashboard.html's own "content" div — the
@@ -42,9 +22,18 @@
                  navigating between org-tabs.html's four tabs no longer resizes the page to match
                  whichever tab's data happens to be shorter or taller. -->
             <div id="workspaces-content" th:fragment="workspaces" class="clavaris-section clavaris-org-tab-content">
-                <h2>Workspaces</h2>
+                <!-- The Organization's own name/environment/date/ID now live in the persistent header above
+                     the tabs (common platform/fragments/organization-header.html), identical on every tab,
+                     so this tab's title block is just a title like Users' and Logs' are. -->
+                <div class="clavaris-page-header">
+                    <div>
+                        <h1>Workspaces</h1>
+                        <p>Isolated groupings of teams, roles and members inside this Organization.</p>
+                    </div>
+                    <button class="clavaris-button clavaris-button--inline" type="button" data-dialog-open="create-workspace-dialog">New workspace</button>
+                </div>
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(workspaces)}">
-                    <p class="clavaris-empty-state">No workspaces yet — create your first one below.</p>
+                    <p class="clavaris-empty-state">No workspaces yet — use “New workspace” above to create the first one.</p>
                 </div>
                 <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(workspaces)}">
                     <table class="clavaris-table">
@@ -142,7 +131,19 @@
                        hx-target="#workspaces-content" hx-swap="outerHTML">Next</a>
                 </nav>
 
-                <div class="clavaris-section-card">
+                <!-- "New workspace" popup, opened from the header button. It lives inside this fragment, so
+                     a successful HTMX create swaps in a fresh fragment with the dialog closed, and a
+                     validation error re-renders it with data-dialog-open-on-load, reopening the popup with
+                     the error in context (same pattern as the Organizations dashboard's create dialog). -->
+                <dialog id="create-workspace-dialog" class="clavaris-dialog">
+                    <div class="clavaris-dialog__header">
+                        <div>
+                            <span class="clavaris-dialog__eyebrow">Workspace</span>
+                            <h2>New workspace</h2>
+                            <p>Choose a name for the new workspace.</p>
+                        </div>
+                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close new workspace dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                    </div>
                     <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces(organizationId=${organization.id()})}"
                           th:object="${workspaceForm}" method="post"
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces(organizationId=${organization.id()})}"
@@ -152,12 +153,15 @@
                         <div class="clavaris-field">
                             <label for="workspace-name">New workspace name</label>
                             <input id="workspace-name" type="text" th:field="*{name}" required/>
-                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name error</p>
+                            <p class="clavaris-field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}" data-dialog-open-on-load>Name error</p>
                         </div>
 
-                        <button class="clavaris-button clavaris-button--inline" type="submit">Create workspace</button>
+                        <div class="clavaris-dialog__actions">
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Create workspace</button>
+                        </div>
                     </form>
-                </div>
+                </dialog>
             </div>
 
         </div>

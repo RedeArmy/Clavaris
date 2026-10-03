@@ -304,6 +304,77 @@ class PlatformWorkspaceRoleControllerTest {
                         + workspaceId));
   }
 
+  // The Workspace Role pages carry their own, more specific Back (to Configure > Workspace Roles or
+  // to Teams & Roles); the generic "Back to Your Organizations" from the org tabs fragment must not
+  // render beside it.
+  @Test
+  void showDetailRendersExactlyOneBackButton() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/" + customRole.id()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("Back to Your Organizations"))))
+        .andExpect(
+            result ->
+                org.junit.jupiter.api.Assertions.assertEquals(
+                    1,
+                    result
+                            .getResponse()
+                            .getContentAsString()
+                            .split("class=\"clavaris-back-button\"", -1)
+                            .length
+                        - 1));
+  }
+
+  @Test
+  void showCreateFormRendersExactlyOneBackButton() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/new"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("Back to Your Organizations"))))
+        .andExpect(
+            result ->
+                org.junit.jupiter.api.Assertions.assertEquals(
+                    1,
+                    result
+                            .getResponse()
+                            .getContentAsString()
+                            .split("class=\"clavaris-back-button\"", -1)
+                            .length
+                        - 1));
+  }
+
+  // The Permissions field is a picker over a textarea: the textarea keeps posting permissionsText,
+  // and the page offers Clavaris's own reserved permissions plus whatever the Organization's other
+  // roles already carry as one-click suggestions.
+  @Test
+  void showCreateFormOffersTheReservedAndAlreadyUsedPermissionsAsSuggestions() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/new"))
+        .andExpect(status().isOk())
+        .andExpect(model().attributeExists("clavarisPermissions", "usedPermissions"))
+        .andExpect(content().string(containsString("data-permission-picker")))
+        .andExpect(content().string(containsString("data-permission-source")))
+        .andExpect(
+            content().string(containsString("data-permission=\"clavaris:workspace:manage_roles\"")))
+        .andExpect(content().string(containsString("/js/permission-picker.js")));
+  }
+
+  @Test
+  void showDetailLocksThePickerForTheReservedRole() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/" + reservedRole.id()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-permission-picker")))
+        .andExpect(content().string(containsString("readonly=\"readonly\"")))
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("data-permission-suggestion"))));
+  }
+
   @Test
   void showDetailReturns404ForARoleFromAnotherOrganization() throws Exception {
     mockMvc.perform(get(rolesPath() + "/" + UUID.randomUUID())).andExpect(status().isNotFound());

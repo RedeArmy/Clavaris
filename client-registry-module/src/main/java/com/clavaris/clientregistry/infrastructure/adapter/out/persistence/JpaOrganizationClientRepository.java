@@ -73,6 +73,14 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
     }
   }
 
+  // deleteById, not a derived query - the caller already holds the full domain object from its own
+  // ownership-checked lookup; same shape JpaOAuthClientRepository#delete uses.
+  @Override
+  public void delete(final OrganizationClient organizationClient) {
+    organizationClients.deleteById(organizationClient.id());
+    organizationClients.flush();
+  }
+
   @Override
   public void deleteAllByOrganizationId(final UUID organizationId) {
     organizationClients.deleteAllByOrganizationId(organizationId);

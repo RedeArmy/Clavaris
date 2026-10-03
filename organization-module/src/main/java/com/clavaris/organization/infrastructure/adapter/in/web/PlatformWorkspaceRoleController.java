@@ -26,6 +26,7 @@ import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateW
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.WorkspaceRoleCycleException;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.ReservedWorkspacePermissions;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import com.clavaris.organization.domain.model.WorkspaceTeam;
@@ -493,6 +494,25 @@ public class PlatformWorkspaceRoleController {
         rolesById.values().stream().sorted(Comparator.comparing(WorkspaceRole::name)).toList();
     model.addAttribute(ROLES_ATTRIBUTE, sortedRoles);
     model.addAttribute(ROLES_BY_ID_ATTRIBUTE, rolesById);
+    addPermissionSuggestions(model, sortedRoles);
+  }
+
+  // Suggestions for the Permissions picker: Clavaris keeps no catalog of consumer-defined
+  // permissions (ADR-0027 §1), so what it can offer is its own reserved permissions plus every
+  // permission any role of this Organization already carries — sorted, distinct. A future
+  // per-Organization permission catalog replaces only this method.
+  private static void addPermissionSuggestions(
+      final Model model, final List<WorkspaceRole> organizationRoles) {
+    final List<String> usedPermissions =
+        organizationRoles.stream()
+            .flatMap(role -> role.permissions().stream())
+            .filter(permission -> !ReservedWorkspacePermissions.ALL.contains(permission))
+            .distinct()
+            .sorted()
+            .toList();
+    model.addAttribute(
+        "clavarisPermissions", ReservedWorkspacePermissions.ALL.stream().sorted().toList());
+    model.addAttribute("usedPermissions", usedPermissions);
   }
 
   private Map<UUID, WorkspaceRole> loadRolesById(final UUID organizationId) {

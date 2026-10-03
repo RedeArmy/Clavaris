@@ -1,0 +1,20 @@
+<!--
+One read-only value on the API Keys page: a label and a one-line hint on the left, the value in a
+monospace box with a one-click Copy button on the right (stacked on narrow screens). Defined once
+here so the four rows can never drift apart. The Copy button only carries data-copy-target (the
+value element's id); copy-to-clipboard.js does the rest.
+-->
+<div th:fragment="row(id, label, hint, value)" class="clavaris-kv">
+    <div class="clavaris-kv__meta">
+        <p class="clavaris-kv__label" th:text="${label}">Label</p>
+        <p class="clavaris-kv__hint" th:text="${hint}">Hint</p>
+    </div>
+    <div class="clavaris-copy-field">
+        <code class="clavaris-copy-field__value" th:id="${id}" th:text="${value}" tabindex="0">value</code>
+        <button type="button" class="clavaris-copy-button" th:attr="data-copy-target=${id},aria-label=${'Copy ' + label}">
+            <svg class="clavaris-icon clavaris-copy-button__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+            <svg class="clavaris-icon clavaris-copy-button__done" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+            <span data-copy-label>Copy</span>
+        </button>
+    </div>
+</div>

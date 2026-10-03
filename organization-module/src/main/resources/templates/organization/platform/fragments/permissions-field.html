@@ -1,0 +1,49 @@
+<!--
+The Permissions field of a Workspace Role, shared by the create and detail pages (it renders inside
+their <form>, so *{permissionsText} resolves against whichever form object that page uses).
+
+Progressive enhancement: the real field is, and stays, the textarea (one opaque permission string
+per line — the contract PlatformWorkspaceRoleController already parses). Without JavaScript that
+textarea is all there is. permission-picker.js hides it and replaces it with removable chips, a
+single-token input, and the suggestion buttons below, writing every change back into the textarea
+so the form posts exactly what it always did.
+
+Suggestions are the permissions already in use across this Organization's roles (plus Clavaris's own
+reserved ones), computed by the controller: Clavaris keeps no catalog of consumer-defined
+permissions (ADR-0027 §1). A future per-Organization permission catalog would replace only that
+suggestion list; this field would not change.
+
+locked: true for the Organization's reserved role, whose permissions can't be edited (the domain
+rejects stripping them). The textarea is then readonly (not disabled: a disabled field is never
+posted, which would send permissionsText=null and trip the reserved-permissions guard).
+-->
+<div th:fragment="field(label, locked)" class="clavaris-field clavaris-permission-picker" data-permission-picker>
+    <label for="role-permissions" th:text="${label}">Permissions</label>
+    <textarea id="role-permissions" th:field="*{permissionsText}" rows="6" data-permission-source
+              th:readonly="${locked}"
+              placeholder="One permission per line, e.g.&#10;jobseeker:candidates:review&#10;jobseeker:interviews:schedule"></textarea>
+
+    <div class="clavaris-permission-picker__suggestions" data-permission-suggestions th:unless="${locked}">
+        <div class="clavaris-permission-picker__group" th:if="${!#lists.isEmpty(clavarisPermissions)}">
+            <p class="clavaris-permission-picker__group-title">Clavaris permissions</p>
+            <div class="clavaris-permission-picker__chips">
+                <button type="button" class="clavaris-chip clavaris-chip--toggle" aria-pressed="false"
+                        th:each="permission : ${clavarisPermissions}"
+                        th:attr="data-permission=${permission}" data-permission-suggestion
+                        th:text="${permission}">clavaris:workspace:manage_members</button>
+            </div>
+        </div>
+        <div class="clavaris-permission-picker__group" th:if="${!#lists.isEmpty(usedPermissions)}">
+            <p class="clavaris-permission-picker__group-title">Already used in this Organization</p>
+            <div class="clavaris-permission-picker__chips">
+                <button type="button" class="clavaris-chip clavaris-chip--toggle" aria-pressed="false"
+                        th:each="permission : ${usedPermissions}"
+                        th:attr="data-permission=${permission}" data-permission-suggestion
+                        th:text="${permission}">jobseeker:candidates:review</button>
+            </div>
+        </div>
+    </div>
+
+    <p class="clavaris-field-hint" th:unless="${locked}">One opaque permission string each — your own application defines what it means. Pick from the permissions already in use, or type a new one and press Enter.</p>
+    <p class="clavaris-field-hint" th:if="${locked}">This Organization's reserved role always carries its own management permissions and can't have them edited away.</p>
+</div>

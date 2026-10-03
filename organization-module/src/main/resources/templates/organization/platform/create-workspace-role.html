@@ -14,7 +14,7 @@
                  own Javadoc). -->
             <div th:replace="~{organization/platform/fragments/workspace-role-page-header :: header(${organization}, ${backTarget}, ${backLabel}, 'New Role')}"></div>
 
-            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
+            <div th:replace="~{organization/platform/fragments/org-tabs :: strip(${organization.id()}, 'configure')}"></div>
 
             <div class="clavaris-configure-layout">
                 <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organization.id()}, 'workspace-roles')}"></div>
@@ -52,12 +52,7 @@
                                 <p class="clavaris-field-hint">A role inherits every permission its parent (and its parent's own ancestors) carries.</p>
                             </div>
 
-                            <div class="clavaris-field">
-                                <label for="role-permissions">Permissions (optional)</label>
-                                <textarea id="role-permissions" th:field="*{permissionsText}" rows="6"
-                                          placeholder="One permission per line, e.g.&#10;jobseeker:candidates:review&#10;jobseeker:interviews:schedule"></textarea>
-                                <p class="clavaris-field-hint">One opaque permission string per line — your own application defines what each one means.</p>
-                            </div>
+                            <div th:replace="~{organization/platform/fragments/permissions-field :: field('Permissions (optional)', false)}"></div>
 
                             <button class="clavaris-button clavaris-button--inline" type="submit">Create role</button>
                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
@@ -68,6 +63,7 @@
             </div>
         </div>
     </main>
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/permission-picker.js') : '/js/permission-picker.js'}" defer></script>
 </div>
 </body>
 </html>

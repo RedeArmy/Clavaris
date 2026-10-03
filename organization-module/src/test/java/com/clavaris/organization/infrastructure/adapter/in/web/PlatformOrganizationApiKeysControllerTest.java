@@ -105,6 +105,28 @@ class PlatformOrganizationApiKeysControllerTest {
             content().string(Matchers.containsString("rotating the signing key will break")));
   }
 
+  // Every value on the page is a copy-ready row: each Copy button points at the id of the element
+  // holding the value, and the one script that does the copying is loaded.
+  @Test
+  void getRendersEveryValueWithAOneClickCopyButton() throws Exception {
+    when(getApiKeys.handle(organization.id())).thenReturn(Optional.of(sampleApiKeys()));
+
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(Matchers.containsString("data-copy-target=\"api-publishable-key\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-copy-target=\"api-frontend-url\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-copy-target=\"api-backend-url\"")))
+        .andExpect(content().string(Matchers.containsString("data-copy-target=\"api-jwks-url\"")))
+        .andExpect(
+            content().string(Matchers.containsString("data-copy-target=\"api-jwks-public-key\"")))
+        .andExpect(content().string(Matchers.containsString("id=\"api-jwks-public-key\"")))
+        .andExpect(content().string(Matchers.containsString("/js/copy-to-clipboard.js")));
+  }
+
   @Test
   void getReturnsNotFoundWhenTheOrganizationIsNotOwnedByTheCurrentAccount() throws Exception {
     when(getOrganization.handle(any())).thenReturn(Optional.empty());

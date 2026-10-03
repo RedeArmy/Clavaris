@@ -1,0 +1,21 @@
+<!--
+The persistent Organization header: name, environment, creation date and ID, shown above the tab row
+of every Organization tab (Workspaces, Users, Logs, Configure and its sub-pages) so the page frame
+is identical whichever tab is open. Included once by each module's own org-tabs.html (the four
+hand-duplicated copies), never by individual pages. Renders nothing when no "organizationHeader"
+model attribute is present (e.g. a fragment-only HTMX response).
+
+The name is a styled paragraph, not a heading: every tab already owns the page's single <h1>
+(Workspaces, Users, Logs, ...). The ID is plain selectable text — every REST admin API call and the
+OAuth Client setup instructions need it typed in by hand; no clipboard JS.
+-->
+<div th:fragment="header" th:if="${organizationHeader != null}" class="clavaris-org-header">
+    <p class="clavaris-org-header__name" th:text="${organizationHeader.name()}">Organization name</p>
+    <p class="clavaris-org-header__meta">
+        <span class="clavaris-badge"
+              th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organizationHeader.production())}"
+              th:text="${organizationHeader.environmentLabel()}">DEVELOPMENT</span>
+        <span>Created <time th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organizationHeader.createdAt())}">date</time></span>
+        <span>ID <code th:text="${organizationHeader.id()}">organization id</code></span>
+    </p>
+</div>
