@@ -16,6 +16,6 @@ OAuth Client setup instructions need it typed in by hand; no clipboard JS.
               th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organizationHeader.production())}"
               th:text="${organizationHeader.environmentLabel()}">DEVELOPMENT</span>
         <span>Created <time th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organizationHeader.createdAt())}">date</time></span>
-        <span>ID <code th:text="${organizationHeader.id()}">organization id</code></span>
+        <span>ID <code th:text="${organizationHeader.organizationId()}">organization id</code></span>
     </p>
 </div>

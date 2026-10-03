@@ -52,7 +52,7 @@ class DashboardOrganizationHeaderAdviceTest {
 
       assertNotNull(header, suffix);
       assertEquals("Acme Co", header.name());
-      assertEquals(organization.id(), header.id());
+      assertEquals(organization.id(), header.organizationId());
       assertEquals("DEVELOPMENT", header.environmentLabel());
       assertEquals(organization.createdAt(), header.createdAt());
     }

@@ -37,13 +37,13 @@ class DashboardOrganizationHeaderAdvice {
   private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private final OrganizationRepository organizations;
-  private final CurrentPlatformAccountResolver currentPlatformAccount;
+  private final CurrentPlatformAccountResolver currentAccount;
 
   /* package */ DashboardOrganizationHeaderAdvice(
       final OrganizationRepository organizations,
-      final CurrentPlatformAccountResolver currentPlatformAccount) {
+      final CurrentPlatformAccountResolver currentAccount) {
     this.organizations = organizations;
-    this.currentPlatformAccount = currentPlatformAccount;
+    this.currentAccount = currentAccount;
   }
 
   @ModelAttribute("organizationHeader")
@@ -55,7 +55,7 @@ class DashboardOrganizationHeaderAdvice {
 
   private Optional<OrganizationHeaderView> headerFor(
       final HttpServletRequest request, final UUID organizationId) {
-    return currentPlatformAccount
+    return currentAccount
         .resolve(request)
         .flatMap(
             ownerId ->
@@ -73,9 +73,13 @@ class DashboardOrganizationHeaderAdvice {
         organization.createdAt());
   }
 
+  private static boolean isHtmxRequest(final HttpServletRequest request) {
+    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
+  }
+
   @SuppressWarnings("PMD.OnlyOneReturn")
   private static Optional<UUID> organizationIdOf(final HttpServletRequest request) {
-    if ("true".equals(request.getHeader(HX_REQUEST_HEADER))) {
+    if (isHtmxRequest(request)) {
       return Optional.empty();
     }
     final String path = request.getRequestURI().substring(request.getContextPath().length());

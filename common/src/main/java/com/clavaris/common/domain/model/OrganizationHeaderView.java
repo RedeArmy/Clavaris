@@ -11,12 +11,13 @@ import java.util.UUID;
  * DashboardOrganizationHeaderAdvice}; organization-module's own Workspaces controller also sets it
  * directly so that page renders the same header without the app module in the loop.
  *
- * @param id the Organization's own ID
+ * @param organizationId the Organization's own ID
  * @param name the Organization's display name
  * @param production {@code true} for a PRODUCTION environment, {@code false} for DEVELOPMENT
  * @param createdAt when the Organization was created
  */
-public record OrganizationHeaderView(UUID id, String name, boolean production, Instant createdAt) {
+public record OrganizationHeaderView(
+    UUID organizationId, String name, boolean production, Instant createdAt) {
 
   /** The environment label exactly as the badge shows it. */
   public String environmentLabel() {

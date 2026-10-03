@@ -73,7 +73,11 @@ import org.springframework.web.server.ResponseStatusException;
 // past the default threshold of 30): every import here backs a real, distinct collaborator this
 // controller genuinely needs — same "wiring, not sprawl" reasoning
 // OrganizationUseCaseConfig's own class-level Javadoc documents for an identical situation.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// PMD.TooManyMethods: one handler per dashboard action (list, create, deactivate, activate, delete,
+// rotate secret) plus the small private helpers they share — each is a real, distinct endpoint or
+// a de-duplication of two of them, not a design smell to split across controllers that would then
+// each need their own copy of the ownership/render plumbing.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/secret-keys")
 public class PlatformOrganizationClientController {
