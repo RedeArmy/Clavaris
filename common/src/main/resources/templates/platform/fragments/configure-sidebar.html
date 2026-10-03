@@ -36,19 +36,20 @@ here (PlatformWorkspaceRoleController#populateBackTarget's own Javadoc).
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
     <a th:href="@{/platform/dashboard/organizations/{id}/api-keys(id=${organizationId})}"
-       th:classappend="${active == 'api-keys'} ? 'active'">API Keys</a>
+       th:classappend="${active == 'api-keys'} ? 'active'" th:attr="aria-current=${active == 'api-keys'} ? 'page'">API Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
-       th:classappend="${active == 'oauth-clients'} ? 'active'">OAuth Clients</a>
+       th:classappend="${active == 'oauth-clients'} ? 'active'" th:attr="aria-current=${active == 'oauth-clients'} ? 'page'">OAuth Clients</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/secret-keys(id=${organizationId})}"
-       th:classappend="${active == 'secret-keys'} ? 'active'">Secret Keys</a>
+       th:classappend="${active == 'secret-keys'} ? 'active'" th:attr="aria-current=${active == 'secret-keys'} ? 'page'">Secret Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/signing-keys(id=${organizationId})}"
-       th:classappend="${active == 'signing-keys'} ? 'active'">Signing Keys</a>
+       th:classappend="${active == 'signing-keys'} ? 'active'" th:attr="aria-current=${active == 'signing-keys'} ? 'page'">Signing Keys</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
-       th:classappend="${active == 'webhook-endpoints'} ? 'active'">Webhook Endpoints</a>
+       th:classappend="${active == 'webhook-endpoints'} ? 'active'" th:attr="aria-current=${active == 'webhook-endpoints'} ? 'page'">Webhook Endpoints</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/workspace-roles(id=${organizationId})}"
-       th:classappend="${active == 'workspace-roles'} ? 'active'">Workspace Roles</a>
+       th:classappend="${active == 'workspace-roles'} ? 'active'" th:attr="aria-current=${active == 'workspace-roles'} ? 'page'">Workspace Roles</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
-       th:classappend="${active == 'rate-limit'} ? 'active'">Rate Limit</a>
+       th:classappend="${active == 'rate-limit'} ? 'active'" th:attr="aria-current=${active == 'rate-limit'} ? 'page'">Rate Limit</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/danger-zone(id=${organizationId})}"
-       th:classappend="${active == 'danger-zone'} ? 'clavaris-configure-sidebar-danger active' : 'clavaris-configure-sidebar-danger'">Danger Zone</a>
+       th:classappend="${active == 'danger-zone'} ? 'clavaris-configure-sidebar-danger active' : 'clavaris-configure-sidebar-danger'"
+       th:attr="aria-current=${active == 'danger-zone'} ? 'page'">Danger Zone</a>
 </aside>

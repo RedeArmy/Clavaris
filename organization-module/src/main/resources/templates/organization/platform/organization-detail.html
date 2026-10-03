@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> / <span th:text="${organization.name()}">Organization</span></p>
 
@@ -92,14 +92,14 @@
                             <span class="clavaris-dialog__eyebrow">Workspace</span>
                             <h2>Delete workspace</h2>
                         </div>
-                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete workspace dialog">×</button>
+                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete workspace dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                     </div>
                     <form method="post"
                           th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/delete(organizationId=${organization.id()},workspaceId=${workspace.id()})}"
                           hx-target="#workspaces-content" hx-swap="outerHTML">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <p class="clavaris-alert clavaris-alert--error">This will permanently delete
+                        <p class="clavaris-alert clavaris-alert--error" role="alert">This will permanently delete
                             <strong th:text="${workspace.name()}">Workspace</strong> — every team, role grouping,
                             and member's role assignment in it. This cannot be undone.</p>
                         <div class="clavaris-field">

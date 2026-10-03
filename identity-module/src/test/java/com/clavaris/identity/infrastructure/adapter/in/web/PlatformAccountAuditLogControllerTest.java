@@ -157,7 +157,7 @@ class PlatformAccountAuditLogControllerTest {
     mockMvc
         .perform(get(path()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("clavaris-back-link")))
+        .andExpect(content().string(containsString("clavaris-back-button")))
         .andExpect(content().string(containsString("href=\"" + profilePath + "\"")));
   }
 

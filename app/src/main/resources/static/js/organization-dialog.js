@@ -3,7 +3,29 @@
 
   const findDialog = (trigger) => document.getElementById(trigger.dataset.dialogOpen);
 
+  // A click that lands on a modal <dialog> element itself (not one of its children) can only have
+  // hit its ::backdrop or its own edge — treat a click outside its box as "dismiss", the same way
+  // Esc already does.
+  const isBackdropClick = (event) => {
+    const dialog = event.target;
+    if (dialog?.tagName !== "DIALOG" || !dialog.open || !dialog.getBoundingClientRect) {
+      return false;
+    }
+    const box = dialog.getBoundingClientRect();
+    return (
+      event.clientX < box.left ||
+      event.clientX > box.right ||
+      event.clientY < box.top ||
+      event.clientY > box.bottom
+    );
+  };
+
   document.addEventListener("click", (event) => {
+    if (isBackdropClick(event)) {
+      event.target.close();
+      return;
+    }
+
     const openTrigger = event.target.closest("[data-dialog-open]");
     if (openTrigger) {
       const dialog = findDialog(openTrigger);

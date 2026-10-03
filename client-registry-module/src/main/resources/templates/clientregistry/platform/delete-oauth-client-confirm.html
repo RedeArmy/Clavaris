@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{clientregistry/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -29,7 +29,7 @@
                  or the Client ID, unlike the Organization-delete flow's own single-string match. -->
             <div class="clavaris-section">
                 <div class="clavaris-section-card">
-                    <p class="clavaris-alert clavaris-alert--error">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert">
                         <strong>This is permanent and cannot be undone.</strong> Deleting
                         <code th:text="${client.clientId()}">client id</code> destroys:
                     </p>
@@ -40,11 +40,11 @@
                         <li>Any already-issued token still associated with it, revoked immediately</li>
                     </ul>
 
-                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationExpiredError}">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${confirmationExpiredError}">
                         That confirmation expired or was already used — a fresh one has been
                         issued below. Please confirm again.
                     </p>
-                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationMismatchError}">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${confirmationMismatchError}">
                         What you typed didn't match — a fresh confirmation has been issued below.
                         Please try again.
                     </p>

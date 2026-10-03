@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -53,7 +53,7 @@
                                     </thead>
                                     <tbody>
                                     <tr th:each="option : ${group.events()}">
-                                        <td style="white-space: nowrap;"><code th:text="${option.value()}">event.type</code></td>
+                                        <td class="clavaris-nowrap"><code th:text="${option.value()}">event.type</code></td>
                                         <td th:text="${option.description()}">description</td>
                                     </tr>
                                     </tbody>

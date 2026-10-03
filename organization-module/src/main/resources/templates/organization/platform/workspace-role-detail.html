@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <!-- Live UX request, 2026-10-02: same Back convention as create-workspace-role.html's
                  own breadcrumb — returns to Configure > Workspace Roles by default, or Teams &
@@ -30,10 +30,10 @@
                     </div>
 
                     <div class="clavaris-section-card">
-                        <p class="clavaris-alert clavaris-alert--error" th:if="${duplicateNameError}">A role with that name already exists in this Organization.</p>
-                        <p class="clavaris-alert clavaris-alert--error" th:if="${parentCycleError}">That parent role would create a cycle — a role can never descend from itself.</p>
-                        <p class="clavaris-alert clavaris-alert--error" th:if="${stillAssignedError}">This role is still assigned to at least one member — reassign or unassign them first (a member can be left without a role).</p>
-                        <p class="clavaris-alert clavaris-alert--error" th:if="${hasChildRolesError}">This role is still the parent of at least one other role — re-parent or clear those roles' parent first.</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${duplicateNameError}">A role with that name already exists in this Organization.</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${parentCycleError}">That parent role would create a cycle — a role can never descend from itself.</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${stillAssignedError}">This role is still assigned to at least one member — reassign or unassign them first (a member can be left without a role).</p>
+                        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${hasChildRolesError}">This role is still the parent of at least one other role — re-parent or clear those roles' parent first.</p>
 
                         <!-- ADR-0027 §2: a reserved role can never be renamed away from its own
                              management permissions or deleted — this form still lets an owner edit a

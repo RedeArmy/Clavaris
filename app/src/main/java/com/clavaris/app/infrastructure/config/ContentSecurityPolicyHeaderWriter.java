@@ -130,9 +130,12 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   @SuppressWarnings("PMD.LongVariable")
   private static final String OAUTH2_CLIENT_ID_PARAM = "client_id";
 
+  // font-src 'self' on every policy below: clavaris.css self-hosts Geist (/fonts/*.woff2). With
+  // font-src 'none' the browser blocked both files, so the whole UI silently fell back to the
+  // system font. Same-origin fonts only — never a font CDN.
   private static final String STRICT_POLICY =
       "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
-          + "font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
   // Matches only ConsentController's own flat, org-agnostic GET — see CONSENT_PATH_PATTERN's own
@@ -166,7 +169,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // connect-src, never script-src. script-src 'self' only permits loading the script file itself.
   private static final String LOGIN_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
   // Matches only LoginController's own GET/POST /o/{organizationId}/login — never
@@ -188,7 +191,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   @SuppressWarnings("PMD.LongVariable")
   private static final String DASHBOARD_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
   // Matches every page under the dashboard app shell — PlatformDashboardSecurityConfig's own
@@ -208,7 +211,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   @SuppressWarnings("PMD.LongVariable")
   private static final String ACCOUNT_PASSKEYS_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'none'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
   @SuppressWarnings("PMD.LongVariable")

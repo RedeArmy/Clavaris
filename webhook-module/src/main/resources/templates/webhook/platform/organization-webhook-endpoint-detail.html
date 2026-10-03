@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -39,16 +39,16 @@
                         </div>
                     </div>
 
-                    <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
+                    <output class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                         <strong>New signing secret:</strong>
                         <code th:text="${justRegisteredRawSecret}">secret</code><br/>
                         Copy this now — it will not be shown again.
-                    </p>
-                    <p class="clavaris-alert clavaris-alert--error" th:if="${unsafeWebhookUrlError}">
+                    </output>
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${unsafeWebhookUrlError}">
                         That URL isn't safe to deliver webhooks to (it resolves to a private, loopback,
                         or otherwise internal network address).
                     </p>
-                    <p class="clavaris-alert clavaris-alert--error" th:if="${emptyEventTypesError}">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${emptyEventTypesError}">
                         Select at least one event type, or turn on "All Events".
                     </p>
 
@@ -85,15 +85,15 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="clavaris-row-actions" style="margin-top: var(--space-4);">
+                        <div class="clavaris-row-actions clavaris-row-actions--spaced">
                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                                th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deliveries(organizationId=${organizationId},endpointId=${endpoint.id()})}">Deliveries</a>
-                            <form method="post"
+                            <form data-confirm="The current secret stops working immediately. The new secret is shown only once." data-confirm-title="Rotate this secret?" data-confirm-label="Rotate secret" data-confirm-tone="danger" method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/rotate-secret(organizationId=${organizationId},endpointId=${endpoint.id()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rotate secret</button>
                             </form>
-                            <form method="post" th:if="${endpoint.active()}"
+                            <form data-confirm="Clavaris will stop delivering events to it until it is reactivated." data-confirm-title="Deactivate this endpoint?" data-confirm-label="Deactivate" data-confirm-tone="danger" method="post" th:if="${endpoint.active()}"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deactivate(organizationId=${organizationId},endpointId=${endpoint.id()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Deactivate</button>
@@ -131,7 +131,7 @@
                     <dialog id="url-dialog" class="clavaris-dialog">
                         <div class="clavaris-dialog__header">
                             <div><h2>Endpoint URL</h2></div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close URL dialog">&times;</button>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close URL dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                         </div>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/url(organizationId=${organizationId},endpointId=${endpoint.id()})}"
                               method="post">
@@ -150,7 +150,7 @@
                     <dialog id="description-dialog" class="clavaris-dialog">
                         <div class="clavaris-dialog__header">
                             <div><h2>Description</h2></div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close description dialog">&times;</button>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close description dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                         </div>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/description(organizationId=${organizationId},endpointId=${endpoint.id()})}"
                               method="post">
@@ -171,7 +171,7 @@
                     <dialog id="event-types-dialog" class="clavaris-dialog">
                         <div class="clavaris-dialog__header">
                             <div><h2>Event types</h2></div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close event types dialog">&times;</button>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close event types dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                         </div>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/event-types(organizationId=${organizationId},endpointId=${endpoint.id()})}"
                               method="post">

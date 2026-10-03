@@ -74,7 +74,7 @@ duplicated even across the team-grouped and "Without Team" lists this fragment r
                     account and Workspace membership — only the role is unassigned (ADR-0027 §5: a
                     member can be left without a role). This cannot be undone.</p>
             </div>
-            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close remove member dialog">×</button>
+            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close remove member dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
         <form method="post"
               th:action="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/members/{accountId}/unassign-role(organizationId=${organization.id()},workspaceId=${workspace.id()},accountId=${memberAccountId})}"

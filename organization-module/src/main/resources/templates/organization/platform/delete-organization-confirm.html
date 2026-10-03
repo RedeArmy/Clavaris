@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -25,7 +25,7 @@
                  PlatformDeleteOrganizationController's own Javadoc for the full design. -->
             <div class="clavaris-section">
                 <div class="clavaris-section-card">
-                    <p class="clavaris-alert clavaris-alert--error">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert">
                         <strong>This is permanent and cannot be undone.</strong> Deleting
                         <strong th:text="${organization.name()}">Organization</strong> destroys:
                     </p>
@@ -42,11 +42,11 @@
                         will be unlinked, but not deleted, and will remain fully intact on its own.
                     </p>
 
-                    <p class="clavaris-alert clavaris-alert--error" th:if="${confirmationExpiredError}">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${confirmationExpiredError}">
                         That confirmation expired or was already used — a fresh one has been
                         issued below. Please confirm again.
                     </p>
-                    <p class="clavaris-alert clavaris-alert--error" th:if="${nameMismatchError}">
+                    <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${nameMismatchError}">
                         The name you typed didn't match — a fresh confirmation has been issued
                         below. Please try again.
                     </p>

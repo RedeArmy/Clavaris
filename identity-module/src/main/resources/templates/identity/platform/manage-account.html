@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <div class="clavaris-page-header">
                 <div>
@@ -21,9 +21,9 @@
                  dual-mode/full-page-vs-fragment rationale). Zero-JS tab switching via the two
                  hidden radio inputs + CSS below — no JS needed to switch between Profile/Security. -->
             <div id="manage-account-content" th:fragment="content">
-                <p class="clavaris-alert clavaris-alert--success" th:if="${param.updated} or ${updated}">Your profile was updated.</p>
-                <p class="clavaris-alert clavaris-alert--success" th:if="${param.removed} or ${removed}">Your profile picture was removed.</p>
-                <p class="clavaris-alert clavaris-alert--error" th:if="${uploadError}" th:text="${uploadError}">Upload error</p>
+                <output class="clavaris-alert clavaris-alert--success" th:if="${param.updated} or ${updated}">Your profile was updated.</output>
+                <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed} or ${removed}">Your profile picture was removed.</output>
+                <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${uploadError}" th:text="${uploadError}">Upload error</p>
 
                 <div class="clavaris-manage-account">
                     <input type="radio" id="clavaris-tab-profile" name="clavaris-manage-account-tab" class="clavaris-manage-account__tab-input" checked="checked"/>

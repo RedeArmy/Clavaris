@@ -9,7 +9,7 @@ above it; a second one here would be a redundant "go back" affordance for the sa
 -->
 <div th:fragment="tabs(organizationId, workspaceId, active)" class="clavaris-org-tabs">
     <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}(organizationId=${organizationId},workspaceId=${workspaceId})}"
-       th:classappend="${active == 'manage'} ? 'active'">Manage</a>
+       th:classappend="${active == 'manage'} ? 'active'" th:attr="aria-current=${active == 'manage'} ? 'page'">Manage</a>
     <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/teams(organizationId=${organizationId},workspaceId=${workspaceId})}"
-       th:classappend="${active == 'teams'} ? 'active'">Teams</a>
+       th:classappend="${active == 'teams'} ? 'active'" th:attr="aria-current=${active == 'teams'} ? 'page'">Teams</a>
 </div>

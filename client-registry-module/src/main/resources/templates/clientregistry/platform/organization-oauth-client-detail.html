@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{clientregistry/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -47,11 +47,11 @@
                         </div>
                     </div>
 
-                    <p class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
+                    <output class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                         <strong>New client secret:</strong>
                         <code th:text="${justRegisteredRawSecret}">secret</code><br/>
                         Copy this now — it will not be shown again.
-                    </p>
+                    </output>
 
                     <div class="clavaris-section-card">
                         <h2>Client credentials</h2>
@@ -84,15 +84,15 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="clavaris-row-actions" th:if="${client.active()}" style="margin-top: var(--space-4);">
-                            <form method="post"
+                        <div class="clavaris-row-actions clavaris-row-actions--spaced" th:if="${client.active()}">
+                            <form data-confirm="The current secret stops working immediately. The new secret is shown only once." data-confirm-title="Rotate this secret?" data-confirm-label="Rotate secret" data-confirm-tone="danger" method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/rotate-secret(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/rotate-secret(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   hx-target="#client-detail-content" hx-swap="outerHTML">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Rotate secret</button>
                             </form>
-                            <form method="post"
+                            <form data-confirm="Applications using it will stop authenticating right away." data-confirm-title="Deactivate this client?" data-confirm-label="Deactivate" data-confirm-tone="danger" method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/deactivate(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/deactivate(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   hx-target="#client-detail-content" hx-swap="outerHTML">
@@ -108,7 +108,7 @@
                              ActivateOAuthClientResult's own Javadoc) — the button's own title
                              says so upfront, and the same "New client secret" banner
                              create/rotate already show appears here too. -->
-                        <div class="clavaris-row-actions" th:unless="${client.active()}" style="margin-top: var(--space-4);">
+                        <div class="clavaris-row-actions clavaris-row-actions--spaced" th:unless="${client.active()}">
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
                                   th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/activate(organizationId=${organizationId},clientId=${client.clientId()})}"
@@ -359,7 +359,7 @@
                     <dialog id="grant-types-dialog" class="clavaris-dialog" th:if="${client.active()}">
                         <div class="clavaris-dialog__header">
                             <div><h2>Grant types</h2></div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close grant types dialog">&times;</button>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close grant types dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                         </div>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/grant-types(organizationId=${organizationId},clientId=${client.clientId()})}"
                               method="post">
@@ -381,7 +381,7 @@
                     <dialog id="scopes-dialog" class="clavaris-dialog" th:if="${client.active()}">
                         <div class="clavaris-dialog__header">
                             <div><h2>Scopes</h2></div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close scopes dialog">&times;</button>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close scopes dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                         </div>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/scopes(organizationId=${organizationId},clientId=${client.clientId()})}"
                               method="post" id="scopes-form">
@@ -445,7 +445,7 @@
                     <dialog id="consent-dialog" class="clavaris-dialog" th:if="${client.active()}">
                         <div class="clavaris-dialog__header">
                             <div><h2>Consent screen</h2></div>
-                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close consent screen dialog">&times;</button>
+                            <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close consent screen dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                         </div>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/consent(organizationId=${organizationId},clientId=${client.clientId()})}"
                               method="post">

@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -77,7 +77,7 @@
                     <h2>Rotate now</h2>
                     <p>Generates a fresh key, activates it immediately, and retires the current one
                         with the normal overlap window.</p>
-                    <form method="post"
+                    <form data-confirm="New tokens are signed with a fresh key. Tokens signed by the previous key stay valid until they expire." data-confirm-title="Rotate the signing key?" data-confirm-label="Rotate signing key" data-confirm-tone="danger" method="post"
                           th:action="@{/platform/dashboard/organizations/{organizationId}/signing-keys/rotate(organizationId=${organizationId})}"
                           th:attr="hx-post=@{/platform/dashboard/organizations/{organizationId}/signing-keys/rotate(organizationId=${organizationId})}"
                           hx-target="#keys-content" hx-swap="outerHTML">

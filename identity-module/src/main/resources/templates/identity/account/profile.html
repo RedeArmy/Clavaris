@@ -13,13 +13,13 @@
         </p>
         <h1>Update Profile</h1>
 
-        <p class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">
             Your profile picture was updated.
-        </p>
-        <p class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">
+        </output>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">
             Your profile picture was removed.
-        </p>
-        <p class="clavaris-alert clavaris-alert--error" th:if="${uploadError}" th:text="${uploadError}">
+        </output>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${uploadError}" th:text="${uploadError}">
             Upload error
         </p>
 
@@ -74,7 +74,7 @@
             <h2>Delete account</h2>
             <p class="clavaris-field-hint">Permanently deletes your account — a hard delete, not reversible.
                 Every session and token is revoked immediately.</p>
-            <p class="clavaris-alert clavaris-alert--error" th:if="${deleteError}">
+            <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${deleteError}">
                 Your account is not allowed to delete itself.
             </p>
             <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="button"
@@ -89,7 +89,7 @@
                     <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> —
                         a hard delete, not reversible. Every session and token is revoked immediately.</p>
                 </div>
-                <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete account dialog">×</button>
+                <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete account dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
             </div>
             <form method="post"
                   th:action="@{/o/{organizationId}/account/profile/delete(organizationId=${organizationId})}">

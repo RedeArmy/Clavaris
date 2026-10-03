@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <div th:replace="~{organization/platform/fragments/workspace-page-header :: header(${organization}, ${workspace})}"></div>
 
@@ -52,7 +52,7 @@
                 <p>Every team in this Workspace, the roles grouped into it, and the members
                     currently holding each role.</p>
 
-                <p class="clavaris-alert clavaris-alert--error" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. If you're sure, type "unassign" in the field that replaced their Remove button below to confirm and proceed anyway.</p>
+                <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. If you're sure, type "unassign" in the field that replaced their Remove button below to confirm and proceed anyway.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams) and #lists.isEmpty(ungroupedRoles)}">
                     <p class="clavaris-empty-state">No teams or roles yet.</p>
@@ -155,7 +155,7 @@
                         <span class="clavaris-dialog__eyebrow">Role</span>
                         <h2>Assign role</h2>
                     </div>
-                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close assign role dialog">×</button>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close assign role dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <div id="team-assign-role-dialog-body">Loading&hellip;</div>
             </dialog>

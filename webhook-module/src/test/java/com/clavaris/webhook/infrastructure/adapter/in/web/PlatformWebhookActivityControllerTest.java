@@ -1,9 +1,11 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -82,6 +84,15 @@ class PlatformWebhookActivityControllerTest {
         .andExpect(view().name("webhook/platform/webhook-activity"))
         .andExpect(model().attribute("organizationName", "Acme Co"))
         .andExpect(model().attribute("maxBucketTotal", 4L));
+  }
+
+  @Test
+  void drawsTheChartAsSvgBecauseTheCspBlocksInlineStyleAttributes() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(content().string(containsString("clavaris-bar-chart__bar--success")))
+        .andExpect(content().string(containsString("clavaris-bar-chart__bar--failure")))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("style=\""))));
   }
 
   @Test
