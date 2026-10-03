@@ -24,7 +24,7 @@
 |---|---|
 | 1. Tokens | colour (light + dark), spacing (4px grid), radius, elevation, motion, type scale, auth-surface tokens |
 | 2. Base | reset, body, `:focus-visible`, reduced-motion, `.clavaris-visually-hidden`, `.clavaris-skip-link`, `.clavaris-icon` |
-| 3. Page shells | card pages (`body > main`), auth pages, dashboard shell (`.clavaris-dashboard*`), landing |
+| 3. Page shells | card pages (the content landmark that is a direct child of the body), auth pages, dashboard shell (`.clavaris-dashboard*`), landing |
 | 4. Components | form controls, toggle, buttons, alerts, badges, tables, pagination, breadcrumb/tabs, menus, dialogs |
 | 5. Features | organizations grid, teams accordion, pickers, activity chart, heatmap |
 | 6. Responsive | all breakpoints (920 / 800 / 640px) |
@@ -57,7 +57,7 @@ Inline SVG with `class="clavaris-icon"`, `viewBox="0 0 24 24"`, `aria-hidden="tr
 
 ### Navigation
 
-`.clavaris-sidebar` is the top bar (brand, primary nav, account menu). Section navigation uses `.clavaris-org-tabs` (full-page navigations, not JS tabs). The active item carries both `.active` and `aria-current="page"`. Each dashboard page has `<main id="main-content">` as the target of the skip link.
+`.clavaris-sidebar` is the top bar (brand, primary nav, account menu). Section navigation uses `.clavaris-org-tabs` (full-page navigations, not JS tabs). The active item carries both `.active` and `aria-current="page"`. Each dashboard page's content landmark carries the id the skip link points to.
 
 ## 4. Accessibility checklist for a new page
 
