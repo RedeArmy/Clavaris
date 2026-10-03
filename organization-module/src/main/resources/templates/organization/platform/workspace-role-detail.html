@@ -60,19 +60,7 @@
                                 <p class="clavaris-field-hint">A role inherits every permission its parent (and its parent's own ancestors) carries.</p>
                             </div>
 
-                            <div class="clavaris-field">
-                                <label for="role-permissions">Permissions</label>
-                                <!-- readonly, not disabled: a disabled field is never submitted by the
-                                     browser at all, which would silently post permissionsText=null for
-                                     a reserved role and trip WorkspaceRole#withPermissions's own reserved-
-                                     permissions guard as an unhandled IllegalArgumentException. readonly
-                                     still submits this field's current (unchanged) value. -->
-                                <textarea id="role-permissions" th:field="*{permissionsText}" rows="6"
-                                          th:readonly="${role.reserved()}"
-                                          placeholder="One permission per line, e.g.&#10;jobseeker:candidates:review&#10;jobseeker:interviews:schedule"></textarea>
-                                <p class="clavaris-field-hint" th:unless="${role.reserved()}">One opaque permission string per line — your own application defines what each one means.</p>
-                                <p class="clavaris-field-hint" th:if="${role.reserved()}">This Organization's reserved role always carries its own management permissions and can't have them edited away.</p>
-                            </div>
+                            <div th:replace="~{organization/platform/fragments/permissions-field :: field('Permissions', ${role.reserved()})}"></div>
 
                             <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
@@ -96,6 +84,7 @@
             </div>
         </div>
     </main>
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/permission-picker.js') : '/js/permission-picker.js'}" defer></script>
 </div>
 </body>
 </html>
