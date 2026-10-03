@@ -40,6 +40,13 @@ public interface OrganizationClientRepository {
 
   void save(OrganizationClient organizationClient);
 
+  /**
+   * Permanently removes one Secret Key - only ever reached from {@code
+   * DeleteOrganizationClientService}, which already holds the full, ownership-checked domain object
+   * (same shape {@code OAuthClientRepository#delete} has).
+   */
+  void delete(OrganizationClient organizationClient);
+
   // BR-DATA-02/03's own client-registry-module equivalent — same role OAuthClientRepository's own
   // identical method plays for DeleteOrganizationService (via OrganizationOAuthClientsEraser).
   void deleteAllByOrganizationId(UUID organizationId);

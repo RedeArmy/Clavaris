@@ -2,6 +2,8 @@ package com.clavaris.clientregistry.infrastructure.config;
 
 import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientService;
 import com.clavaris.clientregistry.application.usecase.activateoauthclient.ActivateOAuthClientUseCase;
+import com.clavaris.clientregistry.application.usecase.activateorganizationclient.ActivateOrganizationClientService;
+import com.clavaris.clientregistry.application.usecase.activateorganizationclient.ActivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientService;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.BootstrapPlatformClientUseCase;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
@@ -19,6 +21,8 @@ import com.clavaris.clientregistry.application.usecase.deactivateplatformclient.
 import com.clavaris.clientregistry.application.usecase.deleteoauthclient.DeleteOAuthClientService;
 import com.clavaris.clientregistry.application.usecase.deleteoauthclient.DeleteOAuthClientUseCase;
 import com.clavaris.clientregistry.application.usecase.deleteoauthclient.OAuthClientTokenRevoker;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.DeleteOrganizationClientService;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.DeleteOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingService;
 import com.clavaris.clientregistry.application.usecase.getclientbranding.GetClientBrandingUseCase;
 import com.clavaris.clientregistry.application.usecase.getclientdomainconfig.GetClientDomainConfigService;
@@ -261,6 +265,23 @@ class ClientRegistryUseCaseConfig {
       final OrganizationClientRepository organizationClients,
       final AuditEventRecorder auditEvents) {
     return new DeactivateOrganizationClientService(organizationClients, auditEvents);
+  }
+
+  // ADR-0023: dashboard "Activate" on a deactivated Secret Key.
+  @Bean
+  /* package */ ActivateOrganizationClientUseCase activateOrganizationClientUseCase(
+      final OrganizationClientRepository organizationClients,
+      final AuditEventRecorder auditEvents) {
+    return new ActivateOrganizationClientService(organizationClients, auditEvents);
+  }
+
+  // ADR-0023: dashboard "Delete" on a deactivated Secret Key; see DeleteOrganizationClientService.
+  @Bean
+  /* package */ DeleteOrganizationClientUseCase deleteOrganizationClientUseCase(
+      final OrganizationClientRepository organizationClients,
+      final OAuthClientTokenRevoker tokenRevoker,
+      final AuditEventRecorder auditEvents) {
+    return new DeleteOrganizationClientService(organizationClients, tokenRevoker, auditEvents);
   }
 
   // ADR-0023
