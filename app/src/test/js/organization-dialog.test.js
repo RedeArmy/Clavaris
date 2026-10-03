@@ -134,3 +134,36 @@ test("does nothing on a role-assigned event when no dialog is open", () => {
 
   assert.doesNotThrow(() => documentStub.dispatch("workspace-role-assigned"));
 });
+
+test("closes a modal dialog when its backdrop is clicked", () => {
+  const documentStub = documentHarness();
+  let closeCalls = 0;
+  const dialog = {
+    tagName: "DIALOG",
+    open: true,
+    close() { closeCalls += 1; },
+    getBoundingClientRect: () => ({ left: 100, right: 300, top: 100, bottom: 300 }),
+  };
+
+  loadScript(documentStub);
+  documentStub.dispatch("click", { target: dialog, clientX: 50, clientY: 150 });
+
+  assert.equal(closeCalls, 1);
+});
+
+test("keeps a dialog open when the click lands inside its own box", () => {
+  const documentStub = documentHarness();
+  let closeCalls = 0;
+  const dialog = {
+    tagName: "DIALOG",
+    open: true,
+    close() { closeCalls += 1; },
+    closest: () => null,
+    getBoundingClientRect: () => ({ left: 100, right: 300, top: 100, bottom: 300 }),
+  };
+
+  loadScript(documentStub);
+  documentStub.dispatch("click", { target: dialog, clientX: 150, clientY: 150 });
+
+  assert.equal(closeCalls, 0);
+});
