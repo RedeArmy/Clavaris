@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -30,7 +30,7 @@
                  mirrors. Replay carries no secret, so — unlike register/rotate-secret on the
                  endpoints page — it keeps the normal redirect-on-success convention. -->
             <div id="deliveries-content" th:fragment="deliveries" class="clavaris-section">
-                <p class="clavaris-alert clavaris-alert--error" th:if="${notReplayableError}">
+                <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${notReplayableError}">
                     That delivery is still owned by the ordinary retry engine (not yet in a
                     terminal state) — it can't be replayed right now.
                 </p>

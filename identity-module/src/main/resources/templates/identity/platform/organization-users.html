@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <!-- SDE-III refactor, 2026-09-22: the old "Back to {organizationName}" link here (identity/
                  platform/fragments/back-link.html) pointed at the Workspaces tab — redundant with, and
@@ -110,7 +110,7 @@
                                      are all reversible or already state-labeled (Lock/Unlock,
                                      Ban/Unban). -->
                                 <details class="clavaris-menu">
-                                    <summary class="clavaris-menu__trigger" aria-label="Open actions menu for this user">⋮</summary>
+                                    <summary class="clavaris-menu__trigger" aria-label="Open actions menu for this user"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg></summary>
                                     <div class="clavaris-menu__panel">
                                         <p class="clavaris-menu__header"
                                            th:text="${#strings.isEmpty(fullName)} ? ${account.email().value()} : ${fullName}">user name</p>
@@ -139,7 +139,7 @@
                                                 th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role(organizationId=${organizationId},accountId=${account.id().value()})}"
                                                 hx-target="#assign-role-dialog-body" hx-swap="innerHTML">Assign role</button>
                                         <hr class="clavaris-menu__divider"/>
-                                        <form method="post" th:if="${account.status().name() == 'ACTIVE'}"
+                                        <form data-confirm="The user cannot sign in until the account is unlocked." data-confirm-title="Lock this account?" data-confirm-label="Lock account" data-confirm-tone="danger" method="post" th:if="${account.status().name() == 'ACTIVE'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/suspend(organizationId=${organizationId},accountId=${account.id().value()})}">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Lock account</button>
@@ -149,7 +149,7 @@
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item">Unlock account</button>
                                         </form>
-                                        <form method="post" th:unless="${account.status().name() == 'BANNED'}"
+                                        <form data-confirm="The user is blocked from signing in until the ban is lifted." data-confirm-title="Ban this account?" data-confirm-label="Ban account" data-confirm-tone="danger" method="post" th:unless="${account.status().name() == 'BANNED'}"
                                               th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/ban(organizationId=${organizationId},accountId=${account.id().value()})}">
                                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                             <button type="submit" class="clavaris-menu__item clavaris-menu__item--danger">Ban account</button>
@@ -171,7 +171,7 @@
                                             <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> —
                                                 a hard delete, not reversible. Every session and token is revoked immediately.</p>
                                         </div>
-                                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete user dialog">×</button>
+                                        <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                                     </div>
                                     <form method="post"
                                           th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/delete(organizationId=${organizationId},accountId=${account.id().value()})}">
@@ -226,7 +226,7 @@
                         <p>Creates an Account directly for this Organization, with the password
                             set immediately — no invitation email is sent.</p>
                     </div>
-                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create user dialog">×</button>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <form th:action="@{''}" th:object="${createForm}" method="post">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -302,7 +302,7 @@
                         <span class="clavaris-dialog__eyebrow">Workspace</span>
                         <h2>Assign role</h2>
                     </div>
-                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close assign role dialog">×</button>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close assign role dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <div id="assign-role-dialog-body">Loading&hellip;</div>
             </dialog>

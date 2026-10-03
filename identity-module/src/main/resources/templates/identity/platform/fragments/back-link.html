@@ -8,6 +8,6 @@ single fragment is reachable from this module's own standalone-MockMvc controlle
 cross-module constraint that comment documents doesn't apply to a fragment only ever referenced
 from within identity-module itself.
 -->
-<a th:fragment="back(href, label)" class="clavaris-back-link" th:href="${href}">
-    <span aria-hidden="true">&larr;</span> <span th:text="${label}">Back</span>
+<a th:fragment="back(href, label)" class="clavaris-back-button" th:href="${href}" th:attr="aria-label=${label},title=${label}">
+    <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span>Back</span>
 </a>

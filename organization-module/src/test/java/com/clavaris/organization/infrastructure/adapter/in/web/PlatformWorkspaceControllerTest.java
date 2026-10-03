@@ -283,7 +283,7 @@ class PlatformWorkspaceControllerTest {
     mockMvc
         .perform(get(workspacesPath() + "/" + workspace.id()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("clavaris-back-link")))
+        .andExpect(content().string(containsString("clavaris-back-button")))
         .andExpect(content().string(containsString("href=\"" + organizationDetailPath + "\"")));
   }
 

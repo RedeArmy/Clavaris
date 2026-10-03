@@ -6,6 +6,7 @@
 <body>
 <main>
     <div class="clavaris-card">
+        <a class="clavaris-back-button" th:href="@{../}" aria-label="Back to sign in" title="Back to sign in"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span>Back</span></a>
         <h1>Sign in with a code</h1>
         <p>Enter your email address and we'll send you a one-time code.</p>
 
@@ -20,8 +21,6 @@
 
             <button class="clavaris-button" type="submit">Send code</button>
         </form>
-
-        <p class="clavaris-links"><a th:href="@{../}">Back to sign in</a></p>
     </div>
 </main>
 </body>

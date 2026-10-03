@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
@@ -43,7 +43,7 @@
                          longer an HTMX fragment target for those actions — only its own keyset
                          pagination still swaps #endpoints-content. -->
                     <div id="endpoints-content" th:fragment="endpoints" class="clavaris-section">
-                <p class="clavaris-alert clavaris-alert--error" th:if="${webhookEndpointLimitExceededError}">
+                <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${webhookEndpointLimitExceededError}">
                     This Organization has already registered the maximum number of webhook
                     endpoints. Deactivating one doesn't free up a slot — contact support if you
                     need the limit raised.

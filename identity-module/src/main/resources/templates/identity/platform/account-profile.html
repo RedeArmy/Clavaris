@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
             <p class="clavaris-breadcrumb">
@@ -51,16 +51,16 @@
                 <p>Scope: <span th:text="${#strings.arrayJoin(impersonationToken.scope().toArray(), ' ')}">scope</span></p>
             </div>
 
-            <p class="clavaris-alert clavaris-alert--success" th:if="${param.profileUpdated}">Profile was updated.</p>
-            <p class="clavaris-alert clavaris-alert--success" th:if="${param.pictureUpdated}">Profile picture was updated.</p>
-            <p class="clavaris-alert clavaris-alert--success" th:if="${param.pictureRemoved}">Profile picture was removed.</p>
-            <p class="clavaris-alert clavaris-alert--success" th:if="${param.passwordResetSent}">A password reset link was sent to this Account's email.</p>
-            <p class="clavaris-alert clavaris-alert--success" th:if="${param.settingsUpdated}">Settings were updated.</p>
-            <p class="clavaris-alert clavaris-alert--success" th:if="${param.metadataUpdated}">Metadata was updated.</p>
-            <p class="clavaris-alert clavaris-alert--error" th:if="${param.metadataError}">
+            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.profileUpdated}">Profile was updated.</p>
+            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.pictureUpdated}">Profile picture was updated.</p>
+            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.pictureRemoved}">Profile picture was removed.</p>
+            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.passwordResetSent}">A password reset link was sent to this Account's email.</p>
+            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.settingsUpdated}">Settings were updated.</p>
+            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.metadataUpdated}">Metadata was updated.</p>
+            <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.metadataError}">
                 <span th:text="${param.metadataError}">publicMetadata</span> is not valid JSON, or is too long.
             </p>
-            <p class="clavaris-alert clavaris-alert--error" th:if="${param.pictureError}" th:text="${param.pictureError}">Upload error</p>
+            <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.pictureError}" th:text="${param.pictureError}">Upload error</p>
 
             <!-- SDE-III review, 2026-09-21 — Clerk dashboard "View Profile" parity: four tabs
                  (Profile/Settings/OAuth/Metadata), zero-JS radio-button switching — see clavaris.css's
@@ -428,7 +428,7 @@
                                         <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">First seen</td>
                                         <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                                         <td>
-                                            <form method="post"
+                                            <form data-confirm="The device is signed out immediately." data-confirm-title="Revoke this session?" data-confirm-label="Revoke" data-confirm-tone="danger" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/sessions/{sessionId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},sessionId=${userSession.sessionId()})}">
                                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
@@ -439,7 +439,7 @@
                                 </table>
                             </div>
 
-                            <p class="clavaris-field-hint" style="margin-top: var(--space-4);">Recognized devices (Device Trust history).</p>
+                            <p class="clavaris-field-hint clavaris-field-hint--spaced">Recognized devices (Device Trust history).</p>
                             <p th:if="${#lists.isEmpty(devices)}" class="clavaris-empty-state">No known devices yet.</p>
                             <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(devices)}">
                                 <table class="clavaris-table">
@@ -563,9 +563,9 @@
 
                     <section id="clavaris-panel-oauth" class="clavaris-manage-account__panel">
                         <div class="clavaris-section-card">
-                            <div class="clavaris-row-actions" style="justify-content: space-between;">
+                            <div class="clavaris-row-actions clavaris-row-actions--between">
                                 <h2>Grants</h2>
-                                <form method="post"
+                                <form data-confirm="Every connected application loses access to this account." data-confirm-title="Revoke all grants?" data-confirm-label="Revoke all" data-confirm-tone="danger" method="post"
                                       th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/revoke-all(organizationId=${organizationId},accountId=${account.id().value()})}">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit"
@@ -595,7 +595,7 @@
                                         <td th:text="${grant.lastIssuedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.lastIssuedAt())} : '—'">last issued</td>
                                         <td th:text="${grant.expiresAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.expiresAt())} : '—'">expires at</td>
                                         <td>
-                                            <form method="post"
+                                            <form data-confirm="The application loses access to this account." data-confirm-title="Revoke this grant?" data-confirm-label="Revoke" data-confirm-tone="danger" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/{authorizationId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},authorizationId=${grant.authorizationId()})}">
                                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Revoke</button>
@@ -649,7 +649,7 @@
                         <p>Mints a raw Bearer access token for this Account, scoped to one OAuth
                             Client — no ID token, no refresh token. The token is shown once.</p>
                     </div>
-                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog">×</button>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <form th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate(organizationId=${organizationId},accountId=${account.id().value()})}" method="post">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

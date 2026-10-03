@@ -22,18 +22,18 @@ could.
 Live UX request, 2026-09-23: restyled as an actual button (clavaris-org-tabs__back) instead of
 plain muted text (clavaris-back-link's own styling) — see that class's own comment in clavaris.css.
 -->
-<div th:fragment="tabs(organizationId, active)">
-    <a class="clavaris-org-tabs__back" th:href="@{/platform/dashboard}">
-        <span aria-hidden="true">&larr;</span> <span>Back to Your Organizations</span>
+<div th:fragment="tabs(organizationId, active)" class="clavaris-tabs-nav">
+    <a class="clavaris-back-button" th:href="@{/platform/dashboard}" aria-label="Back to Your Organizations" title="Back to Your Organizations">
+        <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span>Back</span>
     </a>
     <div class="clavaris-org-tabs">
         <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}"
-           th:classappend="${active == 'workspaces'} ? 'active'">Workspaces</a>
+           th:classappend="${active == 'workspaces'} ? 'active'" th:attr="aria-current=${active == 'workspaces'} ? 'page'">Workspaces</a>
         <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
-           th:classappend="${active == 'users'} ? 'active'">Users</a>
+           th:classappend="${active == 'users'} ? 'active'" th:attr="aria-current=${active == 'users'} ? 'page'">Users</a>
         <a th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organizationId})}"
-           th:classappend="${active == 'logs'} ? 'active'">Logs</a>
+           th:classappend="${active == 'logs'} ? 'active'" th:attr="aria-current=${active == 'logs'} ? 'page'">Logs</a>
         <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
-           th:classappend="${active == 'configure'} ? 'active'">Configure</a>
+           th:classappend="${active == 'configure'} ? 'active'" th:attr="aria-current=${active == 'configure'} ? 'page'">Configure</a>
     </div>
 </div>

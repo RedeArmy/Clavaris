@@ -5,13 +5,13 @@ org-wide pages (the endpoints list, the new Event Catalog/Logs/Activity pages) â
 own detail/Deliveries pages are drill-downs reached from "Endpoints", not siblings of it, so they
 don't carry this row (same distinction Clerk's own dashboard draws).
 -->
-<div th:fragment="tabs(organizationId, active)" class="clavaris-org-tabs" style="margin-bottom: var(--space-4);">
+<div th:fragment="tabs(organizationId, active)" class="clavaris-org-tabs clavaris-org-tabs--spaced">
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints(id=${organizationId})}"
-       th:classappend="${active == 'endpoints'} ? 'active'">Endpoints</a>
+       th:classappend="${active == 'endpoints'} ? 'active'" th:attr="aria-current=${active == 'endpoints'} ? 'page'">Endpoints</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints/event-catalog(id=${organizationId})}"
-       th:classappend="${active == 'event-catalog'} ? 'active'">Event Catalog</a>
+       th:classappend="${active == 'event-catalog'} ? 'active'" th:attr="aria-current=${active == 'event-catalog'} ? 'page'">Event Catalog</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints/logs(id=${organizationId})}"
-       th:classappend="${active == 'logs'} ? 'active'">Logs</a>
+       th:classappend="${active == 'logs'} ? 'active'" th:attr="aria-current=${active == 'logs'} ? 'page'">Logs</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/webhook-endpoints/activity(id=${organizationId})}"
-       th:classappend="${active == 'activity'} ? 'active'">Activity</a>
+       th:classappend="${active == 'activity'} ? 'active'" th:attr="aria-current=${active == 'activity'} ? 'page'">Activity</a>
 </div>

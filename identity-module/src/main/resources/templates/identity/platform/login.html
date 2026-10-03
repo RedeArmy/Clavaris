@@ -15,8 +15,8 @@
             <p>Sign in to manage your identity infrastructure.</p>
         </div>
 
-        <p class="clavaris-alert clavaris-alert--error" th:if="${loginError}">Invalid email or password.</p>
-        <p class="clavaris-alert clavaris-alert--error" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${loginError}">Invalid email or password.</p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.socialLoginError}">Something went wrong signing in — please try again.</p>
 
         <form th:action="@{''}" th:object="${form}" method="post">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

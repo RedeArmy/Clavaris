@@ -6,7 +6,7 @@
 <body>
 <div class="clavaris-dashboard">
     <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
-    <main class="clavaris-dashboard__content">
+    <main id="main-content" class="clavaris-dashboard__content">
         <!-- The modal uses the dashboard's existing plain POST endpoint. A successful creation
              follows the controller's normal redirect; server-side validation re-renders this page
              and reopens the dialog so the field error remains in context. -->
@@ -23,7 +23,7 @@
                 <div class="clavaris-organization-grid">
                     <article class="clavaris-organization-card" th:each="organization : ${organizations}">
                         <div class="clavaris-organization-card__header">
-                            <span class="clavaris-organization-card__mark" aria-hidden="true">◈</span>
+                            <span class="clavaris-organization-card__mark" aria-hidden="true"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
                             <span class="clavaris-badge"
                                   th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organization.environment().name() == 'PRODUCTION')}"
                                   th:text="${organization.environment()}">DEVELOPMENT</span>
@@ -32,12 +32,12 @@
                         <p>Isolated tenant with its own accounts, clients, and signing keys.</p>
                         <div class="clavaris-organization-card__footer">
                             <small>Created <time th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organization.createdAt())}">Created at</time></small>
-                            <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Open <span aria-hidden="true">→</span></a>
+                            <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Open <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
                         </div>
                     </article>
 
                     <button class="clavaris-create-tile" type="button" data-dialog-open="create-organization-dialog">
-                        <span class="clavaris-create-tile__icon" aria-hidden="true">+</span>
+                        <span class="clavaris-create-tile__icon" aria-hidden="true"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
                         <span th:if="${#lists.isEmpty(organizations)}">
                             <strong>Create your first organization</strong>
                             <small>You don't have any organizations yet — choose a name to create your first one.</small>
@@ -78,7 +78,7 @@
                         <h2>Create your organization</h2>
                         <p>Choose a name for your new isolated tenant.</p>
                     </div>
-                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create organization dialog">×</button>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close create organization dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <form th:action="@{''}" th:object="${form}" method="post">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
