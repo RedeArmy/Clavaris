@@ -21,8 +21,8 @@
                  dual-mode/full-page-vs-fragment rationale). Zero-JS tab switching via the two
                  hidden radio inputs + CSS below — no JS needed to switch between Profile/Security. -->
             <div id="manage-account-content" th:fragment="content">
-                <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.updated} or ${updated}">Your profile was updated.</p>
-                <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.removed} or ${removed}">Your profile picture was removed.</p>
+                <output class="clavaris-alert clavaris-alert--success" th:if="${param.updated} or ${updated}">Your profile was updated.</output>
+                <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed} or ${removed}">Your profile picture was removed.</output>
                 <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${uploadError}" th:text="${uploadError}">Upload error</p>
 
                 <div class="clavaris-manage-account">

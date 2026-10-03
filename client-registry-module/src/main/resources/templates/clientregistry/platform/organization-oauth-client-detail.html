@@ -47,11 +47,11 @@
                         </div>
                     </div>
 
-                    <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${justRegisteredRawSecret}">
+                    <output class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                         <strong>New client secret:</strong>
                         <code th:text="${justRegisteredRawSecret}">secret</code><br/>
                         Copy this now — it will not be shown again.
-                    </p>
+                    </output>
 
                     <div class="clavaris-section-card">
                         <h2>Client credentials</h2>

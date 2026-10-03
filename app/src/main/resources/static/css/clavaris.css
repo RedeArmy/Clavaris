@@ -1321,6 +1321,7 @@ body:has(.htmx-request)::after {
 /* --- Alerts and badges ----------------------------------------------------- */
 
 .clavaris-alert {
+  display: block;
   margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
   font-size: var(--text-base);

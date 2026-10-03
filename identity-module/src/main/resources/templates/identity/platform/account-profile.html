@@ -51,12 +51,12 @@
                 <p>Scope: <span th:text="${#strings.arrayJoin(impersonationToken.scope().toArray(), ' ')}">scope</span></p>
             </div>
 
-            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.profileUpdated}">Profile was updated.</p>
-            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.pictureUpdated}">Profile picture was updated.</p>
-            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.pictureRemoved}">Profile picture was removed.</p>
-            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.passwordResetSent}">A password reset link was sent to this Account's email.</p>
-            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.settingsUpdated}">Settings were updated.</p>
-            <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.metadataUpdated}">Metadata was updated.</p>
+            <output class="clavaris-alert clavaris-alert--success" th:if="${param.profileUpdated}">Profile was updated.</output>
+            <output class="clavaris-alert clavaris-alert--success" th:if="${param.pictureUpdated}">Profile picture was updated.</output>
+            <output class="clavaris-alert clavaris-alert--success" th:if="${param.pictureRemoved}">Profile picture was removed.</output>
+            <output class="clavaris-alert clavaris-alert--success" th:if="${param.passwordResetSent}">A password reset link was sent to this Account's email.</output>
+            <output class="clavaris-alert clavaris-alert--success" th:if="${param.settingsUpdated}">Settings were updated.</output>
+            <output class="clavaris-alert clavaris-alert--success" th:if="${param.metadataUpdated}">Metadata was updated.</output>
             <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.metadataError}">
                 <span th:text="${param.metadataError}">publicMetadata</span> is not valid JSON, or is too long.
             </p>

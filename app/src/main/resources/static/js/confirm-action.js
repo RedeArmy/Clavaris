@@ -71,7 +71,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       const submitter = event.submitter;
-      ask(form).then((confirmed) => {
+      void ask(form).then((confirmed) => {
         if (!confirmed) {
           return;
         }

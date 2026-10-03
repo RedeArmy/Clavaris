@@ -39,11 +39,11 @@
                         </div>
                     </div>
 
-                    <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${justRegisteredRawSecret}">
+                    <output class="clavaris-alert clavaris-alert--success" th:if="${justRegisteredRawSecret}">
                         <strong>New signing secret:</strong>
                         <code th:text="${justRegisteredRawSecret}">secret</code><br/>
                         Copy this now — it will not be shown again.
-                    </p>
+                    </output>
                     <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${unsafeWebhookUrlError}">
                         That URL isn't safe to deliver webhooks to (it resolves to a private, loopback,
                         or otherwise internal network address).

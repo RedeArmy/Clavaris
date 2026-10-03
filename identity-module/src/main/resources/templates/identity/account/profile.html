@@ -13,12 +13,12 @@
         </p>
         <h1>Update Profile</h1>
 
-        <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.updated}">
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">
             Your profile picture was updated.
-        </p>
-        <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.removed}">
+        </output>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">
             Your profile picture was removed.
-        </p>
+        </output>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${uploadError}" th:text="${uploadError}">
             Upload error
         </p>
