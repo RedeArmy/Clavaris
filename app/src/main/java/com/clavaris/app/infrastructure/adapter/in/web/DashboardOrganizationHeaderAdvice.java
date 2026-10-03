@@ -43,6 +43,13 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * paired sibling owned by someone else is never offered. HTMX fragment requests are skipped — they
  * swap content below the header, never the header itself.
  */
+// java:S1075: BASE_PATH and the pattern built on it are routes this server-rendered app owns and
+// serves itself (the Organization pages' own @RequestMapping), not an external URI a deployment
+// should be able to repoint — the same "these are code, not runtime config" reasoning
+// PlatformWorkspaceController's and PlatformWorkspaceRoleController's own identical suppressions
+// already document. Making them configurable would only let the switcher links drift from the
+// routes the controllers actually serve.
+@SuppressWarnings("java:S1075")
 @ControllerAdvice(annotations = Controller.class)
 class DashboardOrganizationHeaderAdvice {
 
