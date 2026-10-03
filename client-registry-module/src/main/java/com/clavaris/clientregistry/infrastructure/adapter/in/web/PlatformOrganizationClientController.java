@@ -104,7 +104,10 @@ public class PlatformOrganizationClientController {
   // DeactivateOrganizationClientCommand's own Javadoc for the web-layer-only check it replaced),
   // now enforced by DeactivateOrganizationClientService/RotateOrganizationClientSecretService
   // themselves. One parameter per remaining collaborating port — same rationale as every other
-  // multi-collaborator constructor in this codebase.
+  // multi-collaborator constructor in this codebase. java:S107 (more than 7 parameters) is
+  // suppressed for that reason: the list/create/deactivate/activate/delete/rotate use cases are
+  // each a distinct port, and bundling them into a holder object would only hide the wiring.
+  @SuppressWarnings("java:S107")
   public PlatformOrganizationClientController(
       final CreateOrganizationClientUseCase createClient,
       final ListOrganizationClientsPagedUseCase listClientsPaged,

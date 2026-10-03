@@ -89,7 +89,7 @@ class DashboardOrganizationHeaderAdvice {
     }
     try {
       return Optional.of(UUID.fromString(matcher.group(1)));
-    } catch (IllegalArgumentException malformed) {
+    } catch (final IllegalArgumentException _) {
       return Optional.empty();
     }
   }

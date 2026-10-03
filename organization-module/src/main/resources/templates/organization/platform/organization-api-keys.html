@@ -44,7 +44,7 @@
                         </span>
                     </div>
 
-                    <p class="clavaris-visually-hidden" role="status" aria-live="polite" data-copy-status></p>
+                    <output class="clavaris-visually-hidden" aria-live="polite" data-copy-status></output>
 
                     <div class="clavaris-section">
                         <div class="clavaris-section-card clavaris-kv-card">
@@ -98,7 +98,7 @@
                                         <span data-copy-label>Copy</span>
                                     </button>
                                 </div>
-                                <pre class="clavaris-code-panel__body" tabindex="0"><code id="api-jwks-public-key" th:text="${apiKeys.jwksPublicKey()}">-----BEGIN PUBLIC KEY-----</code></pre>
+                                <pre class="clavaris-code-panel__body"><code id="api-jwks-public-key" th:text="${apiKeys.jwksPublicKey()}">-----BEGIN PUBLIC KEY-----</code></pre>
                             </div>
                             <p class="clavaris-empty-state" th:unless="${apiKeys.jwksPublicKey()}">
                                 No active signing key found for this Organization yet.

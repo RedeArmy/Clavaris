@@ -99,8 +99,9 @@ public class PlatformOrganizationDetailController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
     model.addAttribute("organization", organization);
-    // Also set by the app module's DashboardOrganizationHeaderAdvice for every Organization page;
-    // set here too so this page renders the same header with only organization-module in play.
+    // The app module's DashboardOrganizationHeaderAdvice already supplies this header on every
+    // Organization page. It is set here as well so that this page renders the same header when
+    // only organization-module is wired in.
     model.addAttribute(
         "organizationHeader",
         new com.clavaris.common.domain.model.OrganizationHeaderView(

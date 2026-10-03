@@ -315,7 +315,7 @@ class PlatformOrganizationClientControllerTest {
 
   @Test
   void activateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
-    org.mockito.Mockito.doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
+    doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
         .when(activateClient)
         .handle(any());
 
@@ -338,7 +338,7 @@ class PlatformOrganizationClientControllerTest {
 
   @Test
   void deleteReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
-    org.mockito.Mockito.doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
+    doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
         .when(deleteClient)
         .handle(any());
 
@@ -350,7 +350,7 @@ class PlatformOrganizationClientControllerTest {
   // Deleting a still-active key is the one guard that turns a well-formed request into a conflict.
   @Test
   void deleteReturnsConflictWhenTheClientIsStillActive() throws Exception {
-    org.mockito.Mockito.doThrow(new OrganizationClientActiveException("sk_test_still_active"))
+    doThrow(new OrganizationClientActiveException("sk_test_still_active"))
         .when(deleteClient)
         .handle(any());
 

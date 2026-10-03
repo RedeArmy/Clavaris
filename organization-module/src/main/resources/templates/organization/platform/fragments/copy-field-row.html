@@ -10,7 +10,7 @@ value element's id); copy-to-clipboard.js does the rest.
         <p class="clavaris-kv__hint" th:text="${hint}">Hint</p>
     </div>
     <div class="clavaris-copy-field">
-        <code class="clavaris-copy-field__value" th:id="${id}" th:text="${value}" tabindex="0">value</code>
+        <code class="clavaris-copy-field__value" th:id="${id}" th:text="${value}">value</code>
         <button type="button" class="clavaris-copy-button" th:attr="data-copy-target=${id},aria-label=${'Copy ' + label}">
             <svg class="clavaris-icon clavaris-copy-button__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
             <svg class="clavaris-icon clavaris-copy-button__done" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>

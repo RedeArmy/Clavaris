@@ -16,7 +16,9 @@
     const selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
-    const copied = document.execCommand("copy");
+    // NOSONAR: execCommand is deprecated, but it is the only copy route that works outside secure
+    // contexts (a plain-HTTP pre-production host) and when the async Clipboard API rejects.
+    const copied = document.execCommand("copy"); // NOSONAR
     selection.removeAllRanges();
     if (!copied) {
       throw new Error("copy command was rejected");
