@@ -1,12 +1,15 @@
 package com.clavaris.app.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.EnvironmentOption;
 import com.clavaris.common.domain.model.OrganizationHeaderView;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.OrganizationEnvironment;
 import com.clavaris.organization.infrastructure.adapter.in.web.CurrentPlatformAccountResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,23 +20,51 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 /**
  * Adds the {@code organizationHeader} model attribute to every dashboard page under {@code
  * /platform/dashboard/organizations/{organizationId}/**}, so the Organization's name, environment,
- * creation date and ID stay visible above every tab (Workspaces, Users, Logs, Configure and its
- * sub-pages) instead of only on the Workspaces tab.
+ * creation date, ID and environment switcher stay visible above every tab (Workspaces, Users, Logs,
+ * Configure and its sub-pages).
  *
  * <p>Lives in the app module because it is the one module allowed to depend on all the others: the
  * Users, Logs and Configure pages belong to identity-, client-registry- and webhook-module, none of
  * which can read an Organization. Doing this once here, rather than in each of ~20 controllers,
  * also means a future tab gets the header for free.
  *
+ * <p><b>Environment switcher (Clerk's Development/Production dropdown).</b> Each environment is its
+ * own {@code Organization} with its own accounts, keys and clients (ADR-0010); a DEVELOPMENT one
+ * points at its PRODUCTION sibling through {@code linkedEnvironmentOrganizationId} once promoted,
+ * and the sibling points back. Switching is therefore only navigation to the sibling's equivalent
+ * page — the same top-level tab when it has one, the Organization's home otherwise (a deeper id
+ * such as a client id would not exist on the other side). A DEVELOPMENT Organization that was never
+ * promoted still lists Production, as a "set up" entry leading to Promote to Production. A
+ * PRODUCTION Organization with no paired DEVELOPMENT one (every Organization that predates the
+ * environments feature) has nothing to switch to, so it gets no switcher.
+ *
  * <p>Same ownership rule as every dashboard controller: an Organization the signed-in
- * PlatformAccount does not own resolves to nothing (the page itself still 404s on its own). HTMX
- * fragment requests are skipped — they swap content below the header, never the header itself.
+ * PlatformAccount does not own resolves to nothing (the page itself still 404s on its own), and a
+ * paired sibling owned by someone else is never offered. HTMX fragment requests are skipped — they
+ * swap content below the header, never the header itself.
  */
 @ControllerAdvice(annotations = Controller.class)
 class DashboardOrganizationHeaderAdvice {
 
+  private static final String BASE_PATH = "/platform/dashboard/organizations/";
   private static final Pattern ORGANIZATION_PAGE =
-      Pattern.compile("^/platform/dashboard/organizations/([0-9a-fA-F-]{36})(?:/.*)?$");
+      Pattern.compile(
+          "^/platform/dashboard/organizations/([0-9a-fA-F-]{36})(?:/([^/]+))?(?:/.*)?$");
+
+  // The first path segment after the Organization id that names a whole page of its own, i.e. a
+  // tab or Configure section that exists, with the same URL, in every Organization.
+  private static final Set<String> SHARED_PAGES =
+      Set.of(
+          "users",
+          "audit-log",
+          "oauth-clients",
+          "secret-keys",
+          "signing-keys",
+          "webhook-endpoints",
+          "api-keys",
+          "workspace-roles",
+          "rate-limit-policy",
+          "danger-zone");
   private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private final OrganizationRepository organizations;
@@ -48,37 +79,98 @@ class DashboardOrganizationHeaderAdvice {
 
   @ModelAttribute("organizationHeader")
   /* package */ OrganizationHeaderView organizationHeader(final HttpServletRequest request) {
-    return organizationIdOf(request)
-        .flatMap(organizationId -> headerFor(request, organizationId))
-        .orElse(null);
+    return pageOf(request).flatMap(page -> headerFor(request, page)).orElse(null);
   }
 
+  // The Organization a dashboard URL points at, plus the shared page it is on (empty = the
+  // Organization's home).
+  private record Page(UUID organizationId, String sharedPage) {}
+
   private Optional<OrganizationHeaderView> headerFor(
-      final HttpServletRequest request, final UUID organizationId) {
+      final HttpServletRequest request, final Page page) {
     return currentAccount
         .resolve(request)
         .flatMap(
             ownerId ->
                 organizations
-                    .findById(organizationId)
-                    .filter(organization -> organization.ownerPlatformAccountId().equals(ownerId)))
-        .map(DashboardOrganizationHeaderAdvice::toView);
+                    .findById(page.organizationId())
+                    .filter(organization -> organization.ownerPlatformAccountId().equals(ownerId))
+                    .map(organization -> toView(organization, ownerId, page.sharedPage())));
   }
 
-  private static OrganizationHeaderView toView(final Organization organization) {
+  private OrganizationHeaderView toView(
+      final Organization organization, final UUID ownerId, final String sharedPage) {
     return new OrganizationHeaderView(
         organization.id(),
         organization.name(),
-        organization.environment() == OrganizationEnvironment.PRODUCTION,
-        organization.createdAt());
+        isProduction(organization),
+        organization.createdAt(),
+        environmentsFor(organization, ownerId, sharedPage));
   }
 
-  private static boolean isHtmxRequest(final HttpServletRequest request) {
-    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
+  private List<EnvironmentOption> environmentsFor(
+      final Organization organization, final UUID ownerId, final String sharedPage) {
+    final Optional<Organization> sibling =
+        organization
+            .linkedEnvironmentOrganizationId()
+            .flatMap(organizations::findById)
+            .filter(other -> other.ownerPlatformAccountId().equals(ownerId));
+    return isProduction(organization)
+        ? fromProduction(organization, sibling, sharedPage)
+        : fromDevelopment(organization, sibling, sharedPage);
+  }
+
+  // A PRODUCTION Organization can only switch to the DEVELOPMENT one it was promoted from; with no
+  // such sibling (every Organization that predates the environments feature) there is nothing to
+  // offer and no switcher is shown.
+  private static List<EnvironmentOption> fromProduction(
+      final Organization organization,
+      final Optional<Organization> development,
+      final String sharedPage) {
+    final EnvironmentOption here = optionFor(organization, true, sharedPage);
+    return development
+        .<List<EnvironmentOption>>map(other -> List.of(optionFor(other, false, sharedPage), here))
+        .orElse(List.of());
+  }
+
+  // A DEVELOPMENT Organization always lists Production: its sibling when promoted, otherwise a
+  // "set up" entry that leads to Promote to Production.
+  private static List<EnvironmentOption> fromDevelopment(
+      final Organization organization,
+      final Optional<Organization> production,
+      final String sharedPage) {
+    final EnvironmentOption here = optionFor(organization, true, sharedPage);
+    final EnvironmentOption other =
+        production
+            .map(sibling -> optionFor(sibling, false, sharedPage))
+            .orElseGet(
+                () ->
+                    new EnvironmentOption(
+                        true,
+                        false,
+                        false,
+                        BASE_PATH + organization.id() + "/promote-to-production",
+                        null));
+    return List.of(here, other);
+  }
+
+  private static EnvironmentOption optionFor(
+      final Organization organization, final boolean current, final String sharedPage) {
+    final String page = sharedPage.isEmpty() ? "" : "/" + sharedPage;
+    return new EnvironmentOption(
+        isProduction(organization),
+        current,
+        true,
+        BASE_PATH + organization.id() + page,
+        organization.name());
+  }
+
+  private static boolean isProduction(final Organization organization) {
+    return organization.environment() == OrganizationEnvironment.PRODUCTION;
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
-  private static Optional<UUID> organizationIdOf(final HttpServletRequest request) {
+  private static Optional<Page> pageOf(final HttpServletRequest request) {
     if (isHtmxRequest(request)) {
       return Optional.empty();
     }
@@ -87,10 +179,17 @@ class DashboardOrganizationHeaderAdvice {
     if (!matcher.matches()) {
       return Optional.empty();
     }
+    final String firstSegment = matcher.group(2);
+    final String sharedPage =
+        firstSegment != null && SHARED_PAGES.contains(firstSegment) ? firstSegment : "";
     try {
-      return Optional.of(UUID.fromString(matcher.group(1)));
+      return Optional.of(new Page(UUID.fromString(matcher.group(1)), sharedPage));
     } catch (final IllegalArgumentException _) {
       return Optional.empty();
     }
+  }
+
+  private static boolean isHtmxRequest(final HttpServletRequest request) {
+    return "true".equals(request.getHeader(HX_REQUEST_HEADER));
   }
 }

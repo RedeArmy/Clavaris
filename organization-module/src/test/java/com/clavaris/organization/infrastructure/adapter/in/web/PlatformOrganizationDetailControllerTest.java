@@ -117,6 +117,61 @@ class PlatformOrganizationDetailControllerTest {
         .andExpect(content().string(containsString(organization.id().toString())));
   }
 
+  // When the advice supplies environment options, the badge becomes a Development/Production
+  // dropdown; each entry is a plain link to that environment's own Organization.
+  @Test
+  void rendersTheEnvironmentSwitcherWhenTheHeaderCarriesOptions() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
+    UUID productionId = UUID.randomUUID();
+    com.clavaris.common.domain.model.OrganizationHeaderView header =
+        new com.clavaris.common.domain.model.OrganizationHeaderView(
+            organization.id(),
+            organization.name(),
+            false,
+            organization.createdAt(),
+            java.util.List.of(
+                new com.clavaris.common.domain.model.EnvironmentOption(
+                    false,
+                    true,
+                    true,
+                    "/platform/dashboard/organizations/" + organization.id(),
+                    "Acme Co"),
+                new com.clavaris.common.domain.model.EnvironmentOption(
+                    true,
+                    false,
+                    true,
+                    "/platform/dashboard/organizations/" + productionId,
+                    "Acme Co Prod")));
+
+    mockMvc
+        .perform(
+            get("/platform/dashboard/organizations/{organizationId}", organization.id())
+                .flashAttr("organizationHeader", header))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("class=\"clavaris-env-switch\"")))
+        .andExpect(
+            content().string(containsString("/platform/dashboard/organizations/" + productionId)))
+        .andExpect(content().string(containsString("Acme Co Prod")))
+        .andExpect(content().string(containsString("aria-current=\"true\"")))
+        .andExpect(content().string(containsString("/js/details-dismiss.js")));
+  }
+
+  // Without options (a PRODUCTION Organization with no paired DEVELOPMENT one) the badge stays a
+  // plain label, and the dropdown script is not even loaded.
+  @Test
+  void rendersAPlainBadgeWhenThereIsNoEnvironmentToSwitchTo() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
+
+    mockMvc
+        .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(org.hamcrest.Matchers.not(containsString("clavaris-env-switch"))))
+        .andExpect(content().string(containsString("DEVELOPMENT")));
+  }
+
   // Creating a workspace is a header button that opens a popup, not an always-visible form card.
   @Test
   void offersNewWorkspaceAsAHeaderButtonThatOpensAPopup() throws Exception {

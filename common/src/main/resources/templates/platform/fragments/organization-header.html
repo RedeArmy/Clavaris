@@ -5,17 +5,57 @@ is identical whichever tab is open. Included once by each module's own org-tabs.
 hand-duplicated copies), never by individual pages. Renders nothing when no "organizationHeader"
 model attribute is present (e.g. a fragment-only HTMX response).
 
+Environment switcher (Clerk's Development / Production dropdown): when the header carries
+environment options, the environment badge becomes a disclosure listing both environments. Each is
+a separate, fully isolated Organization (accounts, keys, clients are never shared), so an entry is
+just a link to that Organization's equivalent page; a Production that was never set up links to
+Promote to Production instead. Without options (a PRODUCTION Organization with no paired
+DEVELOPMENT one) the badge stays a plain, non-interactive label. Native <details>: it works without
+JavaScript; details-dismiss.js only adds close-on-outside-click and Escape.
+
 The name is a styled paragraph, not a heading: every tab already owns the page's single <h1>
 (Workspaces, Users, Logs, ...). The ID is plain selectable text — every REST admin API call and the
 OAuth Client setup instructions need it typed in by hand; no clipboard JS.
 -->
 <div th:fragment="header" th:if="${organizationHeader != null}" class="clavaris-org-header">
     <p class="clavaris-org-header__name" th:text="${organizationHeader.name()}">Organization name</p>
-    <p class="clavaris-org-header__meta">
+    <div class="clavaris-org-header__meta">
         <span class="clavaris-badge"
+              th:unless="${organizationHeader.hasEnvironmentSwitcher()}"
               th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organizationHeader.production())}"
               th:text="${organizationHeader.environmentLabel()}">DEVELOPMENT</span>
+
+        <details class="clavaris-env-switch" data-dismissible th:if="${organizationHeader.hasEnvironmentSwitcher()}">
+            <summary class="clavaris-env-switch__trigger"
+                     th:classappend="${organizationHeader.production()} ? 'clavaris-env-switch__trigger--production'"
+                     th:attr="aria-label='Environment: ' + ${organizationHeader.environmentLabel()} + '. Switch environment'">
+                <span class="clavaris-env-switch__dot" aria-hidden="true"></span>
+                <span th:text="${organizationHeader.environmentLabel()}">DEVELOPMENT</span>
+                <svg class="clavaris-icon clavaris-env-switch__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+            <div class="clavaris-env-switch__panel">
+                <p class="clavaris-env-switch__title">Environments</p>
+                <a class="clavaris-env-option"
+                   th:each="option : ${organizationHeader.environments()}"
+                   th:href="@{${option.href()}}"
+                   th:classappend="${option.current()} ? 'clavaris-env-option--current'"
+                   th:attr="aria-current=${option.current()} ? 'true'">
+                    <span class="clavaris-env-switch__dot"
+                          th:classappend="${option.production()} ? 'clavaris-env-switch__dot--production'" aria-hidden="true"></span>
+                    <span class="clavaris-env-option__text">
+                        <span class="clavaris-env-option__label" th:text="${option.label()}">Development</span>
+                        <span class="clavaris-env-option__hint" th:if="${option.setUp()}" th:text="${option.organizationName()}">Acme</span>
+                        <span class="clavaris-env-option__hint" th:unless="${option.setUp()}">Not set up yet</span>
+                    </span>
+                    <svg class="clavaris-icon clavaris-env-option__check" th:if="${option.current()}" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>
+                    <span class="clavaris-env-option__action" th:unless="${option.setUp()}">Set up</span>
+                </a>
+                <p class="clavaris-env-switch__note">Each environment is isolated: users, keys and clients are never shared.</p>
+            </div>
+        </details>
+
         <span>Created <time th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organizationHeader.createdAt())}">date</time></span>
         <span>ID <code th:text="${organizationHeader.organizationId()}">organization id</code></span>
-    </p>
+    </div>
+    <script th:if="${organizationHeader.hasEnvironmentSwitcher()}" th:src="${#resourceUrl != null ? #resourceUrl.url('/js/details-dismiss.js') : '/js/details-dismiss.js'}" defer></script>
 </div>
