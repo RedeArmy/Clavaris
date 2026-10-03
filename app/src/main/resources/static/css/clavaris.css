@@ -2482,6 +2482,76 @@ body:has(.htmx-request)::after {
   padding: 0 28px 28px;
 }
 
+/* --- Toasts (failed HTMX requests) -----------------------------------------
+   The region is a manual popover so it sits in the top layer, above an open modal dialog. The
+   popover-only rule is separate so a browser without popover support drops just that rule. */
+
+.clavaris-toast-region {
+  position: fixed;
+  inset: auto 0 var(--space-6);
+  width: min(480px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+}
+
+.clavaris-toast-region:popover-open {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.clavaris-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  color: var(--clavaris-text-primary);
+  font-size: var(--text-base);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-left: 4px solid var(--clavaris-danger);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  animation: clavaris-toast-in var(--duration) var(--ease);
+}
+
+.clavaris-toast__message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.clavaris-toast__close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  color: var(--clavaris-text-muted);
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.clavaris-toast__close:hover {
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-bg);
+}
+
+@keyframes clavaris-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* Manage-account dialog and admin "View Profile": zero-JS radio-driven tabs. */
 .clavaris-manage-account__tab-input {
   position: absolute;
