@@ -304,6 +304,49 @@ class PlatformWorkspaceRoleControllerTest {
                         + workspaceId));
   }
 
+  // The Workspace Role pages carry their own, more specific Back (to Configure > Workspace Roles or
+  // to Teams & Roles); the generic "Back to Your Organizations" from the org tabs fragment must not
+  // render beside it.
+  @Test
+  void showDetailRendersExactlyOneBackButton() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/" + customRole.id()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("Back to Your Organizations"))))
+        .andExpect(
+            result ->
+                org.junit.jupiter.api.Assertions.assertEquals(
+                    1,
+                    result
+                            .getResponse()
+                            .getContentAsString()
+                            .split("class=\"clavaris-back-button\"", -1)
+                            .length
+                        - 1));
+  }
+
+  @Test
+  void showCreateFormRendersExactlyOneBackButton() throws Exception {
+    mockMvc
+        .perform(get(rolesPath() + "/new"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(org.hamcrest.Matchers.not(containsString("Back to Your Organizations"))))
+        .andExpect(
+            result ->
+                org.junit.jupiter.api.Assertions.assertEquals(
+                    1,
+                    result
+                            .getResponse()
+                            .getContentAsString()
+                            .split("class=\"clavaris-back-button\"", -1)
+                            .length
+                        - 1));
+  }
+
   @Test
   void showDetailReturns404ForARoleFromAnotherOrganization() throws Exception {
     mockMvc.perform(get(rolesPath() + "/" + UUID.randomUUID())).andExpect(status().isNotFound());

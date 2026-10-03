@@ -13,7 +13,7 @@
                  Roles when "Modify" there linked in with its own workspaceId. -->
             <div th:replace="~{organization/platform/fragments/workspace-role-page-header :: header(${organization}, ${backTarget}, ${backLabel}, ${role.name()})}"></div>
 
-            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
+            <div th:replace="~{organization/platform/fragments/org-tabs :: strip(${organization.id()}, 'configure')}"></div>
 
             <div class="clavaris-configure-layout">
                 <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organization.id()}, 'workspace-roles')}"></div>
