@@ -29,18 +29,18 @@ Two passes: a read of the templates, stylesheet and scripts against the design-s
 | A2 | 28 data tables have no `<caption>` or accessible name | census | P2 |
 | A3 | Scroll regions (wide tables, long picker lists) are not keyboard-reachable | `overflow: auto` containers without a focusable descendant | P2 |
 | A4 | The actions column scrolled out of reach on a 1024px viewport (Rotate / Deactivate invisible until the table was scrolled) | seen in the browser | P1 ✅ pinned with `position: sticky` |
-| A5 | No global feedback when an HTMX request fails (4xx/5xx leaves the page silently unchanged) | no `htmx:responseError` handling anywhere | P1 |
+| A5 | ✅ No global feedback when an HTMX request fails (4xx/5xx left the page silently unchanged); an expired session swapped a whole login page into a small fragment target | no `htmx:responseError` handling anywhere | P1 |
 
 ### 3.2 Duplication and drift
 
 | # | Finding | Evidence | Rating |
 |---|---|---|---|
-| D1 | The dashboard navigation, the organization tab row and the `<head>` fragment are hand-copied once per module | `dashboard-nav.html` ×4, `org-tabs.html` ×4, `head.html` ×4; each copy's comment says "keep in sync by hand" | P1 |
+| D1 | ✅ The dashboard navigation, the organization tab row, the `<head>` and the back button were hand-copied once per module | `dashboard-nav.html` ×4, `org-tabs.html` ×4, `head.html` ×4, `back-link.html` ×2; the copies had already drifted (the client-registry and webhook ones loaded extra scripts) | P1 |
 | D2 | The platform auth pages duplicate the tenant ones | 17 same-named template pairs (`login`, `register`, `forgot-password`, …) | P2 |
 | D3 | Seven scripts have no test | `assign-role-refresh`, `event-type-picker`, `login-submit-guard`, `oauth-client-scope-row`, `scope-picker`, `webauthn-login`, `webauthn-register` | P2 |
 | D4 | The tenant brand colour never reaches the browser (inline `<style>` blocked by the CSP) | TD-UX-001 | P2 |
 
-D1 has a cheap cure the project already proves works: `platform/fragments/configure-sidebar.html` and `organization-header.html` live in `common`, whose templates every module sees, and are covered by each module's standalone-MockMvc tests. The comment in the duplicated copies ("a shared fragment would only be reachable from the app module") is out of date for anything placed in `common`.
+**D1 and A5 — resolved.** The four shared fragments now exist once, in `common` (`platform/fragments/dashboard-nav`, `org-tabs`, `back-link`, and `fragments/head`), the same place `configure-sidebar` and `organization-header` already lived and are covered by every module's standalone-MockMvc tests; 14 per-module files were removed and 75 templates repointed. Consolidating exposed real drift: only the client-registry and webhook copies of the navigation loaded the scope and event-type pickers, so those scripts are now loaded by the single navigation fragment on every dashboard page (each is a delegated listener that does nothing without its own container). `htmx-feedback.js` is loaded from the same place and gives every failed HTMX request an announced toast (in the top layer, so it shows above an open dialog) and turns a request redirected to the login page into a reload instead of a login page swapped into a fragment.
 
 ### 3.3 Visual system
 
@@ -96,7 +96,6 @@ So the isolation the product asks for is **structural, not a rule to enforce in 
 
 ## 5. Recommended order for the rest
 
-1. A5 global HTMX error feedback, then D1 consolidating the three duplicated fragments into `common`.
-2. §4.4 items 1 and 3.
-3. A2/A3, D3, D2.
-4. V1, V2, D4.
+1. §4.4 items 1 and 3 (group the environment pair on the dashboard; the development cue).
+2. A2/A3, D3, D2.
+3. V1, V2, D4.
