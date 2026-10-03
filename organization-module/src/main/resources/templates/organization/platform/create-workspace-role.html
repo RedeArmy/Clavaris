@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — New Workspace Role — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organization.name()} + ' — New Workspace Role — Clavaris')}">
     <title>New Workspace Role — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <!-- Live UX request, 2026-10-02: Back returns to wherever this page was opened from —
@@ -14,7 +14,7 @@
                  own Javadoc). -->
             <div th:replace="~{organization/platform/fragments/workspace-role-page-header :: header(${organization}, ${backTarget}, ${backLabel}, 'New Role')}"></div>
 
-            <div th:replace="~{organization/platform/fragments/org-tabs :: strip(${organization.id()}, 'configure')}"></div>
+            <div th:replace="~{platform/fragments/org-tabs :: strip(${organization.id()}, 'configure')}"></div>
 
             <div class="clavaris-configure-layout">
                 <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organization.id()}, 'workspace-roles')}"></div>

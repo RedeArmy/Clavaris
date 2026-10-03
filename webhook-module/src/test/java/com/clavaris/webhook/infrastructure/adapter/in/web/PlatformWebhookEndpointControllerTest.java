@@ -165,6 +165,7 @@ class PlatformWebhookEndpointControllerTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("/js/htmx.min.js")))
         .andExpect(content().string(containsString("/js/organization-dialog.js")))
+        .andExpect(content().string(containsString("/js/htmx-feedback.js")))
         .andExpect(content().string(containsString("/js/category-checkbox-picker.js")))
         .andExpect(content().string(containsString("/js/event-type-picker.js")));
   }

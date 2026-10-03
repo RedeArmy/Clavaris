@@ -133,7 +133,8 @@ class PlatformAccountsControllerTest {
         .perform(get(basePath()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("/js/htmx.min.js")))
-        .andExpect(content().string(containsString("/js/organization-dialog.js")));
+        .andExpect(content().string(containsString("/js/organization-dialog.js")))
+        .andExpect(content().string(containsString("/js/htmx-feedback.js")));
   }
 
   @Test

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Webhook Deliveries — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Webhook Deliveries — Clavaris')}">
     <title>Webhook Deliveries — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">

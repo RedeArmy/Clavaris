@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{organization/fragments/head :: head(${workspace.name()} + ' — ' + ${organization.name()} + ' — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${workspace.name()} + ' — ' + ${organization.name()} + ' — Clavaris')}">
     <title>Workspace — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <div th:replace="~{organization/platform/fragments/workspace-page-header :: header(${organization}, ${workspace})}"></div>

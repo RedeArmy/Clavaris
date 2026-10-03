@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Danger Zone — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organization.name()} + ' — Danger Zone — Clavaris')}">
     <title>Danger Zone — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
@@ -14,7 +14,7 @@
                 <span>Danger Zone</span>
             </p>
 
-            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organization.id()}, 'configure')}"></div>
 
             <!-- SDE-III review, 2026-09-19 — Clerk-style "Configure" navigation: this page replaces
                  the Danger Zone card shells that used to sit at the bottom of

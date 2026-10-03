@@ -1,0 +1,8 @@
+<!--
+The page-level Back button for a page that sits one level below a parent (workspace pages, the
+account admin pages, role pages). href is the destination; label names it for assistive technology
+(aria-label/title), the visible text is always just "Back". One copy for all modules.
+-->
+<a th:fragment="back(href, label)" class="clavaris-back-button" th:href="${href}" th:attr="aria-label=${label},title=${label}">
+    <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span>Back</span>
+</a>

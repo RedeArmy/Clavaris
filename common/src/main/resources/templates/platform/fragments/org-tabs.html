@@ -1,0 +1,34 @@
+<!--
+Navigation shared by every Organization page. Previously one hand copy per module; now the single
+copy in common (see dashboard-nav.html for why that is possible).
+
+tabs(organizationId, active): the page-level back button (to the Organizations list), the
+persistent Organization header and the four top-level tabs (Workspaces, Users, Logs, Configure).
+Workspaces, Logs and Configure's pages all link to existing pages of their own modules; Configure
+opens OAuth Clients, the first thing most owners set up after checking their API Keys.
+strip(organizationId, active): only the tab row, for pages that carry their own, more specific Back
+(the Workspace Role pages), so a page never shows two Back buttons.
+-->
+<div th:fragment="tabs(organizationId, active)" class="clavaris-tabs-nav">
+    <a class="clavaris-back-button" th:href="@{/platform/dashboard}" aria-label="Back to Your Organizations" title="Back to Your Organizations">
+        <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span>Back</span>
+    </a>
+    <div th:replace="~{platform/fragments/organization-header :: header}"></div>
+    <div th:replace="~{platform/fragments/org-tabs :: strip(${organizationId}, ${active})}"></div>
+</div>
+
+<!--
+The tab row on its own, without the generic "Back" button. Pages that carry their own, more specific
+Back (the Workspace Role pages, which return to Configure > Workspace Roles or to Teams & Roles)
+include this instead of "tabs", so a page never shows two Back buttons.
+-->
+<div th:fragment="strip(organizationId, active)" class="clavaris-org-tabs">
+    <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}"
+       th:classappend="${active == 'workspaces'} ? 'active'" th:attr="aria-current=${active == 'workspaces'} ? 'page'">Workspaces</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}"
+       th:classappend="${active == 'users'} ? 'active'" th:attr="aria-current=${active == 'users'} ? 'page'">Users</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organizationId})}"
+       th:classappend="${active == 'logs'} ? 'active'" th:attr="aria-current=${active == 'logs'} ? 'page'">Logs</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/oauth-clients(id=${organizationId})}"
+       th:classappend="${active == 'configure'} ? 'active'" th:attr="aria-current=${active == 'configure'} ? 'page'">Configure</a>
+</div>
