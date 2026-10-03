@@ -3,6 +3,29 @@
 
   const findDialog = (trigger) => document.getElementById(trigger.dataset.dialogOpen);
 
+  // Gives a dialog its accessible name from its own heading, so screen readers announce "Delete this
+  // Secret Key?" instead of an unnamed dialog. Done when the dialog opens rather than in each of
+  // the ~26 templates: dialogs rendered per row need ids derived from the dialog's own (unique) id,
+  // and one place keeps any future dialog covered without a template change.
+  let labelCounter = 0;
+  const labelDialog = (dialog) => {
+    if (!dialog?.querySelector || !dialog.setAttribute) {
+      return;
+    }
+    if (dialog.getAttribute?.("aria-label") || dialog.getAttribute?.("aria-labelledby")) {
+      return;
+    }
+    const heading = dialog.querySelector("h1, h2, h3");
+    if (!heading) {
+      return;
+    }
+    if (!heading.id) {
+      labelCounter += 1;
+      heading.id = `${dialog.id || "dialog"}-title-${labelCounter}`;
+    }
+    dialog.setAttribute("aria-labelledby", heading.id);
+  };
+
   // A click that lands on a modal <dialog> element itself (not one of its children) can only have
   // hit its ::backdrop or its own edge — treat a click outside its box as "dismiss", the same way
   // Esc already does.
@@ -30,6 +53,7 @@
     if (openTrigger) {
       const dialog = findDialog(openTrigger);
       if (dialog?.showModal) {
+        labelDialog(dialog);
         dialog.showModal();
       }
       return;
@@ -49,6 +73,7 @@
   const openDialogMarkedForAutoOpen = () => {
     const dialog = document.querySelector("[data-dialog-open-on-load]")?.closest("dialog");
     if (dialog?.showModal) {
+      labelDialog(dialog);
       dialog.showModal();
     }
   };

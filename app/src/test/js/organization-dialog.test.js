@@ -167,3 +167,45 @@ test("keeps a dialog open when the click lands inside its own box", () => {
 
   assert.equal(closeCalls, 0);
 });
+
+function labelledDialog(attributes = {}) {
+  const heading = { id: "" };
+  const dialog = {
+    id: "delete-role-dialog-1",
+    attributes: { ...attributes },
+    showModalCalls: 0,
+    showModal() { this.showModalCalls += 1; },
+    getAttribute(name) { return this.attributes[name]; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    querySelector: () => heading,
+  };
+  return { dialog, heading };
+}
+
+function openFrom(dialog) {
+  const documentStub = documentHarness();
+  documentStub.getElementById = () => dialog;
+  loadScript(documentStub);
+  documentStub.dispatch("click", {
+    target: { closest: (selector) => (selector === "[data-dialog-open]" ? { dataset: { dialogOpen: dialog.id } } : null) },
+  });
+}
+
+test("names a dialog after its own heading when it opens", () => {
+  const { dialog, heading } = labelledDialog();
+
+  openFrom(dialog);
+
+  assert.equal(dialog.attributes["aria-labelledby"], heading.id);
+  assert.match(heading.id, /^delete-role-dialog-1-title-\d+$/);
+  assert.equal(dialog.showModalCalls, 1);
+});
+
+test("leaves a dialog that already has an accessible name alone", () => {
+  const { dialog, heading } = labelledDialog({ "aria-label": "Already named" });
+
+  openFrom(dialog);
+
+  assert.equal(dialog.attributes["aria-labelledby"], undefined);
+  assert.equal(heading.id, "");
+});
