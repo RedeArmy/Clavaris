@@ -1,5 +1,7 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.clientregistry.application.usecase.activateorganizationclient.ActivateOrganizationClientCommand;
+import com.clavaris.clientregistry.application.usecase.activateorganizationclient.ActivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientCommand;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientResult;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientUseCase;
@@ -7,6 +9,9 @@ import com.clavaris.clientregistry.application.usecase.createorganizationclient.
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationNotFoundException;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientCommand;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.DeleteOrganizationClientCommand;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.DeleteOrganizationClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.OrganizationClientActiveException;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretCommand;
@@ -68,7 +73,11 @@ import org.springframework.web.server.ResponseStatusException;
 // past the default threshold of 30): every import here backs a real, distinct collaborator this
 // controller genuinely needs — same "wiring, not sprawl" reasoning
 // OrganizationUseCaseConfig's own class-level Javadoc documents for an identical situation.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// PMD.TooManyMethods: one handler per dashboard action (list, create, deactivate, activate, delete,
+// rotate secret) plus the small private helpers they share — each is a real, distinct endpoint or
+// a de-duplication of two of them, not a design smell to split across controllers that would then
+// each need their own copy of the ownership/render plumbing.
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/secret-keys")
 public class PlatformOrganizationClientController {
@@ -84,6 +93,8 @@ public class PlatformOrganizationClientController {
   private final CreateOrganizationClientUseCase createClient;
   private final ListOrganizationClientsPagedUseCase listClientsPaged;
   private final DeactivateOrganizationClientUseCase deactivateClient;
+  private final ActivateOrganizationClientUseCase activateClient;
+  private final DeleteOrganizationClientUseCase deleteClient;
   private final RotateOrganizationClientSecretUseCase rotateClientSecret;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
@@ -93,17 +104,24 @@ public class PlatformOrganizationClientController {
   // DeactivateOrganizationClientCommand's own Javadoc for the web-layer-only check it replaced),
   // now enforced by DeactivateOrganizationClientService/RotateOrganizationClientSecretService
   // themselves. One parameter per remaining collaborating port — same rationale as every other
-  // multi-collaborator constructor in this codebase.
+  // multi-collaborator constructor in this codebase. java:S107 (more than 7 parameters) is
+  // suppressed for that reason: the list/create/deactivate/activate/delete/rotate use cases are
+  // each a distinct port, and bundling them into a holder object would only hide the wiring.
+  @SuppressWarnings("java:S107")
   public PlatformOrganizationClientController(
       final CreateOrganizationClientUseCase createClient,
       final ListOrganizationClientsPagedUseCase listClientsPaged,
       final DeactivateOrganizationClientUseCase deactivateClient,
+      final ActivateOrganizationClientUseCase activateClient,
+      final DeleteOrganizationClientUseCase deleteClient,
       final RotateOrganizationClientSecretUseCase rotateClientSecret,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.createClient = createClient;
     this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
+    this.activateClient = activateClient;
+    this.deleteClient = deleteClient;
     this.rotateClientSecret = rotateClientSecret;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
@@ -250,6 +268,77 @@ public class PlatformOrganizationClientController {
     if (DashboardControllerSupport.isHtmxRequest(request)) {
       renderSecretKeysList(
           model, organizationId, owned.organizationName(), KeysetPageRequest.first());
+      return CLIENTS_FRAGMENT;
+    }
+    return "redirect:/platform/dashboard/organizations/" + organizationId + "/secret-keys";
+  }
+
+  // A deactivated Secret Key can be switched back on; the secret itself is untouched.
+  @PostMapping("/{clientId}/activate")
+  public String activate(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+
+    runMutation(
+        () ->
+            activateClient.handle(
+                new ActivateOrganizationClientCommand(
+                    clientId,
+                    organizationId,
+                    AuditActor.platformAccount(owned.ownerPlatformAccountId()))));
+
+    return afterMutation(request, model, organizationId, owned.organizationName());
+  }
+
+  // Permanent deletion, reachable only for an already-deactivated key (409 otherwise). The
+  // dashboard asks for confirmation in a popup before it ever posts here.
+  @PostMapping("/{clientId}/delete")
+  public String delete(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final String clientId,
+      final Model model) {
+    final DashboardControllerSupport.OwnedOrganization owned =
+        DashboardControllerSupport.requireOwnedOrganization(
+            request, organizationId, currentPlatformAccount, organizationResolver);
+
+    runMutation(
+        () ->
+            deleteClient.handle(
+                new DeleteOrganizationClientCommand(
+                    clientId,
+                    organizationId,
+                    AuditActor.platformAccount(owned.ownerPlatformAccountId()))));
+
+    return afterMutation(request, model, organizationId, owned.organizationName());
+  }
+
+  // Shared failure mapping for the activate/delete mutations above: unknown or cross-tenant
+  // clientId -> 404 (indistinguishable, anti-enumeration), a concurrent edit or a delete of a
+  // still-active key -> 409.
+  private static void runMutation(final Runnable mutation) {
+    try {
+      mutation.run();
+    } catch (final OrganizationClientNotFoundException _) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    } catch (final ConcurrentClientModificationException | OrganizationClientActiveException _) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    }
+  }
+
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private String afterMutation(
+      final HttpServletRequest request,
+      final Model model,
+      final UUID organizationId,
+      final String organizationName) {
+    if (DashboardControllerSupport.isHtmxRequest(request)) {
+      renderSecretKeysList(model, organizationId, organizationName, KeysetPageRequest.first());
       return CLIENTS_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/secret-keys";

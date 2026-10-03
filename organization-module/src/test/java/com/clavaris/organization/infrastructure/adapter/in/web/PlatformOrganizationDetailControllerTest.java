@@ -117,6 +117,20 @@ class PlatformOrganizationDetailControllerTest {
         .andExpect(content().string(containsString(organization.id().toString())));
   }
 
+  // Creating a workspace is a header button that opens a popup, not an always-visible form card.
+  @Test
+  void offersNewWorkspaceAsAHeaderButtonThatOpensAPopup() throws Exception {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
+
+    mockMvc
+        .perform(get("/platform/dashboard/organizations/{organizationId}", organization.id()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-dialog-open=\"create-workspace-dialog\"")))
+        .andExpect(content().string(containsString("<dialog id=\"create-workspace-dialog\"")))
+        .andExpect(content().string(containsString("New workspace name")));
+  }
+
   @Test
   void resolvesTheOrganizationThroughTheOwnershipCheckingUseCase() throws Exception {
     UUID organizationId = UUID.randomUUID();

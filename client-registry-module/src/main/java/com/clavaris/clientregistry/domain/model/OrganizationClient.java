@@ -125,6 +125,23 @@ public final class OrganizationClient extends AbstractClientCredential {
         version());
   }
 
+  /**
+   * The counterpart to {@link #deactivate}: a deliberately deactivated Secret Key may be turned
+   * back on. The secret itself is untouched - reactivation restores exactly the credential that was
+   * switched off, so rotate it separately if the reason for deactivating was a suspected leak.
+   */
+  public OrganizationClient activate() {
+    return new OrganizationClient(
+        id(),
+        organizationId,
+        clientId(),
+        clientSecretHash(),
+        allowedScopes(),
+        createdAt(),
+        true,
+        version());
+  }
+
   public UUID organizationId() {
     return organizationId;
   }

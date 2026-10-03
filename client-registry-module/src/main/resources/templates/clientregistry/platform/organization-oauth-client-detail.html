@@ -364,11 +364,16 @@
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/grant-types(organizationId=${organizationId},clientId=${client.clientId()})}"
                               method="post">
                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <div class="clavaris-field" th:each="grantType : ${T(com.clavaris.clientregistry.domain.model.OAuthGrantTypeCatalog).KNOWN}">
-                                <label>
+                            <!-- One row per grant type: name on the left, on/off switch on the right. The real
+                                 checkbox stays in the DOM (visually hidden), so the form still submits
+                                 allowedGrantTypes exactly as before. -->
+                            <div class="clavaris-toggle-list">
+                                <label class="clavaris-toggle clavaris-toggle--row"
+                                       th:each="grantType : ${T(com.clavaris.clientregistry.domain.model.OAuthGrantTypeCatalog).KNOWN}">
                                     <input type="checkbox" name="allowedGrantTypes" th:value="${grantType}"
                                            th:checked="${#lists.contains(client.allowedGrantTypes(), grantType)}"/>
-                                    <span th:text="${grantType}">grant type</span>
+                                    <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                    <code class="clavaris-toggle__label" th:text="${grantType}">grant type</code>
                                 </label>
                             </div>
                             <div class="clavaris-dialog__actions">

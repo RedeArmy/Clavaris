@@ -15,10 +15,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.clavaris.clientregistry.application.usecase.activateorganizationclient.ActivateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientResult;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.CreateOrganizationClientUseCase;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.deactivateorganizationclient.DeactivateOrganizationClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.DeleteOrganizationClientUseCase;
+import com.clavaris.clientregistry.application.usecase.deleteorganizationclient.OrganizationClientActiveException;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedQuery;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
 import com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret.RotateOrganizationClientSecretResult;
@@ -52,6 +55,8 @@ class PlatformOrganizationClientControllerTest {
   private CreateOrganizationClientUseCase createClient;
   private ListOrganizationClientsPagedUseCase listClientsPaged;
   private DeactivateOrganizationClientUseCase deactivateClient;
+  private ActivateOrganizationClientUseCase activateClient;
+  private DeleteOrganizationClientUseCase deleteClient;
   private RotateOrganizationClientSecretUseCase rotateClientSecret;
   private OrganizationForPlatformAccountResolver organizationResolver;
   private CurrentPlatformAccountResolver currentPlatformAccount;
@@ -63,6 +68,8 @@ class PlatformOrganizationClientControllerTest {
     createClient = mock(CreateOrganizationClientUseCase.class);
     listClientsPaged = mock(ListOrganizationClientsPagedUseCase.class);
     deactivateClient = mock(DeactivateOrganizationClientUseCase.class);
+    activateClient = mock(ActivateOrganizationClientUseCase.class);
+    deleteClient = mock(DeleteOrganizationClientUseCase.class);
     rotateClientSecret = mock(RotateOrganizationClientSecretUseCase.class);
     organizationResolver = mock(OrganizationForPlatformAccountResolver.class);
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
@@ -93,6 +100,8 @@ class PlatformOrganizationClientControllerTest {
                     createClient,
                     listClientsPaged,
                     deactivateClient,
+                    activateClient,
+                    deleteClient,
                     rotateClientSecret,
                     organizationResolver,
                     currentPlatformAccount))
@@ -146,6 +155,48 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(view().name("clientregistry/platform/organization-secret-keys"))
         .andExpect(model().attribute("organizationName", "Acme Co"))
         .andExpect(model().attribute("clients", List.of(client)));
+  }
+
+  // A deactivated key offers exactly two actions: switch it back on, or delete it for good - the
+  // latter only through a confirmation popup rendered below the table, never a direct post.
+  @Test
+  void aDeactivatedKeyOffersActivateAndAConfirmedDelete() throws Exception {
+    OrganizationClient inactive = sampleClient().deactivate();
+    KeysetCursor cursor = cursorOf(inactive);
+    when(listClientsPaged.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(inactive), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/secret-keys/sk_test_abc/activate")))
+        .andExpect(content().string(containsString(">Activate</button>")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("data-dialog-open=\"delete-secret-key-dialog-sk_test_abc\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "<dialog class=\"clavaris-dialog\" id=\"delete-secret-key-dialog-sk_test_abc\"")))
+        .andExpect(content().string(containsString("/secret-keys/sk_test_abc/delete")))
+        .andExpect(content().string(containsString("Delete Secret Key")));
+  }
+
+  @Test
+  void anActiveKeyOffersNeitherActivateNorDelete() throws Exception {
+    OrganizationClient active = sampleClient();
+    KeysetCursor cursor = cursorOf(active);
+    when(listClientsPaged.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(active), cursor, cursor, false, false));
+
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("/activate"))))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("/delete"))))
+        .andExpect(content().string(containsString(">Deactivate</button>")));
   }
 
   @Test
@@ -248,6 +299,64 @@ class PlatformOrganizationClientControllerTest {
         .andExpect(redirectedUrl(basePath()));
 
     verify(deactivateClient).handle(any());
+  }
+
+  @Test
+  void plainActivatePostRedirectsOnSuccess() throws Exception {
+    OrganizationClient client = sampleClient();
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/activate"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath()));
+
+    verify(activateClient).handle(any());
+  }
+
+  @Test
+  void activateReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
+    doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
+        .when(activateClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/sk_test_someone_elses/activate"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void plainDeletePostRedirectsOnSuccess() throws Exception {
+    OrganizationClient client = sampleClient();
+
+    mockMvc
+        .perform(post(basePath() + "/" + client.clientId() + "/delete"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(basePath()));
+
+    verify(deleteClient).handle(any());
+  }
+
+  @Test
+  void deleteReturnsNotFoundWhenTheClientBelongsToADifferentOrganization() throws Exception {
+    doThrow(new OrganizationClientNotFoundException("sk_test_someone_elses"))
+        .when(deleteClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/sk_test_someone_elses/delete"))
+        .andExpect(status().isNotFound());
+  }
+
+  // Deleting a still-active key is the one guard that turns a well-formed request into a conflict.
+  @Test
+  void deleteReturnsConflictWhenTheClientIsStillActive() throws Exception {
+    doThrow(new OrganizationClientActiveException("sk_test_still_active"))
+        .when(deleteClient)
+        .handle(any());
+
+    mockMvc
+        .perform(post(basePath() + "/sk_test_still_active/delete"))
+        .andExpect(status().isConflict());
   }
 
   // SDE-III review, 2026-09-15: ownership is now enforced by DeactivateOrganizationClientService

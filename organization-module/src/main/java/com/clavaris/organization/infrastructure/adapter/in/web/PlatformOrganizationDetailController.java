@@ -99,6 +99,17 @@ public class PlatformOrganizationDetailController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
     model.addAttribute("organization", organization);
+    // The app module's DashboardOrganizationHeaderAdvice already supplies this header on every
+    // Organization page. It is set here as well so that this page renders the same header when
+    // only organization-module is wired in.
+    model.addAttribute(
+        "organizationHeader",
+        new com.clavaris.common.domain.model.OrganizationHeaderView(
+            organization.id(),
+            organization.name(),
+            organization.environment()
+                == com.clavaris.organization.domain.model.OrganizationEnvironment.PRODUCTION,
+            organization.createdAt()));
     addWorkspacesToModel(model, organizationId, KeysetPageRequest.fromCursors(after, before));
     model.addAttribute("workspaceForm", new CreateWorkspaceForm());
     if (isHtmxRequest(request)) {
