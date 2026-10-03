@@ -118,9 +118,8 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
   --auth-footer-bg: linear-gradient(180deg, rgba(19, 19, 22, 0.018), rgba(19, 19, 22, 0.045));
 
-  /* Shared min-height of the four Organization tabs, calibrated to Configure's own height so
-     switching tabs (full page navigations) never visibly resizes the page. */
-  --clavaris-org-tab-min-height: 480px;
+  /* Height of the sticky top bar; the dashboard content fills the rest of the viewport. */
+  --topbar-height: 68px;
 
   color-scheme: light;
 }
@@ -531,7 +530,7 @@ body > main {
   z-index: 20;
   display: flex;
   width: 100%;
-  min-height: 68px;
+  min-height: var(--topbar-height);
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-3) clamp(16px, 4vw, 48px);
@@ -610,8 +609,12 @@ body > main {
   color: var(--clavaris-brand-color);
 }
 
+/* Every dashboard page is at least one viewport tall, so a short tab (an empty list) and a long one
+   render the same page height and switching tabs never resizes the frame. */
 .clavaris-dashboard__content {
   min-width: 0;
+  min-height: calc(100vh - var(--topbar-height));
+  min-height: calc(100dvh - var(--topbar-height));
   padding: clamp(28px, 5vw, 64px) clamp(16px, 5vw, 72px);
 }
 
@@ -649,7 +652,7 @@ body > main {
 }
 
 /* Header with a heading and one action: the action stays vertically centred on the heading. */
-.clavaris-section > .clavaris-page-header {
+.clavaris-section > .clavaris-page-header:not(:has(h1)) {
   align-items: center;
   margin-bottom: var(--space-5);
 }
@@ -702,16 +705,6 @@ body > main {
 
 .clavaris-section--danger h2 {
   color: var(--clavaris-danger-text);
-}
-
-/* Four Organization tabs and Configure's content share one min-height (see token). */
-.clavaris-org-tab-content,
-.clavaris-configure-content {
-  min-height: var(--clavaris-org-tab-min-height);
-}
-
-.clavaris-configure-content {
-  min-width: 0;
 }
 
 /* --- Landing page ---------------------------------------------------------- */
@@ -1064,6 +1057,25 @@ label.clavaris-toggle {
   align-items: center;
   gap: var(--space-3);
   cursor: pointer;
+}
+
+/* A list of settings: name on the left, switch pinned to the right, hairline between rows. The
+   markup keeps input, track, then text; row-reverse puts the text first visually. */
+.clavaris-toggle-list {
+  border-top: 1px solid var(--clavaris-border-subtle);
+}
+
+label.clavaris-toggle.clavaris-toggle--row {
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--clavaris-border-subtle);
+}
+
+.clavaris-toggle--row .clavaris-toggle__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .clavaris-toggle input[type="checkbox"] {
@@ -1611,6 +1623,44 @@ body:has(.htmx-request)::after {
   font-weight: 500;
 }
 
+/* Persistent Organization header, identical above every tab. Its height is deterministic — the
+   name is one truncated line and the metadata one non-wrapping row on desktop — so the tab bar sits
+   at the same vertical position on every tab whatever the Organization's name or ID looks like. */
+.clavaris-org-header {
+  min-height: 4.25rem;
+  margin: 0 0 var(--space-2);
+}
+
+.clavaris-org-header__name {
+  margin: 0;
+  overflow: hidden;
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clavaris-org-header__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  overflow-x: auto;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+/* Tab pages share one title-block height (title plus a two-line description), so the first block
+   of content starts at the same y on every tab; a longer description simply grows past it. */
+.clavaris-dashboard__inner:has(> .clavaris-tabs-nav) .clavaris-page-header:has(h1) {
+  min-height: 5.75rem;
+}
+
 .clavaris-org-tabs {
   display: flex;
   gap: 22px;
@@ -1714,7 +1764,7 @@ body:has(.htmx-request)::after {
   align-items: start;
   grid-template-columns: 200px minmax(0, 1fr);
   gap: 32px;
-  margin-top: var(--space-6);
+  margin-top: 0;
 }
 
 .clavaris-configure-sidebar {
@@ -2768,11 +2818,6 @@ body:has(.htmx-request)::after {
   .clavaris-configure-sidebar__label {
     display: none;
   }
-
-  .clavaris-org-tab-content,
-  .clavaris-configure-content {
-    min-height: auto;
-  }
 }
 
 @media (max-width: 640px) {
@@ -2812,9 +2857,12 @@ body:has(.htmx-request)::after {
     flex-wrap: wrap;
   }
 
+  :root {
+    --topbar-height: 60px;
+  }
+
   .clavaris-sidebar {
     gap: 10px;
-    min-height: 60px;
     padding: 10px var(--space-4);
   }
 
@@ -2854,6 +2902,15 @@ body:has(.htmx-request)::after {
 
   .clavaris-section > .clavaris-page-header {
     flex-direction: row;
+  }
+
+  .clavaris-org-header {
+    min-height: 0;
+  }
+
+  .clavaris-org-header__meta {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 
   .clavaris-nav__brand .clavaris-brand-lockup {
