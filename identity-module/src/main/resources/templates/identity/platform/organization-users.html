@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Users — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Users — Clavaris')}">
     <title>Users — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <!-- SDE-III refactor, 2026-09-22: the old "Back to {organizationName}" link here (identity/
@@ -20,7 +20,7 @@
                 <span>Users</span>
             </p>
 
-            <div th:replace="~{identity/platform/fragments/org-tabs :: tabs(${organizationId}, 'users')}"></div>
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organizationId}, 'users')}"></div>
 
             <!-- Live UX request, 2026-09-22: "Create user" moved here from its own dashed-border
                  .clavaris-create-tile that used to sit below the table/pagination — a plain button

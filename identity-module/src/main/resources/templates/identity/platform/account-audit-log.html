@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Audit Log — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Audit Log — Clavaris')}">
     <title>Audit Log — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner"
              th:with="accountLabel=${account.username().isPresent()} ? ${account.username().get().value()} : ${account.email().value()}">
-            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}, 'Back to Profile')}"></div>
+            <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}, 'Back to Profile')}"></div>
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /

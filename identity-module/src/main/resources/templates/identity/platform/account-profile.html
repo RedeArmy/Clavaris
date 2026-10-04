@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{identity/fragments/head :: head(${organizationName} + ' — Profile — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Profile — Clavaris')}">
     <title>Profile — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{identity/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <div th:replace="~{identity/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
+            <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
             <p class="clavaris-breadcrumb">
                 <a th:href="@{/platform/dashboard}">Organizations</a> /
                 <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /

@@ -45,11 +45,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * /o/{organizationId}} prefix that no static-resource handler is ever mounted at.
  *
  * <p><b>SDE-III review, 2026-09-15 — real bug found and closed:</b> only {@code /js/} was excluded
- * here, even though {@code identity/fragments/head.html} (every hosted login/consent/error page)
- * references {@code /css/clavaris.css}, which itself {@code @font-face}s two files under {@code
- * /fonts/}. On a real ADR-0009 verified custom domain, a browser's GET for either got rewritten to
- * {@code /o/{organizationId}/css/clavaris.css} — a path no static-resource handler is mounted at —
- * a 404, so every hosted page served on a custom domain rendered with zero CSS and no web fonts.
+ * here, even though {@code fragments/head.html} (every hosted login/consent/error page) references
+ * {@code /css/clavaris.css}, which itself {@code @font-face}s two files under {@code /fonts/}. On a
+ * real ADR-0009 verified custom domain, a browser's GET for either got rewritten to {@code
+ * /o/{organizationId}/css/clavaris.css} — a path no static-resource handler is mounted at — a 404,
+ * so every hosted page served on a custom domain rendered with zero CSS and no web fonts.
  */
 public final class CustomDomainRequestRewriteFilter extends OncePerRequestFilter {
 

@@ -16,7 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
  * (the HTMX-header check, the "resolve the current PlatformAccount or fail loudly" guard, the
  * ownership-check-or-404, and the anti-enumeration "does this clientId belong to this Organization"
  * check) plus one identical constant — genuine same-module duplication, not the deliberate
- * cross-module kind {@code identity/platform/fragments/dashboard-nav.html}'s own comment documents
+ * cross-module kind the per-module navigation templates used to be (those now live once, in common)
  * (both controllers live in this module, this package even; no module- independence rule is in
  * tension here). Same "small shared utility class" precedent {@code
  * identity.infrastructure.adapter.in.web.CurrentSessionSupport} already establishes for an

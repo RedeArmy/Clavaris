@@ -180,9 +180,18 @@ html {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--clavaris-brand-color) 12%, transparent), transparent 28rem),
-    var(--clavaris-bg);
+  /* The warm tint is pinned to the viewport (fixed, viewport-sized), never to the document: a
+     document-relative gradient moves with the page height, so a long page (the Audit Log) used to
+     get a visibly different background from a short one. */
+  background-color: var(--clavaris-bg);
+  background-image: radial-gradient(
+    circle at 12% -10%,
+    color-mix(in srgb, var(--clavaris-brand-color) 12%, transparent),
+    transparent 28rem
+  );
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% 100vh;
   color: var(--clavaris-text-primary);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -1325,6 +1334,26 @@ body:has(.htmx-request)::after {
   text-align: right;
 }
 
+/* When a wide table scrolls inside its card, the actions column stays pinned to the right edge so
+   Rotate/Deactivate/Delete are never scrolled out of reach. */
+.clavaris-table td:has(> .clavaris-row-actions),
+.clavaris-table td:has(> .clavaris-menu),
+.clavaris-table th:last-child:has(> .clavaris-visually-hidden) {
+  position: sticky;
+  right: 0;
+  background: var(--clavaris-surface);
+  box-shadow: -8px 0 8px -8px rgba(19, 19, 22, 0.12);
+}
+
+.clavaris-table th:last-child:has(> .clavaris-visually-hidden) {
+  background: var(--clavaris-surface-subtle);
+}
+
+.clavaris-table tbody tr:hover td:has(> .clavaris-row-actions),
+.clavaris-table tbody tr:hover td:has(> .clavaris-menu) {
+  background: color-mix(in srgb, var(--clavaris-brand-color) 5%, var(--clavaris-surface));
+}
+
 .clavaris-table td > .clavaris-row-actions {
   flex-wrap: nowrap;
   justify-content: flex-end;
@@ -1799,12 +1828,156 @@ body:has(.htmx-request)::after {
   align-items: center;
   gap: var(--space-1) var(--space-4);
   margin: var(--space-2) 0 0;
-  overflow-x: auto;
   color: var(--clavaris-text-muted);
   font-size: var(--text-sm);
   line-height: 1.6;
   white-space: nowrap;
-  scrollbar-width: none;
+}
+
+/* --- Environment switcher (Development / Production) -----------------------
+   A native <details> styled as the environment badge; its panel floats under it. Each entry is a
+   link to the other environment's equivalent page. */
+
+.clavaris-env-switch {
+  position: relative;
+}
+
+.clavaris-env-switch > summary {
+  list-style: none;
+}
+
+.clavaris-env-switch > summary::-webkit-details-marker {
+  display: none;
+}
+
+.clavaris-env-switch__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--space-2) 2px 10px;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  background: var(--clavaris-bg);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-pill);
+  transition: border-color var(--duration-fast) var(--ease), background-color var(--duration-fast) var(--ease);
+}
+
+.clavaris-env-switch__trigger:hover,
+.clavaris-env-switch[open] > .clavaris-env-switch__trigger {
+  color: var(--clavaris-text-primary);
+  border-color: var(--clavaris-border-strong);
+}
+
+.clavaris-env-switch__trigger--production {
+  color: var(--clavaris-success-text);
+  background: var(--clavaris-success-bg);
+  border-color: color-mix(in srgb, var(--clavaris-success) 25%, transparent);
+}
+
+.clavaris-env-switch__chevron {
+  width: 1em;
+  height: 1em;
+  transition: transform var(--duration) var(--ease);
+}
+
+.clavaris-env-switch[open] .clavaris-env-switch__chevron {
+  transform: rotate(180deg);
+}
+
+.clavaris-env-switch__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  background: var(--clavaris-accent);
+  border-radius: 50%;
+}
+
+.clavaris-env-switch__dot--production,
+.clavaris-env-switch__trigger--production .clavaris-env-switch__dot {
+  background: var(--clavaris-success);
+}
+
+.clavaris-env-switch__panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 30;
+  width: 288px;
+  padding: var(--space-2);
+  white-space: normal;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+}
+
+.clavaris-env-switch__title {
+  margin: 0;
+  padding: 6px 10px 4px;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.clavaris-env-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  color: var(--clavaris-text-primary);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+
+.clavaris-env-option:hover {
+  background: var(--clavaris-bg);
+}
+
+.clavaris-env-option--current {
+  background: color-mix(in srgb, var(--clavaris-brand-color) 8%, var(--clavaris-surface));
+}
+
+.clavaris-env-option__text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.clavaris-env-option__label {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.clavaris-env-option__hint {
+  overflow: hidden;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clavaris-env-option__check {
+  color: var(--clavaris-brand-color);
+}
+
+.clavaris-env-option__action {
+  color: var(--clavaris-brand-color);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.clavaris-env-switch__note {
+  margin: var(--space-1) 0 0;
+  padding: 8px 10px 4px;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  border-top: 1px solid var(--clavaris-border-subtle);
 }
 
 /* Tab pages share one title-block height (title plus a two-line description), so the first block
@@ -2307,6 +2480,76 @@ body:has(.htmx-request)::after {
 
 .clavaris-dialog--confirm .clavaris-dialog__actions {
   padding: 0 28px 28px;
+}
+
+/* --- Toasts (failed HTMX requests) -----------------------------------------
+   The region is a manual popover so it sits in the top layer, above an open modal dialog. The
+   popover-only rule is separate so a browser without popover support drops just that rule. */
+
+.clavaris-toast-region {
+  position: fixed;
+  inset: auto 0 var(--space-6);
+  width: min(480px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+}
+
+.clavaris-toast-region:popover-open {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.clavaris-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  color: var(--clavaris-text-primary);
+  font-size: var(--text-base);
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-left: 4px solid var(--clavaris-danger);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  animation: clavaris-toast-in var(--duration) var(--ease);
+}
+
+.clavaris-toast__message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.clavaris-toast__close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  color: var(--clavaris-text-muted);
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.clavaris-toast__close:hover {
+  color: var(--clavaris-text-primary);
+  background: var(--clavaris-bg);
+}
+
+@keyframes clavaris-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 /* Manage-account dialog and admin "View Profile": zero-JS radio-driven tabs. */
@@ -3113,6 +3356,15 @@ body:has(.htmx-request)::after {
 /* Tablets and narrow panes keep the left rail, just slimmer; only below phone width (where a
    second column cannot fit) does it fold into a horizontal row above the content. */
 @media (max-width: 900px) {
+  .clavaris-org-header {
+    min-height: 0;
+  }
+
+  .clavaris-org-header__meta {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
   .clavaris-kv {
     grid-template-columns: 1fr;
   }
@@ -3226,13 +3478,8 @@ body:has(.htmx-request)::after {
     flex-direction: row;
   }
 
-  .clavaris-org-header {
-    min-height: 0;
-  }
-
-  .clavaris-org-header__meta {
-    flex-wrap: wrap;
-    white-space: normal;
+  .clavaris-env-switch__panel {
+    width: min(288px, calc(100vw - 32px));
   }
 
   .clavaris-nav__brand .clavaris-brand-lockup {

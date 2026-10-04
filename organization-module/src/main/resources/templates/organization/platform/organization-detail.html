@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organization.name()} + ' — Clavaris')}">
     <title>Organization — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> / <span th:text="${organization.name()}">Organization</span></p>
 
-            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'workspaces')}"></div>
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organization.id()}, 'workspaces')}"></div>
 
             <!-- ADR-0025: same HTMX-fragment shape as dashboard.html's own "content" div — the
                  create-workspace form below posts to PlatformWorkspaceController#create, which

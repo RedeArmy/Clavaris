@@ -6,7 +6,7 @@ callers live in this module" rationale workspace-page-header.html's own identica
 documents.
 -->
 <div th:fragment="header(organization, backTarget, backLabel, currentLabel)">
-    <div th:replace="~{organization/platform/fragments/back-link :: back(${backTarget}, ${backLabel})}"></div>
+    <div th:replace="~{platform/fragments/back-link :: back(${backTarget}, ${backLabel})}"></div>
     <p class="clavaris-breadcrumb">
         <a th:href="@{/platform/dashboard}">Organizations</a> /
         <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{webhook/fragments/head :: head(${organizationName} + ' — Event Catalog — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Event Catalog — Clavaris')}">
     <title>Event Catalog — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{webhook/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
@@ -14,7 +14,7 @@
                 <span>Event Catalog</span>
             </p>
 
-            <div th:replace="~{webhook/platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
 
             <div class="clavaris-configure-layout">
                 <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'webhook-endpoints')}"></div>

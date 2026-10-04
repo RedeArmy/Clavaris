@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{organization/fragments/head :: head(${organization.name()} + ' — Audit Log — Clavaris')}">
+<head th:replace="~{fragments/head :: head(${organization.name()} + ' — Audit Log — Clavaris')}">
     <title>Audit Log — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
@@ -14,7 +14,7 @@
                 <span>Audit Log</span>
             </p>
 
-            <div th:replace="~{organization/platform/fragments/org-tabs :: tabs(${organization.id()}, 'logs')}"></div>
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organization.id()}, 'logs')}"></div>
 
             <div class="clavaris-page-header">
                 <div>

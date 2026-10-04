@@ -123,7 +123,7 @@ class CustomDomainRequestRewriteFilterTest {
     verify(domainConfigs, never()).findByHostname(org.mockito.ArgumentMatchers.any());
   }
 
-  // SDE-III review, 2026-09-15 — the real regression this guards: identity/fragments/head.html
+  // SDE-III review, 2026-09-15 — the real regression this guards: fragments/head.html
   // (every hosted login/consent/error page) references /css/clavaris.css, which itself
   // @font-faces two files under /fonts/ — neither prefix was excluded before this fix, so both
   // got rewritten to /o/{organizationId}/css/... and /o/{organizationId}/fonts/..., paths no

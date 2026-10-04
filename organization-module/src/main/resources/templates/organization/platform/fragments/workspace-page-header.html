@@ -8,7 +8,7 @@ responsibility (tabs vs. header) separate, same split back-link.html and org-tab
 at the Organization level.
 -->
 <div th:fragment="header(organization, workspace)">
-    <div th:replace="~{organization/platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organization.id()})}, 'Back to Workspaces')}"></div>
+    <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organization.id()})}, 'Back to Workspaces')}"></div>
     <p class="clavaris-breadcrumb">
         <a th:href="@{/platform/dashboard}">Organizations</a> /
         <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /

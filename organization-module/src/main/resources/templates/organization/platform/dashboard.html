@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{organization/fragments/head :: head('Your organizations — Clavaris')}">
+<head th:replace="~{fragments/head :: head('Your organizations — Clavaris')}">
     <title>Your organizations — Clavaris</title>
 </head>
 <body>
 <div class="clavaris-dashboard">
-    <aside th:replace="~{organization/platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <!-- The modal uses the dashboard's existing plain POST endpoint. A successful creation
              follows the controller's normal redirect; server-side validation re-renders this page
