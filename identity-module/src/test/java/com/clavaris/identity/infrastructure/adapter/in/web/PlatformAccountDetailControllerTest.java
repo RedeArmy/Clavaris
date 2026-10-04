@@ -203,13 +203,12 @@ class PlatformAccountDetailControllerTest {
     mockMvc.perform(get(path())).andExpect(status().isNotFound());
   }
 
-  // TD-FUT-034, Clerk "View Profile" activity heatmap parity — proves
-  // PlatformAccountDetailController's own grid-building turns a sparse day-count list into a
-  // dense, exactly-365-real-day calendar, with today's own cell carrying the stubbed count/level.
+  // TD-FUT-034, Clerk "View Profile" activity heatmap parity: the controller hands the template a
+  // LoginActivityView built from the use case's day counts (the grid itself is covered by
+  // LoginActivityGridTest), and the card shows the headline numbers.
   @Test
-  @SuppressWarnings("unchecked")
-  void buildsAHeatmapGridWithTodaysActivityAtTheCorrectLevel() throws Exception {
-    java.time.LocalDate today = java.time.LocalDate.now();
+  void buildsTheActivityViewFromTheUseCasesDayCounts() throws Exception {
+    java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
     when(getLoginActivity.handle(any()))
         .thenReturn(
             List.of(
@@ -217,21 +216,48 @@ class PlatformAccountDetailControllerTest {
                     .LoginActivityDay(today, 2)));
 
     org.springframework.test.web.servlet.MvcResult result =
-        mockMvc.perform(get(path())).andExpect(status().isOk()).andReturn();
+        mockMvc
+            .perform(get(path()))
+            .andExpect(status().isOk())
+            .andExpect(
+                content()
+                    .string(
+                        containsString(
+                            "Sign-in activity over the last 365 days: 2 sign-ins on 1 day")))
+            .andExpect(content().string(containsString("Monthly totals")))
+            .andReturn();
 
-    List<List<HeatmapDayCell>> weeks =
-        (List<List<HeatmapDayCell>>) result.getModelAndView().getModel().get("loginActivityWeeks");
-    List<HeatmapDayCell> allCells = weeks.stream().flatMap(List::stream).toList();
+    LoginActivityView view =
+        (LoginActivityView) result.getModelAndView().getModel().get("loginActivity");
+    assertThat(view.totalSignIns()).isEqualTo(2);
+    assertThat(view.activeDays()).isEqualTo(1);
+  }
 
-    long realDayCount = allCells.stream().filter(cell -> cell.date() != null).count();
-    assertThat(realDayCount)
-        .isEqualTo(
-            com.clavaris.identity.application.usecase.getloginactivityforaccount
-                .GetLoginActivityForAccountService.WINDOW_DAYS);
+  @Test
+  void anAccountWithNoSignInsShowsAnEmptyStateInsteadOfABlankGrid() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "No sign-ins have been recorded for this user in the last 365 days")))
+        .andExpect(content().string(not(containsString("clavaris-heatmap__week"))));
+  }
 
-    HeatmapDayCell todayCell =
-        allCells.stream().filter(cell -> today.equals(cell.date())).findFirst().orElseThrow();
-    assertThat(todayCell.count()).isEqualTo(2);
-    assertThat(todayCell.level()).isEqualTo(2);
+  // Account.lastSignedInAt and the sign-in history are separate records: an account that signed in
+  // before history was kept (or over a year ago) says so instead of reading as "never signed in".
+  @Test
+  void anAccountThatSignedInButHasNoHistoryExplainsTheGap() throws Exception {
+    account.recordSignIn();
+
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("This user last signed in on")))
+        .andExpect(content().string(containsString("but no sign-in history is recorded")))
+        .andExpect(
+            content().string(not(containsString("No sign-ins have been recorded for this user"))));
   }
 }
