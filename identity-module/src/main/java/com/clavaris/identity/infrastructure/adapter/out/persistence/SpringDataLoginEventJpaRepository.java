@@ -11,12 +11,12 @@ interface SpringDataLoginEventJpaRepository extends JpaRepository<LoginEventEnti
 
   // TD-FUT-034: day-bucketed counts, the one real query shape this table exists for — a native
   // query, same "aggregation this codebase's own JPQL dialect can't portably express" precedent
-  // SpringDataAccountJpaRepository's own TD-PERF-001 native queries already establish. ::date
-  // truncates occurred_at (timestamptz) to a calendar day in the database connection's own session
-  // time zone, same as every other day-level truncation this schema relies on.
+  // SpringDataAccountJpaRepository's own TD-PERF-001 native queries already establish. Bucketed
+  // by UTC calendar day explicitly (AT TIME ZONE 'UTC'), not the connection's session zone, so it
+  // always agrees with the UTC grid PlatformAccountDetailController draws.
   @Query(
       value =
-          "SELECT occurred_at::date AS day, COUNT(*) AS login_count FROM login_events "
+          "SELECT (occurred_at AT TIME ZONE 'UTC')::date AS day, COUNT(*) AS login_count FROM login_events "
               + "WHERE account_id = :accountId AND occurred_at >= :since "
               + "GROUP BY day ORDER BY day",
       nativeQuery = true)

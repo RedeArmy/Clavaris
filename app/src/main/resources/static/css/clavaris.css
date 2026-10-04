@@ -2740,6 +2740,7 @@ body:has(.htmx-request)::after {
 
 .clavaris-manage-account__panel {
   grid-area: 1 / 1;
+  min-width: 0;
   padding: 28px;
   visibility: hidden;
 }
@@ -2788,6 +2789,7 @@ body:has(.htmx-request)::after {
 /* Profile picture editor. */
 .clavaris-profile-picture-section {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-5);
   margin: var(--space-5) 0;
@@ -2804,6 +2806,8 @@ body:has(.htmx-request)::after {
 
 .clavaris-profile-picture-actions {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
@@ -3595,8 +3599,6 @@ body:has(.htmx-request)::after {
 .clavaris-heatmap {
   display: flex;
   gap: 3px;
-  padding-bottom: var(--space-1);
-  overflow-x: auto;
 }
 
 .clavaris-heatmap__week {
@@ -3607,8 +3609,8 @@ body:has(.htmx-request)::after {
 }
 
 .clavaris-heatmap__day {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   background: var(--clavaris-bg);
   border: 1px solid var(--clavaris-border);
   border-radius: 2px;
@@ -3637,6 +3639,213 @@ body:has(.htmx-request)::after {
 .clavaris-heatmap__day--level-4 {
   background: var(--clavaris-brand-color);
   border-color: transparent;
+}
+
+/* Today's cell, and the cell under the pointer, get an outline so a single day is easy to find. */
+.clavaris-heatmap__day--today {
+  outline: 2px solid var(--clavaris-text-primary);
+  outline-offset: 1px;
+}
+
+.clavaris-heatmap .clavaris-heatmap__day:not(.clavaris-heatmap__day--empty):hover {
+  outline: 2px solid var(--clavaris-border-strong);
+  outline-offset: 1px;
+}
+
+/* --- Admin "View Profile": Activity card ------------------------------------
+   Headline numbers, a scrollable calendar with month and weekday labels, a legend, and the
+   per-month table that is the accessible twin of the picture. */
+
+.clavaris-activity__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.clavaris-activity__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.clavaris-activity__stats > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+
+.clavaris-activity__stats dt {
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.clavaris-activity__stats dd {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.clavaris-activity__scroll {
+  margin-top: var(--space-4);
+  padding-bottom: var(--space-2);
+  overflow-x: auto;
+}
+
+.clavaris-activity__frame {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.clavaris-activity__body {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.clavaris-heatmap-figure {
+  margin: 0;
+}
+
+.clavaris-heatmap__months {
+  display: flex;
+  gap: 3px;
+  height: 16px;
+  margin-left: 36px;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+
+.clavaris-heatmap__months span {
+  flex: 0 0 12px;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.clavaris-heatmap__weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px;
+  width: 28px;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  line-height: 12px;
+}
+
+.clavaris-heatmap__legend {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+}
+
+.clavaris-heatmap__legend span:first-child {
+  margin-right: 4px;
+}
+
+.clavaris-heatmap__legend span:last-child {
+  margin-left: 4px;
+}
+
+.clavaris-activity__months {
+  margin-top: var(--space-3);
+}
+
+.clavaris-activity__months summary {
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.clavaris-activity__months .clavaris-table {
+  margin-top: var(--space-2);
+}
+
+/* --- Admin "View Profile": header and card flow -----------------------------
+   A person-first header (picture, name, status and the two dates that matter), and the Profile
+   tab's cards flowing in two balanced columns where there is room, with the wide Activity card
+   spanning both. */
+
+.clavaris-profile-header {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.clavaris-profile-header__avatar {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  background: var(--clavaris-bg);
+  border: 1px solid var(--clavaris-border);
+  border-radius: 50%;
+}
+
+.clavaris-profile-header__text h1,
+.clavaris-profile-header__text p {
+  margin: 0;
+}
+
+.clavaris-profile-header__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  margin-top: var(--space-2) !important;
+}
+
+.clavaris-profile-header__fact {
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+}
+
+.clavaris-profile-header__fact > span {
+  color: var(--clavaris-text-primary);
+  font-weight: 500;
+}
+
+.clavaris-profile-picture-title {
+  margin: 0;
+  font-size: var(--text-base, 1rem);
+}
+
+.clavaris-profile-picture-actions input[type="file"] {
+  max-width: 100%;
+}
+
+.clavaris-profile-picture-actions input[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  color: var(--clavaris-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+
+.clavaris-profile-columns {
+  columns: 2 360px;
+  column-gap: var(--space-5);
+}
+
+.clavaris-profile-columns > .clavaris-section-card {
+  margin: 0 0 var(--space-5);
+  break-inside: avoid;
+}
+
+.clavaris-profile-columns > .clavaris-profile-columns__wide {
+  column-span: all;
 }
 
 /* ==========================================================================
