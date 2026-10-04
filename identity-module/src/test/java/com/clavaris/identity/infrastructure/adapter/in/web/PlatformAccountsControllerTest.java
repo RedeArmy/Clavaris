@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationCommand;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationQuery;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
@@ -224,6 +225,43 @@ class PlatformAccountsControllerTest {
         .andExpect(redirectedUrl(basePath()));
 
     verify(createAccount).handle(any());
+  }
+
+  @Test
+  void createJoinsThePostedCountryCodeAndLocalNumberIntoOnePhoneNumber() throws Exception {
+    when(createAccount.handle(any())).thenReturn(new AccountId(UUID.randomUUID()));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("phoneCountryCode", "+502")
+                .param("phoneNumberLocal", "5555-0100"))
+        .andExpect(status().is3xxRedirection());
+
+    final ArgumentCaptor<AdminCreateAccountForOrganizationCommand> command =
+        ArgumentCaptor.forClass(AdminCreateAccountForOrganizationCommand.class);
+    verify(createAccount).handle(command.capture());
+    assertThat(command.getValue().phoneNumber()).isEqualTo("+502 5555-0100");
+  }
+
+  @Test
+  void aLocalNumberWithNoCountryCodeCreatesTheAccountWithoutAPhoneNumber() throws Exception {
+    when(createAccount.handle(any())).thenReturn(new AccountId(UUID.randomUUID()));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("phoneNumberLocal", "5555-0100"))
+        .andExpect(status().is3xxRedirection());
+
+    final ArgumentCaptor<AdminCreateAccountForOrganizationCommand> command =
+        ArgumentCaptor.forClass(AdminCreateAccountForOrganizationCommand.class);
+    verify(createAccount).handle(command.capture());
+    assertThat(command.getValue().phoneNumber()).isNull();
   }
 
   @Test

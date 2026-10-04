@@ -99,7 +99,7 @@ public class PlatformAccountProfileAdminController {
               blankToNull(firstName),
               blankToNull(lastName),
               blankToNull(username),
-              combinePhoneNumber(phoneCountryCode, phoneNumberLocal),
+              PhoneNumberInput.combine(phoneCountryCode, phoneNumberLocal),
               actorFor(access)));
     } catch (final UsernameAlreadyRegisteredException _) {
       return redirectToProfile(organizationId, accountId)
@@ -168,19 +168,6 @@ public class PlatformAccountProfileAdminController {
 
   private static String blankToNull(final String value) {
     return value == null || value.isBlank() ? null : value.strip();
-  }
-
-  // Live feature request, 2026-09-22 — account-profile.html's own phone number field is two
-  // <input>s (a country-code <select>, a local-number text field), not one — Account.phoneNumber
-  // stays a plain display string (its own Javadoc: "no validated PhoneNumber type"), so this
-  // combines them into that one string rather than teaching the domain/command layer a new
-  // "country code" concept. A local number with no country code selected is treated as blank (the
-  // <select>'s own first option is a blank placeholder) — never a phone number missing its code.
-  private static String combinePhoneNumber(
-      final String phoneCountryCode, final String phoneNumberLocal) {
-    final String local = blankToNull(phoneNumberLocal);
-    final String code = blankToNull(phoneCountryCode);
-    return local == null || code == null ? null : code + " " + local;
   }
 
   private static String encode(final String value) {

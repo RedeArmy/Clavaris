@@ -10,6 +10,8 @@ import jakarta.validation.constraints.Size;
  * com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationCommand},
  * same split {@code RegisterAccountForm}'s own Javadoc documents. First/last name/username/phone
  * are all optional — every one of this class's own fields except email and password may be blank.
+ * The form posts the phone number as {@code phoneCountryCode} + {@code phoneNumberLocal} (see
+ * {@link PhoneNumberInput}); {@code phoneNumber} stays as a single-string fallback.
  */
 // PMD.LongVariable: ignorePasswordPolicy/ignoreAccessRestrictions name exactly what each checkbox
 // on the create-user form does — same rationale AdminCreateAccountForOrganizationCommand's own
@@ -35,6 +37,8 @@ public class AdminCreateAccountForm {
   private String password;
 
   private String phoneNumber;
+  private String phoneCountryCode;
+  private String phoneNumberLocal;
   private boolean ignorePasswordPolicy;
   private boolean ignoreAccessRestrictions;
 
@@ -90,6 +94,22 @@ public class AdminCreateAccountForm {
 
   public void setPhoneNumber(final String phoneNumber) {
     this.phoneNumber = phoneNumber;
+  }
+
+  public String getPhoneCountryCode() {
+    return phoneCountryCode;
+  }
+
+  public void setPhoneCountryCode(final String phoneCountryCode) {
+    this.phoneCountryCode = phoneCountryCode;
+  }
+
+  public String getPhoneNumberLocal() {
+    return phoneNumberLocal;
+  }
+
+  public void setPhoneNumberLocal(final String phoneNumberLocal) {
+    this.phoneNumberLocal = phoneNumberLocal;
   }
 
   public boolean isIgnorePasswordPolicy() {

@@ -259,10 +259,7 @@
                         <p class="clavaris-field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}" data-dialog-open-on-load>Password error</p>
                     </div>
 
-                    <div class="clavaris-field">
-                        <label for="phoneNumber">Phone number</label>
-                        <input id="phoneNumber" type="tel" th:field="*{phoneNumber}"/>
-                    </div>
+                    <div th:replace="~{identity/platform/fragments/phone-field :: phoneField('create-user-phone', 'phoneCountryCode', 'phoneNumberLocal', *{phoneCountryCode}, *{phoneNumberLocal})}"></div>
 
                     <div class="clavaris-field">
                         <label class="clavaris-toggle">
@@ -314,5 +311,6 @@
      comment but never actually shipped anywhere — the Team filter it describes was a no-op). -->
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/assign-role-picker.js') : '/js/assign-role-picker.js'}" defer></script>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/assign-role-refresh.js') : '/js/assign-role-refresh.js'}" defer></script>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/phone-country-picker.js') : '/js/phone-country-picker.js'}" defer></script>
 </body>
 </html>
