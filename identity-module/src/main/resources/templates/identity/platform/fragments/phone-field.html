@@ -235,8 +235,8 @@
         <label for="phone-number" th:for="${prefix + '-number'}" class="clavaris-visually-hidden">Local phone number</label>
         <input id="phone-number" name="phoneNumberLocal" th:id="${prefix + '-number'}" type="tel" th:name="${localName}" th:value="${localValue}"
                placeholder="Local number" class="clavaris-phone-input__number"
-               inputmode="tel" autocomplete="tel-national"
-               th:attr="aria-describedby=${prefix + '-hint ' + prefix + '-preview'}"/>
+               inputmode="tel"
+               th:attr="autocomplete='tel-national',aria-describedby=${prefix + '-hint ' + prefix + '-preview'}"/>
     </div>
     <p th:id="${prefix + '-hint'}" class="clavaris-field-hint">Pick the country, then type the number without its country code.
         <output th:id="${prefix + '-preview'}" class="clavaris-phone-preview"></output></p>

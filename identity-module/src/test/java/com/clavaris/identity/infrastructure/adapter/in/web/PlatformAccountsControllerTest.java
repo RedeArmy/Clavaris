@@ -187,6 +187,20 @@ class PlatformAccountsControllerTest {
   // org-tabs.html's own fragment now renders on every tab, asserted here via the same markup this
   // page actually emits. Rendered as the one shared "Back" button (clavaris-back-button); the
   // destination travels in its aria-label/title, so the full text is still in the markup.
+  // The create-user form's phone field is the shared phone-field fragment: both parts render with
+  // their own ids, names and autofill hints.
+  @Test
+  void theCreateUserFormRendersTheSharedPhoneField() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"create-user-phone-country-code\"")))
+        .andExpect(content().string(containsString("name=\"phoneCountryCode\"")))
+        .andExpect(content().string(containsString("id=\"create-user-phone-number\"")))
+        .andExpect(content().string(containsString("name=\"phoneNumberLocal\"")))
+        .andExpect(content().string(containsString("autocomplete=\"tel-national\"")));
+  }
+
   @Test
   void showsAGeneralBackLinkToTheOrganizationsList() throws Exception {
     mockMvc
