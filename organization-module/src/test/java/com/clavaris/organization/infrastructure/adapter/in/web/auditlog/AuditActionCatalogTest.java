@@ -64,9 +64,7 @@ class AuditActionCatalogTest {
         Files.isDirectory(modules.resolve("identity-module")), "sibling modules not present");
 
     final Pattern written =
-        Pattern.compile(
-            "(?:\\.write\\(|AuditEvent\\.of\\()\\s*[^,;]+,\\s*\"([a-z_]+\\.[a-z_]+)\"",
-            Pattern.DOTALL);
+        Pattern.compile("(?:\\.write\\(|AuditEvent\\.of\\()[^,;]++,\\s*\"([a-z_]+\\.[a-z_]+)\"");
     final Set<String> missing = new TreeSet<>();
     final Set<String> known = new TreeSet<>();
     AuditActionCatalog.knownActions().forEach(known::add);

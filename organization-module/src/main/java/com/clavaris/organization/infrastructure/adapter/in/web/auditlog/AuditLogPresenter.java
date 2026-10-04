@@ -19,6 +19,7 @@ import java.util.Locale;
  */
 public final class AuditLogPresenter {
 
+  private static final String WORKSPACE = "Workspace";
   private static final long MINUTE_SECONDS = 60;
   private static final long MINUTES_PER_HOUR = 60;
   private static final long HOURS_PER_DAY = 24;
@@ -69,14 +70,13 @@ public final class AuditLogPresenter {
       final List<DetailItem> details,
       final AuditEvent event,
       final AuditDetailFormatter.Names names) {
-    final boolean alreadyNamed =
-        details.stream().anyMatch(item -> "Workspace".equals(item.label()));
+    final boolean alreadyNamed = details.stream().anyMatch(item -> WORKSPACE.equals(item.label()));
     final String workspaceName =
-        "Workspace".equals(event.targetType())
+        WORKSPACE.equals(event.targetType())
             ? event.targetId().map(names.workspaces()::get).orElse(null)
             : null;
     if (workspaceName != null && !alreadyNamed) {
-      details.add(0, DetailItem.plain("Workspace", workspaceName));
+      details.add(0, DetailItem.plain(WORKSPACE, workspaceName));
     }
   }
 
