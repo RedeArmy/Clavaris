@@ -137,7 +137,7 @@ public class PlatformAccountsController {
                 blankToNull(form.getFirstName()),
                 blankToNull(form.getLastName()),
                 blankToNull(form.getUsername()),
-                blankToNull(form.getPhoneNumber()),
+                phoneNumberOf(form),
                 form.isIgnorePasswordPolicy(),
                 form.isIgnoreAccessRestrictions()));
         return "redirect:/platform/dashboard/organizations/" + organizationId + "/users";
@@ -201,6 +201,14 @@ public class PlatformAccountsController {
 
   private static boolean isHtmxRequest(final HttpServletRequest request) {
     return "true".equals(request.getHeader(HX_REQUEST_HEADER));
+  }
+
+  // The picker posts a country code and a local number; a plain phoneNumber still works as a
+  // fallback.
+  private static String phoneNumberOf(final AdminCreateAccountForm form) {
+    final String combined =
+        PhoneNumberInput.combine(form.getPhoneCountryCode(), form.getPhoneNumberLocal());
+    return combined == null ? blankToNull(form.getPhoneNumber()) : combined;
   }
 
   private static String blankToNull(final String value) {

@@ -1,9 +1,12 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.auditlog.AuditDetailFormatter;
+import com.clavaris.common.domain.model.auditlog.AuditLogPresenter;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountUseCase;
 import com.clavaris.identity.domain.model.Account;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -54,7 +57,17 @@ public class PlatformAccountAuditLogController {
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, access.organizationName());
     model.addAttribute("account", account);
-    model.addAttribute("auditEvents", getAuditLog.handle(accountId));
+    final AuditLogPresenter.Context context =
+        new AuditLogPresenter.Context(
+            access.ownerPlatformAccountId().value().toString(),
+            AuditDetailFormatter.Names.none(),
+            Instant.now(),
+            accountId.toString());
+    model.addAttribute(
+        "entries",
+        getAuditLog.handle(accountId).stream()
+            .map(event -> AuditLogPresenter.present(event, context))
+            .toList());
     return AUDIT_LOG_VIEW;
   }
 }

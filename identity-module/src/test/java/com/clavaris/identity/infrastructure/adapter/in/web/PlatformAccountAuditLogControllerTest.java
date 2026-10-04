@@ -107,7 +107,49 @@ class PlatformAccountAuditLogControllerTest {
         .perform(get(path()))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/platform/account-audit-log"))
-        .andExpect(model().attribute("auditEvents", List.of(event)));
+        .andExpect(model().attribute("entries", org.hamcrest.Matchers.hasSize(1)));
+  }
+
+  // The point of the page: a person reads a sentence and who did it, not an action key and an id.
+  @Test
+  void readsLikeAPersonWouldWriteItNotLikeTheRawRecord() throws Exception {
+    AuditEvent byYou =
+        AuditEvent.of(
+            AuditActor.platformAccount(OWNER_ID.value()),
+            "account.password_reset_required",
+            "Account",
+            account.id().value().toString(),
+            null);
+    AuditEvent byTheUser =
+        AuditEvent.of(
+            AuditActor.account(account.id().value()),
+            "account.new_device_detected",
+            "Account",
+            account.id().value().toString(),
+            null);
+    when(getAuditLog.handle(account.id().value())).thenReturn(List.of(byYou, byTheUser));
+
+    String html = mockMvc.perform(get(path())).andReturn().getResponse().getContentAsString();
+    String visible = html.substring(0, html.indexOf("<details"));
+
+    org.junit.jupiter.api.Assertions.assertTrue(html.contains("Password reset required"));
+    org.junit.jupiter.api.Assertions.assertTrue(html.contains(">You<"));
+    org.junit.jupiter.api.Assertions.assertTrue(html.contains(">This user<"));
+    org.junit.jupiter.api.Assertions.assertTrue(html.contains("Technical details"));
+    // The raw key and actor id exist only in the collapsed technical details, never up front.
+    org.junit.jupiter.api.Assertions.assertFalse(
+        visible.contains("account.password_reset_required"));
+    org.junit.jupiter.api.Assertions.assertFalse(
+        visible.contains("PLATFORM_ACCOUNT:" + OWNER_ID.value() + "<"));
+    org.junit.jupiter.api.Assertions.assertTrue(html.contains("account.password_reset_required"));
+  }
+
+  @Test
+  void anEmptyLogSaysSoPlainly() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Nothing has been changed for this user yet")));
   }
 
   // Live-found bug, 2026-09-20: this breadcrumb's own "back to Account" link built its URL from

@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationCommand;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationQuery;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
@@ -186,6 +187,20 @@ class PlatformAccountsControllerTest {
   // org-tabs.html's own fragment now renders on every tab, asserted here via the same markup this
   // page actually emits. Rendered as the one shared "Back" button (clavaris-back-button); the
   // destination travels in its aria-label/title, so the full text is still in the markup.
+  // The create-user form's phone field is the shared phone-field fragment: both parts render with
+  // their own ids, names and autofill hints.
+  @Test
+  void theCreateUserFormRendersTheSharedPhoneField() throws Exception {
+    mockMvc
+        .perform(get(basePath()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"create-user-phone-country-code\"")))
+        .andExpect(content().string(containsString("name=\"phoneCountryCode\"")))
+        .andExpect(content().string(containsString("id=\"create-user-phone-number\"")))
+        .andExpect(content().string(containsString("name=\"phoneNumberLocal\"")))
+        .andExpect(content().string(containsString("autocomplete=\"tel-national\"")));
+  }
+
   @Test
   void showsAGeneralBackLinkToTheOrganizationsList() throws Exception {
     mockMvc
@@ -224,6 +239,43 @@ class PlatformAccountsControllerTest {
         .andExpect(redirectedUrl(basePath()));
 
     verify(createAccount).handle(any());
+  }
+
+  @Test
+  void createJoinsThePostedCountryCodeAndLocalNumberIntoOnePhoneNumber() throws Exception {
+    when(createAccount.handle(any())).thenReturn(new AccountId(UUID.randomUUID()));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("phoneCountryCode", "+502")
+                .param("phoneNumberLocal", "5555-0100"))
+        .andExpect(status().is3xxRedirection());
+
+    final ArgumentCaptor<AdminCreateAccountForOrganizationCommand> command =
+        ArgumentCaptor.forClass(AdminCreateAccountForOrganizationCommand.class);
+    verify(createAccount).handle(command.capture());
+    assertThat(command.getValue().phoneNumber()).isEqualTo("+502 5555-0100");
+  }
+
+  @Test
+  void aLocalNumberWithNoCountryCodeCreatesTheAccountWithoutAPhoneNumber() throws Exception {
+    when(createAccount.handle(any())).thenReturn(new AccountId(UUID.randomUUID()));
+
+    mockMvc
+        .perform(
+            post(basePath())
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("phoneNumberLocal", "5555-0100"))
+        .andExpect(status().is3xxRedirection());
+
+    final ArgumentCaptor<AdminCreateAccountForOrganizationCommand> command =
+        ArgumentCaptor.forClass(AdminCreateAccountForOrganizationCommand.class);
+    verify(createAccount).handle(command.capture());
+    assertThat(command.getValue().phoneNumber()).isNull();
   }
 
   @Test
