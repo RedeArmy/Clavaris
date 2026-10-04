@@ -1,4 +1,4 @@
-package com.clavaris.organization.infrastructure.adapter.in.web.auditlog;
+package com.clavaris.common.domain.model.auditlog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,10 +15,11 @@ import org.junit.jupiter.api.Test;
 class AuditLogPresenterTest {
 
   private static final UUID ME = UUID.randomUUID();
+  private static final UUID SUBJECT = UUID.randomUUID();
   private static final Instant NOW = Instant.parse("2026-10-03T12:00:00Z");
 
   private static AuditLogPresenter.Context context(final AuditDetailFormatter.Names names) {
-    return new AuditLogPresenter.Context(ME.toString(), names, NOW);
+    return new AuditLogPresenter.Context(ME.toString(), names, NOW, SUBJECT.toString());
   }
 
   private static AuditEvent event(
@@ -81,6 +82,18 @@ class AuditLogPresenterTest {
     assertFalse(another.actorIsYou());
     assertEquals("Operator (localdev)", operator.actorLabel());
     assertEquals("A user of this Organization", user.actorLabel());
+  }
+
+  // On an Account's own log, what that Account did itself reads "This user".
+  @Test
+  void theViewedAccountsOwnActionsReadThisUser() {
+    final AuditLogEntryView view =
+        AuditLogPresenter.present(
+            event(AuditActor.account(SUBJECT), "account.new_device_detected", "KnownDevice", null),
+            context(AuditDetailFormatter.Names.none()));
+
+    assertEquals("This user", view.actorLabel());
+    assertFalse(view.actorIsYou());
   }
 
   @Test

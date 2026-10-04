@@ -1,9 +1,6 @@
-package com.clavaris.organization.infrastructure.adapter.in.web.auditlog;
+package com.clavaris.common.domain.model.auditlog;
 
-import com.clavaris.organization.domain.model.Workspace;
-import com.clavaris.organization.domain.model.WorkspaceRole;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -61,17 +58,6 @@ public final class AuditDetailFormatter {
 
     public static Names none() {
       return new Names(Map.of(), Map.of());
-    }
-
-    /** Names of the workspaces and roles that still exist, keyed by id. */
-    public static Names existing(
-        final List<Workspace> workspaces, final List<WorkspaceRole> roles) {
-      final Map<String, String> workspaceNames = new HashMap<>();
-      workspaces.forEach(
-          workspace -> workspaceNames.put(workspace.id().toString(), workspace.name()));
-      final Map<String, String> roleNames = new HashMap<>();
-      roles.forEach(role -> roleNames.put(role.id().toString(), role.name()));
-      return new Names(workspaceNames, roleNames);
     }
   }
 

@@ -1,6 +1,10 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditEvent;
+import com.clavaris.common.domain.model.auditlog.AuditCategory;
+import com.clavaris.common.domain.model.auditlog.AuditDetailFormatter;
+import com.clavaris.common.domain.model.auditlog.AuditLogEntryView;
+import com.clavaris.common.domain.model.auditlog.AuditLogPresenter;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
@@ -9,10 +13,6 @@ import com.clavaris.organization.application.usecase.listworkspacerolesfororgani
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationQuery;
 import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
 import com.clavaris.organization.domain.model.Organization;
-import com.clavaris.organization.infrastructure.adapter.in.web.auditlog.AuditCategory;
-import com.clavaris.organization.infrastructure.adapter.in.web.auditlog.AuditDetailFormatter;
-import com.clavaris.organization.infrastructure.adapter.in.web.auditlog.AuditLogEntryView;
-import com.clavaris.organization.infrastructure.adapter.in.web.auditlog.AuditLogPresenter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.Arrays;
@@ -106,7 +106,7 @@ public class PlatformAuditLogController {
     final List<AuditEvent> events = getAuditLog.handle(organizationId);
     final AuditLogPresenter.Context context =
         new AuditLogPresenter.Context(
-            ownerPlatformAccountId.toString(), namesFor(organizationId), Instant.now());
+            ownerPlatformAccountId.toString(), namesFor(organizationId), Instant.now(), "");
     final List<AuditLogEntryView> all =
         events.stream().map(event -> AuditLogPresenter.present(event, context)).toList();
     final Optional<AuditCategory> selected = AuditCategory.fromSlug(category);
@@ -137,7 +137,7 @@ public class PlatformAuditLogController {
 
   // Workspaces and roles that still exist, by id, so "Role changed" can name the roles.
   private AuditDetailFormatter.Names namesFor(final UUID organizationId) {
-    return AuditDetailFormatter.Names.existing(
+    return AuditLogNames.existing(
         listWorkspaces.handle(new ListWorkspacesForOrganizationQuery(organizationId)),
         listRoles.handle(new ListWorkspaceRolesForOrganizationQuery(organizationId)));
   }

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<!-- The Audit Log table, shared by the Organization-wide Logs tab and a single user's "View logs"
+     page, so both read the same way. entries are AuditLogEntryView presenter rows (common's
+     AuditLogPresenter): a sentence per action, who in plain words, relative time with the exact
+     moment on hover, labelled detail pairs, and the raw record kept in a collapsed "Technical
+     details" for support. Styling: the .clavaris-audit* rules in clavaris.css. -->
+<div class="clavaris-table-wrapper" th:fragment="auditTable(entries)">
+    <table class="clavaris-table clavaris-audit">
+        <caption class="clavaris-visually-hidden">Audit log, newest first</caption>
+        <thead>
+        <tr>
+            <th scope="col">When</th>
+            <th scope="col">Who</th>
+            <th scope="col">What happened</th>
+            <th scope="col">Details</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="entry : ${entries}">
+            <td class="clavaris-audit__when">
+                <time th:datetime="${entry.whenIso()}" th:title="${entry.whenFull()}"
+                      th:text="${entry.whenRelative()}">3 hours ago</time>
+            </td>
+            <td>
+                <span class="clavaris-audit__actor"
+                      th:classappend="${entry.actorIsYou()} ? 'clavaris-audit__actor--you'"
+                      th:title="${entry.rawActor()}"
+                      th:text="${entry.actorLabel()}">You</span>
+            </td>
+            <td>
+                <div class="clavaris-audit__event">
+                    <span class="clavaris-audit__dot"
+                          th:classappend="${'clavaris-audit__dot--' + entry.tone().css()}"
+                          aria-hidden="true"></span>
+                    <span class="clavaris-audit__label" th:text="${entry.label()}">Secret Key deleted</span>
+                </div>
+                <span class="clavaris-audit__category" th:text="${entry.category().title()}">Secret Keys</span>
+            </td>
+            <td>
+                <dl class="clavaris-audit__details" th:unless="${#lists.isEmpty(entry.details())}">
+                    <div th:each="item : ${entry.details()}">
+                        <dt th:text="${item.label()}">Client</dt>
+                        <dd th:text="${item.shown()}"
+                            th:title="${item.shortened()} ? ${item.full()}">sk_test_example0…</dd>
+                    </div>
+                </dl>
+                <span class="clavaris-text-muted" th:if="${#lists.isEmpty(entry.details())}">—</span>
+                <details class="clavaris-audit__technical">
+                    <summary>Technical details</summary>
+                    <dl>
+                        <div><dt>Action</dt><dd><code th:text="${entry.rawAction()}">organization_client.deleted</code></dd></div>
+                        <div><dt>Target</dt><dd><code th:text="${entry.rawTarget()}">Organization:…</code></dd></div>
+                        <div><dt>Actor</dt><dd><code th:text="${entry.rawActor()}">PLATFORM_ACCOUNT:…</code></dd></div>
+                        <div th:if="${entry.rawDetail() != ''}"><dt>Detail</dt><dd><code th:text="${entry.rawDetail()}">key=value</code></dd></div>
+                    </dl>
+                </details>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

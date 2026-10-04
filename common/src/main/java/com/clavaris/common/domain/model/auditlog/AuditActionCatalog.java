@@ -1,4 +1,4 @@
-package com.clavaris.organization.infrastructure.adapter.in.web.auditlog;
+package com.clavaris.common.domain.model.auditlog;
 
 import java.util.HashMap;
 import java.util.Locale;

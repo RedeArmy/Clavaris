@@ -1,4 +1,4 @@
-package com.clavaris.organization.infrastructure.adapter.in.web.auditlog;
+package com.clavaris.common.domain.model.auditlog;
 
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
@@ -35,8 +35,14 @@ public final class AuditLogPresenter {
    * @param currentAccountId the signed-in platform account's id, so its own actions read "You"
    * @param names lookups for the workspaces and roles that still exist
    * @param now the instant relative times are measured from
+   * @param subjectAccountId the Account whose own log this is (so its own actions read "This
+   *     user"), or an empty string for an Organization-wide log
    */
-  public record Context(String currentAccountId, AuditDetailFormatter.Names names, Instant now) {}
+  public record Context(
+      String currentAccountId,
+      AuditDetailFormatter.Names names,
+      Instant now,
+      String subjectAccountId) {}
 
   private AuditLogPresenter() {
     // Static helpers only.
@@ -53,7 +59,7 @@ public final class AuditLogPresenter {
         relative(event.occurredAt(), context.now()),
         EXACT.format(event.occurredAt()),
         event.occurredAt().toString(),
-        actorLabel(event.actor(), you),
+        actorLabel(event.actor(), you, context.subjectAccountId()),
         you,
         action.label(),
         action.category(),
@@ -85,11 +91,13 @@ public final class AuditLogPresenter {
         && actor.id().equals(currentAccountId);
   }
 
-  private static String actorLabel(final AuditActor actor, final boolean you) {
+  private static String actorLabel(
+      final AuditActor actor, final boolean you, final String subjectAccountId) {
     return switch (actor.type()) {
       case PLATFORM_ACCOUNT -> you ? "You" : "Another platform account";
       case PLATFORM_CLIENT -> "Operator (" + actor.id() + ")";
-      case ACCOUNT -> "A user of this Organization";
+      case ACCOUNT ->
+          actor.id().equals(subjectAccountId) ? "This user" : "A user of this Organization";
     };
   }
 

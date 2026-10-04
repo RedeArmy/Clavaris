@@ -21,7 +21,7 @@
             <div class="clavaris-page-header">
                 <div>
                     <h1>Audit Log</h1>
-                    <p th:text="'The most recent administrative changes to this Account: ' + ${accountLabel} + '.'">Account audit log</p>
+                    <p th:text="'Who changed what for ' + ${accountLabel} + ', newest first: profile edits, locks and bans, password resets, access to apps and sign-ins from new devices.'">Account audit log</p>
                 </div>
             </div>
 
@@ -30,38 +30,18 @@
                  to that view's own explicitly documented "Account events out of scope" limitation,
                  see GetAuditLogForAccountUseCase's own Javadoc.
 
-                 TD-FUT-037: the table below (When/Actor/Action/Detail) is hand-duplicated in
-                 organization-module's own audit-log.html, one column narrower here (no Target — an
-                 Account has no analogous "which resource" column). Same cross-module reasoning
-                 org-tabs.html's own comment already documents: no module here declares a Maven
-                 dependency on another, so a single shared fragment would only be reachable from the
-                 app module's aggregated runtime classpath, not from either module's own
-                 standalone-MockMvc controller tests — left duplicated deliberately, not an
-                 oversight. -->
+Presented for the person reading it, not for an operator: the table is the shared
+                 platform/fragments/audit-table (common), fed with AuditLogPresenter rows, so this
+                 page and the Organization's Logs tab read the same way — a sentence per action,
+                 "You" for the signed-in account, "This user" for what the viewed Account did
+                 itself, relative time with the exact moment on hover, and the raw record one click
+                 away in each row's collapsed "Technical details". -->
             <div class="clavaris-section">
-                <div class="clavaris-section-card" th:if="${#lists.isEmpty(auditEvents)}">
-                    <p class="clavaris-empty-state">No audit events recorded yet for this Account.</p>
+                <div class="clavaris-section-card" th:if="${#lists.isEmpty(entries)}">
+                    <p class="clavaris-empty-state">Nothing has been changed for this user yet. Profile edits, locks, password resets and similar actions will appear here.</p>
                 </div>
-                <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(auditEvents)}">
-                    <table class="clavaris-table">
-                        <thead>
-                        <tr>
-                            <th scope="col">When</th>
-                            <th scope="col">Actor</th>
-                            <th scope="col">Action</th>
-                            <th scope="col">Detail</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="event : ${auditEvents}">
-                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(event.occurredAt())}">timestamp</td>
-                            <td><code th:text="${event.actor().type()} + ':' + ${event.actor().id()}">actor</code></td>
-                            <td><code th:text="${event.action()}">action</code></td>
-                            <td th:text="${event.detail().orElse('—')}">detail</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div th:unless="${#lists.isEmpty(entries)}"
+                     th:replace="~{platform/fragments/audit-table :: auditTable(${entries})}"></div>
             </div>
         </div>
     </main>

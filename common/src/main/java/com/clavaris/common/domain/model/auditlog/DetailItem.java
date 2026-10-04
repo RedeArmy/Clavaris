@@ -1,4 +1,4 @@
-package com.clavaris.organization.infrastructure.adapter.in.web.auditlog;
+package com.clavaris.common.domain.model.auditlog;
 
 /**
  * One "label: value" pair of an audit event's detail, ready to show.
