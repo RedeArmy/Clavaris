@@ -1,6 +1,3 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
-<body>
 <!-- One phone number field for every form that takes one (Personal information on the profile,
      "Create user" on the Users tab): a country-code <select> (enhanced into a searchable picker by
      phone-country-picker.js, which keeps this <select> as the submitted value) next to the local
@@ -8,9 +5,9 @@
      server. selectedCode/localValue re-fill the field after a validation error (null otherwise).
      prefix keeps the ids unique per use. -->
 <div class="clavaris-field" th:fragment="phoneField(prefix, codeName, localName, selectedCode, localValue)">
-    <label th:for="${prefix + '-country-code'}">Phone number</label>
+    <label for="phone-country-code" th:for="${prefix + '-country-code'}">Phone number</label>
     <div class="clavaris-phone-input">
-        <select th:id="${prefix + '-country-code'}" th:name="${codeName}" class="clavaris-phone-input__code"
+        <select id="phone-country-code" name="phoneCountryCode" th:id="${prefix + '-country-code'}" th:name="${codeName}" class="clavaris-phone-input__code"
                 data-phone-country-picker autocomplete="tel-country-code"
                 th:attr="data-phone-next=${prefix + '-number'},data-phone-preview=${prefix + '-preview'},data-phone-selected=${selectedCode}">
                                             <option value="">Code&hellip;</option>
@@ -235,8 +232,8 @@
                                             <option value="+263">🇿🇼 +263 Zimbabwe</option>
                                         
         </select>
-        <label th:for="${prefix + '-number'}" class="clavaris-visually-hidden">Local phone number</label>
-        <input th:id="${prefix + '-number'}" type="tel" th:name="${localName}" th:value="${localValue}"
+        <label for="phone-number" th:for="${prefix + '-number'}" class="clavaris-visually-hidden">Local phone number</label>
+        <input id="phone-number" name="phoneNumberLocal" th:id="${prefix + '-number'}" type="tel" th:name="${localName}" th:value="${localValue}"
                placeholder="Local number" class="clavaris-phone-input__number"
                inputmode="tel" autocomplete="tel-national"
                th:attr="aria-describedby=${prefix + '-hint ' + prefix + '-preview'}"/>
@@ -244,5 +241,3 @@
     <p th:id="${prefix + '-hint'}" class="clavaris-field-hint">Pick the country, then type the number without its country code.
         <output th:id="${prefix + '-preview'}" class="clavaris-phone-preview"></output></p>
 </div>
-</body>
-</html>

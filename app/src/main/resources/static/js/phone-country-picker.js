@@ -18,9 +18,10 @@
   // points at the highlighted option through aria-activedescendant; Arrow keys, Home/End, Enter and
   // Escape behave as expected, and the result count is announced through a polite live region. No
   // inline styles or scripts (CSP: style-src 'self').
-  const OPTION_PATTERN = /^(\S+)\s+(\+\d+)\s+(.+)$/u;
+  const OPTION_PATTERN = /^(\S+) (\+\d+) (.+)$/u;
   const REGIONAL_INDICATOR_A = 0x1f1e6;
   const REGIONAL_INDICATOR_Z = 0x1f1ff;
+  const LETTER_A = 65;
   const PANEL_ROOM = 340;
   const PANEL_WIDTH = 340;
   const PANEL_MARGIN = 8;
@@ -34,7 +35,7 @@
     Array.from(flag)
       .map((symbol) => symbol.codePointAt(0))
       .filter((code) => code >= REGIONAL_INDICATOR_A && code <= REGIONAL_INDICATOR_Z)
-      .map((code) => String.fromCharCode(65 + code - REGIONAL_INDICATOR_A))
+      .map((code) => String.fromCodePoint(LETTER_A + code - REGIONAL_INDICATOR_A))
       .join("");
 
   const fold = (text) =>
@@ -174,7 +175,7 @@
         return;
       }
       const chosen = selectedCountry();
-      const local = next && next.value.trim();
+      const local = next?.value.trim();
       preview.textContent = chosen && local ? "Will be saved as " + chosen.dial + " " + local : "";
     };
 
@@ -209,7 +210,11 @@
       status.textContent = visible.length === 0 ? "No countries found" : visible.length + " countries";
       const chosen = selectedCountry();
       const chosenPosition = visible.findIndex(({ country }) => chosen && country === chosen);
-      setActive(chosenPosition >= 0 && query === "" ? chosenPosition : visible.length ? 0 : -1);
+      let initial = visible.length > 0 ? 0 : -1;
+      if (chosenPosition >= 0 && query === "") {
+        initial = chosenPosition;
+      }
+      setActive(initial);
     };
 
     const close = (refocus) => {
