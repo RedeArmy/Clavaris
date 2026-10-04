@@ -294,14 +294,19 @@
                                             <div class="clavaris-heatmap__weekdays" aria-hidden="true">
                                                 <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
                                             </div>
-                                            <!-- One image for assistive technology (the numbers are in the headline
-                                                 and in "Monthly totals" below); the cells carry a native tooltip each. -->
-                                            <div class="clavaris-heatmap" role="img"
-                                                 th:attr="aria-label=${'Sign-in activity over the last 365 days: ' + activity.summary()}">
-                                                <div class="clavaris-heatmap__week" th:each="week : ${activity.weeks()}">
-                                                    <div th:each="day : ${week}" th:class="${day.cssClass()}" th:title="${day.title()}"></div>
+                                            <!-- A figure, not a div with an image role: the grid is hidden from assistive
+                                                 technology (371 empty cells say nothing) and the caption below carries the
+                                                 same summary; the numbers are also in the headline and in "Monthly totals".
+                                                 The cells keep a native tooltip each for pointer users. -->
+                                            <figure class="clavaris-heatmap-figure">
+                                                <div class="clavaris-heatmap" aria-hidden="true">
+                                                    <div class="clavaris-heatmap__week" th:each="week : ${activity.weeks()}">
+                                                        <div th:each="day : ${week}" th:class="${day.cssClass()}" th:title="${day.title()}"></div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                                <figcaption class="clavaris-visually-hidden"
+                                                            th:text="${'Sign-in activity over the last 365 days: ' + activity.summary()}">Sign-in activity</figcaption>
+                                            </figure>
                                         </div>
                                     </div>
                                 </div>

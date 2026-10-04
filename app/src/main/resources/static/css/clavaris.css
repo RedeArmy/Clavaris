@@ -3707,6 +3707,10 @@ body:has(.htmx-request)::after {
   gap: var(--space-2);
 }
 
+.clavaris-heatmap-figure {
+  margin: 0;
+}
+
 .clavaris-heatmap__months {
   display: flex;
   gap: 3px;
