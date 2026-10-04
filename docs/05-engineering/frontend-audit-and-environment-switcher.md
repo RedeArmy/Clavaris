@@ -59,6 +59,25 @@ Two passes: a read of the templates, stylesheet and scripts against the design-s
 | F2 | "Promote to Production" is only reachable from Danger Zone, a place users do not look for a routine step | P1 ✅ now offered from the environment menu |
 | F3 | Deep links (`/oauth-clients/{clientId}/…`) have no equivalent in another environment | handled by the switcher (falls back to the tab) |
 
+### 3.5 The Logs tab (Audit Log)
+
+The page existed to answer "who changed what?", but showed the storage record instead of the answer.
+
+| # | Finding (before) | Rating |
+|---|---|---|
+| L1 | ✅ The actor was a machine key and a UUID (`PLATFORM_ACCOUNT:8e864f9b-…`); nobody could tell if it was them | P1 |
+| L2 | ✅ The action was the raw event name (`organization_client.deleted`) | P1 |
+| L3 | ✅ The detail was an unparsed `key=value` string (`deletedClientId=sk_test_example0-0000-…`) with ids instead of names | P1 |
+| L4 | ✅ A "Target" column of `Type:uuid` that no reader could use | P1 |
+| L5 | ✅ The time was a bare date with no time of day, so same-day events could not be ordered by eye | P2 |
+| L6 | ✅ No way to narrow 100 events to the part of the product you care about | P2 |
+| L7 | ✅ Jargon in the page intro ("TD-SEC-007") and no caption on the table | P3 |
+| L8 | Capped at the 100 most recent events, with no paging, search or date range | P2 |
+
+What the page does now: a sentence per action from a catalog of all 80 audit actions (`AuditActionCatalog`; an action added later and not yet listed reads as a sentence made from its own name, and a test fails the build if the application starts writing an unlisted one); "You" for the signed-in account, "Operator (id)" for an API client, "Another platform account" otherwise; relative time ("3 hours ago", exact moment on hover); details as labelled pairs where workspace and role ids are replaced by their names when they still exist, booleans read Yes/No, long identifiers are cut with the full value on hover, and ids that only repeat the page (this Organization's own) are dropped; a coloured marker for created / changed / deleted / credential-touching events; filter chips by group with counts (`?category=`); and the raw record kept in a collapsed "Technical details" per row for support.
+
+Remaining limits (L8 and what the data allows): names of entities that were deleted cannot be recovered, so those show a shortened id; OAuth clients and webhook endpoints are identified by their own id (readable for Secret Keys and OAuth clients, a UUID for webhook endpoints); only the owning platform account exists today, so "Another platform account" is rare. Paging, search and a date range are the natural next step if the 100-event window proves too small.
+
 ## 4. Environment switcher
 
 ### 4.1 How Clerk does it
