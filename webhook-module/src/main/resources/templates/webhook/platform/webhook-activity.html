@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Activity</span>
             </p>
 
@@ -25,19 +25,18 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>Activity</h1>
-                            <p>Delivery attempts across every one of this Organization's own
-                                webhook endpoints, last 6 hours.</p>
+                            <p>Delivery attempts across all of this Organization's webhook endpoints over the last 6 hours.</p>
                         </div>
                     </div>
 
                     <div class="clavaris-section-card">
                         <div class="clavaris-stat-row">
                             <div>
-                                <p class="clavaris-stat__label">Successful Attempts</p>
+                                <p class="clavaris-stat__label">Successful attempts</p>
                                 <p class="clavaris-stat__value clavaris-stat__value--success" th:text="${activity.successfulAttempts()}">0</p>
                             </div>
                             <div>
-                                <p class="clavaris-stat__label">Failed Attempts</p>
+                                <p class="clavaris-stat__label">Failed attempts</p>
                                 <p class="clavaris-stat__value clavaris-stat__value--danger" th:text="${activity.failedAttempts()}">0</p>
                             </div>
                         </div>
@@ -52,7 +51,7 @@
                          lives there, not here). Decimals go through #numbers.formatDecimal with an
                          explicit POINT separator so a comma-decimal locale can't corrupt the attributes. -->
                     <div class="clavaris-section-card">
-                        <h2>Recent Activity</h2>
+                        <h2>Recent activity</h2>
                         <div th:if="${maxBucketTotal == 0}" class="clavaris-empty-state">
                             No delivery attempts in the last 6 hours.
                         </div>

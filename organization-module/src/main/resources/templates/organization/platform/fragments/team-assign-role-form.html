@@ -9,7 +9,7 @@
      fragment never re-filters, it only renders whatever the controller already resolved. -->
 <div th:fragment="assignRoleForm">
     <div th:if="${#lists.isEmpty(eligibleAccounts)}">
-        <p class="clavaris-empty-state">Every account in this Organization already has a role somewhere in this Workspace — remove one from their current role first (this page's own "Remove" button) to make them eligible here.</p>
+        <p class="clavaris-empty-state">Every account in this Organization already has a role in this Workspace. To make one eligible here, first use Remove on their current role.</p>
     </div>
     <div th:if="${#lists.isEmpty(groupRoles)}">
         <p class="clavaris-empty-state">This group has no roles yet.</p>
@@ -31,8 +31,7 @@
              AssignWorkspaceRoleToAccountService's own Javadoc); this fragment's own copy of that
              now-unreachable check was simply never cleaned up until now. -->
         <p class="clavaris-field-error" th:if="${accountAlreadyHasRoleError}">
-            This account already holds a role somewhere in this Workspace — remove it from their
-            current role first (this page's own "Remove" button).
+            This account already has a role in this Workspace. First use Remove on their current role.
         </p>
 
         <div class="clavaris-field">

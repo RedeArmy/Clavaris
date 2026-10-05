@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>OAuth Clients</span>
             </p>
 
@@ -31,12 +31,7 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>OAuth Clients</h1>
-                            <p>The end-user OIDC login client registrations this Organization's own consuming
-                                application(s) use to authenticate real end users against — distinct from
-                                Secret Keys (ADR-0010's <code>OAuthClient</code>, not ADR-0023's
-                                <code>OrganizationClient</code>). Every client is created with the same fixed
-                                grant types, scopes, and consent setting; only its Redirect URIs are yours to
-                                configure, from its own detail page.</p>
+                            <p>The login clients your application uses to sign in this Organization's end users. Every client is created with the same fixed grant types, scopes and consent setting; you only configure its redirect URIs, from its detail page. To call the management API, use a Secret Key instead.</p>
                         </div>
                         <form method="post"
                               th:action="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}">

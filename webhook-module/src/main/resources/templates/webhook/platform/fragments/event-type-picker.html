@@ -1,8 +1,7 @@
 <!--
 Live UX request, 2026-09-25 (Clerk/PayPal-parity Event Catalog): the checkbox vocabulary shared by
 the "Register a new webhook endpoint" page and the endpoint detail page's own "Event types" edit
-dialog — one fragment, so the category/wildcard behavior never drifts between the two. The "All
-Events" wildcard is PayPal's own pattern (see the checkbox itself for why WebhookEndpoint.
+dialog — one fragment, so the category/wildcard behavior never drifts between the two. The "All events" wildcard is PayPal's own pattern (see the checkbox itself for why WebhookEndpoint.
 ALL_EVENTS_WILDCARD is submitted through a separate, normally-disabled hidden input rather than one
 of the real per-event checkboxes) — WebhookEndpoint#subscribesTo treats that one sentinel value as
 "every event type, including one this codebase doesn't produce yet".
@@ -18,7 +17,7 @@ Live UX request, 2026-09-25 (second polish pass): the search box from the first 
 see webhook-event-catalog.html's own <details> for the read-only reference page) list, and revisit
 only once the catalog genuinely grows past a quick scan.
 
-Real bug found live, 2026-09-26: the parent/child checkboxes and "All Events" toggle looked correct
+Real bug found live, 2026-09-26: the parent/child checkboxes and "All events" toggle looked correct
 in every MockMvc content-assertion test (which renders markup but never executes JS or enforces
 CSP) yet did nothing in a real browser — this fragment used to wire everything via inline
 onchange="..." attributes plus an inline <script> block, both silently blocked by
@@ -36,7 +35,7 @@ external script reads.
             <input type="checkbox" id="all-events-checkbox"
                    th:checked="${#lists.contains(selectedValues, '*')}"/>
             <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
-            <span class="clavaris-toggle__label">All Events — including event types this system adds in the future</span>
+            <span class="clavaris-toggle__label">All events — including event types this system adds in the future</span>
         </label>
         <!-- Never a real per-event checkbox's own value: keeping the wildcard out of the
              individually-checkable list means an owner can never half-select it (e.g. by having

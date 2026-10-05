@@ -10,9 +10,9 @@
         <div class="clavaris-dashboard__inner">
             <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Profile</span>
             </p>
 
@@ -457,7 +457,7 @@
                     <section id="clavaris-panel-metadata" class="clavaris-manage-account__panel">
                         <div class="clavaris-section-card">
                             <h2>Metadata</h2>
-                            <p class="clavaris-field-hint">Arbitrary JSON this consuming application defines and Clavaris never interprets. Each tier replaces its previous value entirely on save.</p>
+                            <p class="clavaris-field-hint">Arbitrary JSON that your application defines and Clavaris never interprets. Each of the three fields replaces its previous value entirely when you save.</p>
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/metadata(organizationId=${organizationId},accountId=${account.id().value()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -469,12 +469,12 @@
                                 <div class="clavaris-field">
                                     <label for="account-private-metadata">Private metadata</label>
                                     <textarea id="account-private-metadata" name="privateMetadata" rows="6" th:text="${account.privateMetadata().orElse('')}"></textarea>
-                                    <p class="clavaris-field-hint">Admin/backend-only — never exposed through any account-holder-facing surface.</p>
+                                    <p class="clavaris-field-hint">Visible only to your backend and operators, never to the account holder.</p>
                                 </div>
                                 <div class="clavaris-field">
                                     <label for="account-unsafe-metadata">Unsafe metadata</label>
                                     <textarea id="account-unsafe-metadata" name="unsafeMetadata" rows="6" th:text="${account.unsafeMetadata().orElse('')}"></textarea>
-                                    <p class="clavaris-field-hint">Named "unsafe" per Clerk's own convention — never trust its contents for an authorization decision.</p>
+                                    <p class="clavaris-field-hint">Not validated or protected — never trust its contents for an authorization decision.</p>
                                 </div>
                                 <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
                             </form>
@@ -488,8 +488,7 @@
                     <div>
                         <span class="clavaris-dialog__eyebrow">Account</span>
                         <h2>Impersonate user</h2>
-                        <p>Mints a raw Bearer access token for this Account, scoped to one OAuth
-                            Client — no ID token, no refresh token. The token is shown once.</p>
+                        <p>Creates an access token for this Account, limited to one OAuth Client. No ID token or refresh token is issued, and the token is shown once.</p>
                     </div>
                     <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>

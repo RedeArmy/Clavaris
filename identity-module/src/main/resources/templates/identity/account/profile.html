@@ -8,10 +8,10 @@
     <div class="clavaris-card clavaris-card--wide">
         <p class="clavaris-breadcrumb">
             <a th:href="@{/o/{organizationId}/account/sessions(organizationId=${organizationId})}">Your sessions</a>
-            &middot;
+            <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
             <a th:href="@{/o/{organizationId}/account/passkeys(organizationId=${organizationId})}">Your passkeys</a>
         </p>
-        <h1>Update Profile</h1>
+        <h1>Update profile</h1>
 
         <output class="clavaris-alert clavaris-alert--success" th:if="${param.updated}">
             Your profile picture was updated.
@@ -32,16 +32,16 @@
                 <form method="post" enctype="multipart/form-data"
                       th:action="@{/o/{organizationId}/account/profile/picture(organizationId=${organizationId})}">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                    <label for="profile-picture-file">Update profile</label>
+                    <label for="profile-picture-file">Profile picture</label>
                     <input id="profile-picture-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required/>
-                    <p class="clavaris-field-hint">Recommended size 1:1, up to 10MB.</p>
+                    <p class="clavaris-field-hint">A square image works best, up to 10 MB.</p>
                     <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
                 </form>
 
                 <form method="post"
                       th:action="@{/o/{organizationId}/account/profile/picture/remove(organizationId=${organizationId})}">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove photo</button>
+                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove picture</button>
                 </form>
             </div>
         </div>
@@ -72,7 +72,7 @@
              when an operator has opted this Account into self-delete via the admin Settings tab. -->
         <div class="clavaris-section" th:if="${account.canDeleteOwnAccount()}">
             <h2>Delete account</h2>
-            <p class="clavaris-field-hint">Permanently deletes your account — a hard delete, not reversible.
+            <p class="clavaris-field-hint">Permanently deletes your account — this cannot be undone.
                 Every session and token is revoked immediately.</p>
             <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${deleteError}">
                 Your account is not allowed to delete itself.
@@ -86,8 +86,7 @@
                 <div>
                     <span class="clavaris-dialog__eyebrow">Account</span>
                     <h2>Delete account</h2>
-                    <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> —
-                        a hard delete, not reversible. Every session and token is revoked immediately.</p>
+                    <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> — this cannot be undone. Every session and token is revoked immediately.</p>
                 </div>
                 <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete account dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
             </div>

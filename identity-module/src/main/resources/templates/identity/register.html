@@ -27,7 +27,7 @@
                 <input id="username" type="text" th:field="*{username}" autocomplete="username"
                        pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="32"
                        th:required="${usernameRequired}"/>
-                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('username')}">3–32 characters: letters, digits, underscore, hyphen</p>
+                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('username')}">3–32 characters: letters, numbers, underscores or hyphens</p>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
             </div>
 

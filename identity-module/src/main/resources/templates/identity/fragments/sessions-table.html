@@ -30,7 +30,7 @@ th:each, after the caller's own link-building expression has already run.
                 <td>
                     <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}"
                           th:title="${userSession.userAgent()} ?: ''">Chrome on macOS</span>
-                    <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
+                    <span class="clavaris-badge clavaris-badge--success" th:if="${userSession.sessionId()} == ${currentSessionId}">This device</span>
                 </td>
                 <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
                 <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">Created at</td>
@@ -38,7 +38,7 @@ th:each, after the caller's own link-building expression has already run.
                 <td>
                     <form method="post" th:action="${revokeUrlBase} + '/' + ${userSession.sessionId()} + '/revoke'">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Cerrar sesión</button>
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Sign out</button>
                     </form>
                 </td>
             </tr>

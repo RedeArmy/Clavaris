@@ -70,9 +70,7 @@
 
                     <div class="clavaris-section-card" th:unless="${role.reserved()}">
                         <h2>Delete this role</h2>
-                        <p>Permanently deletes this role. Blocked while any member still holds it —
-                            reassign or unassign (BR-WS: a member can be left without a role) every
-                            member who does first.</p>
+                        <p>Permanently deletes this role. Blocked while any member still holds it — remove it from every member first.</p>
                         <form th:action="@{/platform/dashboard/organizations/{organizationId}/workspace-roles/{roleId}/delete(organizationId=${organization.id()},roleId=${role.id()})}"
                               method="post">
                             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

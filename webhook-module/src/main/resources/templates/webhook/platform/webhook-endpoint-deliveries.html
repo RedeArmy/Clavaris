@@ -9,9 +9,9 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Deliveries</span>
             </p>
 
@@ -19,9 +19,7 @@
                 <div>
                     <h1>Webhook Deliveries</h1>
                     <p>Recent delivery attempts for <code th:text="${endpointUrl}">endpoint url</code>
-                        (ADR-0007, BR-WEBHOOK-03). A delivery already in a terminal state
-                        (Succeeded/Exhausted) can be manually replayed — the next dispatcher tick
-                        picks it up exactly like any ordinary retry.</p>
+                        . Deliveries that have finished (Succeeded or Exhausted) can be replayed; a replay is queued and retried like any other delivery.</p>
                 </div>
             </div>
 
@@ -31,8 +29,7 @@
                  endpoints page — it keeps the normal redirect-on-success convention. -->
             <div id="deliveries-content" th:fragment="deliveries" class="clavaris-section">
                 <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${notReplayableError}">
-                    That delivery is still owned by the ordinary retry engine (not yet in a
-                    terminal state) — it can't be replayed right now.
+                    That delivery is still being retried automatically, so it can't be replayed yet.
                 </p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(deliveries)}">

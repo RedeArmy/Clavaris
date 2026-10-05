@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Danger Zone</span>
             </p>
 
@@ -37,8 +37,7 @@
                     <div class="clavaris-section clavaris-section--danger">
                         <div class="clavaris-section-card clavaris-section-card--danger"
                              th:if="${organization.environment().name() == 'DEVELOPMENT' and organization.linkedEnvironmentOrganizationId().isEmpty()}">
-                            <p>Promote this DEVELOPMENT Organization by creating its paired PRODUCTION
-                                sibling.</p>
+                            <p>Promote this development Organization by creating a paired production Organization.</p>
                             <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                                th:href="@{/platform/dashboard/organizations/{organizationId}/promote-to-production(organizationId=${organization.id()})}">Promote to Production</a>
                         </div>
