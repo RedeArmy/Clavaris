@@ -97,10 +97,20 @@ class OrganizationRegisteredClientRepositoryTest {
     // than only implied by OAuthClient always carrying a non-blank clientSecretHash, since this is
     // the one place that value actually turns into the authentication method SAS enforces at the
     // protocol level — a regression here is exactly the kind of silent widening ADR-0013 exists to
-    // prevent.
+    // prevent. ADR-0013's own decision text is about confidential-vs-public (NONE must never be
+    // reachable), not about which transport a confidential client presents its secret through —
+    // live functional-test finding, 2026-10-05: this used to assert containsExactly(BASIC) alone,
+    // which happened to also be true the day it was written (only BASIC was wired) but was never
+    // part of the actual decision. Both BASIC and POST are confidential methods — neither is
+    // NONE — so asserting "never NONE, always at least one real confidential method" is the
+    // invariant this ADR actually relies on; a tighter assertion on the exact set only pins an
+    // implementation detail, not the security decision.
     assertThat(found.getClientAuthenticationMethods())
-        .as("every OAuthClient must require client_secret_basic — never a public/PKCE-only client")
-        .containsExactly(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        .as(
+            "every OAuthClient must require a confidential method — never NONE (a public/PKCE-only"
+                + " client)")
+        .doesNotContain(ClientAuthenticationMethod.NONE)
+        .isNotEmpty();
     // TD-SEC-026/ADR-0017: the real gap this closed — requireAuthorizationConsent must actually
     // reach ClientSettings, not just exist as a getter nothing reads.
     assertThat(found.getClientSettings().isRequireAuthorizationConsent()).isTrue();

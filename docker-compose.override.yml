@@ -13,4 +13,8 @@
 #     environment:
 #       SPRING_PROFILES_ACTIVE: dev
 
-services: {}
+services:
+  app:
+    environment:
+      PLATFORM_BOOTSTRAP_CLIENT_ID: ${PLATFORM_BOOTSTRAP_CLIENT_ID}
+      PLATFORM_BOOTSTRAP_CLIENT_SECRET: ${PLATFORM_BOOTSTRAP_CLIENT_SECRET}

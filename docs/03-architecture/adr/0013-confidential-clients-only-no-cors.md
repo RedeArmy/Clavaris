@@ -33,6 +33,35 @@ A defense-in-depth regression test (`OrganizationRegisteredClientRepositoryTest`
 - **Negative:** a future consumer whose architecture is genuinely backend-less (a static SPA with no server component at all) cannot integrate with Clavaris as designed today — it would need to add a minimal backend-for-frontend (BFF) purely to hold the client secret and proxy the token exchange, or Clavaris would need a real v2 design effort (a distinct public-client `OAuthClient` type, a per-client registered-origin allowlist, real CORS wiring, and a security review of the resulting broadened attack surface) — not a small addition once needed.
 - **Negative:** this is now a locked decision per this project's own ADR conventions — revisiting it requires an explicit new ADR, not a quiet code change the day a public-client consumer shows up.
 
+## Addendum — `client_secret_post` accepted alongside `client_secret_basic` (2026-10-05, live functional-test finding)
+
+Live functional testing against a real, unmodified standard OIDC client library (ASP.NET Core's
+`OpenIdConnectHandler`, its own default behavior, no custom configuration) found that its token
+exchange sends the client secret via `client_secret_post` (in the POST body), not
+`client_secret_basic` (an `Authorization: Basic` header) — and `OrganizationRegisteredClientRepository`
+only ever registered `CLIENT_SECRET_BASIC`, so the exchange failed with a flat `invalid_client`, no
+error detail, no way for an integrator to self-diagnose. This directly blocked the integration-cost
+success metric (CLAUDE.md §2: "under a day via standard OIDC client libraries, no custom SDK") — a
+real, immediate consequence, not a hypothetical edge case.
+
+**This does not reopen this ADR's decision.** The decision above is confidential-vs-public:
+`ClientAuthenticationMethod.NONE` (no secret at all, PKCE-only) must never be reachable. Both
+`CLIENT_SECRET_BASIC` and `CLIENT_SECRET_POST` present the same confidential secret Clavaris already
+requires and hashes server-side (BR-CLIENT, `OAuthClient.register`'s own non-blank
+`clientSecretHash` requirement, unchanged) — they differ only in which part of the HTTP request
+carries it, a transport detail this ADR's own text never discusses or restricts. Neither widens the
+attack surface this ADR cares about: no CORS policy is added, the token exchange still must happen
+server-side (a browser cannot keep a `client_secret_post` body private any more than it could an
+`Authorization` header), and PKCE remains mandatory on top regardless of which confidential method
+is used.
+
+`OrganizationRegisteredClientRepository.toRegisteredClient` now registers both
+`CLIENT_SECRET_BASIC` and `CLIENT_SECRET_POST` for every `OAuthClient`. The regression test this
+ADR's own "Decision" section names (`OrganizationRegisteredClientRepositoryTest`) now asserts the
+actual invariant this ADR relies on — `ClientAuthenticationMethod.NONE` is never present, and at
+least one real confidential method is — instead of pinning the exact single-element set that
+happened to be true the day the test was first written.
+
 ## Alternatives considered
 
 - **Support public/SPA clients now, with a real per-origin CORS allowlist and a new secret-less `OAuthClient` registration path.** Rejected for v1: no current or near-term consumer needs it (JobSeeker's own `auth-module` is a real backend), it would require reworking four independent layers that all currently assume a secret exists, and it meaningfully broadens the attack surface (CORS misconfiguration, a weaker PKCE-only trust model) for a capability nothing yet exercises. Revisit if and when a genuinely backend-less consumer is a real, scheduled requirement — track as a v2 item if that happens, not spec work done speculatively now.
