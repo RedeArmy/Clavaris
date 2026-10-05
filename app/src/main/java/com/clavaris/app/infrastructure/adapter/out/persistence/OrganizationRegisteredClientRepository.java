@@ -116,7 +116,18 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
         RegisteredClient.withId(client.id().toString())
             .clientId(client.clientId())
             .clientSecret(client.clientSecretHash())
+            // Live functional-test finding, 2026-10-05: this used to register CLIENT_SECRET_BASIC
+            // only, while the discovery document's own token_endpoint_auth_methods_supported
+            // (Spring Authorization Server's server-wide default list) advertises
+            // client_secret_post too — a real interop bug, not a hypothetical: a standard,
+            // unmodified OIDC client library (ASP.NET Core's OpenIdConnectHandler, its own default
+            // behavior) sends client_secret_post on the token exchange and got a flat
+            // invalid_client, exactly the "under a day via standard OIDC client libraries, no
+            // custom SDK" success metric (CLAUDE.md §2) failing in practice. Accepting both methods
+            // every registered client already gets is advertised for closes the gap without
+            // introducing a new per-client choice to design/store.
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
             // BR-CLIENT-03: PKCE is mandatory for every OAuthClient, confidential or not — enforced
             // here at SAS-config level rather than stored per-client in the domain (this is that
             // task, per OAuthClient's own design notes). TD-SEC-026/ADR-0017: consent, unlike
