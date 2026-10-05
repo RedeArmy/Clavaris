@@ -166,6 +166,23 @@ class PlatformAccountProfileAdminControllerTest {
     verify(updatePicture).handle(any());
   }
 
+  // The storage backend being down is a message to the operator, not a 500.
+  @Test
+  void uploadPictureRedirectsWithAMessageWhenTheStorageIsUnavailable() throws Exception {
+    doThrow(
+            new com.clavaris.identity.application.usecase.updateaccountprofilepicture
+                .ProfilePictureStorageException("down", new RuntimeException("no route")))
+        .when(updatePicture)
+        .handle(any());
+    final MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.png", "image/png", new byte[] {1, 2, 3});
+
+    mockMvc
+        .perform(multipart(path("picture")).file(file))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrlPattern(profileUrl() + "?pictureError=We+could+not+save*"));
+  }
+
   @Test
   void uploadPictureRedirectsWithAnEncodedErrorOnInvalidUpload() throws Exception {
     doThrow(new InvalidProfilePictureException("Unsupported image type: image/svg+xml"))

@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -259,5 +261,32 @@ class PlatformAccountDetailControllerTest {
         .andExpect(content().string(containsString("but no sign-in history is recorded")))
         .andExpect(
             content().string(not(containsString("No sign-ins have been recorded for this user"))));
+  }
+
+  // Profile picture card: choose first, upload second; the one row of actions has Remove only when
+  // there is a picture to remove.
+  @Test
+  void theProfilePictureCardChoosesThenUploadsAndOffersNoRemoveWithoutAPicture() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-picture-upload")))
+        .andExpect(content().string(containsString("Choose image")))
+        .andExpect(content().string(containsString("data-picture-submit")))
+        .andExpect(content().string(containsString("/js/profile-picture-upload.js")))
+        .andExpect(content().string(not(containsString("/picture/remove"))));
+  }
+
+  @Test
+  void removeIsOfferedWithAConfirmationOnlyWhenTheAccountHasAPicture() throws Exception {
+    Account withPicture = spy(account);
+    doReturn(Optional.of("avatars/ada.png")).when(withPicture).pictureUrl();
+    when(getAccount.handle(any())).thenReturn(Optional.of(withPicture));
+
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/picture/remove")))
+        .andExpect(content().string(containsString("Remove the profile picture?")));
   }
 }

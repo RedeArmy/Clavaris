@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.listconnectedaccountsforplatfor
 import com.clavaris.identity.application.usecase.registerplatformaccount.PlatformAccountRepository;
 import com.clavaris.identity.application.usecase.removeplatformaccountprofilepicture.RemovePlatformAccountProfilePictureUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.InvalidProfilePictureException;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorageException;
 import com.clavaris.identity.application.usecase.updateplatformaccountprofilepicture.UpdatePlatformAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.updateplatformaccountprofilepicture.UpdatePlatformAccountProfilePictureUseCase;
 import com.clavaris.identity.domain.model.PlatformAccount;
@@ -64,6 +65,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class PlatformAccountProfileController {
 
   private static final String HX_REQUEST_HEADER = "HX-Request";
+  private static final String STORAGE_UNAVAILABLE_MESSAGE =
+      "We could not save the picture right now. Please try again in a moment.";
   private static final String PROFILE_VIEW = "identity/platform/manage-account";
   private static final String PROFILE_FRAGMENT = PROFILE_VIEW + " :: content";
 
@@ -134,6 +137,11 @@ public class PlatformAccountProfileController {
     } catch (final InvalidProfilePictureException e) {
       populateModel(model, platformAccountId, request);
       model.addAttribute("uploadError", e.getMessage());
+      return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
+    } catch (final ProfilePictureStorageException _) {
+      // The storage backend is down or unreachable: say so, instead of a bare 500.
+      populateModel(model, platformAccountId, request);
+      model.addAttribute("uploadError", STORAGE_UNAVAILABLE_MESSAGE);
       return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
     }
     if (isHtmxRequest(request)) {

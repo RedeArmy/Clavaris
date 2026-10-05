@@ -67,7 +67,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
                 + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }

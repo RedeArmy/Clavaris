@@ -190,10 +190,14 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // live against a real browser's own CSP violation report on this exact directive.
   @SuppressWarnings("PMD.LongVariable")
   private static final String DASHBOARD_PAGE_POLICY =
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
           + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
+  // img-src gains blob: here and nowhere else: profile-picture-upload.js previews the file a person
+  // has just chosen (URL.createObjectURL) before anything is uploaded. A blob: URL can only be
+  // minted by a script of this same origin, so it opens no new remote image source.
+  //
   // Matches every page under the dashboard app shell — PlatformDashboardSecurityConfig's own
   // securityMatcher already scopes the whole /platform/** chain to ROLE_PLATFORM_ACCOUNT (this
   // sub-path included), so this pattern only needs to distinguish "dashboard" from "login/register/

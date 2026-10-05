@@ -36,70 +36,57 @@
 
                     <div class="clavaris-manage-account__body">
                         <section id="clavaris-panel-profile" class="clavaris-manage-account__panel">
-                            <div class="clavaris-profile-picture-section">
-                                <img class="clavaris-profile-picture"
-                                     th:src="@{/platform/avatars/{id}(id=${account.id().value()})}"
-                                     alt="Current profile"/>
-                                <div class="clavaris-profile-picture-actions">
-                                    <!-- Live UX bug, 2026-09-22: a plain (non-htmx) form submit here did a full
-                                         browser navigation to this controller's own standalone page, kicking the
-                                         user out of the dialog they were editing inside — see
-                                         PlatformAccountProfileController's own Javadoc for the full fix. hx-target/
-                                         hx-swap re-render this whole fragment in place, same #manage-account-content
-                                         id every entry point into this markup already shares. -->
-                                    <form method="post" enctype="multipart/form-data" th:action="@{/platform/account/picture}"
-                                          th:attr="hx-post=@{/platform/account/picture}" hx-target="#manage-account-content" hx-swap="outerHTML">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <label for="platform-profile-picture-file">Update profile</label>
-                                        <input id="platform-profile-picture-file" type="file" name="file"
-                                               accept="image/jpeg,image/png,image/webp,image/gif" required="required"/>
-                                        <p class="clavaris-field-hint">Recommended size 1:1, up to 10MB.</p>
-                                        <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
-                                    </form>
-                                    <form method="post" th:action="@{/platform/account/picture/remove}"
-                                          th:attr="hx-post=@{/platform/account/picture/remove}" hx-target="#manage-account-content" hx-swap="outerHTML">
-                                        <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove photo</button>
-                                    </form>
-                                </div>
-                            </div>
+                            <!-- The same picture card the Account profile uses (picture-card fragment). htmx=true: every
+                                 submit here re-renders #manage-account-content in place, so the dialog it may be open in
+                                 is never navigated away from (see PlatformAccountProfileController's own Javadoc). -->
+                            <div th:replace="~{identity/platform/fragments/picture-card :: pictureCard('platform-picture', @{/platform/avatars/{id}(id=${account.id().value()})}, @{/platform/account/picture}, @{/platform/account/picture/remove}, ${account.pictureUrl().isPresent()}, true)}"></div>
 
-                            <div class="clavaris-section">
+                            <div class="clavaris-section-card">
                                 <h2>Profile details</h2>
                                 <form method="post" th:action="@{/platform/account/profile}"
                                       th:attr="hx-post=@{/platform/account/profile}" hx-target="#manage-account-content" hx-swap="outerHTML">
                                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <div class="clavaris-field">
-                                        <label for="platform-first-name">First name</label>
-                                        <input id="platform-first-name" type="text" name="firstName" th:value="${account.firstName().orElse('')}"/>
-                                    </div>
-                                    <div class="clavaris-field">
-                                        <label for="platform-last-name">Last name</label>
-                                        <input id="platform-last-name" type="text" name="lastName" th:value="${account.lastName().orElse('')}"/>
+                                    <div class="clavaris-field-row">
+                                        <div class="clavaris-field">
+                                            <label for="platform-first-name">First name</label>
+                                            <input id="platform-first-name" type="text" name="firstName" autocomplete="given-name" th:value="${account.firstName().orElse('')}"/>
+                                        </div>
+                                        <div class="clavaris-field">
+                                            <label for="platform-last-name">Last name</label>
+                                            <input id="platform-last-name" type="text" name="lastName" autocomplete="family-name" th:value="${account.lastName().orElse('')}"/>
+                                        </div>
                                     </div>
                                     <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
                                 </form>
                             </div>
 
-                            <div class="clavaris-section">
-                                <h2>Email addresses</h2>
-                                <p th:text="${account.email().value()}">email</p>
+                            <div class="clavaris-section-card">
+                                <h2>Email address</h2>
+                                <p class="clavaris-account-email">
+                                    <span th:text="${account.email().value()}">email</span>
+                                    <span class="clavaris-badge">Primary</span>
+                                    <span class="clavaris-badge clavaris-badge--success" th:if="${account.emailVerifiedAt().isPresent()}">Verified</span>
+                                    <span class="clavaris-badge clavaris-badge--error" th:unless="${account.emailVerifiedAt().isPresent()}">Not verified</span>
+                                </p>
                             </div>
 
-                            <div class="clavaris-section">
+                            <div class="clavaris-section-card">
                                 <h2>Connected accounts</h2>
-                                <p class="clavaris-empty-state" th:if="${#lists.isEmpty(connectedAccounts)}">No connected accounts.</p>
-                                <div class="clavaris-connected-account" th:each="connected : ${connectedAccounts}">
-                                    <span th:text="${connected.provider()}">GOOGLE</span>
-                                    <span>&bull;</span>
-                                    <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(connected.linkedAt())}">linked at</span>
-                                </div>
+                                <p class="clavaris-empty-state" th:if="${#lists.isEmpty(connectedAccounts)}">No connected accounts. Sign in with Google or GitHub to link one.</p>
+                                <ul class="clavaris-connected-list" th:unless="${#lists.isEmpty(connectedAccounts)}">
+                                    <li class="clavaris-connected-account" th:each="connected : ${connectedAccounts}">
+                                        <strong th:text="${connected.provider().toString() == 'GITHUB'} ? 'GitHub' : ${#strings.capitalize(#strings.toLowerCase(connected.provider()))}">Google</strong>
+                                        <span class="clavaris-text-muted">Connected on
+                                            <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(connected.linkedAt())}">linked at</span></span>
+                                    </li>
+                                </ul>
                             </div>
                         </section>
 
                         <section id="clavaris-panel-security" class="clavaris-manage-account__panel">
-                            <div class="clavaris-section">
+                            <div class="clavaris-section-card">
                                 <h2>Password</h2>
+                                <p>Change the password you use to sign in to the platform. We email you a link to choose a new one.</p>
                                 <!-- Live UX bug, 2026-09-22: a plain navigation here always kicked the user out of
                                      this dialog, even when the dialog was the one thing that opened it — see
                                      ForgotPlatformAccountPasswordController's own Javadoc for the full dual-mode
@@ -112,31 +99,31 @@
                                             hx-swap=${insideDialog} ? 'innerHTML' : null">Change password</a>
                             </div>
 
-                            <div class="clavaris-section">
+                            <div class="clavaris-section-card">
                                 <h2>Active devices</h2>
                                 <p class="clavaris-empty-state" th:if="${#lists.isEmpty(sessions)}">No active sessions.</p>
                                 <div class="clavaris-table-wrapper" th:unless="${#lists.isEmpty(sessions)}">
-                                <table class="clavaris-table">
-                                    <thead>
-                                    <tr>
-                                        <th scope="col">Device</th>
-                                        <th scope="col">IP address</th>
-                                        <th scope="col">Last active</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    <tr th:each="userSession : ${sessions}">
-                                        <td>
-                                            <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}">Chrome on macOS</span>
-                                            <span th:if="${userSession.sessionId()} == ${currentSessionId}"> (this device)</span>
-                                        </td>
-                                        <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
-                                    </tr>
-                                    </tbody>
-                                </table>
+                                    <table class="clavaris-table">
+                                        <thead>
+                                        <tr>
+                                            <th scope="col">Device</th>
+                                            <th scope="col">IP address</th>
+                                            <th scope="col">Last active</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="userSession : ${sessions}">
+                                            <td>
+                                                <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}">Chrome on macOS</span>
+                                                <span class="clavaris-badge clavaris-badge--success" th:if="${userSession.sessionId()} == ${currentSessionId}">This device</span>
+                                            </td>
+                                            <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
+                                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <a class="clavaris-button clavaris-button--secondary clavaris-button--inline" th:href="@{/platform/account/sessions}">Manage sessions</a>
+                                <p><a class="clavaris-button clavaris-button--secondary clavaris-button--inline" th:href="@{/platform/account/sessions}">Manage sessions</a></p>
                             </div>
                         </section>
                     </div>

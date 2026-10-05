@@ -56,6 +56,7 @@ benefits from confirm-action.js and htmx-feedback.js.
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
     <!-- Shared click-through confirmation for any <form data-confirm="...">, see confirm-action.js. -->
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/confirm-action.js') : '/js/confirm-action.js'}" defer></script>
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/profile-picture-upload.js') : '/js/profile-picture-upload.js'}" defer></script>
     <!-- Toast for any failed HTMX request, and recovery from an expired session; see htmx-feedback.js. -->
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx-feedback.js') : '/js/htmx-feedback.js'}" defer></script>
     <!-- Selector widgets (secret-key scopes, webhook event types). Each is a delegated listener that
