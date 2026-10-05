@@ -422,7 +422,7 @@ public class PlatformWebhookEndpointController {
       // Same "form error, not a bare status code" reasoning as create()'s own identical catch —
       // WebhookEndpoint#updateEventTypes would otherwise throw IllegalArgumentException
       // (BR-WEBHOOK-06) for a caller this dashboard form can genuinely produce (every checkbox
-      // and the "All Events" toggle both left unchecked).
+      // and the "All events" toggle both left unchecked).
       populateHeaderModel(model, organizationId, organizationName);
       model.addAttribute(ENDPOINT_ATTRIBUTE, existing);
       model.addAttribute("emptyEventTypesError", true);

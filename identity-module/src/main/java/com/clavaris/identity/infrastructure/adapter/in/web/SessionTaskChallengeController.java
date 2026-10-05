@@ -119,7 +119,7 @@ public class SessionTaskChallengeController {
       bindingResult.rejectValue(
           "newPassword",
           "newPassword.breached",
-          "This password cannot be used - please choose a different one");
+          "This password cannot be used — please choose a different one");
       return FORM_VIEW;
     }
 

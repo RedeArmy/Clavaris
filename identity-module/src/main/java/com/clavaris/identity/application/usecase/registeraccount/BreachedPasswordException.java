@@ -13,6 +13,6 @@ public final class BreachedPasswordException extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
   public BreachedPasswordException() {
-    super("This password cannot be used - please choose a different one");
+    super("This password cannot be used — please choose a different one");
   }
 }

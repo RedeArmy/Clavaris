@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Size;
 public class CreateProductionEnvironmentForm {
 
   @NotBlank(message = "Enter a name for the production environment")
-  @Size(max = 255, message = "Name must not exceed 255 characters")
+  @Size(max = 255, message = "Name must be at most 255 characters")
   private String name = "";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")

@@ -152,7 +152,7 @@ public class RegisterPlatformAccountController {
       bindingResult.rejectValue(
           "password",
           "password.breached",
-          "This password cannot be used - please choose a different one");
+          "This password cannot be used — please choose a different one");
       return FORM_VIEW;
     }
 

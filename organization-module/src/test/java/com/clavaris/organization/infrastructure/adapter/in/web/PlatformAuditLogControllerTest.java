@@ -160,7 +160,7 @@ class PlatformAuditLogControllerTest {
         .andExpect(model().attribute("totalCount", 2))
         .andExpect(content().string(containsString("Secret Key deleted")))
         .andExpect(content().string(not(containsString("Workspace created"))))
-        .andExpect(content().string(containsString("Workspaces &amp; roles")));
+        .andExpect(content().string(containsString("Workspaces &amp; Roles")));
   }
 
   @Test

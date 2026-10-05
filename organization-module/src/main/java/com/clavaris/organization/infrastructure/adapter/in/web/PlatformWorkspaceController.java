@@ -734,7 +734,7 @@ public class PlatformWorkspaceController {
   // has a freshly-minted, never-before-seen id, so it cannot already belong to another team — not a
   // race this path can hit, unlike addRoleToTeam's own identical catch for a pre-existing role id.
   //
-  // Live UX request, 2026-09-28: teamId is now optional — "Without Team" (CreateWorkspaceTeamRole
+  // Live UX request, 2026-09-28: teamId is now optional — "No team" (CreateWorkspaceTeamRole
   // Form's own Javadoc) is a fully supported first-class choice, not just something a role ends up
   // in after its team is later deleted. form.getTeamId() == null skips
   // AddRoleToWorkspaceTeamUseCase
@@ -785,7 +785,7 @@ public class PlatformWorkspaceController {
                 AuditActor.platformAccount(ownerPlatformAccountId)));
       } catch (final WorkspaceTeamNotFoundException _) {
         // The popup's own team <select> only ever offers this Workspace's own real teams or the
-        // synthetic "Without Team" (null) option — reaching this means the submitted teamId was
+        // synthetic "No team" (null) option — reaching this means the submitted teamId was
         // tampered with, not a real user mistake.
         throw new ResponseStatusException(HttpStatus.NOT_FOUND);
       }
@@ -896,7 +896,7 @@ public class PlatformWorkspaceController {
   // Live UX request, 2026-10-02: the Roles section used to only ever show ungroupedRoles (team-
   // grouped roles were only visible nested inside their own team's own accordion row above) —
   // flattens teamsAndRoles' own two separate collections into one list, every role exactly once,
-  // each carrying its own team's name (null for Without Team) so the Roles section's own table can
+  // each carrying its own team's name (null for No team) so the Roles section's own table can
   // show every role with a Team column, searchable/filterable/paginated, instead of just the
   // ungrouped subset.
   private record RoleWithTeamName(WorkspaceRole role, UUID teamId, String teamName) {}

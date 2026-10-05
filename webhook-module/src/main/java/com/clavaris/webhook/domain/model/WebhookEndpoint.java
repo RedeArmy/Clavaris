@@ -35,7 +35,7 @@ import java.util.UUID;
 public final class WebhookEndpoint {
 
   /**
-   * Live UX request, 2026-09-25 (PayPal-parity "All Events" subscription): a single sentinel entry
+   * Live UX request, 2026-09-25 (PayPal-parity "All events" subscription): a single sentinel entry
    * in {@code subscribedEventTypes} meaning "every event type, including one this codebase doesn't
    * produce yet" — deliberately not a separate boolean field, so every existing caller that already
    * treats this list as the complete subscription (persistence, {@link #subscribesTo}) keeps

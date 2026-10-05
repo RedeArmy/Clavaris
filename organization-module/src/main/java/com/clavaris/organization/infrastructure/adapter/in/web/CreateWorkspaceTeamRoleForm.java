@@ -10,7 +10,7 @@ import java.util.UUID;
  * permissionsText}): those stay exclusively on the full Configure &gt; Workspace Roles page, this
  * popup only covers the common "name a role, optionally put it on a team" path. {@code teamId} is
  * optional — live UX request, 2026-09-28: a role with no team stays a fully supported first-class
- * state (the "Without Team" bucket every consumer-facing view already renders — see {@code
+ * state (the "No team" bucket every consumer-facing view already renders — see {@code
  * DeleteWorkspaceTeamService}'s own Javadoc on "the roles themselves survive, becoming ungrouped",
  * and the reserved Admin role, which has never been assigned to any team). When {@code teamId} is
  * present, this popup composes {@link
