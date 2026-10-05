@@ -70,7 +70,7 @@
                                 </td>
                                 <td th:text="${row.role().permissions().size()} + ' permission' + (${row.role().permissions().size()} == 1 ? '' : 's')">N permissions</td>
                                 <td th:text="${row.teamLabel()} ?: ''"></td>
-                                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(row.role().createdAt())}">Created at</td>
+                                <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(row.role().createdAt())}">Created at</td>
                             </tr>
                             </tbody>
                         </table>

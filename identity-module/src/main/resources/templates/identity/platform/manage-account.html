@@ -77,7 +77,7 @@
                                     <li class="clavaris-connected-account" th:each="connected : ${connectedAccounts}">
                                         <strong th:text="${connected.provider().toString() == 'GITHUB'} ? 'GitHub' : ${#strings.capitalize(#strings.toLowerCase(connected.provider()))}">Google</strong>
                                         <span class="clavaris-text-muted">Connected on
-                                            <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(connected.linkedAt())}">linked at</span></span>
+                                            <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(connected.linkedAt())}">linked at</span></span>
                                     </li>
                                 </ul>
                             </div>
@@ -118,7 +118,7 @@
                                                 <span class="clavaris-badge clavaris-badge--success" th:if="${userSession.sessionId()} == ${currentSessionId}">This device</span>
                                             </td>
                                             <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
+                                            <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                                         </tr>
                                         </tbody>
                                     </table>

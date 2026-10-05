@@ -33,8 +33,8 @@ th:each, after the caller's own link-building expression has already run.
                     <span class="clavaris-badge clavaris-badge--success" th:if="${userSession.sessionId()} == ${currentSessionId}">This device</span>
                 </td>
                 <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">Created at</td>
-                <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
+                <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(userSession.createdAt())}">Created at</td>
+                <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                 <td>
                     <form method="post" th:action="${revokeUrlBase} + '/' + ${userSession.sessionId()} + '/revoke'">
                         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

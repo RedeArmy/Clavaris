@@ -47,7 +47,7 @@
                         <tbody>
                         <tr th:each="workspace : ${workspaces}">
                             <td th:text="${workspace.name()}">Workspace name</td>
-                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">Created at</td>
+                            <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(workspace.createdAt())}">Created at</td>
                             <td>
                                 <div class="clavaris-row-actions">
                                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"

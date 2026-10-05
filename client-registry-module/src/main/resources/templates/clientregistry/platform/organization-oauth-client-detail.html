@@ -42,7 +42,7 @@
                                 <span class="clavaris-badge"
                                       th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(client.active())}"
                                       th:text="${client.active()} ? 'Active' : 'Inactive'">Active</span>
-                                &#183; Registered <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(client.createdAt())}">date</span>
+                                &#183; Registered <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(client.createdAt())}">date</span>
                             </p>
                         </div>
                     </div>

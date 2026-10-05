@@ -30,8 +30,8 @@
                 <tbody>
                 <tr th:each="credential : ${credentials}">
                     <td th:text="${credential.nickname()} ?: 'Unnamed passkey'">nickname</td>
-                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.createdAt())}">added</td>
-                    <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
+                    <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(credential.createdAt())}">added</td>
+                    <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
                     <td>
                         <form method="post"
                               th:action="@{/o/{organizationId}/account/passkeys/{credentialId}/delete(organizationId=${organizationId},credentialId=${credential.id()})}">

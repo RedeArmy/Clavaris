@@ -95,8 +95,8 @@
                                  state) — both cases render the same em-dash. -->
                             <td th:with="roleDisplay=${roleDisplayByAccountId.get(account.id().value())}"
                                 th:text="${roleDisplay != null and roleDisplay.roleName() != null} ? ${roleDisplay.roleName()} : '—'">role</td>
-                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</td>
-                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</td>
+                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</td>
+                            <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.createdAt())}">joined</td>
                             <td>
                                 <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab 3-dot
                                      row menu. A native <details>/<summary> disclosure, same

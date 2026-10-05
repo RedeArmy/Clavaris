@@ -54,7 +54,7 @@ OAuth Client setup instructions need it typed in by hand; no clipboard JS.
             </div>
         </details>
 
-        <span>Created <time th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organizationHeader.createdAt())}">date</time></span>
+        <span>Created <time th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(organizationHeader.createdAt())}">date</time></span>
         <span>ID <code th:text="${organizationHeader.organizationId()}">organization id</code></span>
     </div>
     <script th:if="${organizationHeader.hasEnvironmentSwitcher()}" th:src="${#resourceUrl != null ? #resourceUrl.url('/js/details-dismiss.js') : '/js/details-dismiss.js'}" defer></script>

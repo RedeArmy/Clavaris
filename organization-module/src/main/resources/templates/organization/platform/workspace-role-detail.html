@@ -24,7 +24,7 @@
                             <h1 th:text="${role.name()}">Role name</h1>
                             <p>
                                 <span class="clavaris-badge clavaris-badge--success" th:if="${role.reserved()}">Reserved</span>
-                                Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(role.createdAt())}">date</span>
+                                Created <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(role.createdAt())}">date</span>
                             </p>
                         </div>
                     </div>

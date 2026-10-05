@@ -74,7 +74,7 @@
                                   th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(endpoint.active())}"
                                   th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
                         </td>
-                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(endpoint.createdAt())}">Created at</td>
+                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(endpoint.createdAt())}">Created at</td>
                     </tr>
                     </tbody>
                 </table>

@@ -1,16 +1,15 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import com.clavaris.common.domain.model.LongEnglishDateFormatter;
+import com.clavaris.common.i18n.AppLocales;
+import com.clavaris.common.i18n.LocalizedDateFormatter;
 import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountService;
 import com.clavaris.identity.application.usecase.getloginactivityforaccount.LoginActivityDay;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
-import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -119,7 +118,7 @@ final class LoginActivityGrid {
               .orElse(fallback);
       String label = "";
       if (month != null && !month.equals(previous)) {
-        label = month.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+        label = LocalizedDateFormatter.monthShort(month.getMonth(), AppLocales.current());
         if (lastLabelAt >= 0 && index - lastLabelAt < MIN_LABEL_SPACING) {
           labels.set(lastLabelAt, "");
         }
@@ -144,10 +143,7 @@ final class LoginActivityGrid {
         (month, count) ->
             months.add(
                 new LoginActivityView.MonthTotal(
-                    month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH)
-                        + " "
-                        + month.getYear(),
-                    count)));
+                    LocalizedDateFormatter.monthYear(month, AppLocales.current()), count)));
     Collections.reverse(months);
     return months;
   }
@@ -173,9 +169,9 @@ final class LoginActivityGrid {
         title);
   }
 
-  // LongEnglishDateFormatter takes an Instant; a UTC calendar day is its own midnight.
+  // LocalizedDateFormatter takes an Instant; a UTC calendar day is its own midnight.
   private static String readable(final LocalDate date) {
-    return LongEnglishDateFormatter.format(date.atStartOfDay(ZoneOffset.UTC).toInstant());
+    return LocalizedDateFormatter.format(date.atStartOfDay(ZoneOffset.UTC).toInstant());
   }
 
   private static HeatmapDayCell paddingCell() {

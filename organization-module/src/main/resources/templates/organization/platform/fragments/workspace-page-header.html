@@ -18,7 +18,7 @@ at the Organization level.
     <div class="clavaris-page-header">
         <div>
             <h1 th:text="${workspace.name()}">Workspace name</h1>
-            <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
+            <p>Created <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(workspace.createdAt())}">date</span></p>
         </div>
     </div>
 </div>

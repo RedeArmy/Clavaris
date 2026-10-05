@@ -2,14 +2,11 @@ package com.clavaris.common.domain.model.auditlog;
 
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
-import com.clavaris.common.domain.model.LongEnglishDateFormatter;
+import com.clavaris.common.i18n.LocalizedDateFormatter;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Turns the raw audit events into rows a person can read: an actor named for what they are to the
@@ -25,9 +22,6 @@ public final class AuditLogPresenter {
   private static final long HOURS_PER_DAY = 24;
   private static final long DAYS_AS_RELATIVE = 7;
   private static final long YESTERDAY_DAYS = 2;
-  private static final DateTimeFormatter EXACT =
-      DateTimeFormatter.ofPattern("MMMM d, uuuu 'at' HH:mm 'UTC'", Locale.ENGLISH)
-          .withZone(ZoneOffset.UTC);
 
   /**
    * What the presenter needs to know about the moment and the reader.
@@ -57,7 +51,7 @@ public final class AuditLogPresenter {
 
     return new AuditLogEntryView(
         relative(event.occurredAt(), context.now()),
-        EXACT.format(event.occurredAt()),
+        LocalizedDateFormatter.dateTime(event.occurredAt()),
         event.occurredAt().toString(),
         actorLabel(event.actor(), you, context.subjectAccountId()),
         you,
@@ -122,7 +116,7 @@ public final class AuditLogPresenter {
     } else if (days < DAYS_AS_RELATIVE) {
       text = days + " days ago";
     } else {
-      text = LongEnglishDateFormatter.format(when);
+      text = LocalizedDateFormatter.format(when);
     }
     return text;
   }

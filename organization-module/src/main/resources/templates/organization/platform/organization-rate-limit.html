@@ -40,7 +40,7 @@
                                 <span class="clavaris-badge clavaris-badge--muted" th:unless="${rateLimitPolicy.customized()}">System default</span>
                                 <span class="clavaris-badge clavaris-badge--success" th:if="${rateLimitPolicy.customized()}">Custom</span>
                             </p>
-                            <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(rateLimitPolicy.updatedAt())}">date</span>.</p>
+                            <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(rateLimitPolicy.updatedAt())}">date</span>.</p>
                             <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — using the system default below.</p>
 
                             <form th:action="@{/platform/dashboard/organizations/{organizationId}/rate-limit-policy(organizationId=${organizationId})}"

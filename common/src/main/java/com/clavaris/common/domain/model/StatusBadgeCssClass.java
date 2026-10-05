@@ -5,7 +5,7 @@ package com.clavaris.common.domain.model;
  * hand-copied across 8 Thymeleaf templates in 3 different modules — a third delivery status, or a
  * badge-class rename, needed editing 2-8 files in lockstep. Lives in {@code common}, not a single
  * owning module, same "every module's own templates need to reach it" reasoning {@link
- * LongEnglishDateFormatter} already documents — templates invoke it via SpringEL's {@code
+ * LocalizedDateFormatter} already documents — templates invoke it via SpringEL's {@code
  * T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(...)}/{@code
  * .forDeliveryStatus(...)} syntax, which needs no dialect registration (same reason that class
  * stays dialect-free too).
