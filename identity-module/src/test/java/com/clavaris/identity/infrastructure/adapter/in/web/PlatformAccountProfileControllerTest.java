@@ -1,8 +1,10 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -144,8 +146,8 @@ class PlatformAccountProfileControllerTest {
 
   @Test
   void removeIsOfferedWithAConfirmationOnlyWhenThereIsAPictureToRemove() throws Exception {
-    PlatformAccount withPicture = org.mockito.Mockito.spy(account);
-    org.mockito.Mockito.doReturn(Optional.of("avatars/op.png")).when(withPicture).pictureUrl();
+    PlatformAccount withPicture = spy(account);
+    doReturn(Optional.of("avatars/op.png")).when(withPicture).pictureUrl();
     when(accounts.findById(account.id())).thenReturn(Optional.of(withPicture));
 
     mockMvc

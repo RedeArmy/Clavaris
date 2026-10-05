@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -277,8 +279,8 @@ class PlatformAccountDetailControllerTest {
 
   @Test
   void removeIsOfferedWithAConfirmationOnlyWhenTheAccountHasAPicture() throws Exception {
-    Account withPicture = org.mockito.Mockito.spy(account);
-    org.mockito.Mockito.doReturn(Optional.of("avatars/ada.png")).when(withPicture).pictureUrl();
+    Account withPicture = spy(account);
+    doReturn(Optional.of("avatars/ada.png")).when(withPicture).pictureUrl();
     when(getAccount.handle(any())).thenReturn(Optional.of(withPicture));
 
     mockMvc

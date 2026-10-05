@@ -15,7 +15,7 @@
   // dialog re-renders its content after every save); the disabled state is re-applied after each
   // swap. Without JavaScript the form is an ordinary file input plus submit button.
   const MAX_BYTES = 10 * 1024 * 1024;
-  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
   // Per form: the object URL currently shown as a preview, so it can be released.
   const previews = new WeakMap();
@@ -74,12 +74,12 @@
       return;
     }
     const { submit, status, preview } = parts(form);
-    const file = input.files && input.files[0];
+    const file = input.files?.[0];
     if (!file) {
       submit.disabled = true;
       restore(form, preview);
       say(status, "", false);
-    } else if (!ALLOWED_TYPES.includes(file.type)) {
+    } else if (!ALLOWED_TYPES.has(file.type)) {
       reject(form, "Choose a JPG, PNG, WebP or GIF image.");
     } else if (file.size > MAX_BYTES) {
       reject(form, "That image is " + sizeLabel(file.size) + ". The limit is 10 MB.");
@@ -94,7 +94,7 @@
   const prime = () =>
     document.querySelectorAll("form[data-picture-upload]").forEach((form) => {
       const { input, submit } = parts(form);
-      if (input && submit && !(input.files && input.files.length)) {
+      if (input && submit && !input.files?.length) {
         submit.disabled = true;
       }
     });
