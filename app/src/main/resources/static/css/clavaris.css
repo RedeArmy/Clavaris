@@ -2787,12 +2787,130 @@ body:has(.htmx-request)::after {
 }
 
 /* Profile picture editor. */
+/* Two fields side by side where there is room (first/last name), one per row below that. */
+.clavaris-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 var(--space-4);
+}
+
+.clavaris-account-email {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+}
+
+.clavaris-connected-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clavaris-connected-list .clavaris-connected-account {
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--clavaris-border-subtle);
+}
+
+.clavaris-connected-list .clavaris-connected-account:first-child {
+  border-top: 0;
+}
+
+/* Cards inside the Manage account panel follow the same 16px rhythm as the rest of the dashboard
+   (the panel's own cards used to be flat sections with ad-hoc spacing). */
+.clavaris-manage-account__panel > .clavaris-section-card + .clavaris-section-card {
+  margin-top: var(--space-4);
+}
+
+.clavaris-manage-account__panel .clavaris-section-card p {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.clavaris-manage-account__panel .clavaris-section-card p:last-child {
+  margin-bottom: 0;
+}
+
+/* Shared by the self-service profile and the operator's "Manage account" dialog. */
 .clavaris-profile-picture-section {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: var(--space-5);
+  align-items: center;
   margin: var(--space-5) 0;
+}
+
+.clavaris-profile-picture-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.clavaris-profile-picture-actions input[type="file"] {
+  max-width: 100%;
+}
+
+.clavaris-profile-picture-actions input[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  color: var(--clavaris-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+
+/* Profile picture card: the picture, then a heading, a hint and one row of equal-height actions. */
+.clavaris-picture-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.clavaris-picture-card__body {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.clavaris-picture-card__body h2 {
+  margin: 0;
+}
+
+.clavaris-picture-card__body > p {
+  margin: var(--space-1) 0 0;
+}
+
+.clavaris-picture-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.clavaris-picture-card__upload {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* The file input is visually hidden; its label is the button. Show the keyboard focus on it. */
+.clavaris-picture-card__upload input[type="file"]:focus-visible + label {
+  border-color: var(--clavaris-brand-color);
+  box-shadow: var(--focus-ring);
+}
+
+.clavaris-picture-card__upload button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .clavaris-profile-picture {
@@ -2802,15 +2920,6 @@ body:has(.htmx-request)::after {
   background: var(--clavaris-bg);
   border: 1px solid var(--clavaris-border);
   border-radius: 50%;
-}
-
-.clavaris-profile-picture-actions {
-  display: flex;
-  min-width: 0;
-  max-width: 100%;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
 }
 
 /* ==========================================================================
@@ -3813,38 +3922,20 @@ body:has(.htmx-request)::after {
   font-weight: 500;
 }
 
-.clavaris-profile-picture-title {
-  margin: 0;
-  font-size: var(--text-base, 1rem);
-}
-
-.clavaris-profile-picture-actions input[type="file"] {
-  max-width: 100%;
-}
-
-.clavaris-profile-picture-actions input[type="file"]::file-selector-button {
-  margin-right: var(--space-3);
-  padding: var(--space-1) var(--space-3);
-  color: var(--clavaris-text-primary);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-  background: var(--clavaris-surface);
-  border: 1px solid var(--clavaris-border);
-  border-radius: var(--radius-md);
-}
-
 .clavaris-profile-columns {
   columns: 2 360px;
-  column-gap: var(--space-5);
+  column-gap: var(--space-4);
 }
 
 .clavaris-profile-columns > .clavaris-section-card {
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--space-4);
   break-inside: avoid;
 }
 
+/* A card that spans both columns carries its own top margin: the column above it ends without one,
+   which left no gap at all between it and the card before (Identity and Activity). */
 .clavaris-profile-columns > .clavaris-profile-columns__wide {
+  margin-top: var(--space-4);
   column-span: all;
 }
 

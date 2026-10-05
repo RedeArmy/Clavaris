@@ -260,4 +260,31 @@ class PlatformAccountDetailControllerTest {
         .andExpect(
             content().string(not(containsString("No sign-ins have been recorded for this user"))));
   }
+
+  // Profile picture card: choose first, upload second; the one row of actions has Remove only when
+  // there is a picture to remove.
+  @Test
+  void theProfilePictureCardChoosesThenUploadsAndOffersNoRemoveWithoutAPicture() throws Exception {
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-picture-upload")))
+        .andExpect(content().string(containsString("Choose image")))
+        .andExpect(content().string(containsString("data-picture-submit")))
+        .andExpect(content().string(containsString("/js/profile-picture-upload.js")))
+        .andExpect(content().string(not(containsString("/picture/remove"))));
+  }
+
+  @Test
+  void removeIsOfferedWithAConfirmationOnlyWhenTheAccountHasAPicture() throws Exception {
+    Account withPicture = org.mockito.Mockito.spy(account);
+    org.mockito.Mockito.doReturn(Optional.of("avatars/ada.png")).when(withPicture).pictureUrl();
+    when(getAccount.handle(any())).thenReturn(Optional.of(withPicture));
+
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("/picture/remove")))
+        .andExpect(content().string(containsString("Remove the profile picture?")));
+  }
 }

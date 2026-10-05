@@ -10,6 +10,7 @@ import com.clavaris.identity.application.usecase.removeaccountprofilepicture.Rem
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
 import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.InvalidProfilePictureException;
+import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorageException;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureUseCase;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +49,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountProfileAdminController {
+
+  private static final String STORAGE_UNAVAILABLE_MESSAGE =
+      "We could not save the picture right now. Please try again in a moment.";
 
   private static final String REDIRECT_TO_PROFILE = "redirect:/platform/dashboard/organizations/";
 
@@ -129,6 +133,10 @@ public class PlatformAccountProfileAdminController {
       return redirectToProfile(organizationId, accountId)
           + "?pictureError="
           + encode(e.getMessage());
+    } catch (final ProfilePictureStorageException _) {
+      return redirectToProfile(organizationId, accountId)
+          + "?pictureError="
+          + encode(STORAGE_UNAVAILABLE_MESSAGE);
     }
     return redirectToProfile(organizationId, accountId) + "?pictureUpdated";
   }

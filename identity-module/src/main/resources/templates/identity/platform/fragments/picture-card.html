@@ -1,0 +1,37 @@
+<!-- Profile picture card: choose, preview, then upload. Shared by a user's profile (an operator editing
+     an Account) and the operator's own "Manage account", so both read and behave the same. One row of
+     actions, all the same height: [Choose image] [Upload] ... [Remove]. profile-picture-upload.js keeps
+     Upload disabled until a usable file is chosen, previews it in place of the current picture and checks
+     type and size before anything is sent; without JavaScript it is a plain file input and submit button,
+     and the server validates either way. Remove appears only when there is a picture to remove, and asks
+     first. prefix keeps the ids unique per use; htmx adds the hx-* attributes that re-render the "Manage
+     account" content in place (the dialog must not navigate away). -->
+<div class="clavaris-section-card clavaris-picture-card"
+     th:fragment="pictureCard(prefix, avatarSrc, uploadAction, removeAction, hasPicture, htmx)">
+    <img th:id="${prefix + '-preview'}" class="clavaris-profile-picture" th:src="${avatarSrc}"
+         alt="Current profile picture"/>
+    <div class="clavaris-picture-card__body">
+        <h2>Profile picture</h2>
+        <p th:id="${prefix + '-hint'}" class="clavaris-field-hint">JPG, PNG, WebP or GIF, up to 10 MB. A square image works best.</p>
+        <div class="clavaris-picture-card__actions">
+            <form class="clavaris-picture-card__upload" method="post" enctype="multipart/form-data"
+                  data-picture-upload="" th:action="${uploadAction}"
+                  th:attr="data-picture-status=${prefix + '-status'},data-picture-preview=${prefix + '-preview'},hx-post=${htmx} ? ${uploadAction} : null,hx-target=${htmx} ? '#manage-account-content' : null,hx-swap=${htmx} ? 'outerHTML' : null">
+                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input th:id="${prefix + '-file'}" class="clavaris-visually-hidden" type="file" name="file"
+                       accept="image/jpeg,image/png,image/webp,image/gif" required="required"
+                       th:attr="aria-describedby=${prefix + '-hint ' + prefix + '-status'}"/>
+                <label th:for="${prefix + '-file'}" class="clavaris-button clavaris-button--secondary clavaris-button--inline">Choose image</label>
+                <button class="clavaris-button clavaris-button--inline" type="submit" data-picture-submit="">Upload</button>
+            </form>
+            <form th:if="${hasPicture}" method="post" th:action="${removeAction}"
+                  data-confirm="This account goes back to its initials until a new picture is uploaded."
+                  data-confirm-title="Remove the profile picture?" data-confirm-label="Remove" data-confirm-tone="danger"
+                  th:attr="hx-post=${htmx} ? ${removeAction} : null,hx-target=${htmx} ? '#manage-account-content' : null,hx-swap=${htmx} ? 'outerHTML' : null">
+                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
+            </form>
+        </div>
+        <p th:id="${prefix + '-status'}" class="clavaris-field-hint" aria-live="polite"></p>
+    </div>
+</div>

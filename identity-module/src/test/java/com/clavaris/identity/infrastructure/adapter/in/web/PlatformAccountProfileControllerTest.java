@@ -104,6 +104,98 @@ class PlatformAccountProfileControllerTest {
         .andExpect(content().string(org.hamcrest.Matchers.containsString("operator@example.com")));
   }
 
+  // Manage account, redesigned: the shared picture card (choose, then upload; Remove only when
+  // there is a picture), cards for each section, and the email's state as badges.
+  @Test
+  void thePictureCardChoosesThenUploadsAndHasNoRemoveWithoutAPicture() throws Exception {
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Choose image")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("data-picture-upload")))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("id=\"platform-picture-file\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("/platform/account/picture/remove"))));
+  }
+
+  // htmx submits (the dialog) must re-render the content in place, never navigate away.
+  @Test
+  void thePictureAndProfileFormsKeepTheirHtmxAttributesForTheDialog() throws Exception {
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString("hx-post=\"/platform/account/picture\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString("hx-post=\"/platform/account/profile\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString("hx-target=\"#manage-account-content\"")));
+  }
+
+  @Test
+  void removeIsOfferedWithAConfirmationOnlyWhenThereIsAPictureToRemove() throws Exception {
+    PlatformAccount withPicture = org.mockito.Mockito.spy(account);
+    org.mockito.Mockito.doReturn(Optional.of("avatars/op.png")).when(withPicture).pictureUrl();
+    when(accounts.findById(account.id())).thenReturn(Optional.of(withPicture));
+
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "hx-post=\"/platform/account/picture/remove\"")))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.containsString("Remove the profile picture?")));
+  }
+
+  @Test
+  void theEmailShowsItsPrimaryAndVerificationState() throws Exception {
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Primary")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Not verified")));
+
+    account.verifyEmail();
+
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString(">Verified<")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Not verified"))));
+  }
+
+  @Test
+  void connectedAccountsReadAsProviderNamesWithTheirDate() throws Exception {
+    when(listConnectedAccounts.handle(any()))
+        .thenReturn(
+            List.of(
+                new com.clavaris.identity.application.usecase
+                    .listconnectedaccountsforplatformaccount.ConnectedAccount(
+                    com.clavaris.identity.domain.model.SocialProvider.GITHUB, Instant.now())));
+
+    mockMvc
+        .perform(get("/platform/account"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString(">GitHub<")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Connected on")));
+  }
+
   @Test
   void getWithHxRequestHeaderRendersJustTheFragment() throws Exception {
     mockMvc
@@ -175,6 +267,27 @@ class PlatformAccountProfileControllerTest {
         .andExpect(redirectedUrl("/platform/account?updated"));
 
     verify(updatePicture).handle(any());
+  }
+
+  @Test
+  void postPictureReRendersWithAMessageWhenTheStorageIsUnavailable() throws Exception {
+    doThrow(
+            new com.clavaris.identity.application.usecase.updateaccountprofilepicture
+                .ProfilePictureStorageException("down", new RuntimeException("no route")))
+        .when(updatePicture)
+        .handle(any());
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.png", "image/png", new byte[] {1, 2, 3});
+
+    mockMvc
+        .perform(multipart("/platform/account/picture").file(file).header("HX-Request", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/platform/manage-account :: content"))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "We could not save the picture right now.")));
   }
 
   @Test

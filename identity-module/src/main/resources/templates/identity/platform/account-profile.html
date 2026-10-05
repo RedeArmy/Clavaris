@@ -96,27 +96,7 @@
 
                 <div class="clavaris-manage-account__body">
                     <section id="clavaris-panel-profile" class="clavaris-manage-account__panel">
-                        <div class="clavaris-profile-picture-section">
-                            <img class="clavaris-profile-picture"
-                                 th:src="@{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}"
-                                 alt="Current profile"/>
-                            <div class="clavaris-profile-picture-actions">
-                                <h2 class="clavaris-profile-picture-title">Profile picture</h2>
-                                <form method="post" enctype="multipart/form-data"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <label for="account-picture-file">Replace</label>
-                                    <input id="account-picture-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required/>
-                                    <p class="clavaris-field-hint">Recommended size 1:1, up to 10MB.</p>
-                                    <button class="clavaris-button clavaris-button--inline" type="submit">Upload</button>
-                                </form>
-                                <form method="post"
-                                      th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture/remove(organizationId=${organizationId},accountId=${account.id().value()})}">
-                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove</button>
-                                </form>
-                            </div>
-                        </div>
+                        <div th:replace="~{identity/platform/fragments/picture-card :: pictureCard('account-picture', @{/o/{organizationId}/avatars/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}, @{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture(organizationId=${organizationId},accountId=${account.id().value()})}, @{/platform/dashboard/organizations/{organizationId}/users/{accountId}/picture/remove(organizationId=${organizationId},accountId=${account.id().value()})}, ${account.pictureUrl().isPresent()}, false)}"></div>
 
                         <div class="clavaris-profile-columns">
                         <div class="clavaris-section-card">
