@@ -22,8 +22,7 @@ class TemplateUnitsDumpTest {
   void findsTheUnitsAndWritesThemWhenAsked() throws IOException {
     final List<TemplateUnits.Found> units = TemplateUnits.extract();
 
-    assertThat(units).isNotEmpty();
-    assertThat(units).allSatisfy(unit -> assertThat(unit.files()).isNotEmpty());
+    assertThat(units).isNotEmpty().allSatisfy(unit -> assertThat(unit.files()).isNotEmpty());
 
     final String target = System.getProperty("i18n.dump");
     if (target != null) {
