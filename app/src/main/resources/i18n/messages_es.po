@@ -1,0 +1,2878 @@
+# Spanish catalogue: English source text -> Spanish (tuteo, neutral Latin American).
+# See docs/05-engineering/internationalization.md for the format and glossary.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: es\n"
+
+msgid "+ Add endpoint"
+msgstr "+ Añadir endpoint"
+
+msgid "+ Add post-logout redirect URI"
+msgstr "+ Añadir URI de redirección tras cerrar sesión"
+
+msgid "+ Add redirect URI"
+msgstr "+ Añadir URI de redirección"
+
+msgid "+ Add scope"
+msgstr "+ Añadir ámbito"
+
+msgid "+ New role"
+msgstr "+ Nuevo rol"
+
+msgid "1 event type"
+msgstr "1 tipo de evento"
+
+msgid "1 hour ago"
+msgstr "Hace 1 hora"
+
+msgid "1 minute ago"
+msgstr "Hace 1 minuto"
+
+msgid "1 permission"
+msgstr "1 permiso"
+
+msgid "1 scope"
+msgstr "1 ámbito"
+
+msgid "1 sign-in on 1 day"
+msgstr "1 inicio de sesión en 1 día"
+
+msgid "1 sign-in on {0}"
+msgstr "1 inicio de sesión el {0}"
+
+msgid "1 sign-in on {0} days"
+msgstr "1 inicio de sesión en {0} días"
+
+msgid "3–32 characters: letters, numbers, underscores or hyphens"
+msgstr "De 3 a 32 caracteres: letras, números, guiones bajos o guiones"
+
+msgid "8–128 characters"
+msgstr "De 8 a 128 caracteres"
+
+msgid "<0></0> Self-hosted identity infrastructure"
+msgstr "<0></0> Infraestructura de identidad autoalojada"
+
+msgid "<0>New client secret:</0> <1>{0}</1><2/> Copy this now — it will not be shown again."
+msgstr "<0>Nuevo secreto de cliente:</0> <1>{0}</1><2/> Cópialo ahora: no se volverá a mostrar."
+
+msgid "<0>New secret for <1>{0}</1>:</0> <2>{1}</2><3/> Copy this now — it will not be shown again."
+msgstr "<0>Nuevo secreto para <1>{0}</1>:</0> <2>{1}</2><3/> Cópialo ahora: no se volverá a mostrar."
+
+msgid "<0>New signing secret:</0> <1>{0}</1><2/> Copy this now — it will not be shown again."
+msgstr "<0>Nuevo secreto de firma:</0> <1>{0}</1><2/> Cópialo ahora: no se volverá a mostrar."
+
+msgid "<0>Reserved</0> Created <1>{0}</1>"
+msgstr "<0>Reservado</0> Creado el <1>{0}</1>"
+
+msgid "<0>This is permanent and cannot be undone.</0> Deleting <1>{0}</1> destroys:"
+msgstr "<0>Esto es permanente y no se puede deshacer.</0> Eliminar <1>{0}</1> destruye:"
+
+msgid "<0>{0}</0> is not valid JSON, or is too long."
+msgstr "<0>{0}</0> no es un JSON válido o es demasiado largo."
+
+msgid "<0>{0}</0> · Registered <1>{1}</1>"
+msgstr "<0>{0}</0> · Registrado el <1>{1}</1>"
+
+msgid "A Clavaris account already exists for this email address. We've sent a link to confirm linking your social account to it. The link expires in 24 hours."
+msgstr "Ya existe una cuenta de Clavaris con este correo electrónico. Te hemos enviado un enlace para confirmar que quieres vincular tu cuenta social a ella. El enlace caduca en 24 horas."
+
+msgid "A member joined a Workspace."
+msgstr "Un miembro se unió a un espacio de trabajo."
+
+msgid "A member left or was removed from a Workspace."
+msgstr "Un miembro salió de un espacio de trabajo o fue quitado de él."
+
+msgid "A member's Workspace role changed."
+msgstr "Cambió el rol de un miembro en el espacio de trabajo."
+
+msgid "A new Account was registered."
+msgstr "Se registró una cuenta nueva."
+
+msgid "A new self-registration requires approval before the Account can sign in."
+msgstr "Un autorregistro nuevo requiere aprobación antes de que la cuenta pueda iniciar sesión."
+
+msgid "A new Workspace was created."
+msgstr "Se creó un espacio de trabajo nuevo."
+
+msgid "A new WorkspaceRole was created."
+msgstr "Se creó un rol de espacio de trabajo nuevo."
+
+msgid "A password reset link was sent to this Account's email."
+msgstr "Se envió un enlace para restablecer la contraseña al correo de esta cuenta."
+
+msgid "A password reset was requested."
+msgstr "Se solicitó un restablecimiento de contraseña."
+
+msgid "A pending self-registration was approved — the Account is now active."
+msgstr "Se aprobó un autorregistro pendiente; la cuenta ya está activa."
+
+msgid "A pending self-registration was rejected."
+msgstr "Se rechazó un autorregistro pendiente."
+
+msgid "A role inherits every permission its parent (and its parent's own ancestors) carries."
+msgstr "Un rol hereda todos los permisos de su rol padre (y de los ancestros de este)."
+
+msgid "A role with that name already exists in this Organization."
+msgstr "Ya existe un rol con ese nombre en esta Organización."
+
+msgid "A rotated refresh token was reused — every active token for the Account was revoked."
+msgstr "Se reutilizó un token de actualización ya rotado; se revocaron todos los tokens activos de la cuenta."
+
+msgid "A social identity (Google, GitHub) was linked to an Account."
+msgstr "Se vinculó una identidad social (Google, GitHub) a una cuenta."
+
+msgid "A square image works best, up to 10 MB."
+msgstr "Funciona mejor una imagen cuadrada, de hasta 10 MB."
+
+msgid "A standalone OIDC/OAuth2 provider with real per-tenant isolation — your data, your signing keys, your deployment. Standard protocol, zero proprietary lock-in."
+msgstr "Un proveedor OIDC/OAuth2 independiente con aislamiento real por tenant: tus datos, tus claves de firma, tu despliegue. Protocolo estándar, sin dependencia de ningún proveedor."
+
+msgid "A suspended Account was reactivated."
+msgstr "Se reactivó una cuenta suspendida."
+
+msgid "A team with that name already exists in this Workspace."
+msgstr "Ya existe un equipo con ese nombre en este espacio de trabajo."
+
+msgid "A URL this Organization's own consuming application receives event deliveries at. The signing secret is shown exactly once, on the endpoints list, right after you register."
+msgstr "Una URL en la que la aplicación de esta Organización recibe las entregas de eventos. El secreto de firma se muestra exactamente una vez, en la lista de endpoints, justo después de registrarlo."
+
+msgid "A URL your application receives event deliveries at. The signing secret is shown once, on the endpoints list, right after you register."
+msgstr "Una URL en la que tu aplicación recibe las entregas de eventos. El secreto de firma se muestra una sola vez, en la lista de endpoints, justo después de registrarlo."
+
+msgid "A user of this Organization"
+msgstr "Un usuario de esta Organización"
+
+msgid "A Workspace was permanently deleted."
+msgstr "Se eliminó un espacio de trabajo de forma permanente."
+
+msgid "A WorkspaceRole was permanently deleted."
+msgstr "Se eliminó un rol de espacio de trabajo de forma permanente."
+
+msgid "A WorkspaceRole's name, permissions, or parent role changed."
+msgstr "Cambió el nombre, los permisos o el rol padre de un rol de espacio de trabajo."
+
+msgid "Access token: <0>{0}</0>"
+msgstr "Token de acceso: <0>{0}</0>"
+
+msgid "Account"
+msgstr "Cuenta"
+
+msgid "Account ID: <0>{0}</0>"
+msgstr "ID de cuenta: <0>{0}</0>"
+
+msgid "Account linked"
+msgstr "Cuenta vinculada"
+
+msgid "Account linked — Clavaris"
+msgstr "Cuenta vinculada — Clavaris"
+
+msgid "Account locked"
+msgstr "Cuenta bloqueada"
+
+msgid "Account locked — Clavaris"
+msgstr "Cuenta bloqueada — Clavaris"
+
+msgid "Action"
+msgstr "Acción"
+
+msgid "Actions"
+msgstr "Acciones"
+
+msgid "Activate"
+msgstr "Activar"
+
+msgid "Active"
+msgstr "Activo"
+
+msgid "ACTIVE"
+msgstr "ACTIVO"
+
+msgid "Active days"
+msgstr "Días activos"
+
+msgid "Active devices"
+msgstr "Dispositivos activos"
+
+msgid "Active from"
+msgstr "Activa desde"
+
+msgid "Activity"
+msgstr "Actividad"
+
+msgid "Activity — Clavaris"
+msgstr "Actividad — Clavaris"
+
+msgid "Actor"
+msgstr "Actor"
+
+msgid "Add a passkey"
+msgstr "Añadir una clave de acceso"
+
+msgid "Add another isolated tenant to your control plane."
+msgstr "Añade otro tenant aislado a tu plano de control."
+
+msgid "Add client"
+msgstr "Añadir cliente"
+
+msgid "Add existing role"
+msgstr "Añadir un rol existente"
+
+msgid "Add selected roles"
+msgstr "Añadir los roles seleccionados"
+
+msgid "Add team"
+msgstr "Añadir equipo"
+
+msgid "Add these to your application"
+msgstr "Añade esto a tu aplicación"
+
+msgid "Added"
+msgstr "Añadida"
+
+msgid "Advanced create"
+msgstr "Creación avanzada"
+
+msgid "Algorithm"
+msgstr "Algoritmo"
+
+msgid "All <0>{0}</0>"
+msgstr "Todos <0>{0}</0>"
+
+msgid "All events"
+msgstr "Todos los eventos"
+
+msgid "All events — including event types this system adds in the future"
+msgstr "Todos los eventos, incluidos los tipos de evento que el sistema añada en el futuro"
+
+msgid "All teams"
+msgstr "Todos los equipos"
+
+msgid "Allow user to delete their own account"
+msgstr "Permitir que el usuario elimine su propia cuenta"
+
+msgid "Allows this Account to sign in from a new device without a Device Trust challenge — protects against credential-stuffing attacks when off."
+msgstr "Permite que esta cuenta inicie sesión desde un dispositivo nuevo sin la verificación de confianza del dispositivo; cuando está desactivado, protege contra ataques de relleno de credenciales."
+
+msgid "Already been approved? <0>Sign in</0>."
+msgstr "¿Ya te aprobaron? <0>Inicia sesión</0>."
+
+msgid "Already have an account?"
+msgstr "¿Ya tienes una cuenta?"
+
+msgid "Already have an account? Sign in"
+msgstr "¿Ya tienes una cuenta? Inicia sesión"
+
+msgid "Already signing in from another tab — please wait a moment."
+msgstr "Ya estás iniciando sesión desde otra pestaña; espera un momento."
+
+msgid "Already used in this Organization"
+msgstr "Ya usados en esta Organización"
+
+msgid "Also rotates the client secret — the new one is shown once, right after."
+msgstr "También rota el secreto de cliente; el nuevo se muestra una sola vez, justo después."
+
+msgid "An account already exists for this email address. We've sent a link to confirm linking your social account to it. The link expires in 24 hours."
+msgstr "Ya existe una cuenta con este correo electrónico. Te hemos enviado un enlace para confirmar que quieres vincular tu cuenta social a ella. El enlace caduca en 24 horas."
+
+msgid "An Account was permanently deleted."
+msgstr "Se eliminó una cuenta de forma permanente."
+
+msgid "An Account was suspended."
+msgstr "Se suspendió una cuenta."
+
+msgid "An Account's email address was verified."
+msgstr "Se verificó el correo electrónico de una cuenta."
+
+msgid "An Account's password was successfully reset."
+msgstr "Se restableció correctamente la contraseña de una cuenta."
+
+msgid "An optional description of what this endpoint is used for."
+msgstr "Una descripción opcional de para qué se usa este endpoint."
+
+msgid "An Organization was permanently deleted."
+msgstr "Se eliminó una Organización de forma permanente."
+
+msgid "Another platform account"
+msgstr "Otra cuenta de la plataforma"
+
+msgid "Any already-issued token still associated with it, revoked immediately"
+msgstr "Cualquier token ya emitido que siga asociado, revocado de inmediato"
+
+msgid "API <0>{0}</0>"
+msgstr "API <0>{0}</0>"
+
+msgid "API Keys"
+msgstr "Claves de API"
+
+msgid "API Keys — Clavaris"
+msgstr "Claves de API — Clavaris"
+
+msgid "Application"
+msgstr "Aplicación"
+
+msgid "Applications using it will stop authenticating right away."
+msgstr "Las aplicaciones que la usen dejarán de autenticarse de inmediato."
+
+msgid "Approve"
+msgstr "Aprobar"
+
+msgid "Arbitrary JSON that your application defines and Clavaris never interprets. Each of the three fields replaces its previous value entirely when you save."
+msgstr "JSON arbitrario que define tu aplicación y que Clavaris nunca interpreta. Cada uno de los tres campos sustituye por completo su valor anterior al guardar."
+
+msgid "Arbitrary JSON this consuming application defines and Clavaris never interprets. Each tier replaces its previous value entirely on save."
+msgstr "JSON arbitrario que define tu aplicación y que Clavaris nunca interpreta. Cada nivel sustituye por completo su valor anterior al guardar."
+
+msgid "Assign"
+msgstr "Asignar"
+
+msgid "Assign role"
+msgstr "Asignar rol"
+
+msgid "Attempts"
+msgstr "Intentos"
+
+msgid "Audit Log"
+msgstr "Registro de auditoría"
+
+msgid "Audit Log — Clavaris"
+msgstr "Registro de auditoría — Clavaris"
+
+msgid "Audit log, newest first"
+msgstr "Registro de auditoría, del más reciente al más antiguo"
+
+msgid "Authorization endpoint"
+msgstr "Endpoint de autorización"
+
+msgid "Authorize access"
+msgstr "Autorizar acceso"
+
+msgid "Available roles pages"
+msgstr "Páginas de roles disponibles"
+
+msgid "Back"
+msgstr "Atrás"
+
+msgid "Back to account"
+msgstr "Volver a la cuenta"
+
+msgid "Back to sign in"
+msgstr "Volver al inicio de sesión"
+
+msgid "Back to Your Organizations"
+msgstr "Volver a tus Organizaciones"
+
+msgid "Ban account"
+msgstr "Vetar cuenta"
+
+msgid "Ban this account?"
+msgstr "¿Vetar esta cuenta?"
+
+msgid "BANNED"
+msgstr "BLOQUEADO"
+
+msgid "Branding changed"
+msgstr "Marca modificada"
+
+msgid "Browser / OS"
+msgstr "Navegador / SO"
+
+msgid "Bypass Device Trust"
+msgstr "Omitir la confianza del dispositivo"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Change password"
+msgstr "Cambiar contraseña"
+
+msgid "Change the password you use to sign in to the platform. We email you a link to choose a new one."
+msgstr "Cambia la contraseña con la que inicias sesión en la plataforma. Te enviamos por correo un enlace para elegir una nueva."
+
+msgid "Check your email"
+msgstr "Revisa tu correo electrónico"
+
+msgid "Check your email — Clavaris"
+msgstr "Revisa tu correo electrónico — Clavaris"
+
+msgid "Choose a name for the new workspace."
+msgstr "Elige un nombre para el nuevo espacio de trabajo."
+
+msgid "Choose a name for your new isolated tenant."
+msgstr "Elige un nombre para tu nuevo tenant aislado."
+
+msgid "Choose a new password"
+msgstr "Elige una contraseña nueva"
+
+msgid "Choose image"
+msgstr "Elegir imagen"
+
+msgid "Clavaris"
+msgstr "Clavaris"
+
+msgid "Clavaris <0>Control plane</0>"
+msgstr "Clavaris <0>Plano de control</0>"
+
+msgid "Clavaris dashboard"
+msgstr "Panel de Clavaris"
+
+msgid "Clavaris does not interpret permissions — your application decides what each one means. Pick from the permissions already in use, or type a new one and press Enter."
+msgstr "Clavaris no interpreta los permisos: tu aplicación decide qué significa cada uno. Elige entre los permisos que ya se usan o escribe uno nuevo y pulsa Intro."
+
+msgid "Clavaris home"
+msgstr "Inicio de Clavaris"
+
+msgid "Clavaris never interprets a role's name or permissions — they're opaque strings your own application checks for, the same way it would check an OAuth scope."
+msgstr "Clavaris nunca interpreta el nombre ni los permisos de un rol: son cadenas opacas que tu propia aplicación comprueba, igual que comprobaría un ámbito de OAuth."
+
+msgid "Clavaris permissions"
+msgstr "Permisos de Clavaris"
+
+msgid "Clavaris will stop delivering events to it until it is reactivated."
+msgstr "Clavaris dejará de entregarle eventos hasta que se reactive."
+
+msgid "Clavaris — Self-hosted OIDC/OAuth2 identity provider"
+msgstr "Clavaris — Proveedor de identidad OIDC/OAuth2 autoalojado"
+
+msgid "Click the button below to complete your sign-in."
+msgstr "Haz clic en el botón de abajo para completar tu inicio de sesión."
+
+msgid "Client"
+msgstr "Cliente"
+
+msgid "Client credentials"
+msgstr "Credenciales del cliente"
+
+msgid "Client ID"
+msgstr "ID de cliente"
+
+msgid "Client secret"
+msgstr "Secreto de cliente"
+
+msgid "Client-side"
+msgstr "Del lado del cliente"
+
+msgid "Close add existing role dialog"
+msgstr "Cerrar el cuadro para añadir un rol existente"
+
+msgid "Close assign role dialog"
+msgstr "Cerrar el cuadro para asignar un rol"
+
+msgid "Close consent screen dialog"
+msgstr "Cerrar el cuadro de la pantalla de consentimiento"
+
+msgid "Close create organization dialog"
+msgstr "Cerrar el cuadro para crear una Organización"
+
+msgid "Close create role dialog"
+msgstr "Cerrar el cuadro para crear un rol"
+
+msgid "Close create team dialog"
+msgstr "Cerrar el cuadro para crear un equipo"
+
+msgid "Close create user dialog"
+msgstr "Cerrar el cuadro para crear un usuario"
+
+msgid "Close delete account dialog"
+msgstr "Cerrar el cuadro para eliminar la cuenta"
+
+msgid "Close delete role dialog"
+msgstr "Cerrar el cuadro para eliminar el rol"
+
+msgid "Close delete Secret Key dialog"
+msgstr "Cerrar el cuadro para eliminar la clave secreta"
+
+msgid "Close delete team dialog"
+msgstr "Cerrar el cuadro para eliminar el equipo"
+
+msgid "Close delete user dialog"
+msgstr "Cerrar el cuadro para eliminar el usuario"
+
+msgid "Close delete workspace dialog"
+msgstr "Cerrar el cuadro para eliminar el espacio de trabajo"
+
+msgid "Close description dialog"
+msgstr "Cerrar el cuadro de la descripción"
+
+msgid "Close event types dialog"
+msgstr "Cerrar el cuadro de los tipos de evento"
+
+msgid "Close grant types dialog"
+msgstr "Cerrar el cuadro de los tipos de concesión"
+
+msgid "Close impersonate user dialog"
+msgstr "Cerrar el cuadro para suplantar al usuario"
+
+msgid "Close manage account dialog"
+msgstr "Cerrar el cuadro de gestión de la cuenta"
+
+msgid "Close new workspace dialog"
+msgstr "Cerrar el cuadro del nuevo espacio de trabajo"
+
+msgid "Close remove member dialog"
+msgstr "Cerrar el cuadro para quitar al miembro"
+
+msgid "Close scopes dialog"
+msgstr "Cerrar el cuadro de ámbitos"
+
+msgid "Close URL dialog"
+msgstr "Cerrar el cuadro de la URL"
+
+msgid "Code"
+msgstr "Código"
+
+msgid "Code error"
+msgstr "Error en el código"
+
+msgid "Code is required"
+msgstr "El código es obligatorio"
+
+msgid "Code…"
+msgstr "Código…"
+
+msgid "Configuration"
+msgstr "Configuración"
+
+msgid "Configure"
+msgstr "Configurar"
+
+msgid "Configured management API version"
+msgstr "Versión configurada de la API de gestión"
+
+msgid "Confirm"
+msgstr "Confirmar"
+
+msgid "Confirm new password"
+msgstr "Confirmar contraseña nueva"
+
+msgid "Confirm password"
+msgstr "Confirmar contraseña"
+
+msgid "Confirm password error"
+msgstr "Error al confirmar la contraseña"
+
+msgid "Confirm sign-in — Clavaris"
+msgstr "Confirmar inicio de sesión — Clavaris"
+
+msgid "Confirmation error"
+msgstr "Error de confirmación"
+
+msgid "Connected accounts"
+msgstr "Cuentas conectadas"
+
+msgid "Connected on <0>{0}</0>"
+msgstr "Conectada el <0>{0}</0>"
+
+msgid "Consent screen"
+msgstr "Pantalla de consentimiento"
+
+msgid "Consent screen setting changed"
+msgstr "Ajuste de la pantalla de consentimiento modificado"
+
+msgid "Copy"
+msgstr "Copiar"
+
+msgid "Copy JWKS public key"
+msgstr "Copiar la clave pública JWKS"
+
+msgid "Copy {0:t}"
+msgstr "Copiar {0}"
+
+msgid "Create a new role"
+msgstr "Crear un rol nuevo"
+
+msgid "Create a new Secret Key"
+msgstr "Crear una clave secreta nueva"
+
+msgid "Create a new team"
+msgstr "Crear un equipo nuevo"
+
+msgid "Create account"
+msgstr "Crear cuenta"
+
+msgid "Create an account"
+msgstr "Crear una cuenta"
+
+msgid "Create an account — Clavaris"
+msgstr "Crear una cuenta — Clavaris"
+
+msgid "Create organization"
+msgstr "Crear Organización"
+
+msgid "Create production environment"
+msgstr "Crear entorno de producción"
+
+msgid "Create role"
+msgstr "Crear rol"
+
+msgid "Create Secret Key"
+msgstr "Crear clave secreta"
+
+msgid "Create team"
+msgstr "Crear equipo"
+
+msgid "Create user"
+msgstr "Crear usuario"
+
+msgid "Create workspace"
+msgstr "Crear espacio de trabajo"
+
+msgid "Create your account"
+msgstr "Crea tu cuenta"
+
+msgid "Create your Clavaris account"
+msgstr "Crea tu cuenta de Clavaris"
+
+msgid "Create your first organization"
+msgstr "Crea tu primera Organización"
+
+msgid "Create your organization"
+msgstr "Crea tu Organización"
+
+msgid "Created"
+msgstr "Creado"
+
+msgid "Created <0>{0}</0>"
+msgstr "Creado el <0>{0}</0>"
+
+msgid "Creates a brand-new <0>PRODUCTION</0> Organization paired with this <1>DEVELOPMENT</1> one. Nothing is copied — no Accounts, no OAuth Clients, no Workspaces — the new Organization starts empty, with its own signing key and its own tenant issuer. This cannot be undone: once created, this Organization can never be paired with a different one."
+msgstr "Crea una Organización de <0>PRODUCCIÓN</0> nueva y vinculada a esta de <1>DESARROLLO</1>. No se copia nada (ni cuentas, ni clientes OAuth, ni espacios de trabajo): la nueva Organización empieza vacía, con su propia clave de firma y su propio emisor. No se puede deshacer: una vez creada, esta Organización nunca podrá vincularse a otra distinta."
+
+msgid "Creates an access token for this Account, limited to one OAuth Client. No ID token or refresh token is issued, and the token is shown once."
+msgstr "Crea un token de acceso para esta cuenta, limitado a un cliente OAuth. No se emite ningún token de ID ni de actualización, y el token se muestra una sola vez."
+
+msgid "Creates an Account directly for this Organization, with the password set immediately — no invitation email is sent."
+msgstr "Crea una cuenta directamente en esta Organización, con la contraseña ya establecida; no se envía ningún correo de invitación."
+
+msgid "Creates this Organization's paired production Organization, ready for real end-user traffic."
+msgstr "Crea la Organización de producción vinculada a esta, lista para el tráfico real de usuarios finales."
+
+msgid "Current profile"
+msgstr "Perfil actual"
+
+msgid "Custom"
+msgstr "Personalizado"
+
+msgid "Custom domain re-verification failed"
+msgstr "Falló la nueva verificación del dominio personalizado"
+
+msgid "Custom domain re-verified"
+msgstr "Dominio personalizado verificado de nuevo"
+
+msgid "Custom domain requested"
+msgstr "Dominio personalizado solicitado"
+
+msgid "Custom domain verification failed"
+msgstr "Falló la verificación del dominio personalizado"
+
+msgid "Custom domain verified"
+msgstr "Dominio personalizado verificado"
+
+msgid "Danger Zone"
+msgstr "Zona de peligro"
+
+msgid "Danger Zone — Clavaris"
+msgstr "Zona de peligro — Clavaris"
+
+msgid "Deactivate"
+msgstr "Desactivar"
+
+msgid "Deactivate this client?"
+msgstr "¿Desactivar este cliente?"
+
+msgid "Deactivate this endpoint?"
+msgstr "¿Desactivar este endpoint?"
+
+msgid "Deactivate this Secret Key?"
+msgstr "¿Desactivar esta clave secreta?"
+
+msgid "Delete"
+msgstr "Eliminar"
+
+msgid "Delete account"
+msgstr "Eliminar cuenta"
+
+msgid "Delete OAuth Client"
+msgstr "Eliminar cliente OAuth"
+
+msgid "Delete OAuth Client — Clavaris"
+msgstr "Eliminar cliente OAuth — Clavaris"
+
+msgid "Delete Organization"
+msgstr "Eliminar Organización"
+
+msgid "Delete Organization — Clavaris"
+msgstr "Eliminar Organización — Clavaris"
+
+msgid "Delete permanently"
+msgstr "Eliminar permanentemente"
+
+msgid "Delete role"
+msgstr "Eliminar rol"
+
+msgid "Delete Secret Key"
+msgstr "Eliminar clave secreta"
+
+msgid "Delete team"
+msgstr "Eliminar equipo"
+
+msgid "Delete this endpoint permanently"
+msgstr "Eliminar este endpoint permanentemente"
+
+msgid "Delete this OAuth Client permanently"
+msgstr "Eliminar este cliente OAuth permanentemente"
+
+msgid "Delete this Organization permanently"
+msgstr "Eliminar esta Organización permanentemente"
+
+msgid "Delete this role"
+msgstr "Eliminar este rol"
+
+msgid "Delete this Secret Key?"
+msgstr "¿Eliminar esta clave secreta?"
+
+msgid "Delete user"
+msgstr "Eliminar usuario"
+
+msgid "Delete Webhook Endpoint"
+msgstr "Eliminar endpoint de webhook"
+
+msgid "Delete Webhook Endpoint — Clavaris"
+msgstr "Eliminar endpoint de webhook — Clavaris"
+
+msgid "Delete workspace"
+msgstr "Eliminar espacio de trabajo"
+
+msgid "deleted endpoint"
+msgstr "endpoint eliminado"
+
+msgid "Deliveries"
+msgstr "Entregas"
+
+msgid "Delivery attempts across all of this Organization's webhook endpoints over the last 6 hours."
+msgstr "Intentos de entrega en todos los endpoints de webhook de esta Organización durante las últimas 6 horas."
+
+msgid "Deny"
+msgstr "Denegar"
+
+msgid "Description"
+msgstr "Descripción"
+
+msgid "Description (optional)"
+msgstr "Descripción (opcional)"
+
+msgid "Detail"
+msgstr "Detalle"
+
+msgid "Details"
+msgstr "Detalles"
+
+msgid "DEVELOPMENT"
+msgstr "DESARROLLO"
+
+msgid "Development environment"
+msgstr "Entorno de desarrollo"
+
+msgid "Device"
+msgstr "Dispositivo"
+
+msgid "Devices"
+msgstr "Dispositivos"
+
+msgid "Didn't get it? Check your spam folder — or <0>sign in</0> once you've verified."
+msgstr "¿No te llegó? Revisa la carpeta de spam, o <0>inicia sesión</0> cuando lo hayas verificado."
+
+msgid "Discovery URL"
+msgstr "URL de descubrimiento"
+
+msgid "e.g. MacBook Touch ID"
+msgstr "p. ej., Touch ID del MacBook"
+
+msgid "Each environment is isolated: users, keys and clients are never shared."
+msgstr "Cada entorno está aislado: los usuarios, las claves y los clientes nunca se comparten."
+
+msgid "Each Organization is a fully isolated tenant — its own accounts, OAuth clients, and signing keys."
+msgstr "Cada Organización es un tenant totalmente aislado, con sus propias cuentas, clientes OAuth y claves de firma."
+
+msgid "Edit"
+msgstr "Editar"
+
+msgid "Email"
+msgstr "Correo electrónico"
+
+msgid "Email address"
+msgstr "Dirección de correo electrónico"
+
+msgid "Email error"
+msgstr "Error en el correo electrónico"
+
+msgid "Email is required"
+msgstr "El correo electrónico es obligatorio"
+
+msgid "Email must be at most 254 characters"
+msgstr "El correo electrónico debe tener como máximo 254 caracteres"
+
+msgid "Email verification"
+msgstr "Verificación del correo"
+
+msgid "Email verified"
+msgstr "Correo electrónico verificado"
+
+msgid "Email verified — Clavaris"
+msgstr "Correo electrónico verificado — Clavaris"
+
+msgid "Email: <0>{0}</0> <1>Primary</1>"
+msgstr "Correo electrónico: <0>{0}</0> <1>Principal</1>"
+
+msgid "Emergency key purge"
+msgstr "Purga de emergencia de claves"
+
+msgid "Enabled"
+msgstr "Habilitado"
+
+msgid "End-user login (authorization_code) won't work until a redirect URI is added"
+msgstr "El inicio de sesión de usuarios finales (authorization_code) no funcionará hasta que se añada una URI de redirección"
+
+msgid "Endpoint"
+msgstr "Endpoint"
+
+msgid "Endpoint details"
+msgstr "Detalles del endpoint"
+
+msgid "Endpoint URL"
+msgstr "URL del endpoint"
+
+msgid "Endpoints"
+msgstr "Endpoints"
+
+msgid "Enter a name for the production environment"
+msgstr "Escribe un nombre para el entorno de producción"
+
+msgid "Enter a valid email address"
+msgstr "Escribe un correo electrónico válido"
+
+msgid "Enter a valid username"
+msgstr "Escribe un nombre de usuario válido"
+
+msgid "Enter the URL to deliver events to"
+msgstr "Escribe la URL a la que entregar los eventos"
+
+msgid "Enter your code"
+msgstr "Introduce tu código"
+
+msgid "Enter your code — Clavaris"
+msgstr "Introduce tu código — Clavaris"
+
+msgid "Enter your email address and we'll send you a link to reset your password."
+msgstr "Introduce tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña."
+
+msgid "Enter your email address and we'll send you a link to sign in."
+msgstr "Introduce tu correo electrónico y te enviaremos un enlace para iniciar sesión."
+
+msgid "Enter your email address and we'll send you a one-time code."
+msgstr "Introduce tu correo electrónico y te enviaremos un código de un solo uso."
+
+msgid "Environment: {0}. Switch environment"
+msgstr "Entorno: {0}. Cambiar de entorno"
+
+msgid "Environments"
+msgstr "Entornos"
+
+msgid "Event Catalog"
+msgstr "Catálogo de eventos"
+
+msgid "Event Catalog — Clavaris"
+msgstr "Catálogo de eventos — Clavaris"
+
+msgid "Event type"
+msgstr "Tipo de evento"
+
+msgid "Event types"
+msgstr "Tipos de evento"
+
+msgid "Event types error"
+msgstr "Error en los tipos de evento"
+
+msgid "Every account in this Organization already has a role in this Workspace. To make one eligible here, first use Remove on their current role."
+msgstr "Todas las cuentas de esta Organización ya tienen un rol en este espacio de trabajo. Para que una pueda asignarse aquí, primero usa Quitar en su rol actual."
+
+msgid "Every account in this Organization, and everything tied to it — password credentials, sessions, refresh tokens"
+msgstr "Todas las cuentas de esta Organización y todo lo asociado a ellas: credenciales de contraseña, sesiones, tokens de actualización"
+
+msgid "Every Account registered for this Organization."
+msgstr "Todas las cuentas registradas en esta Organización."
+
+msgid "Every connected application loses access to this account."
+msgstr "Todas las aplicaciones conectadas pierden el acceso a esta cuenta."
+
+msgid "Every delivery attempt across all of this Organization's webhook endpoints, newest first."
+msgstr "Todos los intentos de entrega de todos los endpoints de webhook de esta Organización, del más reciente al más antiguo."
+
+msgid "Every event type a webhook endpoint can subscribe to today. This list is a reference — subscribe to individual events (or \"All events\") from an endpoint's own detail page."
+msgstr "Todos los tipos de evento a los que puede suscribirse hoy un endpoint de webhook. Esta lista es de referencia: suscríbete a eventos concretos (o a «Todos los eventos») desde la página de detalle de cada endpoint."
+
+msgid "Every Organization gets its own signing keys, its own issuer, its own JWKS. A compromised key affects one tenant — never the platform."
+msgstr "Cada Organización tiene sus propias claves de firma, su propio emisor y su propio JWKS. Una clave comprometida afecta a un solo tenant, nunca a la plataforma."
+
+msgid "Every redirect URI and post-logout redirect URI configured on it"
+msgstr "Todas las URI de redirección y de redirección tras cerrar sesión configuradas en él"
+
+msgid "Every Secret Key and OAuth Client this Organization ever registered"
+msgstr "Todas las claves secretas y clientes OAuth que esta Organización haya registrado"
+
+msgid "Every signing key this Organization ever rotated through"
+msgstr "Todas las claves de firma por las que ha rotado esta Organización"
+
+msgid "Every team in this Workspace, the roles grouped into it, and the members currently holding each role."
+msgstr "Todos los equipos de este espacio de trabajo, los roles agrupados en cada uno y los miembros que tienen cada rol."
+
+msgid "Every Webhook Endpoint and its delivery history"
+msgstr "Todos los endpoints de webhook y su historial de entregas"
+
+msgid "Every Workspace and Workspace membership"
+msgstr "Todos los espacios de trabajo y las pertenencias a ellos"
+
+msgid "EXHAUSTED"
+msgstr "AGOTADA"
+
+msgid "Expires at"
+msgstr "Caduca el"
+
+msgid "Expires: <0>{0}</0>"
+msgstr "Caduca: <0>{0}</0>"
+
+msgid "Failed"
+msgstr "Fallido"
+
+msgid "FAILED"
+msgstr "FALLIDA"
+
+msgid "Failed attempts"
+msgstr "Intentos fallidos"
+
+msgid "Filter by team"
+msgstr "Filtrar por equipo"
+
+msgid "Filter events by category"
+msgstr "Filtrar eventos por categoría"
+
+msgid "Finish signing in"
+msgstr "Termina de iniciar sesión"
+
+msgid "First name"
+msgstr "Nombre"
+
+msgid "First seen"
+msgstr "Visto por primera vez"
+
+msgid "Forgot password — Clavaris"
+msgstr "Contraseña olvidada — Clavaris"
+
+msgid "Forgot your password?"
+msgstr "¿Olvidaste tu contraseña?"
+
+msgid "Format"
+msgstr "Formato"
+
+msgid "Fri"
+msgstr "vie"
+
+msgid "Generates a fresh key, activates it immediately, and retires the current one with the normal overlap window."
+msgstr "Genera una clave nueva, la activa de inmediato y retira la actual con el periodo de solapamiento habitual."
+
+msgid "Get started"
+msgstr "Empezar"
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "Go to dashboard"
+msgstr "Ir al panel"
+
+msgid "Grant type"
+msgstr "Tipo de concesión"
+
+msgid "Grant types"
+msgstr "Tipos de concesión"
+
+msgid "Grant types changed"
+msgstr "Tipos de concesión modificados"
+
+msgid "Grants"
+msgstr "Concesiones"
+
+msgid "Hostname"
+msgstr "Nombre de host"
+
+msgid "https://example.com/webhooks/clavaris"
+msgstr "https://example.com/webhooks/clavaris"
+
+msgid "https://jobseeker.example.com/callback"
+msgstr "https://jobseeker.example.com/callback"
+
+msgid "ID <0>{0}</0>"
+msgstr "ID <0>{0}</0>"
+
+msgid "Identity"
+msgstr "Identidad"
+
+msgid "Identity control plane"
+msgstr "Plano de control de identidad"
+
+msgid "Identity infrastructure<0/>you actually own"
+msgstr "Infraestructura de identidad<0/>que de verdad es tuya"
+
+msgid "If a Clavaris account exists for that email address, we've sent a link to reset your password. The link expires in 30 minutes."
+msgstr "Si existe una cuenta de Clavaris con ese correo electrónico, te hemos enviado un enlace para restablecer tu contraseña. El enlace caduca en 30 minutos."
+
+msgid "If an account exists for that email address, we've sent a link to reset your password. The link expires in 30 minutes."
+msgstr "Si existe una cuenta con ese correo electrónico, te hemos enviado un enlace para restablecer tu contraseña. El enlace caduca en 30 minutos."
+
+msgid "If an account exists for that email address, we've sent a link to sign in. The link expires in 10 minutes."
+msgstr "Si existe una cuenta con ese correo electrónico, te hemos enviado un enlace para iniciar sesión. El enlace caduca en 10 minutos."
+
+msgid "If checked, password policies will not be enforced on this password."
+msgstr "Si se marca, no se aplicarán las políticas de contraseñas a esta contraseña."
+
+msgid "If checked, this user can be created even when their identifier is on the blocklist, is outside the allowlist, or uses a blocked domain."
+msgstr "Si se marca, el usuario se podrá crear aunque su identificador esté en la lista de bloqueo, fuera de la lista de permitidos o use un dominio bloqueado."
+
+msgid "If you hardcode this value, rotating the signing key will break verification of newly issued tokens immediately — there is no grace period for a static copy the way there is for the JWKS URL above. Prefer fetching the JWKS URL at runtime unless you have a specific reason not to."
+msgstr "Si fijas este valor en tu código, al rotar la clave de firma dejará de verificarse de inmediato la firma de los tokens nuevos: una copia estática no tiene periodo de gracia, a diferencia de la URL de JWKS de arriba. Es preferible consultar la URL de JWKS en tiempo de ejecución, salvo que tengas una razón concreta para no hacerlo."
+
+msgid "Ignore access restrictions"
+msgstr "Ignorar las restricciones de acceso"
+
+msgid "Ignore password policies"
+msgstr "Ignorar las políticas de contraseñas"
+
+msgid "Impersonate user"
+msgstr "Suplantar usuario"
+
+msgid "Impersonation started"
+msgstr "Suplantación iniciada"
+
+msgid "Impersonation token"
+msgstr "Token de suplantación"
+
+msgid "Inactive"
+msgstr "Inactivo"
+
+msgid "Invalid email or password."
+msgstr "Correo electrónico o contraseña no válidos."
+
+msgid "Invalid request"
+msgstr "Solicitud no válida"
+
+msgid "Invalid username or password."
+msgstr "Nombre de usuario o contraseña no válidos."
+
+msgid "IP address"
+msgstr "Dirección IP"
+
+msgid "Isolated groupings of teams, roles and members inside this Organization."
+msgstr "Agrupaciones aisladas de equipos, roles y miembros dentro de esta Organización."
+
+msgid "Isolated tenant with its own accounts, clients, and signing keys."
+msgstr "Tenant aislado con sus propias cuentas, clientes y claves de firma."
+
+msgid "Issuer"
+msgstr "Emisor"
+
+msgid "Its entire delivery history (every past attempt, succeeded or failed)"
+msgstr "Todo su historial de entregas (cada intento pasado, correcto o fallido)"
+
+msgid "Joined"
+msgstr "Se unió"
+
+msgid "Joined <0>{0}</0>"
+msgstr "Se unió el <0>{0}</0>"
+
+msgid "Joined: <0>{0}</0>"
+msgstr "Se unió: <0>{0}</0>"
+
+msgid "JPG, PNG, WebP or GIF, up to 10 MB. A square image works best."
+msgstr "JPG, PNG, WebP o GIF, de hasta 10 MB. Funciona mejor una imagen cuadrada."
+
+msgid "Just now"
+msgstr "Justo ahora"
+
+msgid "JWKS endpoint"
+msgstr "Endpoint JWKS"
+
+msgid "JWKS public key"
+msgstr "Clave pública JWKS"
+
+msgid "JWT (RS256)"
+msgstr "JWT (RS256)"
+
+msgid "Key ID"
+msgstr "ID de clave"
+
+msgid "Keys under your control"
+msgstr "Claves bajo tu control"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Last active"
+msgstr "Última actividad"
+
+msgid "Last attempt"
+msgstr "Último intento"
+
+msgid "Last changed <0>{0}</0>."
+msgstr "Último cambio: <0>{0}</0>."
+
+msgid "Last error"
+msgstr "Último error"
+
+msgid "Last issued"
+msgstr "Última emisión"
+
+msgid "Last name"
+msgstr "Apellidos"
+
+msgid "Last response"
+msgstr "Última respuesta"
+
+msgid "Last seen"
+msgstr "Visto por última vez"
+
+msgid "Last sign-in <0>{0}</0>"
+msgstr "Último inicio de sesión: <0>{0}</0>"
+
+msgid "Last signed in"
+msgstr "Último inicio de sesión"
+
+msgid "Last signed in: <0>{0}</0>"
+msgstr "Último inicio de sesión: <0>{0}</0>"
+
+msgid "Last used"
+msgstr "Último uso"
+
+msgid "Leave blank for every scope this Client is allowed"
+msgstr "Déjalo en blanco para usar todos los ámbitos permitidos a este cliente"
+
+msgid "Less"
+msgstr "Menos"
+
+msgid "Link invalid — Clavaris"
+msgstr "Enlace no válido — Clavaris"
+
+msgid "Linked"
+msgstr "Vinculada"
+
+msgid "Live sessions currently signed in to this Account."
+msgstr "Sesiones activas en este momento en esta cuenta."
+
+msgid "Loading…"
+msgstr "Cargando…"
+
+msgid "Local number"
+msgstr "Número local"
+
+msgid "Local phone number"
+msgstr "Número de teléfono local"
+
+msgid "Lock account"
+msgstr "Bloquear cuenta"
+
+msgid "Lock this account"
+msgstr "Bloquear esta cuenta"
+
+msgid "Lock this account — Clavaris"
+msgstr "Bloquear esta cuenta — Clavaris"
+
+msgid "Lock this account?"
+msgstr "¿Bloquear esta cuenta?"
+
+msgid "Logout endpoint"
+msgstr "Endpoint de cierre de sesión"
+
+msgid "Logs"
+msgstr "Registros"
+
+msgid "Logs pages"
+msgstr "Páginas de registros"
+
+msgid "Longest streak"
+msgstr "Racha más larga"
+
+msgid "Manage"
+msgstr "Gestionar"
+
+msgid "Manage account"
+msgstr "Gestionar cuenta"
+
+msgid "Manage account — Clavaris"
+msgstr "Gestionar cuenta — Clavaris"
+
+msgid "Manage sessions"
+msgstr "Gestionar sesiones"
+
+msgid "Manage your account info."
+msgstr "Gestiona la información de tu cuenta."
+
+msgid "Member"
+msgstr "Miembro"
+
+msgid "Member added to a workspace"
+msgstr "Miembro añadido a un espacio de trabajo"
+
+msgid "Member removed from a workspace"
+msgstr "Miembro quitado de un espacio de trabajo"
+
+msgid "Member's role changed"
+msgstr "Rol del miembro modificado"
+
+msgid "Metadata"
+msgstr "Metadatos"
+
+msgid "Metadata was updated."
+msgstr "Se actualizaron los metadatos."
+
+msgid "Missing action link token"
+msgstr "Falta el token del enlace de acción"
+
+msgid "Missing reset token"
+msgstr "Falta el token de restablecimiento"
+
+msgid "Missing sign-in link token"
+msgstr "Falta el token del enlace de inicio de sesión"
+
+msgid "Mon"
+msgstr "lun"
+
+msgid "Month"
+msgstr "Mes"
+
+msgid "Monthly totals"
+msgstr "Totales mensuales"
+
+msgid "More"
+msgstr "Más"
+
+msgid "Most OIDC client libraries only need the <0>issuer</0> (or discovery URL), <1>client ID</1>, and the client secret above — they fetch every other endpoint themselves from the discovery document."
+msgstr "La mayoría de las bibliotecas cliente de OIDC solo necesitan el <0>emisor</0> (o la URL de descubrimiento), el <1>ID de cliente</1> y el secreto de cliente de arriba; el resto de endpoints los obtienen ellas mismas del documento de descubrimiento."
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "Name (optional)"
+msgstr "Nombre (opcional)"
+
+msgid "Name error"
+msgstr "Error en el nombre"
+
+msgid "Name for the production environment"
+msgstr "Nombre del entorno de producción"
+
+msgid "Name is required"
+msgstr "El nombre es obligatorio"
+
+msgid "Name it and, optionally, put it on one of this Workspace's teams — leave the team as \"No team\" to create it ungrouped. Permissions and parent role can be set afterwards from Configure > Workspace Roles."
+msgstr "Ponle un nombre y, si quieres, asígnalo a uno de los equipos de este espacio de trabajo; deja el equipo en «Sin equipo» para crearlo sin agrupar. Los permisos y el rol padre se pueden definir después desde Configurar > Roles de espacio de trabajo."
+
+msgid "Name must be at most 255 characters"
+msgstr "El nombre debe tener como máximo 255 caracteres"
+
+msgid "Named bundles of opaque, consumer-defined permission strings members can be assigned within any Workspace this Organization owns. Every Organization has one reserved role that keeps its management permissions and cannot be deleted."
+msgstr "Conjuntos con nombre de cadenas de permisos opacas, definidas por tu aplicación, que se pueden asignar a los miembros en cualquier espacio de trabajo de esta Organización. Cada Organización tiene un rol reservado que conserva sus permisos de gestión y no se puede eliminar."
+
+msgid "Never"
+msgstr "Nunca"
+
+msgid "Never customized for this Organization — using the system default below."
+msgstr "Nunca se ha personalizado para esta Organización: se usa el valor predeterminado del sistema indicado abajo."
+
+msgid "New ceiling (requests/minute)"
+msgstr "Nuevo límite (solicitudes/minuto)"
+
+msgid "New Endpoint"
+msgstr "Nuevo endpoint"
+
+msgid "New key"
+msgstr "Clave nueva"
+
+msgid "New password"
+msgstr "Contraseña nueva"
+
+msgid "New role"
+msgstr "Rol nuevo"
+
+msgid "New to Clavaris?"
+msgstr "¿Eres nuevo en Clavaris?"
+
+msgid "New tokens are signed with a fresh key. Tokens signed by the previous key stay valid until they expire."
+msgstr "Los tokens nuevos se firman con una clave nueva. Los firmados con la clave anterior siguen siendo válidos hasta que caduquen."
+
+msgid "New Webhook Endpoint"
+msgstr "Nuevo endpoint de webhook"
+
+msgid "New Webhook Endpoint — Clavaris"
+msgstr "Nuevo endpoint de webhook — Clavaris"
+
+msgid "New workspace"
+msgstr "Nuevo espacio de trabajo"
+
+msgid "New workspace name"
+msgstr "Nombre del nuevo espacio de trabajo"
+
+msgid "New Workspace Role"
+msgstr "Nuevo rol de espacio de trabajo"
+
+msgid "New Workspace Role — Clavaris"
+msgstr "Nuevo rol de espacio de trabajo — Clavaris"
+
+msgid "Next"
+msgstr "Siguiente"
+
+msgid "No"
+msgstr "No"
+
+msgid "No active OAuth grants."
+msgstr "No hay concesiones OAuth activas."
+
+msgid "No active sessions."
+msgstr "No hay sesiones activas."
+
+msgid "No active signing key found for this Organization yet."
+msgstr "Todavía no hay ninguna clave de firma activa para esta Organización."
+
+msgid "No additional permissions are requested."
+msgstr "No se solicitan permisos adicionales."
+
+msgid "No connected accounts. Sign in with Google or GitHub to link one."
+msgstr "No hay cuentas conectadas. Inicia sesión con Google o GitHub para vincular una."
+
+msgid "No deliveries yet for this endpoint."
+msgstr "Todavía no hay entregas para este endpoint."
+
+msgid "No deliveries yet for this Organization."
+msgstr "Todavía no hay entregas para esta Organización."
+
+msgid "No delivery attempts in the last 6 hours."
+msgstr "No ha habido intentos de entrega en las últimas 6 horas."
+
+msgid "No known devices yet."
+msgstr "Todavía no hay dispositivos conocidos."
+
+msgid "No linked social accounts."
+msgstr "No hay cuentas sociales vinculadas."
+
+msgid "No members with this role."
+msgstr "Ningún miembro tiene este rol."
+
+msgid "No OAuth Clients yet — add the first one above."
+msgstr "Todavía no hay clientes OAuth: añade el primero arriba."
+
+msgid "No passkeys registered yet."
+msgstr "Todavía no hay claves de acceso registradas."
+
+msgid "No passkeys registered."
+msgstr "No hay claves de acceso registradas."
+
+msgid "No redirect URI"
+msgstr "Sin URI de redirección"
+
+msgid "No redirect URI configured yet — end-user login (authorization_code) won't work for this client until you add one below. Machine-to-machine calls (client_credentials) already work without one."
+msgstr "Todavía no hay ninguna URI de redirección: el inicio de sesión de usuarios finales (authorization_code) no funcionará con este cliente hasta que añadas una abajo. Las llamadas entre máquinas (client_credentials) ya funcionan sin ella."
+
+msgid "No roles in this team yet."
+msgstr "Todavía no hay roles en este equipo."
+
+msgid "No roles match your search."
+msgstr "Ningún rol coincide con tu búsqueda."
+
+msgid "No roles yet — create the first one below."
+msgstr "Todavía no hay roles: crea el primero abajo."
+
+msgid "No Secret Keys yet — create the first one below."
+msgstr "Todavía no hay claves secretas: crea la primera abajo."
+
+msgid "No sign-ins have been recorded for this user in the last 365 days."
+msgstr "No se ha registrado ningún inicio de sesión de este usuario en los últimos 365 días."
+
+msgid "No sign-ins on {0}"
+msgstr "Sin inicios de sesión el {0}"
+
+msgid "No signing keys found for this Organization."
+msgstr "No se encontraron claves de firma para esta Organización."
+
+msgid "No team"
+msgstr "Sin equipo"
+
+msgid "No teams match your search."
+msgstr "Ningún equipo coincide con tu búsqueda."
+
+msgid "No teams or roles yet."
+msgstr "Todavía no hay equipos ni roles."
+
+msgid "No teams yet — add the first one above."
+msgstr "Todavía no hay equipos: añade el primero arriba."
+
+msgid "No users yet — create the first one above."
+msgstr "Todavía no hay usuarios: crea el primero arriba."
+
+msgid "No webhook endpoints yet — register the first one."
+msgstr "Todavía no hay endpoints de webhook: registra el primero."
+
+msgid "No workspace roles yet."
+msgstr "Todavía no hay roles de espacio de trabajo."
+
+msgid "No workspaces yet — use “New workspace” above to create the first one."
+msgstr "Todavía no hay espacios de trabajo: usa «Nuevo espacio de trabajo» arriba para crear el primero."
+
+msgid "None"
+msgstr "Ninguno"
+
+msgid "Not set up yet"
+msgstr "Aún sin configurar"
+
+msgid "Not validated or protected — never trust its contents for an authorization decision."
+msgstr "Ni validados ni protegidos: nunca te fíes de su contenido para tomar una decisión de autorización."
+
+msgid "Not verified"
+msgstr "Sin verificar"
+
+msgid "Nothing has been changed for this user yet. Profile edits, locks, password resets and similar actions will appear here."
+msgstr "Todavía no se ha cambiado nada de este usuario. Aquí aparecerán las ediciones del perfil, los bloqueos, los restablecimientos de contraseña y acciones similares."
+
+msgid "Nothing has been changed in this Organization yet. Changes to its settings, keys, clients, webhooks and workspaces will appear here."
+msgstr "Todavía no se ha cambiado nada en esta Organización. Aquí aparecerán los cambios en su configuración, claves, clientes, webhooks y espacios de trabajo."
+
+msgid "OAuth"
+msgstr "OAuth"
+
+msgid "OAuth Client"
+msgstr "Cliente OAuth"
+
+msgid "OAuth Client created"
+msgstr "Cliente OAuth creado"
+
+msgid "OAuth Client deactivated"
+msgstr "Cliente OAuth desactivado"
+
+msgid "OAuth Client deleted"
+msgstr "Cliente OAuth eliminado"
+
+msgid "OAuth Client reactivated"
+msgstr "Cliente OAuth reactivado"
+
+msgid "OAuth Client secret rotated"
+msgstr "Secreto del cliente OAuth rotado"
+
+msgid "OAuth Client — Clavaris"
+msgstr "Cliente OAuth — Clavaris"
+
+msgid "OAuth Clients"
+msgstr "Clientes OAuth"
+
+msgid "OAuth Clients pages"
+msgstr "Páginas de clientes OAuth"
+
+msgid "OAuth Clients — Clavaris"
+msgstr "Clientes OAuth — Clavaris"
+
+msgid "OIDC ready"
+msgstr "Compatible con OIDC"
+
+msgid "One permission per line, e.g.&#10;jobseeker:candidates:review&#10;jobseeker:interviews:schedule"
+msgstr "Un permiso por línea, p. ej.&#10;jobseeker:candidates:review&#10;jobseeker:interviews:schedule"
+
+msgid "One uptime target for every deployment, not a number that improves the more you pay."
+msgstr "Un único objetivo de disponibilidad para todos los despliegues, no una cifra que mejora cuanto más pagas."
+
+msgid "Open"
+msgstr "Abrir"
+
+msgid "Open account menu"
+msgstr "Abrir el menú de la cuenta"
+
+msgid "Open actions menu for this user"
+msgstr "Abrir el menú de acciones de este usuario"
+
+msgid "Operator ({0})"
+msgstr "Operador ({0})"
+
+msgid "Operator credential deactivated"
+msgstr "Credencial de operador desactivada"
+
+msgid "Operator credential rotated"
+msgstr "Credencial de operador rotada"
+
+msgid "Operator credential secret rotated"
+msgstr "Secreto de la credencial de operador rotado"
+
+msgid "Or"
+msgstr "O"
+
+msgid "Organization"
+msgstr "Organización"
+
+msgid "Organization created"
+msgstr "Organización creada"
+
+msgid "Organization deleted"
+msgstr "Organización eliminada"
+
+msgid "Organization settings"
+msgstr "Configuración de la Organización"
+
+msgid "Organization — Clavaris"
+msgstr "Organización — Clavaris"
+
+msgid "Organizations"
+msgstr "Organizaciones"
+
+msgid "Organizations pages"
+msgstr "Páginas de Organizaciones"
+
+msgid "Other"
+msgstr "Otros"
+
+msgid "Page 1"
+msgstr "Página 1"
+
+msgid "Parent"
+msgstr "Padre"
+
+msgid "Parent role (optional)"
+msgstr "Rol padre (opcional)"
+
+msgid "Passkey removed"
+msgstr "Clave de acceso eliminada"
+
+msgid "Passkeys"
+msgstr "Claves de acceso"
+
+msgid "Passkeys let you sign in without typing a password, using your device's own screen lock, fingerprint, or a hardware security key."
+msgstr "Las claves de acceso te permiten iniciar sesión sin escribir una contraseña, usando el bloqueo de pantalla de tu dispositivo, tu huella digital o una llave de seguridad física."
+
+msgid "Password"
+msgstr "Contraseña"
+
+msgid "Password does not meet the minimum requirements"
+msgstr "La contraseña no cumple los requisitos mínimos"
+
+msgid "Password error"
+msgstr "Error en la contraseña"
+
+msgid "Password is required"
+msgstr "La contraseña es obligatoria"
+
+msgid "Password must be between 8 and 128 characters"
+msgstr "La contraseña debe tener entre 8 y 128 caracteres"
+
+msgid "Password reset"
+msgstr "Contraseña restablecida"
+
+msgid "Password reset required"
+msgstr "Restablecimiento de contraseña exigido"
+
+msgid "Password reset — Clavaris"
+msgstr "Contraseña restablecida — Clavaris"
+
+msgid "Passwords do not match"
+msgstr "Las contraseñas no coinciden"
+
+msgid "PEM · public key"
+msgstr "PEM · clave pública"
+
+msgid "PENDING"
+msgstr "PENDIENTE"
+
+msgid "Permanently delete this Organization and its entire owned account pool. This cannot be undone."
+msgstr "Elimina permanentemente esta Organización y todas sus cuentas. No se puede deshacer."
+
+msgid "Permanently deletes <0>{0}</0> — this cannot be undone. Every session and token is revoked immediately."
+msgstr "Elimina permanentemente <0>{0}</0>; no se puede deshacer. Todas las sesiones y tokens se revocan de inmediato."
+
+msgid "Permanently deletes <0>{0}</0>. Any role grouped only into this team, and not still assigned to anyone, is deleted along with it. This cannot be undone."
+msgstr "Elimina permanentemente <0>{0}</0>. Cualquier rol agrupado solo en este equipo y que no siga asignado a nadie se elimina con él. No se puede deshacer."
+
+msgid "Permanently deletes <0>{0}</0>. This cannot be undone."
+msgstr "Elimina permanentemente <0>{0}</0>. No se puede deshacer."
+
+msgid "Permanently deletes this role. Blocked while any member still holds it — remove it from every member first."
+msgstr "Elimina permanentemente este rol. Se bloquea mientras algún miembro lo tenga: quítaselo a todos primero."
+
+msgid "Permanently deletes your account — this cannot be undone. Every session and token is revoked immediately."
+msgstr "Elimina permanentemente tu cuenta; no se puede deshacer. Todas las sesiones y tokens se revocan de inmediato."
+
+msgid "Permissions"
+msgstr "Permisos"
+
+msgid "Personal information"
+msgstr "Información personal"
+
+msgid "Phone number"
+msgstr "Número de teléfono"
+
+msgid "Phone number: <0>{0}</0>"
+msgstr "Número de teléfono: <0>{0}</0>"
+
+msgid "Pick the country, then type the number without its country code."
+msgstr "Elige el país y escribe el número sin el prefijo del país."
+
+msgid "Platform"
+msgstr "Plataforma"
+
+msgid "Platform account"
+msgstr "Cuenta de la plataforma"
+
+msgid "Platform account suspended"
+msgstr "Cuenta de la plataforma suspendida"
+
+msgid "Platform console"
+msgstr "Consola de la plataforma"
+
+msgid "Platform profile picture removed"
+msgstr "Foto de perfil de la plataforma eliminada"
+
+msgid "Platform profile picture updated"
+msgstr "Foto de perfil de la plataforma actualizada"
+
+msgid "Platform session revoked"
+msgstr "Sesión de la plataforma revocada"
+
+msgid "Platform sign-in from a new device"
+msgstr "Inicio de sesión en la plataforma desde un dispositivo nuevo"
+
+msgid "Please confirm your password"
+msgstr "Confirma tu contraseña"
+
+msgid "Please verify your email address before signing in."
+msgstr "Verifica tu correo electrónico antes de iniciar sesión."
+
+msgid "Post-logout redirect URIs (optional)"
+msgstr "URI de redirección tras cerrar sesión (opcional)"
+
+msgid "Previous"
+msgstr "Anterior"
+
+msgid "Previous key"
+msgstr "Clave anterior"
+
+msgid "Previous role"
+msgstr "Rol anterior"
+
+msgid "Primary"
+msgstr "Principal"
+
+msgid "Private metadata"
+msgstr "Metadatos privados"
+
+msgid "PRODUCTION"
+msgstr "PRODUCCIÓN"
+
+msgid "Production environment created"
+msgstr "Entorno de producción creado"
+
+msgid "Profile"
+msgstr "Perfil"
+
+msgid "Profile details"
+msgstr "Datos del perfil"
+
+msgid "Profile picture"
+msgstr "Foto de perfil"
+
+msgid "Profile picture removed"
+msgstr "Foto de perfil eliminada"
+
+msgid "Profile picture updated"
+msgstr "Foto de perfil actualizada"
+
+msgid "Profile picture was removed."
+msgstr "Se eliminó la foto de perfil."
+
+msgid "Profile picture was updated."
+msgstr "Se actualizó la foto de perfil."
+
+msgid "Profile was updated."
+msgstr "Se actualizó el perfil."
+
+msgid "Profile — Clavaris"
+msgstr "Perfil — Clavaris"
+
+msgid "Promote this development Organization by creating a paired production Organization."
+msgstr "Promueve esta Organización de desarrollo creando una Organización de producción vinculada."
+
+msgid "Promote to Production"
+msgstr "Promover a producción"
+
+msgid "Promote to Production — Clavaris"
+msgstr "Promover a producción — Clavaris"
+
+msgid "Provider"
+msgstr "Proveedor"
+
+msgid "Provider user ID"
+msgstr "ID de usuario del proveedor"
+
+msgid "Providers"
+msgstr "Proveedores"
+
+msgid "Public metadata"
+msgstr "Metadatos públicos"
+
+msgid "Purged key"
+msgstr "Clave purgada"
+
+msgid "Rate Limit"
+msgstr "Límite de solicitudes"
+
+msgid "Rate limit changed"
+msgstr "Límite de solicitudes modificado"
+
+msgid "Rate Limit — Clavaris"
+msgstr "Límite de solicitudes — Clavaris"
+
+msgid "Reactivate"
+msgstr "Reactivar"
+
+msgid "Read this carefully before confirming."
+msgstr "Lee esto con atención antes de confirmar."
+
+msgid "Readable by anyone who can read this Account — never a place for secrets."
+msgstr "Visibles para cualquiera que pueda ver esta cuenta; nunca son un lugar para secretos."
+
+msgid "Real tenant isolation"
+msgstr "Aislamiento real por tenant"
+
+msgid "Reason"
+msgstr "Motivo"
+
+msgid "Recent activity"
+msgstr "Actividad reciente"
+
+msgid "Recent delivery attempts for <0>{0}</0> . Deliveries that have finished (Succeeded or Exhausted) can be replayed; a replay is queued and retried like any other delivery."
+msgstr "Intentos de entrega recientes de <0>{0}</0>. Las entregas que han terminado (correctas o agotadas) se pueden reenviar; el reenvío se pone en cola y se reintenta como cualquier otra entrega."
+
+msgid "Recognized devices (Device Trust history)."
+msgstr "Dispositivos reconocidos (historial de confianza del dispositivo)."
+
+msgid "Redirect policy changed"
+msgstr "Política de redirección modificada"
+
+msgid "Redirect settings"
+msgstr "Configuración de redirección"
+
+msgid "Redirect URIs"
+msgstr "URI de redirección"
+
+msgid "Redirect URIs changed"
+msgstr "URI de redirección modificadas"
+
+msgid "Register a new passkey"
+msgstr "Registrar una clave de acceso nueva"
+
+msgid "Register endpoint"
+msgstr "Registrar endpoint"
+
+msgid "Registration approved"
+msgstr "Registro aprobado"
+
+msgid "Registration pending approval — Clavaris"
+msgstr "Registro pendiente de aprobación — Clavaris"
+
+msgid "Registration rejected"
+msgstr "Registro rechazado"
+
+msgid "Reliability is not a paid upgrade"
+msgstr "La fiabilidad no es una mejora de pago"
+
+msgid "Remove"
+msgstr "Quitar"
+
+msgid "Remove from role"
+msgstr "Quitar del rol"
+
+msgid "Remove picture"
+msgstr "Quitar foto"
+
+msgid "Remove the profile picture?"
+msgstr "¿Quitar la foto de perfil?"
+
+msgid "Removes <0>{0}</0> from this role. They keep their account and Workspace membership — only the role is removed. This cannot be undone."
+msgstr "Quita a <0>{0}</0> de este rol. Conserva su cuenta y su pertenencia al espacio de trabajo; solo se quita el rol. No se puede deshacer."
+
+msgid "Rename <0>{0}</0>"
+msgstr "Renombrar <0>{0}</0>"
+
+msgid "Rename team"
+msgstr "Renombrar equipo"
+
+msgid "Replacement key"
+msgstr "Clave de reemplazo"
+
+msgid "Replay"
+msgstr "Reenviar"
+
+msgid "Requests per minute"
+msgstr "Solicitudes por minuto"
+
+msgid "Requests per minute must be a positive number"
+msgstr "Las solicitudes por minuto deben ser un número positivo"
+
+msgid "Requests-per-minute error"
+msgstr "Error en las solicitudes por minuto"
+
+msgid "requests/minute"
+msgstr "solicitudes/minuto"
+
+msgid "Require consent screen"
+msgstr "Exigir pantalla de consentimiento"
+
+msgid "Required"
+msgstr "Obligatoria"
+
+msgid "Reserved"
+msgstr "Reservado"
+
+msgid "Reserved for a <0>confirmed</0> key compromise — unlike rotation above, a purge breaks every currently-valid token signed under the purged key immediately, with no overlap window. This is an operator-only action, not available from this dashboard — contact support if you believe a key has been compromised."
+msgstr "Reservada para un compromiso de clave <0>confirmado</0>: a diferencia de la rotación de arriba, una purga invalida de inmediato todos los tokens vigentes firmados con la clave purgada, sin periodo de solapamiento. Es una acción exclusiva de los operadores y no está disponible desde este panel; contacta con soporte si crees que una clave se ha visto comprometida."
+
+msgid "Reset password"
+msgstr "Restablecer contraseña"
+
+msgid "Reset password — Clavaris"
+msgstr "Restablecer contraseña — Clavaris"
+
+msgid "Retired (in overlap)"
+msgstr "Retirada (en solapamiento)"
+
+msgid "Retired at"
+msgstr "Retirada el"
+
+msgid "RETRYING"
+msgstr "REINTENTANDO"
+
+msgid "Revoke"
+msgstr "Revocar"
+
+msgid "Revoke all"
+msgstr "Revocar todas"
+
+msgid "Revoke all grants?"
+msgstr "¿Revocar todas las concesiones?"
+
+msgid "Revoke this grant?"
+msgstr "¿Revocar esta concesión?"
+
+msgid "Revoke this session?"
+msgstr "¿Revocar esta sesión?"
+
+msgid "Role"
+msgstr "Rol"
+
+msgid "Role added to a team"
+msgstr "Rol añadido a un equipo"
+
+msgid "Role assigned."
+msgstr "Rol asignado."
+
+msgid "Role created"
+msgstr "Rol creado"
+
+msgid "Role deleted"
+msgstr "Rol eliminado"
+
+msgid "Role name"
+msgstr "Nombre del rol"
+
+msgid "Role removed from a team"
+msgstr "Rol quitado de un equipo"
+
+msgid "Role updated"
+msgstr "Rol actualizado"
+
+msgid "Role updated."
+msgstr "Rol actualizado."
+
+msgid "Roles"
+msgstr "Roles"
+
+msgid "Roles pages"
+msgstr "Páginas de roles"
+
+msgid "Rotate now"
+msgstr "Rotar ahora"
+
+msgid "Rotate secret"
+msgstr "Rotar secreto"
+
+msgid "Rotate signing key"
+msgstr "Rotar clave de firma"
+
+msgid "Rotate the signing key?"
+msgstr "¿Rotar la clave de firma?"
+
+msgid "Rotate this secret?"
+msgstr "¿Rotar este secreto?"
+
+msgid "Safe to embed"
+msgstr "Seguro para incrustar"
+
+msgid "Save"
+msgstr "Guardar"
+
+msgid "Save changes"
+msgstr "Guardar cambios"
+
+msgid "Save consent setting"
+msgstr "Guardar ajuste de consentimiento"
+
+msgid "Save description"
+msgstr "Guardar descripción"
+
+msgid "Save event types"
+msgstr "Guardar tipos de evento"
+
+msgid "Save grant types"
+msgstr "Guardar tipos de concesión"
+
+msgid "Save redirect settings"
+msgstr "Guardar configuración de redirección"
+
+msgid "Save scopes"
+msgstr "Guardar ámbitos"
+
+msgid "Save URL"
+msgstr "Guardar URL"
+
+msgid "Scope"
+msgstr "Ámbito"
+
+msgid "Scope: <0>{0}</0>"
+msgstr "Ámbito: <0>{0}</0>"
+
+msgid "Scopes"
+msgstr "Ámbitos"
+
+msgid "Scopes changed"
+msgstr "Ámbitos modificados"
+
+msgid "Scopes error"
+msgstr "Error en los ámbitos"
+
+msgid "Search"
+msgstr "Buscar"
+
+msgid "Search by name, username, or email"
+msgstr "Buscar por nombre, usuario o correo electrónico"
+
+msgid "Search roles by name"
+msgstr "Buscar roles por nombre"
+
+msgid "Search teams by name"
+msgstr "Buscar equipos por nombre"
+
+msgid "Search users"
+msgstr "Buscar usuarios"
+
+msgid "Secret Key"
+msgstr "Clave secreta"
+
+msgid "Secret Key activated"
+msgstr "Clave secreta activada"
+
+msgid "Secret Key created"
+msgstr "Clave secreta creada"
+
+msgid "Secret Key deactivated"
+msgstr "Clave secreta desactivada"
+
+msgid "Secret Key deleted"
+msgstr "Clave secreta eliminada"
+
+msgid "Secret Key's secret rotated"
+msgstr "Secreto de la clave secreta rotado"
+
+msgid "Secret Keys"
+msgstr "Claves secretas"
+
+msgid "Secret Keys pages"
+msgstr "Páginas de claves secretas"
+
+msgid "Secret Keys — Clavaris"
+msgstr "Claves secretas — Clavaris"
+
+msgid "Security"
+msgstr "Seguridad"
+
+msgid "Select at least one event type"
+msgstr "Selecciona al menos un tipo de evento"
+
+msgid "Select at least one event type, or turn on \"All events\"."
+msgstr "Selecciona al menos un tipo de evento o activa «Todos los eventos»."
+
+msgid "Select at least one scope"
+msgstr "Selecciona al menos un ámbito"
+
+msgid "Select one or more roles to add to <0>{0}</0>."
+msgstr "Selecciona uno o más roles para añadir a <0>{0}</0>."
+
+msgid "Self-hosted by design. Every credential, every session, every audit event lives in infrastructure you run — not a third party's cloud."
+msgstr "Autoalojado por diseño. Cada credencial, cada sesión y cada evento de auditoría viven en la infraestructura que tú gestionas, no en la nube de un tercero."
+
+msgid "Self-hosted identity infrastructure"
+msgstr "Infraestructura de identidad autoalojada"
+
+msgid "Send code"
+msgstr "Enviar código"
+
+msgid "Send link"
+msgstr "Enviar enlace"
+
+msgid "Send password reset email"
+msgstr "Enviar correo de restablecimiento de contraseña"
+
+msgid "Send reset link"
+msgstr "Enviar enlace de restablecimiento"
+
+msgid "Sessions"
+msgstr "Sesiones"
+
+msgid "Set a new password"
+msgstr "Establece una contraseña nueva"
+
+msgid "Set a new password — Clavaris"
+msgstr "Establece una contraseña nueva — Clavaris"
+
+msgid "Set password"
+msgstr "Establecer contraseña"
+
+msgid "Set up"
+msgstr "Configurar"
+
+msgid "Settings"
+msgstr "Configuración"
+
+msgid "Settings were updated."
+msgstr "Se actualizó la configuración."
+
+msgid "Showing the 100 most recent events."
+msgstr "Se muestran los 100 eventos más recientes."
+
+msgid "Shown once, at creation, rotation, or reactivation — Clavaris never stores or displays it again. Use \"Rotate secret\" below for a new one."
+msgstr "Se muestra una sola vez, al crearlo, rotarlo o reactivarlo; Clavaris no lo almacena ni lo vuelve a mostrar. Usa «Rotar secreto» abajo para obtener uno nuevo."
+
+msgid "Shown once, at registration or rotation — Clavaris never stores or displays it again. Use \"Rotate secret\" below for a new one."
+msgstr "Se muestra una sola vez, al registrarlo o rotarlo; Clavaris no lo almacena ni lo vuelve a mostrar. Usa «Rotar secreto» abajo para obtener uno nuevo."
+
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
+msgid "Sign in to manage your identity infrastructure."
+msgstr "Inicia sesión para gestionar tu infraestructura de identidad."
+
+msgid "Sign in with"
+msgstr "Iniciar sesión con"
+
+msgid "Sign in with a code"
+msgstr "Iniciar sesión con un código"
+
+msgid "Sign in with a code — Clavaris"
+msgstr "Iniciar sesión con un código — Clavaris"
+
+msgid "Sign in with a link — Clavaris"
+msgstr "Iniciar sesión con un enlace — Clavaris"
+
+msgid "Sign in with a passkey"
+msgstr "Iniciar sesión con una clave de acceso"
+
+msgid "Sign in with a username"
+msgstr "Iniciar sesión con un nombre de usuario"
+
+msgid "Sign in with an email code"
+msgstr "Iniciar sesión con un código por correo"
+
+msgid "Sign in with an email link"
+msgstr "Iniciar sesión con un enlace por correo"
+
+msgid "Sign in with GitHub"
+msgstr "Iniciar sesión con GitHub"
+
+msgid "Sign in with Google"
+msgstr "Iniciar sesión con Google"
+
+msgid "Sign in with username"
+msgstr "Iniciar sesión con nombre de usuario"
+
+msgid "Sign in with username — Clavaris"
+msgstr "Iniciar sesión con nombre de usuario — Clavaris"
+
+msgid "Sign in — Clavaris"
+msgstr "Iniciar sesión — Clavaris"
+
+msgid "Sign out"
+msgstr "Cerrar sesión"
+
+msgid "Sign up with"
+msgstr "Registrarse con"
+
+msgid "Sign up with GitHub"
+msgstr "Registrarse con GitHub"
+
+msgid "Sign up with Google"
+msgstr "Registrarse con Google"
+
+msgid "Sign-in activity over the last 365 days: {0:t}"
+msgstr "Actividad de inicio de sesión de los últimos 365 días: {0}"
+
+msgid "Sign-in from a new device"
+msgstr "Inicio de sesión desde un dispositivo nuevo"
+
+msgid "Sign-in policy changed"
+msgstr "Política de inicio de sesión modificada"
+
+msgid "Sign-ins"
+msgstr "Inicios de sesión"
+
+msgid "Sign-ins over the last 365 days, by UTC day."
+msgstr "Inicios de sesión de los últimos 365 días, por día UTC."
+
+msgid "Signing Key emergency-purged"
+msgstr "Clave de firma purgada de emergencia"
+
+msgid "Signing Key rotated"
+msgstr "Clave de firma rotada"
+
+msgid "Signing Keys"
+msgstr "Claves de firma"
+
+msgid "Signing Keys — Clavaris"
+msgstr "Claves de firma — Clavaris"
+
+msgid "Signing secret"
+msgstr "Secreto de firma"
+
+msgid "Skip to content"
+msgstr "Saltar al contenido"
+
+msgid "Skipped"
+msgstr "Omitida"
+
+msgid "Social accounts"
+msgstr "Cuentas sociales"
+
+msgid "Social login credential removed"
+msgstr "Credencial de inicio de sesión social eliminada"
+
+msgid "Social login credential saved"
+msgstr "Credencial de inicio de sesión social guardada"
+
+msgid "Social login settings changed"
+msgstr "Ajustes de inicio de sesión social modificados"
+
+msgid "Something went wrong signing in — please try again."
+msgstr "Algo salió mal al iniciar sesión; inténtalo de nuevo."
+
+msgid "Space-separated. Leave blank to use every scope this Client is allowed."
+msgstr "Separados por espacios. Déjalo en blanco para usar todos los ámbitos que este cliente tiene permitidos."
+
+msgid "Standard OIDC/OAuth2 only. Integrate with any compliant library, in any language, in under a day — nothing proprietary to migrate away from later."
+msgstr "Solo OIDC/OAuth2 estándar. Intégralo con cualquier biblioteca compatible, en cualquier lenguaje, en menos de un día; sin nada propietario de lo que tengas que migrar después."
+
+msgid "Start with identity infrastructure you control."
+msgstr "Empieza con una infraestructura de identidad que controlas."
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "Status: <0>{0}</0>"
+msgstr "Estado: <0>{0}</0>"
+
+msgid "Subscribe to events"
+msgstr "Suscribirse a eventos"
+
+msgid "Subscribed to"
+msgstr "Suscrito a"
+
+msgid "Succeeded"
+msgstr "Correcta"
+
+msgid "SUCCEEDED"
+msgstr "CORRECTA"
+
+msgid "Successful attempts"
+msgstr "Intentos correctos"
+
+msgid "SUSPENDED"
+msgstr "SUSPENDIDO"
+
+msgid "System default"
+msgstr "Valor predeterminado del sistema"
+
+msgid "Target"
+msgstr "Destino"
+
+msgid "Team"
+msgstr "Equipo"
+
+msgid "Team created"
+msgstr "Equipo creado"
+
+msgid "Team deleted"
+msgstr "Equipo eliminado"
+
+msgid "Team error"
+msgstr "Error en el equipo"
+
+msgid "Team hierarchy"
+msgstr "Jerarquía de equipos"
+
+msgid "Team members pages"
+msgstr "Páginas de miembros del equipo"
+
+msgid "Team name"
+msgstr "Nombre del equipo"
+
+msgid "Team renamed"
+msgstr "Equipo renombrado"
+
+msgid "Teams"
+msgstr "Equipos"
+
+msgid "Teams & Roles"
+msgstr "Equipos y roles"
+
+msgid "Teams pages"
+msgstr "Páginas de equipos"
+
+msgid "Technical details"
+msgstr "Detalles técnicos"
+
+msgid "Tenant isolated"
+msgstr "Aislado por tenant"
+
+msgid "Thanks for signing up with <0>{0}</0>. Your registration needs to be approved before you can sign in — you'll be notified once a decision has been made."
+msgstr "Gracias por registrarte con <0>{0}</0>. Tu registro debe ser aprobado antes de que puedas iniciar sesión; te avisaremos cuando se tome una decisión."
+
+msgid "Thanks for signing up. Your registration needs to be approved before you can sign in — you'll be notified once a decision has been made."
+msgstr "Gracias por registrarte. Tu registro debe ser aprobado antes de que puedas iniciar sesión; te avisaremos cuando se tome una decisión."
+
+msgid "That code is invalid or has expired."
+msgstr "Ese código no es válido o ha caducado."
+
+msgid "That confirmation expired or was already used — a fresh one has been issued below. Please confirm again."
+msgstr "Esa confirmación caducó o ya se usó; abajo hay una nueva. Confirma de nuevo."
+
+msgid "That delivery is still being retried automatically, so it can't be replayed yet."
+msgstr "Esa entrega se sigue reintentando automáticamente, así que todavía no se puede reenviar."
+
+msgid "That doesn't match the account's current email."
+msgstr "No coincide con el correo electrónico actual de la cuenta."
+
+msgid "That doesn't match the Workspace's current name."
+msgstr "No coincide con el nombre actual del espacio de trabajo."
+
+msgid "That OAuth Client isn't registered for this Organization."
+msgstr "Ese cliente OAuth no está registrado en esta Organización."
+
+msgid "That parent role would create a cycle — a role can never descend from itself."
+msgstr "Ese rol padre crearía un ciclo: un rol nunca puede descender de sí mismo."
+
+msgid "That role already belongs to a different team in this Workspace — remove it from that team first."
+msgstr "Ese rol ya pertenece a otro equipo de este espacio de trabajo; quítalo primero de ese equipo."
+
+msgid "That role is still assigned to at least one member — reassign or unassign them first."
+msgstr "Ese rol sigue asignado al menos a un miembro; reasígnalos o quítaselo primero."
+
+msgid "That role is still the parent of at least one other role — re-parent or clear them first."
+msgstr "Ese rol sigue siendo el padre de al menos otro rol; cambia o quita primero su rol padre."
+
+msgid "That URL isn't safe to deliver webhooks to (it resolves to a private, loopback, or otherwise internal network address)."
+msgstr "Esa URL no es segura para entregar webhooks (resuelve a una dirección de red privada, de bucle local o interna)."
+
+msgid "That value exceeds the system-wide maximum of <0>{0}</0> requests/minute."
+msgstr "Ese valor supera el máximo del sistema de <0>{0}</0> solicitudes/minuto."
+
+msgid "That would leave nobody able to manage members or roles in this Workspace. To go ahead anyway, type \"unassign\" in the field that replaces the Delete button below."
+msgstr "Eso dejaría a nadie con capacidad para gestionar miembros o roles en este espacio de trabajo. Para continuar de todos modos, escribe «unassign» en el campo que sustituye al botón Eliminar de abajo."
+
+msgid "That would leave nobody able to manage members or roles in this Workspace. To go ahead anyway, type \"unassign\" in the field that replaces their Remove button below."
+msgstr "Eso dejaría a nadie con capacidad para gestionar miembros o roles en este espacio de trabajo. Para continuar de todos modos, escribe «unassign» en el campo que sustituye a su botón Quitar de abajo."
+
+msgid "The account holder resets their own password — an operator never sets one directly."
+msgstr "El titular de la cuenta restablece su propia contraseña; un operador nunca la establece directamente."
+
+msgid "The application loses access to this account."
+msgstr "La aplicación pierde el acceso a esta cuenta."
+
+msgid "The client itself and its credentials — no application will ever be able to authenticate with this Client ID again"
+msgstr "El propio cliente y sus credenciales; ninguna aplicación podrá volver a autenticarse con este ID de cliente"
+
+msgid "The client itself and its credentials — no consuming application will ever be able to authenticate with this Client ID again"
+msgstr "El propio cliente y sus credenciales; ninguna aplicación podrá volver a autenticarse con este ID de cliente"
+
+msgid "The credentials your application uses to call the management API on this Organization's behalf. Each secret is shown once, at creation or rotation — Clavaris never stores or displays it again."
+msgstr "Las credenciales que tu aplicación usa para llamar a la API de gestión en nombre de esta Organización. Cada secreto se muestra una sola vez, al crearlo o rotarlo; Clavaris no lo almacena ni lo vuelve a mostrar."
+
+msgid "The current secret stops working immediately. The new secret is shown only once."
+msgstr "El secreto actual deja de funcionar de inmediato. El secreto nuevo se muestra una sola vez."
+
+msgid "The device is signed out immediately."
+msgstr "El dispositivo cierra sesión de inmediato."
+
+msgid "The endpoint itself and its signing secret — no future event will ever be delivered to this URL again"
+msgstr "El propio endpoint y su secreto de firma; no se volverá a entregar ningún evento a esta URL"
+
+msgid "The following permissions are requested:"
+msgstr "Se solicitan los siguientes permisos:"
+
+msgid "The identifiers and endpoints a consuming application needs to connect to this Organization — its own tenant issuer, the shared token endpoint, and the JWKS document/public key used to verify tokens it issues."
+msgstr "Los identificadores y endpoints que una aplicación necesita para conectarse a esta Organización: su emisor de tenant propio, el endpoint de tokens compartido y el documento JWKS o la clave pública con que se verifican los tokens que emite."
+
+msgid "The identifiers and endpoints your application needs to connect to this Organization: its issuer, the shared token endpoint, and the JWKS document and public key used to verify the tokens it issues."
+msgstr "Los identificadores y endpoints que tu aplicación necesita para conectarse a esta Organización: su emisor, el endpoint de tokens compartido y el documento JWKS y la clave pública con que se verifican los tokens que emite."
+
+msgid "The link you followed is no longer valid — it may have already been used, or it may have expired. Request a new one and try again."
+msgstr "El enlace que seguiste ya no es válido: puede que ya se haya usado o que haya caducado. Solicita uno nuevo e inténtalo de nuevo."
+
+msgid "The link you followed is no longer valid — it may have already been used, or it may have expired. Try signing in with that provider again."
+msgstr "El enlace que seguiste ya no es válido: puede que ya se haya usado o que haya caducado. Intenta iniciar sesión de nuevo con ese proveedor."
+
+msgid "The login clients your application uses to sign in this Organization's end users. Every client is created with the same fixed grant types, scopes and consent setting; you only configure its redirect URIs, from its detail page. To call the management API, use a Secret Key instead."
+msgstr "Los clientes de inicio de sesión que tu aplicación usa para autenticar a los usuarios finales de esta Organización. Todos los clientes se crean con los mismos tipos de concesión, ámbitos y ajuste de consentimiento fijos; solo configuras sus URI de redirección, desde su página de detalle. Para llamar a la API de gestión, usa una clave secreta."
+
+msgid "The name you typed didn't match — a fresh confirmation has been issued below. Please try again."
+msgstr "El nombre que escribiste no coincide; abajo hay una nueva confirmación. Inténtalo de nuevo."
+
+msgid "The per-minute request limit for this Organization's issuer. It stops one tenant from affecting the others, and is separate from the fixed anti-abuse limits every tenant shares."
+msgstr "El límite de solicitudes por minuto del emisor de esta Organización. Evita que un tenant afecte a los demás y es independiente de los límites antiabuso fijos que comparten todos los tenants."
+
+msgid "The RS256 key pair this Organization signs its tokens with. Rotating retires the current key and activates a new one; the retired key stays in the JWKS for the configured overlap window, so tokens already issued keep verifying until they expire."
+msgstr "El par de claves RS256 con el que esta Organización firma sus tokens. Al rotar, la clave actual se retira y se activa una nueva; la clave retirada permanece en el JWKS durante el periodo de solapamiento configurado, de modo que los tokens ya emitidos siguen verificándose hasta que caduquen."
+
+msgid "The uploaded file exceeds the 10MB limit"
+msgstr "El archivo subido supera el límite de 10 MB"
+
+msgid "The uploaded file is empty"
+msgstr "El archivo subido está vacío"
+
+msgid "The URLs your application receives event deliveries at. Each delivery is signed with its endpoint's secret, shown once at registration or rotation."
+msgstr "Las URL en las que tu aplicación recibe las entregas de eventos. Cada entrega se firma con el secreto de su endpoint, que se muestra una sola vez al registrarlo o rotarlo."
+
+msgid "The user cannot sign in until the account is unlocked."
+msgstr "El usuario no puede iniciar sesión hasta que se desbloquee la cuenta."
+
+msgid "The user is blocked from signing in until the ban is lifted."
+msgstr "El usuario no puede iniciar sesión hasta que se levante el bloqueo."
+
+msgid "These are the devices and browsers currently signed in to your account. If you don't recognize one, sign it out."
+msgstr "Estos son los dispositivos y navegadores con sesión iniciada en tu cuenta. Si no reconoces alguno, cierra su sesión."
+
+msgid "These are the devices and browsers currently signed in to your Clavaris operator account. If you don't recognize one, sign it out."
+msgstr "Estos son los dispositivos y navegadores con sesión iniciada en tu cuenta de operador de Clavaris. Si no reconoces alguno, cierra su sesión."
+
+msgid "This account already has a role in this Workspace. First use Remove on their current role."
+msgstr "Esta cuenta ya tiene un rol en este espacio de trabajo. Primero usa Quitar en su rol actual."
+
+msgid "This account goes back to its initials until a new picture is uploaded."
+msgstr "Esta cuenta vuelve a mostrar sus iniciales hasta que se suba una foto nueva."
+
+msgid "This account has been locked and signed out of every active session. Contact support to restore access."
+msgstr "Esta cuenta se ha bloqueado y se ha cerrado su sesión en todos los dispositivos. Contacta con soporte para recuperar el acceso."
+
+msgid "This Account is not ACTIVE and cannot be impersonated."
+msgstr "Esta cuenta no está ACTIVA y no se puede suplantar."
+
+msgid "This browser doesn't support passkeys."
+msgstr "Este navegador no admite claves de acceso."
+
+msgid "This client is inactive — configuration can't be edited until you reactivate it above."
+msgstr "Este cliente está inactivo: la configuración no se puede editar hasta que lo reactives arriba."
+
+msgid "This client is inactive — reactivate it above to get an updated client secret."
+msgstr "Este cliente está inactivo: reactívalo arriba para obtener un secreto de cliente actualizado."
+
+msgid "This client is inactive — redirect settings can't be edited until you reactivate it above."
+msgstr "Este cliente está inactivo: la configuración de redirección no se puede editar hasta que lo reactives arriba."
+
+msgid "This client is inactive — these setup values won't work until you reactivate it above."
+msgstr "Este cliente está inactivo: estos valores de configuración no funcionarán hasta que lo reactives arriba."
+
+msgid "This device"
+msgstr "Este dispositivo"
+
+msgid "This email is already registered"
+msgstr "Este correo electrónico ya está registrado"
+
+msgid "This email is not allowed to register"
+msgstr "Este correo electrónico no puede registrarse"
+
+msgid "This email is not allowed to register for this Organization"
+msgstr "Este correo electrónico no puede registrarse en esta Organización"
+
+msgid "This group has no roles yet."
+msgstr "Este grupo todavía no tiene roles."
+
+msgid "This link is invalid or has expired"
+msgstr "Este enlace no es válido o ha caducado"
+
+msgid "This link is invalid or has expired. Please restart the sign-in process from the application you were trying to access."
+msgstr "Este enlace no es válido o ha caducado. Reinicia el proceso de inicio de sesión desde la aplicación a la que intentabas acceder."
+
+msgid "This OAuthClient is inactive."
+msgstr "Este cliente OAuth está inactivo."
+
+msgid "This Organization can't be promoted right now — it's either not a DEVELOPMENT environment, or it already has a linked production environment."
+msgstr "Esta Organización no se puede promover ahora: no es un entorno de DESARROLLO o ya tiene un entorno de producción vinculado."
+
+msgid "This Organization can't be promoted to production — it's either already a PRODUCTION environment, or it already has a linked one."
+msgstr "Esta Organización no se puede promover a producción: ya es un entorno de PRODUCCIÓN o ya tiene uno vinculado."
+
+msgid "This Organization has already registered the maximum number of webhook endpoints. Deactivating one doesn't free up a slot — contact support if you need the limit raised."
+msgstr "Esta Organización ya ha registrado el número máximo de endpoints de webhook. Desactivar uno no libera un hueco; contacta con soporte si necesitas ampliar el límite."
+
+msgid "This Organization has no Workspaces yet."
+msgstr "Esta Organización todavía no tiene espacios de trabajo."
+
+msgid "This Organization is paired with a linked environment — that Organization will be unlinked, but not deleted, and will remain fully intact on its own."
+msgstr "Esta Organización está vinculada a otro entorno: esa Organización se desvinculará, pero no se eliminará y seguirá intacta por sí sola."
+
+msgid "This Organization's active signing key, PEM-encoded. Paste it into a backend or edge environment to verify JWTs without fetching the JWKS URL at runtime. Rotate it on the Signing Keys page."
+msgstr "La clave de firma activa de esta Organización, codificada en PEM. Pégala en un backend o entorno edge para verificar JWT sin consultar la URL del JWKS en tiempo de ejecución. Rótala en la página de claves de firma."
+
+msgid "This Organization's reserved role always keeps its management permissions, so they can't be removed."
+msgstr "El rol reservado de esta Organización conserva siempre sus permisos de gestión, por lo que no se pueden quitar."
+
+msgid "This password cannot be used — please choose a different one"
+msgstr "Esta contraseña no se puede usar; elige otra"
+
+msgid "This permanently deletes <0>{0}</0> and revokes any token it issued. This cannot be undone."
+msgstr "Esto elimina permanentemente <0>{0}</0> y revoca cualquier token que haya emitido. No se puede deshacer."
+
+msgid "This role is still assigned to at least one member — reassign or unassign them first (a member can be left without a role)."
+msgstr "Este rol sigue asignado al menos a un miembro; reasígnalos o quítaselo primero (un miembro puede quedarse sin rol)."
+
+msgid "This role is still the parent of at least one other role — re-parent or clear those roles' parent first."
+msgstr "Este rol sigue siendo el padre de al menos otro rol; cambia o quita primero el rol padre de esos roles."
+
+msgid "This token will not be shown again — copy it now."
+msgstr "Este token no se volverá a mostrar: cópialo ahora."
+
+msgid "This user"
+msgstr "Este usuario"
+
+msgid "This user last signed in on <0>{0}</0>, but no sign-in history is recorded for the last 365 days."
+msgstr "Este usuario inició sesión por última vez el <0>{0}</0>, pero no hay historial de inicios de sesión de los últimos 365 días."
+
+msgid "This username is already taken"
+msgstr "Este nombre de usuario ya está en uso"
+
+msgid "This wasn't me — lock the account"
+msgstr "No fui yo: bloquear la cuenta"
+
+msgid "This will permanently delete <0>{0}</0> — every team, role grouping, and member's role assignment in it. This cannot be undone."
+msgstr "Esto elimina permanentemente <0>{0}</0>: todos sus equipos, agrupaciones de roles y asignaciones de rol de miembros. No se puede deshacer."
+
+msgid "This Workspace has no roles yet."
+msgstr "Este espacio de trabajo todavía no tiene roles."
+
+msgid "This would leave the Workspace with nobody able to manage its members — assign another member first."
+msgstr "Esto dejaría el espacio de trabajo sin nadie que pueda gestionar a sus miembros; asigna primero a otro miembro."
+
+msgid "Token endpoint"
+msgstr "Endpoint de tokens"
+
+msgid "Type \"unassign\" to confirm"
+msgstr "Escribe «unassign» para confirmar"
+
+msgid "Type <0>delete</0> or the Client ID (<1>{0}</1>) to confirm"
+msgstr "Escribe <0>delete</0> o el ID de cliente (<1>{0}</1>) para confirmar"
+
+msgid "Type <0>delete</0> to confirm"
+msgstr "Escribe <0>delete</0> para confirmar"
+
+msgid "Type <0>{0}</0> to confirm"
+msgstr "Escribe <0>{0}</0> para confirmar"
+
+msgid "Type: <0>{0}</0>"
+msgstr "Tipo: <0>{0}</0>"
+
+msgid "unassign"
+msgstr "unassign"
+
+msgid "Unban account"
+msgstr "Levantar bloqueo de la cuenta"
+
+msgid "Unknown"
+msgstr "Desconocido"
+
+msgid "Unlock account"
+msgstr "Desbloquear cuenta"
+
+msgid "Unsafe metadata"
+msgstr "Metadatos no seguros"
+
+msgid "Unsupported image type: {0}"
+msgstr "Tipo de imagen no admitido: {0}"
+
+msgid "Up to <0>{0}</0> requests/minute (the system-wide maximum)."
+msgstr "Hasta <0>{0}</0> solicitudes/minuto (el máximo del sistema)."
+
+msgid "Update ceiling"
+msgstr "Actualizar límite"
+
+msgid "Update profile"
+msgstr "Actualizar perfil"
+
+msgid "Update profile — Clavaris"
+msgstr "Actualizar perfil — Clavaris"
+
+msgid "Upload"
+msgstr "Subir"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "URL error"
+msgstr "Error en la URL"
+
+msgid "User"
+msgstr "Usuario"
+
+msgid "User banned"
+msgstr "Usuario bloqueado"
+
+msgid "User deleted"
+msgstr "Usuario eliminado"
+
+msgid "User locked"
+msgstr "Usuario bloqueado temporalmente"
+
+msgid "User metadata updated"
+msgstr "Metadatos del usuario actualizados"
+
+msgid "User permissions"
+msgstr "Permisos del usuario"
+
+msgid "User permissions updated"
+msgstr "Permisos del usuario actualizados"
+
+msgid "User profile updated"
+msgstr "Perfil del usuario actualizado"
+
+msgid "User unbanned"
+msgstr "Bloqueo del usuario levantado"
+
+msgid "User unlocked"
+msgstr "Usuario desbloqueado"
+
+msgid "User's access for an app revoked"
+msgstr "Acceso del usuario a una aplicación revocado"
+
+msgid "User's access for every app revoked"
+msgstr "Acceso del usuario a todas las aplicaciones revocado"
+
+msgid "User's session revoked"
+msgstr "Sesión del usuario revocada"
+
+msgid "Userinfo endpoint"
+msgstr "Endpoint de información de usuario"
+
+msgid "Username"
+msgstr "Nombre de usuario"
+
+msgid "Username error"
+msgstr "Error en el nombre de usuario"
+
+msgid "Username is required"
+msgstr "El nombre de usuario es obligatorio"
+
+msgid "Username must be 3-32 characters (letters, digits, underscore, hyphen only)"
+msgstr "El nombre de usuario debe tener de 3 a 32 caracteres (solo letras, dígitos, guion bajo y guion)"
+
+msgid "Username must be at most 32 characters"
+msgstr "El nombre de usuario debe tener como máximo 32 caracteres"
+
+msgid "Username: <0>{0}</0>"
+msgstr "Nombre de usuario: <0>{0}</0>"
+
+msgid "Users"
+msgstr "Usuarios"
+
+msgid "Users pages"
+msgstr "Páginas de usuarios"
+
+msgid "Users — Clavaris"
+msgstr "Usuarios — Clavaris"
+
+msgid "Verified"
+msgstr "Verificado"
+
+msgid "Verify"
+msgstr "Verificar"
+
+msgid "Verify this device"
+msgstr "Verifica este dispositivo"
+
+msgid "Verify this device — Clavaris"
+msgstr "Verifica este dispositivo — Clavaris"
+
+msgid "View"
+msgstr "Ver"
+
+msgid "View log"
+msgstr "Ver registro"
+
+msgid "View profile"
+msgstr "Ver perfil"
+
+msgid "Visible only to your backend and operators, never to the account holder."
+msgstr "Visibles solo para tu backend y los operadores, nunca para el titular de la cuenta."
+
+msgid "We couldn't send your device sign-in verification code right now — please try again in a moment."
+msgstr "No pudimos enviar ahora el código de verificación del dispositivo; inténtalo de nuevo en un momento."
+
+msgid "We couldn't send your sign-in verification code right now — please try again in a moment."
+msgstr "No pudimos enviar ahora tu código de verificación de inicio de sesión; inténtalo de nuevo en un momento."
+
+msgid "We don't recognize this device. We sent a 6-digit code to your email address. It expires in 10 minutes."
+msgstr "No reconocemos este dispositivo. Enviamos un código de 6 dígitos a tu correo electrónico. Caduca en 10 minutos."
+
+msgid "We sent a 6-digit code to your email address. It expires in 10 minutes."
+msgstr "Enviamos un código de 6 dígitos a tu correo electrónico. Caduca en 10 minutos."
+
+msgid "We'll lock this account and sign it out of every active session immediately. If this was actually you signing in, close this page — no action is needed."
+msgstr "Bloquearemos esta cuenta y cerraremos de inmediato todas sus sesiones activas. Si en realidad fuiste tú quien inició sesión, cierra esta página; no hace falta ninguna acción."
+
+msgid "We're experiencing high sign-in demand right now — please try again in a moment."
+msgstr "Hay mucha demanda de inicios de sesión en este momento; inténtalo de nuevo en un momento."
+
+msgid "Webhook Deliveries"
+msgstr "Entregas de webhooks"
+
+msgid "Webhook Deliveries — Clavaris"
+msgstr "Entregas de webhooks — Clavaris"
+
+msgid "Webhook delivery attempts per hour over the last 6 hours, successes and failures"
+msgstr "Intentos de entrega de webhooks por hora en las últimas 6 horas, correctos y fallidos"
+
+msgid "Webhook delivery replayed"
+msgstr "Entrega de webhook reenviada"
+
+msgid "Webhook description changed"
+msgstr "Descripción del webhook modificada"
+
+msgid "Webhook Endpoint"
+msgstr "Endpoint de webhook"
+
+msgid "Webhook Endpoint activated"
+msgstr "Endpoint de webhook activado"
+
+msgid "Webhook Endpoint created"
+msgstr "Endpoint de webhook creado"
+
+msgid "Webhook Endpoint deactivated"
+msgstr "Endpoint de webhook desactivado"
+
+msgid "Webhook Endpoint deleted"
+msgstr "Endpoint de webhook eliminado"
+
+msgid "Webhook Endpoint — Clavaris"
+msgstr "Endpoint de webhook — Clavaris"
+
+msgid "Webhook Endpoints"
+msgstr "Endpoints de webhook"
+
+msgid "Webhook Endpoints pages"
+msgstr "Páginas de endpoints de webhook"
+
+msgid "Webhook Endpoints — Clavaris"
+msgstr "Endpoints de webhook — Clavaris"
+
+msgid "Webhook event types changed"
+msgstr "Tipos de evento del webhook modificados"
+
+msgid "Webhook Logs — Clavaris"
+msgstr "Registros de webhooks — Clavaris"
+
+msgid "Webhook signing secret rotated"
+msgstr "Secreto de firma del webhook rotado"
+
+msgid "Webhook URL changed"
+msgstr "URL del webhook modificada"
+
+msgid "Webhooks"
+msgstr "Webhooks"
+
+msgid "Wed"
+msgstr "mié"
+
+msgid "Welcome back"
+msgstr "Te damos la bienvenida de nuevo"
+
+msgid "What happened"
+msgstr "Qué ocurrió"
+
+msgid "What you typed didn't match — a fresh confirmation has been issued below. Please try again."
+msgstr "Lo que escribiste no coincide; abajo hay una nueva confirmación. Inténtalo de nuevo."
+
+msgid "When"
+msgstr "Cuándo"
+
+msgid "Whether Clavaris shows the end user a consent screen before issuing an authorization code to this client."
+msgstr "Si Clavaris muestra al usuario final una pantalla de consentimiento antes de emitir un código de autorización a este cliente."
+
+msgid "Who"
+msgstr "Quién"
+
+msgid "Who changed what in this Organization, newest first: settings, Secret Keys, OAuth Clients, Webhook Endpoints, Workspaces and roles, and Signing Keys. End-user sign-in activity is not part of this view."
+msgstr "Quién cambió qué en esta Organización, de lo más reciente a lo más antiguo: configuración, claves secretas, clientes OAuth, endpoints de webhook, espacios de trabajo y roles, y claves de firma. La actividad de inicio de sesión de los usuarios finales no forma parte de esta vista."
+
+msgid "Workspace"
+msgstr "Espacio de trabajo"
+
+msgid "Workspace created"
+msgstr "Espacio de trabajo creado"
+
+msgid "Workspace deleted"
+msgstr "Espacio de trabajo eliminado"
+
+msgid "Workspace Role — Clavaris"
+msgstr "Rol de espacio de trabajo — Clavaris"
+
+msgid "Workspace Roles"
+msgstr "Roles de espacio de trabajo"
+
+msgid "Workspace Roles — Clavaris"
+msgstr "Roles de espacio de trabajo — Clavaris"
+
+msgid "Workspace — Clavaris"
+msgstr "Espacio de trabajo — Clavaris"
+
+msgid "Workspaces"
+msgstr "Espacios de trabajo"
+
+msgid "Workspaces & Roles"
+msgstr "Espacios de trabajo y roles"
+
+msgid "Workspaces pages"
+msgstr "Páginas de espacios de trabajo"
+
+msgid "Yes"
+msgstr "Sí"
+
+msgid "Yesterday"
+msgstr "Ayer"
+
+msgid "You"
+msgstr "Tú"
+
+msgid "You don't have any organizations yet — choose a name to create your first one."
+msgstr "Todavía no tienes ninguna organización: elige un nombre para crear la primera."
+
+msgid "Your account is not allowed to delete itself."
+msgstr "Tu cuenta no puede eliminarse a sí misma."
+
+msgid "Your account was created. We've sent a verification link to <0>{0}</0> — follow it to finish setting up your account."
+msgstr "Se creó tu cuenta. Enviamos un enlace de verificación a <0>{0}</0>; síguelo para terminar de configurarla."
+
+msgid "Your account was created. We've sent a verification link to the email address you registered with — follow it to finish setting up your account."
+msgstr "Se creó tu cuenta. Enviamos un enlace de verificación al correo con el que te registraste; síguelo para terminar de configurarla."
+
+msgid "Your active sessions"
+msgstr "Tus sesiones activas"
+
+msgid "Your administrator requires you to set a new password before you can continue."
+msgstr "Tu administrador exige que establezcas una contraseña nueva antes de continuar."
+
+msgid "Your Clavaris account was created. We've sent a verification link to <0>{0}</0> — follow it to finish setting up your account."
+msgstr "Se creó tu cuenta de Clavaris. Enviamos un enlace de verificación a <0>{0}</0>; síguelo para terminar de configurarla."
+
+msgid "Your Clavaris account was created. We've sent a verification link to the email address you registered with — follow it to finish setting up your account."
+msgstr "Se creó tu cuenta de Clavaris. Enviamos un enlace de verificación al correo con el que te registraste; síguelo para terminar de configurarla."
+
+msgid "Your email address has been verified. You can now sign in."
+msgstr "Se verificó tu correo electrónico. Ya puedes iniciar sesión."
+
+msgid "Your infrastructure, your data"
+msgstr "Tu infraestructura, tus datos"
+
+msgid "Your Organizations"
+msgstr "Tus Organizaciones"
+
+msgid "Your organizations — Clavaris"
+msgstr "Tus organizaciones — Clavaris"
+
+msgid "Your passkeys"
+msgstr "Tus claves de acceso"
+
+msgid "Your passkeys — Clavaris"
+msgstr "Tus claves de acceso — Clavaris"
+
+msgid "Your password has been changed. For your security, you've been signed out everywhere — sign in again with your new password."
+msgstr "Se cambió tu contraseña. Por tu seguridad, se cerró tu sesión en todos los dispositivos; inicia sesión de nuevo con la contraseña nueva."
+
+msgid "Your previous link worked, but we couldn't send your device sign-in verification code right now — please request a new link and try again."
+msgstr "Tu enlace anterior funcionó, pero no pudimos enviar ahora el código de verificación del dispositivo; solicita un enlace nuevo e inténtalo de nuevo."
+
+msgid "Your profile picture was removed."
+msgstr "Se eliminó tu foto de perfil."
+
+msgid "Your profile picture was updated."
+msgstr "Se actualizó tu foto de perfil."
+
+msgid "Your profile was updated."
+msgstr "Se actualizó tu perfil."
+
+msgid "Your registration is pending approval"
+msgstr "Tu registro está pendiente de aprobación"
+
+msgid "Your sessions"
+msgstr "Tus sesiones"
+
+msgid "Your sessions — Clavaris"
+msgstr "Tus sesiones — Clavaris"
+
+msgid "Your social account is now linked to your Clavaris account. You can sign in with it from now on."
+msgstr "Tu cuenta social ya está vinculada a tu cuenta de Clavaris. Desde ahora puedes iniciar sesión con ella."
+
+msgid "Your social account is now linked. You can sign in with it from now on."
+msgstr "Tu cuenta social ya está vinculada. Desde ahora puedes iniciar sesión con ella."
+
+msgid "Zero lock-in"
+msgstr "Sin dependencia de proveedor"
+
+msgid "{0} days ago"
+msgstr "Hace {0} días"
+
+msgid "{0} event types"
+msgstr "{0} tipos de evento"
+
+msgid "{0} hours ago"
+msgstr "Hace {0} horas"
+
+msgid "{0} minutes ago"
+msgstr "Hace {0} minutos"
+
+msgid "{0} permissions"
+msgstr "{0} permisos"
+
+msgid "{0} requests/minute"
+msgstr "{0} solicitudes/minuto"
+
+msgid "{0} scopes"
+msgstr "{0} ámbitos"
+
+msgid "{0} sign-ins on 1 day"
+msgstr "{0} inicios de sesión en 1 día"
+
+msgid "{0} sign-ins on {1}"
+msgstr "{0} inicios de sesión el {1}"
+
+msgid "{0} sign-ins on {1} days"
+msgstr "{0} inicios de sesión en {1} días"
+
+msgid "© Clavaris"
+msgstr "© Clavaris"
+
+msgid "— None —"
+msgstr "— Ninguno —"
+
