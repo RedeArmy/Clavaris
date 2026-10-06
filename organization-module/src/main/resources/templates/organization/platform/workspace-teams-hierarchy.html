@@ -17,8 +17,7 @@
                  member currently holding each role. Roles with no team (created directly without
                  one — live UX request, 2026-09-28, CreateWorkspaceTeamRoleForm's own Javadoc — or
                  left ungrouped after their own team was deleted, via Configure > Workspace Roles or
-                 the Manage tab's own "add existing role" path) render under a synthetic "Without
-                 Team" group instead of being silently dropped from the picture.
+                 the Manage tab's own "add existing role" path) render under a synthetic "No team" group instead of being silently dropped from the picture.
 
                  Live UX request, 2026-09-28: each member now renders as their name (or email, when
                  no name is set) instead of a bare accountId — resolved via accountLabelById, backed
@@ -30,7 +29,7 @@
                  ever created against an account this same directory already returned.
 
                  Live UX request, 2026-09-27: "Assign role" — one button per team (and one for the
-                 synthetic "Without Team" group) opens a shared popup scoped to that group: pick one of
+                 synthetic "No team" group) opens a shared popup scoped to that group: pick one of
                  this Organization's own accounts that doesn't already hold a role in this specific
                  group, then one of the group's own roles. Composes AssignWorkspaceRoleToAccountUseCase
                  — creates a brand-new WorkspaceMembership for an account with none yet, or replaces
@@ -52,7 +51,7 @@
                 <p>Every team in this Workspace, the roles grouped into it, and the members
                     currently holding each role.</p>
 
-                <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. If you're sure, type "unassign" in the field that replaced their Remove button below to confirm and proceed anyway.</p>
+                <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${cannotDemoteLastAdminError}">That would leave nobody able to manage members or roles in this Workspace. To go ahead anyway, type "unassign" in the field that replaces their Remove button below.</p>
 
                 <div class="clavaris-section-card" th:if="${#lists.isEmpty(teams) and #lists.isEmpty(ungroupedRoles)}">
                     <p class="clavaris-empty-state">No teams or roles yet.</p>
@@ -66,7 +65,7 @@
                      round trips. Deliberately independent of membersPage below (that one paginates
                      WHICH MEMBERS show under whatever team/role is rendered — a real keyset query,
                      TD-PERF-027 — this paginates WHICH TEAMS show at all); the two layers don't
-                     conflict, they just both happen to live on the same page. "Without Team" is a
+                     conflict, they just both happen to live on the same page. "No team" is a
                      synthetic group, not a real named team to search for, so it's deliberately
                      outside this pagination — always shown, unaffected by the team search/page. -->
                 <div data-teams-hierarchy th:unless="${#lists.isEmpty(teams)}">
@@ -111,7 +110,7 @@
 
                 <div class="clavaris-section-card" th:unless="${#lists.isEmpty(ungroupedRoles)}">
                     <div class="clavaris-page-header">
-                        <h3>Without Team</h3>
+                        <h3>No team</h3>
                         <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button"
                                 data-dialog-open="team-assign-role-dialog"
                                 th:attr="hx-get=@{/platform/dashboard/organizations/{organizationId}/workspaces/{workspaceId}/roles/assign-role(organizationId=${organization.id()},workspaceId=${workspace.id()})}"

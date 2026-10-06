@@ -153,10 +153,6 @@ class ResetPasswordControllerTest {
         .andExpect(view().name("identity/reset-password"))
         .andExpect(model().attributeHasFieldErrors("form", "newPassword"))
         // Deliberately generic — never mentions a breach/source (BR-ID-07's own wording).
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "This password cannot be used - please choose a different one")));
+        .andExpect(content().string(containsString("This password cannot be used")));
   }
 }

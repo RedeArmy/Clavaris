@@ -3939,6 +3939,46 @@ body:has(.htmx-request)::after {
   column-span: all;
 }
 
+/* --- Language switcher ------------------------------------------------------
+   Added to every full page by the localisation dialect: a small pill with one link per language,
+   fixed to the bottom-left corner so it never competes with the header or the toasts (bottom-right).
+   Plain links, so it works with no script. */
+
+.clavaris-lang-switch {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  z-index: 20;
+  display: inline-flex;
+  padding: 2px;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-card);
+}
+
+.clavaris-lang-switch a {
+  min-width: 36px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-decoration: none;
+  border-radius: var(--radius-pill);
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.clavaris-lang-switch a:hover {
+  color: var(--clavaris-text-primary);
+}
+
+.clavaris-lang-switch a[aria-current="true"] {
+  color: var(--clavaris-accent-contrast);
+  background: var(--clavaris-brand-color);
+}
+
 /* ==========================================================================
    6. Responsive
    ========================================================================== */

@@ -33,8 +33,7 @@
         <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
         <p class="clavaris-field-error" th:if="${cannotDemoteLastAdminError}">
-            This would leave the Workspace with no one able to manage its own members — assign a
-            different substitute first.
+            This would leave the Workspace with nobody able to manage its members — assign another member first.
         </p>
 
         <input type="hidden" th:if="${membership != null}" name="workspaceId" th:value="${membership.workspaceId()}"/>
@@ -56,7 +55,7 @@
             <select id="assignRoleTeamId" name="teamId">
                 <option value="ungrouped"
                         th:selected="${currentRoleId == null or roleTeamId.get(currentRoleId) == null}">
-                    Without Team
+                    No team
                 </option>
                 <option th:each="team : ${teams}" th:value="${team.id()}" th:text="${team.name()}"
                         th:selected="${currentRoleId != null and team.id() == roleTeamId.get(currentRoleId)}">

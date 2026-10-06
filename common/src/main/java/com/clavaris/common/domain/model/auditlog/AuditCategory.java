@@ -10,10 +10,10 @@ import java.util.Optional;
 public enum AuditCategory {
   ORGANIZATION("organization", "Organization settings"),
   SECRET_KEYS("secret-keys", "Secret Keys"),
-  OAUTH_CLIENTS("oauth-clients", "OAuth clients"),
+  OAUTH_CLIENTS("oauth-clients", "OAuth Clients"),
   WEBHOOKS("webhooks", "Webhooks"),
-  WORKSPACES("workspaces", "Workspaces & roles"),
-  SIGNING_KEYS("signing-keys", "Signing keys"),
+  WORKSPACES("workspaces", "Workspaces & Roles"),
+  SIGNING_KEYS("signing-keys", "Signing Keys"),
   USERS("users", "Users"),
   PLATFORM("platform", "Platform"),
   OTHER("other", "Other");

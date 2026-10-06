@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Webhook Endpoints</span>
             </p>
 
@@ -25,12 +25,10 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>Webhook Endpoints</h1>
-                            <p>URLs this Organization's own consuming application(s) receive event
-                                deliveries at (ADR-0007). Each delivery is signed with this endpoint's own
-                                secret — shown exactly once, at registration or rotation.</p>
+                            <p>The URLs your application receives event deliveries at. Each delivery is signed with its endpoint's secret, shown once at registration or rotation.</p>
                         </div>
                         <a class="clavaris-button clavaris-button--inline"
-                           th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/new(organizationId=${organizationId})}">+ Add Endpoint</a>
+                           th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/new(organizationId=${organizationId})}">+ Add endpoint</a>
                     </div>
 
                     <!-- Live UX request, 2026-09-25 (Clerk-parity master-detail redesign): this list is
@@ -68,7 +66,7 @@
                             <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}(organizationId=${organizationId},endpointId=${endpoint.id()})}"
                                th:text="${endpoint.url()}">url</a>
                         </td>
-                        <td th:if="${#lists.contains(endpoint.subscribedEventTypes(), '*')}">All Events</td>
+                        <td th:if="${#lists.contains(endpoint.subscribedEventTypes(), '*')}">All events</td>
                         <td th:unless="${#lists.contains(endpoint.subscribedEventTypes(), '*')}"
                             th:text="${endpoint.subscribedEventTypes().size()} + ' event type' + (${endpoint.subscribedEventTypes().size()} == 1 ? '' : 's')">N event types</td>
                         <td>
@@ -76,7 +74,7 @@
                                   th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(endpoint.active())}"
                                   th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
                         </td>
-                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(endpoint.createdAt())}">Created at</td>
+                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(endpoint.createdAt())}">Created at</td>
                     </tr>
                     </tbody>
                 </table>

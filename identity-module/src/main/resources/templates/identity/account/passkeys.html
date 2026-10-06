@@ -9,7 +9,7 @@
         <p class="clavaris-breadcrumb">
             <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
         </p>
-        <h1>Your Passkeys</h1>
+        <h1>Your passkeys</h1>
         <p>Passkeys let you sign in without typing a password, using your device's own screen lock,
             fingerprint, or a hardware security key.</p>
 
@@ -30,8 +30,8 @@
                 <tbody>
                 <tr th:each="credential : ${credentials}">
                     <td th:text="${credential.nickname()} ?: 'Unnamed passkey'">nickname</td>
-                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.createdAt())}">added</td>
-                    <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
+                    <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(credential.createdAt())}">added</td>
+                    <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
                     <td>
                         <form method="post"
                               th:action="@{/o/{organizationId}/account/passkeys/{credentialId}/delete(organizationId=${organizationId},credentialId=${credential.id()})}">
@@ -57,6 +57,7 @@
         </div>
     </div>
 </main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/webauthn-register.js') : '/js/webauthn-register.js'}" defer></script>
 </body>
 </html>

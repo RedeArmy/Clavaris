@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Logs</span>
             </p>
 
@@ -25,15 +25,13 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>Logs</h1>
-                            <p>Every delivery attempt across every one of this Organization's own
-                                webhook endpoints, newest first.</p>
+                            <p>Every delivery attempt across all of this Organization's webhook endpoints, newest first.</p>
                         </div>
                     </div>
 
                     <div id="logs-content" th:fragment="logs" class="clavaris-section">
                         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${notReplayableError}">
-                            That delivery is still owned by the ordinary retry engine (not yet in a
-                            terminal state) — it can't be replayed right now.
+                            That delivery is still being retried automatically, so it can't be replayed yet.
                         </p>
 
                         <div class="clavaris-section-card" th:if="${#lists.isEmpty(deliveries)}">
@@ -65,8 +63,8 @@
                                               th:text="${delivery.status().name()}">status</span>
                                     </td>
                                     <td th:text="${delivery.attemptCount()}">attempts</td>
-                                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(delivery.lastAttemptAt())} ?: '—'">last attempt</td>
-                                    <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(delivery.createdAt())}">created</td>
+                                    <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(delivery.lastAttemptAt())} ?: '—'">last attempt</td>
+                                    <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(delivery.createdAt())}">created</td>
                                     <td>
                                         <div class="clavaris-row-actions" th:if="${delivery.status().isReplayable()}">
                                             <form method="post"

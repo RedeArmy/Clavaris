@@ -44,6 +44,6 @@ posted, which would send permissionsText=null and trip the reserved-permissions 
         </div>
     </div>
 
-    <p class="clavaris-field-hint" th:unless="${locked}">One opaque permission string each — your own application defines what it means. Pick from the permissions already in use, or type a new one and press Enter.</p>
-    <p class="clavaris-field-hint" th:if="${locked}">This Organization's reserved role always carries its own management permissions and can't have them edited away.</p>
+    <p class="clavaris-field-hint" th:unless="${locked}">Clavaris does not interpret permissions — your application decides what each one means. Pick from the permissions already in use, or type a new one and press Enter.</p>
+    <p class="clavaris-field-hint" th:if="${locked}">This Organization's reserved role always keeps its management permissions, so they can't be removed.</p>
 </div>

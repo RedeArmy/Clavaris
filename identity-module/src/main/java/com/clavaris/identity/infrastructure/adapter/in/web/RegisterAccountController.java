@@ -301,7 +301,7 @@ public class RegisterAccountController {
       bindingResult.rejectValue(
           PASSWORD,
           "password.breached",
-          "This password cannot be used - please choose a different one");
+          "This password cannot be used — please choose a different one");
       addSignUpOptions(organizationId, model);
       return Optional.empty();
     } catch (UsernameRequiredException _) {

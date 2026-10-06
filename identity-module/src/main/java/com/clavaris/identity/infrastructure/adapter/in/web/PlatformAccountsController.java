@@ -156,7 +156,7 @@ public class PlatformAccountsController {
         bindingResult.rejectValue(
             "password",
             "password.breached",
-            "This password cannot be used - please choose a different one");
+            "This password cannot be used — please choose a different one");
       } catch (final AccessRestrictedException _) {
         bindingResult.rejectValue(
             EMAIL, "email.restricted", "This email is not allowed to register");

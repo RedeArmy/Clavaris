@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Signing Keys</span>
             </p>
 
@@ -23,11 +23,7 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>Signing Keys</h1>
-                            <p>The RS256 key pair this Organization's own tenant issuer signs tokens under
-                                (ADR-0010 §5.2). Rotating retires the current key and activates a fresh one —
-                                the retired key keeps publishing in JWKS for the configured overlap window,
-                                so any already-issued, still-valid token keeps verifying until it naturally
-                                expires.</p>
+                            <p>The RS256 key pair this Organization signs its tokens with. Rotating retires the current key and activates a new one; the retired key stays in the JWKS for the configured overlap window, so tokens already issued keep verifying until they expire.</p>
                         </div>
                     </div>
 
@@ -66,8 +62,8 @@
                                   th:classappend="${key.retiredAt().isEmpty()} ? 'clavaris-badge--success' : 'clavaris-badge--muted'"
                                   th:text="${key.retiredAt().isEmpty()} ? 'Active' : 'Retired (in overlap)'">Active</span>
                         </td>
-                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(key.activeFrom())}">Active from</td>
-                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(key.retiredAt().orElse(null))}">—</td>
+                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(key.activeFrom())}">Active from</td>
+                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(key.retiredAt().orElse(null))}">—</td>
                     </tr>
                     </tbody>
                 </table>

@@ -501,7 +501,7 @@ class PlatformWebhookEndpointControllerTest {
     verify(updateEndpointEventTypes).handle(any());
   }
 
-  // Live UX request, 2026-09-25 (PayPal-parity "All Events"): the wildcard is a genuinely valid
+  // Live UX request, 2026-09-25 (PayPal-parity "All events"): the wildcard is a genuinely valid
   // single-entry submission, not an "empty selection" the controller should reject.
   @Test
   void updateEventTypesAcceptsTheAllEventsWildcard() throws Exception {

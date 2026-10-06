@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Live UX request, 2026-10-04: the profile picture's "Choose image" + "Upload" controls
   // (form[data-picture-upload], from the shared picture-card fragment: a user's profile and the
   // operator's own "Manage account"). Chooses first, uploads second, and tells the person what they
@@ -80,13 +85,13 @@
       restore(form, preview);
       say(status, "", false);
     } else if (!ALLOWED_TYPES.has(file.type)) {
-      reject(form, "Choose a JPG, PNG, WebP or GIF image.");
+      reject(form, t("Choose a JPG, PNG, WebP or GIF image."));
     } else if (file.size > MAX_BYTES) {
-      reject(form, "That image is " + sizeLabel(file.size) + ". The limit is 10 MB.");
+      reject(form, t("That image is {0}. The limit is 10 MB.", sizeLabel(file.size)));
     } else {
       show(form, preview, file);
       submit.disabled = false;
-      say(status, file.name + " (" + sizeLabel(file.size) + ") will replace the current picture.", false);
+      say(status, t("{0} ({1}) will replace the current picture.", file.name, sizeLabel(file.size)), false);
     }
   });
 

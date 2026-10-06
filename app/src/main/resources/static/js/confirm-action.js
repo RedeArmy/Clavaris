@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Click-through confirmation for any <form data-confirm="Message">. Destructive one-click
   // actions (rotate a secret, deactivate a key, revoke a session) used to fire immediately; now a
   // shared modal asks first. Optional attributes on the form:
@@ -24,16 +29,17 @@
       '<button type="button" class="clavaris-button clavaris-button--secondary clavaris-button--inline" data-confirm-cancel>Cancel</button>' +
       '<button type="button" class="clavaris-button clavaris-button--inline" data-confirm-accept></button>' +
       "</div>";
+    element.querySelector("[data-confirm-cancel]").textContent = t("Cancel");
     document.body.appendChild(element);
     return element;
   };
 
   const ask = (form) => {
     dialog ??= build();
-    dialog.querySelector("#clavaris-confirm-title").textContent = form.dataset.confirmTitle || "Are you sure?";
+    dialog.querySelector("#clavaris-confirm-title").textContent = form.dataset.confirmTitle || t("Are you sure?");
     dialog.querySelector("#clavaris-confirm-message").textContent = form.dataset.confirm;
     const accept = dialog.querySelector("[data-confirm-accept]");
-    accept.textContent = form.dataset.confirmLabel || "Confirm";
+    accept.textContent = form.dataset.confirmLabel || t("Confirm");
     accept.classList.toggle("clavaris-button--danger", form.dataset.confirmTone === "danger");
 
     return new Promise((resolve) => {

@@ -9,9 +9,9 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span th:text="${endpoint.url()}">endpoint url</span>
             </p>
 
@@ -34,7 +34,7 @@
                                 <span class="clavaris-badge"
                                       th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(endpoint.active())}"
                                       th:text="${endpoint.active()} ? 'Active' : 'Inactive'">Active</span>
-                                &#183; Registered <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(endpoint.createdAt())}">date</span>
+                                &#183; Registered <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(endpoint.createdAt())}">date</span>
                             </p>
                         </div>
                     </div>
@@ -49,7 +49,7 @@
                         or otherwise internal network address).
                     </p>
                     <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${emptyEventTypesError}">
-                        Select at least one event type, or turn on "All Events".
+                        Select at least one event type, or turn on "All events".
                     </p>
 
                     <div class="clavaris-section-card">
@@ -115,7 +115,7 @@
                                 <tbody>
                                 <tr>
                                     <th scope="row">Subscribed to</th>
-                                    <td th:if="${#lists.contains(endpoint.subscribedEventTypes(), '*')}">All Events</td>
+                                    <td th:if="${#lists.contains(endpoint.subscribedEventTypes(), '*')}">All events</td>
                                     <td th:unless="${#lists.contains(endpoint.subscribedEventTypes(), '*')}"
                                         th:text="${#strings.listJoin(endpoint.subscribedEventTypes(), ', ')}">event types</td>
                                     <td>

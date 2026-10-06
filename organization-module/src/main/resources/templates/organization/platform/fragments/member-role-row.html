@@ -1,6 +1,6 @@
 <!--
 SonarQube-style branch self-review fix, 2026-09-29: the "one member, one Remove button" row used to
-be hand-duplicated between the team-grouped and "Without Team" role lists on
+be hand-duplicated between the team-grouped and "No team" role lists on
 workspace-teams-hierarchy.html — identical markup, only the enclosing th:each's own role differed.
 Extracted here, same "a block shared within one module gets its own fragments/*.html file"
 precedent every other fragment in this directory already establishes (team-assign-role-form.html,
@@ -42,7 +42,7 @@ ChangeWorkspaceMemberRoleCommand#force()'s own Javadoc for why the dashboard is 
 that guard on explicit confirmation). The dialog itself always renders (same "trigger is
 conditional, not the dialog" shape delete-team-dialog/delete-role-dialog already use) — memberAccountId
 is unique per page (an account holds at most one role per Workspace), so its own id is never
-duplicated even across the team-grouped and "Without Team" lists this fragment renders into. -->
+duplicated even across the team-grouped and "No team" lists this fragment renders into. -->
 <ul>
 <li class="clavaris-row-actions"
     th:fragment="row(organization, workspace, memberAccountId, label, forceConfirmAccountId)">
@@ -71,8 +71,7 @@ duplicated even across the team-grouped and "Without Team" lists this fragment r
                 <span class="clavaris-dialog__eyebrow">Member</span>
                 <h2>Remove from role</h2>
                 <p>Removes <strong th:text="${label}">name</strong> from this role. They keep their
-                    account and Workspace membership — only the role is unassigned (ADR-0027 §5: a
-                    member can be left without a role). This cannot be undone.</p>
+                    account and Workspace membership — only the role is removed. This cannot be undone.</p>
             </div>
             <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close remove member dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>

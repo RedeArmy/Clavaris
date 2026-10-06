@@ -9,9 +9,8 @@
         <p class="clavaris-breadcrumb">
             <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
         </p>
-        <h1>Your Active Sessions</h1>
-        <p>These are the devices/browsers currently signed in to your account. If you don't recognize
-            one, close it.</p>
+        <h1>Your active sessions</h1>
+        <p>These are the devices and browsers currently signed in to your account. If you don't recognize one, sign it out.</p>
 
         <div th:replace="~{identity/fragments/sessions-table :: sessionsTable(${sessions}, ${friendlyDeviceLabels}, ${currentSessionId}, @{/o/{organizationId}/account/sessions(organizationId=${organizationId})})}"></div>
     </div>

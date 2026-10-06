@@ -10,9 +10,9 @@
         <div class="clavaris-dashboard__inner">
             <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}, 'Back to Users')}"></div>
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Profile</span>
             </p>
 
@@ -30,9 +30,9 @@
                                   th:classappend="${account.status().name() == 'ACTIVE'} ? 'clavaris-badge--success' : (${account.status().name() == 'DELETED'} ? 'clavaris-badge--muted' : 'clavaris-badge--error')"
                                   th:text="${account.status()}">ACTIVE</span>
                             <span class="clavaris-profile-header__fact">Joined
-                                <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</span></span>
+                                <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.createdAt())}">joined</span></span>
                             <span class="clavaris-profile-header__fact" th:if="${account.lastSignedInAt().isPresent()}">Last sign-in
-                                <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())}">date</span></span>
+                                <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.lastSignedInAt().get())}">date</span></span>
                         </p>
                     </div>
                 </div>
@@ -62,7 +62,7 @@
                 <p>This token will not be shown again — copy it now.</p>
                 <p>Access token: <code th:text="${impersonationToken.accessToken()}">token</code></p>
                 <p>Type: <span th:text="${impersonationToken.tokenType()}">Bearer</span></p>
-                <p>Expires: <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(impersonationToken.expiresAt())}">expires</span></p>
+                <p>Expires: <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(impersonationToken.expiresAt())}">expires</span></p>
                 <p>Scope: <span th:text="${#strings.arrayJoin(impersonationToken.scope().toArray(), ' ')}">scope</span></p>
             </div>
 
@@ -167,8 +167,8 @@
                             <p>Email: <span th:text="${account.email().value()}">email</span> <span class="clavaris-badge">Primary</span></p>
                             <p th:if="${account.username().isPresent()}">Username: <span th:text="${account.username().get().value()}">username</span></p>
                             <p th:if="${account.phoneNumber().isPresent()}">Phone number: <span th:text="${account.phoneNumber().get()}">phone</span></p>
-                            <p>Joined: <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</span></p>
-                            <p>Last signed in: <span th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</span></p>
+                            <p>Joined: <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.createdAt())}">joined</span></p>
+                            <p>Last signed in: <span th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</span></p>
                         </div>
 
                         <div class="clavaris-section-card">
@@ -203,8 +203,8 @@
                                             <span th:text="${friendlyDeviceLabels[userSession.sessionId()]}" th:title="${userSession.userAgent()} ?: ''">Chrome on macOS</span>
                                         </td>
                                         <td th:text="${userSession.sourceIp()} ?: 'Unknown'">IP address</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.createdAt())}">First seen</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
+                                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(userSession.createdAt())}">First seen</td>
+                                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(userSession.lastAccessedAt())}">Last active</td>
                                         <td>
                                             <form data-confirm="The device is signed out immediately." data-confirm-title="Revoke this session?" data-confirm-label="Revoke" data-confirm-tone="danger" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/sessions/{sessionId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},sessionId=${userSession.sessionId()})}">
@@ -231,8 +231,8 @@
                                     <tbody>
                                     <tr th:each="device : ${devices}">
                                         <td th:text="${device.userAgent()}">user agent</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.firstSeenAt())}">first seen</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(device.lastSeenAt())}">last seen</td>
+                                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(device.firstSeenAt())}">first seen</td>
+                                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(device.lastSeenAt())}">last seen</td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -261,7 +261,7 @@
                             <!-- Account.lastSignedInAt and this history are separate records: an account can
                                  have signed in before sign-in history was kept, or more than a year ago. -->
                             <p class="clavaris-empty-state" th:if="${activity.isEmpty() and account.lastSignedInAt().isPresent()}">This user last signed in on
-                                <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())}">date</span>,
+                                <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.lastSignedInAt().get())}">date</span>,
                                 but no sign-in history is recorded for the last 365 days.</p>
 
                             <th:block th:unless="${activity.isEmpty()}">
@@ -336,8 +336,8 @@
                                     <tbody>
                                     <tr th:each="credential : ${webAuthnCredentials}">
                                         <td th:text="${credential.nickname()} ?: 'Unnamed passkey'">nickname</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.createdAt())}">added</td>
-                                        <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
+                                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(credential.createdAt())}">added</td>
+                                        <td th:text="${credential.lastUsedAt() != null} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(credential.lastUsedAt())} : 'Never'">last used</td>
                                         <td>
                                             <form method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/passkeys/{credentialId}/delete(organizationId=${organizationId},accountId=${account.id().value()},credentialId=${credential.id()})}">
@@ -367,7 +367,7 @@
                                     <tr th:each="identity : ${socialIdentities}">
                                         <td th:text="${identity.provider()}">provider</td>
                                         <td th:text="${identity.providerUserId()}">provider user id</td>
-                                        <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(identity.linkedAt())}">linked</td>
+                                        <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(identity.linkedAt())}">linked</td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -434,8 +434,8 @@
                                         <td th:text="${grant.grantType()}">grant type</td>
                                         <td>JWT (RS256)</td>
                                         <td th:text="${grant.scopes()} ?: '—'">scopes</td>
-                                        <td th:text="${grant.lastIssuedAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.lastIssuedAt())} : '—'">last issued</td>
-                                        <td th:text="${grant.expiresAt() != null} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(grant.expiresAt())} : '—'">expires at</td>
+                                        <td th:text="${grant.lastIssuedAt() != null} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(grant.lastIssuedAt())} : '—'">last issued</td>
+                                        <td th:text="${grant.expiresAt() != null} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(grant.expiresAt())} : '—'">expires at</td>
                                         <td>
                                             <form data-confirm="The application loses access to this account." data-confirm-title="Revoke this grant?" data-confirm-label="Revoke" data-confirm-tone="danger" method="post"
                                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/oauth-grants/{authorizationId}/revoke(organizationId=${organizationId},accountId=${account.id().value()},authorizationId=${grant.authorizationId()})}">
@@ -457,7 +457,7 @@
                     <section id="clavaris-panel-metadata" class="clavaris-manage-account__panel">
                         <div class="clavaris-section-card">
                             <h2>Metadata</h2>
-                            <p class="clavaris-field-hint">Arbitrary JSON this consuming application defines and Clavaris never interprets. Each tier replaces its previous value entirely on save.</p>
+                            <p class="clavaris-field-hint">Arbitrary JSON that your application defines and Clavaris never interprets. Each of the three fields replaces its previous value entirely when you save.</p>
                             <form method="post"
                                   th:action="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}/metadata(organizationId=${organizationId},accountId=${account.id().value()})}">
                                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -469,12 +469,12 @@
                                 <div class="clavaris-field">
                                     <label for="account-private-metadata">Private metadata</label>
                                     <textarea id="account-private-metadata" name="privateMetadata" rows="6" th:text="${account.privateMetadata().orElse('')}"></textarea>
-                                    <p class="clavaris-field-hint">Admin/backend-only — never exposed through any account-holder-facing surface.</p>
+                                    <p class="clavaris-field-hint">Visible only to your backend and operators, never to the account holder.</p>
                                 </div>
                                 <div class="clavaris-field">
                                     <label for="account-unsafe-metadata">Unsafe metadata</label>
                                     <textarea id="account-unsafe-metadata" name="unsafeMetadata" rows="6" th:text="${account.unsafeMetadata().orElse('')}"></textarea>
-                                    <p class="clavaris-field-hint">Named "unsafe" per Clerk's own convention — never trust its contents for an authorization decision.</p>
+                                    <p class="clavaris-field-hint">Not validated or protected — never trust its contents for an authorization decision.</p>
                                 </div>
                                 <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
                             </form>
@@ -488,8 +488,7 @@
                     <div>
                         <span class="clavaris-dialog__eyebrow">Account</span>
                         <h2>Impersonate user</h2>
-                        <p>Mints a raw Bearer access token for this Account, scoped to one OAuth
-                            Client — no ID token, no refresh token. The token is shown once.</p>
+                        <p>Creates an access token for this Account, limited to one OAuth Client. No ID token or refresh token is issued, and the token is shown once.</p>
                     </div>
                     <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close impersonate user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>

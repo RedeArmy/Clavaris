@@ -8,9 +8,9 @@ documents.
 <div th:fragment="header(organization, backTarget, backLabel, currentLabel)">
     <div th:replace="~{platform/fragments/back-link :: back(${backTarget}, ${backLabel})}"></div>
     <p class="clavaris-breadcrumb">
-        <a th:href="@{/platform/dashboard}">Organizations</a> /
-        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
-        <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> /
+        <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+        <a th:href="@{/platform/dashboard/organizations/{organizationId}/workspace-roles(organizationId=${organization.id()})}">Workspace Roles</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
         <span th:text="${currentLabel}">Current</span>
     </p>
 </div>

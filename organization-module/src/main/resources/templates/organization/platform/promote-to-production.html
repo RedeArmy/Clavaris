@@ -9,16 +9,15 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Promote to Production</span>
             </p>
 
             <div class="clavaris-page-header">
                 <div>
                     <h1>Promote to Production</h1>
-                    <p>Creates this Organization's paired PRODUCTION sibling, ready for real
-                        end-user traffic.</p>
+                    <p>Creates this Organization's paired production Organization, ready for real end-user traffic.</p>
                 </div>
             </div>
 

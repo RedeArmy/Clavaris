@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Rate Limit</span>
             </p>
 
@@ -29,9 +29,7 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>Rate Limit</h1>
-                            <p>The per-minute request ceiling this Organization's own tenant issuer
-                                enforces (ADR-0010 §6.2) — a noisy-neighbor guard, separate from the
-                                fixed, system-wide anti-abuse limits every tenant shares.</p>
+                            <p>The per-minute request limit for this Organization's issuer. It stops one tenant from affecting the others, and is separate from the fixed anti-abuse limits every tenant shares.</p>
                         </div>
                     </div>
 
@@ -42,7 +40,7 @@
                                 <span class="clavaris-badge clavaris-badge--muted" th:unless="${rateLimitPolicy.customized()}">System default</span>
                                 <span class="clavaris-badge clavaris-badge--success" th:if="${rateLimitPolicy.customized()}">Custom</span>
                             </p>
-                            <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(rateLimitPolicy.updatedAt())}">date</span>.</p>
+                            <p th:if="${rateLimitPolicy.customized()}">Last changed <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(rateLimitPolicy.updatedAt())}">date</span>.</p>
                             <p th:unless="${rateLimitPolicy.customized()}">Never customized for this Organization — using the system default below.</p>
 
                             <form th:action="@{/platform/dashboard/organizations/{organizationId}/rate-limit-policy(organizationId=${organizationId})}"

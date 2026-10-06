@@ -535,7 +535,7 @@ class PlatformWorkspaceControllerTest {
         .perform(get(teamsPath()))
         .andExpect(status().isOk())
         .andExpect(model().attribute("ungroupedRoles", List.of(role)))
-        .andExpect(content().string(containsString("Without Team")));
+        .andExpect(content().string(containsString("No team")));
   }
 
   @Test
@@ -1044,7 +1044,7 @@ class PlatformWorkspaceControllerTest {
     verify(addRoleToTeam).handle(any());
   }
 
-  // Live UX request, 2026-09-28: "Without Team" is now a first-class choice in the popup itself,
+  // Live UX request, 2026-09-28: "No team" is now a first-class choice in the popup itself,
   // not just something a role ends up in after its team is later deleted.
   @Test
   void plainCreateRolePostWithoutATeamCreatesAnUngroupedRole() throws Exception {

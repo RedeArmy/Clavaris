@@ -153,7 +153,7 @@ test("searching by name hides every role that doesn't match, case-insensitively"
   assert.equal(rows[1].hidden, true);
 });
 
-test("filtering by team shows only that team's own roles, including Without Team", () => {
+test("filtering by team shows only that team's own roles, including No team", () => {
   const rows = [
     rowStub("Admin", "__none__"),
     rowStub("Reviewer", "team-1"),

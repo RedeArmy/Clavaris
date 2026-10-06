@@ -9,9 +9,9 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/webhook-endpoints(organizationId=${organizationId})}">Webhook Endpoints</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>New Endpoint</span>
             </p>
 
@@ -31,9 +31,7 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>New Webhook Endpoint</h1>
-                            <p>A URL this Organization's own consuming application receives event
-                                deliveries at. The signing secret is shown exactly once, on the
-                                endpoints list, right after you register.</p>
+                            <p>A URL your application receives event deliveries at. The signing secret is shown once, on the endpoints list, right after you register.</p>
                         </div>
                     </div>
 

@@ -31,7 +31,7 @@
                         <h2 th:text="${organization.name()}">Organization name</h2>
                         <p>Isolated tenant with its own accounts, clients, and signing keys.</p>
                         <div class="clavaris-organization-card__footer">
-                            <small>Created <time th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(organization.createdAt())}">Created at</time></small>
+                            <small>Created <time th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(organization.createdAt())}">Created at</time></small>
                             <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Open <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
                         </div>
                     </article>

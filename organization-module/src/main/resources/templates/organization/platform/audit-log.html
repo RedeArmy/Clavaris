@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Audit Log</span>
             </p>
 
@@ -19,8 +19,7 @@
             <div class="clavaris-page-header">
                 <div>
                     <h1>Audit Log</h1>
-                    <p>Who changed what in this Organization, newest first: settings, Secret Keys, OAuth
-                        clients, webhooks, workspaces and roles, and signing keys. End-user sign-in
+                    <p>Who changed what in this Organization, newest first: settings, Secret Keys, OAuth Clients, Webhook Endpoints, Workspaces and roles, and Signing Keys. End-user sign-in
                         activity is not part of this view.</p>
                 </div>
             </div>

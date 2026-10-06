@@ -242,11 +242,7 @@ class RegisterPlatformAccountControllerTest {
         .andExpect(view().name("identity/platform/register"))
         .andExpect(model().attributeHasFieldErrors("form", "password"))
         // Deliberately generic — never mentions a breach/source (BR-ID-07's own wording).
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "This password cannot be used - please choose a different one")));
+        .andExpect(content().string(containsString("This password cannot be used")));
 
     verifyNoInteractions(requestEmailVerification);
   }

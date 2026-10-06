@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Turns a Workspace Role's Permissions textarea into chips. The textarea stays the single source
   // of truth for the form (one opaque permission per line); this script only edits it through a
   // friendlier interface and writes every change back, so the server contract is untouched and the
@@ -48,7 +53,7 @@
 
     const ui = el("div", "clavaris-permission-picker__ui");
     const chips = el("ul", "clavaris-permission-picker__selected");
-    chips.setAttribute("aria-label", "Selected permissions");
+    chips.setAttribute("aria-label", t("Selected permissions"));
     ui.append(chips);
 
     let input;
@@ -57,8 +62,8 @@
       input.type = "text";
       input.autocomplete = "off";
       input.spellcheck = false;
-      input.setAttribute("aria-label", "Add a permission");
-      input.placeholder = "Type a permission and press Enter";
+      input.setAttribute("aria-label", t("Add a permission"));
+      input.placeholder = t("Type a permission and press Enter");
       ui.append(input);
     }
     source.after(ui);
@@ -67,7 +72,7 @@
       source.value = serialize(permissions);
       chips.replaceChildren();
       if (permissions.length === 0) {
-        chips.append(el("li", "clavaris-permission-picker__empty", "No permissions assigned."));
+        chips.append(el("li", "clavaris-permission-picker__empty", t("No permissions assigned.")));
       }
       for (const permission of permissions) {
         const chip = el("li", "clavaris-chip");
@@ -76,7 +81,7 @@
           const remove = el("button", "clavaris-chip__remove");
           remove.type = "button";
           remove.dataset.permissionRemove = permission;
-          remove.setAttribute("aria-label", `Remove ${permission}`);
+          remove.setAttribute("aria-label", t("Remove {0}", permission));
           remove.textContent = "×";
           chip.append(remove);
         }

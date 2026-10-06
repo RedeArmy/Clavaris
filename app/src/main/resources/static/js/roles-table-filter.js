@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Live UX request, 2026-10-02 — workspace-detail.html's own unified "Roles" table (every role
   // this Organization has, grouped and ungrouped alike, each with its own Team column): searchable
   // by name, filterable by team, paginated 10/page. All client-side, same role-picker.js convention
@@ -55,7 +60,7 @@
 
     const indicator = table.querySelector("[data-roles-page-indicator]");
     if (indicator) {
-      indicator.textContent = "Page " + page + " of " + totalPages(matches);
+      indicator.textContent = t("Page {0} of {1}", page, totalPages(matches));
     }
     const prev = table.querySelector("[data-roles-prev]");
     const next = table.querySelector("[data-roles-next]");

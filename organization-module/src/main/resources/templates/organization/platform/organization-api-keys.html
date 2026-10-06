@@ -9,8 +9,8 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>API Keys</span>
             </p>
 
@@ -34,10 +34,7 @@
                     <div class="clavaris-page-header">
                         <div>
                             <h1>API Keys</h1>
-                            <p>The identifiers and endpoints a consuming application needs to connect
-                                to this Organization — its own tenant issuer, the shared token
-                                endpoint, and the JWKS document/public key used to verify tokens it
-                                issues.</p>
+                            <p>The identifiers and endpoints your application needs to connect to this Organization: its issuer, the shared token endpoint, and the JWKS document and public key used to verify the tokens it issues.</p>
                         </div>
                         <span class="clavaris-badge clavaris-badge--muted" title="Configured management API version">
                             API <code th:text="${apiKeys.configuredApiVersion()}">v1</code>
@@ -59,7 +56,7 @@
                             <div class="clavaris-kv-card__header">
                                 <h2>Endpoints</h2>
                             </div>
-                            <div th:replace="~{organization/platform/fragments/copy-field-row :: row('api-frontend-url', 'Frontend API URL', 'The tenant issuer of this Organization (ADR-0010 §5.1): OIDC discovery, the authorization endpoint and hosted login live under it.', ${apiKeys.frontendApiUrl()})}"></div>
+                            <div th:replace="~{organization/platform/fragments/copy-field-row :: row('api-frontend-url', 'Frontend API URL', 'The issuer URL of this Organization: OIDC discovery, the authorization endpoint and hosted login live under it.', ${apiKeys.frontendApiUrl()})}"></div>
                             <div th:replace="~{organization/platform/fragments/copy-field-row :: row('api-backend-url', 'Backend API URL', 'The shared client_credentials token endpoint, reached with a Secret Key or a platform-issued credential.', ${apiKeys.backendApiUrl()})}"></div>
                             <div th:replace="~{organization/platform/fragments/copy-field-row :: row('api-jwks-url', 'JWKS URL', 'Most OIDC client libraries fetch it automatically; only needed directly for manual or offline verification.', ${apiKeys.jwksUrl()})}"></div>
                         </div>
@@ -70,9 +67,7 @@
                                 <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
                                    th:href="@{/platform/dashboard/organizations/{id}/signing-keys(id=${organizationId})}">Signing Keys</a>
                             </div>
-                            <p class="clavaris-kv-card__intro">This Organization's own active signing key (ADR-0010 §5.2), PEM-encoded.
-                                Paste it into a backend or edge environment for networkless JWT verification, without fetching the
-                                JWKS URL at runtime. Rotate it on the Signing Keys page.</p>
+                            <p class="clavaris-kv-card__intro">This Organization's active signing key, PEM-encoded. Paste it into a backend or edge environment to verify JWTs without fetching the JWKS URL at runtime. Rotate it on the Signing Keys page.</p>
                             <!-- Live UX follow-up, 2026-09-24: rotation-with-overlap (ADR-0010 §5.2)
                                  protects a consumer that fetches the JWKS URL at runtime — the
                                  retired key keeps publishing for the overlap window. It does NOT

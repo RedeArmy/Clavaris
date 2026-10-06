@@ -15,8 +15,8 @@
                  the general "Back to Your Organizations" link that replaces it, shared by every tab
                  instead of re-added here on its own. -->
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Users</span>
             </p>
 
@@ -95,8 +95,8 @@
                                  state) — both cases render the same em-dash. -->
                             <td th:with="roleDisplay=${roleDisplayByAccountId.get(account.id().value())}"
                                 th:text="${roleDisplay != null and roleDisplay.roleName() != null} ? ${roleDisplay.roleName()} : '—'">role</td>
-                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</td>
-                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(account.createdAt())}">joined</td>
+                            <td th:text="${account.lastSignedInAt().isPresent()} ? ${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.lastSignedInAt().get())} : 'Never'">last signed in</td>
+                            <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(account.createdAt())}">joined</td>
                             <td>
                                 <!-- SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab 3-dot
                                      row menu. A native <details>/<summary> disclosure, same
@@ -168,8 +168,7 @@
                                         <div>
                                             <span class="clavaris-dialog__eyebrow">Account</span>
                                             <h2>Delete user</h2>
-                                            <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> —
-                                                a hard delete, not reversible. Every session and token is revoked immediately.</p>
+                                            <p>Permanently deletes <strong th:text="${account.email().value()}">email</strong> — this cannot be undone. Every session and token is revoked immediately.</p>
                                         </div>
                                         <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close delete user dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                                     </div>

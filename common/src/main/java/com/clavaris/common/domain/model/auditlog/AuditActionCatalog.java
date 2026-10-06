@@ -100,7 +100,7 @@ public final class AuditActionCatalog {
         "organization_client.secret_rotated",
         AuditCategory.SECRET_KEYS,
         AuditTone.SENSITIVE,
-        "Secret Key secret rotated");
+        "Secret Key's secret rotated");
     add(
         "organization_client.deactivated",
         AuditCategory.SECRET_KEYS,
@@ -120,27 +120,27 @@ public final class AuditActionCatalog {
         "oauth_client.registered",
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.CREATED,
-        "OAuth client created");
+        "OAuth Client created");
     add(
         "oauth_client.activated",
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.UPDATED,
-        "OAuth client reactivated");
+        "OAuth Client reactivated");
     add(
         "oauth_client.deactivated",
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.UPDATED,
-        "OAuth client deactivated");
+        "OAuth Client deactivated");
     add(
         "oauth_client.deleted",
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.DELETED,
-        "OAuth client deleted");
+        "OAuth Client deleted");
     add(
         "oauth_client.secret_rotated",
         AuditCategory.OAUTH_CLIENTS,
         AuditTone.SENSITIVE,
-        "OAuth client secret rotated");
+        "OAuth Client secret rotated");
     add(
         "oauth_client.consent_updated",
         AuditCategory.OAUTH_CLIENTS,
@@ -165,7 +165,7 @@ public final class AuditActionCatalog {
         "webhook_endpoint.registered",
         AuditCategory.WEBHOOKS,
         AuditTone.CREATED,
-        "Webhook endpoint created");
+        "Webhook Endpoint created");
     add(
         "webhook_endpoint.url_updated",
         AuditCategory.WEBHOOKS,
@@ -190,17 +190,17 @@ public final class AuditActionCatalog {
         "webhook_endpoint.activated",
         AuditCategory.WEBHOOKS,
         AuditTone.UPDATED,
-        "Webhook endpoint activated");
+        "Webhook Endpoint activated");
     add(
         "webhook_endpoint.deactivated",
         AuditCategory.WEBHOOKS,
         AuditTone.UPDATED,
-        "Webhook endpoint deactivated");
+        "Webhook Endpoint deactivated");
     add(
         "webhook_endpoint.deleted",
         AuditCategory.WEBHOOKS,
         AuditTone.DELETED,
-        "Webhook endpoint deleted");
+        "Webhook Endpoint deleted");
     add(
         "webhook_delivery.replayed",
         AuditCategory.WEBHOOKS,
@@ -243,12 +243,12 @@ public final class AuditActionCatalog {
         "signing_key.rotated",
         AuditCategory.SIGNING_KEYS,
         AuditTone.SENSITIVE,
-        "Signing key rotated");
+        "Signing Key rotated");
     add(
         "signing_key.emergency_purged",
         AuditCategory.SIGNING_KEYS,
         AuditTone.SENSITIVE,
-        "Signing key emergency-purged");
+        "Signing Key emergency-purged");
     add("account.banned", AuditCategory.USERS, AuditTone.SENSITIVE, "User banned");
     add("account.unbanned", AuditCategory.USERS, AuditTone.UPDATED, "User unbanned");
     add("account.suspended", AuditCategory.USERS, AuditTone.SENSITIVE, "User locked");

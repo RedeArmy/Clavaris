@@ -8,7 +8,7 @@
     <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
-            <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> / <span th:text="${organization.name()}">Organization</span></p>
+            <p class="clavaris-breadcrumb"><a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span> <span th:text="${organization.name()}">Organization</span></p>
 
             <div th:replace="~{platform/fragments/org-tabs :: tabs(${organization.id()}, 'workspaces')}"></div>
 
@@ -47,7 +47,7 @@
                         <tbody>
                         <tr th:each="workspace : ${workspaces}">
                             <td th:text="${workspace.name()}">Workspace name</td>
-                            <td th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">Created at</td>
+                            <td th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(workspace.createdAt())}">Created at</td>
                             <td>
                                 <div class="clavaris-row-actions">
                                     <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"

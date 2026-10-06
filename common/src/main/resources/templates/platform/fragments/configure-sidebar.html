@@ -2,7 +2,7 @@
 SDE-III review, 2026-09-19 (SonarCloud duplication fix, follow-up) — Clerk-style "Configure"
 sub-navigation, one real shared copy in common/ rather than four hand-duplicated per-module
 copies. Pure markup, no business logic (BR-agnostic navigation links only), so it fits common's
-own "shared code only" scope the same way LongEnglishDateFormatter does — every module that
+own "shared code only" scope the same way LocalizedDateFormatter does — every module that
 renders a dashboard page already depends on common, and Spring's classpath-based Thymeleaf
 resolution doesn't care which module's JAR a classpath:/templates/... resource actually lives in,
 so this single file resolves identically from every one of the four consuming modules'

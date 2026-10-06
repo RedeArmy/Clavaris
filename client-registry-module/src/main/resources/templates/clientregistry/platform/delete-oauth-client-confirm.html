@@ -9,17 +9,17 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}">OAuth Clients</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}(organizationId=${organizationId},clientId=${client.clientId()})}" th:text="${client.clientId()}">client id</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}">OAuth Clients</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}(organizationId=${organizationId},clientId=${client.clientId()})}" th:text="${client.clientId()}">client id</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Delete</span>
             </p>
 
             <div class="clavaris-page-header">
                 <div>
                     <h1>Delete OAuth Client</h1>
-                    <p>A permanent, irreversible action — read this carefully before confirming.</p>
+                    <p>Read this carefully before confirming.</p>
                 </div>
             </div>
 
@@ -34,7 +34,7 @@
                         <code th:text="${client.clientId()}">client id</code> destroys:
                     </p>
                     <ul>
-                        <li>The client itself and its credentials — no consuming application will
+                        <li>The client itself and its credentials — no application will
                             ever be able to authenticate with this Client ID again</li>
                         <li>Every redirect URI and post-logout redirect URI configured on it</li>
                         <li>Any already-issued token still associated with it, revoked immediately</li>

@@ -11,10 +11,10 @@
              th:with="accountLabel=${account.username().isPresent()} ? ${account.username().get().value()} : ${account.email().value()}">
             <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}, 'Back to Profile')}"></div>
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}" th:text="${accountLabel}">Account</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}/users(id=${organizationId})}">Users</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/users/{accountId}(organizationId=${organizationId},accountId=${account.id().value()})}" th:text="${accountLabel}">Account</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span>Audit Log</span>
             </p>
 

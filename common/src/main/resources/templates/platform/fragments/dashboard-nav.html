@@ -52,6 +52,7 @@ benefits from confirm-action.js and htmx-feedback.js.
          never opened at all (organization-dialog.js missing too). Loading both here, once,
          guarantees every page that includes this fragment gets them — the now-redundant
          standalone tags these replace have been removed from every page that had them. -->
+    <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/htmx.min.js') : '/js/htmx.min.js'}" defer></script>
     <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-dialog.js') : '/js/organization-dialog.js'}" defer></script>
     <!-- Shared click-through confirmation for any <form data-confirm="...">, see confirm-action.js. -->

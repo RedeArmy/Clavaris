@@ -9,9 +9,9 @@
     <main id="main-content" class="clavaris-dashboard__content">
         <div class="clavaris-dashboard__inner">
             <p class="clavaris-breadcrumb">
-                <a th:href="@{/platform/dashboard}">Organizations</a> /
-                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> /
-                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}">OAuth Clients</a> /
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{organizationId}/oauth-clients(organizationId=${organizationId})}">OAuth Clients</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
                 <span th:text="${client.clientId()}">client id</span>
             </p>
 
@@ -42,7 +42,7 @@
                                 <span class="clavaris-badge"
                                       th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(client.active())}"
                                       th:text="${client.active()} ? 'Active' : 'Inactive'">Active</span>
-                                &#183; Registered <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(client.createdAt())}">date</span>
+                                &#183; Registered <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(client.createdAt())}">date</span>
                             </p>
                         </div>
                     </div>
@@ -461,7 +461,7 @@
                                     <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                     <span class="clavaris-toggle__label">Require consent screen</span>
                                 </label>
-                                <p>ADR-0017: whether Clavaris shows the end user a consent screen before issuing an authorization code to this client.</p>
+                                <p>Whether Clavaris shows the end user a consent screen before issuing an authorization code to this client.</p>
                             </div>
                             <div class="clavaris-dialog__actions">
                                 <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>

@@ -10,15 +10,15 @@ at the Organization level.
 <div th:fragment="header(organization, workspace)">
     <div th:replace="~{platform/fragments/back-link :: back(@{/platform/dashboard/organizations/{id}(id=${organization.id()})}, 'Back to Workspaces')}"></div>
     <p class="clavaris-breadcrumb">
-        <a th:href="@{/platform/dashboard}">Organizations</a> /
-        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> /
+        <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+        <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}" th:text="${organization.name()}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
         <span th:text="${workspace.name()}">Workspace</span>
     </p>
 
     <div class="clavaris-page-header">
         <div>
             <h1 th:text="${workspace.name()}">Workspace name</h1>
-            <p>Created <span th:text="${T(com.clavaris.common.domain.model.LongEnglishDateFormatter).format(workspace.createdAt())}">date</span></p>
+            <p>Created <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(workspace.createdAt())}">date</span></p>
         </div>
     </div>
 </div>

@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Live UX request, 2026-10-02 — workspace-teams-hierarchy.html's own Team hierarchy tab: search
   // teams by name and page through them 5/page. Both client-side, same role-picker.js/
   // roles-table-filter.js convention — every team is already rendered in full either way
@@ -45,7 +50,7 @@
 
     const indicator = container.querySelector("[data-teams-page-indicator]");
     if (indicator) {
-      indicator.textContent = "Page " + page + " of " + totalPages(matches);
+      indicator.textContent = t("Page {0} of {1}", page, totalPages(matches));
     }
     const prev = container.querySelector("[data-teams-prev]");
     const next = container.querySelector("[data-teams-next]");
