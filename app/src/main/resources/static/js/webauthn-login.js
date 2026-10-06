@@ -15,6 +15,11 @@
 (function () {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  var t = function (text) {
+    return window.clavarisI18n ? window.clavarisI18n.t(text) : text;
+  };
+
   var BUTTON_ID = "passkey-signin-button";
   var ERROR_ID = "passkey-signin-error";
 
@@ -47,7 +52,7 @@
       return;
     }
     var isInternalCode = message && INTERNAL_ERROR_CODES.indexOf(message) !== -1;
-    errorElement.textContent = message && !isInternalCode ? message : GENERIC_ERROR;
+    errorElement.textContent = message && !isInternalCode ? message : t(GENERIC_ERROR);
     errorElement.hidden = false;
   }
 

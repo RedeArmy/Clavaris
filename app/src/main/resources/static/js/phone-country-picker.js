@@ -1,6 +1,14 @@
 (() => {
   "use strict";
 
+  // Translation helpers: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+  // A country's name in the page's language (Intl.DisplayNames), else the name the server sent.
+  const localName = (isoCode, serverName) =>
+    globalThis.clavarisI18n?.countryName(isoCode, serverName) ?? serverName;
+
   // Live UX request, 2026-10-04 — the Personal information card's phone number. The country-code
   // <select> listed ~240 options as "🇬🇹 +502 Guatemala" in a 128px box, so the closed control read
   // "GT +502 Gua", the flag drew as two letters on Windows (which has no flag glyphs), and — because
@@ -70,14 +78,29 @@
     Array.from(select.options)
       .map((option, index) => ({ option, index, match: OPTION_PATTERN.exec(option.text.trim()) }))
       .filter((entry) => entry.match && entry.option.value)
-      .map(({ option, index, match }) => ({
-        index,
-        iso: isoFromFlag(match[1]),
-        dial: match[2],
-        name: match[3],
-        search: fold(match[3] + " " + isoFromFlag(match[1]) + " " + match[2]),
-        value: option.value,
-      }));
+      .map(({ option, index, match }) => {
+        const iso = isoFromFlag(match[1]);
+        const name = localName(iso, match[3]);
+        return {
+          index,
+          iso,
+          dial: match[2],
+          name,
+          // Searchable by the name in the page's language, the English one, the ISO code and the dial code.
+          search: fold([name, match[3], iso, match[2]].join(" ")),
+          value: option.value,
+        };
+      });
+
+  const countStatus = (count) => {
+    let text = t("No countries found");
+    if (count === 1) {
+      text = t("1 country");
+    } else if (count > 1) {
+      text = t("{0} countries", count);
+    }
+    return text;
+  };
 
   const rank = (country, query) => {
     const dialDigits = country.dial.replace("+", "");
@@ -118,21 +141,21 @@
     panel.hidden = true;
     const search = element("input", "clavaris-phone-code__search");
     search.type = "search";
-    search.placeholder = "Search country or code";
+    search.placeholder = t("Search country or code");
     search.autocomplete = "off";
     search.spellcheck = false;
     search.setAttribute("role", "combobox");
-    search.setAttribute("aria-label", "Search country or dial code");
+    search.setAttribute("aria-label", t("Search country or dial code"));
     search.setAttribute("aria-controls", listId);
     search.setAttribute("aria-expanded", "true");
     search.setAttribute("aria-autocomplete", "list");
     const list = element("ul", "clavaris-phone-code__list");
     list.id = listId;
     list.setAttribute("role", "listbox");
-    list.setAttribute("aria-label", "Countries");
+    list.setAttribute("aria-label", t("Countries"));
     const status = element("output", "clavaris-visually-hidden");
     status.setAttribute("aria-live", "polite");
-    const empty = element("p", "clavaris-phone-code__empty", "No country matches that.");
+    const empty = element("p", "clavaris-phone-code__empty", t("No country matches that."));
     empty.hidden = true;
     panel.append(search, list, empty, status);
 
@@ -159,14 +182,14 @@
       const chosen = selectedCountry();
       iso.textContent = chosen ? chosen.iso : "";
       iso.hidden = !chosen;
-      dial.textContent = chosen ? chosen.dial : "Code";
+      dial.textContent = chosen ? chosen.dial : t("Code");
       trigger.classList.toggle("is-empty", !chosen);
       rows.forEach(({ row, country }) => row.setAttribute("aria-selected", String(country === chosen)));
       trigger.setAttribute(
         "aria-label",
         chosen
-          ? "Country code, " + chosen.name + " " + chosen.dial + ". Change"
-          : "Country code. Choose",
+          ? t("Country code, {0} {1}. Change", chosen.name, chosen.dial)
+          : t("Country code. Choose"),
       );
     };
 
@@ -176,7 +199,7 @@
       }
       const chosen = selectedCountry();
       const local = next?.value.trim();
-      preview.textContent = chosen && local ? "Will be saved as " + chosen.dial + " " + local : "";
+      preview.textContent = chosen && local ? t("Will be saved as {0} {1}", chosen.dial, local) : "";
     };
 
     const setActive = (position) => {
@@ -207,7 +230,7 @@
         list.append(row);
       });
       empty.hidden = visible.length > 0;
-      status.textContent = visible.length === 0 ? "No countries found" : visible.length + " countries";
+      status.textContent = countStatus(visible.length);
       const chosen = selectedCountry();
       const chosenPosition = visible.findIndex(({ country }) => chosen && country === chosen);
       let initial = visible.length > 0 ? 0 : -1;

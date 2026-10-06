@@ -92,6 +92,7 @@
 <!-- Code review finding (2026-09-01): client-side, same-origin-only cross-tab submit guard — see
      ContentSecurityPolicyHeaderWriter's own Javadoc and login-submit-guard.js's own header comment
      for the full rationale. -->
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/login-submit-guard.js') : '/js/login-submit-guard.js'}" defer></script>
 <!-- ADR-0009 §1: only actually does anything when data-modal is set on <body> above — see its own
      header comment for why social-provider links need window.open() treatment inside an iframe,

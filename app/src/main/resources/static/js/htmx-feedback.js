@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Global feedback for failed HTMX requests. Every mutation and paginated list on the dashboard is
   // an hx-post/hx-get; when one fails HTMX swaps nothing and says nothing, so the page looks as if
   // the click did nothing (or worked). This listens once, on <body>, and tells the user what happened
@@ -30,9 +35,9 @@
 
   const messageFor = (status) => {
     if (MESSAGES.has(status)) {
-      return MESSAGES.get(status);
+      return t(MESSAGES.get(status));
     }
-    return status >= 500 ? SERVER_ERROR : FALLBACK;
+    return t(status >= 500 ? SERVER_ERROR : FALLBACK);
   };
 
   // True when a response ended up on the login page, i.e. the session is gone.
@@ -54,7 +59,7 @@
       region = document.createElement("div");
       region.className = "clavaris-toast-region";
       region.setAttribute("popover", "manual");
-      region.setAttribute("aria-label", "Notifications");
+      region.setAttribute("aria-label", t("Notifications"));
       document.body.appendChild(region);
     }
     return region;
@@ -114,7 +119,7 @@
     const close = document.createElement("button");
     close.type = "button";
     close.className = "clavaris-toast__close";
-    close.setAttribute("aria-label", "Dismiss notification");
+    close.setAttribute("aria-label", t("Dismiss notification"));
     close.textContent = "×";
     close.addEventListener("click", () => dismiss(toast));
 
@@ -139,7 +144,7 @@
 
   root.addEventListener("htmx:sendError", () => showToast(messageFor(0)));
 
-  root.addEventListener("htmx:timeout", () => showToast(TIMEOUT));
+  root.addEventListener("htmx:timeout", () => showToast(t(TIMEOUT)));
 
   if (typeof module !== "undefined") {
     module.exports = { messageFor, isLoginRedirect };

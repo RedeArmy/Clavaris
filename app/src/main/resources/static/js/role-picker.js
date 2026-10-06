@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // Live UX request, 2026-10-01 — workspace-detail.html's own "Add existing role" popup: the
   // single-select <select> became a paginated (10/page), multi-select checkbox list, confirmed by
   // one "Add selected roles" submit. Pagination is purely client-side — every checkbox for this
@@ -26,7 +31,7 @@
     });
     const indicator = picker.querySelector(".clavaris-role-picker__page-indicator");
     if (indicator) {
-      indicator.textContent = "Page " + page + " of " + totalPages(picker);
+      indicator.textContent = t("Page {0} of {1}", page, totalPages(picker));
     }
     const prev = picker.querySelector("[data-role-picker-prev]");
     const next = picker.querySelector("[data-role-picker-next]");

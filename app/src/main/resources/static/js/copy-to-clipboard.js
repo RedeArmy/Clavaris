@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Translation helper: the shared i18n.js when the page loads it, plain English otherwise.
+  const t = (text, ...args) =>
+    globalThis.clavarisI18n?.t(text, ...args) ??
+    args.reduce((out, arg, index) => out.split("{" + index + "}").join(String(arg)), text);
+
   // One-click copy for any <button data-copy-target="<id>">: copies the text content of the element
   // with that id (an identifier, URL or PEM block). Gives instant feedback on the button itself
   // ("Copied", checkmark icon) and announces it politely to assistive technology through the page's
@@ -39,11 +44,11 @@
     copyBySelection(source);
   };
 
-  const showFeedback = (button, message) => {
+  const showFeedback = (button, message, copied) => {
     const label = button.querySelector("[data-copy-label]");
     const original = button.dataset.copyIdleLabel ?? label?.textContent ?? "";
     button.dataset.copyIdleLabel = original;
-    button.dataset.copied = message === "Copied" ? "true" : "false";
+    button.dataset.copied = copied ? "true" : "false";
     if (label) {
       label.textContent = message;
     }
@@ -70,8 +75,8 @@
       return;
     }
     writeText(source.textContent.trim(), source).then(
-      () => showFeedback(button, "Copied"),
-      () => showFeedback(button, "Copy failed"),
+      () => showFeedback(button, t("Copied"), true),
+      () => showFeedback(button, t("Copy failed"), false),
     );
   });
 })();

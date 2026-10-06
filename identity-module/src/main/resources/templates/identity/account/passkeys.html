@@ -57,6 +57,7 @@
         </div>
     </div>
 </main>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/i18n.js') : '/js/i18n.js'}" defer></script>
 <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/webauthn-register.js') : '/js/webauthn-register.js'}" defer></script>
 </body>
 </html>
