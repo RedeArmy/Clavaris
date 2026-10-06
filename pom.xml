@@ -120,7 +120,7 @@
              underlying cause. Fixed versions confirmed present on Maven Central before pinning:
              2.18.11/2.21.7/2.22.3 for jackson-2-bom, 3.1.7/3.2.3 for jackson-bom — again the
              smaller same-minor-line bump chosen for each. -->
-        <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
+        <jackson-2-bom.version>2.22.3</jackson-2-bom.version>
         <jackson-bom.version>3.1.7</jackson-bom.version>
         <!-- ADR-0026: identity-module's own SupabaseS3ProfilePictureStorage adapter talks to
              Supabase Storage's S3-compatible endpoint via this well-vetted client — no proprietary
