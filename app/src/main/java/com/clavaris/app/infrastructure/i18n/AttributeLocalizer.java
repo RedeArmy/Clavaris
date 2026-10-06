@@ -44,7 +44,7 @@ final class AttributeLocalizer {
           "th:aria-label",
           "th:value",
           "th:label");
-  private static final Pattern LITERAL = Pattern.compile("'((?:[^'\\\\]|\\\\.)*)'");
+  private static final Pattern LITERAL = Pattern.compile("'([^'\\\\]*+(?:\\\\.[^'\\\\]*+)*+)'");
 
   private final MessageCatalog catalog;
   private final IModelFactory factory;

@@ -24,9 +24,19 @@ class PoParserTest {
   void readsSeveralEntriesAndSkipsCommentsAndTheHeader() {
     final List<PoEntry> entries =
         parse(
-            "# translator note\nmsgid \"\"\nmsgstr \"Language: es\\n\"\n\n"
-                + "#: some/template.html:3\n#, fuzzy\nmsgid \"Save\"\nmsgstr \"Guardar\"\n\n"
-                + "msgid \"Next\"\nmsgstr \"Siguiente\"\n");
+            """
+            # translator note
+            msgid ""
+            msgstr "Language: es\\n"
+
+            #: some/template.html:3
+            #, fuzzy
+            msgid "Save"
+            msgstr "Guardar"
+
+            msgid "Next"
+            msgstr "Siguiente"
+            """);
 
     assertThat(entries)
         .containsExactly(new PoEntry("", "Save", "Guardar"), new PoEntry("", "Next", "Siguiente"));
@@ -46,8 +56,14 @@ class PoParserTest {
   void keepsAContextAndUnescapesQuotes() {
     final List<PoEntry> entries =
         parse(
-            "msgctxt \"th\"\nmsgid \"Created\"\nmsgstr \"Creado\"\n\n"
-                + "msgid \"Say \\\"hi\\\"\"\nmsgstr \"Di \\\"hola\\\"\"\n");
+            """
+            msgctxt "th"
+            msgid "Created"
+            msgstr "Creado"
+
+            msgid "Say \\"hi\\""
+            msgstr "Di \\"hola\\""
+            """);
 
     assertThat(entries)
         .containsExactly(

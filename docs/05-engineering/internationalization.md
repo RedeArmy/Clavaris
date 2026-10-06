@@ -51,7 +51,7 @@ The handler groups text the way a person reads it: a button, a heading, or a sen
 2. Add the Spanish entry. `SpanishCatalogTest` fails with the exact list of units that lack one, so nothing ships half-translated.
 3. The same test checks that every placeholder and tag in the English also appears in the translation.
 
-To list what the templates currently ask for (context, text, templates), run `./mvnw -pl app -am test -Dtest=DumpTemplateUnitsTool -Dsurefire.failIfNoSpecifiedTests=false -Di18n.dump=units.tsv`. On a machine whose default charset is not UTF-8, add `-Dfile.encoding=UTF-8` to the JVM options.
+To list what the templates currently ask for (context, text, templates), run `./mvnw -pl app -am test -Dtest=TemplateUnitsDumpTest -Dsurefire.failIfNoSpecifiedTests=false -Di18n.dump=units.tsv`. On a machine whose default charset is not UTF-8, add `-Dfile.encoding=UTF-8` to the JVM options.
 
 ## Adding a language
 

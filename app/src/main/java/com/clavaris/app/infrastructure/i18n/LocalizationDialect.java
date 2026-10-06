@@ -50,8 +50,8 @@ public final class LocalizationDialect extends AbstractDialect
   // After the standard processors and the comment stripper, so it sees the final page.
   private static final int PRECEDENCE = 1100;
 
-  private final Function<Locale, MessageCatalog> catalogs;
-  private final Consumer<ExtractedUnit> extractor;
+  private final Function<Locale, MessageCatalog> catalogSource;
+  private final Consumer<ExtractedUnit> unitSink;
 
   /** The normal configuration: catalogues from the classpath. */
   public LocalizationDialect() {
@@ -59,10 +59,11 @@ public final class LocalizationDialect extends AbstractDialect
   }
 
   public LocalizationDialect(
-      final Function<Locale, MessageCatalog> catalogs, final Consumer<ExtractedUnit> extractor) {
+      final Function<Locale, MessageCatalog> catalogSource,
+      final Consumer<ExtractedUnit> unitSink) {
     super(NAME);
-    this.catalogs = catalogs;
-    this.extractor = extractor;
+    this.catalogSource = catalogSource;
+    this.unitSink = unitSink;
   }
 
   @Override
@@ -77,9 +78,9 @@ public final class LocalizationDialect extends AbstractDialect
 
   @Override
   public Map<String, Object> getExecutionAttributes() {
-    return extractor == null
-        ? Map.of(CATALOGS, catalogs)
-        : Map.of(CATALOGS, catalogs, EXTRACTOR, extractor);
+    return unitSink == null
+        ? Map.of(CATALOGS, catalogSource)
+        : Map.of(CATALOGS, catalogSource, EXTRACTOR, unitSink);
   }
 
   /**

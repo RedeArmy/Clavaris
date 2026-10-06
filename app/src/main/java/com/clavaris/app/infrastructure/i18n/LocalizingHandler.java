@@ -63,9 +63,9 @@ public final class LocalizingHandler extends AbstractTemplateHandler {
       Set.of(
           "a", "abbr", "b", "bdi", "code", "em", "i", "kbd", "mark", "small", "span", "strong",
           "sub", "sup", "time", "u");
-  private static final Set<String> NEVER_TRANSLATED = Set.of("script", "style", "textarea");
-  private static final String LINE_BREAK = "br";
   private static final String TEXTAREA = "textarea";
+  private static final Set<String> NEVER_TRANSLATED = Set.of("script", "style", TEXTAREA);
+  private static final String LINE_BREAK = "br";
   private static final String BODY = "body";
   private static final String HTML = "html";
   private static final String DO_NOT_TRANSLATE = "no";
@@ -170,7 +170,7 @@ public final class LocalizingHandler extends AbstractTemplateHandler {
     if (!boundaries.isEmpty()) {
       boundaries.pop();
     }
-    if (!skipFrames.isEmpty() && skipFrames.pop()) {
+    if (!skipFrames.isEmpty() && Boolean.TRUE.equals(skipFrames.pop())) {
       skipping--;
     }
     if (BODY.equals(name) && skipping == 0 && extractor == null && !modalPage) {

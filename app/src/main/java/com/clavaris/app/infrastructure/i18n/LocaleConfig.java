@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Optional;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -32,12 +33,10 @@ public class LocaleConfig implements WebMvcConfigurer {
 
   /* default */ static final String COOKIE_NAME = "clavaris-lang";
 
-  // PMD.UnnecessaryConstructor: AtLeastOneConstructor asks for one and the two rules contradict
-  // each
-  // other; Spring instantiates this class and only its @Bean methods matter.
-  @SuppressWarnings("PMD.UnnecessaryConstructor")
-  public LocaleConfig() {
-    super();
+  private final ObjectProvider<LocaleResolver> resolvers;
+
+  public LocaleConfig(final ObjectProvider<LocaleResolver> resolvers) {
+    this.resolvers = resolvers;
   }
 
   /** Must be called {@code localeResolver}: that is the bean name Spring MVC looks for. */
@@ -59,7 +58,7 @@ public class LocaleConfig implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(final InterceptorRegistry registry) {
-    registry.addInterceptor(new LanguageInterceptor(localeResolver()));
+    registry.addInterceptor(new LanguageInterceptor(resolvers.getObject()));
   }
 
   /**
