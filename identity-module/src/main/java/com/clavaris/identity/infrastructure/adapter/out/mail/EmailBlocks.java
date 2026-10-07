@@ -18,6 +18,7 @@ import java.util.List;
 final class EmailBlocks {
 
   private static final String CELL_FONT = "font-family:" + EmailStyle.SANS + ";";
+  private static final String MUTED_CLASS = EmailHtml.cls("muted");
 
   private EmailBlocks() {
     // Static helpers only.
@@ -35,13 +36,12 @@ final class EmailBlocks {
 
   /* default */ static String text(final Block block) {
     return switch (block) {
-      case Paragraph paragraph -> paragraph.text();
-      case Action action -> action.label() + ": " + action.url();
-      case Code code -> code.label() + ": " + code.value();
-      case Details details ->
-          String.join(
-              "\n", details.rows().stream().map(row -> row.label() + ": " + row.value()).toList());
-      case Note note -> note.text();
+      case Paragraph(String text) -> text;
+      case Action(String label, String url, Tone _) -> label + ": " + url;
+      case Code(String label, String value) -> label + ": " + value;
+      case Details(List<Detail> rows) ->
+          String.join("\n", rows.stream().map(row -> row.label() + ": " + row.value()).toList());
+      case Note(String text) -> text;
     };
   }
 
@@ -79,19 +79,16 @@ final class EmailBlocks {
         "margin:0 0 4px;font-size:12px;line-height:1.6;color:" + EmailStyle.MUTED + ";";
     return EmailHtml.table("", EmailHtml.cls("btn"), "margin:24px 0 20px;", EmailHtml.row(cell))
         + EmailHtml.element(
-            "p", EmailHtml.cls("muted"), small, EmailHtml.esc(EmailCopy.text(EmailCopy.FALLBACK)))
+            "p", MUTED_CLASS, small, EmailHtml.esc(EmailCopy.text(EmailCopy.FALLBACK)))
         + EmailHtml.element(
-            "p",
-            EmailHtml.cls("muted"),
-            small + "word-break:break-all;",
-            EmailHtml.esc(action.url()));
+            "p", MUTED_CLASS, small + "word-break:break-all;", EmailHtml.esc(action.url()));
   }
 
   private static String code(final Code code) {
     final String label =
         EmailHtml.element(
             "div",
-            EmailHtml.cls("muted"),
+            MUTED_CLASS,
             CELL_FONT
                 + "font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;"
                 + "color:"
