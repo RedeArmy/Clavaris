@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -116,6 +117,9 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       final SocialProvider provider,
       final boolean deviceTrustVerified,
       final String fallbackUrl) {
+    // The provider names the AMR_ authority below. A null one would only surface as an opaque
+    // NullPointerException while that authority is built; fail here, saying why.
+    Objects.requireNonNull(provider, "provider is required for a social login");
     // ADR-0020: FACTOR_AUTHORIZATION_CODE — the standard Spring Security authority for "an OAuth2
     // Authorization Code exchange authenticated this session," exactly what a social login via
     // Google/GitHub actually is under the hood, same auth_time role as PASSWORD_AUTHORITY above.

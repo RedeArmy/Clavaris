@@ -1,9 +1,11 @@
 package com.clavaris.app.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.clavaris.identity.domain.model.SocialProvider;
 import java.util.UUID;
@@ -73,6 +75,23 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
         .contains("ROLE_ACCOUNT", "FACTOR_AUTHORIZATION_CODE", "AMR_GOOGLE")
         .noneMatch(authority -> authority.equals("AMR_MFA"));
     verify(contextRepository).saveContext(any(), any(), any());
+  }
+
+  @Test
+  void establishViaSocialLoginRejectsAMissingProviderBeforeTouchingTheSession() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    UUID accountId = UUID.randomUUID();
+
+    assertThatNullPointerException()
+        .isThrownBy(
+            () ->
+                establisher.establishViaSocialLogin(
+                    request, response, accountId, null, false, "/o/x/login?authenticated"))
+        .withMessage("provider is required for a social login");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    verifyNoInteractions(contextRepository);
   }
 
   // TD-SEC-048: proves the actual fix - a Device Trust step-up composes RFC 8176's "mfa" value
