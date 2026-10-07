@@ -1,0 +1,200 @@
+# Spanish text of the emails Clavaris sends: English source text -> Spanish.
+# Every entry carries the context "email" so it never collides with a page entry.
+# See docs/05-engineering/internationalization.md for the format and the glossary.
+
+msgctxt "email"
+msgid "Verify your email address"
+msgstr "Verifica tu correo electrónico"
+
+msgctxt "email"
+msgid "Reset your password"
+msgstr "Restablece tu contraseña"
+
+msgctxt "email"
+msgid "Confirm linking your {0} account"
+msgstr "Confirma la vinculación de tu cuenta de {0}"
+
+msgctxt "email"
+msgid "Your sign-in code"
+msgstr "Tu código de inicio de sesión"
+
+msgctxt "email"
+msgid "Your sign-in link"
+msgstr "Tu enlace de inicio de sesión"
+
+msgctxt "email"
+msgid "Confirm this new device"
+msgstr "Confirma este dispositivo nuevo"
+
+msgctxt "email"
+msgid "New sign-in to your account"
+msgstr "Nuevo inicio de sesión en tu cuenta"
+
+msgctxt "email"
+msgid "New sign-in to your Clavaris account"
+msgstr "Nuevo inicio de sesión en tu cuenta de Clavaris"
+
+msgctxt "email"
+msgid "Confirm your email address to finish setting up your account."
+msgstr "Confirma tu correo electrónico para terminar de configurar tu cuenta."
+
+msgctxt "email"
+msgid "Use this code to finish setting up your account."
+msgstr "Usa este código para terminar de configurar tu cuenta."
+
+msgctxt "email"
+msgid "Choose a new password for your account."
+msgstr "Elige una contraseña nueva para tu cuenta."
+
+msgctxt "email"
+msgid "Confirm that you want to connect your {0} account."
+msgstr "Confirma que quieres conectar tu cuenta de {0}."
+
+msgctxt "email"
+msgid "Use this code to sign in. It expires in 10 minutes."
+msgstr "Usa este código para iniciar sesión. Caduca en 10 minutos."
+
+msgctxt "email"
+msgid "Use this link to sign in. It expires in 10 minutes."
+msgstr "Usa este enlace para iniciar sesión. Caduca en 10 minutos."
+
+msgctxt "email"
+msgid "Enter this code to confirm it's you. It expires in 10 minutes."
+msgstr "Introduce este código para confirmar que eres tú. Caduca en 10 minutos."
+
+msgctxt "email"
+msgid "A new device or browser signed in to your account."
+msgstr "Un dispositivo o navegador nuevo inició sesión en tu cuenta."
+
+msgctxt "email"
+msgid "Confirm your email address to finish setting up your Clavaris account."
+msgstr "Confirma tu correo electrónico para terminar de configurar tu cuenta de Clavaris."
+
+msgctxt "email"
+msgid "Enter this code to finish setting up your account."
+msgstr "Introduce este código para terminar de configurar tu cuenta."
+
+msgctxt "email"
+msgid "We received a request to reset the password for your account."
+msgstr "Recibimos una solicitud para restablecer la contraseña de tu cuenta."
+
+msgctxt "email"
+msgid "We received a request to reset the password for your Clavaris account."
+msgstr "Recibimos una solicitud para restablecer la contraseña de tu cuenta de Clavaris."
+
+msgctxt "email"
+msgid "Someone tried to sign in to your account with {0}. If that was you, confirm the link to connect the two accounts."
+msgstr "Alguien intentó iniciar sesión en tu cuenta con {0}. Si fuiste tú, confirma el enlace para conectar ambas cuentas."
+
+msgctxt "email"
+msgid "Someone tried to sign in to your Clavaris account with {0}. If that was you, confirm the link to connect the two accounts."
+msgstr "Alguien intentó iniciar sesión en tu cuenta de Clavaris con {0}. Si fuiste tú, confirma el enlace para conectar ambas cuentas."
+
+msgctxt "email"
+msgid "Enter this code to sign in."
+msgstr "Introduce este código para iniciar sesión."
+
+msgctxt "email"
+msgid "Use the button below to sign in."
+msgstr "Usa el botón de abajo para iniciar sesión."
+
+msgctxt "email"
+msgid "We don't recognize the device you're signing in from. Enter this code to confirm it's you."
+msgstr "No reconocemos el dispositivo desde el que inicias sesión. Introduce este código para confirmar que eres tú."
+
+msgctxt "email"
+msgid "Your account was just signed in to from a new device or browser."
+msgstr "Se acaba de iniciar sesión en tu cuenta desde un dispositivo o navegador nuevo."
+
+msgctxt "email"
+msgid "Your Clavaris account was just signed in to from a new device or browser."
+msgstr "Se acaba de iniciar sesión en tu cuenta de Clavaris desde un dispositivo o navegador nuevo."
+
+msgctxt "email"
+msgid "If this was you, no action is needed."
+msgstr "Si fuiste tú, no tienes que hacer nada."
+
+msgctxt "email"
+msgid "If you don't recognize this activity, lock your account and sign out of every active session now."
+msgstr "Si no reconoces esta actividad, bloquea tu cuenta y cierra todas las sesiones activas ahora mismo."
+
+msgctxt "email"
+msgid "If you don't recognize this activity, change your password and review your active sessions."
+msgstr "Si no reconoces esta actividad, cambia tu contraseña y revisa tus sesiones activas."
+
+msgctxt "email"
+msgid "Verify email"
+msgstr "Verificar correo"
+
+msgctxt "email"
+msgid "Reset password"
+msgstr "Restablecer contraseña"
+
+msgctxt "email"
+msgid "Confirm link"
+msgstr "Confirmar vinculación"
+
+msgctxt "email"
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
+msgctxt "email"
+msgid "This wasn't me"
+msgstr "No fui yo"
+
+msgctxt "email"
+msgid "Your code"
+msgstr "Tu código"
+
+msgctxt "email"
+msgid "Device"
+msgstr "Dispositivo"
+
+msgctxt "email"
+msgid "IP address"
+msgstr "Dirección IP"
+
+msgctxt "email"
+msgid "Time"
+msgstr "Hora"
+
+msgctxt "email"
+msgid "This link expires in 24 hours. If you didn't request this, you can safely ignore this email."
+msgstr "Este enlace caduca en 24 horas. Si no lo solicitaste, puedes ignorar este correo."
+
+msgctxt "email"
+msgid "This code expires in 24 hours. If you didn't request this, you can safely ignore this email."
+msgstr "Este código caduca en 24 horas. Si no lo solicitaste, puedes ignorar este correo."
+
+msgctxt "email"
+msgid "This link expires in 30 minutes and can be used once. If you didn't request this, ignore this email: your password will not change."
+msgstr "Este enlace caduca en 30 minutos y solo se puede usar una vez. Si no lo solicitaste, ignora este correo: tu contraseña no cambiará."
+
+msgctxt "email"
+msgid "This link expires in 24 hours and can be used once. If you didn't request this, ignore this email: nothing will change."
+msgstr "Este enlace caduca en 24 horas y solo se puede usar una vez. Si no lo solicitaste, ignora este correo: no se hará ningún cambio."
+
+msgctxt "email"
+msgid "This code expires in 10 minutes. If you didn't request this, ignore this email: nobody can sign in without it."
+msgstr "Este código caduca en 10 minutos. Si no lo solicitaste, ignora este correo: nadie puede iniciar sesión sin él."
+
+msgctxt "email"
+msgid "This link expires in 10 minutes and can be used once. If you didn't request this, ignore this email: nobody can sign in without it."
+msgstr "Este enlace caduca en 10 minutos y solo se puede usar una vez. Si no lo solicitaste, ignora este correo: nadie puede iniciar sesión sin él."
+
+msgctxt "email"
+msgid "This code expires in 10 minutes. If you didn't try to sign in, ignore this email: nobody can finish signing in without it."
+msgstr "Este código caduca en 10 minutos. Si no intentaste iniciar sesión, ignora este correo: nadie puede completar el inicio de sesión sin él."
+
+msgctxt "email"
+msgid "This link expires in 7 days and can be used once."
+msgstr "Este enlace caduca en 7 días y solo se puede usar una vez."
+
+msgctxt "email"
+msgid "If the button does not work, copy and paste this link into your browser:"
+msgstr "Si el botón no funciona, copia y pega este enlace en tu navegador:"
+
+msgctxt "email"
+msgid "Sent by Clavaris. This is an automated message, so replies are not monitored."
+msgstr "Enviado por Clavaris. Es un mensaje automático, así que las respuestas no se supervisan."
+

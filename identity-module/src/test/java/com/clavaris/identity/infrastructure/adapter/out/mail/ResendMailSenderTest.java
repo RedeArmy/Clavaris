@@ -87,6 +87,22 @@ class ResendMailSenderTest {
   }
 
   @Test
+  void sendsAPlainTextTwinAlongsideTheHtml() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+    UUID organizationId = UUID.randomUUID();
+
+    sender.sendEmailVerification(
+        "user@example.com", new OrganizationId(organizationId), "the-raw-token");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("text").asString())
+        .doesNotContain("<")
+        .contains("Verify your email address")
+        .contains(BASE_URL + "/o/" + organizationId + "/verify-email?token=the-raw-token");
+  }
+
+  @Test
   void sendsAWellFormedRequestForAnEmailVerificationCode() {
     respondWith(200, "");
     ResendMailSender sender = senderPointedAtTheStubServer();
@@ -170,7 +186,7 @@ class ResendMailSenderTest {
         "the-raw-token");
 
     JsonNode body = objectMapper.readTree(capturedRequest.body);
-    assertThat(body.get("subject").asString()).isEqualTo("Confirm linking your GOOGLE account");
+    assertThat(body.get("subject").asString()).isEqualTo("Confirm linking your Google account");
     assertThat(body.get("html").asString())
         .as("the same tenant-scoped /o/{organizationId}/... link shape as every other tenant email")
         .contains(BASE_URL + "/o/" + organizationId + "/confirm-social-link?token=the-raw-token");
@@ -220,7 +236,7 @@ class ResendMailSenderTest {
     assertThat(body.get("html").asString())
         .contains("Mozilla/5.0 Test Browser")
         .doesNotContain("account-alert/lock")
-        .doesNotContain("This wasn't me");
+        .doesNotContain("wasn&#39;t me");
   }
 
   @Test
@@ -283,7 +299,7 @@ class ResendMailSenderTest {
     assertThat(body.get("html").asString())
         .contains("Mozilla/5.0 Test Browser")
         .doesNotContain("account-alert/lock")
-        .doesNotContain("This wasn't me");
+        .doesNotContain("wasn&#39;t me");
   }
 
   @Test
@@ -326,7 +342,7 @@ class ResendMailSenderTest {
         "founder@example.com", SocialProvider.GITHUB, "the-raw-token");
 
     JsonNode body = objectMapper.readTree(capturedRequest.body);
-    assertThat(body.get("subject").asString()).isEqualTo("Confirm linking your GITHUB account");
+    assertThat(body.get("subject").asString()).isEqualTo("Confirm linking your GitHub account");
     assertThat(body.get("html").asString())
         .as("the platform tier's own link has no organizationId segment at all")
         .contains(BASE_URL + "/platform/confirm-social-link?token=the-raw-token");
