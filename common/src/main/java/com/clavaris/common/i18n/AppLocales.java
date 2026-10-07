@@ -26,6 +26,7 @@ public final class AppLocales {
   /** Every supported locale, the first being the default. */
   public static final List<Locale> SUPPORTED = List.of(ENGLISH, SPANISH);
 
+  public static final String ENGLISH_LANGUAGE = "en";
   public static final String SPANISH_LANGUAGE = "es";
 
   private AppLocales() {
@@ -40,7 +41,11 @@ public final class AppLocales {
 
   /** The supported locale that shares {@code requested}'s language, else English. */
   public static Locale resolve(final Locale requested) {
-    return parse(requested == null ? null : requested.getLanguage()).orElse(ENGLISH);
+    Locale resolved = ENGLISH;
+    if (requested != null) {
+      resolved = parse(requested.getLanguage()).orElse(ENGLISH);
+    }
+    return resolved;
   }
 
   /** The supported locale for a language tag such as "es", "es-GT" or "EN", if there is one. */
@@ -52,6 +57,10 @@ public final class AppLocales {
           SUPPORTED.stream().filter(locale -> locale.getLanguage().equals(language)).findFirst();
     }
     return match;
+  }
+
+  public static boolean isEnglish(final Locale locale) {
+    return ENGLISH_LANGUAGE.equals(locale.getLanguage());
   }
 
   public static boolean isSpanish(final Locale locale) {

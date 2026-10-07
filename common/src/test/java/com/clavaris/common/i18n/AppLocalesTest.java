@@ -32,6 +32,14 @@ class AppLocalesTest {
   }
 
   @Test
+  void tellsEnglishFromSpanishByLanguage() {
+    assertThat(AppLocales.isEnglish(Locale.UK)).isTrue();
+    assertThat(AppLocales.isEnglish(AppLocales.SPANISH)).isFalse();
+    assertThat(AppLocales.isSpanish(Locale.forLanguageTag("es-GT"))).isTrue();
+    assertThat(AppLocales.isSpanish(AppLocales.ENGLISH)).isFalse();
+  }
+
+  @Test
   void parsesLanguageTagsAndIgnoresGarbage() {
     assertThat(AppLocales.parse("ES")).contains(AppLocales.SPANISH);
     assertThat(AppLocales.parse("es_MX")).contains(AppLocales.SPANISH);

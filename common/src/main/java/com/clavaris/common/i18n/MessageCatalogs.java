@@ -20,7 +20,7 @@ public final class MessageCatalogs {
 
   public static MessageCatalog forLocale(final Locale locale) {
     final Locale supported = AppLocales.resolve(locale);
-    return AppLocales.ENGLISH.getLanguage().equals(supported.getLanguage())
+    return AppLocales.isEnglish(supported)
         ? MessageCatalog.empty()
         : CACHE.computeIfAbsent(supported.getLanguage(), MessageCatalog::load);
   }
