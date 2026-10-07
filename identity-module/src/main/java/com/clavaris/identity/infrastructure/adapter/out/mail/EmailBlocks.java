@@ -37,7 +37,7 @@ final class EmailBlocks {
   /* default */ static String text(final Block block) {
     return switch (block) {
       case Paragraph(String text) -> text;
-      case Action(String label, String url, Tone _) -> label + ": " + url;
+      case Action(String label, String url, _) -> label + ": " + url;
       case Code(String label, String value) -> label + ": " + value;
       case Details(List<Detail> rows) ->
           String.join("\n", rows.stream().map(row -> row.label() + ": " + row.value()).toList());
