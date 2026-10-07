@@ -494,13 +494,18 @@ body > main {
   margin-top: 10px;
 }
 
+/* Two buttons share a row only while both labels fit on one line; otherwise each takes a full row.
+   The wrap decision comes from the labels' own width, so a longer translation stacks the buttons
+   instead of spilling out of them, with no per-language rule. */
 .clavaris-social-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
 
 .clavaris-social-options p {
+  flex: 1 1 0;
+  min-width: max-content;
   margin: 0;
 }
 
@@ -667,7 +672,8 @@ body > main {
 }
 
 .clavaris-page-header > .clavaris-button--inline {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .clavaris-section {
@@ -1292,7 +1298,8 @@ label.clavaris-toggle.clavaris-toggle--row {
   line-height: 1.25;
   text-align: center;
   text-decoration: none;
-  white-space: nowrap;
+  text-wrap: balance;
+  overflow-wrap: break-word;
   cursor: pointer;
   background: var(--clavaris-brand-color);
   border: 1px solid transparent;
@@ -1361,8 +1368,11 @@ label.clavaris-toggle.clavaris-toggle--row {
   background: color-mix(in srgb, var(--clavaris-danger) 86%, #000);
 }
 
+/* The provider buttons keep their label on one line: when it does not fit beside the other
+   button, the row wraps (see .clavaris-social-options) rather than the label. */
 .clavaris-button--social {
   gap: var(--space-2);
+  white-space: nowrap;
 }
 
 .clavaris-button--social svg {
@@ -1375,6 +1385,7 @@ label.clavaris-toggle.clavaris-toggle--row {
   min-height: 32px;
   padding: 5px var(--space-3);
   font-size: var(--text-sm);
+  white-space: nowrap;
 }
 
 /* In-flight HTMX request: pending submit buttons are inert, a thin progress bar crosses the top
@@ -2790,7 +2801,7 @@ body:has(.htmx-request)::after {
 /* Two fields side by side where there is room (first/last name), one per row below that. */
 .clavaris-field-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 0 var(--space-4);
 }
 
@@ -4019,7 +4030,7 @@ body:has(.htmx-request)::after {
 
 @media (max-width: 640px) {
   .clavaris-configure-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
   }
 
@@ -4063,10 +4074,6 @@ body:has(.htmx-request)::after {
   .clavaris-auth-brand img {
     width: 178px;
     height: auto;
-  }
-
-  .clavaris-social-options {
-    grid-template-columns: 1fr;
   }
 
   .clavaris-links--split {
