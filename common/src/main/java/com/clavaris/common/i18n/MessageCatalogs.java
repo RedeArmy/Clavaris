@@ -19,9 +19,9 @@ public final class MessageCatalogs {
   }
 
   public static MessageCatalog forLocale(final Locale locale) {
-    final Locale supported = AppLocales.resolve(locale);
-    return AppLocales.isEnglish(supported)
+    final String language = AppLocales.languageOf(locale);
+    return AppLocales.ENGLISH_LANGUAGE.equals(language)
         ? MessageCatalog.empty()
-        : CACHE.computeIfAbsent(supported.getLanguage(), MessageCatalog::load);
+        : CACHE.computeIfAbsent(language, MessageCatalog::load);
   }
 }

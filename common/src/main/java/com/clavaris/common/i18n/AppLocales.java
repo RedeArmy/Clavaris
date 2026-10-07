@@ -59,8 +59,17 @@ public final class AppLocales {
     return match;
   }
 
-  public static boolean isEnglish(final Locale locale) {
-    return ENGLISH_LANGUAGE.equals(locale.getLanguage());
+  /**
+   * The language of the supported locale for {@code requested}, or English's when there is none.
+   * Works on the language code rather than a {@link Locale}, so a caller that only needs to key or
+   * compare by language never handles a value that could be missing.
+   */
+  public static String languageOf(final Locale requested) {
+    String language = ENGLISH_LANGUAGE;
+    if (requested != null) {
+      language = parse(requested.getLanguage()).map(Locale::getLanguage).orElse(ENGLISH_LANGUAGE);
+    }
+    return language;
   }
 
   public static boolean isSpanish(final Locale locale) {
