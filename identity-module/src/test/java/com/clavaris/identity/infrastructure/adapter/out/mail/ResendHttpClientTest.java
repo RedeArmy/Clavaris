@@ -32,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 class ResendHttpClientTest {
 
   private static final URI ENDPOINT = URI.create("http://localhost:1/emails");
+  private static final Emails.Composed EMAIL = new Emails.Composed("subject", "html", "text");
 
   @Test
   void tripsOpenAfterRepeatedFailuresAndThenFailsFastWithoutCallingTheRealHttpClientAgain()
@@ -55,10 +56,10 @@ class ResendHttpClientTest {
     // the circuit is now OPEN. Both still reach the real (mocked) HttpClient — the breaker only
     // starts rejecting calls itself once it has enough data to open.
     assertThatExceptionOfType(MailDeliveryException.class)
-        .isThrownBy(() -> client.send("user@example.com", "subject", "html"))
+        .isThrownBy(() -> client.send("user@example.com", EMAIL))
         .withMessageContaining("network/IO");
     assertThatExceptionOfType(MailDeliveryException.class)
-        .isThrownBy(() -> client.send("user@example.com", "subject", "html"))
+        .isThrownBy(() -> client.send("user@example.com", EMAIL))
         .withMessageContaining("network/IO");
     assertThat(circuitBreaker.getState())
         .as("2 failures out of a 2-call window at a 50% threshold must open the circuit")
@@ -67,7 +68,7 @@ class ResendHttpClientTest {
     // The third call must fail immediately, with the circuit-breaker-specific message — and,
     // decisively, without ever reaching the real HttpClient again.
     assertThatExceptionOfType(MailDeliveryException.class)
-        .isThrownBy(() -> client.send("user@example.com", "subject", "html"))
+        .isThrownBy(() -> client.send("user@example.com", EMAIL))
         .withMessageContaining("circuit breaker is open");
     verify(httpClient, times(2)).send(any(), any());
   }
@@ -88,9 +89,9 @@ class ResendHttpClientTest {
         new ResendHttpClient(
             httpClient, new ObjectMapper(), "test-key", "no-reply@test", ENDPOINT, circuitBreaker);
 
-    client.send("user@example.com", "subject", "html");
-    client.send("user@example.com", "subject", "html");
-    client.send("user@example.com", "subject", "html");
+    client.send("user@example.com", EMAIL);
+    client.send("user@example.com", EMAIL);
+    client.send("user@example.com", EMAIL);
 
     assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
     verify(httpClient, times(3)).send(any(), any());

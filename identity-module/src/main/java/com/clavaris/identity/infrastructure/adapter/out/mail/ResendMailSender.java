@@ -17,7 +17,6 @@ import java.time.Instant;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.HtmlUtils;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -46,12 +45,6 @@ import tools.jackson.databind.ObjectMapper;
 class ResendMailSender implements MailSender, PlatformMailSender {
 
   private static final URI DEFAULT_RESEND_ENDPOINT = URI.create("https://api.resend.com/emails");
-
-  // Both the tenant-tier LINK and CODE email-verification methods (ADR-0024 §2) and the
-  // platform-tier equivalent share this exact subject line — one constant, not three repeated
-  // literals.
-  @SuppressWarnings("PMD.LongVariable")
-  private static final String VERIFY_EMAIL_SUBJECT = "Verify your email address";
 
   private final ResendHttpClient httpClient;
   private final String baseUrl;
@@ -151,37 +144,21 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   @Override
   public void sendEmailVerification(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
-    final String link = link(organizationId, "verify-email", rawToken);
     httpClient.send(
-        toAddress,
-        VERIFY_EMAIL_SUBJECT,
-        "<p>Confirm your email address to finish setting up your account:</p>"
-            + ResendHttpClient.htmlButton(link, "Verify email")
-            + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
+        toAddress, Emails.verifyEmailLink(link(organizationId, "verify-email", rawToken), false));
   }
 
   @Override
   public void sendEmailVerificationCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    httpClient.send(
-        toAddress,
-        VERIFY_EMAIL_SUBJECT,
-        "<p>Confirm your email address to finish setting up your account. Enter this code:</p>"
-            + ResendHttpClient.htmlCode(rawCode)
-            + "<p>This code expires in 24 hours. If you didn't request this, you can ignore it.</p>");
+    httpClient.send(toAddress, Emails.verifyEmailCode(rawCode));
   }
 
   @Override
   public void sendPasswordReset(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
-    final String link = link(organizationId, "reset-password", rawToken);
     httpClient.send(
-        toAddress,
-        "Reset your password",
-        "<p>A password reset was requested for this account:</p>"
-            + ResendHttpClient.htmlButton(link, "Reset password")
-            + "<p>This link expires in 30 minutes and can only be used once. If you didn't request"
-            + " this, you can safely ignore it — your password will not be changed.</p>");
+        toAddress, Emails.passwordReset(link(organizationId, "reset-password", rawToken), false));
   }
 
   @Override
@@ -190,54 +167,29 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final OrganizationId organizationId,
       final SocialProvider provider,
       final String rawToken) {
-    final String link = link(organizationId, "confirm-social-link", rawToken);
     httpClient.send(
         toAddress,
-        "Confirm linking your " + provider + " account",
-        "<p>Someone tried to sign in to this account using "
-            + provider
-            + ". If this was you, confirm the link:</p>"
-            + ResendHttpClient.htmlButton(link, "Confirm link")
-            + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
-            + " this, you can safely ignore it — no account changes will be made.</p>");
+        Emails.socialLinkConfirmation(
+            link(organizationId, "confirm-social-link", rawToken), provider, false));
   }
 
   @Override
   public void sendEmailSignInCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    httpClient.send(
-        toAddress,
-        "Your sign-in code",
-        "<p>Enter this code to sign in:</p>"
-            + ResendHttpClient.htmlCode(rawCode)
-            + "<p>This code expires in 10 minutes. If you didn't request this, you can safely"
-            + " ignore it — no one can sign in without it.</p>");
+    httpClient.send(toAddress, Emails.signInCode(rawCode));
   }
 
   @Override
   public void sendEmailSignInLink(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
-    final String link = link(organizationId, "login/email-link", rawToken);
     httpClient.send(
-        toAddress,
-        "Your sign-in link",
-        "<p>Click the button below to sign in:</p>"
-            + ResendHttpClient.htmlButton(link, "Sign in")
-            + "<p>This link expires in 10 minutes and can only be used once. If you didn't request"
-            + " this, you can safely ignore it — no one can sign in without it.</p>");
+        toAddress, Emails.signInLink(link(organizationId, "login/email-link", rawToken)));
   }
 
   @Override
   public void sendDeviceTrustChallengeCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    httpClient.send(
-        toAddress,
-        "Confirm this new device",
-        "<p>We don't recognize the device you're signing in from. Enter this code to confirm"
-            + " it's you:</p>"
-            + ResendHttpClient.htmlCode(rawCode)
-            + "<p>This code expires in 10 minutes. If you didn't try to sign in, you can safely"
-            + " ignore this — no one can complete the sign-in without it.</p>");
+    httpClient.send(toAddress, Emails.deviceTrustCode(rawCode));
   }
 
   @Override
@@ -248,75 +200,38 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String sourceIp,
       final Instant occurredAt,
       final String rawAlertToken) {
-    // TD-FUT-025: renders a real "this wasn't me" action link when a token was minted
-    // (rawAlertToken != null), and degrades to the old plain-informational body when it wasn't —
-    // MailSender's own Javadoc documents that minting failure must never fail the whole send.
+    // TD-FUT-025: a real "this wasn't me" action link when a token was minted (rawAlertToken !=
+    // null), and a plain informational email when it was not - MailSender's own Javadoc documents
+    // that a minting failure must never fail the whole send.
     //
-    // userAgent/sourceIp are the first values this class has ever interpolated into an email body
-    // that this server itself did NOT generate — a raw HTTP request header, fully attacker-
-    // controlled. HtmlUtils.htmlEscape guards against HTML injection into the sent email; every
-    // other send* method here only ever interpolates a link/token this server built itself, so
-    // this is the first method that needs it.
-    final String actionParagraph =
-        rawAlertToken == null
-            ? "<p>If this was you, no action is needed. If you don't recognize this activity,"
-                + " change your password and review your active sessions.</p>"
-            : "<p>If this was you, no action is needed.</p>"
-                + "<p>If you don't recognize this activity, lock your account and sign out every"
-                + " active session immediately:</p>"
-                + ResendHttpClient.htmlButton(
-                    link(organizationId, "account-alert/lock", rawAlertToken), "This wasn't me")
-                + "<p>This link expires in 7 days and can only be used once.</p>";
+    // userAgent and sourceIp are the first values that reach an email body which this server did
+    // NOT generate: a raw HTTP request header, fully attacker-controlled. EmailRenderer escapes
+    // every value it lays out, so they cannot inject markup into the sent email.
+    final String lockLink =
+        rawAlertToken == null ? null : link(organizationId, "account-alert/lock", rawAlertToken);
     httpClient.send(
-        toAddress,
-        "New sign-in to your account",
-        "<p>Your account was just signed in to from a new device or browser:</p>"
-            + "<ul><li>Device: "
-            + HtmlUtils.htmlEscape(userAgent)
-            + "</li><li>IP address: "
-            + HtmlUtils.htmlEscape(sourceIp)
-            + "</li><li>Time: "
-            + occurredAt
-            + "</li></ul>"
-            + actionParagraph);
+        toAddress, Emails.newDeviceAlert(userAgent, sourceIp, occurredAt, lockLink, false));
   }
 
   @Override
   public void sendPlatformAccountEmailVerification(final String toAddress, final String rawToken) {
-    final String link = platformLink("verify-email", rawToken);
     httpClient.send(
-        toAddress,
-        VERIFY_EMAIL_SUBJECT,
-        "<p>Confirm your email address to finish setting up your Clavaris account:</p>"
-            + ResendHttpClient.htmlButton(link, "Verify email")
-            + "<p>This link expires in 24 hours. If you didn't request this, you can ignore it.</p>");
+        toAddress, Emails.verifyEmailLink(platformLink("verify-email", rawToken), true));
   }
 
   @Override
   public void sendPlatformSocialLinkConfirmation(
       final String toAddress, final SocialProvider provider, final String rawToken) {
-    final String link = platformLink("confirm-social-link", rawToken);
     httpClient.send(
         toAddress,
-        "Confirm linking your " + provider + " account",
-        "<p>Someone tried to sign in to your Clavaris account using "
-            + provider
-            + ". If this was you, confirm the link:</p>"
-            + ResendHttpClient.htmlButton(link, "Confirm link")
-            + "<p>This link expires in 24 hours and can only be used once. If you didn't request"
-            + " this, you can safely ignore it — no account changes will be made.</p>");
+        Emails.socialLinkConfirmation(
+            platformLink("confirm-social-link", rawToken), provider, true));
   }
 
   @Override
   public void sendPlatformAccountPasswordReset(final String toAddress, final String rawToken) {
-    final String link = platformLink("reset-password", rawToken);
     httpClient.send(
-        toAddress,
-        "Reset your password",
-        "<p>A password reset was requested for your Clavaris account:</p>"
-            + ResendHttpClient.htmlButton(link, "Reset password")
-            + "<p>This link expires in 30 minutes and can only be used once. If you didn't request"
-            + " this, you can safely ignore it — your password will not be changed.</p>");
+        toAddress, Emails.passwordReset(platformLink("reset-password", rawToken), true));
   }
 
   @Override
@@ -326,31 +241,12 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String sourceIp,
       final Instant occurredAt,
       final String rawAlertToken) {
-    // Same HtmlUtils.htmlEscape rationale as sendNewDeviceLoginNotification above — userAgent/
-    // sourceIp are attacker-controlled raw request-header values, not something this server built.
-    // TD-FUT-031: same real-link-when-minted/degrade-when-not shape as that tenant-tier sibling.
-    final String actionParagraph =
-        rawAlertToken == null
-            ? "<p>If this was you, no action is needed. If you don't recognize this activity,"
-                + " change your password and review your active sessions.</p>"
-            : "<p>If this was you, no action is needed.</p>"
-                + "<p>If you don't recognize this activity, lock your account and sign out every"
-                + " active session immediately:</p>"
-                + ResendHttpClient.htmlButton(
-                    platformLink("account-alert/lock", rawAlertToken), "This wasn't me")
-                + "<p>This link expires in 7 days and can only be used once.</p>";
+    // Same escaping rationale as sendNewDeviceLoginNotification above. TD-FUT-031: same
+    // real-link-when-minted, plain-when-not shape as that tenant-tier sibling.
+    final String lockLink =
+        rawAlertToken == null ? null : platformLink("account-alert/lock", rawAlertToken);
     httpClient.send(
-        toAddress,
-        "New sign-in to your Clavaris account",
-        "<p>Your Clavaris account was just signed in to from a new device or browser:</p>"
-            + "<ul><li>Device: "
-            + HtmlUtils.htmlEscape(userAgent)
-            + "</li><li>IP address: "
-            + HtmlUtils.htmlEscape(sourceIp)
-            + "</li><li>Time: "
-            + occurredAt
-            + "</li></ul>"
-            + actionParagraph);
+        toAddress, Emails.newDeviceAlert(userAgent, sourceIp, occurredAt, lockLink, true));
   }
 
   private String link(

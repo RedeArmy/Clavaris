@@ -71,9 +71,14 @@ final class ResendHttpClient {
   // broad-Exception catch clause is defensive-only, matching Callable#call's own broad `throws
   // Exception` signature executeCallable propagates — see that catch block's own comment.
   @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
-  /* package */ void send(final String toAddress, final String subject, final String html) {
+  /* package */ void send(final String toAddress, final Emails.Composed email) {
     final Map<String, Object> requestBody =
-        Map.of("from", fromAddress, "to", List.of(toAddress), "subject", subject, "html", html);
+        Map.of(
+            "from", fromAddress,
+            "to", List.of(toAddress),
+            "subject", email.subject(),
+            "html", email.html(),
+            "text", email.text());
 
     final String jsonBody;
     try {
@@ -123,23 +128,5 @@ final class ResendHttpClient {
       // from a real delivery success.
       throw new MailDeliveryException("Resend responded with status " + response.statusCode());
     }
-  }
-
-  // Extracted purely to remove the "<p><a href=\"" literal's duplication
-  // (PMD.AvoidDuplicateLiterals) across every send*() method that renders one clickable action
-  // link. Static/stateless: this is plain HTML formatting, not a Resend-API concern, but lives here
-  // rather than back on ResendMailSender since every method that calls it also calls send() on the
-  // same line — one shared collaborator, not two.
-  /* package */ static String htmlButton(final String link, final String label) {
-    return "<p><a href=\"" + link + "\">" + label + "</a></p>";
-  }
-
-  // ADR-0024: the CODE-shaped counterpart to htmlButton above — every send*Code() method renders
-  // one large, easy-to-retype value the same way. code itself is always this server's own
-  // EmailOneTimeCode.generate() output (six ASCII digits), never attacker-controlled input, so no
-  // HTML-escaping is needed here the way sendNewDeviceLoginNotification's own userAgent/sourceIp
-  // interpolation requires.
-  /* package */ static String htmlCode(final String code) {
-    return "<p style=\"font-size:24px;font-weight:bold;letter-spacing:4px;\">" + code + "</p>";
   }
 }

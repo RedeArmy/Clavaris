@@ -60,6 +60,10 @@ To list what the templates currently ask for (context, text, templates), run `./
 3. Add the table to `i18n.js` for browser-side strings (confirmation prompts, toasts, the phone picker, the picture uploader). Server-rendered text never goes through it.
 4. Copy `SpanishCatalogTest` for the new catalogue.
 
+## Emails
+
+The emails Clavaris sends are translated from the same catalogue format, but not by the page translator: their text is written in Java (`EmailCopy`) and looked up with the context `email`. Their Spanish lives in `identity-module/src/main/resources/i18n/messages_es_email.po`, which is merged with the page catalogue like any other `messages_<language>*.po`. The language is the one of the request being served, since every email is sent while its reader waits on that request. See `email-audit.md`.
+
 ## Formats
 
 | | English | Spanish |
