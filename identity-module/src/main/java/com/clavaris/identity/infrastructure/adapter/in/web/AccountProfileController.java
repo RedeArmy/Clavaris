@@ -1,11 +1,15 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteownaccount.SelfDeleteNotAllowedException;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationQuery;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
+import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
+import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.InvalidProfilePictureException;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureUseCase;
@@ -16,6 +20,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -37,8 +43,11 @@ import org.springframework.web.multipart.MultipartFile;
 // PMD.AvoidFieldNameMatchingMethodName: removePicture (the field) and removePicture() (the
 // @PostMapping handler) name the same real concept — same "the field is the collaborator, the
 // method is the endpoint that calls it" shape every other controller in this codebase already
-// has for its own use-case fields.
-@SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
+// has for its own use-case fields. PMD.ExcessiveImports: TD-FUT-040 added updateProfile's own
+// exception/command/use-case imports on top of what this controller already had — same
+// "real use cases, not a God-class symptom" reasoning PlatformAccountProfileAdminController's
+// own, slightly larger, identical surface already establishes.
+@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/account/profile")
 public class AccountProfileController {
@@ -47,6 +56,7 @@ public class AccountProfileController {
   private static final String REDIRECT_PREFIX = "redirect:/o/";
 
   private final GetAccountForOrganizationUseCase getAccount;
+  private final UpdateAccountProfileUseCase updateProfile;
   private final UpdateAccountProfilePictureUseCase updatePicture;
   private final RemoveAccountProfilePictureUseCase removePicture;
   private final DeleteOwnAccountUseCase deleteOwnAccount;
@@ -55,11 +65,13 @@ public class AccountProfileController {
   @SuppressWarnings("java:S107")
   public AccountProfileController(
       final GetAccountForOrganizationUseCase getAccount,
+      final UpdateAccountProfileUseCase updateProfile,
       final UpdateAccountProfilePictureUseCase updatePicture,
       final RemoveAccountProfilePictureUseCase removePicture,
       final DeleteOwnAccountUseCase deleteOwnAccount,
       final CurrentAccountResolver currentAccount) {
     this.getAccount = getAccount;
+    this.updateProfile = updateProfile;
     this.updatePicture = updatePicture;
     this.removePicture = removePicture;
     this.deleteOwnAccount = deleteOwnAccount;
@@ -73,6 +85,53 @@ public class AccountProfileController {
       final Model model) {
     populateModel(model, organizationId, requireCurrentAccount(request));
     return PROFILE_VIEW;
+  }
+
+  // TD-FUT-040: self-service name/username/phone editing — same shape as
+  // PlatformAccountProfileAdminController's own identical operator-driven method, reusing the exact
+  // same UpdateAccountProfileUseCase (built generically enough for this call site from day one, per
+  // that command's own Javadoc) rather than a second, parallel implementation. Actor is
+  // AuditActor.account(...) here, never platformAccount(...) — the Account is genuinely acting on
+  // itself, unlike the admin controller's own operator-driven call.
+  //
+  // PMD.OnlyOneReturn: two real, distinct outcomes — a username conflict re-renders the form with
+  // an error, success redirects plainly — same rationale PlatformAccountProfileAdminController's
+  // own identical suppression documents.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
+  @PostMapping
+  public String updateProfile(
+      @PathVariable final UUID organizationId,
+      final HttpServletRequest request,
+      @RequestParam(required = false) final String firstName,
+      @RequestParam(required = false) final String lastName,
+      @RequestParam(required = false) final String username,
+      @RequestParam(required = false) final String phoneCountryCode,
+      @RequestParam(required = false) final String phoneNumberLocal) {
+    final AccountId accountId = requireCurrentAccount(request);
+    try {
+      updateProfile.handle(
+          new UpdateAccountProfileCommand(
+              accountId,
+              blankToNull(firstName),
+              blankToNull(lastName),
+              blankToNull(username),
+              PhoneNumberInput.combine(phoneCountryCode, phoneNumberLocal),
+              AuditActor.account(accountId.value())));
+    } catch (final UsernameAlreadyRegisteredException _) {
+      return REDIRECT_PREFIX
+          + organizationId
+          + "/account/profile?usernameError="
+          + encode("This username is already taken");
+    }
+    return REDIRECT_PREFIX + organizationId + "/account/profile?profileUpdated";
+  }
+
+  private static String blankToNull(final String value) {
+    return value == null || value.isBlank() ? null : value.strip();
+  }
+
+  private static String encode(final String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8);
   }
 
   // PMD.OnlyOneReturn: two real, distinct outcomes — a validation error re-renders the form,

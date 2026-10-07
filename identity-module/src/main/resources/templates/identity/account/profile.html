@@ -19,6 +19,9 @@
         <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">
             Your profile picture was removed.
         </output>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.profileUpdated}">
+            Your profile was updated.
+        </output>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${uploadError}" th:text="${uploadError}">
             Upload error
         </p>
@@ -46,6 +49,15 @@
             </div>
         </div>
 
+        <!-- TD-FUT-040: self-service "Personal information" — same editable-fields shape as
+             PlatformAccountProfileAdminController's own identical operator-facing card
+             (identity/platform/account-profile.html), minus anything operator-only. Email stays
+             read-only here deliberately — self-service email change is its own, separately-scoped
+             item (TD-FUT-043), not bundled into this one. Username/phone follow the exact same
+             "editable only while absent, write-once in practice" pattern as the admin page (ADR-0024
+             §4 for username; a 2026-09-22 feature request for phone, see UpdateAccountProfileCommand's
+             own Javadoc) — shown as plain text once set, never a second input that would silently no-op
+             on submit. -->
         <div class="clavaris-section">
             <div class="clavaris-table-wrapper">
             <table class="clavaris-table">
@@ -54,18 +66,42 @@
                     <th scope="row">Email</th>
                     <td th:text="${account.email().value()}">email</td>
                 </tr>
-                <tr th:if="${account.firstName().isPresent() or account.lastName().isPresent()}">
-                    <th scope="row">Name</th>
-                    <td th:with="fullName=${(account.firstName().orElse('') + ' ' + account.lastName().orElse('')).trim()}"
-                        th:text="${fullName}">name</td>
-                </tr>
                 <tr th:if="${account.username().isPresent()}">
                     <th scope="row">Username</th>
                     <td th:text="${account.username().get().value()}">username</td>
                 </tr>
+                <tr th:if="${account.phoneNumber().isPresent()}">
+                    <th scope="row">Phone number</th>
+                    <td th:text="${account.phoneNumber().get()}">phone</td>
+                </tr>
                 </tbody>
             </table>
             </div>
+        </div>
+
+        <div class="clavaris-section">
+            <h2>Personal information</h2>
+            <form method="post"
+                  th:action="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">
+                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="clavaris-field">
+                    <label for="account-first-name">First name</label>
+                    <input id="account-first-name" type="text" name="firstName" th:value="${account.firstName().orElse('')}"/>
+                </div>
+                <div class="clavaris-field">
+                    <label for="account-last-name">Last name</label>
+                    <input id="account-last-name" type="text" name="lastName" th:value="${account.lastName().orElse('')}"/>
+                </div>
+                <th:block th:if="${account.phoneNumber().isEmpty()}">
+                    <div th:replace="~{identity/platform/fragments/phone-field :: phoneField('account-phone', 'phoneCountryCode', 'phoneNumberLocal', null, null)}"></div>
+                </th:block>
+                <div class="clavaris-field" th:if="${account.username().isEmpty()}">
+                    <label for="account-username">Username</label>
+                    <input id="account-username" type="text" name="username"/>
+                    <p class="clavaris-field-error" th:if="${param.usernameError}" th:text="${param.usernameError}">Username error</p>
+                </div>
+                <button class="clavaris-button clavaris-button--inline" type="submit">Save</button>
+            </form>
         </div>
 
         <!-- Clerk "Allow user to delete their account" parity (ADR-0026): only rendered at all

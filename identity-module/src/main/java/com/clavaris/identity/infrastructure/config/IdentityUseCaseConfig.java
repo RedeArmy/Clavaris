@@ -58,6 +58,8 @@ import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvat
 import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarUseCase;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationService;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.getaccountprofile.GetAccountProfileService;
+import com.clavaris.identity.application.usecase.getaccountprofile.GetAccountProfileUseCase;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountService;
 import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountUseCase;
 import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountService;
@@ -241,6 +243,15 @@ class IdentityUseCaseConfig {
   /* package */ GetAccountForOrganizationUseCase getAccountForOrganizationUseCase(
       final AccountRepository accountRepository) {
     return new GetAccountForOrganizationService(accountRepository);
+  }
+
+  // TD-FUT-041: Backend-API-style profile read, accountId-only (no organizationId filter — see
+  // that query's own Javadoc for why this is a separate, simpler use case from the one right
+  // above).
+  @Bean
+  /* package */ GetAccountProfileUseCase getAccountProfileUseCase(
+      final AccountRepository accountRepository) {
+    return new GetAccountProfileService(accountRepository);
   }
 
   @Bean

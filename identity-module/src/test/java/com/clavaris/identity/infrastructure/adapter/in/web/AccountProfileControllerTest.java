@@ -16,8 +16,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteownaccount.SelfDeleteNotAllowedException;
 import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
+import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureCommand;
 import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
+import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileCommand;
+import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.InvalidProfilePictureException;
 import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureUseCase;
 import com.clavaris.identity.domain.model.Account;
@@ -44,6 +47,7 @@ class AccountProfileControllerTest {
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();
 
   private GetAccountForOrganizationUseCase getAccount;
+  private UpdateAccountProfileUseCase updateProfile;
   private UpdateAccountProfilePictureUseCase updatePicture;
   private RemoveAccountProfilePictureUseCase removePicture;
   private DeleteOwnAccountUseCase deleteOwnAccount;
@@ -54,6 +58,7 @@ class AccountProfileControllerTest {
   @BeforeEach
   void setUp() {
     getAccount = mock(GetAccountForOrganizationUseCase.class);
+    updateProfile = mock(UpdateAccountProfileUseCase.class);
     updatePicture = mock(UpdateAccountProfilePictureUseCase.class);
     removePicture = mock(RemoveAccountProfilePictureUseCase.class);
     deleteOwnAccount = mock(DeleteOwnAccountUseCase.class);
@@ -89,7 +94,12 @@ class AccountProfileControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new AccountProfileController(
-                    getAccount, updatePicture, removePicture, deleteOwnAccount, currentAccount))
+                    getAccount,
+                    updateProfile,
+                    updatePicture,
+                    removePicture,
+                    deleteOwnAccount,
+                    currentAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -101,6 +111,45 @@ class AccountProfileControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/account/profile"))
         .andExpect(content().string(org.hamcrest.Matchers.containsString("ada@example.com")));
+  }
+
+  // TD-FUT-040: self-service name/username/phone editing.
+  @Test
+  void postProfileUpdatesNameAndRedirects() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile", ORGANIZATION_ID)
+                .param("firstName", "Ada")
+                .param("lastName", "Lovelace"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/profile?profileUpdated"));
+
+    verify(updateProfile)
+        .handle(
+            new UpdateAccountProfileCommand(
+                account.id(),
+                "Ada",
+                "Lovelace",
+                null,
+                null,
+                com.clavaris.common.domain.model.AuditActor.account(account.id().value())));
+  }
+
+  @Test
+  void postProfileRedirectsWithAnErrorOnUsernameConflict() throws Exception {
+    doThrow(new UsernameAlreadyRegisteredException(account.organizationId()))
+        .when(updateProfile)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile", ORGANIZATION_ID).param("username", "ada"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/account/profile?usernameError=This+username+is+already+taken"));
   }
 
   @Test

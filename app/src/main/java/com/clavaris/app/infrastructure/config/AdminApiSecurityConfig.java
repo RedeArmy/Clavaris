@@ -211,6 +211,14 @@ class AdminApiSecurityConfig {
                     // too (not OPERATOR_ONLY), same rationale as the two routes above.
                     .requestMatchers(HttpMethod.PUT, "/api/v1/admin/accounts/*/metadata")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_METADATA_WRITE)
+                    // TD-FUT-041, Clerk Backend API parity — GET and PUT share one scope
+                    // (ACCOUNTS_PROFILE_WRITE's own Javadoc explains why), reachable by an
+                    // OrganizationClient too (not OPERATOR_ONLY), same rationale as the metadata
+                    // route right above.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/accounts/*/profile")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_PROFILE_WRITE)
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/admin/accounts/*/profile")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.ACCOUNTS_PROFILE_WRITE)
                     // Clerk "session tasks" parity: forcing a future password reset — its own
                     // scope, deliberately separate from ACCOUNTS_SUSPEND (see
                     // PlatformScopes.ACCOUNTS_FORCE_PASSWORD_RESET's own Javadoc for why).

@@ -114,6 +114,12 @@ public final class OrganizationClientOwnershipFilter extends OncePerRequestFilte
             // TD-FUT-034, Clerk "Metadata" parity — same dual-authority rationale as the two
             // routes above.
             oneHopAccount(HttpMethod.PUT, "/api/v1/admin/accounts/{accountId}/metadata"),
+            // TD-FUT-041, Clerk Backend API parity — same dual-authority rationale as the
+            // metadata route right above; both GET and PUT listed since they share one scope
+            // (ACCOUNTS_PROFILE_WRITE's own Javadoc explains why) but are two distinct routes
+            // this filter's own fail-closed allowlist must name individually.
+            oneHopAccount(HttpMethod.GET, "/api/v1/admin/accounts/{accountId}/profile"),
+            oneHopAccount(HttpMethod.PUT, "/api/v1/admin/accounts/{accountId}/profile"),
             // TD-SEC-061: the read equivalent of the three write routes below was missing —
             // this filter fails closed, so an OrganizationClient token with write access to
             // this exact resource got an inexplicable 403 on the one read of an otherwise
