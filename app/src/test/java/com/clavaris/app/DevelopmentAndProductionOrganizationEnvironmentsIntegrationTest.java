@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -39,9 +40,9 @@ import tools.jackson.databind.ObjectMapper;
  * SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis) — the three
  * phases end to end, against real Postgres and real HTTP, not assumed from the unit tests alone:
  * (1) a brand-new Organization is DEVELOPMENT by default, with a real, explicit, low-capacity
- * {@code RateLimitPolicy} row; (2) registering an Account under it never triggers a real outbound
- * verification email, while the {@code VerificationToken} itself is still genuinely created; (3)
- * {@code :create-production-environment} promotes it to a linked {@code PRODUCTION} sibling — no
+ * {@code RateLimitPolicy} row; (2) registering an Account with a real address under it still
+ * triggers a real outbound verification email — see below for why this changed; (3) {@code
+ * :create-production-environment} promotes it to a linked {@code PRODUCTION} sibling — no
  * {@code RateLimitPolicy} row (system default applies).
  *
  * <p>SDE-III correction, 2026-09-24: this test previously also asserted that a client registered
@@ -50,6 +51,13 @@ import tools.jackson.databind.ObjectMapper;
  * reasoning); {@code OAuthClient.clientId} is now a fixed {@code client_} prefix regardless of the
  * owning Organization's environment, so there is nothing environment-specific left to assert about
  * it here.
+ *
+ * <p>Correctness finding, 2026-10-08: phase 2 used to assert the opposite — that a
+ * {@code DEVELOPMENT} Organization never sends a real verification email at all, for any address.
+ * That blocked every real registrant's own sign-up against any sandboxed Organization (every
+ * Organization's own default), with no way to complete it. See {@code TestEmailAddress}'s own
+ * Javadoc for the replacement: only an address carrying its {@code +clavaris_test} marker bypasses
+ * the real send now, in any environment — this test now proves both halves of that, end to end.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(TestMailSenderConfig.class)
@@ -100,11 +108,11 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
             developmentOrganizationId);
     assertThat(developmentRequestsPerMinute).isEqualTo(300);
 
-    // Phase 2: registering an Account under this DEVELOPMENT Organization never triggers a real
-    // outbound verification email, but the VerificationToken itself is still genuinely created —
-    // the flow completes, it just never leaves this process.
-    UUID accountId = registerAccount(developmentOrganizationId, "sandbox-user@example.com");
-    verify(mailSender, never()).sendEmailVerification(any(), any(), any());
+    // Phase 2: registering an Account with a real address under this DEVELOPMENT Organization
+    // DOES trigger a real outbound verification email — environment no longer gates this at all
+    // (correctness finding, 2026-10-08, see this class's own Javadoc).
+    UUID accountId = registerAccount(developmentOrganizationId, "real-user@example.com");
+    verify(mailSender).sendEmailVerification(eq("real-user@example.com"), any(), any());
     Integer verificationTokenRows =
         jdbcTemplate.queryForObject(
             "select count(*) from verification_tokens where account_id = ? and type = ?",
@@ -112,6 +120,21 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
             accountId,
             "EMAIL_VERIFICATION");
     assertThat(verificationTokenRows).isEqualTo(1);
+
+    // The other half of the replacement: an address carrying the +clavaris_test marker still
+    // bypasses the real send, in this same DEVELOPMENT Organization — the VerificationToken is
+    // still genuinely created either way.
+    UUID testAddressAccountId =
+        registerAccount(developmentOrganizationId, "sandbox-user+clavaris_test@example.com");
+    verify(mailSender, never())
+        .sendEmailVerification(eq("sandbox-user+clavaris_test@example.com"), any(), any());
+    Integer testAddressVerificationTokenRows =
+        jdbcTemplate.queryForObject(
+            "select count(*) from verification_tokens where account_id = ? and type = ?",
+            Integer.class,
+            testAddressAccountId,
+            "EMAIL_VERIFICATION");
+    assertThat(testAddressVerificationTokenRows).isEqualTo(1);
 
     // Phase 3: promote the DEVELOPMENT Organization to a linked PRODUCTION sibling.
     HttpResponse<String> promoteResponse =

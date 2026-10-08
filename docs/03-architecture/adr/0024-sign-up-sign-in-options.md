@@ -85,7 +85,8 @@ optional: passwordless sign-up needs a passwordless way to actually complete.
 
 `requestemailsignincode`/`authenticatewithemailcode` and `requestemailsigninlink`/
 `authenticatewithemaillink` are direct siblings of `requestpasswordreset`/`confirmpasswordreset`
-(silent-on-unknown-email anti-enumeration, `DEVELOPMENT`-environment bypass). Both call the same
+(silent-on-unknown-email anti-enumeration, `+clavaris_test`-marked-address bypass — see BR-ID-15,
+corrected 2026-10-08, this was environment-wide until that correction). Both call the same
 new `AuthenticatedSessionEstablisher.establishViaOneTimeEmailProof(...)` — a single-use value
 proven once is the same OIDC `amr=["otp"]` factor regardless of which of the two delivery
 mechanisms carried it, so one establish method serves both, using Spring Security's real

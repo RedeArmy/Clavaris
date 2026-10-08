@@ -14,7 +14,6 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.EmailVerificationMethod;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -33,7 +32,6 @@ class RequestEmailSignInLinkServiceTest {
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
-  private OrganizationEnvironmentChecker environmentChecker;
   private AccountAuthenticationPolicyProvider policyProvider;
   private RequestEmailSignInLinkService service;
 
@@ -42,11 +40,8 @@ class RequestEmailSignInLinkServiceTest {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
-    environmentChecker = mock(OrganizationEnvironmentChecker.class);
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
-    service =
-        new RequestEmailSignInLinkService(
-            accounts, tokens, mailSender, environmentChecker, policyProvider);
+    service = new RequestEmailSignInLinkService(accounts, tokens, mailSender, policyProvider);
     when(policyProvider.policyFor(organizationId)).thenReturn(enabledPolicy());
   }
 
@@ -61,7 +56,6 @@ class RequestEmailSignInLinkServiceTest {
     Account account = Account.register(organizationId, email);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(false);
 
     service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
 
@@ -84,13 +78,14 @@ class RequestEmailSignInLinkServiceTest {
     verify(mailSender, never()).sendEmailSignInLink(any(), any(), any());
   }
 
+  // Correctness finding, 2026-10-08: no environment check left — only a +clavaris_test-marked
+  // address bypasses the real send, regardless of the owning Organization's environment.
   @Test
-  void bypassesEmailDeliveryInADevelopmentEnvironment() {
-    Email email = new Email("dev-org@example.com");
+  void bypassesEmailDeliveryForATestMarkedAddress() {
+    Email email = new Email("dev-org+clavaris_test@example.com");
     Account account = Account.register(organizationId, email);
     when(accounts.findByOrganizationIdAndEmail(organizationId, email))
         .thenReturn(Optional.of(account));
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
 
     service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
 

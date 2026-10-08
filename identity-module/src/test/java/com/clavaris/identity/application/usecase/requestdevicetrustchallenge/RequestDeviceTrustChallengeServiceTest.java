@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
@@ -32,7 +31,6 @@ class RequestDeviceTrustChallengeServiceTest {
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
-  private OrganizationEnvironmentChecker environmentChecker;
   private RequestDeviceTrustChallengeService service;
 
   @BeforeEach
@@ -40,9 +38,7 @@ class RequestDeviceTrustChallengeServiceTest {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
-    environmentChecker = mock(OrganizationEnvironmentChecker.class);
-    service =
-        new RequestDeviceTrustChallengeService(accounts, tokens, mailSender, environmentChecker);
+    service = new RequestDeviceTrustChallengeService(accounts, tokens, mailSender);
   }
 
   private Account someAccount() {
@@ -53,7 +49,6 @@ class RequestDeviceTrustChallengeServiceTest {
   void issuesADeviceTrustChallengeCodeAndEmailsIt() {
     Account account = someAccount();
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(false);
 
     service.handle(new RequestDeviceTrustChallengeCommand(account.id()));
 
@@ -68,11 +63,13 @@ class RequestDeviceTrustChallengeServiceTest {
         .sendDeviceTrustChallengeCode(eq(account.email().value()), eq(organizationId), any());
   }
 
+  // Correctness finding, 2026-10-08: no environment check left — only a +clavaris_test-marked
+  // address bypasses the real send, regardless of the owning Organization's environment.
   @Test
-  void bypassesEmailDeliveryInADevelopmentEnvironment() {
-    Account account = someAccount();
+  void bypassesEmailDeliveryForATestMarkedAddress() {
+    Account account =
+        Account.register(organizationId, new Email("device-trust+clavaris_test@example.com"));
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
 
     service.handle(new RequestDeviceTrustChallengeCommand(account.id()));
 
