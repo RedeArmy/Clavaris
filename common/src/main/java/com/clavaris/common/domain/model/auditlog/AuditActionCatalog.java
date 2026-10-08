@@ -61,6 +61,11 @@ public final class AuditActionCatalog {
         AuditTone.UPDATED,
         "Rate limit changed");
     add(
+        "session_policy.set",
+        AuditCategory.ORGANIZATION,
+        AuditTone.UPDATED,
+        "Session policy changed");
+    add(
         "redirect_policy.set",
         AuditCategory.ORGANIZATION,
         AuditTone.UPDATED,
