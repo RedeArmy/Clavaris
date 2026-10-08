@@ -82,13 +82,13 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
     final int nextSlash = afterPrefix.indexOf('/');
     final String organizationId = nextSlash < 0 ? afterPrefix : afterPrefix.substring(0, nextSlash);
     final String loginUrl = request.getContextPath() + PREFIX + organizationId + LOGIN_SUFFIX;
-    final String clientId =
-        request.getParameter(OAUTH2_CLIENT_ID_PARAM) != null
-            ? request.getParameter(OAUTH2_CLIENT_ID_PARAM)
-            : request.getParameter(CLIENT_ID_PARAM);
+    final String oauth2ClientId = request.getParameter(OAUTH2_CLIENT_ID_PARAM);
     response.sendRedirect(
         appendIfPresent(
-            appendIfPresent(loginUrl, CLIENT_ID_PARAM, clientId),
+            appendIfPresent(
+                loginUrl,
+                CLIENT_ID_PARAM,
+                oauth2ClientId != null ? oauth2ClientId : request.getParameter(CLIENT_ID_PARAM)),
             DISPLAY_PARAM,
             request.getParameter(DISPLAY_PARAM)));
   }
