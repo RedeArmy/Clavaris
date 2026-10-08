@@ -13,7 +13,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
 // TD-SEC-009: proves the writer's own branching logic in isolation — which policy, on which
@@ -77,44 +81,47 @@ class ContentSecurityPolicyHeaderWriterTest {
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 
-  // Code review finding (2026-09-01): identity/login.html now loads its own real, same-origin
-  // script (login-submit-guard.js) — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
-  // this earns its own policy, distinct from both the strict default and the consent page's.
-  //
-  // TD-FUT-034 (SDE-III review, 2026-09-30): connect-src is now 'self', not 'none' — same
-  // DASHBOARD_PAGE_POLICY bug class, this time for webauthn-login.js's own fetch() calls.
-  @Test
-  void setsTheLoginPagePolicyOnlyForTheLoginPagePathItself() {
-    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+  // SonarCloud finding: these three used to be separate, identically-shaped tests (request +
+  // response + writeHeaders + verify one exact header string) — one row each below instead,
+  // same per-page rationale each original test's own doc comment carried, now on the data
+  // provider: (1) login — identity/login.html's own login-submit-guard.js, plus TD-FUT-034's
+  // webauthn-login.js fetch() calls (connect-src 'self', not 'none'); (2) passkeys — TD-FUT-034,
+  // the self-service "your passkeys" page's own webauthn-register.js needs the same script-src
+  // 'self' + connect-src 'self' pair; (3) profile — Clerk <UserProfile/> parity (pattern (a)),
+  // this template's own i18n.js/organization-dialog.js need script-src 'self', but connect-src
+  // stays 'none' since neither script makes a fetch/XHR call (confirmed by reading
+  // organization-dialog.js directly).
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("orgScopedSinglePagePolicies")
+  void setsTheCorrectPolicyForEachOrgScopedSinglePage(
+      final String label, final String path, final String expectedPolicy) {
+    HttpServletRequest request = requestWithUri(path);
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
 
     writer.writeHeaders(request, response);
 
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
+    verify(response).setHeader(HEADER_NAME, expectedPolicy);
   }
 
-  // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs the same
-  // script-src 'self' + connect-src 'self' pair the login page and dashboard already carve out —
-  // see ContentSecurityPolicyHeaderWriter's own ACCOUNT_PASSKEYS_PAGE_POLICY comment.
-  @Test
-  void setsTheAccountPasskeysPagePolicyWithScriptAndConnectSrcSelf() {
-    HttpServletRequest request =
-        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/passkeys");
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
+  private static Stream<Arguments> orgScopedSinglePagePolicies() {
+    final String scriptSelfConnectSelf =
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+            + "form-action 'self'; frame-ancestors 'none'";
+    final String scriptSelfConnectNone =
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+            + "form-action 'self'; frame-ancestors 'none'";
+    return Stream.of(
+        Arguments.of("login page", ORG_LOGIN_PATH, scriptSelfConnectSelf),
+        Arguments.of(
+            "account passkeys page",
+            "/o/11111111-1111-1111-1111-111111111111/account/passkeys",
+            scriptSelfConnectSelf),
+        Arguments.of(
+            "account profile page",
+            "/o/11111111-1111-1111-1111-111111111111/account/profile",
+            scriptSelfConnectNone));
   }
 
   // A sibling path under the same /o/{organizationId}/account/** prefix — the sessions page — must
@@ -132,25 +139,6 @@ class ContentSecurityPolicyHeaderWriterTest {
         .setHeader(
             HEADER_NAME,
             "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
-  }
-
-  // Clerk <UserProfile/> parity, pattern (a): the self-service profile page's own
-  // i18n.js/organization-dialog.js need script-src 'self' — connect-src stays 'none', neither
-  // script makes a fetch/XHR call (confirmed by reading organization-dialog.js directly).
-  @Test
-  void setsTheAccountProfilePagePolicyWithScriptSrcSelfAndConnectSrcNone() {
-    HttpServletRequest request =
-        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }

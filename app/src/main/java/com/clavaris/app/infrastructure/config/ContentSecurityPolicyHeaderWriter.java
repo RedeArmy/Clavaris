@@ -267,13 +267,9 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private static final Pattern ACCOUNT_PROFILE_PAGE_PATH =
       Pattern.compile("^/o/[^/]+/account/profile$");
 
-  // Security finding, 2026-10-07 (see EmbeddingEligibilityChecker's own Javadoc): every org-scoped
-  // page this class relaxes frame-ancestors for (login, profile) must pass the Organization its
-  // own request path actually names, so a resolved OAuthClient belonging to a *different*
-  // Organization is never trusted just because it happens to have a verified embedding domain.
-  // One capturing-group pattern, reused by both — LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH above
-  // already proved the request matches "/o/{organizationId}/...", this just captures that same
-  // segment instead of only confirming its shape.
+  // See this class's own Javadoc (2026-10-07 security finding) for why this exists. Reused by
+  // both login/profile — LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH already proved the shape, this
+  // just captures the same segment.
   @SuppressWarnings("PMD.LongVariable")
   private static final Pattern ORGANIZATION_SCOPED_PATH_PREFIX = Pattern.compile("^/o/([^/]+)/.*$");
 
