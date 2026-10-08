@@ -35,6 +35,16 @@ import org.springframework.security.web.AuthenticationEntryPoint;
  * {@code /oauth2/authorize?...&display=modal} request would lose both by the time the browser ever
  * reaches {@code /o/{organizationId}/login} — the login page needs {@code clientId} to resolve
  * embedding eligibility and {@code display} to know it's being rendered inside an iframe at all.
+ *
+ * <p>TD-FUT-045 (security finding, 2026-10-08): this entry point also fires for every other
+ * authenticated path on {@code ACCOUNT_SELF_SERVICE_PATH_PATTERN} ({@code /o/*&#47;account/**}),
+ * including the self-service profile page's own embedded-iframe access — and THAT originally-
+ * requested URL never goes through {@code /oauth2/authorize} at all, so it carries {@code clientId}
+ * (camelCase, same convention the login page itself already uses) directly, never the OAuth2 spec's
+ * {@code client_id}. Checking {@code client_id} first, falling back to {@code clientId}, covers
+ * both originating shapes without the caller needing to know which one applies — the same two-name
+ * duality {@code ContentSecurityPolicyHeaderWriter}'s own {@code CLIENT_ID_PARAM}/{@code
+ * OAUTH2_CLIENT_ID_PARAM} pair already documents for the consent-page case.
  */
 public final class OrganizationLoginRedirectEntryPoint implements AuthenticationEntryPoint {
 
@@ -42,6 +52,7 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   private static final String LOGIN_SUFFIX = "/login";
   private static final String DISPLAY_PARAM = "display";
   private static final String CLIENT_ID_PARAM = "clientId";
+  private static final String OAUTH2_CLIENT_ID_PARAM = OAuth2ParameterNames.CLIENT_ID;
 
   // Constructed directly (new OrganizationLoginRedirectEntryPoint()) by
   // OrganizationAuthorizationServerConfig, not Spring's own component scan — this class holds no
@@ -67,10 +78,13 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
     final int nextSlash = afterPrefix.indexOf('/');
     final String organizationId = nextSlash < 0 ? afterPrefix : afterPrefix.substring(0, nextSlash);
     final String loginUrl = request.getContextPath() + PREFIX + organizationId + LOGIN_SUFFIX;
+    final String clientId =
+        request.getParameter(OAUTH2_CLIENT_ID_PARAM) != null
+            ? request.getParameter(OAUTH2_CLIENT_ID_PARAM)
+            : request.getParameter(CLIENT_ID_PARAM);
     response.sendRedirect(
         appendIfPresent(
-            appendIfPresent(
-                loginUrl, CLIENT_ID_PARAM, request.getParameter(OAuth2ParameterNames.CLIENT_ID)),
+            appendIfPresent(loginUrl, CLIENT_ID_PARAM, clientId),
             DISPLAY_PARAM,
             request.getParameter(DISPLAY_PARAM)));
   }
