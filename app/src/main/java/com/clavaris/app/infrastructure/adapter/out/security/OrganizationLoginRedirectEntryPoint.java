@@ -52,6 +52,10 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   private static final String LOGIN_SUFFIX = "/login";
   private static final String DISPLAY_PARAM = "display";
   private static final String CLIENT_ID_PARAM = "clientId";
+
+  // Same PMD.LongVariable suppression ContentSecurityPolicyHeaderWriter's own identically-named
+  // constant already carries.
+  @SuppressWarnings("PMD.LongVariable")
   private static final String OAUTH2_CLIENT_ID_PARAM = OAuth2ParameterNames.CLIENT_ID;
 
   // Constructed directly (new OrganizationLoginRedirectEntryPoint()) by
