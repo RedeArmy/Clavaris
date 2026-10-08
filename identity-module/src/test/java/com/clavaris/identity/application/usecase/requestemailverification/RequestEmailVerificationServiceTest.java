@@ -30,7 +30,6 @@ class RequestEmailVerificationServiceTest {
   private AccountRepository accounts;
   private VerificationTokenRepository tokens;
   private MailSender mailSender;
-  private OrganizationEnvironmentChecker environmentChecker;
   private AccountAuthenticationPolicyProvider policyProvider;
   private RequestEmailVerificationService service;
 
@@ -39,16 +38,12 @@ class RequestEmailVerificationServiceTest {
     accounts = mock(AccountRepository.class);
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
-    environmentChecker = mock(OrganizationEnvironmentChecker.class);
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
     // Matches today's real default (ADR-0024: LINK) — every existing test below relies on this
-    // exact send path being taken by default, same as before this port existed. Mockito's own
-    // default (unstubbed boolean = false) already means "not DEVELOPMENT".
+    // exact send path being taken by default.
     when(policyProvider.policyFor(organizationId))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
-    service =
-        new RequestEmailVerificationService(
-            accounts, tokens, mailSender, environmentChecker, policyProvider);
+    service = new RequestEmailVerificationService(accounts, tokens, mailSender, policyProvider);
   }
 
   @Test
@@ -155,16 +150,33 @@ class RequestEmailVerificationServiceTest {
         .sendEmailVerificationCode(eq("both-user@example.com"), eq(organizationId), any());
   }
 
-  // SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis).
+  // Correctness finding, 2026-10-08: real email delivery must not depend on the owning
+  // Organization's DEVELOPMENT/PRODUCTION environment at all — see TestEmailAddress's own Javadoc.
+  // Only a +clavaris_test-marked address skips the real send, in any environment.
   @Test
-  void stillIssuesATokenButNeverSendsARealEmailForADevelopmentEnvironmentAccount() {
-    Account account = Account.register(organizationId, new Email("sandbox-user@example.com"));
+  void stillIssuesATokenButNeverSendsARealEmailForATestMarkedAddress() {
+    Account account =
+        Account.register(organizationId, new Email("sandbox-user+clavaris_test@example.com"));
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
-    when(environmentChecker.isDevelopment(organizationId)).thenReturn(true);
 
     service.handle(new RequestEmailVerificationCommand(account.id()));
 
     verify(tokens, times(1)).save(any());
     verify(mailSender, never()).sendEmailVerification(any(), any(), any());
+  }
+
+  // The direct regression test for the bug this replaced: a real address against ANY
+  // Organization (this test mocks nothing about environment at all — there is nothing left to
+  // mock) must still receive a real verification email.
+  @Test
+  void sendsARealEmailForARegularAddressRegardlessOfOrganizationEnvironment() {
+    Account account = Account.register(organizationId, new Email("real-user@example.com"));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+
+    service.handle(new RequestEmailVerificationCommand(account.id()));
+
+    verify(tokens, times(1)).save(any());
+    verify(mailSender)
+        .sendEmailVerification(eq("real-user@example.com"), eq(organizationId), any());
   }
 }

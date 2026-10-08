@@ -116,7 +116,6 @@ import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestE
 import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
@@ -341,16 +340,14 @@ class IdentityUseCaseConfig {
         securityMetrics);
   }
 
-  @SuppressWarnings("java:S107")
   @Bean
   /* package */ RequestEmailVerificationUseCase requestEmailVerificationUseCase(
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new RequestEmailVerificationService(
-        accounts, verificationTokens, mailSender, environmentChecker, policyProvider);
+        accounts, verificationTokens, mailSender, policyProvider);
   }
 
   @Bean
@@ -366,11 +363,9 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      final EventOutboxWriter eventOutboxWriter,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
+      final EventOutboxWriter eventOutboxWriter) {
     return new RequestPasswordResetService(
-        accounts, verificationTokens, mailSender, eventOutboxWriter, environmentChecker);
+        accounts, verificationTokens, mailSender, eventOutboxWriter);
   }
 
   @Bean
@@ -402,10 +397,9 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new RequestEmailSignInCodeService(
-        accounts, verificationTokens, mailSender, environmentChecker, policyProvider);
+        accounts, verificationTokens, mailSender, policyProvider);
   }
 
   @Bean
@@ -420,10 +414,9 @@ class IdentityUseCaseConfig {
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationEnvironmentChecker environmentChecker,
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new RequestEmailSignInLinkService(
-        accounts, verificationTokens, mailSender, environmentChecker, policyProvider);
+        accounts, verificationTokens, mailSender, policyProvider);
   }
 
   // ADR-0024 §4 — username sign-in
@@ -447,11 +440,8 @@ class IdentityUseCaseConfig {
   /* package */ RequestDeviceTrustChallengeUseCase requestDeviceTrustChallengeUseCase(
       final AccountRepository accounts,
       @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
-    return new RequestDeviceTrustChallengeService(
-        accounts, verificationTokens, mailSender, environmentChecker);
+      final MailSender mailSender) {
+    return new RequestDeviceTrustChallengeService(accounts, verificationTokens, mailSender);
   }
 
   @Bean

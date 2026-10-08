@@ -3,13 +3,13 @@ package com.clavaris.identity.application.usecase.requestpasswordreset;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.event.PasswordResetRequestedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -28,10 +28,10 @@ import org.slf4j.LoggerFactory;
  * enumeration concern as the HTTP response revealing it; operators seeing repeated unknown-account
  * attempts against one Organization is exactly BR-ID-06's rate-limiting signal.
  *
- * <p>SDE-III feature build, 2026-09-04 (Clerk Development/Production instances analysis): same
- * {@code DEVELOPMENT}-environment bypass {@code RequestEmailVerificationService} applies, same
- * named limitation (this alone doesn't give an out-of-process caller a way to retrieve the raw
- * token) — see that class's own Javadoc for the full reasoning, not repeated here.
+ * <p>Correctness finding, 2026-10-08: same {@link TestEmailAddress} bypass {@code
+ * RequestEmailVerificationService} applies, replacing the former {@code
+ * DEVELOPMENT}-environment-wide one — see that class's own Javadoc for the full reasoning, not
+ * repeated here.
  */
 public class RequestPasswordResetService implements RequestPasswordResetUseCase {
 
@@ -47,29 +47,21 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
   private final MailSender mailSender;
   private final EventOutboxWriter outbox;
 
-  @SuppressWarnings("PMD.LongVariable")
-  private final OrganizationEnvironmentChecker environmentChecker;
-
-  @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as every
-  // other orchestration-shaped constructor in this codebase.
   public RequestPasswordResetService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
       final MailSender mailSender,
-      final EventOutboxWriter outbox,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
+      final EventOutboxWriter outbox) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
     this.outbox = outbox;
-    this.environmentChecker = environmentChecker;
   }
 
   // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
   // own identical suppression: every logged argument is a direct value-object accessor, not an
   // expensive computation. PMD.OnlyOneReturn: three genuinely distinct exits (unknown account,
-  // DEVELOPMENT-environment bypass, the normal real-send path) — same "one exit per distinct
+  // test-marked-address bypass, the normal real-send path) — same "one exit per distinct
   // outcome" rationale every admin-API controller in this codebase already applies.
   @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
   @Override
@@ -101,9 +93,9 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
         account.organizationId(),
         PasswordResetRequestedEvent.from(account));
 
-    if (environmentChecker.isDevelopment(account.organizationId())) {
+    if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(
-          "event=password_reset_bypassed_development_environment organizationId={} accountId={}",
+          "event=password_reset_bypassed_test_address organizationId={} accountId={}",
           command.organizationId(),
           account.id());
       return;

@@ -3,12 +3,12 @@ package com.clavaris.identity.application.usecase.requestemailsigninlink;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -17,9 +17,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Orchestration for {@link RequestEmailSignInLinkUseCase} — ADR-0024 §3, the link counterpart to
  * {@code RequestEmailSignInCodeService}; see that class's own Javadoc for the shared conventions
- * (silent-on-unknown-account, {@code DEVELOPMENT}-bypass, split transaction).
+ * (silent-on-unknown-account, {@link TestEmailAddress}-bypass, split transaction).
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RequestEmailSignInLinkService.class);
@@ -28,20 +27,16 @@ public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseC
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
   private final MailSender mailSender;
-  private final OrganizationEnvironmentChecker environmentChecker;
   private final AccountAuthenticationPolicyProvider policyProvider;
 
-  @SuppressWarnings("java:S107")
   public RequestEmailSignInLinkService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
       final MailSender mailSender,
-      final OrganizationEnvironmentChecker environmentChecker,
       final AccountAuthenticationPolicyProvider policyProvider) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
-    this.environmentChecker = environmentChecker;
     this.policyProvider = policyProvider;
   }
 
@@ -72,10 +67,9 @@ public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseC
             Instant.now().plus(TOKEN_TTL));
     tokens.save(token);
 
-    if (environmentChecker.isDevelopment(account.organizationId())) {
+    if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(
-          "event=email_sign_in_link_bypassed_development_environment organizationId={}"
-              + " accountId={}",
+          "event=email_sign_in_link_bypassed_test_address organizationId={} accountId={}",
           command.organizationId(),
           account.id());
       return;

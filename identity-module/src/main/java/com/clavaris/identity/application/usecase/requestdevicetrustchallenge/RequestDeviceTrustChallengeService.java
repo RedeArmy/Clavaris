@@ -2,13 +2,13 @@ package com.clavaris.identity.application.usecase.requestdevicetrustchallenge;
 
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
  * Orchestration for {@link RequestDeviceTrustChallengeUseCase} — ADR-0024 §6. Issued only after the
  * primary factor (password/username/passwordless email) has already succeeded; the caller (one of
  * the four sign-in controllers) already resolved a real, active {@link Account}, so this has no
- * "unknown account" branch to guard, unlike every request-a-code use case in §3.
+ * "unknown account" branch to guard, unlike every request-a-code use case in §3. Correctness
+ * finding, 2026-10-08: same {@link TestEmailAddress} bypass {@code RequestEmailVerificationService}
+ * applies, replacing the former {@code DEVELOPMENT}-environment-wide one.
  */
 public class RequestDeviceTrustChallengeService implements RequestDeviceTrustChallengeUseCase {
 
@@ -30,19 +32,13 @@ public class RequestDeviceTrustChallengeService implements RequestDeviceTrustCha
   private final VerificationTokenRepository tokens;
   private final MailSender mailSender;
 
-  @SuppressWarnings("PMD.LongVariable")
-  private final OrganizationEnvironmentChecker environmentChecker;
-
   public RequestDeviceTrustChallengeService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
-      final MailSender mailSender,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
+      final MailSender mailSender) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
-    this.environmentChecker = environmentChecker;
   }
 
   @SuppressWarnings("PMD.GuardLogStatement")
@@ -63,10 +59,9 @@ public class RequestDeviceTrustChallengeService implements RequestDeviceTrustCha
             Instant.now().plus(TOKEN_TTL));
     tokens.save(token);
 
-    if (environmentChecker.isDevelopment(account.organizationId())) {
+    if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(
-          "event=device_trust_challenge_bypassed_development_environment organizationId={}"
-              + " accountId={}",
+          "event=device_trust_challenge_bypassed_test_address organizationId={} accountId={}",
           account.organizationId(),
           account.id());
       return;

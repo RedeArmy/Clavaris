@@ -3,13 +3,13 @@ package com.clavaris.identity.application.usecase.requestemailsignincode;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.OrganizationEnvironmentChecker;
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.EmailOneTimeCode;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import com.clavaris.identity.domain.service.TestEmailAddress;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -18,10 +18,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Orchestration for {@link RequestEmailSignInCodeUseCase} — ADR-0024 §3, direct sibling of {@code
  * RequestPasswordResetService}: same silent-on-unknown-account anti-enumeration convention, same
- * {@code DEVELOPMENT}-environment bypass, same transaction-splitting rationale (token persisted
- * first, mail sent after, no DB transaction held open across the network call).
+ * {@link TestEmailAddress} bypass, same transaction-splitting rationale (token persisted first,
+ * mail sent after, no DB transaction held open across the network call).
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RequestEmailSignInCodeService.class);
@@ -33,20 +32,16 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
   private final AccountRepository accounts;
   private final VerificationTokenRepository tokens;
   private final MailSender mailSender;
-  private final OrganizationEnvironmentChecker environmentChecker;
   private final AccountAuthenticationPolicyProvider policyProvider;
 
-  @SuppressWarnings("java:S107")
   public RequestEmailSignInCodeService(
       final AccountRepository accounts,
       final VerificationTokenRepository tokens,
       final MailSender mailSender,
-      final OrganizationEnvironmentChecker environmentChecker,
       final AccountAuthenticationPolicyProvider policyProvider) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mailSender = mailSender;
-    this.environmentChecker = environmentChecker;
     this.policyProvider = policyProvider;
   }
 
@@ -77,10 +72,9 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
             Instant.now().plus(TOKEN_TTL));
     tokens.save(token);
 
-    if (environmentChecker.isDevelopment(account.organizationId())) {
+    if (TestEmailAddress.isTestAddress(account.email().value())) {
       LOG.info(
-          "event=email_sign_in_code_bypassed_development_environment organizationId={}"
-              + " accountId={}",
+          "event=email_sign_in_code_bypassed_test_address organizationId={} accountId={}",
           command.organizationId(),
           account.id());
       return;
