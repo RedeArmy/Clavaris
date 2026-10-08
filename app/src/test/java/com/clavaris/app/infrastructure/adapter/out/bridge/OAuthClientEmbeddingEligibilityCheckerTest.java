@@ -28,14 +28,14 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
 
   @Test
   void resolvesEmptyForANullClientId() {
-    assertThat(checker.resolveAllowedFrameAncestor(null)).isEmpty();
+    assertThat(checker.resolveAllowedFrameAncestor(null, UUID.randomUUID())).isEmpty();
   }
 
   @Test
   void resolvesEmptyForAnUnknownClientId() {
     when(oauthClients.findByClientId("unknown-client")).thenReturn(Optional.empty());
 
-    assertThat(checker.resolveAllowedFrameAncestor("unknown-client")).isEmpty();
+    assertThat(checker.resolveAllowedFrameAncestor("unknown-client", UUID.randomUUID())).isEmpty();
   }
 
   @Test
@@ -44,7 +44,8 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
     when(oauthClients.findByClientId("dev-client")).thenReturn(Optional.of(client));
     when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(true);
 
-    assertThat(checker.resolveAllowedFrameAncestor("dev-client")).contains("*");
+    assertThat(checker.resolveAllowedFrameAncestor("dev-client", client.organizationId()))
+        .contains("*");
   }
 
   @Test
@@ -58,7 +59,7 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
             .markVerified();
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verified));
 
-    assertThat(checker.resolveAllowedFrameAncestor("prod-client"))
+    assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
         .contains("https://app.example.com");
   }
 
@@ -69,7 +70,8 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
     when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(false);
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.empty());
 
-    assertThat(checker.resolveAllowedFrameAncestor("prod-client")).isEmpty();
+    assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
+        .isEmpty();
   }
 
   @Test
@@ -82,7 +84,8 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
             .markVerified();
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verifiedNoOrigin));
 
-    assertThat(checker.resolveAllowedFrameAncestor("prod-client")).isEmpty();
+    assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
+        .isEmpty();
   }
 
   @Test
@@ -95,7 +98,40 @@ class OAuthClientEmbeddingEligibilityCheckerTest {
             client.id(), ClientDomainMode.CNAME, "login.example.com", "https://app.example.com");
     when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(pending));
 
-    assertThat(checker.resolveAllowedFrameAncestor("prod-client")).isEmpty();
+    assertThat(checker.resolveAllowedFrameAncestor("prod-client", client.organizationId()))
+        .isEmpty();
+  }
+
+  // Security finding, 2026-10-07: the actual regression test for the cross-tenant gap this pass
+  // closed — a client with an otherwise-perfectly-eligible verified domain must still be rejected
+  // if the request is actually for a *different* Organization's own page. Before this fix, this
+  // client would have been granted its own real origin regardless of expectedOrganizationId.
+  @Test
+  void aClientWithAVerifiedDomainIsNotEligibleForADifferentOrganizationsOwnPage() {
+    OAuthClient client = anOAuthClient();
+    when(oauthClients.findByClientId("prod-client")).thenReturn(Optional.of(client));
+    when(environmentChecker.isDevelopment(client.organizationId())).thenReturn(false);
+    ClientDomainConfig verified =
+        ClientDomainConfig.request(
+                client.id(), ClientDomainMode.CNAME, "login.example.com", "https://app.example.com")
+            .markVerified();
+    when(domainConfigs.findByOAuthClientId(client.id())).thenReturn(Optional.of(verified));
+    UUID aDifferentOrganizationsId = UUID.randomUUID();
+
+    assertThat(checker.resolveAllowedFrameAncestor("prod-client", aDifferentOrganizationsId))
+        .isEmpty();
+  }
+
+  // Same scenario, development tier — the wildcard carve-out is scoped to "this clientId's own
+  // Organization is in development," not "any Organization asking about this clientId."
+  @Test
+  void aDevelopmentOrganizationsClientIsNotEligibleForADifferentOrganizationsOwnPage() {
+    OAuthClient client = anOAuthClient();
+    when(oauthClients.findByClientId("dev-client")).thenReturn(Optional.of(client));
+    UUID aDifferentOrganizationsId = UUID.randomUUID();
+
+    assertThat(checker.resolveAllowedFrameAncestor("dev-client", aDifferentOrganizationsId))
+        .isEmpty();
   }
 
   private static OAuthClient anOAuthClient() {

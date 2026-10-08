@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpSession;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.header.HeaderWriter;
@@ -101,6 +103,23 @@ import org.springframework.security.web.header.HeaderWriter;
  * unrelated, non-modal consent render later in the same browser session can never inherit a stale
  * "was modal once" flag — the exact shape of regression the reverted blanket-drop attempt above
  * hit.
+ *
+ * <p><b>Security finding, 2026-10-07 (live validation of TD-FUT-045, the embedded-profile extension
+ * of this same mechanism): {@code EmbeddingEligibilityChecker} now takes the request path's own
+ * Organization too.</b> The relaxation above used to resolve an allowed origin from {@code
+ * clientId} alone — nothing checked that the resolved {@code OAuthClient} actually belonged to the
+ * Organization whose login/profile page was being framed. An attacker who legitimately registers
+ * their own verified-domain {@code OAuthClient} under their own Organization could have framed a
+ * *different* Organization's own login or profile page inside their own site — a real cross-tenant
+ * clickjacking setup {@code threat-model-stride.md}'s own existing entry for this relaxation never
+ * named. Same {@code organizationId}-cross-check posture this codebase already applies elsewhere
+ * for an identical reason ({@code DeviceTrustChallengeController}, BR-ORG-02). {@link
+ * #organizationIdFromPath} parses it straight from the request path for both {@link
+ * #LOGIN_PAGE_PATH}/{@link #ACCOUNT_PROFILE_PAGE_PATH} (both genuinely {@code
+ * "/o/{organizationId}/..."} shaped) and fails CLOSED (no relaxation attempted at all) if that ever
+ * comes back null — never silently falls through to the one call site ({@link
+ * #withRelaxedFrameAncestorsOnConsentPage}, the flat/org-agnostic consent page) where a null is a
+ * deliberate, unrelated opt-out.
  *
  * <p><b>ADR-0025: the admin dashboard's own policy.</b> {@code /platform/dashboard/**} gets {@code
  * script-src 'self'} — same shape as {@link #LOGIN_PAGE_POLICY}, for the same reason: a real,
@@ -248,6 +267,16 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private static final Pattern ACCOUNT_PROFILE_PAGE_PATH =
       Pattern.compile("^/o/[^/]+/account/profile$");
 
+  // Security finding, 2026-10-07 (see EmbeddingEligibilityChecker's own Javadoc): every org-scoped
+  // page this class relaxes frame-ancestors for (login, profile) must pass the Organization its
+  // own request path actually names, so a resolved OAuthClient belonging to a *different*
+  // Organization is never trusted just because it happens to have a verified embedding domain.
+  // One capturing-group pattern, reused by both — LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH above
+  // already proved the request matches "/o/{organizationId}/...", this just captures that same
+  // segment instead of only confirming its shape.
+  @SuppressWarnings("PMD.LongVariable")
+  private static final Pattern ORGANIZATION_SCOPED_PATH_PREFIX = Pattern.compile("^/o/([^/]+)/.*$");
+
   private final EmbeddingEligibilityChecker embeddingChecker;
 
   // Constructed only by each SecurityFilterChain builder's own `new
@@ -296,7 +325,8 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
       return withRelaxedFrameAncestorsOnConsentPage(request);
     }
     if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
-      return withRelaxedFrameAncestorsIfDisplayModal(LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM);
+      return withRelaxedFrameAncestorsIfDisplayModal(
+          LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM, organizationIdFromPath(requestUri));
     }
     if (DASHBOARD_PAGE_PATH.matcher(requestUri).matches()) {
       return DASHBOARD_PAGE_POLICY;
@@ -306,22 +336,63 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     }
     if (ACCOUNT_PROFILE_PAGE_PATH.matcher(requestUri).matches()) {
       return withRelaxedFrameAncestorsIfDisplayModal(
-          ACCOUNT_PROFILE_PAGE_POLICY, request, CLIENT_ID_PARAM);
+          ACCOUNT_PROFILE_PAGE_POLICY,
+          request,
+          CLIENT_ID_PARAM,
+          organizationIdFromPath(requestUri));
     }
     return STRICT_POLICY;
   }
 
   // ADR-0009 §1/§4: see this class's own Javadoc. STRICT_POLICY/LOGIN_PAGE_POLICY both end in the
   // exact literal "frame-ancestors 'none'" — asserted by construction, not discovered by parsing.
-  // PMD.OnlyOneReturn: "not display=modal at all" / "resolved" are two independent, equally valid
-  // exits — same rationale as every other early-return chain in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // PMD.OnlyOneReturn: three independent, equally valid exits — "not display=modal at all," the
+  // new fail-closed-on-malformed-segment middle one (security finding, 2026-10-07), and "resolved"
+  // — same rationale as every other early-return chain in this codebase. PMD.LongVariable: see
+  // EmbeddingEligibilityChecker's own identical suppression.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   private String withRelaxedFrameAncestorsIfDisplayModal(
-      final String basePolicy, final HttpServletRequest request, final String clientIdParam) {
+      final String basePolicy,
+      final HttpServletRequest request,
+      final String clientIdParam,
+      final UUID expectedOrganizationId) {
     if (!DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
       return basePolicy;
     }
-    return relaxFrameAncestors(basePolicy, request.getParameter(clientIdParam));
+    // Security finding, 2026-10-07: this method is only ever called for a request this class's
+    // own LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH already matched — both genuinely
+    // "/o/{organizationId}/..." shaped, so expectedOrganizationId should never actually be null
+    // here. If it somehow is (a malformed segment HeaderWriterFilter sees before Spring MVC's own
+    // @PathVariable UUID binding would reject it), fail CLOSED — no relaxation at all — never
+    // fall through to relaxFrameAncestors, where a bare null is the signal
+    // withRelaxedFrameAncestorsOnConsentPage uses on purpose to mean "no Organization to check
+    // against," the opposite intent.
+    if (expectedOrganizationId == null) {
+      return basePolicy;
+    }
+    return relaxFrameAncestors(
+        basePolicy, request.getParameter(clientIdParam), expectedOrganizationId);
+  }
+
+  // Security finding, 2026-10-07: null on a malformed/missing segment — fail-safe, same posture
+  // every other UUID.fromString call site in this class's own neighborhood (e.g. this class's own
+  // callers never trust a client-suppliable value without a try/catch around it) already follows.
+  // Only ever called for a request this same method's own caller already matched against
+  // LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH, both "/o/{organizationId}/..." shaped, so the
+  // capturing group below is expected to be present and well-formed in practice — this is a
+  // defensive fallback, not the normal path. PMD.OnlyOneReturn: "doesn't even match the shape" /
+  // "malformed UUID" / "resolved" are three independent, equally valid exits.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private static UUID organizationIdFromPath(final String requestUri) {
+    final Matcher matcher = ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri);
+    if (!matcher.matches()) {
+      return null;
+    }
+    try {
+      return UUID.fromString(matcher.group(1));
+    } catch (final IllegalArgumentException _) {
+      return null;
+    }
   }
 
   // TD-SEC-050 (closed): the consent page needs its own variant, not the shared method above —
@@ -334,21 +405,29 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // caught before this gate existed at all — see this class's own Javadoc).
   @SuppressWarnings("PMD.OnlyOneReturn")
   private String withRelaxedFrameAncestorsOnConsentPage(final HttpServletRequest request) {
+    // /oauth2/consent is flat/org-agnostic (this class's own Javadoc) — genuinely no
+    // organizationId to check against, the one deliberate null EmbeddingEligibilityChecker's own
+    // Javadoc documents as an opt-out, not a gap matching the one
+    // withRelaxedFrameAncestorsIfDisplayModal
+    // just closed.
     if (DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
-      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM));
+      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
     }
     final HttpSession session = request.getSession(false);
     final String pendingState =
         session == null ? null : (String) session.getAttribute(MODAL_STATE_SESSION_ATTRIBUTE);
     if (pendingState != null
         && Objects.equals(pendingState, request.getParameter(OAuth2ParameterNames.STATE))) {
-      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM));
+      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
     }
     return STRICT_POLICY;
   }
 
-  private String relaxFrameAncestors(final String basePolicy, final String clientId) {
-    final Optional<String> allowedOrigin = embeddingChecker.resolveAllowedFrameAncestor(clientId);
+  @SuppressWarnings("PMD.LongVariable")
+  private String relaxFrameAncestors(
+      final String basePolicy, final String clientId, final UUID expectedOrganizationId) {
+    final Optional<String> allowedOrigin =
+        embeddingChecker.resolveAllowedFrameAncestor(clientId, expectedOrganizationId);
     return allowedOrigin
         .map(origin -> basePolicy.replace("frame-ancestors 'none'", "frame-ancestors " + origin))
         .orElse(basePolicy);
