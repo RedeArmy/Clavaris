@@ -42,8 +42,8 @@ import tools.jackson.databind.ObjectMapper;
  * (1) a brand-new Organization is DEVELOPMENT by default, with a real, explicit, low-capacity
  * {@code RateLimitPolicy} row; (2) registering an Account with a real address under it still
  * triggers a real outbound verification email — see below for why this changed; (3) {@code
- * :create-production-environment} promotes it to a linked {@code PRODUCTION} sibling — no
- * {@code RateLimitPolicy} row (system default applies).
+ * :create-production-environment} promotes it to a linked {@code PRODUCTION} sibling — no {@code
+ * RateLimitPolicy} row (system default applies).
  *
  * <p>SDE-III correction, 2026-09-24: this test previously also asserted that a client registered
  * under each Organization got a {@code test_}/{@code live_}-prefixed {@code clientId} — that
@@ -52,9 +52,9 @@ import tools.jackson.databind.ObjectMapper;
  * owning Organization's environment, so there is nothing environment-specific left to assert about
  * it here.
  *
- * <p>Correctness finding, 2026-10-08: phase 2 used to assert the opposite — that a
- * {@code DEVELOPMENT} Organization never sends a real verification email at all, for any address.
- * That blocked every real registrant's own sign-up against any sandboxed Organization (every
+ * <p>Correctness finding, 2026-10-08: phase 2 used to assert the opposite — that a {@code
+ * DEVELOPMENT} Organization never sends a real verification email at all, for any address. That
+ * blocked every real registrant's own sign-up against any sandboxed Organization (every
  * Organization's own default), with no way to complete it. See {@code TestEmailAddress}'s own
  * Javadoc for the replacement: only an address carrying its {@code +clavaris_test} marker bypasses
  * the real send now, in any environment — this test now proves both halves of that, end to end.
@@ -282,11 +282,14 @@ class DevelopmentAndProductionOrganizationEnvironmentsIntegrationTest
     String csrfToken = extractCsrfToken(formResponse.body());
 
     String password = "a-correct-password";
+    // URL-encode the email: application/x-www-form-urlencoded treats a literal "+" as a space,
+    // so an unencoded +clavaris_test address would arrive at the server mangled into a different
+    // (space-containing) address entirely — not a case any prior caller here ever exercised.
     String body =
         "_csrf="
             + csrfToken
             + "&email="
-            + email
+            + java.net.URLEncoder.encode(email, java.nio.charset.StandardCharsets.UTF_8)
             + "&password="
             + password
             + "&confirmPassword="

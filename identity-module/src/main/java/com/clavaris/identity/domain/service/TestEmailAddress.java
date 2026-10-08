@@ -21,6 +21,11 @@ package com.clavaris.identity.domain.service;
  * completable" contract the old Organization-wide bypass already established — only the trigger
  * condition changed, not what happens once triggered.
  */
+// PMD.TestClassWithoutTestCases false positive: PMD's own "looks like a JUnit test class" heuristic
+// matches any class name starting with "Test", regardless of package or actual content — this is a
+// real domain service, not a test, and genuinely has no test cases of its own (its tests live in
+// TestEmailAddressTest, a separate class).
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 public final class TestEmailAddress {
 
   private static final String TEST_MARKER = "+clavaris_test";
@@ -36,8 +41,8 @@ public final class TestEmailAddress {
    * normalization cannot silently defeat the check by casing the marker differently.
    */
   public static boolean isTestAddress(final String rawEmail) {
-    final int at = rawEmail.indexOf('@');
-    final String localPart = at < 0 ? rawEmail : rawEmail.substring(0, at);
+    final int atIndex = rawEmail.indexOf('@');
+    final String localPart = atIndex < 0 ? rawEmail : rawEmail.substring(0, atIndex);
     return localPart.contains(TEST_MARKER);
   }
 }

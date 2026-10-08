@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
  * {@code RequestEmailSignInCodeService}; see that class's own Javadoc for the shared conventions
  * (silent-on-unknown-account, {@link TestEmailAddress}-bypass, split transaction).
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RequestEmailSignInLinkService.class);

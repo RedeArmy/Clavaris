@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
  * {@link TestEmailAddress} bypass, same transaction-splitting rationale (token persisted first,
  * mail sent after, no DB transaction held open across the network call).
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RequestEmailSignInCodeService.class);
