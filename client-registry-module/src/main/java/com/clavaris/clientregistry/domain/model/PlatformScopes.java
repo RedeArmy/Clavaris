@@ -247,6 +247,22 @@ public final class PlatformScopes {
   public static final String ACCOUNTS_METADATA_WRITE = "platform:accounts:metadata:write";
 
   /**
+   * TD-FUT-041, Clerk Backend API ({@code clerkClient.users.getUser}/{@code updateUser}) parity:
+   * reading or replacing an Account's {@code firstName}/{@code lastName}/{@code username}/{@code
+   * phoneNumber} — one scope covers both the read ({@code GetAccountProfileController},
+   * identity-module) and the write ({@code UpdateAccountProfileController}, identity-module), a
+   * deliberate choice (confirmed with the product owner, 2026-10-07) rather than splitting
+   * read/write the way most other mutating-only scopes here do: a consuming application's own
+   * backend reading a user's profile back is exactly as routine as writing it for this specific
+   * field set (name/username/phone, not a destructive or security-sensitive action the way every
+   * split-scope row elsewhere on this class is), so a second, narrower read-only scope would only
+   * add ceremony without a real security boundary behind it. Deliberately NOT in {@link
+   * #OPERATOR_ONLY}, same rationale {@link #ACCOUNTS_METADATA_WRITE}'s own Javadoc already
+   * establishes for the sibling metadata endpoint.
+   */
+  public static final String ACCOUNTS_PROFILE_WRITE = "platform:accounts:profile:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -278,7 +294,8 @@ public final class PlatformScopes {
           CLIENT_BRANDING_WRITE,
           CLIENT_DOMAIN_WRITE,
           ACCOUNTS_REVIEW_REGISTRATION,
-          ACCOUNTS_METADATA_WRITE);
+          ACCOUNTS_METADATA_WRITE,
+          ACCOUNTS_PROFILE_WRITE);
 
   /**
    * SDE-III review, 2026-09-15 — real gap found and closed: every scope above whose own Javadoc

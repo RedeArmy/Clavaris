@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.updateaccountprofile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,7 +13,9 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
+import com.clavaris.identity.domain.event.AccountProfileUpdatedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -29,6 +32,7 @@ class UpdateAccountProfileServiceTest {
 
   private AccountRepository accounts;
   private AuditEventRecorder auditEvents;
+  private EventOutboxWriter outbox;
   private UpdateAccountProfileService service;
   private Account account;
 
@@ -36,7 +40,8 @@ class UpdateAccountProfileServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new UpdateAccountProfileService(accounts, auditEvents);
+    outbox = mock(EventOutboxWriter.class);
+    service = new UpdateAccountProfileService(accounts, auditEvents, outbox);
     account = Account.register(new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"));
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
   }
@@ -53,6 +58,32 @@ class UpdateAccountProfileServiceTest {
         .write(ACTOR, "account.profile_updated", "Account", account.id().value().toString(), null);
   }
 
+  // TD-FUT-044: the "both directions" half of profile sync — a webhook fires in the same
+  // transaction as the save, for every caller (self-service, operator, Backend-API) that reaches
+  // this one shared method. The payload itself is asserted field-by-field, never by record
+  // equality — AccountProfileUpdatedEvent.from(account) stamps its own occurredAt via Instant.now()
+  // at construction time, so two separately-built instances are never equal even for the same
+  // Account, same reason RegisterAccountServiceTest's own identical outbox assertion uses any()
+  // for the payload rather than an exact record match.
+  @Test
+  void writesAccountProfileUpdatedToTheOutbox() {
+    service.handle(
+        new UpdateAccountProfileCommand(account.id(), "Ada", "Lovelace", null, null, ACTOR));
+
+    org.mockito.ArgumentCaptor<AccountProfileUpdatedEvent> event =
+        org.mockito.ArgumentCaptor.forClass(AccountProfileUpdatedEvent.class);
+    verify(outbox)
+        .write(
+            eq("account.profile_updated"),
+            eq(account.id()),
+            eq(account.organizationId()),
+            event.capture());
+    assertThat(event.getValue().firstName()).isEqualTo("Ada");
+    assertThat(event.getValue().lastName()).isEqualTo("Lovelace");
+    assertThat(event.getValue().accountId()).isEqualTo(account.id());
+    assertThat(event.getValue().organizationId()).isEqualTo(account.organizationId());
+  }
+
   @Test
   void throwsWhenTheAccountDoesNotExist() {
     AccountId missing = AccountId.newId();
@@ -64,6 +95,7 @@ class UpdateAccountProfileServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
   }
 
   // Live feature request, 2026-09-22: only applied while the Account has no phone number yet —
@@ -117,6 +149,7 @@ class UpdateAccountProfileServiceTest {
     assertThat(account.username()).isEmpty();
     verify(accounts, never()).save(any());
     verifyNoInteractions(auditEvents);
+    verifyNoInteractions(outbox);
   }
 
   @Test

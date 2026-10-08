@@ -6,6 +6,7 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,10 @@ import org.springframework.stereotype.Component;
  * domain/embeddingOrigin registration required) — a deliberate, documented testing convenience, not
  * production-hardened, hence the wildcard origin and the warning log line every time it's used.
  */
+// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on three
+// methods/parameters below (security finding, 2026-10-07, expectedOrganizationId) — same false-
+// positive rationale PlatformScopes' own class-level suppression already documents.
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Component
 class OAuthClientEmbeddingEligibilityChecker implements EmbeddingEligibilityChecker {
 
@@ -44,15 +49,33 @@ class OAuthClientEmbeddingEligibilityChecker implements EmbeddingEligibilityChec
     this.environmentChecker = environmentChecker;
   }
 
-  // Two exits (unknown client / resolved) is clearer here than forcing a single-return shape —
-  // same rationale ClientDomainConfig's own validateHostnameIfPresent suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
+  // Three exits (unknown client / wrong Organization / resolved) is clearer here than forcing a
+  // single-return shape — same rationale ClientDomainConfig's own validateHostnameIfPresent
+  // suppression documents.
+  // PMD.LongVariable: same rationale as EmbeddingEligibilityChecker's own identical suppression.
+  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   @Override
-  public Optional<String> resolveAllowedFrameAncestor(final String clientId) {
+  public Optional<String> resolveAllowedFrameAncestor(
+      final String clientId, final UUID expectedOrganizationId) {
     if (clientId == null) {
       return Optional.empty();
     }
-    return oauthClients.findByClientId(clientId).flatMap(this::resolveFor);
+    return oauthClients
+        .findByClientId(clientId)
+        .filter(client -> belongsToExpectedOrganization(client, expectedOrganizationId))
+        .flatMap(this::resolveFor);
+  }
+
+  // Security finding, 2026-10-07 (see this interface's own Javadoc): a resolved OAuthClient
+  // belonging to a different Organization than the one the request path actually names must be
+  // treated identically to "unknown client" — never partially trusted just because it happens to
+  // have a verified domain for ITS OWN, unrelated Organization. expectedOrganizationId == null is
+  // the one deliberate opt-out (the consent page's own flat, org-agnostic path has none to check
+  // against) — every other caller must pass a real value.
+  @SuppressWarnings("PMD.LongVariable")
+  private static boolean belongsToExpectedOrganization(
+      final OAuthClient client, final UUID expectedOrganizationId) {
+    return expectedOrganizationId == null || client.organizationId().equals(expectedOrganizationId);
   }
 
   // Two exits (dev wildcard / production domain-gated lookup) — same rationale as

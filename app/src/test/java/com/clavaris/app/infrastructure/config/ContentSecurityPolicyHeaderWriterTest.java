@@ -12,7 +12,12 @@ import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityCh
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
 // TD-SEC-009: proves the writer's own branching logic in isolation — which policy, on which
@@ -23,6 +28,10 @@ import org.mockito.ArgumentCaptor;
 class ContentSecurityPolicyHeaderWriterTest {
 
   private static final String HEADER_NAME = "Content-Security-Policy";
+  // Security finding, 2026-10-07: the Organization segment every org-scoped path below shares —
+  // EmbeddingEligibilityChecker now cross-checks this against the resolved OAuthClient's own
+  // organizationId, so every login/profile stub below must pass it, not just the clientId.
+  private static final UUID ORG_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
   private static final String ORG_REGISTER_PATH =
       "/o/11111111-1111-1111-1111-111111111111/register";
   private static final String ORG_LOGIN_PATH = "/o/11111111-1111-1111-1111-111111111111/login";
@@ -72,52 +81,56 @@ class ContentSecurityPolicyHeaderWriterTest {
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 
-  // Code review finding (2026-09-01): identity/login.html now loads its own real, same-origin
-  // script (login-submit-guard.js) — see ContentSecurityPolicyHeaderWriter's own Javadoc for why
-  // this earns its own policy, distinct from both the strict default and the consent page's.
-  //
-  // TD-FUT-034 (SDE-III review, 2026-09-30): connect-src is now 'self', not 'none' — same
-  // DASHBOARD_PAGE_POLICY bug class, this time for webauthn-login.js's own fetch() calls.
-  @Test
-  void setsTheLoginPagePolicyOnlyForTheLoginPagePathItself() {
-    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+  // SonarCloud finding: these three used to be separate, identically-shaped tests (request +
+  // response + writeHeaders + verify one exact header string) — one row each below instead,
+  // same per-page rationale each original test's own doc comment carried, now on the data
+  // provider: (1) login — identity/login.html's own login-submit-guard.js, plus TD-FUT-034's
+  // webauthn-login.js fetch() calls (connect-src 'self', not 'none'); (2) passkeys — TD-FUT-034,
+  // the self-service "your passkeys" page's own webauthn-register.js needs the same script-src
+  // 'self' + connect-src 'self' pair; (3) profile — Clerk <UserProfile/> parity (pattern (a)),
+  // this template's own i18n.js/organization-dialog.js need script-src 'self', but connect-src
+  // stays 'none' since neither script makes a fetch/XHR call (confirmed by reading
+  // organization-dialog.js directly).
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("orgScopedSinglePagePolicies")
+  void setsTheCorrectPolicyForEachOrgScopedSinglePage(
+      final String label, final String path, final String expectedPolicy) {
+    HttpServletRequest request = requestWithUri(path);
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
 
     writer.writeHeaders(request, response);
 
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
+    verify(response).setHeader(HEADER_NAME, expectedPolicy);
   }
 
-  // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs the same
-  // script-src 'self' + connect-src 'self' pair the login page and dashboard already carve out —
-  // see ContentSecurityPolicyHeaderWriter's own ACCOUNT_PASSKEYS_PAGE_POLICY comment.
-  @Test
-  void setsTheAccountPasskeysPagePolicyWithScriptAndConnectSrcSelf() {
-    HttpServletRequest request =
-        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/passkeys");
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
+  private static Stream<Arguments> orgScopedSinglePagePolicies() {
+    final String scriptSelfConnectSelf =
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+            + "form-action 'self'; frame-ancestors 'none'";
+    final String scriptSelfConnectNone =
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+            + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+            + "form-action 'self'; frame-ancestors 'none'";
+    return Stream.of(
+        Arguments.of("login page", ORG_LOGIN_PATH, scriptSelfConnectSelf),
+        Arguments.of(
+            "account passkeys page",
+            "/o/11111111-1111-1111-1111-111111111111/account/passkeys",
+            scriptSelfConnectSelf),
+        Arguments.of(
+            "account profile page",
+            "/o/11111111-1111-1111-1111-111111111111/account/profile",
+            scriptSelfConnectNone));
   }
 
-  // A sibling path under the same /o/{organizationId}/account/** prefix — e.g. the profile page —
-  // must not be swept into this carve-out; it has no script of its own and should stay strict.
+  // A sibling path under the same /o/{organizationId}/account/** prefix — the sessions page — must
+  // not be swept into either the passkeys or the profile carve-out; it has no script of its own and
+  // should stay strict.
   @Test
   void doesNotWidenThePolicyForOtherAccountPages() {
     HttpServletRequest request =
-        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/sessions");
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
 
     writer.writeHeaders(request, response);
@@ -128,6 +141,30 @@ class ContentSecurityPolicyHeaderWriterTest {
             "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // ADR-0009 §1/§4, same mechanism as the login page's own identical test — display=modal + an
+  // embedding-eligible clientId relaxes frame-ancestors on the profile page too, reusing
+  // EmbeddingEligibilityChecker verbatim (it has no notion of which page is asking).
+  @Test
+  void relaxesFrameAncestorsOnTheProfilePageWhenDisplayModalAndClientIdAreEligible() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web", ORG_ID))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request =
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains("frame-ancestors https://jobseeker.example.com"));
   }
 
   // A sibling path under the same /o/{organizationId}/login/** prefix — the plain "sign in with
@@ -258,7 +295,7 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void relaxesFrameAncestorsOnTheLoginPageWhenDisplayModalAndClientIdAreEligible() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web", ORG_ID))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -275,10 +312,57 @@ class ContentSecurityPolicyHeaderWriterTest {
             org.mockito.ArgumentMatchers.contains("frame-ancestors https://jobseeker.example.com"));
   }
 
+  // Security finding, 2026-10-07: the writer must pass the Organization it actually parsed from
+  // THIS request's own path, never a value from the clientId alone — this is the one thing
+  // ContentSecurityPolicyHeaderWriterTest can prove in isolation (the real reject-on-mismatch
+  // logic lives in OAuthClientEmbeddingEligibilityCheckerTest, against the real implementation,
+  // not a mock of the interface this class depends on).
+  @Test
+  void passesTheOrganizationIdParsedFromTheLoginPagesOwnPathToTheChecker() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(checker).resolveAllowedFrameAncestor("jobseeker-web", ORG_ID);
+  }
+
+  // Security finding, 2026-10-07: a malformed organizationId segment must fail CLOSED (no
+  // relaxation attempted at all, checker never even called) — never fall through and pass null,
+  // which the checker treats as "no Organization to check against" (the consent page's own
+  // deliberate opt-out, the opposite intent here).
+  @Test
+  void neverRelaxesFrameAncestorsWhenTheOrganizationIdSegmentIsMalformed() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request = requestWithUri("/o/not-a-real-uuid/login");
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
+    verify(checker, never())
+        .resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
   @Test
   void keepsFrameAncestorsNoneWhenDisplayModalButTheCheckerFindsNoEligibleOrigin() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor("unverified-client"))
+    when(checker.resolveAllowedFrameAncestor("unverified-client", ORG_ID))
         .thenReturn(java.util.Optional.empty());
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -297,7 +381,8 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void neverRelaxesFrameAncestorsWithoutDisplayModalEvenForAnEligibleClient() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+    when(checker.resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -310,7 +395,9 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
-    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+    verify(checker, never())
+        .resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   // TD-SEC-011: same display=modal gate as the login page, deliberately kept even though SAS's
@@ -321,7 +408,7 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void relaxesFrameAncestorsOnTheConsentPageWhenDisplayModalAndClientIdAreEligible() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web", null))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -341,7 +428,7 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void keepsFrameAncestorsNoneOnTheConsentPageWhenDisplayModalButTheCheckerFindsNoEligibleOrigin() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor("unverified-client"))
+    when(checker.resolveAllowedFrameAncestor("unverified-client", null))
         .thenReturn(java.util.Optional.empty());
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -365,7 +452,8 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void neverRelaxesFrameAncestorsOnTheConsentPageWithoutDisplayModalEvenForAnEligibleClient() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+    when(checker.resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -378,7 +466,9 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
-    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+    verify(checker, never())
+        .resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   // The consent page's own camelCase "clientId" (this project's login-page-only convention) must
@@ -391,7 +481,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     // null (the unstubbed request.getParameter("client_id") below), Mockito's own default
     // Optional.empty() for an unstubbed argument is exactly what proves the bug this test guards
     // against would otherwise go undetected.
-    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web", null))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -405,7 +495,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
-    verify(checker).resolveAllowedFrameAncestor(null);
+    verify(checker).resolveAllowedFrameAncestor(null, null);
   }
 
   // TD-SEC-050: SAS's own sendAuthorizationConsent redirect never forwards display=modal — these
@@ -445,7 +535,7 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void relaxesFrameAncestorsOnTheConsentPageViaTheSessionFallbackWhenStateMatches() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web", null))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -469,7 +559,8 @@ class ContentSecurityPolicyHeaderWriterTest {
   @Test
   void neverRelaxesOnTheConsentPageWhenTheSessionsPendingStateDoesNotMatchThisRequest() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+    when(checker.resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -489,13 +580,16 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(consentResponse)
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
-    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+    verify(checker, never())
+        .resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   @Test
   void neverRelaxesOnTheConsentPageWhenNoSessionExistsAtAll() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
-    when(checker.resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any()))
+    when(checker.resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
         new ContentSecurityPolicyHeaderWriter(checker);
@@ -510,7 +604,9 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(consentResponse)
         .setHeader(
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
-    verify(checker, never()).resolveAllowedFrameAncestor(org.mockito.ArgumentMatchers.any());
+    verify(checker, never())
+        .resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 
   private static HttpServletRequest requestWithUri(final String uri) {

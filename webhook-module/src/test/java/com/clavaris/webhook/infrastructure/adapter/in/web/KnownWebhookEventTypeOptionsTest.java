@@ -28,7 +28,8 @@ class KnownWebhookEventTypeOptionsTest {
     assertThat(account.events())
         .extracting(EventTypeOption::value)
         .allMatch(v -> v.startsWith("account."));
-    assertThat(account.events()).hasSize(8);
+    // TD-FUT-044 added account.profile_updated as a 9th account.* event.
+    assertThat(account.events()).hasSize(9);
   }
 
   @Test

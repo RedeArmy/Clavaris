@@ -2,7 +2,9 @@ package com.clavaris.identity.application.usecase.updateaccountprofile;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.UsernameAlreadyRegisteredException;
+import com.clavaris.identity.domain.event.AccountProfileUpdatedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Username;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,11 +14,15 @@ public class UpdateAccountProfileService implements UpdateAccountProfileUseCase 
 
   private final AccountRepository accounts;
   private final AuditEventRecorder auditEvents;
+  private final EventOutboxWriter outbox;
 
   public UpdateAccountProfileService(
-      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox) {
     this.accounts = accounts;
     this.auditEvents = auditEvents;
+    this.outbox = outbox;
   }
 
   @Override
@@ -38,6 +44,17 @@ public class UpdateAccountProfileService implements UpdateAccountProfileUseCase 
         "Account",
         account.id().value().toString(),
         null);
+
+    // TD-FUT-044 (Clerk user.updated parity): same transaction as the save above (ADR-0007 §1) —
+    // every one of the three callers (self-service, operator dashboard, Backend-API) fires this,
+    // since all three reach this exact method, same "one real caller, not three real
+    // implementations" posture TD-FUT-040/041's own Javadoc already established for the method
+    // itself.
+    outbox.write(
+        "account.profile_updated",
+        account.id(),
+        account.organizationId(),
+        AccountProfileUpdatedEvent.from(account));
   }
 
   // Live feature request, 2026-09-22 — user explicitly asked for phone number to follow the exact
