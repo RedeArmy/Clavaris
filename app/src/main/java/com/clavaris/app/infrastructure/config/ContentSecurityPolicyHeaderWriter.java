@@ -222,6 +222,32 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private static final Pattern ACCOUNT_PASSKEYS_PAGE_PATH =
       Pattern.compile("^/o/[^/]+/account/passkeys$");
 
+  // Clerk <UserProfile/> parity, pattern (a) — embedded profile, same ADR-0009 §1/§4 mechanism as
+  // LOGIN_PAGE_POLICY right above, deliberately not CORS/a new JS SDK (that would reopen ADR-0013's
+  // own locked "no cross-origin browser caller" decision — confirmed with the product owner,
+  // 2026-10-07): a consuming application iframes this same self-service page
+  // (identity/account/profile.html) with ?display=modal&clientId=... on the src URL, exactly the
+  // login page's own query-param convention, reusing EmbeddingEligibilityChecker/
+  // ModalAwareSessionCookieSerializer verbatim (both already keyed by clientId/display=modal
+  // generically, neither needed a single change for this). If the browser has no live Clavaris
+  // session yet in that iframe's own browsing context, the user sees Clavaris's own login form
+  // inside the iframe first — the exact same first-load experience embedded login already has,
+  // not a regression this page introduces.
+  //
+  // script-src 'self' (this template's own i18n.js/organization-dialog.js, same two scripts
+  // every dashboard-adjacent page already loads), connect-src 'none' (neither script makes a
+  // fetch/XHR call — confirmed by reading organization-dialog.js directly, no HTMX attributes
+  // anywhere in this specific template unlike the dashboard's own pages).
+  @SuppressWarnings("PMD.LongVariable")
+  private static final String ACCOUNT_PROFILE_PAGE_POLICY =
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+          + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+
+  @SuppressWarnings("PMD.LongVariable")
+  private static final Pattern ACCOUNT_PROFILE_PAGE_PATH =
+      Pattern.compile("^/o/[^/]+/account/profile$");
+
   private final EmbeddingEligibilityChecker embeddingChecker;
 
   // Constructed only by each SecurityFilterChain builder's own `new
@@ -261,7 +287,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     }
   }
 
-  // Three-way, not a ternary any more — see this class's own Javadoc for why each path pattern
+  // Five-way, not a ternary any more — see this class's own Javadoc for why each path pattern
   // gets its own real policy/relaxation rule rather than one being folded into "everything else".
   @SuppressWarnings("PMD.OnlyOneReturn")
   private String policyFor(final HttpServletRequest request) {
@@ -277,6 +303,10 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     }
     if (ACCOUNT_PASSKEYS_PAGE_PATH.matcher(requestUri).matches()) {
       return ACCOUNT_PASSKEYS_PAGE_POLICY;
+    }
+    if (ACCOUNT_PROFILE_PAGE_PATH.matcher(requestUri).matches()) {
+      return withRelaxedFrameAncestorsIfDisplayModal(
+          ACCOUNT_PROFILE_PAGE_POLICY, request, CLIENT_ID_PARAM);
     }
     return STRICT_POLICY;
   }

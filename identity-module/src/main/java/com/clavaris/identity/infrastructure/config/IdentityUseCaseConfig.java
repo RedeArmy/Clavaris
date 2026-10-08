@@ -603,8 +603,10 @@ class IdentityUseCaseConfig {
 
   @Bean
   /* package */ UpdateAccountProfileUseCase updateAccountProfileUseCase(
-      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
-    return new UpdateAccountProfileService(accounts, auditEvents);
+      final AccountRepository accounts,
+      final AuditEventRecorder auditEvents,
+      final EventOutboxWriter outbox) {
+    return new UpdateAccountProfileService(accounts, auditEvents, outbox);
   }
 
   @Bean

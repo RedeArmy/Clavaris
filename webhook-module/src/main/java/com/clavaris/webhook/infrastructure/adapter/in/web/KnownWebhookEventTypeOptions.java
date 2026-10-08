@@ -31,6 +31,11 @@ public final class KnownWebhookEventTypeOptions {
           new EventTypeOption("account.created", "A new Account was registered."),
           new EventTypeOption("account.deleted", "An Account was permanently deleted."),
           new EventTypeOption("account.email_verified", "An Account's email address was verified."),
+          new EventTypeOption(
+              "account.profile_updated",
+              "An Account's firstName/lastName/username/phoneNumber changed — by the Account"
+                  + " itself, an operator, or a consuming application's own Backend-API call"
+                  + " (TD-FUT-044)."),
           new EventTypeOption("account.reactivated", "A suspended Account was reactivated."),
           new EventTypeOption(
               "account.registration.pending_approval",

@@ -112,12 +112,13 @@ class ContentSecurityPolicyHeaderWriterTest {
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 
-  // A sibling path under the same /o/{organizationId}/account/** prefix — e.g. the profile page —
-  // must not be swept into this carve-out; it has no script of its own and should stay strict.
+  // A sibling path under the same /o/{organizationId}/account/** prefix — the sessions page — must
+  // not be swept into either the passkeys or the profile carve-out; it has no script of its own and
+  // should stay strict.
   @Test
   void doesNotWidenThePolicyForOtherAccountPages() {
     HttpServletRequest request =
-        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/sessions");
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
 
     writer.writeHeaders(request, response);
@@ -128,6 +129,49 @@ class ContentSecurityPolicyHeaderWriterTest {
             "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // Clerk <UserProfile/> parity, pattern (a): the self-service profile page's own
+  // i18n.js/organization-dialog.js need script-src 'self' — connect-src stays 'none', neither
+  // script makes a fetch/XHR call (confirmed by reading organization-dialog.js directly).
+  @Test
+  void setsTheAccountProfilePagePolicyWithScriptSrcSelfAndConnectSrcNone() {
+    HttpServletRequest request =
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // ADR-0009 §1/§4, same mechanism as the login page's own identical test — display=modal + an
+  // embedding-eligible clientId relaxes frame-ancestors on the profile page too, reusing
+  // EmbeddingEligibilityChecker verbatim (it has no notion of which page is asking).
+  @Test
+  void relaxesFrameAncestorsOnTheProfilePageWhenDisplayModalAndClientIdAreEligible() {
+    EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
+    when(checker.resolveAllowedFrameAncestor("jobseeker-web"))
+        .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter modalAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(checker);
+    HttpServletRequest request =
+        requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
+    when(request.getParameter("display")).thenReturn("modal");
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    modalAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains("frame-ancestors https://jobseeker.example.com"));
   }
 
   // A sibling path under the same /o/{organizationId}/login/** prefix — the plain "sign in with
