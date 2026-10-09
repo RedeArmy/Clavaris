@@ -7,6 +7,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantAccountOnlySecurityContextFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantSessionConcurrencyFilter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
 import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegisteredClientRepository;
 import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
@@ -345,6 +346,7 @@ public class OrganizationAuthorizationServerConfig {
       // without holding a compromised key's material "live" in JWKS indefinitely.
       @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours,
       final EmbeddingEligibilityChecker embeddingChecker,
+      final RedirectUriOriginResolver redirectUriOriginResolver,
       // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
       // bulkheads its own password checks through — both compete for the same limited CPU budget.
       final CpuBoundVerificationGate argon2BulkheadGate,
@@ -633,7 +635,9 @@ public class OrganizationAuthorizationServerConfig {
         // each gets a different policy and how it tells them apart.
         .headers(
             headers ->
-                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)));
+                headers.addHeaderWriter(
+                    new ContentSecurityPolicyHeaderWriter(
+                        embeddingChecker, redirectUriOriginResolver)));
 
     return http.build();
   }

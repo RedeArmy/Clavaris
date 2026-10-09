@@ -6,6 +6,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifier
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.security.CircuitBreakerClientHttpRequestInterceptor;
 import com.clavaris.app.infrastructure.adapter.out.security.GitHubVerifiedEmailUserService;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
@@ -248,7 +249,9 @@ class SocialLoginConfig {
       @Value("${clavaris.rate-limit.social-login.per-ip-limit:30}") final int perIpLimit,
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
           final int capacityDefaultRequestsPerMinute,
-      final EmbeddingEligibilityChecker embeddingChecker) {
+      final EmbeddingEligibilityChecker embeddingChecker,
+      @SuppressWarnings("PMD.LongVariable")
+          final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.securityMatcher(
             "/oauth2/authorization/**",
             "/login/oauth2/code/**",
@@ -306,7 +309,9 @@ class SocialLoginConfig {
             AntiAbuseRateLimitingFilter.class)
         .headers(
             headers ->
-                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)));
+                headers.addHeaderWriter(
+                    new ContentSecurityPolicyHeaderWriter(
+                        embeddingChecker, redirectUriOriginResolver)));
     return http.build();
   }
 

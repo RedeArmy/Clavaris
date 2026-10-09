@@ -5,6 +5,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifier
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.security.PlatformLoginRedirectEntryPoint;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import java.time.Duration;
@@ -106,7 +107,9 @@ public class PlatformDashboardSecurityConfig {
           final int platformAccountPictureUploadPerAccountLimit,
       @Value("${clavaris.rate-limit.platform-admin-picture.upload-per-account-limit:10}")
           final int platformAdminPictureUploadPerAccountLimit,
-      final EmbeddingEligibilityChecker embeddingChecker) {
+      final EmbeddingEligibilityChecker embeddingChecker,
+      @SuppressWarnings("PMD.LongVariable")
+          final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.securityMatcher("/platform/**")
         .sessionManagement(
             session ->
@@ -285,7 +288,9 @@ public class PlatformDashboardSecurityConfig {
         // serves gets the strict policy (ContentSecurityPolicyHeaderWriter's own Javadoc).
         .headers(
             headers ->
-                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)));
+                headers.addHeaderWriter(
+                    new ContentSecurityPolicyHeaderWriter(
+                        embeddingChecker, redirectUriOriginResolver)));
     return http.build();
   }
 }
