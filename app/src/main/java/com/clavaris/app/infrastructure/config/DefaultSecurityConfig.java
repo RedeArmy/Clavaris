@@ -5,6 +5,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifier
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import java.time.Duration;
 import java.util.List;
@@ -63,7 +64,9 @@ public class DefaultSecurityConfig {
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.login-email-code-confirm.per-email-limit:10}")
           final int emailCodeConfirmPerEmailLimit,
-      final EmbeddingEligibilityChecker embeddingChecker) {
+      final EmbeddingEligibilityChecker embeddingChecker,
+      @SuppressWarnings("PMD.LongVariable")
+          final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
         // TD-SEC-009: this chain is where RegisterAccountController's own hosted Thymeleaf form
         // (/o/{organizationId}/register) and every other non-SAS/non-dashboard hosted page lives —
@@ -71,7 +74,9 @@ public class DefaultSecurityConfig {
         // unconditionally even though this same chain also serves Actuator/non-HTML responses.
         .headers(
             headers ->
-                headers.addHeaderWriter(new ContentSecurityPolicyHeaderWriter(embeddingChecker)))
+                headers.addHeaderWriter(
+                    new ContentSecurityPolicyHeaderWriter(
+                        embeddingChecker, redirectUriOriginResolver)))
         .addFilterBefore(
             new AntiAbuseRateLimitingFilter(
                 rateLimiter,

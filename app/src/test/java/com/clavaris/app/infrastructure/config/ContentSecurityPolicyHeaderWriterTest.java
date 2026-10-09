@@ -9,9 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -44,7 +46,8 @@ class ContentSecurityPolicyHeaderWriterTest {
       "/platform/dashboard/organizations/11111111-1111-1111-1111-111111111111/oauth-clients";
 
   private final ContentSecurityPolicyHeaderWriter writer =
-      new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class));
+      new ContentSecurityPolicyHeaderWriter(
+          mock(EmbeddingEligibilityChecker.class), mock(RedirectUriOriginResolver.class));
 
   @Test
   void setsTheStrictPolicyOnAnHtmlResponseForAnOrdinaryHostedUiPath() {
@@ -152,7 +155,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("jobseeker-web", ORG_ID))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request =
         requestWithUri("/o/11111111-1111-1111-1111-111111111111/account/profile");
     when(request.getParameter("display")).thenReturn("modal");
@@ -298,7 +301,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("jobseeker-web", ORG_ID))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("clientId")).thenReturn("jobseeker-web");
@@ -321,7 +324,7 @@ class ContentSecurityPolicyHeaderWriterTest {
   void passesTheOrganizationIdParsedFromTheLoginPagesOwnPathToTheChecker() {
     EmbeddingEligibilityChecker checker = mock(EmbeddingEligibilityChecker.class);
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("clientId")).thenReturn("jobseeker-web");
@@ -343,7 +346,7 @@ class ContentSecurityPolicyHeaderWriterTest {
             org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri("/o/not-a-real-uuid/login");
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("clientId")).thenReturn("jobseeker-web");
@@ -365,7 +368,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("unverified-client", ORG_ID))
         .thenReturn(java.util.Optional.empty());
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("clientId")).thenReturn("unverified-client");
@@ -385,7 +388,7 @@ class ContentSecurityPolicyHeaderWriterTest {
             org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
     when(request.getParameter("clientId")).thenReturn("jobseeker-web");
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
@@ -411,7 +414,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("jobseeker-web", null))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("client_id")).thenReturn("jobseeker-web");
@@ -431,7 +434,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("unverified-client", null))
         .thenReturn(java.util.Optional.empty());
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("client_id")).thenReturn("unverified-client");
@@ -456,7 +459,7 @@ class ContentSecurityPolicyHeaderWriterTest {
             org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
     when(request.getParameter("client_id")).thenReturn("jobseeker-web");
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
@@ -484,7 +487,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("jobseeker-web", null))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
     when(request.getParameter("display")).thenReturn("modal");
     when(request.getParameter("clientId")).thenReturn("jobseeker-web");
@@ -538,7 +541,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     when(checker.resolveAllowedFrameAncestor("jobseeker-web", null))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpSession session = mock(HttpSession.class);
     when(session.getAttribute("clavaris.security.display-modal.pending-state"))
         .thenReturn("shared-state-value");
@@ -563,7 +566,7 @@ class ContentSecurityPolicyHeaderWriterTest {
             org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpSession session = mock(HttpSession.class);
     // A different, unrelated authorization attempt's own leftover state — same HttpSession, a
     // genuinely different "state" value, exactly the staleness this design avoids.
@@ -592,7 +595,7 @@ class ContentSecurityPolicyHeaderWriterTest {
             org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(java.util.Optional.of("https://jobseeker.example.com"));
     ContentSecurityPolicyHeaderWriter modalAwareWriter =
-        new ContentSecurityPolicyHeaderWriter(checker);
+        new ContentSecurityPolicyHeaderWriter(checker, mock(RedirectUriOriginResolver.class));
     HttpServletRequest consentRequest = requestWithUri(ORG_CONSENT_PATH);
     when(consentRequest.getSession(false)).thenReturn(null);
     when(consentRequest.getParameter("state")).thenReturn("this-flows-own-state");
@@ -606,6 +609,154 @@ class ContentSecurityPolicyHeaderWriterTest {
             eq(HEADER_NAME), org.mockito.ArgumentMatchers.contains("frame-ancestors 'none'"));
     verify(checker, never())
         .resolveAllowedFrameAncestor(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  // Security finding, 2026-10-09: live-caught on preproduction, real browser — see
+  // ContentSecurityPolicyHeaderWriter's own Javadoc addendum and RedirectUriOriginResolver's own
+  // Javadoc for the full "Chrome/Safari enforce form-action across a form submission's own
+  // redirect chain" rationale this widening fixes. Unconditional — no display=modal gate, unlike
+  // frame-ancestors above — every ordinary login ends in this same cross-origin redirect.
+  @Test
+  void widensFormActionOnTheLoginPageToTheClientsOwnRedirectUriOrigin() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    when(resolver.resolveAllowedFormActionOrigins("jobseeker-web", ORG_ID))
+        .thenReturn(List.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains(
+                "form-action 'self' https://jobseeker.example.com"));
+  }
+
+  @Test
+  void widensFormActionWithEveryOriginWhenTheClientHasSeveralRedirectUris() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    when(resolver.resolveAllowedFormActionOrigins("multi-redirect-client", ORG_ID))
+        .thenReturn(List.of("https://a.example.com", "https://b.example.com"));
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("clientId")).thenReturn("multi-redirect-client");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains(
+                "form-action 'self' https://a.example.com https://b.example.com"));
+  }
+
+  @Test
+  void widensFormActionEvenWithoutDisplayModalUnlikeTheFrameAncestorsRelaxation() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    when(resolver.resolveAllowedFormActionOrigins("jobseeker-web", ORG_ID))
+        .thenReturn(List.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    ArgumentCaptor<String> policyCaptor = ArgumentCaptor.forClass(String.class);
+    verify(response).setHeader(eq(HEADER_NAME), policyCaptor.capture());
+    assertThat(policyCaptor.getValue())
+        .contains("form-action 'self' https://jobseeker.example.com")
+        .contains("frame-ancestors 'none'");
+  }
+
+  @Test
+  void passesTheOrganizationIdParsedFromTheLoginPagesOwnPathToTheRedirectUriResolver() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("clientId")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    verify(resolver).resolveAllowedFormActionOrigins("jobseeker-web", ORG_ID);
+  }
+
+  @Test
+  void neverWidensFormActionOnTheLoginPageWhenTheResolverFindsNoOrigins() {
+    HttpServletRequest request = requestWithUri(ORG_LOGIN_PATH);
+    when(request.getParameter("clientId")).thenReturn("unknown-client");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    // The shared `writer` field's own RedirectUriOriginResolver mock is unstubbed — Mockito's own
+    // default answer for a List-returning method is an empty list, exactly "nothing resolved".
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // TD-SEC-011: deliberately "client_id" (OAuth2's own parameter name), never this project's own
+  // "clientId" — same convention the frame-ancestors relaxation already follows on this same path.
+  @Test
+  void widensFormActionOnTheConsentPageToTheClientsOwnRedirectUriOrigin() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    when(resolver.resolveAllowedFormActionOrigins("jobseeker-web", null))
+        .thenReturn(List.of("https://jobseeker.example.com"));
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            eq(HEADER_NAME),
+            org.mockito.ArgumentMatchers.contains(
+                "form-action 'self' https://jobseeker.example.com"));
+  }
+
+  @Test
+  void passesNullOrganizationToTheRedirectUriResolverOnTheConsentPage() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getParameter("client_id")).thenReturn("jobseeker-web");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    verify(resolver).resolveAllowedFormActionOrigins("jobseeker-web", null);
+  }
+
+  @Test
+  void neverCallsTheRedirectUriResolverForTheDashboardPage() {
+    RedirectUriOriginResolver resolver = mock(RedirectUriOriginResolver.class);
+    ContentSecurityPolicyHeaderWriter formActionAwareWriter =
+        new ContentSecurityPolicyHeaderWriter(mock(EmbeddingEligibilityChecker.class), resolver);
+    HttpServletRequest request = requestWithUri(DASHBOARD_PATH);
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    formActionAwareWriter.writeHeaders(request, response);
+
+    verify(resolver, never())
+        .resolveAllowedFormActionOrigins(
             org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
   }
 

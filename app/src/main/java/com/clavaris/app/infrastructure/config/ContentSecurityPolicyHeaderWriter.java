@@ -1,9 +1,11 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
+import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -130,6 +132,21 @@ import org.springframework.security.web.header.HeaderWriter;
  * for structurally different reasons (one script tag vs. a whole app shell) and this project's own
  * established convention ({@code STRICT_POLICY} vs. {@code LOGIN_PAGE_POLICY} themselves) is a
  * named constant per real reason, not one shared just because the text matches right now.
+ *
+ * <p><b>Security finding, 2026-10-09 (live-caught on preproduction, real browser): {@code
+ * form-action 'self'} widens to the requesting {@code OAuthClient}'s own registered {@code
+ * redirectUri} origin(s) on the login and consent pages.</b> Both pages' own {@code <form>} POST
+ * ultimately ends, after SAS's own internal redirects, in a 302 to that {@code redirect_uri} —
+ * never this origin, by protocol design. Chrome and Safari enforce {@code form-action} against
+ * every redirect hop a form submission's own navigation passes through, not just the literal {@code
+ * action} attribute (Firefox does not); {@code curl}/{@code HttpClient}-based tests, {@code
+ * AuthorizationCodeFlowIntegrationTest} included, never enforce CSP at all, which is exactly how
+ * this shipped unnoticed since TD-SEC-009 first added the header. See {@link
+ * RedirectUriOriginResolver}'s own Javadoc for the real-world reports confirming this browser
+ * behavior and the full fix shape — same {@code clientId}/{@code expectedOrganizationId}
+ * cross-tenant-check posture {@link EmbeddingEligibilityChecker} already establishes for {@code
+ * frame-ancestors}, reused verbatim here for {@code form-action} instead, never widened to every
+ * Organization's own registered clients.
  */
 // PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on 4 of this
 // class's own long, descriptively-named constants — same false-positive rationale
@@ -275,12 +292,20 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   private final EmbeddingEligibilityChecker embeddingChecker;
 
+  // Security finding, 2026-10-09: see this class's own Javadoc addendum.
+  @SuppressWarnings("PMD.LongVariable")
+  private final RedirectUriOriginResolver redirectUriOriginResolver;
+
   // Constructed only by each SecurityFilterChain builder's own `new
-  // ContentSecurityPolicyHeaderWriter(checker)` call — see this class's own Javadoc for why every
-  // site passes one even though only OrganizationAuthorizationServerConfig's own chain ever
-  // actually invokes it.
-  public ContentSecurityPolicyHeaderWriter(final EmbeddingEligibilityChecker embeddingChecker) {
+  // ContentSecurityPolicyHeaderWriter(checker, resolver)` call — see this class's own Javadoc for
+  // why every site passes one even though only OrganizationAuthorizationServerConfig's own chain
+  // ever actually invokes it.
+  public ContentSecurityPolicyHeaderWriter(
+      final EmbeddingEligibilityChecker embeddingChecker,
+      @SuppressWarnings("PMD.LongVariable")
+          final RedirectUriOriginResolver redirectUriOriginResolver) {
     this.embeddingChecker = embeddingChecker;
+    this.redirectUriOriginResolver = redirectUriOriginResolver;
   }
 
   @Override
@@ -318,11 +343,18 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private String policyFor(final HttpServletRequest request) {
     final String requestUri = request.getRequestURI();
     if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
-      return withRelaxedFrameAncestorsOnConsentPage(request);
+      return withWidenedFormAction(
+          withRelaxedFrameAncestorsOnConsentPage(request),
+          request.getParameter(OAUTH2_CLIENT_ID_PARAM),
+          null);
     }
     if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
-      return withRelaxedFrameAncestorsIfDisplayModal(
-          LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM, organizationIdFromPath(requestUri));
+      final UUID organizationId = organizationIdFromPath(requestUri);
+      return withWidenedFormAction(
+          withRelaxedFrameAncestorsIfDisplayModal(
+              LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM, organizationId),
+          request.getParameter(CLIENT_ID_PARAM),
+          organizationId);
     }
     if (DASHBOARD_PAGE_PATH.matcher(requestUri).matches()) {
       return DASHBOARD_PAGE_POLICY;
@@ -427,6 +459,26 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     return allowedOrigin
         .map(origin -> basePolicy.replace("frame-ancestors 'none'", "frame-ancestors " + origin))
         .orElse(basePolicy);
+  }
+
+  // Security finding, 2026-10-09: see this class's own Javadoc addendum. Unlike
+  // relaxFrameAncestors above (gated behind display=modal via the two
+  // withRelaxedFrameAncestors*/withWidenedFormAction's own callers), this widening is
+  // unconditional — every ordinary, non-embedded login/consent also ends in a cross-origin
+  // redirect to the client's own redirect_uri, not just a modal-embedded one.
+  // PMD.OnlyOneReturn: "nothing resolved, keep the base policy" / "widen it" are two genuinely
+  // distinct outcomes — same rationale every other early-return guard in this class already
+  // applies.
+  @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
+  private String withWidenedFormAction(
+      final String basePolicy, final String clientId, final UUID expectedOrganizationId) {
+    final List<String> allowedOrigins =
+        redirectUriOriginResolver.resolveAllowedFormActionOrigins(clientId, expectedOrganizationId);
+    if (allowedOrigins.isEmpty()) {
+      return basePolicy;
+    }
+    return basePolicy.replace(
+        "form-action 'self'", "form-action 'self' " + String.join(" ", allowedOrigins));
   }
 
   private static boolean isHtml(final HttpServletResponse response) {
