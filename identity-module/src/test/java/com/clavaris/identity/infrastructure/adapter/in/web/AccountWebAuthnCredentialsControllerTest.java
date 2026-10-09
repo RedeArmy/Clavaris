@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,6 +53,7 @@ class AccountWebAuthnCredentialsControllerTest {
   private DeleteWebAuthnCredentialUseCase deleteCredential;
   private GetAccountForOrganizationUseCase getAccount;
   private CurrentAccountResolver currentAccount;
+  private RequireRecentAuthentication requireRecentAuthentication;
   private AccountId accountId;
   private MockMvc mockMvc;
 
@@ -63,6 +65,7 @@ class AccountWebAuthnCredentialsControllerTest {
     deleteCredential = mock(DeleteWebAuthnCredentialUseCase.class);
     getAccount = mock(GetAccountForOrganizationUseCase.class);
     currentAccount = mock(CurrentAccountResolver.class);
+    requireRecentAuthentication = mock(RequireRecentAuthentication.class);
 
     accountId = AccountId.newId();
     Account account =
@@ -70,6 +73,9 @@ class AccountWebAuthnCredentialsControllerTest {
     when(currentAccount.resolve(any())).thenReturn(Optional.of(accountId));
     when(getAccount.handle(any())).thenReturn(Optional.of(account));
     when(listCredentials.handle(any())).thenReturn(List.of());
+    // Default: every test below exercises a recently-authenticated session unless it
+    // deliberately overrides this stub to prove the reverification-redirect path itself.
+    when(requireRecentAuthentication.isStale(ORGANIZATION_ID)).thenReturn(false);
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -90,7 +96,8 @@ class AccountWebAuthnCredentialsControllerTest {
                     listCredentials,
                     deleteCredential,
                     getAccount,
-                    currentAccount))
+                    currentAccount,
+                    requireRecentAuthentication))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -209,5 +216,23 @@ class AccountWebAuthnCredentialsControllerTest {
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/passkeys"));
 
     verify(deleteCredential).handle(new DeleteWebAuthnCredentialCommand(credentialId, accountId));
+  }
+
+  // Clerk "Sessions" settings parity.
+  @Test
+  void deleteRedirectsToLoginWithoutDeletingWhenTheAuthenticationIsStale() throws Exception {
+    when(requireRecentAuthentication.isStale(ORGANIZATION_ID)).thenReturn(true);
+    UUID credentialId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post(
+                "/o/{organizationId}/account/passkeys/{credentialId}/delete",
+                ORGANIZATION_ID,
+                credentialId))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login"));
+
+    verify(deleteCredential, never()).handle(any());
   }
 }
