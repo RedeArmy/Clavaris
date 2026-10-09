@@ -1,0 +1,79 @@
+# Spanish text of the Sessions settings page (organization-module): English source text -> Spanish.
+# The messages are exact, not patterns: a generic "{0} minutes" entry would also match any other
+# text that happens to end in "minutes". See docs/05-engineering/internationalization.md.
+
+# The unit selector
+msgid "Minutes"
+msgstr "Minutos"
+
+msgid "Hours"
+msgstr "Horas"
+
+msgid "Days"
+msgstr "Días"
+
+msgid "Weeks"
+msgstr "Semanas"
+
+msgid "Months"
+msgstr "Meses"
+
+msgid "Years"
+msgstr "Años"
+
+msgid "minutes"
+msgstr "minutos"
+
+msgid "Unit of time"
+msgstr "Unidad de tiempo"
+
+# The fields
+msgid "Maximum lifetime"
+msgstr "Duración máxima"
+
+msgid "Inactivity timeout"
+msgstr "Tiempo de inactividad"
+
+msgid "Valid for"
+msgstr "Válida durante"
+
+msgid "How long a session can last, however active the Account is. Between 5 minutes and 10 years. Default: 1 week."
+msgstr "Cuánto puede durar una sesión, por activa que esté la cuenta. Entre 5 minutos y 10 años. Por defecto: 1 semana."
+
+msgid "How long an Account can be idle before it is signed out. Between 5 minutes and 1 year, and never longer than the maximum lifetime. Default: 1 week."
+msgstr "Cuánto tiempo puede estar inactiva una cuenta antes de cerrar su sesión. Entre 5 minutos y 1 año, y nunca más que la duración máxima. Por defecto: 1 semana."
+
+msgid "How long a successful sign-in or reverification counts as recent for sensitive actions. Between 1 and 10 minutes. Default: 10 minutes."
+msgstr "Durante cuánto tiempo un inicio de sesión o una reverificación correctos cuentan como recientes para acciones sensibles. Entre 1 y 10 minutos. Por defecto: 10 minutos."
+
+# Multi-session handling
+msgid "Allow multiple sessions"
+msgstr "Permitir varias sesiones"
+
+msgid "When off, signing in again signs the Account out of every other session."
+msgstr "Si está desactivado, al volver a iniciar sesión se cierra la sesión de la cuenta en todas las demás."
+
+# What the server says when a value is not acceptable
+msgid "Enter a whole number greater than zero."
+msgstr "Introduce un número entero mayor que cero."
+
+msgid "Choose a unit of time."
+msgstr "Elige una unidad de tiempo."
+
+msgid "Must be at least 5 minutes."
+msgstr "Debe ser como mínimo 5 minutos."
+
+msgid "Must be at least 1 minute."
+msgstr "Debe ser como mínimo 1 minuto."
+
+msgid "Must be at most 10 years."
+msgstr "Debe ser como máximo 10 años."
+
+msgid "Must be at most 1 year."
+msgstr "Debe ser como máximo 1 año."
+
+msgid "Must be at most 10 minutes."
+msgstr "Debe ser como máximo 10 minutos."
+
+msgid "Can't be longer than the maximum lifetime."
+msgstr "No puede ser mayor que la duración máxima."

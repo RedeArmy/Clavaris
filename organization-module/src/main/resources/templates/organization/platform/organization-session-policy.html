@@ -18,7 +18,12 @@
 
             <!-- Clerk "Sessions" settings parity — same standalone-Configure-page shape every
                  sibling policy page (Rate Limit, API Keys, ...) already follows. Posts to
-                 PlatformSessionPolicyController#set, same HTMX-fragment-vs-redirect convention. -->
+                 PlatformSessionPolicyController#set, same HTMX-fragment-vs-redirect convention.
+
+                 Each duration is an amount plus a unit (minutes to years), not a raw count of
+                 minutes: the server stores minutes either way and checks the amount against the
+                 bounds in whichever unit was chosen, so the form works without the script. The
+                 script (duration-field.js) only adds the live check and the total beneath each field. -->
             <div class="clavaris-configure-layout">
                 <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'sessions')}"></div>
 
@@ -41,41 +46,85 @@
                                 <h2>Session lifetime</h2>
 
                                 <div class="clavaris-field">
-                                    <label for="session-policy-maximum-lifetime">Maximum lifetime (minutes)</label>
-                                    <input id="session-policy-maximum-lifetime" type="number" min="5" max="5256000"
-                                           th:field="*{maximumLifetimeMinutes}" required/>
-                                    <p class="clavaris-field-hint">Set the maximum lifetime duration for a session. Accepts between 5 minutes and 10 years.</p>
-                                    <p class="clavaris-field-error" th:if="${#fields.hasErrors('maximumLifetimeMinutes')}" th:errors="*{maximumLifetimeMinutes}">Maximum lifetime error</p>
+                                    <label for="session-policy-maximum-lifetime">Maximum lifetime</label>
+                                    <div class="clavaris-duration" data-duration-field
+                                         th:attr="data-min-minutes=${limits.minimumLifetime()},data-max-minutes=${limits.maximumLifetime()}">
+                                        <input id="session-policy-maximum-lifetime" class="clavaris-duration__value"
+                                               type="number" inputmode="numeric" min="1" step="1" required
+                                               th:field="*{maximumLifetimeValue}"
+                                               aria-describedby="session-policy-maximum-lifetime-hint"
+                                               th:attr="aria-invalid=${#fields.hasErrors('maximumLifetimeValue')} ? 'true'"/>
+                                        <select class="clavaris-duration__unit" aria-label="Unit of time"
+                                                th:field="*{maximumLifetimeUnit}">
+                                            <option th:each="unit : ${durationUnits}" th:value="${unit.name()}"
+                                                    th:text="${unit.label()}" th:attr="data-minutes=${unit.minutes()}">Minutes</option>
+                                        </select>
+                                    </div>
+                                    <p id="session-policy-maximum-lifetime-hint" class="clavaris-field-hint">How long a session can last, however active the Account is. Between 5 minutes and 10 years. Default: 1 week.</p>
+                                    <p class="clavaris-field-hint clavaris-duration__total" data-duration-total hidden></p>
+                                    <p class="clavaris-field-error" data-duration-error hidden></p>
+                                    <p class="clavaris-field-error" th:if="${#fields.hasErrors('maximumLifetimeValue')}" th:errors="*{maximumLifetimeValue}">Maximum lifetime error</p>
                                 </div>
 
                                 <div class="clavaris-field">
-                                    <label for="session-policy-inactivity-timeout">Inactivity timeout (minutes)</label>
-                                    <input id="session-policy-inactivity-timeout" type="number" min="5" max="525600"
-                                           th:field="*{inactivityTimeoutMinutes}" required/>
-                                    <p class="clavaris-field-hint">Set the inactivity timeout for a session. Accepts between 5 minutes and 1 year.</p>
-                                    <p class="clavaris-field-error" th:if="${#fields.hasErrors('inactivityTimeoutMinutes')}" th:errors="*{inactivityTimeoutMinutes}">Inactivity timeout error</p>
+                                    <label for="session-policy-inactivity-timeout">Inactivity timeout</label>
+                                    <div class="clavaris-duration" data-duration-field
+                                         data-not-longer-than="session-policy-maximum-lifetime"
+                                         th:attr="data-min-minutes=${limits.minimumInactivity()},data-max-minutes=${limits.maximumInactivity()}">
+                                        <input id="session-policy-inactivity-timeout" class="clavaris-duration__value"
+                                               type="number" inputmode="numeric" min="1" step="1" required
+                                               th:field="*{inactivityTimeoutValue}"
+                                               aria-describedby="session-policy-inactivity-timeout-hint"
+                                               th:attr="aria-invalid=${#fields.hasErrors('inactivityTimeoutValue')} ? 'true'"/>
+                                        <select class="clavaris-duration__unit" aria-label="Unit of time"
+                                                th:field="*{inactivityTimeoutUnit}">
+                                            <option th:each="unit : ${durationUnits}" th:value="${unit.name()}"
+                                                    th:text="${unit.label()}" th:attr="data-minutes=${unit.minutes()}">Minutes</option>
+                                        </select>
+                                    </div>
+                                    <p id="session-policy-inactivity-timeout-hint" class="clavaris-field-hint">How long an Account can be idle before it is signed out. Between 5 minutes and 1 year, and never longer than the maximum lifetime. Default: 1 week.</p>
+                                    <p class="clavaris-field-hint clavaris-duration__total" data-duration-total hidden></p>
+                                    <p class="clavaris-field-error" data-duration-error hidden></p>
+                                    <p class="clavaris-field-error" th:if="${#fields.hasErrors('inactivityTimeoutValue')}" th:errors="*{inactivityTimeoutValue}">Inactivity timeout error</p>
                                 </div>
                             </div>
 
                             <div class="clavaris-section-card">
                                 <h2>Reverification window</h2>
                                 <div class="clavaris-field">
-                                    <label for="session-policy-reverification-window">Reverification window (minutes)</label>
-                                    <input id="session-policy-reverification-window" type="number" min="1" max="10"
-                                           th:field="*{reverificationWindowMinutes}" required/>
-                                    <p class="clavaris-field-hint">Customize how long a successful sign-in or reverification remains valid for Clavaris-protected sensitive actions. Accepts between 1 and 10 minutes.</p>
+                                    <label for="session-policy-reverification-window">Valid for</label>
+                                    <div class="clavaris-duration" data-duration-field
+                                         th:attr="data-min-minutes=${limits.minimumWindow()},data-max-minutes=${limits.maximumWindow()}">
+                                        <input id="session-policy-reverification-window" class="clavaris-duration__value"
+                                               type="number" inputmode="numeric" min="1" step="1" required
+                                               th:field="*{reverificationWindowMinutes}"
+                                               aria-describedby="session-policy-reverification-window-hint"
+                                               data-minutes-per-unit="1"
+                                               th:attr="aria-invalid=${#fields.hasErrors('reverificationWindowMinutes')} ? 'true'"/>
+                                        <span class="clavaris-duration__suffix">minutes</span>
+                                    </div>
+                                    <p id="session-policy-reverification-window-hint" class="clavaris-field-hint">How long a successful sign-in or reverification counts as recent for sensitive actions. Between 1 and 10 minutes. Default: 10 minutes.</p>
+                                    <p class="clavaris-field-error" data-duration-error hidden></p>
                                     <p class="clavaris-field-error" th:if="${#fields.hasErrors('reverificationWindowMinutes')}" th:errors="*{reverificationWindowMinutes}">Reverification window error</p>
                                 </div>
                             </div>
 
                             <div class="clavaris-section-card">
                                 <h2>Multi-session handling</h2>
-                                <div class="clavaris-field">
-                                    <label for="session-policy-multi-session">
-                                        <input id="session-policy-multi-session" type="checkbox" th:field="*{multiSessionHandlingEnabled}"/>
-                                        Allow an Account to be signed into more than one session at a time
+                                <div class="clavaris-toggle-list">
+                                    <label class="clavaris-toggle clavaris-toggle--row" for="session-policy-multi-session">
+                                        <!--/* Not th:field: it adds a hidden input after the checkbox, which breaks the
+                                             "checkbox + track" selector the toggle's styling depends on. An unchecked
+                                             box is simply absent from the submission, which binds to false. */-->
+                                        <input id="session-policy-multi-session" type="checkbox"
+                                               name="multiSessionHandlingEnabled" value="true"
+                                               th:checked="*{multiSessionHandlingEnabled}"/>
+                                        <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                        <span class="clavaris-toggle__label">
+                                            <span class="clavaris-toggle__title">Allow multiple sessions</span>
+                                            <span class="clavaris-toggle__hint">When off, signing in again signs the Account out of every other session.</span>
+                                        </span>
                                     </label>
-                                    <p class="clavaris-field-hint">When disabled, signing in again revokes every other active session for that Account.</p>
                                 </div>
                             </div>
 
@@ -87,5 +136,6 @@
         </div>
     </main>
 </div>
+<script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/duration-field.js') : '/js/duration-field.js'}" defer></script>
 </body>
 </html>

@@ -1,13 +1,15 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-
 /**
  * Web-layer form object for the dashboard's own Sessions tuning form — same {@code
  * SetSessionPolicyRequest}-is-the-REST-API's-own-DTO split {@code SetRateLimitPolicyForm}'s own
- * Javadoc documents. The {@code @Min}/{@code @Max} bounds mirror {@code SessionPolicy}'s own range
- * constants exactly, same precedent that REST request DTO already follows.
+ * Javadoc documents. The REST request keeps speaking minutes; this form speaks what a person types:
+ * an amount and a unit for each duration.
+ *
+ * <p>The amounts and units are plain text on purpose. A number field bound to an {@code int} turns
+ * "abc" or "1.5" into a framework conversion error nobody can read; held as text, {@link
+ * SessionPolicyFormValidator} parses them and says what is wrong in the words the page uses. It
+ * also keeps exactly what was typed when the form is shown again with an error.
  *
  * <p>PMD.DataClass: a plain web-layer form bean is *supposed* to be just fields + getters/setters —
  * same convention {@code CreateWorkspaceTeamRoleForm}'s own Javadoc already establishes.
@@ -15,18 +17,11 @@ import jakarta.validation.constraints.Min;
 @SuppressWarnings({"PMD.LongVariable", "PMD.DataClass"})
 public class SetSessionPolicyForm {
 
-  @Min(5)
-  @Max(5_256_000)
-  private int maximumLifetimeMinutes;
-
-  @Min(5)
-  @Max(525_600)
-  private int inactivityTimeoutMinutes;
-
-  @Min(1)
-  @Max(10)
-  private int reverificationWindowMinutes;
-
+  private String maximumLifetimeValue;
+  private String maximumLifetimeUnit;
+  private String inactivityTimeoutValue;
+  private String inactivityTimeoutUnit;
+  private String reverificationWindowMinutes;
   private boolean multiSessionHandlingEnabled;
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -34,27 +29,43 @@ public class SetSessionPolicyForm {
     // Intentionally empty.
   }
 
-  public int getMaximumLifetimeMinutes() {
-    return maximumLifetimeMinutes;
+  public String getMaximumLifetimeValue() {
+    return maximumLifetimeValue;
   }
 
-  public void setMaximumLifetimeMinutes(final int maximumLifetimeMinutes) {
-    this.maximumLifetimeMinutes = maximumLifetimeMinutes;
+  public void setMaximumLifetimeValue(final String maximumLifetimeValue) {
+    this.maximumLifetimeValue = maximumLifetimeValue;
   }
 
-  public int getInactivityTimeoutMinutes() {
-    return inactivityTimeoutMinutes;
+  public String getMaximumLifetimeUnit() {
+    return maximumLifetimeUnit;
   }
 
-  public void setInactivityTimeoutMinutes(final int inactivityTimeoutMinutes) {
-    this.inactivityTimeoutMinutes = inactivityTimeoutMinutes;
+  public void setMaximumLifetimeUnit(final String maximumLifetimeUnit) {
+    this.maximumLifetimeUnit = maximumLifetimeUnit;
   }
 
-  public int getReverificationWindowMinutes() {
+  public String getInactivityTimeoutValue() {
+    return inactivityTimeoutValue;
+  }
+
+  public void setInactivityTimeoutValue(final String inactivityTimeoutValue) {
+    this.inactivityTimeoutValue = inactivityTimeoutValue;
+  }
+
+  public String getInactivityTimeoutUnit() {
+    return inactivityTimeoutUnit;
+  }
+
+  public void setInactivityTimeoutUnit(final String inactivityTimeoutUnit) {
+    this.inactivityTimeoutUnit = inactivityTimeoutUnit;
+  }
+
+  public String getReverificationWindowMinutes() {
     return reverificationWindowMinutes;
   }
 
-  public void setReverificationWindowMinutes(final int reverificationWindowMinutes) {
+  public void setReverificationWindowMinutes(final String reverificationWindowMinutes) {
     this.reverificationWindowMinutes = reverificationWindowMinutes;
   }
 
