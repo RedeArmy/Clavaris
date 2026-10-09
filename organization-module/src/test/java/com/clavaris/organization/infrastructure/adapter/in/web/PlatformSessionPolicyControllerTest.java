@@ -144,13 +144,27 @@ class PlatformSessionPolicyControllerTest {
   }
 
   @Test
+  void theSwitchIsCheckedByDefaultAndHasNoHiddenCompanionInput() throws Exception {
+    // A hidden input after the checkbox would break the "checkbox + track" styling selector.
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("checked=\"checked\"")))
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("_multiSessionHandlingEnabled"))));
+  }
+
+  @Test
   void theRenderedPageOffersEveryUnitAndASwitchRatherThanACheckbox() throws Exception {
     mockMvc
         .perform(get(path()))
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"HOURS\"")))
         .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"YEARS\"")))
-        .andExpect(content().string(org.hamcrest.Matchers.containsString("role=\"switch\"")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("clavaris-toggle__track")))
         .andExpect(content().string(org.hamcrest.Matchers.containsString("data-min-minutes=\"5\"")))
         .andExpect(
             content().string(org.hamcrest.Matchers.containsString("data-max-minutes=\"5256000\"")));

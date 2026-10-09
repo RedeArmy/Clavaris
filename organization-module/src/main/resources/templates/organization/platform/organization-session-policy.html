@@ -113,8 +113,12 @@
                                 <h2>Multi-session handling</h2>
                                 <div class="clavaris-toggle-list">
                                     <label class="clavaris-toggle clavaris-toggle--row" for="session-policy-multi-session">
-                                        <input id="session-policy-multi-session" type="checkbox" role="switch"
-                                               th:field="*{multiSessionHandlingEnabled}"/>
+                                        <!--/* Not th:field: it adds a hidden input after the checkbox, which breaks the
+                                             "checkbox + track" selector the toggle's styling depends on. An unchecked
+                                             box is simply absent from the submission, which binds to false. */-->
+                                        <input id="session-policy-multi-session" type="checkbox"
+                                               name="multiSessionHandlingEnabled" value="true"
+                                               th:checked="*{multiSessionHandlingEnabled}"/>
                                         <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
                                         <span class="clavaris-toggle__label">
                                             <span class="clavaris-toggle__title">Allow multiple sessions</span>
