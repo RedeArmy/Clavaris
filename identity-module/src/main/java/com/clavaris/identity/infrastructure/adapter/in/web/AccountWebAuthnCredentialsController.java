@@ -69,6 +69,7 @@ public class AccountWebAuthnCredentialsController {
   private final DeleteWebAuthnCredentialUseCase deleteCredential;
   private final GetAccountForOrganizationUseCase getAccount;
   private final CurrentAccountResolver currentAccount;
+  private final RequireRecentAuthentication requireRecentAuthentication;
 
   @SuppressWarnings("java:S107")
   public AccountWebAuthnCredentialsController(
@@ -77,13 +78,15 @@ public class AccountWebAuthnCredentialsController {
       final ListWebAuthnCredentialsForAccountUseCase listCredentials,
       final DeleteWebAuthnCredentialUseCase deleteCredential,
       final GetAccountForOrganizationUseCase getAccount,
-      final CurrentAccountResolver currentAccount) {
+      final CurrentAccountResolver currentAccount,
+      final RequireRecentAuthentication requireRecentAuthentication) {
     this.startRegistration = startRegistration;
     this.completeRegistration = completeRegistration;
     this.listCredentials = listCredentials;
     this.deleteCredential = deleteCredential;
     this.getAccount = getAccount;
     this.currentAccount = currentAccount;
+    this.requireRecentAuthentication = requireRecentAuthentication;
   }
 
   @GetMapping
@@ -149,12 +152,22 @@ public class AccountWebAuthnCredentialsController {
   // Deliberately a no-op either way (not found, or belongs to a different Account) — same
   // "ownership mismatch is a safe no-op, never an error" posture DeleteWebAuthnCredentialUseCase's
   // own Javadoc establishes.
+  //
+  // Clerk "Sessions" settings parity: removing a security credential is exactly the kind of
+  // sensitive action the reverification window exists to gate — RequireRecentAuthentication's own
+  // Javadoc has the full mechanism. A stale authentication is sent back to login rather than
+  // silently completing the deletion; the retry-the-action-after-re-login UX is deliberately simple
+  // for this first real consumer (no pending-action resume mechanism yet) — a natural follow-up,
+  // not assumed solved here.
   @PostMapping("/{credentialId}/delete")
   public String delete(
       @PathVariable final UUID organizationId,
       @PathVariable final UUID credentialId,
       final HttpServletRequest request) {
     final AccountId accountId = requireCurrentAccount(request);
+    if (requireRecentAuthentication.isStale(organizationId)) {
+      return "redirect:/o/" + organizationId + "/login";
+    }
     deleteCredential.handle(new DeleteWebAuthnCredentialCommand(credentialId, accountId));
     return "redirect:/o/" + organizationId + "/account/passkeys";
   }

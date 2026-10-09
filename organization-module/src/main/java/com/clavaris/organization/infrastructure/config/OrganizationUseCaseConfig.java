@@ -65,6 +65,8 @@ import com.clavaris.organization.application.usecase.getorganizationforplatforma
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.getsessionpolicyfororganization.GetSessionPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.getsessionpolicyfororganization.GetSessionPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationService;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationService;
@@ -113,6 +115,9 @@ import com.clavaris.organization.application.usecase.setorganizationsocialcreden
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.setsessionpolicyfororganization.SessionPolicyRepository;
+import com.clavaris.organization.application.usecase.setsessionpolicyfororganization.SetSessionPolicyForOrganizationService;
+import com.clavaris.organization.application.usecase.setsessionpolicyfororganization.SetSessionPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleService;
@@ -258,6 +263,23 @@ class OrganizationUseCaseConfig {
           final int hardSystemWideCap) {
     return new GetRateLimitPolicyForOrganizationService(
         policies, systemDefaultRequestsPerMinute, hardSystemWideCap);
+  }
+
+  // Clerk "Sessions" settings parity — same dual-caller shape (REST admin API +
+  // PlatformSessionPolicyController dashboard) as the rate-limit policy pair above.
+  @SuppressWarnings("PMD.LinguisticNaming")
+  @Bean
+  /* package */ SetSessionPolicyForOrganizationUseCase setSessionPolicyForOrganizationUseCase(
+      final OrganizationRepository organizations,
+      final SessionPolicyRepository policies,
+      final AuditEventRecorder auditEvents) {
+    return new SetSessionPolicyForOrganizationService(organizations, policies, auditEvents);
+  }
+
+  @Bean
+  /* package */ GetSessionPolicyForOrganizationUseCase getSessionPolicyForOrganizationUseCase(
+      final SessionPolicyRepository policies) {
+    return new GetSessionPolicyForOrganizationService(policies);
   }
 
   // ADR-0025, TD-SEC-007: the dashboard's own audit-log query — see

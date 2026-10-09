@@ -14,6 +14,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionPolicyProvider;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionPolicySnapshot;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
@@ -48,6 +50,7 @@ class RotateRefreshTokenServiceTest {
   private AccountSessionRevoker accountSessionRevoker;
   private EventOutboxWriter outbox;
   private SecurityMetricsRecorder metrics;
+  private SessionPolicyProvider sessionPolicyProvider;
   private RotateRefreshTokenService service;
 
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
@@ -61,6 +64,7 @@ class RotateRefreshTokenServiceTest {
     accountSessionRevoker = mock(AccountSessionRevoker.class);
     outbox = mock(EventOutboxWriter.class);
     metrics = mock(SecurityMetricsRecorder.class);
+    sessionPolicyProvider = mock(SessionPolicyProvider.class);
     service =
         new RotateRefreshTokenService(
             refreshTokens,
@@ -69,7 +73,8 @@ class RotateRefreshTokenServiceTest {
             accountTokenRevoker,
             accountSessionRevoker,
             outbox,
-            metrics);
+            metrics,
+            sessionPolicyProvider);
 
     // Default: an ACTIVE account, matching this class's own accountId field — the SDE-III
     // review (2026-09-03) status check every test below now passes through unless a test
@@ -79,6 +84,14 @@ class RotateRefreshTokenServiceTest {
     // every test below exercises the ordinary, uncontested rotation path unless it deliberately
     // overrides this stub to prove the lost-race/reuse path itself.
     when(refreshTokens.revokeIfActive(any(), any())).thenReturn(true);
+    // Default: every test below exercises a session well within the (default-wide) session
+    // policy unless it deliberately overrides this stub to prove the maximum-lifetime/
+    // inactivity-timeout rejection path itself — assertSessionWithinPolicy resolves the
+    // Organization unconditionally on every call, so this must be stubbed globally, not just on
+    // the (pre-existing) reuse-detection tests that already stub it for handleReuse's own sake.
+    when(accounts.findOrganizationIdById(accountId)).thenReturn(Optional.of(organizationId));
+    when(sessionPolicyProvider.policyFor(organizationId))
+        .thenReturn(SessionPolicySnapshot.defaults());
 
     logAppender.start();
     loggerUnderTest().addAppender(logAppender);
@@ -154,6 +167,71 @@ class RotateRefreshTokenServiceTest {
     verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
     verify(outbox, never()).write(any(), any(), any(), any());
     verify(metrics).increment("clavaris.auth.refresh_token.rotated");
+  }
+
+  // Clerk "Sessions" settings parity: a session past its Organization's own configured maximum
+  // lifetime must be rejected as an ordinary failure, same posture rejectsRotationForASuspended...
+  // establishes for account status — never the reuse-detection cascade, which would be a real
+  // false-positive alert/mass-revocation for routine, expected session expiry.
+  @Test
+  void rejectsRotationForASessionPastItsOrganizationsMaximumLifetimeWithoutTreatingItAsReuse() {
+    Session oldSession =
+        Session.reconstitute(
+            UUID.randomUUID(),
+            accountId,
+            List.of("openid", "profile"),
+            Instant.now().minus(31, ChronoUnit.DAYS),
+            Instant.now(), // recently active — only the lifetime bound is exceeded
+            null);
+    String rawValue = "a-valid-refresh-token-value";
+    RefreshToken active = activeTokenFor(oldSession, rawValue);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+    when(sessions.findById(oldSession.id())).thenReturn(Optional.of(oldSession));
+    when(sessionPolicyProvider.policyFor(organizationId))
+        .thenReturn(new SessionPolicySnapshot(30 * 24 * 60, 10_080, 10, true));
+    RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    // Never burned/flagged as reuse, and never even reaches the conditional-consume step —
+    // policy rejection must happen before any mutation.
+    verify(refreshTokens, never()).revokeIfActive(any(), any());
+    verify(refreshTokens, never()).insert(any());
+    verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
+  }
+
+  // Same rationale as the maximum-lifetime test above, for the independent inactivity-timeout
+  // bound.
+  @Test
+  void rejectsRotationForASessionPastItsOrganizationsInactivityTimeoutWithoutTreatingItAsReuse() {
+    Session staleSession =
+        Session.reconstitute(
+            UUID.randomUUID(),
+            accountId,
+            List.of("openid", "profile"),
+            Instant.now().minus(2, ChronoUnit.DAYS), // well within the lifetime bound
+            Instant.now().minus(2, ChronoUnit.DAYS), // but never touched since
+            null);
+    String rawValue = "a-valid-refresh-token-value";
+    RefreshToken active = activeTokenFor(staleSession, rawValue);
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(active));
+    when(sessions.findById(staleSession.id())).thenReturn(Optional.of(staleSession));
+    when(sessionPolicyProvider.policyFor(organizationId))
+        .thenReturn(new SessionPolicySnapshot(10_080, 60, 10, true));
+    RotateRefreshTokenCommand command = commandFor(rawValue, Instant.now().plusSeconds(3600));
+
+    assertThatExceptionOfType(InvalidRefreshTokenException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(refreshTokens, never()).revokeIfActive(any(), any());
+    verify(refreshTokens, never()).insert(any());
+    verify(accountTokenRevoker, never()).revokeAllTokensFor(any());
+    verify(accountSessionRevoker, never()).revokeAllSessionsFor(any());
   }
 
   @Test

@@ -166,6 +166,10 @@ class AdminApiSecurityConfig {
                     .requestMatchers(
                         HttpMethod.PUT, "/api/v1/admin/organizations/*/rate-limit-policy")
                     .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.RATE_LIMIT_POLICY_WRITE)
+                    // Clerk "Sessions" settings parity: same defence-in-depth reasoning as the
+                    // rate-limit ceiling rule above — operator-managed only in v1.
+                    .requestMatchers(HttpMethod.PUT, "/api/v1/admin/organizations/*/session-policy")
+                    .hasAuthority(SCOPE_AUTHORITY_PREFIX + PlatformScopes.SESSION_POLICY_WRITE)
                     // TD-SEC-008/ADR-0010 §5.2: manually-triggered key rotation is its own scope
                     // too, same defence-in-depth reasoning as the two rules above.
                     .requestMatchers(

@@ -263,6 +263,15 @@ public final class PlatformScopes {
   public static final String ACCOUNTS_PROFILE_WRITE = "platform:accounts:profile:write";
 
   /**
+   * Clerk "Sessions" settings parity: tuning an Organization's session lifetime/inactivity-
+   * timeout/reverification-window/multi-session-handling policy — operator-managed only in v1, same
+   * posture {@link #RATE_LIMIT_POLICY_WRITE}'s own Javadoc already establishes (also in {@link
+   * #OPERATOR_ONLY} for the same reason). Reading the policy back is unscoped, same "only mutating
+   * actions get their own scope" precedent every other GET on this surface follows.
+   */
+  public static final String SESSION_POLICY_WRITE = "platform:session-policy:write";
+
+  /**
    * Granted to the bootstrap {@code PlatformClient} (BR-PLATFORM-03) — the operator's own client,
    * gets everything that exists so far.
    */
@@ -295,7 +304,8 @@ public final class PlatformScopes {
           CLIENT_DOMAIN_WRITE,
           ACCOUNTS_REVIEW_REGISTRATION,
           ACCOUNTS_METADATA_WRITE,
-          ACCOUNTS_PROFILE_WRITE);
+          ACCOUNTS_PROFILE_WRITE,
+          SESSION_POLICY_WRITE);
 
   /**
    * SDE-III review, 2026-09-15 — real gap found and closed: every scope above whose own Javadoc
@@ -312,7 +322,11 @@ public final class PlatformScopes {
    * OrganizationClient#register} now calls instead of the generic one below.
    */
   public static final List<String> OPERATOR_ONLY =
-      List.of(RATE_LIMIT_POLICY_WRITE, SIGNING_KEYS_ROTATE, SOCIAL_LOGIN_POLICY_WRITE);
+      List.of(
+          RATE_LIMIT_POLICY_WRITE,
+          SIGNING_KEYS_ROTATE,
+          SOCIAL_LOGIN_POLICY_WRITE,
+          SESSION_POLICY_WRITE);
 
   /**
    * ADR-0023 / SDE-III review, 2026-09-15: {@link #BOOTSTRAP_DEFAULT} minus {@link #OPERATOR_ONLY}
