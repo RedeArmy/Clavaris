@@ -1,0 +1,43 @@
+name: Docker Hub mirror
+description: >-
+  Makes the runner's Docker daemon try a public Docker Hub mirror before Docker Hub itself, so
+  image pulls (Testcontainers' postgres/redis/ryuk, anything else a test starts) survive Docker
+  Hub's anonymous rate limit and its registry/auth outages.
+
+# Why this exists: GitHub-hosted runners pull Docker Hub images anonymously, from IP ranges shared
+# with every other job on GitHub, so the "429 Too Many Requests" limit and token-endpoint timeouts
+# (auth.docker.io) hit CI at random. The tests then wait out Testcontainers' own two-minute pull
+# timeout per image and fail the build for a reason that has nothing to do with the code under
+# test.
+#
+# mirror.gcr.io is Google's public, unauthenticated pull-through cache of Docker Hub. The daemon
+# asks a configured mirror first and falls back to Docker Hub itself if the mirror misses or is
+# down, so this can only make a pull more likely to succeed, never less. It needs no account and no
+# secret. The images the tests use were checked to be served by it (postgres:16, redis:7,
+# testcontainers/ryuk, eclipse-temurin). docker-build's own BuildKit builder does not use the
+# daemon's mirrors; ci.yml configures it separately through setup-buildx-action.
+#
+# Restarting the daemon is safe here only because this runs before anything starts a container.
+
+runs:
+  using: composite
+  steps:
+    - name: Configure the Docker daemon to use the mirror
+      shell: bash
+      run: |
+        set -euo pipefail
+        config=/etc/docker/daemon.json
+        current='{}'
+        if [ -s "$config" ]; then
+          current="$(sudo cat "$config")"
+        fi
+        # Keep whatever the runner image already configures; add the mirror to the list.
+        echo "$current" \
+          | jq '."registry-mirrors" = (((."registry-mirrors" // []) + ["https://mirror.gcr.io"]) | unique)' \
+          | sudo tee "$config" > /dev/null
+        sudo systemctl restart docker
+        for _ in $(seq 1 30); do
+          docker info > /dev/null 2>&1 && break
+          sleep 1
+        done
+        echo "Docker registry mirrors: $(docker info --format '{{json .RegistryConfig.Mirrors}}')"

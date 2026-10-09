@@ -48,12 +48,18 @@ jobs:
       # Integration tests use Testcontainers (test-strategy.md §2), which
       # drives the Docker daemon directly rather than GitHub Actions'
       # `services:` block — ubuntu-latest runners ship Docker preinstalled,
-      # so no extra setup is needed here.
+      # so no extra setup is needed here beyond the mirror below: the tests pull
+      # postgres/redis/ryuk from Docker Hub anonymously, and that registry's rate
+      # limit and token-endpoint timeouts used to fail whole builds at random (see
+      # the action's own header).
       #
       # ArchUnit's hexagonal-dependency check (coding-standards.md §2,
       # test-strategy.md §2) runs as an ordinary test class picked up by
       # `mvn verify` below — there is no separate ArchUnit CI step by design,
       # matching "run in CI on every build, not a manual review step."
+      - name: Use a Docker Hub mirror for image pulls
+        uses: ./.github/actions/docker-hub-mirror
+
       - name: Build and test (mvn verify)
         run: mvn -B verify
 
@@ -84,8 +90,18 @@ jobs:
       # cold Maven dependency resolution inside the image build" gap. A bare Dockerfile cache
       # mount alone would only help within a single build, never across runs, since each run starts
       # on a fresh VM with no local BuildKit cache of its own.
+      #
+      # buildkitd-config-inline: the docker-container builder pulls app/Dockerfile's base images
+      # (eclipse-temurin) itself, not through the daemon, so it needs its own mirror setting. It
+      # asks mirror.gcr.io first and falls back to Docker Hub, same as the daemon mirror the test
+      # jobs use (.github/actions/docker-hub-mirror), so an anonymous-pull rate limit or a Docker
+      # Hub token timeout no longer fails the build before it starts.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
 
       # Tagged clavaris-app:ci first (untagged for a registry) so the Trivy scan below and every
       # existing step keep working unchanged regardless of whether this run pushes anywhere.
@@ -369,6 +385,10 @@ jobs:
       # added as a repo secret (2026-08-18). Branch protection on `master` requiring the
       # `ci-passed` aggregator job below (not this job individually) is a GitHub repo setting only
       # an admin can configure — nothing in this workflow file can set that from here.
+      # Same Docker Hub mirror as build-and-test: this job runs the same Testcontainers suite.
+      - name: Use a Docker Hub mirror for image pulls
+        uses: ./.github/actions/docker-hub-mirror
+
       - name: Build and test
         run: mvn -B verify
 
