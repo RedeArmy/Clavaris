@@ -4315,18 +4315,19 @@ body:has(.htmx-request)::after {
   max-width: 440px;
 }
 
-.clavaris-consent__header {
+/* The application's own mark and heading at the top of a card (login, consent). */
+.clavaris-app-header {
   margin-bottom: var(--space-6);
   text-align: center;
 }
 
-.clavaris-consent__header .clavaris-card__logo {
+.clavaris-app-header .clavaris-card__logo {
   max-height: 40px;
   margin-bottom: var(--space-4);
 }
 
 /* No logo: the application's initial on its brand colour, so the page still has a face. */
-.clavaris-consent__monogram {
+.clavaris-app-monogram {
   display: inline-flex;
   width: 48px;
   height: 48px;
@@ -4341,8 +4342,13 @@ body:has(.htmx-request)::after {
   box-shadow: 0 6px 14px color-mix(in srgb, var(--clavaris-brand-color) 28%, transparent);
 }
 
-.clavaris-consent__header h1 {
+.clavaris-app-header h1 {
   margin-bottom: var(--space-2);
+}
+
+/* Nothing under the heading (the login page): no gap left for text that is not there. */
+.clavaris-app-header h1:last-child {
+  margin-bottom: 0;
 }
 
 .clavaris-consent__lead {

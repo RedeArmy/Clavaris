@@ -1,6 +1,8 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -109,6 +111,9 @@ class LoginControllerTest {
 
     ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
     viewResolver.setTemplateEngine(templateEngine);
+    // The pages are UTF-8 (the tab title has an em dash); MockMvc would otherwise decode as
+    // Latin-1.
+    viewResolver.setCharacterEncoding("UTF-8");
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
@@ -137,6 +142,95 @@ class LoginControllerTest {
         Account.register(new OrganizationId(ORGANIZATION_ID), new Email("user@example.com"));
     account.attachPasswordCredential("argon2id$hashed");
     return account;
+  }
+
+  // The consuming application's own sign-in shows that application's branding and nothing of
+  // Clavaris. With no branding it is a plain "Sign in", never "Clavaris: Sign in".
+  @Test
+  void anApplicationWithNoBrandingGetsAPlainSignInAndNoMentionOfClavaris() throws Exception {
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("<h1>Sign in</h1>")))
+        .andExpect(content().string(containsString("<title>Sign in</title>")))
+        .andExpect(content().string(not(containsString("Clavaris"))))
+        // The tab icon is the blank one, not the Clavaris mark; consumer.css is what makes the
+        // hidden notices actually hidden on these pages only.
+        .andExpect(content().string(containsString("/brand/neutral-icon.svg")))
+        .andExpect(content().string(containsString("/css/consumer.css")))
+        .andExpect(content().string(not(containsString("clavaris-mark"))))
+        .andExpect(content().string(not(containsString("clavaris-app-monogram"))))
+        .andExpect(content().string(not(containsString("clavaris-card__logo"))));
+  }
+
+  @Test
+  void anApplicationWithOnlyANameGetsSignInToItAndItsInitial() throws Exception {
+    when(clientBrandingProvider.brandingFor(any(), any()))
+        .thenReturn(
+            new ClientBrandingSnapshot(
+                Optional.empty(), Optional.empty(), Optional.of("Acme Analytics")));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID).param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(containsString("<h1>Sign in to <strong>Acme Analytics</strong></h1>")))
+        .andExpect(content().string(containsString("<title>Acme Analytics — Sign in</title>")))
+        .andExpect(content().string(containsString("clavaris-app-monogram")))
+        .andExpect(content().string(not(containsString("clavaris-card__logo"))))
+        .andExpect(content().string(not(containsString("Clavaris"))));
+  }
+
+  @Test
+  void anApplicationWithALogoAndANameShowsTheLogoLabelledWithTheName() throws Exception {
+    when(clientBrandingProvider.brandingFor(any(), any()))
+        .thenReturn(
+            new ClientBrandingSnapshot(
+                Optional.of("https://cdn.acme.test/logo.png"),
+                Optional.empty(),
+                Optional.of("Acme Analytics")));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID).param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("src=\"https://cdn.acme.test/logo.png\"")))
+        .andExpect(content().string(containsString("alt=\"Acme Analytics\"")))
+        .andExpect(content().string(containsString("Sign in to <strong>Acme Analytics</strong>")))
+        .andExpect(content().string(not(containsString("clavaris-app-monogram"))));
+  }
+
+  @Test
+  void anApplicationWithOnlyALogoShowsItAboveAPlainSignIn() throws Exception {
+    when(clientBrandingProvider.brandingFor(any(), any()))
+        .thenReturn(
+            new ClientBrandingSnapshot(
+                Optional.of("https://cdn.acme.test/logo.png"), Optional.empty(), Optional.empty()));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID).param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("src=\"https://cdn.acme.test/logo.png\"")))
+        .andExpect(content().string(containsString("alt=\"Application logo\"")))
+        .andExpect(content().string(containsString("<h1>Sign in</h1>")))
+        .andExpect(content().string(not(containsString("Clavaris"))));
+  }
+
+  // The notice and the passkey error box must start hidden: they are revealed by
+  // login-submit-guard.js and webauthn-login.js only when they apply. (That the hidden attribute
+  // actually hides them is the stylesheet's job; hidden-attribute.test.js guards that.)
+  @Test
+  void theConditionalNoticesAreRenderedHidden() throws Exception {
+    mockMvc
+        .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<output id=\"login-submit-guard-notice\"[^>]*\\bhidden\\b.*")))
+        .andExpect(
+            content()
+                .string(matchesPattern("(?s).*<p id=\"passkey-signin-error\"[^>]*\\bhidden\\b.*")));
   }
 
   @Test

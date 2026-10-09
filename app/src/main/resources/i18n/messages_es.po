@@ -557,8 +557,8 @@ msgstr "Confirmar contraseña"
 msgid "Confirm password error"
 msgstr "Error al confirmar la contraseña"
 
-msgid "Confirm sign-in — Clavaris"
-msgstr "Confirmar inicio de sesión — Clavaris"
+msgid "Confirm sign-in"
+msgstr "Confirmar inicio de sesión"
 
 msgid "Confirmation error"
 msgstr "Error de confirmación"
@@ -598,9 +598,6 @@ msgstr "Crear cuenta"
 
 msgid "Create an account"
 msgstr "Crear una cuenta"
-
-msgid "Create an account — Clavaris"
-msgstr "Crear una cuenta — Clavaris"
 
 msgid "Create organization"
 msgstr "Crear Organización"
@@ -911,9 +908,6 @@ msgstr "Escribe la URL a la que entregar los eventos"
 msgid "Enter your code"
 msgstr "Introduce tu código"
 
-msgid "Enter your code — Clavaris"
-msgstr "Introduce tu código — Clavaris"
-
 msgid "Enter your email address and we'll send you a link to reset your password."
 msgstr "Introduce tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña."
 
@@ -1015,6 +1009,9 @@ msgstr "Nombre"
 
 msgid "First seen"
 msgstr "Visto por primera vez"
+
+msgid "Forgot password"
+msgstr "Contraseña olvidada"
 
 msgid "Forgot password — Clavaris"
 msgstr "Contraseña olvidada — Clavaris"
@@ -1208,6 +1205,9 @@ msgstr "Déjalo en blanco para usar todos los ámbitos permitidos a este cliente
 msgid "Less"
 msgstr "Menos"
 
+msgid "Link invalid"
+msgstr "Enlace no válido"
+
 msgid "Link invalid — Clavaris"
 msgstr "Enlace no válido — Clavaris"
 
@@ -1231,9 +1231,6 @@ msgstr "Bloquear cuenta"
 
 msgid "Lock this account"
 msgstr "Bloquear esta cuenta"
-
-msgid "Lock this account — Clavaris"
-msgstr "Bloquear esta cuenta — Clavaris"
 
 msgid "Lock this account?"
 msgstr "¿Bloquear esta cuenta?"
@@ -1826,8 +1823,8 @@ msgstr "Registrar endpoint"
 msgid "Registration approved"
 msgstr "Registro aprobado"
 
-msgid "Registration pending approval — Clavaris"
-msgstr "Registro pendiente de aprobación — Clavaris"
+msgid "Registration pending approval"
+msgstr "Registro pendiente de aprobación"
 
 msgid "Registration rejected"
 msgstr "Registro rechazado"
@@ -2090,9 +2087,6 @@ msgstr "Sesiones"
 msgid "Set a new password"
 msgstr "Establece una contraseña nueva"
 
-msgid "Set a new password — Clavaris"
-msgstr "Establece una contraseña nueva — Clavaris"
-
 msgid "Set password"
 msgstr "Establecer contraseña"
 
@@ -2126,11 +2120,8 @@ msgstr "Iniciar sesión con"
 msgid "Sign in with a code"
 msgstr "Iniciar sesión con un código"
 
-msgid "Sign in with a code — Clavaris"
-msgstr "Iniciar sesión con un código — Clavaris"
-
-msgid "Sign in with a link — Clavaris"
-msgstr "Iniciar sesión con un enlace — Clavaris"
+msgid "Sign in with a link"
+msgstr "Iniciar sesión con un enlace"
 
 msgid "Sign in with a passkey"
 msgstr "Iniciar sesión con una clave de acceso"
@@ -2152,9 +2143,6 @@ msgstr "Iniciar sesión con Google"
 
 msgid "Sign in with username"
 msgstr "Iniciar sesión con nombre de usuario"
-
-msgid "Sign in with username — Clavaris"
-msgstr "Iniciar sesión con nombre de usuario — Clavaris"
 
 msgid "Sign in — Clavaris"
 msgstr "Iniciar sesión — Clavaris"
@@ -2570,9 +2558,6 @@ msgstr "Actualizar límite"
 msgid "Update profile"
 msgstr "Actualizar perfil"
 
-msgid "Update profile — Clavaris"
-msgstr "Actualizar perfil — Clavaris"
-
 msgid "Upload"
 msgstr "Subir"
 
@@ -2659,9 +2644,6 @@ msgstr "Verificar"
 
 msgid "Verify this device"
 msgstr "Verifica este dispositivo"
-
-msgid "Verify this device — Clavaris"
-msgstr "Verifica este dispositivo — Clavaris"
 
 msgid "View"
 msgstr "Ver"
@@ -2851,9 +2833,6 @@ msgstr "Tus organizaciones — Clavaris"
 
 msgid "Your passkeys"
 msgstr "Tus claves de acceso"
-
-msgid "Your passkeys — Clavaris"
-msgstr "Tus claves de acceso — Clavaris"
 
 msgid "Your password has been changed. For your security, you've been signed out everywhere — sign in again with your new password."
 msgstr "Se cambió tu contraseña. Por tu seguridad, se cerró tu sesión en todos los dispositivos; inicia sesión de nuevo con la contraseña nueva."

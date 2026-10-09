@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -96,6 +97,21 @@ class PlatformLoginControllerTest {
         .andExpect(redirectedUrl("/platform/dashboard"));
 
     verifyNoInteractions(useCase);
+  }
+
+  // Clavaris's own sign-in is Clavaris's own page: it keeps the Clavaris title and mark. The
+  // changes that take Clavaris out of the consuming application's pages (consumerHead,
+  // consumer.css)
+  // must never reach it.
+  @Test
+  void clavarisOwnSignInKeepsTheClavarisTitleAndMarkAndLoadsNothingConsumerOnly() throws Exception {
+    mockMvc
+        .perform(get("/platform/login"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Clavaris</title>")))
+        .andExpect(content().string(containsString("/brand/clavaris-mark-polished.svg")))
+        .andExpect(content().string(not(containsString("consumer.css"))))
+        .andExpect(content().string(not(containsString("neutral-icon"))));
   }
 
   // SDE-III review, 2026-09-16 — social-provider brand icons: this tier's own pair is always
