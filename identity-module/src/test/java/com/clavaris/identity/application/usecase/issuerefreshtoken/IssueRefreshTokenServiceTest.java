@@ -13,7 +13,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
-import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -38,7 +37,6 @@ class IssueRefreshTokenServiceTest {
   private AccountRepository accounts;
   private SessionPolicyProvider sessionPolicyProvider;
   private AccountTokenRevoker accountTokenRevoker;
-  private AccountSessionRevoker accountSessionRevoker;
   private IssueRefreshTokenService service;
 
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
@@ -51,16 +49,9 @@ class IssueRefreshTokenServiceTest {
     accounts = mock(AccountRepository.class);
     sessionPolicyProvider = mock(SessionPolicyProvider.class);
     accountTokenRevoker = mock(AccountTokenRevoker.class);
-    accountSessionRevoker = mock(AccountSessionRevoker.class);
     service =
         new IssueRefreshTokenService(
-            sessions,
-            refreshTokens,
-            metrics,
-            accounts,
-            sessionPolicyProvider,
-            accountTokenRevoker,
-            accountSessionRevoker);
+            sessions, refreshTokens, metrics, accounts, sessionPolicyProvider, accountTokenRevoker);
 
     // Default: every test below exercises an ordinary login (multi-session handling enabled,
     // the default) unless it deliberately overrides these stubs to prove the revocation-cascade
@@ -128,7 +119,6 @@ class IssueRefreshTokenServiceTest {
     verify(refreshTokens).revokeAllActiveForAccount(accountId);
     verify(sessions).revokeAllActiveForAccount(accountId);
     verify(accountTokenRevoker).revokeAllTokensFor(accountId);
-    verify(accountSessionRevoker).revokeAllSessionsFor(accountId);
     // The new session/token this same call opens must still succeed — the cascade only touches
     // what existed before it.
     verify(sessions).insert(any());
@@ -146,6 +136,5 @@ class IssueRefreshTokenServiceTest {
     verify(refreshTokens, never()).revokeAllActiveForAccount(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
     verifyNoInteractions(accountTokenRevoker);
-    verifyNoInteractions(accountSessionRevoker);
   }
 }

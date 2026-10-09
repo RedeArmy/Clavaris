@@ -320,17 +320,15 @@ class IdentityUseCaseConfig {
       final RefreshTokenRepository refreshTokens,
       final SecurityMetricsRecorder securityMetrics,
       final AccountRepository accounts,
-      final SessionPolicyProvider sessionPolicyProvider,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker) {
+      @SuppressWarnings("PMD.LongVariable") final SessionPolicyProvider sessionPolicyProvider,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker) {
     return new IssueRefreshTokenService(
         sessions,
         refreshTokens,
         securityMetrics,
         accounts,
         sessionPolicyProvider,
-        accountTokenRevoker,
-        accountSessionRevoker);
+        accountTokenRevoker);
   }
 
   @Bean
@@ -342,7 +340,7 @@ class IdentityUseCaseConfig {
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter eventOutboxWriter,
       final SecurityMetricsRecorder securityMetrics,
-      final SessionPolicyProvider sessionPolicyProvider) {
+      @SuppressWarnings("PMD.LongVariable") final SessionPolicyProvider sessionPolicyProvider) {
     return new RotateRefreshTokenService(
         refreshTokens,
         sessions,

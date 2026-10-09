@@ -92,6 +92,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
 
   private final EventOutboxWriter outbox;
   private final SecurityMetricsRecorder metrics;
+
+  @SuppressWarnings("PMD.LongVariable")
   private final SessionPolicyProvider sessionPolicyProvider;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
@@ -105,7 +107,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter outbox,
       final SecurityMetricsRecorder metrics,
-      final SessionPolicyProvider sessionPolicyProvider) {
+      @SuppressWarnings("PMD.LongVariable") final SessionPolicyProvider sessionPolicyProvider) {
     this.refreshTokens = refreshTokens;
     this.sessions = sessions;
     this.accounts = accounts;

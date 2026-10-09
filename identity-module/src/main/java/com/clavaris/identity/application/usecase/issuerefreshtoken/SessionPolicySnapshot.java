@@ -13,6 +13,9 @@ package com.clavaris.identity.application.usecase.issuerefreshtoken;
  * default is already resolved by organization-module's own {@code
  * GetSessionPolicyForOrganizationUseCase} before this snapshot is ever built.
  */
+// PMD.LongVariable: all 4 fields name exactly what they hold, same convention SessionPolicy
+// (organization-module) and AccountAuthenticationPolicySnapshot's own fields already establish.
+@SuppressWarnings("PMD.LongVariable")
 public record SessionPolicySnapshot(
     int maximumLifetimeMinutes,
     int inactivityTimeoutMinutes,

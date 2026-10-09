@@ -2,7 +2,6 @@ package com.clavaris.identity.application.usecase.issuerefreshtoken;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
-import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -26,13 +25,29 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Clerk "Sessions" settings parity: before opening the new Session, checks the Account's own
  * Organization's {@link SessionPolicyProvider#policyFor}; when {@code
  * multiSessionHandlingEnabled()} is {@code false}, revokes every pre-existing Session/RefreshToken
- * for the Account first — the same 4-part cascade {@code RotateRefreshTokenService}'s own BR-ID-03
- * reuse response uses ({@link RefreshTokenRepository#revokeAllActiveForAccount}, {@link
- * SessionRepository#revokeAllActiveForAccount}, {@link AccountTokenRevoker}, {@link
- * AccountSessionRevoker}), triggered by policy instead of a compromise signal. Ordering matters:
- * nothing new has been opened yet at that point, so there is no risk of the cascade catching the
- * session this same call is about to create.
+ * and SAS authorization for the Account first — {@link RefreshTokenRepository
+ * #revokeAllActiveForAccount}, {@link SessionRepository#revokeAllActiveForAccount}, {@link
+ * AccountTokenRevoker}, a 3-part subset of {@code RotateRefreshTokenService}'s own BR-ID-03
+ * reuse-response cascade, triggered by policy instead of a compromise signal.
+ *
+ * <p>Deliberately <strong>excludes</strong> {@code RotateRefreshTokenService}'s fourth cascade
+ * step, {@code AccountSessionRevoker} (the hosted-UI {@code HttpSession}/{@code SessionRegistry}
+ * layer): by the time this use case runs — the backend-to-backend {@code authorization_code}→token
+ * exchange (ADR-0013, confidential clients only) — the browser's own hosted-login {@code
+ * HttpSession} from the interactive login step that just happened was already registered in the
+ * same {@code SessionRegistry}, under the same principal, by {@code
+ * SpringSecurityAuthenticatedSessionEstablisher#establish} moments earlier. Calling {@code
+ * AccountSessionRevoker#revokeAllSessionsFor} here would expire that brand-new browser session too
+ * — logging the Account straight back out of the hosted self-service pages it just signed into —
+ * which is the opposite of "the new session survives, only the old ones are revoked." BR-ID-03's
+ * own reuse response has no such concern: there, nuking the current session along with everything
+ * else is the correct, intended full lockout.
  */
+// PMD.LongVariable: sessionPolicyProvider/accountTokenRevoker name exactly what they hold, same
+// convention RotateRefreshTokenService's own identical fields already establish — a class-level
+// suppression here, not one per occurrence, since AvoidDuplicateLiterals otherwise flags the
+// repeated annotation string.
+@SuppressWarnings("PMD.LongVariable")
 public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(IssueRefreshTokenService.class);
@@ -42,32 +57,21 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
   private final SecurityMetricsRecorder metrics;
   private final AccountRepository accounts;
   private final SessionPolicyProvider sessionPolicyProvider;
-
-  // Descriptive over PMD's default LongVariable threshold, same convention
-  // RotateRefreshTokenService's own identical fields already establish.
-  @SuppressWarnings("PMD.LongVariable")
   private final AccountTokenRevoker accountTokenRevoker;
 
-  @SuppressWarnings("PMD.LongVariable")
-  private final AccountSessionRevoker accountSessionRevoker;
-
-  @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
-  // RotateRefreshTokenService's own identical suppression.
   public IssueRefreshTokenService(
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
       final SecurityMetricsRecorder metrics,
       final AccountRepository accounts,
       final SessionPolicyProvider sessionPolicyProvider,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker) {
+      final AccountTokenRevoker accountTokenRevoker) {
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;
     this.metrics = metrics;
     this.accounts = accounts;
     this.sessionPolicyProvider = sessionPolicyProvider;
     this.accountTokenRevoker = accountTokenRevoker;
-    this.accountSessionRevoker = accountSessionRevoker;
   }
 
   // PMD.GuardLogStatement false positive, same reasoning as AuthenticateWithPasswordService's own
@@ -100,11 +104,10 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
   }
 
   // See this class's own Javadoc for the full rationale and ordering guarantee.
-  // PMD.GuardLogStatement false positive, same reasoning as handle()'s own identical suppression.
-  // PMD.OnlyOneReturn: "multi-session handling enabled, nothing to do" and "disabled, run the
-  // cascade" are two genuinely distinct outcomes — same "one exit per distinct outcome" rationale
-  // every other early-return guard in this codebase already applies.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
+  // PMD.OnlyOneReturn does not flag a void method's bare early-return guard clause, so no
+  // suppression for it is needed here (unlike RequireRecentAuthentication's boolean-returning
+  // isStale, which does trip it); PMD.GuardLogStatement likewise doesn't flag this method's own
+  // log call, unlike handle()'s.
   private void revokeOtherSessionsIfMultiSessionHandlingDisabled(final AccountId accountId) {
     final OrganizationId organizationId =
         accounts
@@ -127,6 +130,5 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
     refreshTokens.revokeAllActiveForAccount(accountId);
     sessions.revokeAllActiveForAccount(accountId);
     accountTokenRevoker.revokeAllTokensFor(accountId);
-    accountSessionRevoker.revokeAllSessionsFor(accountId);
   }
 }

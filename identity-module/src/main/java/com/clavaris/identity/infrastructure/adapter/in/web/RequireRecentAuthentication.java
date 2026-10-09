@@ -31,6 +31,11 @@ import org.springframework.stereotype.Component;
  * authentication must never assume one, same posture {@code WebhookUrlSsrfChecker}'s own
  * unresolvable-host handling already establishes for an unrelated check.
  */
+// PMD.LongVariable: sessionPolicyProvider/reverificationWindowMinutes name exactly what they
+// hold, same convention this codebase's other session-policy consumers already establish.
+// PMD.OnlyOneReturn: isStale's two returns are genuinely distinct outcomes ("stale" vs. "fresh
+// enough"), same "one exit per distinct outcome" rationale already applied elsewhere.
+@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 @Component
 public class RequireRecentAuthentication {
 

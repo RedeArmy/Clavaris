@@ -8,8 +8,11 @@ import jakarta.validation.constraints.Min;
  * SetSessionPolicyRequest}-is-the-REST-API's-own-DTO split {@code SetRateLimitPolicyForm}'s own
  * Javadoc documents. The {@code @Min}/{@code @Max} bounds mirror {@code SessionPolicy}'s own range
  * constants exactly, same precedent that REST request DTO already follows.
+ *
+ * <p>PMD.DataClass: a plain web-layer form bean is *supposed* to be just fields + getters/setters —
+ * same convention {@code CreateWorkspaceTeamRoleForm}'s own Javadoc already establishes.
  */
-@SuppressWarnings("PMD.LongVariable")
+@SuppressWarnings({"PMD.LongVariable", "PMD.DataClass"})
 public class SetSessionPolicyForm {
 
   @Min(5)
