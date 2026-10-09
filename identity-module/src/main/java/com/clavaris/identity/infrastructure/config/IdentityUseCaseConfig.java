@@ -69,6 +69,7 @@ import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateA
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionPolicyProvider;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationService;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
@@ -329,7 +330,8 @@ class IdentityUseCaseConfig {
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter eventOutboxWriter,
-      final SecurityMetricsRecorder securityMetrics) {
+      final SecurityMetricsRecorder securityMetrics,
+      final SessionPolicyProvider sessionPolicyProvider) {
     return new RotateRefreshTokenService(
         refreshTokens,
         sessions,
@@ -337,7 +339,8 @@ class IdentityUseCaseConfig {
         accountTokenRevoker,
         accountSessionRevoker,
         eventOutboxWriter,
-        securityMetrics);
+        securityMetrics,
+        sessionPolicyProvider);
   }
 
   @Bean

@@ -2,6 +2,8 @@ package com.clavaris.identity.application.usecase.rotaterefreshtoken;
 
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionPolicyProvider;
+import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionPolicySnapshot;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
@@ -13,6 +15,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -89,6 +92,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
 
   private final EventOutboxWriter outbox;
   private final SecurityMetricsRecorder metrics;
+  private final SessionPolicyProvider sessionPolicyProvider;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
   // ConfirmPasswordResetService's own identical suppression — BR-ID-03's reuse cascade genuinely
@@ -100,7 +104,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
       @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter outbox,
-      final SecurityMetricsRecorder metrics) {
+      final SecurityMetricsRecorder metrics,
+      final SessionPolicyProvider sessionPolicyProvider) {
     this.refreshTokens = refreshTokens;
     this.sessions = sessions;
     this.accounts = accounts;
@@ -108,6 +113,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     this.accountSessionRevoker = accountSessionRevoker;
     this.outbox = outbox;
     this.metrics = metrics;
+    this.sessionPolicyProvider = sessionPolicyProvider;
   }
 
   // PMD.GuardLogStatement false positive, same reasoning as AuthenticateWithPasswordService's own
@@ -155,6 +161,12 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
                             + presented.id()
                             + " references a Session that doesn't"
                             + " exist — data integrity violated before reaching this use case"));
+    // Clerk "Sessions" settings parity, before any mutation (same ordering rationale as the
+    // scope check immediately below) — a session past its Organization's own configured maximum
+    // lifetime or inactivity timeout must leave the presented token fully usable for nothing
+    // (same InvalidRefreshTokenException every other rejection on this path already produces, so
+    // the OAuth2 error response never leaks which specific rule tripped).
+    assertSessionWithinPolicy(session, presented.accountId());
     // RFC 6749 §6, before any mutation: an over-scoped request must leave the presented token
     // fully usable for a later, correctly-scoped retry — see
     // RequestedScopeExceedsAuthorizedScopeException's own Javadoc for the real bug this ordering
@@ -227,6 +239,45 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
           "event=refresh_token_rejected_inactive_account accountId={} accountStatus={}",
           presented.accountId(),
           account.status());
+      throw new InvalidRefreshTokenException();
+    }
+  }
+
+  // Clerk "Sessions" settings parity — see this method's own call site comment above.
+  // PMD.GuardLogStatement false positive, same reasoning as assertAccountActive's own identical
+  // suppression.
+  @SuppressWarnings("PMD.GuardLogStatement")
+  private void assertSessionWithinPolicy(final Session session, final AccountId accountId) {
+    final OrganizationId organizationId =
+        accounts
+            .findOrganizationIdById(accountId)
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "RefreshToken references AccountId "
+                            + accountId
+                            + " that doesn't exist — data integrity violated before reaching this"
+                            + " use case"));
+    final SessionPolicySnapshot policy = sessionPolicyProvider.policyFor(organizationId);
+    final Instant now = Instant.now();
+    if (now.isAfter(
+        session.createdAt().plus(Duration.ofMinutes(policy.maximumLifetimeMinutes())))) {
+      LOG.info(
+          "event=refresh_token_rejected_session_policy reason=maximum_lifetime_exceeded"
+              + " organizationId={} accountId={} sessionId={}",
+          organizationId,
+          accountId,
+          session.id());
+      throw new InvalidRefreshTokenException();
+    }
+    if (now.isAfter(
+        session.lastSeenAt().plus(Duration.ofMinutes(policy.inactivityTimeoutMinutes())))) {
+      LOG.info(
+          "event=refresh_token_rejected_session_policy reason=inactivity_timeout_exceeded"
+              + " organizationId={} accountId={} sessionId={}",
+          organizationId,
+          accountId,
+          session.id());
       throw new InvalidRefreshTokenException();
     }
   }
