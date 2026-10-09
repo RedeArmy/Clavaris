@@ -318,8 +318,19 @@ class IdentityUseCaseConfig {
   /* package */ IssueRefreshTokenUseCase issueRefreshTokenUseCase(
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
-      final SecurityMetricsRecorder securityMetrics) {
-    return new IssueRefreshTokenService(sessions, refreshTokens, securityMetrics);
+      final SecurityMetricsRecorder securityMetrics,
+      final AccountRepository accounts,
+      final SessionPolicyProvider sessionPolicyProvider,
+      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
+      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker) {
+    return new IssueRefreshTokenService(
+        sessions,
+        refreshTokens,
+        securityMetrics,
+        accounts,
+        sessionPolicyProvider,
+        accountTokenRevoker,
+        accountSessionRevoker);
   }
 
   @Bean
