@@ -365,7 +365,7 @@ public class RegisterAccountController {
       // RedirectQueryParams's own Javadoc for the header/query injection primitive this closes.
       String target = REDIRECT_ORGANIZATION_PREFIX + organizationId + "/login/email-code/confirm";
       target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
-      target = RedirectQueryParams.appendIfPresent(target, "clientId", clientId);
+      target = RedirectQueryParams.appendIfPresent(target, CLIENT_ID, clientId);
       target = RedirectQueryParams.appendIfPresent(target, "redirectUrl", redirectUrl);
       return target;
     }

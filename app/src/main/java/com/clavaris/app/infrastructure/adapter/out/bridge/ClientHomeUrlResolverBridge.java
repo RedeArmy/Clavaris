@@ -57,7 +57,7 @@ class ClientHomeUrlResolverBridge implements ClientHomeUrlResolver {
       }
       final String port = uri.getPort() < 0 ? "" : ":" + uri.getPort();
       return Optional.of(scheme.toLowerCase(Locale.ROOT) + "://" + uri.getHost() + port + "/");
-    } catch (final URISyntaxException e) {
+    } catch (final URISyntaxException _) {
       return Optional.empty();
     }
   }
