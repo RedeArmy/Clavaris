@@ -65,7 +65,9 @@ public class RequireRecentAuthentication {
     }
     Instant latest = null;
     for (final GrantedAuthority authority : authentication.getAuthorities()) {
-      if (authority instanceof FactorGrantedAuthority factor && factor.getIssuedAt() != null) {
+      // getIssuedAt() is never null: FactorGrantedAuthority's own constructor requires it, and
+      // Builder#build() defaults to Instant.now() when unset.
+      if (authority instanceof FactorGrantedAuthority factor) {
         final Instant issuedAt = factor.getIssuedAt();
         if (latest == null || issuedAt.isAfter(latest)) {
           latest = issuedAt;
