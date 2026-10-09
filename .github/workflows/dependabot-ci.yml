@@ -143,6 +143,28 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
+      # Same Docker Hub mirror as ci.yml's test jobs (see .github/actions/docker-hub-mirror for the
+      # reasoning): this job runs the same Testcontainers suite and fails the same way when Docker
+      # Hub rate-limits the runner. Inlined rather than `uses: ./.github/actions/...` on purpose:
+      # this workflow runs with `pull_request_target` and has just checked out the PR's own head, so
+      # a local action would be code the PR controls, in a privileged context. This file always
+      # comes from the base branch (see the header), so nothing the PR changes can alter these lines.
+      - name: Use a Docker Hub mirror for image pulls
+        run: |
+          set -euo pipefail
+          config=/etc/docker/daemon.json
+          current='{}'
+          if [ -s "$config" ]; then
+            current="$(sudo cat "$config")"
+          fi
+          echo "$current"             | jq '."registry-mirrors" = (((."registry-mirrors" // []) + ["https://mirror.gcr.io"]) | unique)'             | sudo tee "$config" > /dev/null
+          sudo systemctl restart docker
+          for _ in $(seq 1 30); do
+            docker info > /dev/null 2>&1 && break
+            sleep 1
+          done
+          echo "Docker registry mirrors: $(docker info --format '{{json .RegistryConfig.Mirrors}}')"
+
       # Identical invocation to ci.yml's own sonarcloud step — see that file's own comments for the
       # full reasoning behind each property (including the 2026-09-04 sonar.sources/
       # sonar.plsql.file.suffixes additions); not repeated here.
