@@ -2369,9 +2369,6 @@ msgstr "El dispositivo cierra sesión de inmediato."
 msgid "The endpoint itself and its signing secret — no future event will ever be delivered to this URL again"
 msgstr "El propio endpoint y su secreto de firma; no se volverá a entregar ningún evento a esta URL"
 
-msgid "The following permissions are requested:"
-msgstr "Se solicitan los siguientes permisos:"
-
 msgid "The identifiers and endpoints a consuming application needs to connect to this Organization — its own tenant issuer, the shared token endpoint, and the JWKS document/public key used to verify tokens it issues."
 msgstr "Los identificadores y endpoints que una aplicación necesita para conectarse a esta Organización: su emisor de tenant propio, el endpoint de tokens compartido y el documento JWKS o la clave pública con que se verifican los tokens que emite."
 

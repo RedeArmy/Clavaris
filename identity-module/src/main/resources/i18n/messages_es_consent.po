@@ -1,0 +1,51 @@
+# Spanish text of the consent screen ("<application> wants to access your account"): English source
+# text -> Spanish. "Approve", "Deny" and "No additional permissions are requested." live in
+# messages_es.po. See docs/05-engineering/internationalization.md.
+
+# The application's own name rides in the <0>{0}</0> tag, so it is never translated.
+msgid "<0>{0}</0> wants to access your account"
+msgstr "<0>{0}</0> quiere acceder a tu cuenta"
+
+msgid "This application wants to access your account"
+msgstr "Esta aplicación quiere acceder a tu cuenta"
+
+# The browser tab: the application's name, then the fixed words.
+msgid "{0} — Authorize access"
+msgstr "{0} — Autorizar acceso"
+
+msgid "Approve only what you are comfortable sharing. You can switch off any permission below."
+msgstr "Aprueba solo lo que quieras compartir. Puedes desactivar cualquiera de los permisos de abajo."
+
+msgid "This will allow it to:"
+msgstr "Esto le permitirá:"
+
+# The permissions a client can ask for
+msgid "Your profile"
+msgstr "Tu perfil"
+
+msgid "Your name and basic profile details, such as your picture."
+msgstr "Tu nombre y los datos básicos de tu perfil, como tu foto."
+
+msgid "Your email address"
+msgstr "Tu correo electrónico"
+
+msgid "The email address on your account and whether it has been verified."
+msgstr "El correo electrónico de tu cuenta y si está verificado."
+
+msgid "Your address"
+msgstr "Tu dirección"
+
+msgid "The postal address on your profile."
+msgstr "La dirección postal de tu perfil."
+
+msgid "Your phone number"
+msgstr "Tu número de teléfono"
+
+msgid "The phone number on your profile."
+msgstr "El número de teléfono de tu perfil."
+
+msgid "Stay signed in"
+msgstr "Mantener la sesión iniciada"
+
+msgid "Keep its access when you are not using the application."
+msgstr "Conserva el acceso cuando no estés usando la aplicación."

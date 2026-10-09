@@ -5,6 +5,7 @@ import com.clavaris.identity.application.usecase.resolveorganizationforclient.Or
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
@@ -60,6 +61,9 @@ public class ConsentController {
   // class's own Javadoc.
   private static final String OPENID_SCOPE = "openid";
 
+  private static final List<String> DISPLAY_ORDER =
+      List.of("profile", "email", "address", "phone", "offline_access");
+
   private final OrganizationForClientResolver organizationForClient;
   private final ClientBrandingProvider clientBrandingProvider;
 
@@ -108,6 +112,16 @@ public class ConsentController {
     if (scope == null || scope.isBlank()) {
       return List.of();
     }
-    return Arrays.stream(scope.split(" ")).filter(s -> !OPENID_SCOPE.equals(s)).toList();
+    return Arrays.stream(scope.split(" "))
+        .filter(s -> !OPENID_SCOPE.equals(s))
+        .sorted(Comparator.comparingInt(ConsentController::rank).thenComparing(s -> s))
+        .toList();
+  }
+
+  // The scopes arrive in no particular order (SAS hands them over as a set); the page lists the
+  // standard ones first, in the order a person expects, then any custom scope alphabetically.
+  private static int rank(final String scope) {
+    final int index = DISPLAY_ORDER.indexOf(scope);
+    return index < 0 ? DISPLAY_ORDER.size() : index;
   }
 }
