@@ -26,8 +26,13 @@
         </p>
 
         <p class="clavaris-links">
-            Already been approved? <a th:href="@{../login}">Sign in</a>.
+            Already been approved? <a th:href="@{../login(clientId=${clientId})}">Sign in</a>.
         </p>
+        <!--/* Back to the application the person came from; only rendered when the request named a
+                client of this Organization (see ReturnToApplicationLink). */-->
+        <div class="clavaris-return" th:if="${homeUrl}">
+            <a class="clavaris-button clavaris-button--secondary" th:href="${homeUrl}">Back to home</a>
+        </div>
     </div>
 </main>
 </body>

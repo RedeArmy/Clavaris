@@ -114,12 +114,14 @@ public class RegisterAccountController {
   private static final String EMAIL = "email";
   private static final String USERNAME = "username";
   private static final String PASSWORD = "password";
+  private static final String CLIENT_ID = "clientId";
 
   private final RegisterAccountUseCase useCase;
   private final RequestEmailVerificationUseCase requestEmailVerification;
   private final AccountAuthenticationPolicyProvider policyProvider;
   private final RequestEmailSignInCodeUseCase requestEmailSignInCode;
   private final RequestEmailSignInLinkUseCase requestEmailSignInLink;
+  private final ReturnToApplicationLink returnToApplication;
 
   // Same port LoginController's own identical field already uses — no new abstraction, this
   // controller just now also reads it.
@@ -134,13 +136,15 @@ public class RegisterAccountController {
       final RequestEmailSignInCodeUseCase requestEmailSignInCode,
       final RequestEmailSignInLinkUseCase requestEmailSignInLink,
       @SuppressWarnings("PMD.LongVariable")
-          final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider) {
+          final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider,
+      final ReturnToApplicationLink returnToApplication) {
     this.useCase = useCase;
     this.requestEmailVerification = requestEmailVerification;
     this.policyProvider = policyProvider;
     this.requestEmailSignInCode = requestEmailSignInCode;
     this.requestEmailSignInLink = requestEmailSignInLink;
     this.socialLoginPolicyProvider = socialLoginPolicyProvider;
+    this.returnToApplication = returnToApplication;
   }
 
   @GetMapping
@@ -217,6 +221,8 @@ public class RegisterAccountController {
           REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-approval";
       pendingApprovalTarget =
           RedirectQueryParams.appendIfPresent(pendingApprovalTarget, EMAIL, form.getEmail());
+      pendingApprovalTarget =
+          RedirectQueryParams.appendIfPresent(pendingApprovalTarget, CLIENT_ID, clientId);
       return pendingApprovalTarget;
     }
 
@@ -245,6 +251,8 @@ public class RegisterAccountController {
     String target =
         REDIRECT_ORGANIZATION_PREFIX + organizationId + "/register/pending-verification";
     target = RedirectQueryParams.appendIfPresent(target, EMAIL, form.getEmail());
+    // So the confirmation page can offer a way back to the application the person came from.
+    target = RedirectQueryParams.appendIfPresent(target, CLIENT_ID, clientId);
     return target;
   }
 
@@ -376,16 +384,24 @@ public class RegisterAccountController {
       // Optional, never trusted for anything but display (see RedirectQueryParams's own Javadoc) —
       // a direct GET with no query string still renders the page, just without the personalized
       // "we sent it to X" line below.
-      @RequestParam(required = false) final String email, final Model model) {
+      @PathVariable final UUID organizationId,
+      @RequestParam(required = false) final String email,
+      @RequestParam(required = false) final String clientId,
+      final Model model) {
     model.addAttribute(EMAIL, email);
+    returnToApplication.addTo(model, organizationId, clientId);
     return "identity/register-pending-verification";
   }
 
   // TD-FUT-019: same optional-query-param-for-display-only shape as pendingVerification above.
   @GetMapping("/pending-approval")
   public String pendingApproval(
-      @RequestParam(required = false) final String email, final Model model) {
+      @PathVariable final UUID organizationId,
+      @RequestParam(required = false) final String email,
+      @RequestParam(required = false) final String clientId,
+      final Model model) {
     model.addAttribute(EMAIL, email);
+    returnToApplication.addTo(model, organizationId, clientId);
     return "identity/register-pending-approval";
   }
 

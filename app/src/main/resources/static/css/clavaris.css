@@ -4377,3 +4377,8 @@ body:has(.htmx-request)::after {
 .clavaris-card--consent > form {
   display: none;
 }
+
+/* "Back to home" under a confirmation message that would otherwise be a dead end. */
+.clavaris-return {
+  margin-top: var(--space-6);
+}

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * The "forgot your password?" entry point — {@code organizationId} from the path, never a form
@@ -28,16 +29,26 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class ForgotPasswordController {
 
   private static final String FORM_VIEW = "identity/forgot-password";
+  private static final String CLIENT_ID = "clientId";
 
   private final RequestPasswordResetUseCase useCase;
+  private final ReturnToApplicationLink returnLink;
 
-  public ForgotPasswordController(final RequestPasswordResetUseCase useCase) {
+  public ForgotPasswordController(
+      final RequestPasswordResetUseCase useCase, final ReturnToApplicationLink returnLink) {
     this.useCase = useCase;
+    this.returnLink = returnLink;
   }
 
   @GetMapping
-  public String showForm(@PathVariable final UUID organizationId, final Model model) {
+  public String showForm(
+      @PathVariable final UUID organizationId,
+      // Carried from the sign-in page so the confirmation that follows can offer a way back to the
+      // application; the form posts to a URL that keeps it.
+      @RequestParam(required = false) final String clientId,
+      final Model model) {
     model.addAttribute("form", new RequestPasswordResetForm());
+    model.addAttribute(CLIENT_ID, clientId);
     // Live UX bug fix, 2026-09-22: forgot-password-form.html's own shared "card" fragment now
     // builds its own explicit submit URL instead of self-submitting via an empty th:action — see
     // that fragment's own Javadoc for why. This page never runs inside any dialog (unlike the
@@ -55,9 +66,11 @@ public class ForgotPasswordController {
       @PathVariable final UUID organizationId,
       @Valid @ModelAttribute("form") final RequestPasswordResetForm form,
       final BindingResult bindingResult,
+      @RequestParam(required = false) final String clientId,
       final Model model) {
     if (bindingResult.hasErrors()) {
       model.addAttribute("organizationId", organizationId);
+      model.addAttribute(CLIENT_ID, clientId);
       return FORM_VIEW;
     }
 
@@ -65,11 +78,16 @@ public class ForgotPasswordController {
         new RequestPasswordResetCommand(
             new OrganizationId(organizationId), new Email(form.getEmail())));
 
-    return "redirect:/o/" + organizationId + "/forgot-password/pending";
+    return RedirectQueryParams.appendIfPresent(
+        "redirect:/o/" + organizationId + "/forgot-password/pending", CLIENT_ID, clientId);
   }
 
   @GetMapping("/pending")
-  public String pending() {
+  public String pending(
+      @PathVariable final UUID organizationId,
+      @RequestParam(required = false) final String clientId,
+      final Model model) {
+    returnLink.addTo(model, organizationId, clientId);
     return "identity/forgot-password-pending";
   }
 }

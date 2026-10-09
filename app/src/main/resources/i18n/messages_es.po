@@ -359,6 +359,9 @@ msgstr "Atrás"
 msgid "Back to account"
 msgstr "Volver a la cuenta"
 
+msgid "Back to home"
+msgstr "Volver al inicio"
+
 msgid "Back to sign in"
 msgstr "Volver al inicio de sesión"
 

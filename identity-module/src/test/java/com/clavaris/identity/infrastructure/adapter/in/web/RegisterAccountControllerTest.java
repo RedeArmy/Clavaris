@@ -35,12 +35,14 @@ import com.clavaris.identity.application.usecase.requestemailverification.EmailV
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
+import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +71,7 @@ class RegisterAccountControllerTest {
   private RequestEmailSignInCodeUseCase requestEmailSignInCode;
   private RequestEmailSignInLinkUseCase requestEmailSignInLink;
   private OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
+  private ClientHomeUrlResolver homeUrls;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -79,6 +82,7 @@ class RegisterAccountControllerTest {
     requestEmailSignInCode = mock(RequestEmailSignInCodeUseCase.class);
     requestEmailSignInLink = mock(RequestEmailSignInLinkUseCase.class);
     socialLoginPolicyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
+    homeUrls = mock(ClientHomeUrlResolver.class);
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
@@ -111,7 +115,8 @@ class RegisterAccountControllerTest {
                     policyProvider,
                     requestEmailSignInCode,
                     requestEmailSignInLink,
-                    socialLoginPolicyProvider))
+                    socialLoginPolicyProvider,
+                    new ReturnToApplicationLink(homeUrls)))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -599,5 +604,77 @@ class RegisterAccountControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/register-pending-verification"))
         .andExpect(model().attribute("email", "new-user@example.com"));
+  }
+
+  @Test
+  void theClientRidesTheRedirectToThePendingVerificationPage() throws Exception {
+    when(useCase.handle(any())).thenReturn(new RegisterAccountResult(AccountId.newId(), false));
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/register", ORGANIZATION_ID)
+                .param("clientId", "acme-web")
+                .param("email", "new-user@example.com")
+                .param("password", "a-valid-password")
+                .param("confirmPassword", "a-valid-password"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/register/pending-verification?email=new-user%40example.com"
+                    + "&clientId=acme-web"));
+  }
+
+  @Test
+  void pendingVerificationOffersABackToHomeLinkWhenTheClientHasAHome() throws Exception {
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID)
+                .param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("homeUrl", "https://app.acme.test/"))
+        .andExpect(content().string(containsString("href=\"https://app.acme.test/\"")))
+        .andExpect(content().string(containsString("Back to home")));
+  }
+
+  @Test
+  void pendingApprovalOffersABackToHomeLinkWhenTheClientHasAHome() throws Exception {
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/register/pending-approval", ORGANIZATION_ID)
+                .param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("href=\"https://app.acme.test/\"")))
+        .andExpect(content().string(containsString("Back to home")));
+  }
+
+  @Test
+  void theConfirmationPagesHaveNoBackToHomeLinkWithoutAClientHome() throws Exception {
+    mockMvc
+        .perform(get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(model().attributeDoesNotExist("homeUrl"))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Back to home"))));
+    mockMvc
+        .perform(get("/o/{organizationId}/register/pending-approval", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Back to home"))));
+  }
+
+  @Test
+  void theSignInLinkOnTheConfirmationPageKeepsTheClient() throws Exception {
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/register/pending-verification", ORGANIZATION_ID)
+                .param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("login?clientId=acme-web")));
   }
 }
