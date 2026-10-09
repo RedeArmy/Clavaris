@@ -87,6 +87,32 @@ class ConsentControllerTest {
   }
 
   @Test
+  void theScopesAreListedStandardOnesFirstThenCustomOnesAlphabetically() throws Exception {
+    when(organizationForClient.resolve(CLIENT_ID))
+        .thenReturn(Optional.of(new OrganizationId(ORGANIZATION_ID)));
+
+    mockMvc
+        .perform(
+            get("/oauth2/consent")
+                .param("client_id", CLIENT_ID)
+                .param("state", "s")
+                .param(
+                    "scope", "reports:read offline_access phone openid email profile audit:read"))
+        .andExpect(status().isOk())
+        .andExpect(
+            model()
+                .attribute(
+                    "scopes",
+                    List.of(
+                        "profile",
+                        "email",
+                        "phone",
+                        "offline_access",
+                        "audit:read",
+                        "reports:read")));
+  }
+
+  @Test
   void aMissingScopeParamRendersAnEmptyScopeList() throws Exception {
     when(organizationForClient.resolve(CLIENT_ID))
         .thenReturn(Optional.of(new OrganizationId(ORGANIZATION_ID)));

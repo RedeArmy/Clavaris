@@ -5,54 +5,85 @@
 </head>
 <body>
 <main>
-    <div class="clavaris-card">
-        <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
-             th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
-        <h1 th:if="${branding.logoUrl.isEmpty()}"
-            th:text="${branding.applicationDisplayName.orElse('This application')} + ' wants to access your account'">
-            This application wants to access your account
-        </h1>
+    <div class="clavaris-card clavaris-card--consent" th:with="appName=${branding.applicationDisplayName.orElse('')}">
+        <header class="clavaris-consent__header">
+            <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
+                 th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
+            <span class="clavaris-consent__monogram" aria-hidden="true" th:if="${branding.logoUrl.isEmpty()}"
+                  th:text="${#strings.isEmpty(appName) ? 'C' : #strings.toUpperCase(#strings.substring(appName, 0, 1))}">C</span>
 
-        <!-- TD-SEC-011: openid is never listed here — see ConsentController's own Javadoc for why. -->
-        <p th:if="${not #lists.isEmpty(scopes)}">The following permissions are requested:</p>
-        <p th:if="${#lists.isEmpty(scopes)}">No additional permissions are requested.</p>
+            <!--/* The application's own name goes in its own element, so the sentence around it is one
+                    fixed text the Spanish catalogue can translate ("<0>{0}</0> wants to access your
+                    account"). Gluing the name into a th:text string made the whole heading untranslatable. */-->
+            <h1 th:if="${not #strings.isEmpty(appName)}"><strong th:text="${appName}">Application</strong> wants to access your account</h1>
+            <h1 th:if="${#strings.isEmpty(appName)}">This application wants to access your account</h1>
+            <p class="clavaris-consent__lead">Approve only what you are comfortable sharing. You can switch off any permission below.</p>
+        </header>
 
-        <!-- Posts directly to the real, tenant-scoped authorize endpoint SAS itself recognizes as a
-             consent decision — never back to this page. See ConsentController's own Javadoc for why
-             this URL is already correct without any {organizationId} templating on consentPage
-             itself. -->
-        <form th:action="${authorizeUri}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <!--/* TD-SEC-011: openid is never listed here — see ConsentController's own Javadoc for why. */-->
+        <p class="clavaris-consent__heading" th:if="${not #lists.isEmpty(scopes)}">This will allow it to:</p>
+        <p class="clavaris-consent__empty" th:if="${#lists.isEmpty(scopes)}">No additional permissions are requested.</p>
+
+        <!--/* The CSRF token is added to each form by Thymeleaf itself (th:action on a POST form).
+
+                Two independent forms that carry only hidden fields; the controls below belong to them
+                through the form attribute, so Approve and Deny can sit side by side.
+
+                Approve posts the switches that are still on, straight to the real, tenant-scoped
+                authorize endpoint SAS recognises as a consent decision — never back to this page (see
+                ConsentController's own Javadoc). Deny posts no scope at all, which
+                OAuth2AuthorizationConsentAuthenticationProvider treats as a declined consent: an empty
+                set of authorities removes the pending authorization and redirects with
+                error=access_denied, with no script needed. */-->
+        <form id="consent-approve" th:action="${authorizeUri}" method="post">
             <input type="hidden" name="client_id" th:value="${clientId}"/>
             <input type="hidden" name="state" th:value="${state}"/>
-
-            <!-- The checkbox is nested inside its own <label>, not paired via a separate id/for —
-                 requestedScope is arbitrary OAuth2 scope text, not guaranteed to be a valid HTML id
-                 token (e.g. a scope containing a space or colon), and Thymeleaf's th:id/th:for
-                 attributes aren't visible to a static HTML/accessibility linter reading the raw
-                 template source anyway (only the rendered output). Nesting is a normal, equally valid
-                 WCAG label-association pattern that needs neither. -->
-            <div class="clavaris-field" th:each="requestedScope : ${scopes}">
-                <label>
-                    <input type="checkbox" name="scope" th:value="${requestedScope}" checked/>
-                    <span th:text="${requestedScope}">scope</span>
-                </label>
-            </div>
-
-            <button class="clavaris-button" type="submit">Approve</button>
         </form>
-
-        <!-- A second, independent, scope-free form — no scope="..." parameter at all is exactly what
-             OAuth2AuthorizationConsentAuthenticationProvider treats as a declined consent (decompiled
-             confirmation: an empty resulting authorities set removes the pending authorization and
-             redirects with error=access_denied). No client-side script needed to "uncheck everything
-             then submit," unlike SAS's own DefaultConsentPage Cancel button. -->
-        <form th:action="${authorizeUri}" method="post">
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <form id="consent-deny" th:action="${authorizeUri}" method="post">
             <input type="hidden" name="client_id" th:value="${clientId}"/>
             <input type="hidden" name="state" th:value="${state}"/>
-            <button class="clavaris-button clavaris-button--secondary" type="submit">Deny</button>
         </form>
+
+        <!--/* The checkbox is nested inside its own label rather than paired by id/for: a scope is
+                arbitrary OAuth2 text, not guaranteed to be a valid HTML id (it may hold a colon), and
+                nesting is an equally valid label association that needs neither. The track follows
+                the input directly, which the toggle's styling depends on. */-->
+        <div class="clavaris-toggle-list" th:if="${not #lists.isEmpty(scopes)}">
+            <label class="clavaris-toggle clavaris-toggle--row" th:each="requestedScope : ${scopes}">
+                <input type="checkbox" name="scope" form="consent-approve" th:value="${requestedScope}" checked="checked"/>
+                <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                <span class="clavaris-toggle__label" th:switch="${requestedScope}">
+                    <span th:case="'profile'">
+                        <span class="clavaris-toggle__title">Your profile</span>
+                        <span class="clavaris-toggle__hint">Your name and basic profile details, such as your picture.</span>
+                    </span>
+                    <span th:case="'email'">
+                        <span class="clavaris-toggle__title">Your email address</span>
+                        <span class="clavaris-toggle__hint">The email address on your account and whether it has been verified.</span>
+                    </span>
+                    <span th:case="'address'">
+                        <span class="clavaris-toggle__title">Your address</span>
+                        <span class="clavaris-toggle__hint">The postal address on your profile.</span>
+                    </span>
+                    <span th:case="'phone'">
+                        <span class="clavaris-toggle__title">Your phone number</span>
+                        <span class="clavaris-toggle__hint">The phone number on your profile.</span>
+                    </span>
+                    <span th:case="'offline_access'">
+                        <span class="clavaris-toggle__title">Stay signed in</span>
+                        <span class="clavaris-toggle__hint">Keep its access when you are not using the application.</span>
+                    </span>
+                    <span th:case="*">
+                        <span class="clavaris-toggle__title" translate="no" th:text="${requestedScope}">scope</span>
+                    </span>
+                </span>
+            </label>
+        </div>
+
+        <div class="clavaris-consent__actions">
+            <button class="clavaris-button clavaris-button--secondary" type="submit" form="consent-deny">Deny</button>
+            <button class="clavaris-button" type="submit" form="consent-approve">Approve</button>
+        </div>
     </div>
 </main>
 </body>

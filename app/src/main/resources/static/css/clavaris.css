@@ -4306,3 +4306,74 @@ body:has(.htmx-request)::after {
     flex-wrap: wrap;
   }
 }
+
+/* ==========================================================================
+   Consent screen ("<application> wants to access your account")
+   ========================================================================== */
+
+.clavaris-card--consent {
+  max-width: 440px;
+}
+
+.clavaris-consent__header {
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.clavaris-consent__header .clavaris-card__logo {
+  max-height: 40px;
+  margin-bottom: var(--space-4);
+}
+
+/* No logo: the application's initial on its brand colour, so the page still has a face. */
+.clavaris-consent__monogram {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+  color: var(--clavaris-accent-contrast);
+  font-size: 1.375rem;
+  font-weight: 600;
+  background: var(--clavaris-brand-color);
+  border-radius: 12px;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--clavaris-brand-color) 28%, transparent);
+}
+
+.clavaris-consent__header h1 {
+  margin-bottom: var(--space-2);
+}
+
+.clavaris-consent__lead {
+  margin: 0;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.clavaris-consent__heading {
+  margin: 0 0 var(--space-2);
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.clavaris-consent__empty {
+  margin: 0 0 var(--space-4);
+  color: var(--clavaris-text-muted);
+  text-align: center;
+}
+
+/* Deny and Approve share a row while both labels fit; otherwise each takes a full row. */
+.clavaris-consent__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+/* The two decision forms hold only hidden fields; the buttons reach them through form="...". */
+.clavaris-card--consent > form {
+  display: none;
+}
