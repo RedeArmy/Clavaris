@@ -10,7 +10,8 @@ import com.clavaris.organization.application.usecase.setsessionpolicyfororganiza
 import com.clavaris.organization.domain.model.Organization;
 import com.clavaris.organization.domain.model.SessionPolicy;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -49,6 +50,8 @@ public class PlatformSessionPolicyController {
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String SESSION_POLICY_ATTRIBUTE = "sessionPolicy";
   private static final String SESSION_POLICY_FORM_ATTRIBUTE = "sessionPolicyForm";
+  private static final String DURATION_UNITS_ATTRIBUTE = "durationUnits";
+  private static final String LIMITS_ATTRIBUTE = "limits";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as
   // every other dashboard controller's own identical constant.
@@ -58,6 +61,7 @@ public class PlatformSessionPolicyController {
   private final SetSessionPolicyForOrganizationUseCase setSessionPolicy;
   private final GetSessionPolicyForOrganizationUseCase getSessionPolicy;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
+  private final SessionPolicyFormValidator formValidator = new SessionPolicyFormValidator();
 
   public PlatformSessionPolicyController(
       final GetOrganizationForPlatformAccountUseCase getOrganization,
@@ -79,7 +83,7 @@ public class PlatformSessionPolicyController {
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
 
-    populateModel(model, organization, organizationId);
+    populateModel(model, organization, organizationId, false);
     return SESSION_POLICY_VIEW;
   }
 
@@ -90,14 +94,18 @@ public class PlatformSessionPolicyController {
   public String set(
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
-      @Valid @ModelAttribute(SESSION_POLICY_FORM_ATTRIBUTE) final SetSessionPolicyForm form,
+      @ModelAttribute(SESSION_POLICY_FORM_ATTRIBUTE) final SetSessionPolicyForm form,
       final BindingResult bindingResult,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     final Organization organization =
         requireOwnedOrganization(organizationId, ownerPlatformAccountId);
 
-    if (bindingResult.hasErrors()) {
+    // The amounts and units are checked here, in the words the page uses, not by bean validation:
+    // see SessionPolicyFormValidator. On a problem the page is shown again with what was typed.
+    final Optional<SessionPolicyFormValidator.Parsed> durations =
+        formValidator.validate(form, bindingResult);
+    if (durations.isEmpty()) {
       return rerenderWithError(request, model, organization, organizationId);
     }
 
@@ -105,9 +113,9 @@ public class PlatformSessionPolicyController {
       setSessionPolicy.handle(
           new SetSessionPolicyForOrganizationCommand(
               organizationId,
-              form.getMaximumLifetimeMinutes(),
-              form.getInactivityTimeoutMinutes(),
-              form.getReverificationWindowMinutes(),
+              durations.get().lifetime(),
+              durations.get().inactivity(),
+              durations.get().reverification(),
               form.isMultiSessionHandlingEnabled(),
               AuditActor.platformAccount(ownerPlatformAccountId)));
     } catch (final OrganizationNotFoundException _) {
@@ -120,7 +128,7 @@ public class PlatformSessionPolicyController {
     }
 
     if (isHtmxRequest(request)) {
-      populateModel(model, organization, organizationId);
+      populateModel(model, organization, organizationId, false);
       return SESSION_POLICY_FRAGMENT;
     }
     return "redirect:/platform/dashboard/organizations/" + organizationId + "/session-policy";
@@ -131,24 +139,38 @@ public class PlatformSessionPolicyController {
       final Model model,
       final Organization organization,
       final UUID organizationId) {
-    populateModel(model, organization, organizationId);
+    populateModel(model, organization, organizationId, true);
     return isHtmxRequest(request) ? SESSION_POLICY_FRAGMENT : SESSION_POLICY_VIEW;
   }
 
   private void populateModel(
-      final Model model, final Organization organization, final UUID organizationId) {
+      final Model model,
+      final Organization organization,
+      final UUID organizationId,
+      final boolean keepSubmittedForm) {
     final SessionPolicy policy = getSessionPolicy.handle(organizationId);
     model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
     model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organization.name());
     model.addAttribute(SESSION_POLICY_ATTRIBUTE, policy);
-    model.addAttribute(SESSION_POLICY_FORM_ATTRIBUTE, formFrom(policy));
+    model.addAttribute(DURATION_UNITS_ATTRIBUTE, List.of(DurationUnit.values()));
+    model.addAttribute(LIMITS_ATTRIBUTE, SessionPolicyLimits.current());
+    // After an error the form in the model is the one just submitted: keep it, so what was typed
+    // is not replaced by the saved values. Otherwise show the saved policy, with each duration in
+    // the largest unit that states it exactly (so 1080 minutes reads "18 hours").
+    if (!keepSubmittedForm) {
+      model.addAttribute(SESSION_POLICY_FORM_ATTRIBUTE, formFrom(policy));
+    }
   }
 
   private static SetSessionPolicyForm formFrom(final SessionPolicy policy) {
+    final DurationUnit.Amount lifetime = DurationUnit.bestFit(policy.maximumLifetimeMinutes());
+    final DurationUnit.Amount inactivity = DurationUnit.bestFit(policy.inactivityTimeoutMinutes());
     final SetSessionPolicyForm form = new SetSessionPolicyForm();
-    form.setMaximumLifetimeMinutes(policy.maximumLifetimeMinutes());
-    form.setInactivityTimeoutMinutes(policy.inactivityTimeoutMinutes());
-    form.setReverificationWindowMinutes(policy.reverificationWindowMinutes());
+    form.setMaximumLifetimeValue(String.valueOf(lifetime.value()));
+    form.setMaximumLifetimeUnit(lifetime.unit().name());
+    form.setInactivityTimeoutValue(String.valueOf(inactivity.value()));
+    form.setInactivityTimeoutUnit(inactivity.unit().name());
+    form.setReverificationWindowMinutes(String.valueOf(policy.reverificationWindowMinutes()));
     form.setMultiSessionHandlingEnabled(policy.multiSessionHandlingEnabled());
     return form;
   }

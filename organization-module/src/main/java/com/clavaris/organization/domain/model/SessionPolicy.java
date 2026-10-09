@@ -26,12 +26,14 @@ import java.util.UUID;
 })
 public final class SessionPolicy {
 
-  private static final int MIN_MAXIMUM_LIFETIME_MINUTES = 5;
-  private static final int MAX_MAXIMUM_LIFETIME_MINUTES = 5_256_000; // 10 years
-  private static final int MIN_INACTIVITY_TIMEOUT_MINUTES = 5;
-  private static final int MAX_INACTIVITY_TIMEOUT_MINUTES = 525_600; // 1 year
-  private static final int MIN_REVERIFICATION_WINDOW_MINUTES = 1;
-  private static final int MAX_REVERIFICATION_WINDOW_MINUTES = 10;
+  // The bounds are public so the dashboard form and its page state them from this one place
+  // instead of repeating the numbers.
+  public static final int MIN_MAXIMUM_LIFETIME_MINUTES = 5;
+  public static final int MAX_MAXIMUM_LIFETIME_MINUTES = 5_256_000; // 10 years
+  public static final int MIN_INACTIVITY_TIMEOUT_MINUTES = 5;
+  public static final int MAX_INACTIVITY_TIMEOUT_MINUTES = 525_600; // 1 year
+  public static final int MIN_REVERIFICATION_WINDOW_MINUTES = 1;
+  public static final int MAX_REVERIFICATION_WINDOW_MINUTES = 10;
 
   // Clerk's own real defaults for the first three; multi-session handling defaults to enabled.
   private static final int DEFAULT_MAXIMUM_LIFETIME_MINUTES = 10_080; // 7 days

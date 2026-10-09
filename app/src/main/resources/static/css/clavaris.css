@@ -1280,6 +1280,101 @@ label.clavaris-toggle.clavaris-toggle--row {
   box-shadow: var(--focus-ring);
 }
 
+/* A setting with a name and a line of explanation beside its switch. */
+.clavaris-toggle__title {
+  display: block;
+  font-weight: 600;
+}
+
+.clavaris-toggle__hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* A duration: an amount and its unit as one control. The group carries the border and the focus
+   ring, so the two halves read as a single field; a fixed unit (the reverification window is only
+   ever minutes) is a quiet suffix instead of a selector with one choice. */
+.clavaris-duration {
+  display: flex;
+  max-width: 22rem;
+  overflow: hidden;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.clavaris-duration:hover {
+  border-color: var(--clavaris-border-strong);
+}
+
+.clavaris-duration:focus-within {
+  border-color: var(--clavaris-brand-color);
+  box-shadow: var(--focus-ring);
+}
+
+.clavaris-duration:has([aria-invalid="true"]) {
+  border-color: var(--clavaris-danger);
+}
+
+.clavaris-field .clavaris-duration input,
+.clavaris-field .clavaris-duration select {
+  min-height: 40px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.clavaris-field .clavaris-duration input:focus,
+.clavaris-field .clavaris-duration select:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.clavaris-duration__value {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+
+.clavaris-duration__value::-webkit-inner-spin-button,
+.clavaris-duration__value::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.clavaris-field .clavaris-duration .clavaris-duration__unit {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 7.5rem;
+  cursor: pointer;
+  background: var(--clavaris-surface-subtle);
+  border-left: 1px solid var(--clavaris-border-subtle);
+}
+
+.clavaris-duration__suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  color: var(--clavaris-text-muted);
+  background: var(--clavaris-surface-subtle);
+  border-left: 1px solid var(--clavaris-border-subtle);
+}
+
+/* What the amount comes to in the largest exact unit ("That is 18 hours."), set a little stronger
+   than the explanation above it so it reads as the answer to what was typed. */
+.clavaris-field .clavaris-duration__total {
+  color: var(--clavaris-text-primary);
+  font-weight: 500;
+}
+
 /* --- Buttons ---------------------------------------------------------------
    Default is a full-width block (one action per card form). --inline makes it content-sized.
    Variants: (default) primary · --secondary · --ghost · --danger. */

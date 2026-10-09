@@ -72,6 +72,24 @@
       "Algo salió mal al iniciar sesión con tu clave de acceso.",
     "Something went wrong registering your passkey.":
       "Algo salió mal al registrar tu clave de acceso.",
+    // Duration fields (the Sessions page): the same wording the server uses
+    "1 minute": "1 minuto",
+    "{0} minutes": "{0} minutos",
+    "1 hour": "1 hora",
+    "{0} hours": "{0} horas",
+    "1 day": "1 día",
+    "{0} days": "{0} días",
+    "1 week": "1 semana",
+    "{0} weeks": "{0} semanas",
+    "1 month": "1 mes",
+    "{0} months": "{0} meses",
+    "1 year": "1 año",
+    "{0} years": "{0} años",
+    "Enter a whole number greater than zero.": "Introduce un número entero mayor que cero.",
+    "Must be at least {0}.": "Debe ser como mínimo {0}.",
+    "Must be at most {0}.": "Debe ser como máximo {0}.",
+    "Can't be longer than the maximum lifetime.": "No puede ser mayor que la duración máxima.",
+    "That is {0}.": "Equivale a {0}.",
   };
 
   const TABLES = { es: SPANISH };
