@@ -32,6 +32,11 @@ role, while that table additionally shows each role's own Team within one specif
 "Modify" and "Advanced create" there link into this controller's own create/detail pages too, now
 carrying their own workspaceId so those pages' own Back/Cancel button returns there instead of
 here (PlatformWorkspaceRoleController#populateBackTarget's own Javadoc).
+
+Sessions added 2026-10-08 (Clerk "Sessions" settings parity, PlatformSessionPolicyController,
+organization-module) — placed right after Workspace Roles, grouping the two Organization-wide
+account-behavior policies (Workspace Roles, Sessions) ahead of the two capacity/API-shaped ones
+(Rate Limit, Danger Zone).
 -->
 <aside th:fragment="sidebar(organizationId, active)" class="clavaris-configure-sidebar">
     <p class="clavaris-configure-sidebar__label">Configure</p>
@@ -47,6 +52,8 @@ here (PlatformWorkspaceRoleController#populateBackTarget's own Javadoc).
        th:classappend="${active == 'webhook-endpoints'} ? 'active'" th:attr="aria-current=${active == 'webhook-endpoints'} ? 'page'">Webhook Endpoints</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/workspace-roles(id=${organizationId})}"
        th:classappend="${active == 'workspace-roles'} ? 'active'" th:attr="aria-current=${active == 'workspace-roles'} ? 'page'">Workspace Roles</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/session-policy(id=${organizationId})}"
+       th:classappend="${active == 'sessions'} ? 'active'" th:attr="aria-current=${active == 'sessions'} ? 'page'">Sessions</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
        th:classappend="${active == 'rate-limit'} ? 'active'" th:attr="aria-current=${active == 'rate-limit'} ? 'page'">Rate Limit</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/danger-zone(id=${organizationId})}"

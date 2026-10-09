@@ -248,6 +248,9 @@ msgstr "Todos los eventos, incluidos los tipos de evento que el sistema añada e
 msgid "All teams"
 msgstr "Todos los equipos"
 
+msgid "Allow an Account to be signed into more than one session at a time"
+msgstr "Permitir que una cuenta tenga más de una sesión activa a la vez"
+
 msgid "Allow user to delete their own account"
 msgstr "Permitir que el usuario elimine su propia cuenta"
 
@@ -668,6 +671,9 @@ msgstr "Falló la verificación del dominio personalizado"
 msgid "Custom domain verified"
 msgstr "Dominio personalizado verificado"
 
+msgid "Customize how long a successful sign-in or reverification remains valid for Clavaris-protected sensitive actions. Accepts between 1 and 10 minutes."
+msgstr "Personaliza cuánto tiempo permanece válido un inicio de sesión o una reverificación exitosa para acciones sensibles protegidas por Clavaris. Acepta entre 1 y 10 minutos."
+
 msgid "Danger Zone"
 msgstr "Zona de peligro"
 
@@ -742,6 +748,48 @@ msgstr "Eliminar endpoint de webhook — Clavaris"
 
 msgid "Delete workspace"
 msgstr "Eliminar espacio de trabajo"
+
+msgid "When disabled, signing in again revokes every other active session for that Account."
+msgstr "Si se deshabilita, volver a iniciar sesión revoca el resto de las sesiones activas de esa cuenta."
+
+msgid "Set the maximum lifetime duration for a session. Accepts between 5 minutes and 10 years."
+msgstr "Define la duración máxima de una sesión. Acepta entre 5 minutos y 10 años."
+
+msgid "Set the inactivity timeout for a session. Accepts between 5 minutes and 1 year."
+msgstr "Define el tiempo de inactividad de una sesión. Acepta entre 5 minutos y 1 año."
+
+msgid "Sessions — Clavaris"
+msgstr "Sesiones — Clavaris"
+
+msgid "Session lifetime"
+msgstr "Duración de la sesión"
+
+msgid "Reverification window error"
+msgstr "Error en la ventana de reverificación"
+
+msgid "Reverification window (minutes)"
+msgstr "Ventana de reverificación (minutos)"
+
+msgid "Reverification window"
+msgstr "Ventana de reverificación"
+
+msgid "Multi-session handling"
+msgstr "Gestión de sesiones múltiples"
+
+msgid "Maximum lifetime error"
+msgstr "Error en la duración máxima"
+
+msgid "Maximum lifetime (minutes)"
+msgstr "Duración máxima (minutos)"
+
+msgid "Inactivity timeout error"
+msgstr "Error en el tiempo de inactividad"
+
+msgid "Inactivity timeout (minutes)"
+msgstr "Tiempo de inactividad (minutos)"
+
+msgid "How long a signed-in session stays valid for this Organization's own Accounts, and whether an Account may hold more than one active session at a time."
+msgstr "Cuánto tiempo permanece válida una sesión iniciada para las cuentas de esta Organización, y si una cuenta puede tener más de una sesión activa a la vez."
 
 msgid "deleted endpoint"
 msgstr "endpoint eliminado"
