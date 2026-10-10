@@ -7,10 +7,11 @@ import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Serves an Organization's logo to the application's own people, from the platform's own origin:
@@ -23,7 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
  * different type, and a policy that forbids everything, so even a file that somehow were not a
  * plain image could run nothing. (The image types accepted are checked on upload; SVG is not one.)
  */
-@RestController
+// java:S6833 asks for @RestController here. This is not the management API: it is a public asset
+// endpoint like the avatar ones, and ADR-0008 §3 (enforced by OpenApiDocumentationTest) scopes the
+// @Operation requirement to @RestController only, so these stay @Controller + @ResponseBody.
+@SuppressWarnings("java:S6833")
+@Controller
 public class OrganizationLogoController {
 
   // The URL carries the time the logo was last set (?v=), so a changed logo has a new URL and the
@@ -39,6 +44,7 @@ public class OrganizationLogoController {
   }
 
   @GetMapping("/o/{organizationId}/branding/logo")
+  @ResponseBody
   public ResponseEntity<byte[]> show(
       @PathVariable final UUID organizationId,
       @RequestParam(name = "v", required = false) final String version) {

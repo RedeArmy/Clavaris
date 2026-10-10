@@ -10,10 +10,11 @@ import java.util.regex.Pattern;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * Serves the one CSS rule that gives a consuming application's sign-in and consent pages its brand
@@ -25,7 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
  * here, whatever stored it, so only a plain hex colour can ever reach the response; anything else
  * yields an empty stylesheet and the pages keep the default colour.
  */
-@RestController
+// java:S6833 asks for @RestController here. This is not the management API: it is a public asset
+// endpoint like the avatar ones, and ADR-0008 §3 (enforced by OpenApiDocumentationTest) scopes the
+// @Operation requirement to @RestController only, so these stay @Controller + @ResponseBody.
+@SuppressWarnings("java:S6833")
+@Controller
 public class ConsumerThemeController {
 
   private static final Pattern HEX_COLOUR = Pattern.compile("^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$");
@@ -48,6 +53,7 @@ public class ConsumerThemeController {
   }
 
   @GetMapping("/o/{organizationId}/branding/theme.css")
+  @ResponseBody
   public ResponseEntity<String> theme(
       @PathVariable final UUID organizationId,
       @RequestParam(name = "clientId", required = false) final String clientId) {
