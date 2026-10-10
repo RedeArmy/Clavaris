@@ -24,6 +24,8 @@ class ConsumerBrandNameConfig implements WebMvcConfigurer {
   public void addInterceptors(final InterceptorRegistry registry) {
     registry
         .addInterceptor(new ConsumerBrandNameInterceptor(brandingProvider))
-        .addPathPatterns("/o/**");
+        // The consent screen is not under /o/{organizationId}/, but it shows the application's
+        // logo too, and its logo origin has to reach the content security policy.
+        .addPathPatterns("/o/**", "/oauth2/consent");
   }
 }

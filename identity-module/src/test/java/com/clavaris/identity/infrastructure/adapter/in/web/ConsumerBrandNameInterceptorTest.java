@@ -145,6 +145,83 @@ class ConsumerBrandNameInterceptorTest {
     assertThat(view.getModel()).doesNotContainKey("brandName");
   }
 
+  // The logo is on another origin and the page's policy only allows this one: the response is told
+  // which single origin it may load images from, so the logo is drawn and not shown broken.
+  @Test
+  void theOriginOfThePagesLogoIsNamedOnTheRequest() {
+    inOrganization();
+    when(branding.brandingFor(any(), any())).thenReturn(named("Acme"));
+    final ModelAndView page = new ModelAndView("identity/login");
+    page.addObject(
+        "branding",
+        new ClientBrandingSnapshot(
+            Optional.of("https://cdn.acme.test:8443/img/logo.png?v=2"),
+            Optional.empty(),
+            Optional.of("Acme")));
+
+    run(page);
+
+    assertThat(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN))
+        .isEqualTo("https://cdn.acme.test:8443");
+  }
+
+  // The consent screen is not under /o/{organizationId}/ but shows the logo too.
+  @Test
+  void theConsentScreenNamesItsLogoOriginWithoutAnOrganizationInThePath() {
+    final ModelAndView page = new ModelAndView("identity/consent");
+    page.addObject(
+        "branding",
+        new ClientBrandingSnapshot(
+            Optional.of("https://cdn.acme.test/logo.svg"), Optional.empty(), Optional.empty()));
+
+    run(page);
+
+    assertThat(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN))
+        .isEqualTo("https://cdn.acme.test");
+  }
+
+  @Test
+  void aPageWithNoLogoNamesNoOrigin() {
+    inOrganization();
+    final ModelAndView page = new ModelAndView("identity/login");
+    page.addObject("brandName", "Acme");
+    page.addObject("branding", named("Acme"));
+
+    run(page);
+
+    assertThat(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN)).isNull();
+  }
+
+  @Test
+  void aLogoThatIsNotAnHttpsUrlNamesNoOrigin() {
+    inOrganization();
+    final ModelAndView page = new ModelAndView("identity/login");
+    page.addObject("brandName", "Acme");
+    page.addObject(
+        "branding",
+        new ClientBrandingSnapshot(
+            Optional.of("http://cdn.acme.test/logo.png"), Optional.empty(), Optional.empty()));
+
+    run(page);
+
+    assertThat(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN)).isNull();
+  }
+
+  // Clavaris's own platform views never get a logo origin.
+  @Test
+  void aPlatformViewNamesNoLogoOrigin() {
+    inOrganization();
+    final ModelAndView page = new ModelAndView("identity/platform/login");
+    page.addObject(
+        "branding",
+        new ClientBrandingSnapshot(
+            Optional.of("https://cdn.acme.test/logo.png"), Optional.empty(), Optional.empty()));
+
+    run(page);
+
+    assertThat(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN)).isNull();
+  }
+
   @Test
   void aRequestWithNoViewIsLeftAlone() {
     inOrganization();

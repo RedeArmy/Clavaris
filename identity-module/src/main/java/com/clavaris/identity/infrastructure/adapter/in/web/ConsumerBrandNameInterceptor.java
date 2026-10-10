@@ -1,9 +1,12 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +32,13 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
   /** The model attribute the page header reads. */
   public static final String BRAND_NAME = "brandName";
 
+  /**
+   * The request attribute naming the one origin (an {@code https://host[:port]}) the response may
+   * load images from, so the application's logo can be drawn. Read by the content security policy
+   * writer, which validates it before use.
+   */
+  public static final String LOGO_ORIGIN = "com.clavaris.identity.brandingLogoOrigin";
+
   private static final String VIEW_PREFIX = "identity/";
   private static final String PLATFORM_PREFIX = "identity/platform/";
   private static final String ORG_VARIABLE = "organizationId";
@@ -46,14 +56,47 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
       final HttpServletResponse response,
       final Object handler,
       final ModelAndView modelAndView) {
-    if (isConsumerView(modelAndView) && !modelAndView.getModel().containsKey(BRAND_NAME)) {
-      organizationOf(request)
-          .flatMap(
-              organization ->
-                  brandingProvider
-                      .brandingFor(organization, request.getParameter(CLIENT_PARAM))
-                      .applicationDisplayName())
-          .ifPresent(name -> modelAndView.addObject(BRAND_NAME, name));
+    if (isConsumerView(modelAndView)) {
+      allowBrandingLogo(request, modelAndView);
+      if (!modelAndView.getModel().containsKey(BRAND_NAME)) {
+        organizationOf(request)
+            .flatMap(
+                organization ->
+                    brandingProvider
+                        .brandingFor(organization, request.getParameter(CLIENT_PARAM))
+                        .applicationDisplayName())
+            .ifPresent(name -> modelAndView.addObject(BRAND_NAME, name));
+      }
+    }
+  }
+
+  // The application's logo is an https URL on some other origin, and the page's content security
+  // policy only allows images from this one, so the browser would refuse to draw it and show a
+  // broken image. Say which origin this response may load images from: just that one, and only for
+  // this response; the policy writer validates it again before using it.
+  private static void allowBrandingLogo(
+      final HttpServletRequest request, final ModelAndView modelAndView) {
+    if (modelAndView.getModel().get("branding") instanceof ClientBrandingSnapshot snapshot) {
+      snapshot
+          .logoUrl()
+          .flatMap(ConsumerBrandNameInterceptor::httpsOriginOf)
+          .ifPresent(origin -> request.setAttribute(LOGO_ORIGIN, origin));
+    }
+  }
+
+  // "https://cdn.acme.test:8443/img/logo.png?v=2" -> "https://cdn.acme.test:8443"; anything that is
+  // not an https URL with a host is no origin at all.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private static Optional<String> httpsOriginOf(final String url) {
+    try {
+      final URI uri = new URI(url);
+      if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
+        return Optional.empty();
+      }
+      return Optional.of(
+          "https://" + uri.getHost() + (uri.getPort() < 0 ? "" : ":" + uri.getPort()));
+    } catch (final URISyntaxException _) {
+      return Optional.empty();
     }
   }
 
