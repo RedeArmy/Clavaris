@@ -216,8 +216,9 @@ class UpdateOrganizationProfileServiceTest {
   @Test
   void anOrganizationThatDoesNotExistIsNotFound() {
     when(organizations.findById(id)).thenReturn(Optional.empty());
+    final UpdateOrganizationProfileCommand missing = command("Acme", null, null, null, null, false);
 
-    assertThatThrownBy(() -> service.handle(command("Acme", null, null, null, null, false)))
+    assertThatThrownBy(() -> service.handle(missing))
         .isInstanceOf(OrganizationNotFoundException.class);
 
     verifyNoInteractions(profiles, logos, audit);
@@ -226,13 +227,14 @@ class UpdateOrganizationProfileServiceTest {
   @Test
   void aBlankNameIsRefusedBeforeAnythingIsWritten() {
     organizationExistsWithNoProfile();
+    final UpdateOrganizationProfileCommand blank =
+        command("   ", "A description", null, null, null, false);
+    final UpdateOrganizationProfileCommand absent = command(null, null, null, null, null, false);
 
-    assertThatThrownBy(
-            () -> service.handle(command("   ", "A description", null, null, null, false)))
+    assertThatThrownBy(() -> service.handle(blank))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("blank");
-    assertThatThrownBy(() -> service.handle(command(null, null, null, null, null, false)))
-        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> service.handle(absent)).isInstanceOf(IllegalArgumentException.class);
 
     verify(organizations, never()).save(any());
     verify(profiles, never()).save(any());
@@ -242,9 +244,10 @@ class UpdateOrganizationProfileServiceTest {
   @Test
   void aMalformedColourIsRefusedBeforeAnythingIsWritten() {
     organizationExistsWithNoProfile();
+    final UpdateOrganizationProfileCommand malformed =
+        command("Acme Hiring", null, null, "blue", null, false);
 
-    assertThatThrownBy(
-            () -> service.handle(command("Acme Hiring", null, null, "blue", null, false)))
+    assertThatThrownBy(() -> service.handle(malformed))
         .isInstanceOf(IllegalArgumentException.class);
 
     verify(profiles, never()).save(any());

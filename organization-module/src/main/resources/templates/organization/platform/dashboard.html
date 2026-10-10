@@ -114,6 +114,7 @@
                     <div class="clavaris-field">
                         <label th:for="'organization-name-' + ${organization.id()}">Organization name</label>
                         <input th:id="'organization-name-' + ${organization.id()}" type="text" name="name"
+                               aria-label="Organization name"
                                th:value="${nameValue}" maxlength="255" required/>
                         <p class="clavaris-field-error" th:if="${editing and editErrors['name'] != null}"
                            th:text="${editErrors['name']}">Name error</p>
@@ -122,6 +123,7 @@
                     <div class="clavaris-field">
                         <label th:for="'organization-application-' + ${organization.id()}">Application name</label>
                         <input th:id="'organization-application-' + ${organization.id()}" type="text"
+                               aria-label="Application name"
                                name="applicationName" th:value="${applicationValue}" maxlength="100"/>
                         <p class="clavaris-field-hint">The name of the system your users sign in to. It is shown
                             on its sign-in and consent pages and in the emails it sends. Leave it empty to
@@ -133,6 +135,7 @@
                     <div class="clavaris-field">
                         <label th:for="'organization-description-' + ${organization.id()}">Description</label>
                         <textarea th:id="'organization-description-' + ${organization.id()}" name="description"
+                                  aria-label="Description"
                                   rows="3" maxlength="500" th:text="${descriptionValue}"></textarea>
                         <p class="clavaris-field-hint">Shown on this organization's card. Leave it empty to show
                             nothing.</p>
@@ -147,6 +150,7 @@
                                    aria-label="Pick a colour"
                                    th:value="${colorValue != null and !colorValue.isEmpty() ? colorValue : '#f59e0b'}"/>
                             <input th:id="'organization-color-' + ${organization.id()}" type="text" name="brandColor"
+                                   aria-label="Brand colour"
                                    th:value="${colorValue}" maxlength="7" placeholder="#2563eb"
                                    pattern="#[0-9A-Fa-f]{6}" data-color-text/>
                         </div>
@@ -167,6 +171,7 @@
                             </span>
                             <div class="clavaris-logo-field__controls">
                                 <input th:id="'organization-logo-' + ${organization.id()}" type="file" name="logo"
+                                       aria-label="Logo"
                                        accept="image/png,image/jpeg,image/webp,image/gif" data-logo-input/>
                                 <label class="clavaris-toggle" th:if="${profile != null and profile.hasLogo()}">
                                     <input type="checkbox" name="removeLogo" value="true" data-logo-remove/>

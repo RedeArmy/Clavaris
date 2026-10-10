@@ -118,7 +118,7 @@ public class PlatformOrganizationProfileController {
         logo = OrganizationLogo.of(organizationId, file.getContentType(), file.getBytes());
       } catch (final IllegalArgumentException e) {
         errors.rejectValue(LOGO_FIELD, "invalid", e.getMessage());
-      } catch (final IOException e) {
+      } catch (final IOException _) {
         errors.rejectValue(LOGO_FIELD, "unreadable", "The file could not be read");
       }
     }
@@ -156,7 +156,7 @@ public class PlatformOrganizationProfileController {
     try {
       return KeysetPageRequest.fromCursors(
           blankToNull(form.getAfter()), blankToNull(form.getBefore()));
-    } catch (final IllegalArgumentException | DateTimeException e) {
+    } catch (final IllegalArgumentException | DateTimeException _) {
       // A malformed token: not a real flow, so fall back to the first page rather than failing a
       // save.
       return KeysetPageRequest.first();

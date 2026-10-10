@@ -60,16 +60,15 @@ class OrganizationLogoTest {
   // The declared type is not trusted: the bytes have to be of the type they claim.
   @Test
   void aFileThatIsNotWhatItClaimsToBeIsRefused() {
-    assertThatThrownBy(() -> OrganizationLogo.of(organizationId, "image/png", jpeg()))
+    final byte[] jpeg = jpeg();
+    final byte[] script = "<script>alert(1)</script>".getBytes(StandardCharsets.UTF_8);
+    final byte[] png = png();
+
+    assertThatThrownBy(() -> OrganizationLogo.of(organizationId, "image/png", jpeg))
         .hasMessageContaining("not a valid image/png");
-    assertThatThrownBy(
-            () ->
-                OrganizationLogo.of(
-                    organizationId,
-                    "image/png",
-                    "<script>alert(1)</script>".getBytes(StandardCharsets.UTF_8)))
+    assertThatThrownBy(() -> OrganizationLogo.of(organizationId, "image/png", script))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> OrganizationLogo.of(organizationId, "image/webp", png()))
+    assertThatThrownBy(() -> OrganizationLogo.of(organizationId, "image/webp", png))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

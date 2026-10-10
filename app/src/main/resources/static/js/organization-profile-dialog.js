@@ -52,7 +52,7 @@
     let image = slot.querySelector("[data-logo-preview]");
     if (!image) {
       image = document.createElement("img");
-      image.setAttribute("data-logo-preview", "");
+      image.dataset.logoPreview = "";
       image.alt = t("Chosen logo");
       slot.querySelector("[data-logo-placeholder]")?.remove();
       slot.append(image);

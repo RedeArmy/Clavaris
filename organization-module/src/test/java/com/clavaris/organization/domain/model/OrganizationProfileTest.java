@@ -44,9 +44,9 @@ class OrganizationProfileTest {
 
   @Test
   void aMalformedBrandColourIsRefused() {
+    final OrganizationProfile empty = OrganizationProfile.empty(organizationId);
     for (final String bad : new String[] {"2563eb", "#256", "#2563ebff", "blue", "#gggggg"}) {
-      assertThatThrownBy(
-              () -> OrganizationProfile.empty(organizationId).withDetails(null, null, bad))
+      assertThatThrownBy(() -> empty.withDetails(null, null, bad))
           .as(bad)
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("hex colour");

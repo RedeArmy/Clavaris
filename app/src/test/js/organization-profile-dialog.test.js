@@ -26,10 +26,7 @@ function load() {
     },
     createElement: (tag) => ({
       tag,
-      attributes: {},
-      setAttribute(name, value) {
-        this.attributes[name] = value;
-      },
+      dataset: {},
     }),
   };
   global.URL.createObjectURL = () => "blob:preview";
