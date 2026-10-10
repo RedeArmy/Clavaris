@@ -163,7 +163,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   // https://host or https://host:port, nothing else: no path, no query, no ';', no whitespace.
   private static final Pattern HTTPS_ORIGIN =
-      Pattern.compile("^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$");
+      Pattern.compile("^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:\\d{1,5})?$");
 
   // This project's own login-page-only query param convention — never SAS's own client_id.
   private static final String CLIENT_ID_PARAM = "clientId";
