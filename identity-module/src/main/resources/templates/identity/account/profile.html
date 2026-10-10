@@ -35,6 +35,8 @@
                 <form method="post" enctype="multipart/form-data"
                       th:action="@{/o/{organizationId}/account/profile/picture(organizationId=${organizationId})}">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
+                    <input type="hidden" th:if="${param.clientId}" name="clientId" th:value="${param.clientId}"/>
                     <label for="profile-picture-file">Profile picture</label>
                     <input id="profile-picture-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required/>
                     <p class="clavaris-field-hint">A square image works best, up to 10 MB.</p>
@@ -44,6 +46,8 @@
                 <form method="post"
                       th:action="@{/o/{organizationId}/account/profile/picture/remove(organizationId=${organizationId})}">
                     <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
+                    <input type="hidden" th:if="${param.clientId}" name="clientId" th:value="${param.clientId}"/>
                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Remove picture</button>
                 </form>
             </div>
@@ -84,6 +88,8 @@
             <form method="post"
                   th:action="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">
                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
+                <input type="hidden" th:if="${param.clientId}" name="clientId" th:value="${param.clientId}"/>
                 <div class="clavaris-field">
                     <label for="account-first-name">First name</label>
                     <input id="account-first-name" type="text" name="firstName" th:value="${account.firstName().orElse('')}"/>
@@ -129,6 +135,8 @@
             <form method="post"
                   th:action="@{/o/{organizationId}/account/profile/delete(organizationId=${organizationId})}">
                 <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
+                <input type="hidden" th:if="${param.clientId}" name="clientId" th:value="${param.clientId}"/>
                 <div class="clavaris-dialog__actions">
                     <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
                     <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Delete account</button>
