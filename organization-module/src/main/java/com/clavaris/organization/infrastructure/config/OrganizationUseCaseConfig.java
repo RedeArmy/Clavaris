@@ -63,6 +63,10 @@ import com.clavaris.organization.application.usecase.getorganizationapikeys.GetO
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountService;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
+import com.clavaris.organization.application.usecase.getorganizationlogo.GetOrganizationLogoService;
+import com.clavaris.organization.application.usecase.getorganizationlogo.GetOrganizationLogoUseCase;
+import com.clavaris.organization.application.usecase.getorganizationprofiles.GetOrganizationProfilesService;
+import com.clavaris.organization.application.usecase.getorganizationprofiles.GetOrganizationProfilesUseCase;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getsessionpolicyfororganization.GetSessionPolicyForOrganizationService;
@@ -120,6 +124,10 @@ import com.clavaris.organization.application.usecase.setsessionpolicyfororganiza
 import com.clavaris.organization.application.usecase.setsessionpolicyfororganization.SetSessionPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.updateorganizationprofile.OrganizationLogoRepository;
+import com.clavaris.organization.application.usecase.updateorganizationprofile.OrganizationProfileRepository;
+import com.clavaris.organization.application.usecase.updateorganizationprofile.UpdateOrganizationProfileService;
+import com.clavaris.organization.application.usecase.updateorganizationprofile.UpdateOrganizationProfileUseCase;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleService;
 import com.clavaris.organization.application.usecase.updateworkspacerole.UpdateWorkspaceRoleUseCase;
 import org.springframework.beans.factory.annotation.Value;
@@ -263,6 +271,29 @@ class OrganizationUseCaseConfig {
           final int hardSystemWideCap) {
     return new GetRateLimitPolicyForOrganizationService(
         policies, systemDefaultRequestsPerMinute, hardSystemWideCap);
+  }
+
+  // The Organization's own profile (description, application name, brand colour, logo), edited from
+  // the dashboard's "Your organizations" cards and read by the consumer-facing branding.
+  @Bean
+  /* package */ UpdateOrganizationProfileUseCase updateOrganizationProfileUseCase(
+      final OrganizationRepository organizations,
+      final OrganizationProfileRepository profiles,
+      final OrganizationLogoRepository logos,
+      final AuditEventRecorder auditEvents) {
+    return new UpdateOrganizationProfileService(organizations, profiles, logos, auditEvents);
+  }
+
+  @Bean
+  /* package */ GetOrganizationProfilesUseCase getOrganizationProfilesUseCase(
+      final OrganizationProfileRepository profiles) {
+    return new GetOrganizationProfilesService(profiles);
+  }
+
+  @Bean
+  /* package */ GetOrganizationLogoUseCase getOrganizationLogoUseCase(
+      final OrganizationLogoRepository logos) {
+    return new GetOrganizationLogoService(logos);
   }
 
   // Clerk "Sessions" settings parity — same dual-caller shape (REST admin API +

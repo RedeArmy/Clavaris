@@ -1,13 +1,9 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationCommand;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
-import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedQuery;
-import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedUseCase;
-import com.clavaris.organization.domain.model.Organization;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -43,23 +39,24 @@ public class PlatformOrganizationDashboardController {
 
   private static final String DASHBOARD_VIEW = "organization/platform/dashboard";
   private static final String CONTENT_FRAGMENT = DASHBOARD_VIEW + " :: content";
-  private static final String ORGANIZATIONS_ATTRIBUTE = "organizations";
-  private static final String PAGE_ATTRIBUTE = "organizationsPage";
+  // The page's own cursors, handed to every edit dialog so saving returns to this same page.
+  private static final String PAGE_AFTER_ATTRIBUTE = "pageAfter";
+  private static final String PAGE_BEFORE_ATTRIBUTE = "pageBefore";
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — present on every
   // request HTMX itself issues, absent on an ordinary browser navigation/form submit.
   private static final String HX_REQUEST_HEADER = "HX-Request";
 
   private final CreateOrganizationUseCase createOrganization;
-  private final ListOrganizationsForPlatformAccountPagedUseCase listOrganizations;
+  private final OrganizationDashboardModel dashboardModel;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public PlatformOrganizationDashboardController(
       final CreateOrganizationUseCase createOrganization,
-      final ListOrganizationsForPlatformAccountPagedUseCase listOrganizations,
+      final OrganizationDashboardModel dashboardModel,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.createOrganization = createOrganization;
-    this.listOrganizations = listOrganizations;
+    this.dashboardModel = dashboardModel;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
@@ -74,19 +71,12 @@ public class PlatformOrganizationDashboardController {
       @RequestParam(required = false) final String before,
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
-    addOrganizationsToModel(
+    dashboardModel.populate(
         model, ownerPlatformAccountId, KeysetPageRequest.fromCursors(after, before));
     model.addAttribute("form", new CreateOrganizationForm());
+    model.addAttribute(PAGE_AFTER_ATTRIBUTE, after);
+    model.addAttribute(PAGE_BEFORE_ATTRIBUTE, before);
     return DASHBOARD_VIEW;
-  }
-
-  private void addOrganizationsToModel(
-      final Model model, final UUID ownerPlatformAccountId, final KeysetPageRequest pageRequest) {
-    final KeysetPage<Organization> organizationsPage =
-        listOrganizations.handle(
-            new ListOrganizationsForPlatformAccountPagedQuery(ownerPlatformAccountId, pageRequest));
-    model.addAttribute(ORGANIZATIONS_ATTRIBUTE, organizationsPage.content());
-    model.addAttribute(PAGE_ATTRIBUTE, organizationsPage);
   }
 
   @SuppressWarnings("PMD.OnlyOneReturn")
@@ -98,7 +88,7 @@ public class PlatformOrganizationDashboardController {
       final Model model) {
     final UUID ownerPlatformAccountId = requireCurrentPlatformAccount(request);
     if (bindingResult.hasErrors()) {
-      addOrganizationsToModel(model, ownerPlatformAccountId, KeysetPageRequest.first());
+      dashboardModel.populate(model, ownerPlatformAccountId, KeysetPageRequest.first());
       return isHtmxRequest(request) ? CONTENT_FRAGMENT : DASHBOARD_VIEW;
     }
 
@@ -124,7 +114,7 @@ public class PlatformOrganizationDashboardController {
       // first page (no cursor) — a newly-created Organization sorts first (newest-first
       // ordering), so this is exactly where it becomes visible, same as a real GET with no
       // ?after=/?before= would show too.
-      addOrganizationsToModel(model, ownerPlatformAccountId, KeysetPageRequest.first());
+      dashboardModel.populate(model, ownerPlatformAccountId, KeysetPageRequest.first());
       model.addAttribute("form", new CreateOrganizationForm());
       return CONTENT_FRAGMENT;
     }

@@ -4388,3 +4388,71 @@ body:has(.htmx-request)::after {
 .clavaris-return {
   margin-top: var(--space-6);
 }
+
+/* ==========================================================================
+   Edit organization dialog ("Your organizations")
+   ========================================================================== */
+
+/* Colour: a swatch that opens the browser's picker, beside the hex value it writes (and reads). */
+.clavaris-color-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.clavaris-field .clavaris-color-field__picker {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 40px;
+  padding: 2px;
+  cursor: pointer;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+
+.clavaris-color-field [data-color-text] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Logo: what it looks like now (or a placeholder), and the file chooser with its remove switch. */
+.clavaris-logo-field__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.clavaris-logo-field__preview {
+  display: grid;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  padding: var(--space-1);
+  overflow: hidden;
+  color: var(--clavaris-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  background: var(--clavaris-bg);
+  border: 1px dashed var(--clavaris-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.clavaris-logo-field__preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.clavaris-logo-field__controls {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The logo that is about to be removed stays visible but reads as on its way out. */
+.clavaris-logo-field__preview--removing {
+  opacity: 0.35;
+}

@@ -21,17 +21,26 @@
 
             <div class="clavaris-section">
                 <div class="clavaris-organization-grid">
-                    <article class="clavaris-organization-card" th:each="organization : ${organizations}">
+                    <!--/* The card: the edit icon where the environment badge used to be, the
+                            description only when the Organization has one (no placeholder text), and
+                            the environment badge in the footer, where "Created ..." used to be. */-->
+                    <article class="clavaris-organization-card" th:each="organization : ${organizations}"
+                             th:with="profile=${profiles.get(organization.id())}">
                         <div class="clavaris-organization-card__header">
                             <span class="clavaris-organization-card__mark" aria-hidden="true"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+                            <button class="clavaris-icon-button" type="button"
+                                    aria-label="Edit organization" title="Edit organization"
+                                    th:attr="data-dialog-open='edit-organization-' + ${organization.id()}">
+                                <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                            </button>
+                        </div>
+                        <h2 th:text="${organization.name()}">Organization name</h2>
+                        <p th:if="${profile != null and profile.description().isPresent()}"
+                           th:text="${profile.description().get()}">Description</p>
+                        <div class="clavaris-organization-card__footer">
                             <span class="clavaris-badge"
                                   th:classappend="${T(com.clavaris.common.domain.model.StatusBadgeCssClass).forBoolean(organization.environment().name() == 'PRODUCTION')}"
                                   th:text="${organization.environment()}">DEVELOPMENT</span>
-                        </div>
-                        <h2 th:text="${organization.name()}">Organization name</h2>
-                        <p>Isolated tenant with its own accounts, clients, and signing keys.</p>
-                        <div class="clavaris-organization-card__footer">
-                            <small>Created <time th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(organization.createdAt())}">Created at</time></small>
                             <a th:href="@{/platform/dashboard/organizations/{id}(id=${organization.id()})}">Open <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
                         </div>
                     </article>
@@ -71,6 +80,115 @@
                 </nav>
             </div>
 
+            <!--/* One edit dialog per Organization, outside the cards so a card's own hover and layout
+                    never touch it. It opens from the card's edit icon and is filled from the
+                    Organization and its profile. After a rejected save the page is rendered again
+                    with editingOrganizationId set: that Organization's dialog then shows what was
+                    submitted and the message under each field, and opens by itself
+                    (data-dialog-open-on-load). A plain multipart post, so the logo upload needs no
+                    script; organization-profile-dialog.js only adds the live preview and checks. */-->
+            <dialog th:each="organization : ${organizations}"
+                    th:id="'edit-organization-' + ${organization.id()}"
+                    class="clavaris-dialog"
+                    th:with="profile=${profiles.get(organization.id())},
+                             editing=${editingOrganizationId != null and editingOrganizationId.equals(organization.id())},
+                             nameValue=${editingOrganizationId != null and editingOrganizationId.equals(organization.id()) ? editForm.name : organization.name()},
+                             applicationValue=${editingOrganizationId != null and editingOrganizationId.equals(organization.id()) ? editForm.applicationName : (profile != null ? profile.applicationName().orElse('') : '')},
+                             descriptionValue=${editingOrganizationId != null and editingOrganizationId.equals(organization.id()) ? editForm.description : (profile != null ? profile.description().orElse('') : '')},
+                             colorValue=${editingOrganizationId != null and editingOrganizationId.equals(organization.id()) ? editForm.brandColor : (profile != null ? profile.brandColor().orElse('') : '')}">
+                <div class="clavaris-dialog__header">
+                    <div>
+                        <span class="clavaris-dialog__eyebrow">Organization</span>
+                        <h2>Edit organization</h2>
+                        <p>Change how this organization is named and how its application is shown to the
+                            people who sign in to it.</p>
+                    </div>
+                    <button class="clavaris-dialog__close" type="button" data-dialog-close aria-label="Close edit organization dialog"><svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                </div>
+                <form th:action="@{/platform/dashboard/organizations/{id}/profile(id=${organization.id()})}"
+                      method="post" enctype="multipart/form-data" data-organization-profile-form>
+                    <span hidden th:if="${editing}" data-dialog-open-on-load></span>
+                    <input type="hidden" name="after" th:value="${pageAfter}"/>
+                    <input type="hidden" name="before" th:value="${pageBefore}"/>
+
+                    <div class="clavaris-field">
+                        <label th:for="'organization-name-' + ${organization.id()}">Organization name</label>
+                        <input th:id="'organization-name-' + ${organization.id()}" type="text" name="name"
+                               th:value="${nameValue}" maxlength="255" required/>
+                        <p class="clavaris-field-error" th:if="${editing and editErrors['name'] != null}"
+                           th:text="${editErrors['name']}">Name error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label th:for="'organization-application-' + ${organization.id()}">Application name</label>
+                        <input th:id="'organization-application-' + ${organization.id()}" type="text"
+                               name="applicationName" th:value="${applicationValue}" maxlength="100"/>
+                        <p class="clavaris-field-hint">The name of the system your users sign in to. It is shown
+                            on its sign-in and consent pages and in the emails it sends. Leave it empty to
+                            use the organization's name.</p>
+                        <p class="clavaris-field-error" th:if="${editing and editErrors['applicationName'] != null}"
+                           th:text="${editErrors['applicationName']}">Application name error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label th:for="'organization-description-' + ${organization.id()}">Description</label>
+                        <textarea th:id="'organization-description-' + ${organization.id()}" name="description"
+                                  rows="3" maxlength="500" th:text="${descriptionValue}"></textarea>
+                        <p class="clavaris-field-hint">Shown on this organization's card. Leave it empty to show
+                            nothing.</p>
+                        <p class="clavaris-field-error" th:if="${editing and editErrors['description'] != null}"
+                           th:text="${editErrors['description']}">Description error</p>
+                    </div>
+
+                    <div class="clavaris-field">
+                        <label th:for="'organization-color-' + ${organization.id()}">Brand colour</label>
+                        <div class="clavaris-color-field" data-color-field>
+                            <input class="clavaris-color-field__picker" type="color" data-color-picker
+                                   aria-label="Pick a colour"
+                                   th:value="${colorValue != null and !colorValue.isEmpty() ? colorValue : '#f59e0b'}"/>
+                            <input th:id="'organization-color-' + ${organization.id()}" type="text" name="brandColor"
+                                   th:value="${colorValue}" maxlength="7" placeholder="#2563eb"
+                                   pattern="#[0-9A-Fa-f]{6}" data-color-text/>
+                        </div>
+                        <p class="clavaris-field-hint">The colour of its buttons on the sign-in and consent
+                            pages. Leave it empty for the default.</p>
+                        <p class="clavaris-field-error" th:if="${editing and editErrors['brandColor'] != null}"
+                           th:text="${editErrors['brandColor']}">Colour error</p>
+                    </div>
+
+                    <div class="clavaris-field clavaris-logo-field" data-logo-field>
+                        <label th:for="'organization-logo-' + ${organization.id()}">Logo</label>
+                        <div class="clavaris-logo-field__row">
+                            <span class="clavaris-logo-field__preview">
+                                <img th:if="${profile != null and profile.hasLogo()}" data-logo-preview
+                                     th:src="@{/o/{id}/branding/logo(id=${organization.id()}, v=${profile.logoUpdatedAt().get().toEpochMilli()})}"
+                                     alt="Current logo"/>
+                                <span th:unless="${profile != null and profile.hasLogo()}" data-logo-placeholder>No logo</span>
+                            </span>
+                            <div class="clavaris-logo-field__controls">
+                                <input th:id="'organization-logo-' + ${organization.id()}" type="file" name="logo"
+                                       accept="image/png,image/jpeg,image/webp,image/gif" data-logo-input/>
+                                <label class="clavaris-toggle" th:if="${profile != null and profile.hasLogo()}">
+                                    <input type="checkbox" name="removeLogo" value="true" data-logo-remove/>
+                                    <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                    <span class="clavaris-toggle__label">Remove the current logo</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="clavaris-field-hint">PNG, JPEG, WebP or GIF, up to 1 MB. Shown on the sign-in and
+                            consent pages.</p>
+                        <p class="clavaris-field-error" data-logo-error
+                           th:hidden="${!(editing and editErrors['logo'] != null)}"
+                           th:text="${editing and editErrors['logo'] != null ? editErrors['logo'] : ''}"></p>
+                    </div>
+
+                    <div class="clavaris-dialog__actions">
+                        <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="button" data-dialog-close>Cancel</button>
+                        <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
+                    </div>
+                </form>
+            </dialog>
+
             <dialog id="create-organization-dialog" class="clavaris-dialog">
                 <div class="clavaris-dialog__header">
                     <div>
@@ -96,6 +214,7 @@
                 </form>
             </dialog>
         </div>
+        <script th:src="${#resourceUrl != null ? #resourceUrl.url('/js/organization-profile-dialog.js') : '/js/organization-profile-dialog.js'}"></script>
     </main>
 </div>
 </body>

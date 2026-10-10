@@ -1,0 +1,75 @@
+# Spanish text of the dashboard's "Edit organization" dialog on the "Your organizations" cards, and
+# of the messages the server answers with when a value in it is rejected (organization-module).
+# See docs/05-engineering/internationalization.md.
+
+msgid "Edit organization"
+msgstr "Editar organización"
+
+msgid "Change how this organization is named and how its application is shown to the people who sign in to it."
+msgstr "Cambia cómo se llama esta organización y cómo se muestra su aplicación a las personas que inician sesión en ella."
+
+msgid "Close edit organization dialog"
+msgstr "Cerrar el diálogo de editar organización"
+
+msgid "Organization name"
+msgstr "Nombre de la organización"
+
+msgid "Application name"
+msgstr "Nombre de la aplicación"
+
+msgid "The name of the system your users sign in to. It is shown on its sign-in and consent pages and in the emails it sends. Leave it empty to use the organization's name."
+msgstr "El nombre del sistema en el que inician sesión tus usuarios. Se muestra en sus páginas de inicio de sesión y de consentimiento y en los correos que envía. Déjalo vacío para usar el nombre de la organización."
+
+msgid "Shown on this organization's card. Leave it empty to show nothing."
+msgstr "Se muestra en la tarjeta de esta organización. Déjala vacía para no mostrar nada."
+
+msgid "Brand colour"
+msgstr "Color de la marca"
+
+msgid "Pick a colour"
+msgstr "Elige un color"
+
+msgid "The colour of its buttons on the sign-in and consent pages. Leave it empty for the default."
+msgstr "El color de sus botones en las páginas de inicio de sesión y de consentimiento. Déjalo vacío para usar el predeterminado."
+
+msgid "Logo"
+msgstr "Logotipo"
+
+msgid "Current logo"
+msgstr "Logotipo actual"
+
+msgid "No logo"
+msgstr "Sin logotipo"
+
+msgid "Remove the current logo"
+msgstr "Quitar el logotipo actual"
+
+msgid "PNG, JPEG, WebP or GIF, up to 1 MB. Shown on the sign-in and consent pages."
+msgstr "PNG, JPEG, WebP o GIF, de hasta 1 MB. Se muestra en las páginas de inicio de sesión y de consentimiento."
+
+msgid "The logo must be a PNG, JPEG, WebP or GIF image"
+msgstr "El logotipo debe ser una imagen PNG, JPEG, WebP o GIF"
+
+msgid "The logo must not be larger than 1 MB"
+msgstr "El logotipo no debe pesar más de 1 MB"
+
+msgid "The logo is empty"
+msgstr "El logotipo está vacío"
+
+msgid "The file is not a valid {0} image"
+msgstr "El archivo no es una imagen {0} válida"
+
+msgid "The file could not be read"
+msgstr "No se pudo leer el archivo"
+
+msgid "Description must be at most 500 characters"
+msgstr "La descripción debe tener como máximo 500 caracteres"
+
+msgid "Application name must be at most 100 characters"
+msgstr "El nombre de la aplicación debe tener como máximo 100 caracteres"
+
+msgid "Use a hex colour such as #2563eb"
+msgstr "Usa un color hexadecimal como #2563eb"
+
+msgid "#2563eb"
+msgstr "#2563eb"

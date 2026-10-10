@@ -240,6 +240,25 @@ public final class Organization {
         linkedEnvironmentOrganizationId);
   }
 
+  /**
+   * The same Organization under a new name. Nothing else about it changes: not its owner, its
+   * environment, nor the Organization it is linked to.
+   *
+   * @throws IllegalArgumentException when {@code newName} is blank or longer than the {@code name}
+   *     column
+   */
+  public Organization withName(final String newName) {
+    return new Organization(
+        id,
+        newName,
+        createdAt,
+        ownerPlatformAccountId,
+        socialLoginEnabled,
+        allowedSocialProviders,
+        environment,
+        linkedEnvironmentOrganizationId);
+  }
+
   private static String requireValidName(final String name) {
     if (name == null || name.isBlank()) {
       throw new IllegalArgumentException("Organization name must not be blank");

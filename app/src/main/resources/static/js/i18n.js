@@ -90,6 +90,10 @@
     "Must be at most {0}.": "Debe ser como máximo {0}.",
     "Can't be longer than the maximum lifetime.": "No puede ser mayor que la duración máxima.",
     "That is {0}.": "Equivale a {0}.",
+    "The logo must be a PNG, JPEG, WebP or GIF image":
+      "El logotipo debe ser una imagen PNG, JPEG, WebP o GIF",
+    "The logo must not be larger than 1 MB": "El logotipo no debe pesar más de 1 MB",
+    "Chosen logo": "Logotipo elegido",
   };
 
   const TABLES = { es: SPANISH };
