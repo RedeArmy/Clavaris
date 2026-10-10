@@ -1,16 +1,13 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{fragments/head :: head(${branding.applicationDisplayName.orElse('Clavaris')} + ' — Authorize access')}">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Authorize access')}">
     <title>Authorize access</title>
 </head>
 <body>
 <main>
     <div class="clavaris-card clavaris-card--consent" th:with="appName=${branding.applicationDisplayName.orElse('')}">
-        <header class="clavaris-consent__header">
-            <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
-                 th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
-            <span class="clavaris-consent__monogram" aria-hidden="true" th:if="${branding.logoUrl.isEmpty()}"
-                  th:text="${#strings.isEmpty(appName) ? 'C' : #strings.toUpperCase(#strings.substring(appName, 0, 1))}">C</span>
+        <header class="clavaris-app-header">
+            <div th:replace="~{identity/fragments/application-mark :: mark}"></div>
 
             <!--/* The application's own name goes in its own element, so the sentence around it is one
                     fixed text the Spanish catalogue can translate ("<0>{0}</0> wants to access your

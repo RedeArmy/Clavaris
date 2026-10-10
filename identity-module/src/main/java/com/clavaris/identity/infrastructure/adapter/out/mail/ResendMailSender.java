@@ -4,6 +4,7 @@ import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import com.clavaris.common.infrastructure.adapter.out.resilience.CircuitBreakerMetricsBinder;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.requestplatformaccountemailverification.PlatformMailSender;
+import com.clavaris.identity.application.usecase.resolveorganizationname.OrganizationNameProvider;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -14,6 +15,8 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
+import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -48,6 +51,7 @@ class ResendMailSender implements MailSender, PlatformMailSender {
 
   private final ResendHttpClient httpClient;
   private final String baseUrl;
+  private final OrganizationNameProvider organizationNames;
 
   // Package-private: constructed only by Spring's own component scan (via @Component above) —
   // MailSender (the port) is what every caller outside this package should depend on. @Autowired
@@ -73,7 +77,8 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       @Value("${clavaris.resilience.resend.sliding-window-size:10}") final int slidingWindowSize,
       @Value("${clavaris.resilience.resend.wait-duration-in-open-state-seconds:30}")
           final long waitDurationInOpenStateSeconds,
-      final SecurityMetricsRecorder metrics) {
+      final SecurityMetricsRecorder metrics,
+      final OrganizationNameProvider organizationNames) {
     this(
         HttpClient.newHttpClient(),
         objectMapper,
@@ -82,7 +87,8 @@ class ResendMailSender implements MailSender, PlatformMailSender {
         baseUrl,
         DEFAULT_RESEND_ENDPOINT,
         buildCircuitBreaker(
-            failureRateThreshold, slidingWindowSize, waitDurationInOpenStateSeconds, metrics));
+            failureRateThreshold, slidingWindowSize, waitDurationInOpenStateSeconds, metrics),
+        organizationNames);
   }
 
   // Test-only (TD-SEC-020): lets ResendMailSenderTest point this at a local stub HTTP server —
@@ -106,7 +112,28 @@ class ResendMailSender implements MailSender, PlatformMailSender {
         fromAddress,
         baseUrl,
         resendEndpoint,
-        CircuitBreaker.ofDefaults("resend"));
+        organizationId -> Optional.empty());
+  }
+
+  // Test-only: the same, with the Organization names the tenant emails are sent in.
+  @SuppressWarnings("java:S107")
+  /* package */ ResendMailSender(
+      final HttpClient httpClient,
+      final ObjectMapper objectMapper,
+      final String apiKey,
+      final String fromAddress,
+      final String baseUrl,
+      final URI resendEndpoint,
+      final OrganizationNameProvider organizationNames) {
+    this(
+        httpClient,
+        objectMapper,
+        apiKey,
+        fromAddress,
+        baseUrl,
+        resendEndpoint,
+        CircuitBreaker.ofDefaults("resend"),
+        organizationNames);
   }
 
   @SuppressWarnings("java:S107")
@@ -117,7 +144,9 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final String fromAddress,
       final String baseUrl,
       final URI resendEndpoint,
-      final CircuitBreaker circuitBreaker) {
+      final CircuitBreaker circuitBreaker,
+      final OrganizationNameProvider organizationNames) {
+    this.organizationNames = organizationNames;
     this.httpClient =
         new ResendHttpClient(
             httpClient, objectMapper, apiKey, fromAddress, resendEndpoint, circuitBreaker);
@@ -144,21 +173,27 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   @Override
   public void sendEmailVerification(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
-    httpClient.send(
-        toAddress, Emails.verifyEmailLink(link(organizationId, "verify-email", rawToken), false));
+    sendAsOrganization(
+        toAddress,
+        organizationId,
+        brand ->
+            Emails.verifyEmailLink(brand, link(organizationId, "verify-email", rawToken), false));
   }
 
   @Override
   public void sendEmailVerificationCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    httpClient.send(toAddress, Emails.verifyEmailCode(rawCode));
+    sendAsOrganization(toAddress, organizationId, brand -> Emails.verifyEmailCode(brand, rawCode));
   }
 
   @Override
   public void sendPasswordReset(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
-    httpClient.send(
-        toAddress, Emails.passwordReset(link(organizationId, "reset-password", rawToken), false));
+    sendAsOrganization(
+        toAddress,
+        organizationId,
+        brand ->
+            Emails.passwordReset(brand, link(organizationId, "reset-password", rawToken), false));
   }
 
   @Override
@@ -167,29 +202,33 @@ class ResendMailSender implements MailSender, PlatformMailSender {
       final OrganizationId organizationId,
       final SocialProvider provider,
       final String rawToken) {
-    httpClient.send(
+    sendAsOrganization(
         toAddress,
-        Emails.socialLinkConfirmation(
-            link(organizationId, "confirm-social-link", rawToken), provider, false));
+        organizationId,
+        brand ->
+            Emails.socialLinkConfirmation(
+                brand, link(organizationId, "confirm-social-link", rawToken), provider, false));
   }
 
   @Override
   public void sendEmailSignInCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    httpClient.send(toAddress, Emails.signInCode(rawCode));
+    sendAsOrganization(toAddress, organizationId, brand -> Emails.signInCode(brand, rawCode));
   }
 
   @Override
   public void sendEmailSignInLink(
       final String toAddress, final OrganizationId organizationId, final String rawToken) {
-    httpClient.send(
-        toAddress, Emails.signInLink(link(organizationId, "login/email-link", rawToken)));
+    sendAsOrganization(
+        toAddress,
+        organizationId,
+        brand -> Emails.signInLink(brand, link(organizationId, "login/email-link", rawToken)));
   }
 
   @Override
   public void sendDeviceTrustChallengeCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
-    httpClient.send(toAddress, Emails.deviceTrustCode(rawCode));
+    sendAsOrganization(toAddress, organizationId, brand -> Emails.deviceTrustCode(brand, rawCode));
   }
 
   @Override
@@ -209,14 +248,18 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     // every value it lays out, so they cannot inject markup into the sent email.
     final String lockLink =
         rawAlertToken == null ? null : link(organizationId, "account-alert/lock", rawAlertToken);
-    httpClient.send(
-        toAddress, Emails.newDeviceAlert(userAgent, sourceIp, occurredAt, lockLink, false));
+    sendAsOrganization(
+        toAddress,
+        organizationId,
+        brand -> Emails.newDeviceAlert(brand, userAgent, sourceIp, occurredAt, lockLink, false));
   }
 
   @Override
   public void sendPlatformAccountEmailVerification(final String toAddress, final String rawToken) {
     httpClient.send(
-        toAddress, Emails.verifyEmailLink(platformLink("verify-email", rawToken), true));
+        toAddress,
+        Emails.verifyEmailLink(Emails.PLATFORM_BRAND, platformLink("verify-email", rawToken), true),
+        null);
   }
 
   @Override
@@ -225,13 +268,16 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     httpClient.send(
         toAddress,
         Emails.socialLinkConfirmation(
-            platformLink("confirm-social-link", rawToken), provider, true));
+            Emails.PLATFORM_BRAND, platformLink("confirm-social-link", rawToken), provider, true),
+        null);
   }
 
   @Override
   public void sendPlatformAccountPasswordReset(final String toAddress, final String rawToken) {
     httpClient.send(
-        toAddress, Emails.passwordReset(platformLink("reset-password", rawToken), true));
+        toAddress,
+        Emails.passwordReset(Emails.PLATFORM_BRAND, platformLink("reset-password", rawToken), true),
+        null);
   }
 
   @Override
@@ -246,7 +292,22 @@ class ResendMailSender implements MailSender, PlatformMailSender {
     final String lockLink =
         rawAlertToken == null ? null : platformLink("account-alert/lock", rawAlertToken);
     httpClient.send(
-        toAddress, Emails.newDeviceAlert(userAgent, sourceIp, occurredAt, lockLink, true));
+        toAddress,
+        Emails.newDeviceAlert(
+            Emails.PLATFORM_BRAND, userAgent, sourceIp, occurredAt, lockLink, true),
+        null);
+  }
+
+  // An email to one of an Organization's own Accounts is sent in that Organization's name (its
+  // header, its footer, the sender's display name), never Clavaris's: the Account signed up with
+  // the consuming application, not with Clavaris. An Organization whose name cannot be found gets
+  // an email that names nobody, rather than falling back to Clavaris.
+  private void sendAsOrganization(
+      final String toAddress,
+      final OrganizationId organizationId,
+      final Function<String, Emails.Composed> email) {
+    final String brand = organizationNames.nameFor(organizationId).orElse(null);
+    httpClient.send(toAddress, email.apply(brand), brand);
   }
 
   private String link(

@@ -1,0 +1,15 @@
+# Spanish text of the consuming application's sign-in page (identity/login.html): English source
+# text -> Spanish. "Sign in" itself lives in messages_es.po. See
+# docs/05-engineering/internationalization.md.
+
+# The application's own name rides in the <0>{0}</0> tag, so it is never translated.
+msgid "Sign in to <0>{0}</0>"
+msgstr "Inicia sesión en <0>{0}</0>"
+
+# The browser tab: the application's name, then the fixed words.
+msgid "{0} — Sign in"
+msgstr "{0} — Iniciar sesión"
+
+# The logo's alternative text when the application has a logo but no display name.
+msgid "Application logo"
+msgstr "Logotipo de la aplicación"

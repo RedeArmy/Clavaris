@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
 import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
+import com.clavaris.identity.infrastructure.adapter.in.web.ConsumerBrandNameInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 // TD-SEC-009: proves the writer's own branching logic in isolation — which policy, on which
@@ -204,6 +206,86 @@ class ContentSecurityPolicyHeaderWriterTest {
             "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // An application's logo lives on its own origin; img-src 'self' would make the browser refuse to
+  // draw it. The sign-in and consent pages name that one origin and only it is allowed.
+  @Test
+  void allowsExactlyTheLogoOriginForImagesWhenThePageNamesOne() {
+    HttpServletRequest request = requestWithUri("/o/11111111-1111-1111-1111-111111111111/login");
+    when(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN))
+        .thenReturn("https://cdn.acme.test:8443");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    org.mockito.ArgumentCaptor<String> policy = org.mockito.ArgumentCaptor.forClass(String.class);
+    verify(response).setHeader(eq(HEADER_NAME), policy.capture());
+    assertThat(policy.getValue())
+        .contains("img-src 'self' https://cdn.acme.test:8443; font-src 'self'")
+        .contains("default-src 'self'")
+        .doesNotContain("*");
+  }
+
+  @Test
+  void theConsentPageGetsTheLogoOriginToo() {
+    HttpServletRequest request = requestWithUri(ORG_CONSENT_PATH);
+    when(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN))
+        .thenReturn("https://cdn.acme.test");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'none'; style-src 'self'; "
+                + "img-src 'self' https://cdn.acme.test; "
+                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  // The value comes from the application's own configuration, but it is still checked before it
+  // goes into a security header: a value that is not a plain https origin changes nothing.
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "http://cdn.acme.test",
+        "https://cdn.acme.test/logo.png",
+        "https://cdn.acme.test; script-src *",
+        "https://cdn.acme.test *",
+        "https://",
+        "https://cdn.acme.test:99999999",
+        "javascript:alert(1)",
+        "*",
+        ""
+      })
+  void aLogoOriginThatIsNotAPlainHttpsOriginIsIgnored(final String origin) {
+    HttpServletRequest request = requestWithUri(ORG_REGISTER_PATH);
+    when(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN)).thenReturn(origin);
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  @Test
+  void aNonStringLogoOriginIsIgnored() {
+    HttpServletRequest request = requestWithUri(ORG_REGISTER_PATH);
+    when(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN)).thenReturn(42);
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    org.mockito.ArgumentCaptor<String> policy = org.mockito.ArgumentCaptor.forClass(String.class);
+    verify(response).setHeader(eq(HEADER_NAME), policy.capture());
+    assertThat(policy.getValue()).contains("img-src 'self';");
   }
 
   @Test

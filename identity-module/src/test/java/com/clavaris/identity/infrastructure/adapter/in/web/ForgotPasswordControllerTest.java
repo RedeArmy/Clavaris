@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -16,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetCommand;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
@@ -37,12 +40,15 @@ class ForgotPasswordControllerTest {
 
   private RequestPasswordResetUseCase useCase;
   private ClientHomeUrlResolver homeUrls;
+  private ClientBrandingProvider branding;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     useCase = mock(RequestPasswordResetUseCase.class);
     homeUrls = mock(ClientHomeUrlResolver.class);
+    branding = mock(ClientBrandingProvider.class);
+    when(branding.brandingFor(any(), any())).thenReturn(ClientBrandingSnapshot.unconfigured());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();
     applicationContext.refresh();
@@ -57,10 +63,13 @@ class ForgotPasswordControllerTest {
 
     ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
     viewResolver.setTemplateEngine(templateEngine);
+    // The tab title has an em dash; MockMvc would otherwise decode the page as Latin-1.
+    viewResolver.setCharacterEncoding("UTF-8");
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new ForgotPasswordController(useCase, new ReturnToApplicationLink(homeUrls)))
+            .addInterceptors(new ConsumerBrandNameInterceptor(branding))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -150,5 +159,47 @@ class ForgotPasswordControllerTest {
         .andExpect(status().isOk())
         .andExpect(model().attributeDoesNotExist("homeUrl"))
         .andExpect(content().string(not(containsString("Back to home"))));
+  }
+
+  // The standard for the consumer system: the tab carries the application's name, and its
+  // Organization's when it has none of its own. Never Clavaris.
+  @Test
+  void theTabCarriesTheBrandNameAndNeverClavaris() throws Exception {
+    when(branding.brandingFor(new OrganizationId(ORGANIZATION_ID), null))
+        .thenReturn(
+            new ClientBrandingSnapshot(
+                Optional.empty(), Optional.empty(), Optional.of("Acme Analytics")));
+
+    mockMvc
+        .perform(get("/o/{organizationId}/forgot-password", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(containsString("<title>Acme Analytics — Forgot password</title>")))
+        .andExpect(content().string(not(containsString("Clavaris"))));
+  }
+
+  @Test
+  void theTabIsJustThePageTitleWhenEvenTheOrganizationHasNoName() throws Exception {
+    mockMvc
+        .perform(get("/o/{organizationId}/forgot-password", ORGANIZATION_ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("<title>Forgot password</title>")))
+        .andExpect(content().string(not(containsString("Clavaris"))));
+  }
+
+  @Test
+  void thePendingPageCarriesTheBrandNameToo() throws Exception {
+    when(branding.brandingFor(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(
+            new ClientBrandingSnapshot(
+                Optional.empty(), Optional.empty(), Optional.of("Acme Dashboard")));
+
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/forgot-password/pending", ORGANIZATION_ID)
+                .param("clientId", "acme-web"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(containsString("<title>Acme Dashboard — Check your email</title>")));
   }
 }

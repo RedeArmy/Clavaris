@@ -1,0 +1,21 @@
+/*
+ * Rules that apply only to the pages the consuming application's own people see (the tenant
+ * sign-in, sign-up, password-reset and account pages, the consent screen). Those pages load this
+ * file through the `consumerHead` fragment; Clavaris's own dashboard and platform pages load only
+ * clavaris.css and are not touched by anything here.
+ */
+
+/* The hidden attribute has to win over a component's own display value. Without this, a class that
+   sets display (.clavaris-alert is display: block, .clavaris-button is display: flex) beats the
+   browser's built-in [hidden] { display: none }, so an element a template or a script hides on
+   purpose stayed visible all the time. On the sign-in page that showed "Already signing in from
+   another tab" permanently and an empty red box under the passkey button. */
+[hidden] {
+  display: none !important;
+}
+
+/* The passkey button sits right under "Sign in". The notice that used to be between them (and was
+   wrongly always visible) was what gave them room; with it correctly hidden they need their own. */
+#passkey-signin-button {
+  margin-top: var(--space-3);
+}

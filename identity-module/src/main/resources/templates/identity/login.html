@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{fragments/head :: head(${branding.applicationDisplayName.orElse('Clavaris')} + ' — Sign in')}">
-    <title>Sign in — Clavaris</title>
+<head th:replace="~{fragments/consumer-head :: consumerHead('Sign in')}">
+    <title>Sign in</title>
 </head>
 <!-- ADR-0009 §1: data-modal marks this render as happening inside a consumer's own iframe
      (display=modal) — login-submit-guard.js's own sibling script below reads this to decide
@@ -11,9 +11,15 @@
 <body th:attr="data-modal=${modal}">
 <main>
     <div class="clavaris-card">
-        <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent()}" th:src="${branding.logoUrl.get()}"
-             th:alt="${branding.applicationDisplayName.orElse('Clavaris')}"/>
-        <h1 th:if="${branding.logoUrl.isEmpty()}" th:text="${branding.applicationDisplayName.orElse('Clavaris')} + ': Sign in'">Sign in</h1>
+        <!--/* This is the consuming application's sign-in, so it shows that application's own branding
+                and nothing of Clavaris: its logo or initial, and "Sign in to <name>". An application
+                with no branding gets a plain "Sign in". The name sits in its own element so the
+                sentence around it is one fixed text the Spanish catalogue can translate. */-->
+        <header class="clavaris-app-header">
+            <div th:replace="~{identity/fragments/application-mark :: mark}"></div>
+            <h1 th:if="${branding.applicationDisplayName.isPresent()}">Sign in to <strong th:text="${branding.applicationDisplayName.get()}">Application</strong></h1>
+            <h1 th:unless="${branding.applicationDisplayName.isPresent()}">Sign in</h1>
+        </header>
 
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${loginError}">Invalid email or password.</p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${emailNotVerifiedError}">Please verify your email address before signing in.</p>

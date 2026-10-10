@@ -17,6 +17,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +85,92 @@ class ResendMailSenderTest {
             "the tenant link must be organization-scoped (/o/{organizationId}/...), not the "
                 + "platform tier's own /platform/... shape")
         .contains(BASE_URL + "/o/" + organizationId + "/verify-email?token=the-raw-token");
+  }
+
+  // A tenant's email is sent in its Organization's name: the sender's display name, the header and
+  // the footer. Clavaris appears nowhere in it.
+  @Test
+  void aTenantEmailIsSentInTheOrganizationsNameAndNeverClavaris() {
+    respondWith(200, "");
+    ResendMailSender sender =
+        new ResendMailSender(
+            HttpClient.newHttpClient(),
+            objectMapper,
+            API_KEY,
+            FROM_ADDRESS,
+            BASE_URL,
+            stubServerUri(),
+            organizationId -> Optional.of("Acme Analytics"));
+
+    sender.sendPasswordReset("user@example.com", new OrganizationId(UUID.randomUUID()), "tok");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("from").asString()).isEqualTo("\"Acme Analytics\" <" + FROM_ADDRESS + ">");
+    assertThat(body.get("html").asString())
+        .contains("Acme Analytics")
+        .contains("Sent by Acme Analytics")
+        // The brand, not the word: the reset link's host in this test is clavaris.example.test.
+        .doesNotContain("Clavaris");
+    assertThat(body.get("text").asString()).startsWith("ACME ANALYTICS").doesNotContain("Clavaris");
+  }
+
+  // The Organization's name is typed by whoever created it, so it is made safe before it goes into
+  // the From header.
+  @Test
+  void aHostileOrganizationNameCannotBreakOutOfTheSenderName() {
+    respondWith(200, "");
+    ResendMailSender sender =
+        new ResendMailSender(
+            HttpClient.newHttpClient(),
+            objectMapper,
+            API_KEY,
+            FROM_ADDRESS,
+            BASE_URL,
+            stubServerUri(),
+            organizationId -> Optional.of("Acme\" <evil@x.test>\r\nBcc: spy@x.test"));
+
+    sender.sendPasswordReset("user@example.com", new OrganizationId(UUID.randomUUID()), "tok");
+
+    String from = objectMapper.readTree(capturedRequest.body).get("from").asString();
+    assertThat(from).endsWith(" <" + FROM_ADDRESS + ">").doesNotContain("\r").doesNotContain("\n");
+    assertThat(from.substring(0, from.lastIndexOf(" <")).replace("\"", ""))
+        .doesNotContain("<")
+        .doesNotContain(">");
+  }
+
+  // An Organization whose name could not be found: nobody is named, and the configured sender is
+  // used as it is. Still no Clavaris.
+  @Test
+  void aTenantEmailWithNoOrganizationNameKeepsTheConfiguredSenderAndNamesNobody() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+
+    sender.sendPasswordReset("user@example.com", new OrganizationId(UUID.randomUUID()), "tok");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("from").asString()).isEqualTo(FROM_ADDRESS);
+    assertThat(body.get("html").asString()).doesNotContain("Clavaris").doesNotContain("Sent by");
+  }
+
+  // Clavaris's own emails to its platform accounts are sent exactly as before.
+  @Test
+  void aPlatformEmailIsStillSentInClavarisName() {
+    respondWith(200, "");
+    ResendMailSender sender =
+        new ResendMailSender(
+            HttpClient.newHttpClient(),
+            objectMapper,
+            API_KEY,
+            FROM_ADDRESS,
+            BASE_URL,
+            stubServerUri(),
+            organizationId -> Optional.of("Acme Analytics"));
+
+    sender.sendPlatformAccountPasswordReset("user@example.com", "tok");
+
+    JsonNode body = objectMapper.readTree(capturedRequest.body);
+    assertThat(body.get("from").asString()).isEqualTo(FROM_ADDRESS);
+    assertThat(body.get("html").asString()).contains("Clavaris").doesNotContain("Acme Analytics");
   }
 
   @Test

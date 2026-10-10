@@ -1,0 +1,18 @@
+<!--
+  The consuming application's own mark at the top of a hosted card: its logo, or, with no logo but a
+  display name, the name's initial on its brand colour. With no branding at all it renders nothing,
+  deliberately: a page for someone else's application must never fall back to showing Clavaris.
+
+  Reads `branding` (a ClientBrandingSnapshot) from the page's own model, like the rest of the page.
+  The logo's alternative text is the application's name; with no name it is a plain "Application
+  logo" so the image is never left unlabelled.
+-->
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="mark">
+    <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent() and branding.applicationDisplayName.isPresent()}"
+         th:src="${branding.logoUrl.get()}" th:alt="${branding.applicationDisplayName.get()}"/>
+    <img class="clavaris-card__logo" th:if="${branding.logoUrl.isPresent() and branding.applicationDisplayName.isEmpty()}"
+         th:src="${branding.logoUrl.get()}" alt="Application logo"/>
+    <span class="clavaris-app-monogram" aria-hidden="true"
+          th:if="${branding.logoUrl.isEmpty() and branding.applicationDisplayName.isPresent()}"
+          th:text="${#strings.toUpperCase(#strings.substring(branding.applicationDisplayName.get(), 0, 1))}">A</span>
+</th:block>

@@ -11,10 +11,15 @@ import java.util.List;
  * The emails Clavaris sends, one factory method each. A method says what the email is for (its
  * subject, its one action, how long it lasts); {@link EmailCopy} supplies the words in the reader's
  * language and {@link EmailRenderer} the layout. The tenant and platform tiers share a method and
- * differ only by the {@code platform} flag, which names "your Clavaris account" where a tenant
- * email says "your account".
+ * differ by the {@code platform} flag, which names "your Clavaris account" where a tenant email
+ * says "your account", and by the {@code brand}: the name an email is sent in. A platform email is
+ * Clavaris's own ({@link #PLATFORM_BRAND}); a tenant email is its Organization's, or nobody's when
+ * that name is unknown ({@code null}), and never Clavaris's.
  */
 final class Emails {
+
+  /** The name Clavaris's own emails (to platform accounts) are sent in. */
+  /* default */ static final String PLATFORM_BRAND = "Clavaris";
 
   /** A finished email: the subject and the HTML and plain-text bodies. */
   /* default */ record Composed(String subject, String html, String text) {}
@@ -24,11 +29,13 @@ final class Emails {
   }
 
   /** Confirm an email address with a link. */
-  /* default */ static Composed verifyEmailLink(final String link, final boolean platform) {
+  /* default */ static Composed verifyEmailLink(
+      final String brand, final String link, final boolean platform) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_VERIFY);
     final String lead =
         EmailCopy.text(platform ? EmailCopy.LEAD_VERIFY_PLAT : EmailCopy.PRE_VERIFY);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_VERIFY))
             .paragraph(lead)
@@ -37,9 +44,10 @@ final class Emails {
   }
 
   /** Confirm an email address with a one-time code. */
-  /* default */ static Composed verifyEmailCode(final String code) {
+  /* default */ static Composed verifyEmailCode(final String brand, final String code) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_VERIFY);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_VCODE))
             .paragraph(EmailCopy.text(EmailCopy.LEAD_VCODE))
@@ -48,10 +56,12 @@ final class Emails {
   }
 
   /** Choose a new password. */
-  /* default */ static Composed passwordReset(final String link, final boolean platform) {
+  /* default */ static Composed passwordReset(
+      final String brand, final String link, final boolean platform) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_RESET);
     final String lead = EmailCopy.text(platform ? EmailCopy.LEAD_RESET_PLAT : EmailCopy.LEAD_RESET);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_RESET))
             .paragraph(lead)
@@ -61,12 +71,16 @@ final class Emails {
 
   /** Confirm connecting a Google or GitHub identity to an existing account. */
   /* default */ static Composed socialLinkConfirmation(
-      final String link, final SocialProvider provider, final boolean platform) {
+      final String brand,
+      final String link,
+      final SocialProvider provider,
+      final boolean platform) {
     final String name = EmailValues.providerName(provider);
     final String subject = EmailCopy.text(EmailCopy.SUBJ_SOCIAL, name);
     final String lead =
         EmailCopy.text(platform ? EmailCopy.LEAD_SOCIAL_PLAT : EmailCopy.LEAD_SOCIAL, name);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_SOCIAL, name))
             .paragraph(lead)
@@ -75,9 +89,10 @@ final class Emails {
   }
 
   /** Passwordless sign-in with a code. */
-  /* default */ static Composed signInCode(final String code) {
+  /* default */ static Composed signInCode(final String brand, final String code) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_CODE);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_CODE))
             .paragraph(EmailCopy.text(EmailCopy.LEAD_CODE))
@@ -86,9 +101,10 @@ final class Emails {
   }
 
   /** Passwordless sign-in with a link. */
-  /* default */ static Composed signInLink(final String link) {
+  /* default */ static Composed signInLink(final String brand, final String link) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_LINK);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_LINK))
             .paragraph(EmailCopy.text(EmailCopy.LEAD_LINK))
@@ -97,9 +113,10 @@ final class Emails {
   }
 
   /** Confirm a sign-in from a device the account has not used before. */
-  /* default */ static Composed deviceTrustCode(final String code) {
+  /* default */ static Composed deviceTrustCode(final String brand, final String code) {
     final String subject = EmailCopy.text(EmailCopy.SUBJ_DEVICE);
     return compose(
+        brand,
         subject,
         EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_DEVICE))
             .paragraph(EmailCopy.text(EmailCopy.LEAD_DEVICE))
@@ -114,6 +131,7 @@ final class Emails {
    *     case the email says to change the password instead
    */
   /* default */ static Composed newDeviceAlert(
+      final String brand,
       final String userAgent,
       final String sourceIp,
       final Instant occurredAt,
@@ -141,13 +159,14 @@ final class Emails {
           .dangerAction(EmailCopy.text(EmailCopy.BTN_LOCK), lockLink)
           .note(EmailCopy.text(EmailCopy.NOTE_ALERT));
     }
-    return compose(subject, content);
+    return compose(brand, subject, content);
   }
 
-  private static Composed compose(final String subject, final EmailContent content) {
+  private static Composed compose(
+      final String brand, final String subject, final EmailContent content) {
     return new Composed(
         subject,
-        EmailRenderer.html(content, AppLocales.current().getLanguage()),
-        EmailRenderer.text(content));
+        EmailRenderer.html(content, brand, AppLocales.current().getLanguage()),
+        EmailRenderer.text(content, brand));
   }
 }

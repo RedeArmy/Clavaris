@@ -194,7 +194,14 @@ msgctxt "email"
 msgid "If the button does not work, copy and paste this link into your browser:"
 msgstr "Si el botón no funciona, copia y pega este enlace en tu navegador:"
 
+# {0} is the name the email is sent in: the Organization's for its own Accounts, Clavaris's for the
+# platform's.
 msgctxt "email"
-msgid "Sent by Clavaris. This is an automated message, so replies are not monitored."
-msgstr "Enviado por Clavaris. Es un mensaje automático, así que las respuestas no se supervisan."
+msgid "Sent by {0}. This is an automated message, so replies are not monitored."
+msgstr "Enviado por {0}. Es un mensaje automático, así que las respuestas no se supervisan."
+
+# When the email has no name to give (an Organization whose name could not be found).
+msgctxt "email"
+msgid "This is an automated message, so replies are not monitored."
+msgstr "Es un mensaje automático, así que las respuestas no se supervisan."
 

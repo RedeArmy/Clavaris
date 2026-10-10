@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
 import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
+import com.clavaris.identity.infrastructure.adapter.in.web.ConsumerBrandNameInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -157,6 +158,12 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private static final String HEADER_NAME = "Content-Security-Policy";
   private static final String DISPLAY_PARAM = "display";
   private static final String DISPLAY_MODAL = "modal";
+
+  private static final String SELF_IMAGES = "img-src 'self'";
+
+  // https://host or https://host:port, nothing else: no path, no query, no ';', no whitespace.
+  private static final Pattern HTTPS_ORIGIN =
+      Pattern.compile("^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:\\d{1,5})?$");
 
   // This project's own login-page-only query param convention — never SAS's own client_id.
   private static final String CLIENT_ID_PARAM = "clientId";
@@ -318,7 +325,19 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     if (response.containsHeader(HEADER_NAME) || !isHtml(response)) {
       return;
     }
-    response.setHeader(HEADER_NAME, policyFor(request));
+    response.setHeader(HEADER_NAME, withLogoOrigin(policyFor(request), request));
+  }
+
+  // An application's logo is an https URL on its own origin, which img-src 'self' would make the
+  // browser refuse: the sign-in and consent pages would show a broken image instead. The page's
+  // controller names that one origin on the request; this adds exactly it to img-src for this
+  // response and nothing else. Anything that is not a plain https://host[:port] is ignored, so a
+  // value could never smuggle another directive into the policy.
+  private static String withLogoOrigin(final String policy, final HttpServletRequest request) {
+    final Object origin = request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN);
+    return origin instanceof String candidate && HTTPS_ORIGIN.matcher(candidate).matches()
+        ? policy.replace(SELF_IMAGES, SELF_IMAGES + " " + candidate)
+        : policy;
   }
 
   // TD-SEC-050: fires on every request to AUTHORIZE_PATH, authenticated or not — an unauthenticated

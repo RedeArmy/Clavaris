@@ -1,5 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.out.mail;
 
+import java.util.Locale;
+
 /**
  * Lays an {@link EmailContent} out as the Clavaris email: a centred 560px card on a warm canvas,
  * the product's amber accent, one primary action, and a plain-text twin for every email.
@@ -17,8 +19,13 @@ final class EmailRenderer {
     // Static helpers only.
   }
 
-  /** The complete HTML document for {@code content}, in the given language. */
-  /* default */ static String html(final EmailContent content, final String language) {
+  /**
+   * The complete HTML document for {@code content}, sent in the name of {@code brand} (or of nobody
+   * when it is {@code null} or blank), in the given language.
+   */
+  /* default */ static String html(
+      final EmailContent content, final String brand, final String language) {
+    final String name = named(brand);
     final StringBuilder body = new StringBuilder();
     content.blocks().forEach(block -> body.append(EmailBlocks.html(block)));
     final String canvas = "background:" + EmailStyle.CANVAS + ";";
@@ -27,7 +34,7 @@ final class EmailRenderer {
             "560",
             "",
             "width:100%;max-width:560px;",
-            wordmark() + card(content.title(), body.toString()) + footer());
+            wordmark(name) + card(content.title(), body.toString()) + footer(name));
     final String page =
         EmailHtml.table(
             "100%",
@@ -49,13 +56,17 @@ final class EmailRenderer {
   }
 
   /** The plain-text version: the same title, blocks and footer, with no markup. */
-  /* default */ static String text(final EmailContent content) {
-    final StringBuilder text =
-        new StringBuilder("CLAVARIS\n\n").append(content.title()).append('\n');
+  /* default */ static String text(final EmailContent content, final String brand) {
+    final String name = named(brand);
+    final StringBuilder text = new StringBuilder();
+    if (name != null) {
+      text.append(name.toUpperCase(Locale.ROOT)).append("\n\n");
+    }
+    text.append(content.title()).append('\n');
     content
         .blocks()
         .forEach(block -> text.append('\n').append(EmailBlocks.text(block)).append('\n'));
-    return text.append("\n--\n").append(EmailCopy.text(EmailCopy.FOOTER)).append('\n').toString();
+    return text.append("\n--\n").append(footerText(name)).append('\n').toString();
   }
 
   private static String head(final String title) {
@@ -79,8 +90,13 @@ final class EmailRenderer {
         EmailHtml.esc(text) + "&zwnj;&nbsp;".repeat(40));
   }
 
-  // The product name with the small amber dot the console uses as its eyebrow mark.
-  private static String wordmark() {
+  // The name the email is sent in, with the small amber dot the console uses as its eyebrow mark.
+  // With no name there is nothing to show: never a fallback to Clavaris on a tenant's email.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private static String wordmark(final String brand) {
+    if (brand == null) {
+      return "";
+    }
     final String circle =
         EmailHtml.element(
             "div",
@@ -99,7 +115,7 @@ final class EmailRenderer {
                 + ";font-size:17px;font-weight:600;letter-spacing:-0.02em;color:"
                 + EmailStyle.INK
                 + ";",
-            "Clavaris");
+            EmailHtml.esc(brand));
     return EmailHtml.row(
         EmailHtml.element(
             "td",
@@ -138,7 +154,18 @@ final class EmailRenderer {
             EmailHtml.table("100%", "", "", EmailHtml.row(padded))));
   }
 
-  private static String footer() {
+  // A blank name is no name: the email then names nobody, never Clavaris.
+  private static String named(final String brand) {
+    return brand == null || brand.isBlank() ? null : brand.strip();
+  }
+
+  private static String footerText(final String brand) {
+    return brand == null
+        ? EmailCopy.text(EmailCopy.FOOTER_PLAIN)
+        : EmailCopy.text(EmailCopy.FOOTER, brand);
+  }
+
+  private static String footer(final String brand) {
     return EmailHtml.row(
         EmailHtml.element(
             "td",
@@ -148,6 +175,6 @@ final class EmailRenderer {
                 + ";font-size:12px;line-height:1.6;color:"
                 + EmailStyle.MUTED
                 + ";",
-            EmailHtml.esc(EmailCopy.text(EmailCopy.FOOTER))));
+            EmailHtml.esc(footerText(brand))));
   }
 }
