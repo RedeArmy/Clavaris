@@ -36,6 +36,11 @@ public final class AuditActionCatalog {
         AuditTone.CREATED,
         "Production environment created");
     add(
+        "organization.profile_updated",
+        AuditCategory.ORGANIZATION,
+        AuditTone.UPDATED,
+        "Organization profile updated");
+    add(
         "organization.social_credential_set",
         AuditCategory.ORGANIZATION,
         AuditTone.UPDATED,

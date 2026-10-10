@@ -73,3 +73,6 @@ msgstr "Usa un color hexadecimal como #2563eb"
 
 msgid "#2563eb"
 msgstr "#2563eb"
+
+msgid "Organization profile updated"
+msgstr "Perfil de la Organización actualizado"
