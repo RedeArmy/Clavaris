@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.config;
 
+import com.clavaris.identity.application.usecase.registerwebauthncredential.RelyingPartyFactory;
 import com.yubico.webauthn.CredentialRepository;
 import com.yubico.webauthn.RelyingParty;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
@@ -35,13 +36,39 @@ class WebAuthnConfig {
 
   private static final String RELYING_PARTY_NAME = "Clavaris";
 
+  // Used to authenticate with a passkey. The name is never shown in that ceremony; it is only
+  // shown when a passkey is created, and that goes through relyingPartyFactory below.
   @Bean
   /* package */ RelyingParty relyingParty(
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl,
       final CredentialRepository credentialRepository) {
+    return build(clavarisBaseUrl, credentialRepository, RELYING_PARTY_NAME);
+  }
+
+  // The relying party a passkey is created under, named per Organization: the browser shows the
+  // name when it asks to save the passkey, and for a consuming application's Account that must be
+  // the application's, not Clavaris's. The id and origins are the deployment's own either way: they
+  // are what the passkey is bound to and what the browser enforces. With no name it shows the host.
+  @Bean
+  /* package */ RelyingPartyFactory relyingPartyFactory(
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl,
+      final CredentialRepository credentialRepository) {
+    return displayName ->
+        build(
+            clavarisBaseUrl,
+            credentialRepository,
+            displayName == null || displayName.isBlank()
+                ? URI.create(clavarisBaseUrl).getHost()
+                : displayName.strip());
+  }
+
+  private static RelyingParty build(
+      final String clavarisBaseUrl,
+      final CredentialRepository credentialRepository,
+      final String name) {
     final URI baseUri = URI.create(clavarisBaseUrl);
     final RelyingPartyIdentity identity =
-        RelyingPartyIdentity.builder().id(baseUri.getHost()).name(RELYING_PARTY_NAME).build();
+        RelyingPartyIdentity.builder().id(baseUri.getHost()).name(name).build();
     return RelyingParty.builder()
         .identity(identity)
         .credentialRepository(credentialRepository)

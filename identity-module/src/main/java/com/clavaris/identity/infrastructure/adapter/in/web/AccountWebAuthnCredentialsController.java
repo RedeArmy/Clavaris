@@ -111,7 +111,8 @@ public class AccountWebAuthnCredentialsController {
     final Account account = requireAccount(organizationId, accountId);
     final PublicKeyCredentialCreationOptions options =
         startRegistration.handle(
-            new StartWebAuthnRegistrationCommand(accountId, account.email().value()));
+            new StartWebAuthnRegistrationCommand(
+                accountId, new OrganizationId(organizationId), account.email().value()));
     request.getSession().setAttribute(WebAuthnRegistrationPendingState.ATTRIBUTE, options.toJson());
     return ResponseEntity.ok(options.toCredentialsCreateJson());
   }

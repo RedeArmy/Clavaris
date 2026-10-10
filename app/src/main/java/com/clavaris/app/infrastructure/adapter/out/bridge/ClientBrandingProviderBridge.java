@@ -6,6 +6,7 @@ import com.clavaris.clientregistry.domain.model.ClientBranding;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
+import com.clavaris.identity.application.usecase.resolveorganizationname.OrganizationNameProvider;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -20,18 +21,36 @@ class ClientBrandingProviderBridge implements ClientBrandingProvider {
 
   private final OAuthClientRepository oauthClients;
   private final GetClientBrandingUseCase getClientBranding;
+  private final OrganizationNameProvider organizationNames;
 
   /* package */ ClientBrandingProviderBridge(
-      final OAuthClientRepository oauthClients, final GetClientBrandingUseCase getClientBranding) {
+      final OAuthClientRepository oauthClients,
+      final GetClientBrandingUseCase getClientBranding,
+      final OrganizationNameProvider organizationNames) {
     this.oauthClients = oauthClients;
     this.getClientBranding = getClientBranding;
+    this.organizationNames = organizationNames;
+  }
+
+  // The application's own display name when it has one; otherwise its Organization's name. The
+  // pages these snapshots feed (sign-in, consent) are the consuming application's, so they always
+  // have a name of its own to show and never fall back to Clavaris.
+  @Override
+  public ClientBrandingSnapshot brandingFor(
+      final OrganizationId organizationId, final String clientId) {
+    final ClientBrandingSnapshot configured = configuredBranding(organizationId, clientId);
+    return configured.applicationDisplayName().isPresent()
+        ? configured
+        : new ClientBrandingSnapshot(
+            configured.logoUrl(),
+            configured.primaryColor(),
+            organizationNames.nameFor(organizationId));
   }
 
   // Two exits (no usable client context / a resolved snapshot) — same rationale
   // RedirectUrlResolverBridge's own identical suppression documents.
   @SuppressWarnings("PMD.OnlyOneReturn")
-  @Override
-  public ClientBrandingSnapshot brandingFor(
+  private ClientBrandingSnapshot configuredBranding(
       final OrganizationId organizationId, final String clientId) {
     if (clientId == null) {
       return ClientBrandingSnapshot.unconfigured();

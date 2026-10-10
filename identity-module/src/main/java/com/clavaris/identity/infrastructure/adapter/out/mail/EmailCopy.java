@@ -119,7 +119,10 @@ final class EmailCopy {
   /* default */ static final String FALLBACK =
       "If the button does not work, copy and paste this link into your browser:";
   /* default */ static final String FOOTER =
-      "Sent by Clavaris. This is an automated message, so replies are not monitored.";
+      "Sent by {0}. This is an automated message, so replies are not monitored.";
+  // When the email has no brand to name (an Organization whose name could not be found).
+  /* default */ static final String FOOTER_PLAIN =
+      "This is an automated message, so replies are not monitored.";
 
   private EmailCopy() {
     // Static helpers only.

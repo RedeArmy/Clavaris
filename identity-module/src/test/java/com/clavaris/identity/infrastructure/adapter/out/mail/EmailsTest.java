@@ -30,6 +30,9 @@ class EmailsTest {
 
   private static final String LINK = "https://id.example.com/o/42/verify-email?token=abc%2Bdef";
   private static final Instant AT = Instant.parse("2026-08-31T10:00:00Z");
+  // The name a tenant email is sent in (its Organization's) and the platform's own.
+  private static final String ORG = "Acme Analytics";
+  private static final String PLATFORM = Emails.PLATFORM_BRAND;
   private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\d+}");
 
   @AfterEach
@@ -37,20 +40,30 @@ class EmailsTest {
     LocaleContextHolder.resetLocaleContext();
   }
 
-  private static List<Emails.Composed> everyEmail() {
+  private static List<Emails.Composed> tenantEmails() {
     return List.of(
-        Emails.verifyEmailLink(LINK, false),
-        Emails.verifyEmailLink(LINK, true),
-        Emails.verifyEmailCode("482913"),
-        Emails.passwordReset(LINK, false),
-        Emails.passwordReset(LINK, true),
-        Emails.socialLinkConfirmation(LINK, SocialProvider.GOOGLE, false),
-        Emails.socialLinkConfirmation(LINK, SocialProvider.GITHUB, true),
-        Emails.signInCode("111222"),
-        Emails.signInLink(LINK),
-        Emails.deviceTrustCode("999888"),
-        Emails.newDeviceAlert("Mozilla/5.0 Test Browser", "203.0.113.5", AT, LINK, false),
-        Emails.newDeviceAlert("Mozilla/5.0 Test Browser", "203.0.113.5", AT, null, true));
+        Emails.verifyEmailLink(ORG, LINK, false),
+        Emails.verifyEmailCode(ORG, "482913"),
+        Emails.passwordReset(ORG, LINK, false),
+        Emails.socialLinkConfirmation(ORG, LINK, SocialProvider.GOOGLE, false),
+        Emails.signInCode(ORG, "111222"),
+        Emails.signInLink(ORG, LINK),
+        Emails.deviceTrustCode(ORG, "999888"),
+        Emails.newDeviceAlert(ORG, "Mozilla/5.0 Test Browser", "203.0.113.5", AT, LINK, false));
+  }
+
+  private static List<Emails.Composed> platformEmails() {
+    return List.of(
+        Emails.verifyEmailLink(PLATFORM, LINK, true),
+        Emails.passwordReset(PLATFORM, LINK, true),
+        Emails.socialLinkConfirmation(PLATFORM, LINK, SocialProvider.GITHUB, true),
+        Emails.newDeviceAlert(PLATFORM, "Mozilla/5.0 Test Browser", "203.0.113.5", AT, null, true));
+  }
+
+  private static List<Emails.Composed> everyEmail() {
+    final List<Emails.Composed> all = new java.util.ArrayList<>(tenantEmails());
+    all.addAll(platformEmails());
+    return all;
   }
 
   @Test
@@ -65,7 +78,6 @@ class EmailsTest {
                     .contains("name=\"color-scheme\"")
                     .contains("prefers-color-scheme:dark")
                     .contains("display:none;max-height:0")
-                    .contains("Clavaris")
                     .doesNotContain("<img")
                     .doesNotContain("<script"));
   }
@@ -76,16 +88,15 @@ class EmailsTest {
         .allSatisfy(
             email ->
                 assertThat(email.text())
-                    .startsWith("CLAVARIS")
                     .contains(email.subject())
                     .doesNotContain("<")
                     .doesNotContain("&#")
-                    .contains("Sent by Clavaris"));
+                    .contains("Sent by "));
   }
 
   @Test
   void aLinkEmailCarriesItsLinkAsAButtonAndAsPlainText() {
-    final Emails.Composed email = Emails.verifyEmailLink(LINK, false);
+    final Emails.Composed email = Emails.verifyEmailLink(ORG, LINK, false);
 
     assertThat(email.html())
         .contains("<a href=\"" + LINK + "\"")
@@ -96,7 +107,7 @@ class EmailsTest {
 
   @Test
   void aCodeEmailShowsTheCodeLargeAndInThePlainText() {
-    final Emails.Composed email = Emails.signInCode("111222");
+    final Emails.Composed email = Emails.signInCode(ORG, "111222");
 
     assertThat(email.html()).contains(">111222</div>").contains("letter-spacing:0.3em");
     assertThat(email.text()).contains("Your code: 111222");
@@ -106,9 +117,9 @@ class EmailsTest {
   @Test
   void theNewDeviceAlertShowsADangerActionOnlyWhenThereIsALinkToLockTheAccount() {
     final Emails.Composed withLink =
-        Emails.newDeviceAlert("Mozilla/5.0", "203.0.113.5", AT, LINK, false);
+        Emails.newDeviceAlert(ORG, "Mozilla/5.0", "203.0.113.5", AT, LINK, false);
     final Emails.Composed withoutLink =
-        Emails.newDeviceAlert("Mozilla/5.0", "203.0.113.5", AT, null, false);
+        Emails.newDeviceAlert(ORG, "Mozilla/5.0", "203.0.113.5", AT, null, false);
 
     assertThat(withLink.html()).contains("This wasn&#39;t me").contains("#dc2626");
     assertThat(withLink.text()).contains("This wasn't me: " + LINK);
@@ -118,7 +129,8 @@ class EmailsTest {
 
   @Test
   void theSignInTimeIsReadableNotARawTimestamp() {
-    final Emails.Composed email = Emails.newDeviceAlert("Mozilla/5.0", "1.2.3.4", AT, null, false);
+    final Emails.Composed email =
+        Emails.newDeviceAlert(ORG, "Mozilla/5.0", "1.2.3.4", AT, null, false);
 
     assertThat(email.html()).contains("August 31, 2026 at 10:00 UTC").doesNotContain("2026-08-31T");
     assertThat(email.text()).contains("Time: August 31, 2026 at 10:00 UTC");
@@ -126,7 +138,7 @@ class EmailsTest {
 
   @Test
   void aMissingDeviceOrAddressReadsAsADashRatherThanTheWordNull() {
-    final Emails.Composed email = Emails.newDeviceAlert(null, " ", AT, null, false);
+    final Emails.Composed email = Emails.newDeviceAlert(ORG, null, " ", AT, null, false);
 
     assertThat(email.text()).contains("Device: —").contains("IP address: —").doesNotContain("null");
   }
@@ -134,7 +146,7 @@ class EmailsTest {
   @Test
   void valuesTheServerDidNotWriteAreEscaped() {
     final Emails.Composed email =
-        Emails.newDeviceAlert("<script>alert(1)</script>", "1.2.3.4\"><b>", AT, null, false);
+        Emails.newDeviceAlert(ORG, "<script>alert(1)</script>", "1.2.3.4\"><b>", AT, null, false);
 
     assertThat(email.html())
         .doesNotContain("<script>")
@@ -144,16 +156,16 @@ class EmailsTest {
 
   @Test
   void aSocialProviderIsNamedByItsBrandNotItsConstant() {
-    assertThat(Emails.socialLinkConfirmation(LINK, SocialProvider.GOOGLE, false).subject())
+    assertThat(Emails.socialLinkConfirmation(ORG, LINK, SocialProvider.GOOGLE, false).subject())
         .isEqualTo("Confirm linking your Google account");
-    assertThat(Emails.socialLinkConfirmation(LINK, SocialProvider.GITHUB, true).subject())
+    assertThat(Emails.socialLinkConfirmation(PLATFORM, LINK, SocialProvider.GITHUB, true).subject())
         .isEqualTo("Confirm linking your GitHub account");
   }
 
   @Test
   void aPlatformEmailNamesTheClavarisAccountWhereATenantEmailSaysYourAccount() {
-    assertThat(Emails.passwordReset(LINK, true).text()).contains("your Clavaris account");
-    assertThat(Emails.passwordReset(LINK, false).text())
+    assertThat(Emails.passwordReset(PLATFORM, LINK, true).text()).contains("your Clavaris account");
+    assertThat(Emails.passwordReset(ORG, LINK, false).text())
         .contains("for your account.")
         .doesNotContain("your Clavaris account");
   }
@@ -175,7 +187,8 @@ class EmailsTest {
                   .doesNotContain("Sent by")
                   .doesNotContain("Your code")
                   .doesNotContain("IP address");
-              assertThat(email.text()).contains("Enviado por Clavaris");
+              // Tenant emails are sent in the Organization's name, platform ones in Clavaris's.
+              assertThat(email.text()).containsPattern("Enviado por (Acme Analytics|Clavaris)\\.");
             });
   }
 
@@ -183,11 +196,12 @@ class EmailsTest {
   void aSpanishEmailKeepsItsSubjectLinkAndCode() {
     LocaleContextHolder.setLocale(Locale.forLanguageTag("es-GT"));
 
-    assertThat(Emails.verifyEmailLink(LINK, false).subject())
+    assertThat(Emails.verifyEmailLink(ORG, LINK, false).subject())
         .isEqualTo("Verifica tu correo electrónico");
-    assertThat(Emails.verifyEmailLink(LINK, false).html()).contains("<a href=\"" + LINK + "\"");
-    assertThat(Emails.signInCode("111222").text()).contains("Tu código: 111222");
-    assertThat(Emails.socialLinkConfirmation(LINK, SocialProvider.GITHUB, false).subject())
+    assertThat(Emails.verifyEmailLink(ORG, LINK, false).html())
+        .contains("<a href=\"" + LINK + "\"");
+    assertThat(Emails.signInCode(ORG, "111222").text()).contains("Tu código: 111222");
+    assertThat(Emails.socialLinkConfirmation(ORG, LINK, SocialProvider.GITHUB, false).subject())
         .isEqualTo("Confirma la vinculación de tu cuenta de GitHub");
   }
 
@@ -195,7 +209,7 @@ class EmailsTest {
   void theSignInTimeFollowsTheLanguage() {
     LocaleContextHolder.setLocale(AppLocales.SPANISH);
 
-    assertThat(Emails.newDeviceAlert("Mozilla/5.0", "1.2.3.4", AT, null, false).text())
+    assertThat(Emails.newDeviceAlert(ORG, "Mozilla/5.0", "1.2.3.4", AT, null, false).text())
         .contains("Hora: 31 de agosto de 2026, 10:00 UTC");
   }
 
@@ -265,5 +279,67 @@ class EmailsTest {
     }
 
     assertThat(written).isEqualTo(AppLocales.SUPPORTED.size() * everyEmail().size());
+  }
+
+  // A tenant's people signed up with the consuming application, not with Clavaris: its emails are
+  // sent in the Organization's name, in the header, the footer and the plain text.
+  @Test
+  void aTenantEmailIsSentInTheOrganizationsNameAndNeverClavaris() {
+    assertThat(tenantEmails())
+        .allSatisfy(
+            email -> {
+              assertThat(email.html()).contains(ORG).contains("Sent by " + ORG);
+              assertThat(email.text()).startsWith("ACME ANALYTICS").contains("Sent by " + ORG);
+              assertThat(email.html().toLowerCase(java.util.Locale.ROOT))
+                  .doesNotContain("clavaris");
+              assertThat(email.text().toLowerCase(java.util.Locale.ROOT))
+                  .doesNotContain("clavaris");
+              assertThat(email.subject()).doesNotContain("Clavaris");
+            });
+  }
+
+  // Clavaris's own emails (to its platform accounts) stay as they are.
+  @Test
+  void aPlatformEmailIsStillSentInClavarisName() {
+    assertThat(platformEmails())
+        .allSatisfy(
+            email -> {
+              assertThat(email.html()).contains("Clavaris").contains("Sent by Clavaris");
+              assertThat(email.text()).startsWith("CLAVARIS").contains("Sent by Clavaris");
+            });
+  }
+
+  // An Organization whose name could not be found gets an email that names nobody, never Clavaris.
+  @Test
+  void aTenantEmailWithNoOrganizationNameNamesNobodyAndNeverFallsBackToClavaris() {
+    final Emails.Composed email = Emails.verifyEmailLink(null, LINK, false);
+
+    assertThat(email.html().toLowerCase(java.util.Locale.ROOT)).doesNotContain("clavaris");
+    assertThat(email.text().toLowerCase(java.util.Locale.ROOT)).doesNotContain("clavaris");
+    assertThat(email.html()).doesNotContain("Sent by").contains("This is an automated message");
+    assertThat(email.text()).doesNotContain("Sent by").contains("This is an automated message");
+    assertThat(email.text()).startsWith(email.subject());
+  }
+
+  @Test
+  void aBlankOrganizationNameCountsAsNone() {
+    assertThat(Emails.signInCode("   ", "111222").text()).doesNotContain("Sent by");
+  }
+
+  // The Organization's name is typed by whoever created it: it is escaped like any other value.
+  @Test
+  void anOrganizationNameIsEscapedInTheHtml() {
+    final Emails.Composed email = Emails.signInCode("<script>alert(1)</script>", "111222");
+
+    assertThat(email.html()).doesNotContain("<script>").contains("&lt;script&gt;");
+  }
+
+  @Test
+  void theBrandedFooterIsTranslatedKeepingTheName() {
+    LocaleContextHolder.setLocale(Locale.forLanguageTag("es"));
+
+    final Emails.Composed email = Emails.signInCode(ORG, "111222");
+
+    assertThat(email.text()).contains("Enviado por " + ORG + ".");
   }
 }

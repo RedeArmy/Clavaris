@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{fragments/consumer-head :: consumerHead(${branding.applicationDisplayName.isPresent() ? branding.applicationDisplayName.get() + ' — Authorize access' : 'Authorize access'})}">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Authorize access')}">
     <title>Authorize access</title>
 </head>
 <body>

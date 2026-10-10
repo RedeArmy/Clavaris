@@ -96,4 +96,29 @@ class ResendHttpClientTest {
     assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
     verify(httpClient, times(3)).send(any(), any());
   }
+
+  // The sender's display name comes from an Organization's name, which whoever created it typed.
+  @Test
+  void aDisplayNameIsReducedToPlainPrintableText() {
+    assertThat(ResendHttpClient.displayName("Acme Analytics")).isEqualTo("Acme Analytics");
+    assertThat(ResendHttpClient.displayName("  Acme \t  Analytics ")).isEqualTo("Acme Analytics");
+    assertThat(ResendHttpClient.displayName("Acme\" <a@b.c>\r\nBcc: x@y.z"))
+        .isEqualTo("Acme a@b.c Bcc: x@y.z");
+    assertThat(ResendHttpClient.displayName("back\\slash")).isEqualTo("back slash");
+    assertThat(ResendHttpClient.displayName("   ")).isEmpty();
+    assertThat(ResendHttpClient.displayName(null)).isEmpty();
+  }
+
+  @Test
+  void aVeryLongDisplayNameIsCut() {
+    assertThat(ResendHttpClient.displayName("A".repeat(200))).hasSize(64);
+  }
+
+  @Test
+  void theAddressIsTakenFromABareAddressOrANamedOne() {
+    assertThat(ResendHttpClient.addressOf("no-reply@clavaris.test"))
+        .isEqualTo("no-reply@clavaris.test");
+    assertThat(ResendHttpClient.addressOf("Clavaris <no-reply@clavaris.test>"))
+        .isEqualTo("no-reply@clavaris.test");
+  }
 }

@@ -102,6 +102,7 @@ import com.clavaris.identity.application.usecase.registeraccount.RegisterAccount
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationService;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationUseCase;
+import com.clavaris.identity.application.usecase.registerwebauthncredential.RelyingPartyFactory;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationService;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationUseCase;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
@@ -122,6 +123,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Reques
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
 import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
+import com.clavaris.identity.application.usecase.resolveorganizationname.OrganizationNameProvider;
 import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionService;
 import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionUseCase;
 import com.clavaris.identity.application.usecase.revokealloauthgrantsforaccount.RevokeAllOAuthGrantsForAccountService;
@@ -805,8 +807,8 @@ class IdentityUseCaseConfig {
   // TD-FUT-034, Clerk "View Profile" passkeys parity.
   @Bean
   /* package */ StartWebAuthnRegistrationUseCase startWebAuthnRegistrationUseCase(
-      final RelyingParty relyingParty) {
-    return new StartWebAuthnRegistrationService(relyingParty);
+      final RelyingPartyFactory relyingParties, final OrganizationNameProvider organizationNames) {
+    return new StartWebAuthnRegistrationService(relyingParties, organizationNames);
   }
 
   // TD-FUT-034, Clerk "View Profile" passkeys parity.

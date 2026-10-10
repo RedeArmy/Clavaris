@@ -1,0 +1,71 @@
+# Spanish text of the browser-tab title on every page the consuming application's people see:
+# "<brand> — <page>", where <brand> is the application's own name or, with none, its
+# Organization's (see ConsumerBrandNameInterceptor). {0} is the brand and is never translated.
+# The plain page title lives in messages_es.po; "Sign in" and "Authorize access" have their entry
+# in messages_es_login.po and messages_es_consent.po.
+
+msgid "{0} — Account linked"
+msgstr "{0} — Cuenta vinculada"
+
+msgid "{0} — Account locked"
+msgstr "{0} — Cuenta bloqueada"
+
+msgid "{0} — Check your email"
+msgstr "{0} — Revisa tu correo electrónico"
+
+msgid "{0} — Confirm sign-in"
+msgstr "{0} — Confirmar inicio de sesión"
+
+msgid "{0} — Create an account"
+msgstr "{0} — Crear una cuenta"
+
+msgid "{0} — Email verified"
+msgstr "{0} — Correo electrónico verificado"
+
+msgid "{0} — Enter your code"
+msgstr "{0} — Introduce tu código"
+
+msgid "{0} — Forgot password"
+msgstr "{0} — Contraseña olvidada"
+
+msgid "{0} — Invalid request"
+msgstr "{0} — Solicitud no válida"
+
+msgid "{0} — Link invalid"
+msgstr "{0} — Enlace no válido"
+
+msgid "{0} — Lock this account"
+msgstr "{0} — Bloquear esta cuenta"
+
+msgid "{0} — Password reset"
+msgstr "{0} — Contraseña restablecida"
+
+msgid "{0} — Registration pending approval"
+msgstr "{0} — Registro pendiente de aprobación"
+
+msgid "{0} — Reset password"
+msgstr "{0} — Restablecer contraseña"
+
+msgid "{0} — Set a new password"
+msgstr "{0} — Establece una contraseña nueva"
+
+msgid "{0} — Sign in with a code"
+msgstr "{0} — Iniciar sesión con un código"
+
+msgid "{0} — Sign in with a link"
+msgstr "{0} — Iniciar sesión con un enlace"
+
+msgid "{0} — Sign in with username"
+msgstr "{0} — Iniciar sesión con nombre de usuario"
+
+msgid "{0} — Update profile"
+msgstr "{0} — Actualizar perfil"
+
+msgid "{0} — Verify this device"
+msgstr "{0} — Verifica este dispositivo"
+
+msgid "{0} — Your passkeys"
+msgstr "{0} — Tus claves de acceso"
+
+msgid "{0} — Your sessions"
+msgstr "{0} — Tus sesiones"

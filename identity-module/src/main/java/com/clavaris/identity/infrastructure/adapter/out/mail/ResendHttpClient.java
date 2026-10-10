@@ -42,6 +42,10 @@ final class ResendHttpClient {
   @SuppressWarnings("PMD.LongVariable")
   private static final int FIRST_ERROR_STATUS = 300;
 
+  // A display name longer than this is cut: mail clients truncate it anyway, and an Organization's
+  // name has no length limit of its own that suits a header.
+  private static final int MAX_SENDER_NAME = 64;
+
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final String apiKey;
@@ -64,6 +68,44 @@ final class ResendHttpClient {
     this.circuitBreaker = circuitBreaker;
   }
 
+  /** Sends {@code email} from the configured sender, with no display name of its own. */
+  /* package */ void send(final String toAddress, final Emails.Composed email) {
+    send(toAddress, email, null);
+  }
+
+  // The From header: the configured address, with {@code senderName} as its display name when there
+  // is one (an Organization's own emails are sent in its name). The name is user-supplied, so it is
+  // reduced to plain printable text first: no quotes, angle brackets, backslashes or line breaks
+  // that could end the display name early or add a header.
+  private String sender(final String senderName) {
+    final String name = displayName(senderName);
+    return name.isEmpty() ? fromAddress : "\"" + name + "\" <" + addressOf(fromAddress) + ">";
+  }
+
+  /* package */ static String displayName(final String raw) {
+    final StringBuilder name = new StringBuilder();
+    for (final char character : raw == null ? new char[0] : raw.toCharArray()) {
+      final boolean unsafe =
+          Character.isISOControl(character)
+              || character == '"'
+              || character == '\\'
+              || character == '<'
+              || character == '>';
+      name.append(unsafe ? ' ' : character);
+    }
+    final String collapsed = name.toString().strip().replaceAll("\\s+", " ");
+    return collapsed.length() > MAX_SENDER_NAME
+        ? collapsed.substring(0, MAX_SENDER_NAME).strip()
+        : collapsed;
+  }
+
+  // "Name <a@b.c>" -> "a@b.c"; a bare address is returned as is.
+  /* package */ static String addressOf(final String from) {
+    final int open = from.lastIndexOf('<');
+    final int close = from.lastIndexOf('>');
+    return open >= 0 && close > open ? from.substring(open + 1, close).strip() : from.strip();
+  }
+
   // PMD.CyclomaticComplexity: the circuit breaker added one more genuinely distinct failure mode
   // (CallNotPermittedException) on top of the pre-existing IOException/InterruptedException split
   // — same "each real outcome needs its own branch" shape AuthenticateWithPasswordService's own
@@ -71,10 +113,11 @@ final class ResendHttpClient {
   // broad-Exception catch clause is defensive-only, matching Callable#call's own broad `throws
   // Exception` signature executeCallable propagates — see that catch block's own comment.
   @SuppressWarnings({"PMD.CyclomaticComplexity", "PMD.AvoidCatchingGenericException"})
-  /* package */ void send(final String toAddress, final Emails.Composed email) {
+  /* package */ void send(
+      final String toAddress, final Emails.Composed email, final String senderName) {
     final Map<String, Object> requestBody =
         Map.of(
-            "from", fromAddress,
+            "from", sender(senderName),
             "to", List.of(toAddress),
             "subject", email.subject(),
             "html", email.html(),

@@ -14,6 +14,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.Accoun
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicySnapshot;
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -251,6 +252,10 @@ public class LoginController {
     model.addAttribute("redirectUrl", redirectUrl);
     model.addAttribute("display", display);
     model.addAttribute("modal", "modal".equals(display));
-    model.addAttribute("branding", clientBrandingProvider.brandingFor(orgId, clientId));
+    final ClientBrandingSnapshot branding = clientBrandingProvider.brandingFor(orgId, clientId);
+    model.addAttribute("branding", branding);
+    // The name the browser tab carries ("<name> — Sign in"); see ConsumerBrandNameInterceptor.
+    model.addAttribute(
+        ConsumerBrandNameInterceptor.BRAND_NAME, branding.applicationDisplayName().orElse(null));
   }
 }

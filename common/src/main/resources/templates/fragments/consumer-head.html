@@ -3,8 +3,10 @@ The <head> of a page the consuming application's own people see (the tenant sign
 password-reset and account pages, the consent screen). Same as `fragments/head`, except that nothing
 in it names or shows Clavaris: those pages have to look like part of the application they belong to.
 
-  - The title is the page's own title ("Sign in"), never "... — Clavaris". A page that knows the
-    application's name (the sign-in, the consent screen) builds "<name> — <page>" itself.
+  - The title is "<brand> — <page>" ("Acme Analytics — Sign in") and never "... — Clavaris". The
+    brand is the model's `brandName`: the application's own display name when it has one and its
+    Organization's name otherwise (see ConsumerBrandNameInterceptor). With no brand name, which
+    only happens when even the Organization's name cannot be found, it is just the page's title.
   - It also loads consumer.css, rules that apply only to these pages, so nothing here changes how
     Clavaris's own pages look.
   - The tab icon is a blank, same-origin one rather than the Clavaris mark. The application's logo
@@ -18,7 +20,7 @@ up this one (caught by PlatformLoginControllerTest).
 <head th:fragment="consumerHead(pageTitle)">
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title th:text="${pageTitle}">Page</title>
+    <title th:text="${brandName != null ? brandName + ' — ' + pageTitle : pageTitle}">Page</title>
     <link rel="stylesheet" th:href="${#resourceUrl != null ? #resourceUrl.url('/css/clavaris.css') : '/css/clavaris.css'}"/>
     <link rel="stylesheet" th:href="${#resourceUrl != null ? #resourceUrl.url('/css/consumer.css') : '/css/consumer.css'}"/>
     <link rel="icon" type="image/svg+xml" th:href="${#resourceUrl != null ? #resourceUrl.url('/brand/neutral-icon.svg') : '/brand/neutral-icon.svg'}"/>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head th:replace="~{fragments/consumer-head :: consumerHead(${branding.applicationDisplayName.isPresent() ? branding.applicationDisplayName.get() + ' — Sign in' : 'Sign in'})}">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Sign in')}">
     <title>Sign in</title>
 </head>
 <!-- ADR-0009 §1: data-modal marks this render as happening inside a consumer's own iframe

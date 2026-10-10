@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveorganizationforclient.OrganizationForClientResolver;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletResponse;
@@ -100,8 +101,14 @@ public class ConsentController {
     model.addAttribute("state", state);
     model.addAttribute("authorizeUri", "/o/" + organizationId.get().value() + "/oauth2/authorize");
     model.addAttribute("scopes", requestedScopesExcludingOpenid(scope));
+    final ClientBrandingSnapshot branding =
+        clientBrandingProvider.brandingFor(organizationId.get(), clientId);
+    model.addAttribute("branding", branding);
+    // The name the browser tab carries ("<name> — Authorize access"). This page is not under
+    // /o/{organizationId}/, so ConsumerBrandNameInterceptor does not see it; it sets the name
+    // itself.
     model.addAttribute(
-        "branding", clientBrandingProvider.brandingFor(organizationId.get(), clientId));
+        ConsumerBrandNameInterceptor.BRAND_NAME, branding.applicationDisplayName().orElse(null));
     return CONSENT_VIEW;
   }
 
