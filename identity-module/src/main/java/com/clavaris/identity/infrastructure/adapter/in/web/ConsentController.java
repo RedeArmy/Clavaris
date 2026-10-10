@@ -109,6 +109,11 @@ public class ConsentController {
     // itself.
     model.addAttribute(
         ConsumerBrandNameInterceptor.BRAND_NAME, branding.applicationDisplayName().orElse(null));
+    if (branding.primaryColor().isPresent()) {
+      model.addAttribute(
+          ConsumerBrandNameInterceptor.THEME_URL,
+          ConsumerThemeController.urlFor(organizationId.get(), clientId));
+    }
     return CONSENT_VIEW;
   }
 
