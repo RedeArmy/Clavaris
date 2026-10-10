@@ -263,12 +263,13 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // own locked "no cross-origin browser caller" decision — confirmed with the product owner,
   // 2026-10-07): a consuming application iframes this same self-service page
   // (identity/account/profile.html) with ?display=modal&clientId=... on the src URL, exactly the
-  // login page's own query-param convention, reusing EmbeddingEligibilityChecker/
-  // ModalAwareSessionCookieSerializer verbatim (both already keyed by clientId/display=modal
-  // generically, neither needed a single change for this). If the browser has no live Clavaris
-  // session yet in that iframe's own browsing context, the user sees Clavaris's own login form
-  // inside the iframe first — the exact same first-load experience embedded login already has,
-  // not a regression this page introduces.
+  // login page's own query-param convention, reusing EmbeddingEligibilityChecker verbatim (no
+  // change needed here for this). Real single sign-on, not merely "the embedded login's own first
+  // session survives" (real bug found live, 2026-10-10, closed in
+  // AdaptiveSameSiteSessionCookieSerializer, not here): an Account that already has an ordinary,
+  // non-embedded, top-level session on a real HTTPS deployment is now recognized by this iframe
+  // directly, no second login inside it required — only a genuinely brand-new browser (no live
+  // Clavaris session at all yet) sees Clavaris's own login form inside the iframe first.
   //
   // script-src 'self' (this template's own i18n.js/organization-dialog.js, same two scripts
   // every dashboard-adjacent page already loads), connect-src 'none' (neither script makes a
