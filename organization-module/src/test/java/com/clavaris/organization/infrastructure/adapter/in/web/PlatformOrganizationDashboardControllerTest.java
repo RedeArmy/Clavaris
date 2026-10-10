@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -19,10 +20,14 @@ import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationResult;
 import com.clavaris.organization.application.usecase.createorganization.CreateOrganizationUseCase;
+import com.clavaris.organization.application.usecase.getorganizationprofiles.GetOrganizationProfilesUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedQuery;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedUseCase;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationProfile;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +51,7 @@ class PlatformOrganizationDashboardControllerTest {
 
   private CreateOrganizationUseCase createOrganization;
   private ListOrganizationsForPlatformAccountPagedUseCase listOrganizations;
+  private GetOrganizationProfilesUseCase getProfiles;
   private CurrentPlatformAccountResolver currentPlatformAccount;
   private MockMvc mockMvc;
 
@@ -53,6 +59,8 @@ class PlatformOrganizationDashboardControllerTest {
   void setUp() {
     createOrganization = mock(CreateOrganizationUseCase.class);
     listOrganizations = mock(ListOrganizationsForPlatformAccountPagedUseCase.class);
+    getProfiles = mock(GetOrganizationProfilesUseCase.class);
+    when(getProfiles.handle(any())).thenReturn(Map.of());
     currentPlatformAccount = mock(CurrentPlatformAccountResolver.class);
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(listOrganizations.handle(any())).thenReturn(emptyPage());
@@ -70,11 +78,14 @@ class PlatformOrganizationDashboardControllerTest {
 
     ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
     viewResolver.setTemplateEngine(templateEngine);
+    viewResolver.setCharacterEncoding("UTF-8");
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformOrganizationDashboardController(
-                    createOrganization, listOrganizations, currentPlatformAccount))
+                    createOrganization,
+                    new OrganizationDashboardModel(listOrganizations, getProfiles),
+                    currentPlatformAccount))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -218,5 +229,132 @@ class PlatformOrganizationDashboardControllerTest {
         .andExpect(view().name("organization/platform/dashboard :: content"));
 
     verify(createOrganization, never()).handle(any());
+  }
+
+  // --- the Organization card and its edit dialog ---------------------------------------------
+
+  private Organization showOneOrganization() {
+    Organization organization = Organization.register("Acme Co", OWNER_ID);
+    KeysetCursor cursor = cursorOf(organization);
+    when(listOrganizations.handle(any()))
+        .thenReturn(new KeysetPage<>(List.of(organization), cursor, cursor, false, false));
+    return organization;
+  }
+
+  private static String card(final String page) {
+    final int start = page.indexOf("<article class=\"clavaris-organization-card\"");
+    return page.substring(start, page.indexOf("</article>", start));
+  }
+
+  private String page() throws Exception {
+    return mockMvc
+        .perform(get("/platform/dashboard"))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  // The edit icon sits where the environment badge used to; the badge sits where "Created ..." used
+  // to, beside "Open"; and the creation date is gone.
+  @Test
+  void theCardHasTheEditIconInItsHeaderAndTheEnvironmentInItsFooterAndNoCreationDate()
+      throws Exception {
+    Organization organization = showOneOrganization();
+
+    final String card = card(page());
+
+    final int icon = card.indexOf("clavaris-icon-button");
+    final int name = card.indexOf("<h2");
+    final int badge = card.indexOf("clavaris-badge");
+    final int open = card.indexOf(">Open");
+    org.assertj.core.api.Assertions.assertThat(icon).isPositive().isLessThan(name);
+    org.assertj.core.api.Assertions.assertThat(badge).isGreaterThan(name).isLessThan(open);
+    org.assertj.core.api.Assertions.assertThat(card)
+        .contains("aria-label=\"Edit organization\"")
+        .contains("data-dialog-open=\"edit-organization-" + organization.id() + "\"")
+        .contains("DEVELOPMENT")
+        .doesNotContain("Created")
+        .doesNotContain("<time");
+  }
+
+  // With no description there is no text at all: never the old default sentence.
+  @Test
+  void anOrganizationWithNoDescriptionShowsNoDescriptionText() throws Exception {
+    showOneOrganization();
+
+    mockMvc
+        .perform(get("/platform/dashboard"))
+        .andExpect(content().string(not(containsString("Isolated tenant with its own accounts"))));
+    org.assertj.core.api.Assertions.assertThat(card(page())).doesNotContain("<p>");
+  }
+
+  @Test
+  void theDescriptionIsShownInPlaceOfTheDefaultTextAndEscaped() throws Exception {
+    Organization organization = showOneOrganization();
+    when(getProfiles.handle(any()))
+        .thenReturn(
+            Map.of(
+                organization.id(),
+                OrganizationProfile.empty(organization.id())
+                    .withDetails("Hiring <b>tools</b> for recruiters", null, null)));
+
+    final String card = card(page());
+
+    org.assertj.core.api.Assertions.assertThat(card)
+        .contains("Hiring &lt;b&gt;tools&lt;/b&gt; for recruiters")
+        .doesNotContain("<b>tools</b>")
+        .doesNotContain("Isolated tenant");
+  }
+
+  @Test
+  void theEditDialogIsFilledFromTheOrganizationAndItsProfile() throws Exception {
+    Organization organization = showOneOrganization();
+    Instant logoAt = Instant.parse("2026-10-10T12:00:00Z");
+    when(getProfiles.handle(any()))
+        .thenReturn(
+            Map.of(
+                organization.id(),
+                OrganizationProfile.empty(organization.id())
+                    .withDetails("A description", "Acme Jobs", "#2563EB")
+                    .withLogoUpdatedAt(logoAt)));
+
+    final String page = page();
+
+    org.assertj.core.api.Assertions.assertThat(page)
+        .contains("id=\"edit-organization-" + organization.id() + "\"")
+        .contains("action=\"/platform/dashboard/organizations/" + organization.id() + "/profile\"")
+        .contains("enctype=\"multipart/form-data\"")
+        .contains("value=\"Acme Co\"")
+        .contains("value=\"Acme Jobs\"")
+        .contains("value=\"#2563eb\"")
+        .contains(">A description</textarea>")
+        .contains("/o/" + organization.id() + "/branding/logo?v=" + logoAt.toEpochMilli())
+        .contains("name=\"removeLogo\"");
+  }
+
+  @Test
+  void anOrganizationWithNoLogoShowsAPlaceholderAndNoRemoveSwitch() throws Exception {
+    showOneOrganization();
+
+    final String page = page();
+
+    org.assertj.core.api.Assertions.assertThat(page)
+        .contains("data-logo-placeholder")
+        .doesNotContain("data-logo-remove")
+        .doesNotContain("/branding/logo");
+  }
+
+  // The page's own cursors ride in each dialog so a save returns to the page the person was on.
+  @Test
+  void theEditDialogCarriesThePagesCursors() throws Exception {
+    showOneOrganization();
+    KeysetCursor cursor = new KeysetCursor(Instant.now(), UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/platform/dashboard").param("after", cursor.encode()))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(containsString("name=\"after\" value=\"" + cursor.encode() + "\"")));
   }
 }

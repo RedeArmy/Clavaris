@@ -222,6 +222,62 @@ class ConsumerBrandNameInterceptorTest {
     assertThat(request.getAttribute(ConsumerBrandNameInterceptor.LOGO_ORIGIN)).isNull();
   }
 
+  private static ClientBrandingSnapshot coloured(final String colour) {
+    return new ClientBrandingSnapshot(
+        Optional.empty(), Optional.of(colour), Optional.of("Acme Analytics"));
+  }
+
+  // The colour cannot be inlined (style-src 'self'), so the page is pointed at a stylesheet.
+  @Test
+  void aPageWithABrandColourIsPointedAtTheThemeStylesheet() {
+    inOrganization();
+    request.setParameter("clientId", "acme-web");
+    final ModelAndView page = new ModelAndView("identity/login");
+    page.addObject("brandName", "Acme Analytics");
+    page.addObject("branding", coloured("#2563eb"));
+
+    run(page);
+
+    assertThat(page.getModel())
+        .containsEntry(
+            "brandThemeUrl", "/o/" + ORGANIZATION + "/branding/theme.css?clientId=acme-web");
+  }
+
+  @Test
+  void aPageWithoutAClientGetsTheOrganizationWideThemeUrl() {
+    inOrganization();
+    when(branding.brandingFor(new OrganizationId(ORGANIZATION), null))
+        .thenReturn(coloured("#2563eb"));
+
+    final ModelAndView view = run(new ModelAndView("identity/forgot-password"));
+
+    assertThat(view.getModel())
+        .containsEntry("brandThemeUrl", "/o/" + ORGANIZATION + "/branding/theme.css");
+  }
+
+  @Test
+  void aPageWithNoBrandColourGetsNoThemeUrl() {
+    inOrganization();
+    final ModelAndView page = new ModelAndView("identity/login");
+    page.addObject("brandName", "Acme");
+    page.addObject("branding", named("Acme"));
+
+    run(page);
+
+    assertThat(page.getModel()).doesNotContainKey("brandThemeUrl");
+  }
+
+  @Test
+  void aPlatformViewGetsNoThemeUrl() {
+    inOrganization();
+    final ModelAndView page = new ModelAndView("identity/platform/login");
+    page.addObject("branding", coloured("#2563eb"));
+
+    run(page);
+
+    assertThat(page.getModel()).doesNotContainKey("brandThemeUrl");
+  }
+
   @Test
   void aRequestWithNoViewIsLeftAlone() {
     inOrganization();

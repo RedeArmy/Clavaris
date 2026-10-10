@@ -24,6 +24,6 @@ up this one (caught by PlatformLoginControllerTest).
     <link rel="stylesheet" th:href="${#resourceUrl != null ? #resourceUrl.url('/css/clavaris.css') : '/css/clavaris.css'}"/>
     <link rel="stylesheet" th:href="${#resourceUrl != null ? #resourceUrl.url('/css/consumer.css') : '/css/consumer.css'}"/>
     <link rel="icon" type="image/svg+xml" th:href="${#resourceUrl != null ? #resourceUrl.url('/brand/neutral-icon.svg') : '/brand/neutral-icon.svg'}"/>
-    <style th:if="${branding != null and branding.primaryColor != null and branding.primaryColor.isPresent()}"
-           th:text="':root { --clavaris-brand-color: ' + ${branding.primaryColor.get()} + '; }'">/* th:text overwrites this at render time — see ADR-0009 §3 */</style>
+    <!-- The brand colour, as a same-origin stylesheet: an inline <style> is refused by style-src 'self'. -->
+    <link rel="stylesheet" th:if="${brandThemeUrl != null}" th:href="${brandThemeUrl}"/>
 </head>

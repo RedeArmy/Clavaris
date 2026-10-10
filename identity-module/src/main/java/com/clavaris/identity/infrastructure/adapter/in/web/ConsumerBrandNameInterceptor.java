@@ -33,6 +33,12 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
   public static final String BRAND_NAME = "brandName";
 
   /**
+   * The model attribute holding the URL of the stylesheet that applies the brand colour, present
+   * only when there is one. Read by {@code fragments/consumer-head}.
+   */
+  public static final String THEME_URL = "brandThemeUrl";
+
+  /**
    * The request attribute naming the one origin (an {@code https://host[:port]}) the response may
    * load images from, so the application's logo can be drawn. Read by the content security policy
    * writer, which validates it before use.
@@ -58,16 +64,51 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
       final ModelAndView modelAndView) {
     if (isConsumerView(modelAndView)) {
       allowBrandingLogo(request, modelAndView);
-      if (!modelAndView.getModel().containsKey(BRAND_NAME)) {
-        organizationOf(request)
-            .flatMap(
-                organization ->
-                    brandingProvider
-                        .brandingFor(organization, request.getParameter(CLIENT_PARAM))
-                        .applicationDisplayName())
-            .ifPresent(name -> modelAndView.addObject(BRAND_NAME, name));
-      }
+      organizationOf(request)
+          .ifPresent(organization -> applyBranding(request, modelAndView, organization));
     }
+  }
+
+  // The name for the tab title and, when the application has a brand colour, the stylesheet that
+  // applies it. A page that already carries its branding (sign-in) is not looked up again, and one
+  // that already set its own name keeps it.
+  private void applyBranding(
+      final HttpServletRequest request,
+      final ModelAndView modelAndView,
+      final OrganizationId organization) {
+    final String clientId = request.getParameter(CLIENT_PARAM);
+    final boolean needsName = !modelAndView.getModel().containsKey(BRAND_NAME);
+    brandingOf(modelAndView, needsName, organization, clientId)
+        .ifPresent(
+            branding -> {
+              if (needsName) {
+                branding
+                    .applicationDisplayName()
+                    .ifPresent(name -> modelAndView.addObject(BRAND_NAME, name));
+              }
+              branding
+                  .primaryColor()
+                  .ifPresent(
+                      _ ->
+                          modelAndView.addObject(
+                              THEME_URL, ConsumerThemeController.urlFor(organization, clientId)));
+            });
+  }
+
+  // The branding the page was given, else (only when it still needs a name) the one looked up.
+  // PMD.OnlyOneReturn: the three exits are three different answers, not one value built up.
+  @SuppressWarnings("PMD.OnlyOneReturn")
+  private Optional<ClientBrandingSnapshot> brandingOf(
+      final ModelAndView modelAndView,
+      final boolean needsName,
+      final OrganizationId organization,
+      final String clientId) {
+    if (modelAndView.getModel().get("branding") instanceof ClientBrandingSnapshot known) {
+      return Optional.of(known);
+    }
+    return needsName
+        ? Optional.of(brandingProvider.brandingFor(organization, clientId))
+        : Optional.empty();
   }
 
   // The application's logo is an https URL on some other origin, and the page's content security
