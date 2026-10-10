@@ -47,13 +47,35 @@ import org.springframework.web.multipart.MultipartFile;
 // exception/command/use-case imports on top of what this controller already had — same
 // "real use cases, not a God-class symptom" reasoning PlatformAccountProfileAdminController's
 // own, slightly larger, identical surface already establishes.
-@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ExcessiveImports"})
+// PMD.TooManyMethods: real use-case handlers plus the small redirectToProfile/
+// redirectWithEmbedParams/appendEmbedParamsIfPresent trio the 2026-10-10 bug fix added (see this
+// class's own DISPLAY_PARAM field comment) — one shared helper for a real, repeated need across
+// five distinct redirects, not organic sprawl.
+@SuppressWarnings({
+  "PMD.AvoidFieldNameMatchingMethodName",
+  "PMD.ExcessiveImports",
+  "PMD.TooManyMethods"
+})
 @Controller
 @RequestMapping("/o/{organizationId}/account/profile")
 public class AccountProfileController {
 
   private static final String PROFILE_VIEW = "identity/account/profile";
   private static final String REDIRECT_PREFIX = "redirect:/o/";
+
+  // Real bug found live, 2026-10-10: every one of this controller's own post-mutation redirects
+  // used to drop these two — the ADR-0009 §1/§4 embedded-iframe query-param convention
+  // ContentSecurityPolicyHeaderWriter's own frame-ancestors relaxation reads on every GET to this
+  // same page — so the very next request after a successful Save/upload/remove/delete landed back
+  // on this page with the default, un-relaxed frame-ancestors 'none', and the browser refused to
+  // keep displaying it inside the iframe the request originally came from (live-observed as a
+  // blocked-frame error page immediately after clicking "Guardar"). Same param names
+  // ContentSecurityPolicyHeaderWriter's own CLIENT_ID_PARAM/DISPLAY_PARAM/DISPLAY_MODAL already use
+  // — not shared across the module boundary (app/identity-module), so duplicated here rather than
+  // introducing a dependency neither module needs for anything else.
+  private static final String DISPLAY_PARAM = "display";
+  private static final String DISPLAY_MODAL = "modal";
+  private static final String CLIENT_ID_PARAM = "clientId";
 
   private final GetAccountForOrganizationUseCase getAccount;
   private final UpdateAccountProfileUseCase updateProfile;
@@ -118,12 +140,10 @@ public class AccountProfileController {
               PhoneNumberInput.combine(phoneCountryCode, phoneNumberLocal),
               AuditActor.account(accountId.value())));
     } catch (final UsernameAlreadyRegisteredException _) {
-      return REDIRECT_PREFIX
-          + organizationId
-          + "/account/profile?usernameError="
-          + encode("This username is already taken");
+      return redirectToProfile(
+          request, organizationId, "usernameError=" + encode("This username is already taken"));
     }
-    return REDIRECT_PREFIX + organizationId + "/account/profile?profileUpdated";
+    return redirectToProfile(request, organizationId, "profileUpdated");
   }
 
   private static String blankToNull(final String value) {
@@ -132,6 +152,35 @@ public class AccountProfileController {
 
   private static String encode(final String value) {
     return URLEncoder.encode(value, StandardCharsets.UTF_8);
+  }
+
+  // See this class's own DISPLAY_PARAM field comment for the real bug this closes — every
+  // redirect this controller issues must preserve the embedded-iframe query-param convention the
+  // request that triggered it already carried, or the very next load of the target page breaks
+  // out of its own iframe.
+  private static String redirectToProfile(
+      final HttpServletRequest request, final UUID organizationId, final String statusQueryParam) {
+    return redirectWithEmbedParams(request, "/account/profile?" + statusQueryParam, organizationId);
+  }
+
+  private static String redirectWithEmbedParams(
+      final HttpServletRequest request, final String pathAndQuery, final UUID organizationId) {
+    final StringBuilder url =
+        new StringBuilder(REDIRECT_PREFIX).append(organizationId).append(pathAndQuery);
+    appendEmbedParamsIfPresent(request, url);
+    return url.toString();
+  }
+
+  private static void appendEmbedParamsIfPresent(
+      final HttpServletRequest request, final StringBuilder url) {
+    if (!DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
+      return;
+    }
+    url.append('&').append(DISPLAY_PARAM).append('=').append(DISPLAY_MODAL);
+    final String clientId = request.getParameter(CLIENT_ID_PARAM);
+    if (clientId != null) {
+      url.append('&').append(CLIENT_ID_PARAM).append('=').append(encode(clientId));
+    }
   }
 
   // PMD.OnlyOneReturn: two real, distinct outcomes — a validation error re-renders the form,
@@ -154,14 +203,14 @@ public class AccountProfileController {
       model.addAttribute("uploadError", e.getMessage());
       return PROFILE_VIEW;
     }
-    return REDIRECT_PREFIX + organizationId + "/account/profile?updated";
+    return redirectToProfile(request, organizationId, "updated");
   }
 
   @PostMapping("/picture/remove")
   public String removePicture(
       @PathVariable final UUID organizationId, final HttpServletRequest request) {
     removePicture.handle(new RemoveAccountProfilePictureCommand(requireCurrentAccount(request)));
-    return REDIRECT_PREFIX + organizationId + "/account/profile?removed";
+    return redirectToProfile(request, organizationId, "removed");
   }
 
   // PMD.OnlyOneReturn: two real, distinct outcomes — not allowed re-renders with an error, success
@@ -189,7 +238,7 @@ public class AccountProfileController {
     if (session != null) {
       session.invalidate();
     }
-    return REDIRECT_PREFIX + organizationId + "/login?accountDeleted";
+    return redirectWithEmbedParams(request, "/login?accountDeleted", organizationId);
   }
 
   private void populateModel(

@@ -231,4 +231,108 @@ class AccountProfileControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("identity/account/profile"));
   }
+
+  // Real bug found live, 2026-10-10: ADR-0009's embedded <UserProfile/> iframe broke itself out
+  // of its own frame on the very next load after any mutation, because these redirects used to
+  // drop display=modal&clientId — the one thing ContentSecurityPolicyHeaderWriter's own
+  // frame-ancestors relaxation for this exact page reads on every GET.
+  @Test
+  void postProfilePreservesDisplayModalAndClientIdOnTheSuccessRedirect() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile", ORGANIZATION_ID)
+                .param("firstName", "Ada")
+                .param("display", "modal")
+                .param("clientId", "jobseeker-web"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/account/profile?profileUpdated&display=modal&clientId=jobseeker-web"));
+  }
+
+  @Test
+  void postProfilePreservesDisplayModalAndClientIdOnTheUsernameConflictRedirect() throws Exception {
+    doThrow(new UsernameAlreadyRegisteredException(account.organizationId()))
+        .when(updateProfile)
+        .handle(any());
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile", ORGANIZATION_ID)
+                .param("username", "ada")
+                .param("display", "modal")
+                .param("clientId", "jobseeker-web"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/account/profile?usernameError=This+username+is+already+taken"
+                    + "&display=modal&clientId=jobseeker-web"));
+  }
+
+  @Test
+  void postPicturePreservesDisplayModalAndClientIdOnRedirect() throws Exception {
+    MockMultipartFile file =
+        new MockMultipartFile("file", "avatar.png", "image/png", new byte[] {1, 2, 3});
+
+    mockMvc
+        .perform(
+            multipart("/o/{organizationId}/account/profile/picture", ORGANIZATION_ID)
+                .file(file)
+                .param("display", "modal")
+                .param("clientId", "jobseeker-web"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/account/profile?updated&display=modal&clientId=jobseeker-web"));
+  }
+
+  @Test
+  void postRemovePreservesDisplayModalAndClientIdOnRedirect() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile/picture/remove", ORGANIZATION_ID)
+                .param("display", "modal")
+                .param("clientId", "jobseeker-web"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/account/profile?removed&display=modal&clientId=jobseeker-web"));
+  }
+
+  @Test
+  void postDeletePreservesDisplayModalAndClientIdOnTheLoginRedirect() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile/delete", ORGANIZATION_ID)
+                .param("display", "modal")
+                .param("clientId", "jobseeker-web"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            redirectedUrl(
+                "/o/"
+                    + ORGANIZATION_ID
+                    + "/login?accountDeleted&display=modal&clientId=jobseeker-web"));
+  }
+
+  // The ordinary, non-embedded case must stay exactly as before — no trailing "&display=..." at
+  // all when the request genuinely isn't part of a modal flow.
+  @Test
+  void neverAppendsEmbedParamsWhenDisplayIsNotExactlyModal() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/account/profile", ORGANIZATION_ID)
+                .param("firstName", "Ada")
+                .param("display", "not-modal")
+                .param("clientId", "jobseeker-web"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/account/profile?profileUpdated"));
+  }
 }
