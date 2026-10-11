@@ -170,7 +170,7 @@ class PlatformSocialConnectionsControllerTest {
         mockMvc
             .perform(get(base() + "/google"))
             .andExpect(status().isOk())
-            .andExpect(view().name("organization/platform/organization-connection-detail"))
+            .andExpect(view().name("organization/platform/organization-connections"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -335,7 +335,7 @@ class PlatformSocialConnectionsControllerTest {
         mockMvc
             .perform(post(base() + "/google").param("enabled", "true"))
             .andExpect(status().isOk())
-            .andExpect(view().name("organization/platform/organization-connection-detail"))
+            .andExpect(view().name("organization/platform/organization-connections"))
             .andReturn()
             .getResponse()
             .getContentAsString();

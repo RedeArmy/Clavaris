@@ -49,8 +49,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/connections")
 public class PlatformSocialConnectionsController {
 
-  private static final String LIST_VIEW = "organization/platform/organization-connections";
-  private static final String DETAIL_VIEW = "organization/platform/organization-connection-detail";
+  // One template, two views: the list when the model has no connection, a provider's page when it
+  // has.
+  private static final String VIEW = "organization/platform/organization-connections";
   private static final String CLIENT_ID_FIELD = "clientId";
   private static final String CLIENT_SECRET_FIELD = "clientSecret";
   private static final String FORM_ATTRIBUTE = "connectionForm";
@@ -81,7 +82,7 @@ public class PlatformSocialConnectionsController {
       final Model model) {
     final Organization organization = requireOwnedOrganization(request, organizationId);
     populateCommon(model, organization, getConnections.handle(organizationId));
-    return LIST_VIEW;
+    return VIEW;
   }
 
   @GetMapping("/{provider}")
@@ -95,7 +96,7 @@ public class PlatformSocialConnectionsController {
     final SocialConnection connection =
         connectionOf(organizationId, socialProvider, model, organization);
     model.addAttribute(FORM_ATTRIBUTE, formFrom(connection));
-    return DETAIL_VIEW;
+    return VIEW;
   }
 
   @PostMapping("/{provider}")
@@ -137,7 +138,7 @@ public class PlatformSocialConnectionsController {
     // The page again, with what was typed. The secret is cleared: it is never sent back to a page.
     form.setClientSecret(null);
     connectionOf(organizationId, socialProvider, model, organization);
-    return DETAIL_VIEW;
+    return VIEW;
   }
 
   @PostMapping("/{provider}/credentials/remove")
