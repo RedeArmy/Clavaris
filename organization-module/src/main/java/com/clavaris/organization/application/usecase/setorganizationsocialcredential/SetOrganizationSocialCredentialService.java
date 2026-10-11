@@ -9,13 +9,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Orchestration for {@link SetOrganizationSocialCredentialUseCase} — ADR-0022's own core write
- * path. Two guards, both enforced here (not in the domain model, which has no cross-aggregate
- * visibility into {@code Organization} itself — same division of responsibility {@code
+ * path. One guard, enforced here (not in the domain model, which has no cross-aggregate visibility
+ * into {@code Organization} itself — same division of responsibility {@code
  * CreateProductionEnvironmentService}'s own Javadoc already draws): the target Organization must be
- * {@code PRODUCTION} ({@link OrganizationNotProductionException}), and social login must already be
- * enabled for this exact provider via ADR-0020 Decision 3's own policy ({@link
- * SocialLoginNotEnabledForProviderException}) — bringing your own credentials is additive to that
- * gate, never a way around it.
+ * {@code PRODUCTION} ({@link OrganizationNotProductionException}).
+ *
+ * <p>The provider does not have to be enabled yet. A PRODUCTION Organization signs in only through
+ * its own credentials (ADR-0022, as amended), so it cannot enable a provider before it has them:
+ * they have to be settable first. Enabling still goes through the social-login policy, which is
+ * what refuses a PRODUCTION provider with no credentials.
  */
 public class SetOrganizationSocialCredentialService
     implements SetOrganizationSocialCredentialUseCase {
@@ -47,11 +49,6 @@ public class SetOrganizationSocialCredentialService
 
     if (organization.environment() != OrganizationEnvironment.PRODUCTION) {
       throw new OrganizationNotProductionException(command.organizationId());
-    }
-    if (!organization.socialLoginEnabled()
-        || !organization.allowedSocialProviders().contains(command.provider().name())) {
-      throw new SocialLoginNotEnabledForProviderException(
-          command.organizationId(), command.provider());
     }
 
     final String encryptedSecret = cipher.encrypt(command.rawClientSecret());

@@ -4456,3 +4456,66 @@ body:has(.htmx-request)::after {
 .clavaris-logo-field__preview--removing {
   opacity: 0.35;
 }
+
+/* Connections (Configure): a provider's mark and name on the list, and the header of its own page. */
+.clavaris-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+}
+
+.clavaris-connection__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--clavaris-surface);
+  border: 1px solid var(--clavaris-border);
+  border-radius: var(--radius-md);
+}
+
+.clavaris-connection__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.clavaris-connection__icon--large {
+  width: 56px;
+  height: 56px;
+}
+
+.clavaris-connection__icon--large svg {
+  width: 28px;
+  height: 28px;
+}
+
+.clavaris-connection__name {
+  display: flex;
+  flex-direction: column;
+}
+
+.clavaris-connection__name small {
+  color: var(--clavaris-text-muted);
+}
+
+.clavaris-connection-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.clavaris-connection-header h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* A status message that is an <output> (so it is announced politely) still reads as a block alert. */
+output.clavaris-alert {
+  display: block;
+}

@@ -8,8 +8,24 @@ package com.clavaris.organization.domain.model;
  * documents for {@code allowedSocialProviders}, and {@code OrganizationEnvironmentChecker}'s own
  * "two small parallel enums bridged in app" precedent already established for a nearly identical
  * situation).
+ *
+ * <p>{@link #displayName} is how the provider writes its own name ("GitHub", not "Github"), for the
+ * dashboard's Connections page.
  */
+// PMD.AvoidFieldNameMatchingMethodName: the accessor is named like the field, the record-style
+// convention every domain type here uses.
+@SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 public enum SocialProvider {
-  GOOGLE,
-  GITHUB
+  GOOGLE("Google"),
+  GITHUB("GitHub");
+
+  private final String displayName;
+
+  SocialProvider(final String displayName) {
+    this.displayName = displayName;
+  }
+
+  public String displayName() {
+    return displayName;
+  }
 }

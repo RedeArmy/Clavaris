@@ -6,6 +6,7 @@ import com.clavaris.identity.application.usecase.authenticateplatformaccountwith
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderCommand;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderResult;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.EmailSubaddressNotAllowedException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialLoginNotAllowedException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.UnverifiedProviderEmailException;
 import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
@@ -244,7 +245,9 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
                   socialProfile.lastName(),
                   socialProfile.username(),
                   socialProfile.pictureUrl()));
-    } catch (final SocialLoginNotAllowedException | UnverifiedProviderEmailException _) {
+    } catch (final SocialLoginNotAllowedException
+        | UnverifiedProviderEmailException
+        | EmailSubaddressNotAllowedException _) {
       // ADR-0020 Decision 3/BR-ID-12: re-verified by the use case itself — a narrow TOCTOU window
       // between SocialLoginRedirectController's own pre-check and this point (an operator disabling
       // the provider mid-flow) lands here, same fail-closed outcome either way.

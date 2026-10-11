@@ -2,7 +2,10 @@ package com.clavaris.organization.application.usecase.setsocialloginpolicyfororg
 
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialRepository;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationEnvironment;
+import com.clavaris.organization.domain.model.SocialProvider;
 import java.util.List;
 import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +27,15 @@ public class SetSocialLoginPolicyForOrganizationService
   private static final Set<String> KNOWN_PROVIDERS = Set.of("GOOGLE", "GITHUB");
 
   private final OrganizationRepository organizations;
+  private final OrganizationSocialCredentialRepository credentials;
   private final AuditEventRecorder auditEvents;
 
   public SetSocialLoginPolicyForOrganizationService(
-      final OrganizationRepository organizations, final AuditEventRecorder auditEvents) {
+      final OrganizationRepository organizations,
+      final OrganizationSocialCredentialRepository credentials,
+      final AuditEventRecorder auditEvents) {
     this.organizations = organizations;
+    this.credentials = credentials;
     this.auditEvents = auditEvents;
   }
 
@@ -53,6 +60,7 @@ public class SetSocialLoginPolicyForOrganizationService
             .findById(command.organizationId())
             .orElseThrow(() -> new OrganizationNotFoundException(command.organizationId()));
 
+    requireOwnCredentialsInProduction(command, organization);
     final Organization updated =
         organization.withSocialLoginPolicy(command.enabled(), List.copyOf(command.providers()));
     organizations.save(updated);
@@ -65,5 +73,21 @@ public class SetSocialLoginPolicyForOrganizationService
         "enabled=" + command.enabled() + " providers=" + command.providers());
 
     return new SetSocialLoginPolicyForOrganizationResult(updated);
+  }
+
+  // ADR-0022, as amended: a PRODUCTION Organization signs in only through its own OAuth app, so it
+  // cannot switch on a provider it has no credentials for. A DEVELOPMENT one uses the shared app.
+  private void requireOwnCredentialsInProduction(
+      final SetSocialLoginPolicyForOrganizationCommand command, final Organization organization) {
+    if (command.enabled() && organization.environment() == OrganizationEnvironment.PRODUCTION) {
+      for (final String provider : command.providers()) {
+        if (credentials
+            .findByOrganizationIdAndProvider(
+                command.organizationId(), SocialProvider.valueOf(provider))
+            .isEmpty()) {
+          throw new SocialCredentialsRequiredException(command.organizationId(), provider);
+        }
+      }
+    }
   }
 }

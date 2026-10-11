@@ -94,6 +94,19 @@ class AuditDetailFormatterTest {
     assertEquals("Some new field", format("someNewField=x").get(0).label());
   }
 
+  // The Spanish catalogue is keyed by these exact words (messages_es_organization_connections.po),
+  // so a saved connection's detail must keep spelling them this way.
+  @Test
+  void aSavedConnectionsOptionsAreSpelledTheWayTheCatalogueTranslatesThem() {
+    final List<DetailItem> items =
+        format("provider=GOOGLE blockEmailSubaddresses=true alwaysShowAccountSelector=false");
+
+    assertEquals("Block email subaddresses", items.get(1).label());
+    assertEquals("Yes", items.get(1).shown());
+    assertEquals("Always show account selector", items.get(2).label());
+    assertEquals("No", items.get(2).shown());
+  }
+
   @Test
   void nothingComesOutOfNullBlankOrNullValuedDetails() {
     assertTrue(format(null).isEmpty());

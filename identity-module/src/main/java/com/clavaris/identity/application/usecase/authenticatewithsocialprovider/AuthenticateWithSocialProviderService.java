@@ -156,6 +156,8 @@ public class AuthenticateWithSocialProviderService
       throw new SocialLoginNotAllowedException(command.organizationId(), command.provider());
     }
 
+    requireSubaddressAllowed(command);
+
     // CLAUDE.md §5: scoped by organizationId — a returning login must never resolve an identity
     // that belongs to a different Organization's Account pool (code review finding).
     final Optional<SocialIdentity> existingIdentity =
@@ -207,6 +209,28 @@ public class AuthenticateWithSocialProviderService
       return linkBrandNewAccount(command);
     }
     return raisePendingLinkForExistingAccount(command, existingAccount.get());
+  }
+
+  // An Organization may refuse subaddresses (name+tag@...): one can otherwise get around a
+  // provider's own organisation controls. Applies to returning identities too, so turning it on
+  // also stops accounts that already signed in with one.
+  private void requireSubaddressAllowed(final AuthenticateWithSocialProviderCommand command) {
+    if (policyProvider.blocksEmailSubaddresses(command.organizationId(), command.provider())
+        && hasSubaddress(command.email().value())) {
+      LOG.info(
+          "event=social_login_failure organizationId={} provider={} reason=email_subaddress",
+          command.organizationId(),
+          command.provider());
+      recordFailure("email_subaddress");
+      throw new EmailSubaddressNotAllowedException();
+    }
+  }
+
+  private static boolean hasSubaddress(final String email) {
+    final String localPart = email.substring(0, Math.max(email.indexOf('@'), 0));
+    return localPart.indexOf('+') >= 0
+        || localPart.indexOf('=') >= 0
+        || localPart.indexOf('#') >= 0;
   }
 
   private AuthenticateWithSocialProviderResult linkBrandNewAccount(

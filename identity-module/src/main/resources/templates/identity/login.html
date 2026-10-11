@@ -61,7 +61,7 @@
                     <!-- Thymeleaf's own preprocessing syntax (__${...}__): the only documented way to
                          build a dynamic fragment/template name — a plain ${...} inside ~{...} is
                          evaluated too late to select which template gets loaded. -->
-                    <span th:replace="~{__${'identity/fragments/social-icon-' + #strings.toLowerCase(provider.name())}__ :: icon}"></span>
+                    <span th:replace="~{__${'fragments/social-icon-' + #strings.toLowerCase(provider.name())}__ :: icon}"></span>
                     <span th:text="${'Sign in with ' + #strings.capitalize(#strings.toLowerCase(provider.name()))}">Sign in with Provider</span>
                 </a>
             </p>

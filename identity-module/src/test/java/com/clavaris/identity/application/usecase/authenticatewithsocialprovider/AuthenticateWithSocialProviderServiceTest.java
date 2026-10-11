@@ -318,4 +318,58 @@ class AuthenticateWithSocialProviderServiceTest {
 
     verifyNoInteractions(accounts, socialIdentities, pendingLinks, mailSender, outbox);
   }
+
+  private AuthenticateWithSocialProviderCommand commandFor(final String email) {
+    return new AuthenticateWithSocialProviderCommand(
+        ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123", new Email(email), true);
+  }
+
+  private void blockSubaddresses() {
+    when(policyProvider.blocksEmailSubaddresses(ORGANIZATION_ID, SocialProvider.GOOGLE))
+        .thenReturn(true);
+  }
+
+  // The three separators Clerk's "Block email subaddresses" covers.
+  @Test
+  void refusesEverySubaddressFormWhenTheOrganizationBlocksThem() {
+    blockSubaddresses();
+    for (final String email :
+        new String[] {"ana+news@example.com", "ana=x@example.com", "a#b@example.com"}) {
+      final AuthenticateWithSocialProviderCommand command = commandFor(email);
+
+      assertThatExceptionOfType(EmailSubaddressNotAllowedException.class)
+          .as(email)
+          .isThrownBy(() -> service.handle(command));
+    }
+
+    verifyNoInteractions(accounts, socialIdentities, pendingLinks, mailSender, outbox);
+  }
+
+  @Test
+  void anOrdinaryAddressIsStillAcceptedWhenSubaddressesAreBlocked() {
+    blockSubaddresses();
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, new Email("ana@example.com")))
+        .thenReturn(Optional.empty());
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(
+            ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123"))
+        .thenReturn(Optional.empty());
+
+    org.assertj.core.api.Assertions.assertThatCode(
+            () -> service.handle(commandFor("ana@example.com")))
+        .doesNotThrowAnyException();
+  }
+
+  // Nothing changes for an Organization that never saved its connection.
+  @Test
+  void aSubaddressIsAcceptedWhenTheOrganizationDoesNotBlockThem() {
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, new Email("ana+news@example.com")))
+        .thenReturn(Optional.empty());
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(
+            ORGANIZATION_ID, SocialProvider.GOOGLE, "google-sub-123"))
+        .thenReturn(Optional.empty());
+
+    org.assertj.core.api.Assertions.assertThatCode(
+            () -> service.handle(commandFor("ana+news@example.com")))
+        .doesNotThrowAnyException();
+  }
 }

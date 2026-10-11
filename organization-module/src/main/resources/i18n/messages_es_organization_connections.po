@@ -1,0 +1,139 @@
+# Spanish for the Configure > Connections pages (social providers per Organization), their
+# validation messages and the audit label of saving a connection.
+
+msgid "Connections"
+msgstr "Conexiones"
+
+msgid "Connections — Clavaris"
+msgstr "Conexiones — Clavaris"
+
+msgid "The social providers people can use to sign up and sign in to this Organization's application. Email and password are always available."
+msgstr "Los proveedores sociales con los que las personas pueden registrarse e iniciar sesión en la aplicación de esta Organización. El correo y la contraseña siempre están disponibles."
+
+msgid "This is a development Organization: it signs in through Clavaris's shared Google and GitHub apps, so there are no credentials to set up. A production Organization uses its own."
+msgstr "Esta es una Organización de desarrollo: inicia sesión a través de las apps compartidas de Google y GitHub de Clavaris, así que no hay credenciales que configurar. Una Organización de producción usa las suyas."
+
+msgid "Social provider"
+msgstr "Proveedor social"
+
+msgid "Used for sign-in"
+msgstr "Se usa para iniciar sesión"
+
+msgid "Setup required"
+msgstr "Requiere configuración"
+
+msgid "Disabled"
+msgstr "Desactivada"
+
+msgid "People can sign up and sign in with this provider."
+msgstr "Las personas pueden registrarse e iniciar sesión con este proveedor."
+
+msgid "Connection saved."
+msgstr "Conexión guardada."
+
+msgid "Credentials removed. The connection is switched off."
+msgstr "Credenciales quitadas. La conexión está desactivada."
+
+msgid "This connection is switched on, but this Organization has no credentials of its own for it, so it is not offered on the sign-in page. Add them below."
+msgstr "Esta conexión está activada, pero esta Organización no tiene credenciales propias para ella, así que no se ofrece en la página de inicio de sesión. Añádelas más abajo."
+
+msgid "Enable for sign-up and sign-in"
+msgstr "Activar para registro e inicio de sesión"
+
+msgid "People can sign up or sign in to this Organization's application with this provider. When off, the provider is not offered."
+msgstr "Las personas pueden registrarse o iniciar sesión en la aplicación de esta Organización con este proveedor. Si está desactivada, el proveedor no se ofrece."
+
+msgid "Shared credentials"
+msgstr "Credenciales compartidas"
+
+msgid "A development Organization signs in through Clavaris's own app for this provider, so there is nothing to set up here. To use your own app, and show your own name on the provider's consent screen, use a production Organization."
+msgstr "Una Organización de desarrollo inicia sesión a través de la app propia de Clavaris para este proveedor, así que aquí no hay nada que configurar. Para usar tu propia app, y mostrar tu propio nombre en la pantalla de consentimiento del proveedor, usa una Organización de producción."
+
+msgid "Promote to production"
+msgstr "Pasar a producción"
+
+msgid "Use your own credentials"
+msgstr "Usa tus propias credenciales"
+
+msgid "A production Organization signs in through its own app, so people see its name on the provider's consent screen. Create an OAuth app with the provider, register the redirect URI below, then paste the app's client ID and client secret here."
+msgstr "Una Organización de producción inicia sesión a través de su propia app, así que las personas ven su nombre en la pantalla de consentimiento del proveedor. Crea una app OAuth con el proveedor, registra la URI de redirección de abajo y pega aquí el ID de cliente y el secreto de cliente de la app."
+
+msgid "Authorized redirect URI"
+msgstr "URI de redirección autorizada"
+
+msgid "Copy Authorized redirect URI"
+msgstr "Copiar URI de redirección autorizada"
+
+msgid "Add this URL to the OAuth app you create with the provider."
+msgstr "Añade esta URL a la app OAuth que crees con el proveedor."
+
+msgid "A saved secret is never shown again. Leave this empty to keep it, or type a new one to replace it."
+msgstr "Un secreto guardado no se vuelve a mostrar. Déjalo vacío para conservarlo o escribe uno nuevo para reemplazarlo."
+
+msgid "Both the client ID and the client secret are needed the first time."
+msgstr "La primera vez hacen falta tanto el ID de cliente como el secreto de cliente."
+
+msgid "Sign-in options"
+msgstr "Opciones de inicio de sesión"
+
+msgid "Block email subaddresses"
+msgstr "Bloquear subdirecciones de correo"
+
+msgid "Refuse sign-ins with an address that has a tag, such as name+tag@example.com, name=tag@ or name#tag@. Recommended: a subaddress can get around the provider's own organisation controls. Accounts that already signed in this way are refused too."
+msgstr "Rechazar inicios de sesión con una dirección que lleve una etiqueta, como nombre+etiqueta@example.com, nombre=etiqueta@ o nombre#etiqueta@. Recomendado: una subdirección puede eludir los controles de organización del propio proveedor. Las cuentas que ya iniciaron sesión así también se rechazan."
+
+msgid "Always show account selector prompt"
+msgstr "Mostrar siempre el selector de cuenta"
+
+msgid "Ask the provider to show its account chooser every time, even when someone is already signed in to it."
+msgstr "Pedir al proveedor que muestre su selector de cuentas cada vez, incluso si la persona ya tiene sesión iniciada en él."
+
+msgid "Danger zone"
+msgstr "Zona de peligro"
+
+msgid "Removing this Organization's credentials also switches the connection off: the provider stops being offered until new credentials are saved."
+msgstr "Quitar las credenciales de esta Organización también desactiva la conexión: el proveedor deja de ofrecerse hasta que se guarden credenciales nuevas."
+
+msgid "Remove credentials"
+msgstr "Quitar credenciales"
+
+msgid "Remove credentials?"
+msgstr "¿Quitar las credenciales?"
+
+msgid "This removes the saved credentials and switches the connection off. People will not be able to sign in with this provider until you save new ones."
+msgstr "Esto quita las credenciales guardadas y desactiva la conexión. Las personas no podrán iniciar sesión con este proveedor hasta que guardes otras nuevas."
+
+msgid "Client ID must be at most 255 characters"
+msgstr "El ID de cliente debe tener como máximo 255 caracteres"
+
+msgid "Client secret must be at most 1000 characters"
+msgstr "El secreto de cliente debe tener como máximo 1000 caracteres"
+
+msgid "Enter this provider's client ID and client secret to enable it"
+msgstr "Introduce el ID de cliente y el secreto de cliente de este proveedor para activarlo"
+
+msgid "Enter both the client ID and the client secret"
+msgstr "Introduce tanto el ID de cliente como el secreto de cliente"
+
+msgid "A development Organization signs in through Clavaris's shared app"
+msgstr "Una Organización de desarrollo inicia sesión a través de la app compartida de Clavaris"
+
+msgid "Social connection updated"
+msgstr "Conexión social actualizada"
+
+msgid "Client ID error"
+msgstr "Error en el ID de cliente"
+
+msgid "Client secret error"
+msgstr "Error en el secreto de cliente"
+
+msgid "Credentials error"
+msgstr "Error en las credenciales"
+
+# The audit page spells out the detail keys of a saved connection (alwaysShowAccountSelector, and
+# blockEmailSubaddresses, whose text is above) in these exact words.
+msgid "Always show account selector"
+msgstr "Mostrar siempre el selector de cuenta"
+
+msgid "Set up this connection in the production Organization"
+msgstr "Configura esta conexión en la Organización de producción"

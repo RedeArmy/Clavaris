@@ -5,7 +5,11 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
+import com.clavaris.organization.application.usecase.savesocialconnection.SocialConnectionSettingsRepository;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialRepository;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationEnvironment;
+import com.clavaris.organization.domain.model.SocialConnectionSettings;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
@@ -38,9 +42,16 @@ public class OrganizationSocialLoginPolicyProviderBridge
     implements OrganizationSocialLoginPolicyProvider {
 
   private final OrganizationRepository organizations;
+  private final OrganizationSocialCredentialRepository credentials;
+  private final SocialConnectionSettingsRepository settings;
 
-  public OrganizationSocialLoginPolicyProviderBridge(final OrganizationRepository organizations) {
+  public OrganizationSocialLoginPolicyProviderBridge(
+      final OrganizationRepository organizations,
+      final OrganizationSocialCredentialRepository credentials,
+      final SocialConnectionSettingsRepository settings) {
     this.organizations = organizations;
+    this.credentials = credentials;
+    this.settings = settings;
   }
 
   @Override
@@ -53,7 +64,8 @@ public class OrganizationSocialLoginPolicyProviderBridge
         .map(
             found ->
                 found.socialLoginEnabled()
-                    && found.allowedSocialProviders().contains(provider.name()))
+                    && found.allowedSocialProviders().contains(provider.name())
+                    && hasRequiredCredentials(found, provider))
         .orElse(false);
   }
 
@@ -71,9 +83,40 @@ public class OrganizationSocialLoginPolicyProviderBridge
       // .contains(provider.name())
       // check above already places in this same list.
       for (final String providerName : organization.get().allowedSocialProviders()) {
-        allowed.add(SocialProvider.valueOf(providerName));
+        final SocialProvider provider = SocialProvider.valueOf(providerName);
+        if (hasRequiredCredentials(organization.get(), provider)) {
+          allowed.add(provider);
+        }
       }
     }
     return allowed;
+  }
+
+  // Read fresh on every sign-in, not cached: turning "block email subaddresses" on has to take
+  // effect on the next attempt, the same freshness the provider-allowed check above has. An
+  // Organization that never saved its connection has no row, which reads as nothing blocked.
+  @Override
+  public boolean blocksEmailSubaddresses(
+      final OrganizationId organizationId, final SocialProvider provider) {
+    return settings
+        .findByOrganizationIdAndProvider(
+            organizationId.value(),
+            com.clavaris.organization.domain.model.SocialProvider.valueOf(provider.name()))
+        .map(SocialConnectionSettings::blockEmailSubaddresses)
+        .orElse(false);
+  }
+
+  // ADR-0022, as amended: a PRODUCTION Organization signs in only through its own OAuth app, never
+  // the shared Clavaris one, so a provider it has no credentials for is not offered even when it is
+  // switched on (an Organization enabled before this rule, or whose credentials were removed). A
+  // DEVELOPMENT Organization always uses the shared app and needs none.
+  private boolean hasRequiredCredentials(
+      final Organization organization, final SocialProvider provider) {
+    return organization.environment() != OrganizationEnvironment.PRODUCTION
+        || credentials
+            .findByOrganizationIdAndProvider(
+                organization.id(),
+                com.clavaris.organization.domain.model.SocialProvider.valueOf(provider.name()))
+            .isPresent();
   }
 }

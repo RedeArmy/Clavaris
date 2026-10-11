@@ -71,6 +71,8 @@ import com.clavaris.organization.application.usecase.getratelimitpolicyfororgani
 import com.clavaris.organization.application.usecase.getratelimitpolicyfororganization.GetRateLimitPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getsessionpolicyfororganization.GetSessionPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.getsessionpolicyfororganization.GetSessionPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.getsocialconnections.GetSocialConnectionsService;
+import com.clavaris.organization.application.usecase.getsocialconnections.GetSocialConnectionsUseCase;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationService;
 import com.clavaris.organization.application.usecase.getworkspacefororganization.GetWorkspaceForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.listaccessrestrictionentriesfororganization.ListAccessRestrictionEntriesForOrganizationService;
@@ -109,6 +111,9 @@ import com.clavaris.organization.application.usecase.removeworkspacemember.Works
 import com.clavaris.organization.application.usecase.removeworkspacemember.WorkspaceMemberRefreshTokenRevoker;
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamService;
 import com.clavaris.organization.application.usecase.renameworkspaceteam.RenameWorkspaceTeamUseCase;
+import com.clavaris.organization.application.usecase.savesocialconnection.SaveSocialConnectionService;
+import com.clavaris.organization.application.usecase.savesocialconnection.SaveSocialConnectionUseCase;
+import com.clavaris.organization.application.usecase.savesocialconnection.SocialConnectionSettingsRepository;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationUseCase;
@@ -590,8 +595,10 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ SetSocialLoginPolicyForOrganizationUseCase
       setSocialLoginPolicyForOrganizationUseCase(
-          final OrganizationRepository organizations, final AuditEventRecorder auditEvents) {
-    return new SetSocialLoginPolicyForOrganizationService(organizations, auditEvents);
+          final OrganizationRepository organizations,
+          final OrganizationSocialCredentialRepository credentials,
+          final AuditEventRecorder auditEvents) {
+    return new SetSocialLoginPolicyForOrganizationService(organizations, credentials, auditEvents);
   }
 
   // PMD.LinguisticNaming: same false positive SetRateLimitPolicyForOrganizationUseCase's own
@@ -615,9 +622,32 @@ class OrganizationUseCaseConfig {
 
   @Bean
   /* package */ DeleteOrganizationSocialCredentialUseCase deleteOrganizationSocialCredentialUseCase(
+      final OrganizationRepository organizations,
       final OrganizationSocialCredentialRepository credentials,
       final AuditEventRecorder auditEvents) {
-    return new DeleteOrganizationSocialCredentialService(credentials, auditEvents);
+    return new DeleteOrganizationSocialCredentialService(organizations, credentials, auditEvents);
+  }
+
+  // The dashboard's "Connections" page: one transactional save of a provider's switch, credentials
+  // and settings, and the read that feeds the page.
+  @Bean
+  /* package */ SaveSocialConnectionUseCase saveSocialConnectionUseCase(
+      final OrganizationRepository organizations,
+      final OrganizationSocialCredentialRepository credentials,
+      final OrganizationSocialCredentialCipher cipher,
+      final SocialConnectionSettingsRepository settings,
+      final AuditEventRecorder auditEvents) {
+    return new SaveSocialConnectionService(
+        organizations, credentials, cipher, settings, auditEvents);
+  }
+
+  @Bean
+  /* package */ GetSocialConnectionsUseCase getSocialConnectionsUseCase(
+      final OrganizationRepository organizations,
+      final OrganizationSocialCredentialRepository credentials,
+      final SocialConnectionSettingsRepository settings,
+      @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
+    return new GetSocialConnectionsService(organizations, credentials, settings, clavarisBaseUrl);
   }
 
   // ADR-0023 / Clerk API-keys parity

@@ -6,7 +6,6 @@ import com.clavaris.organization.application.usecase.setorganizationsocialcreden
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SetOrganizationSocialCredentialCommand;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SetOrganizationSocialCredentialResult;
 import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SetOrganizationSocialCredentialUseCase;
-import com.clavaris.organization.application.usecase.setorganizationsocialcredential.SocialLoginNotEnabledForProviderException;
 import com.clavaris.organization.domain.model.SocialProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,7 +46,7 @@ class SetOrganizationSocialCredentialController {
   @ApiResponse(
       responseCode = "409",
       description =
-          "Organization is not PRODUCTION, or social login is not enabled for this provider")
+          "Organization is not PRODUCTION: a DEVELOPMENT Organization uses the shared app")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
   @PutMapping("/api/v1/admin/organizations/{organizationId}/social-credentials/{provider}")
   /* package */ ResponseEntity<SetOrganizationSocialCredentialResponse> set(
@@ -67,8 +66,7 @@ class SetOrganizationSocialCredentialController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
-    } catch (final OrganizationNotProductionException
-        | SocialLoginNotEnabledForProviderException _) {
+    } catch (final OrganizationNotProductionException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
     return ResponseEntity.ok(SetOrganizationSocialCredentialResponse.from(result));

@@ -2,6 +2,7 @@ package com.clavaris.organization.application.usecase.setsocialloginpolicyfororg
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -13,7 +14,10 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
+import com.clavaris.organization.application.usecase.setorganizationsocialcredential.OrganizationSocialCredentialRepository;
 import com.clavaris.organization.domain.model.Organization;
+import com.clavaris.organization.domain.model.OrganizationSocialCredential;
+import com.clavaris.organization.domain.model.SocialProvider;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,14 +29,17 @@ class SetSocialLoginPolicyForOrganizationServiceTest {
   private static final AuditActor ACTOR = AuditActor.platformClient("test-client");
 
   private OrganizationRepository organizations;
+  private OrganizationSocialCredentialRepository credentials;
   private AuditEventRecorder auditEvents;
   private SetSocialLoginPolicyForOrganizationService service;
 
   @BeforeEach
   void setUp() {
     organizations = mock(OrganizationRepository.class);
+    credentials = mock(OrganizationSocialCredentialRepository.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new SetSocialLoginPolicyForOrganizationService(organizations, auditEvents);
+    service =
+        new SetSocialLoginPolicyForOrganizationService(organizations, credentials, auditEvents);
   }
 
   @Test
@@ -131,5 +138,71 @@ class SetSocialLoginPolicyForOrganizationServiceTest {
 
     verify(organizations, never()).save(any());
     verifyNoInteractions(auditEvents);
+  }
+
+  // A PRODUCTION Organization signs in only through its own OAuth app (ADR-0022, as amended).
+  @Test
+  void aProductionOrganizationCannotEnableAProviderItHasNoCredentialsFor() {
+    Organization production =
+        Organization.registerProductionEnvironment("Acme", UUID.randomUUID(), UUID.randomUUID());
+    when(organizations.findById(production.id())).thenReturn(Optional.of(production));
+    when(credentials.findByOrganizationIdAndProvider(production.id(), SocialProvider.GOOGLE))
+        .thenReturn(Optional.empty());
+    SetSocialLoginPolicyForOrganizationCommand command =
+        new SetSocialLoginPolicyForOrganizationCommand(
+            production.id(), true, List.of("GOOGLE"), ACTOR);
+
+    assertThatThrownBy(() -> service.handle(command))
+        .isInstanceOf(SocialCredentialsRequiredException.class);
+
+    verify(organizations, never()).save(any());
+  }
+
+  @Test
+  void aProductionOrganizationCanEnableAProviderItHasCredentialsFor() {
+    Organization production =
+        Organization.registerProductionEnvironment("Acme", UUID.randomUUID(), UUID.randomUUID());
+    when(organizations.findById(production.id())).thenReturn(Optional.of(production));
+    when(credentials.findByOrganizationIdAndProvider(production.id(), SocialProvider.GOOGLE))
+        .thenReturn(
+            Optional.of(
+                OrganizationSocialCredential.define(
+                    production.id(), SocialProvider.GOOGLE, "client-id", "encrypted")));
+
+    SetSocialLoginPolicyForOrganizationResult result =
+        service.handle(
+            new SetSocialLoginPolicyForOrganizationCommand(
+                production.id(), true, List.of("GOOGLE"), ACTOR));
+
+    assertThat(result.organization().allowedSocialProviders()).containsExactly("GOOGLE");
+  }
+
+  @Test
+  void aProductionOrganizationCanAlwaysDisable() {
+    Organization production =
+        Organization.registerProductionEnvironment("Acme", UUID.randomUUID(), UUID.randomUUID())
+            .withSocialLoginPolicy(true, List.of("GOOGLE"));
+    when(organizations.findById(production.id())).thenReturn(Optional.of(production));
+
+    SetSocialLoginPolicyForOrganizationResult result =
+        service.handle(
+            new SetSocialLoginPolicyForOrganizationCommand(
+                production.id(), false, List.of(), ACTOR));
+
+    assertThat(result.organization().socialLoginEnabled()).isFalse();
+    org.mockito.Mockito.verifyNoInteractions(credentials);
+  }
+
+  // A DEVELOPMENT sandbox always uses the shared app, so it needs no credentials.
+  @Test
+  void aDevelopmentOrganizationNeedsNoCredentials() {
+    Organization development = Organization.register("Acme", UUID.randomUUID());
+    when(organizations.findById(development.id())).thenReturn(Optional.of(development));
+
+    service.handle(
+        new SetSocialLoginPolicyForOrganizationCommand(
+            development.id(), true, List.of("GOOGLE"), ACTOR));
+
+    org.mockito.Mockito.verifyNoInteractions(credentials);
   }
 }

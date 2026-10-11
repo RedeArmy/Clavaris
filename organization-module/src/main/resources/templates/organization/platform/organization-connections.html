@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/head :: head(${organizationName} + ' — Connections — Clavaris')}">
+    <title>Connections — Clavaris</title>
+</head>
+<body>
+<div class="clavaris-dashboard">
+    <aside th:replace="~{platform/fragments/dashboard-nav :: sidebar('organizations')}"></aside>
+    <main id="main-content" class="clavaris-dashboard__content">
+        <div class="clavaris-dashboard__inner">
+            <p class="clavaris-breadcrumb">
+                <a th:href="@{/platform/dashboard}">Organizations</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <a th:href="@{/platform/dashboard/organizations/{id}(id=${organizationId})}" th:text="${organizationName}">Organization</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                <span th:if="${connection == null}">Connections</span>
+                <th:block th:if="${connection != null}">
+                    <a th:href="@{/platform/dashboard/organizations/{id}/connections(id=${organizationId})}">Connections</a> <span class="clavaris-breadcrumb__sep" aria-hidden="true">/</span>
+                    <span th:text="${connection.provider().displayName()}">Google</span>
+                </th:block>
+            </p>
+
+            <div th:replace="~{platform/fragments/org-tabs :: tabs(${organizationId}, 'configure')}"></div>
+
+            <!-- Clerk "SSO connections" parity, in one template with two views told apart by whether
+                 the model carries a connection, so the page shell is written once:
+                   - the list: the social providers this Organization's sign-in can offer, each
+                     with where it stands;
+                   - one provider's own page: its switch, the credentials this Organization signs
+                     in through, the redirect URI to register with the provider, and the options.
+                 A PRODUCTION Organization uses its own OAuth app and cannot switch a provider on
+                 without it; a DEVELOPMENT one uses Clavaris's shared app and has no credentials to
+                 enter (ADR-0022, as amended). A saved secret is never shown again, so a blank field
+                 keeps it. Email and password are always available and are not listed: no setting
+                 here can turn them off (ADR-0020 Decision 3). -->
+            <div class="clavaris-configure-layout">
+                <div th:replace="~{platform/fragments/configure-sidebar :: sidebar(${organizationId}, 'connections')}"></div>
+
+                <div class="clavaris-configure-content">
+                    <!--/* The list of providers: shown when no provider is chosen. */-->
+                    <th:block th:if="${connection == null}">
+                        <div class="clavaris-page-header">
+                            <div>
+                                <h1>Connections</h1>
+                                <p>The social providers people can use to sign up and sign in to this Organization's application. Email and password are always available.</p>
+                            </div>
+                        </div>
+
+                        <p class="clavaris-alert clavaris-alert--warning" th:unless="${production}">This is a development Organization: it signs in through Clavaris's shared Google and GitHub apps, so there are no credentials to set up. A production Organization uses its own.</p>
+
+                        <div class="clavaris-section">
+                            <div class="clavaris-table-wrapper">
+                                <table class="clavaris-table">
+                                    <thead>
+                                    <tr>
+                                        <th scope="col">Provider</th>
+                                        <th scope="col">Configuration</th>
+                                        <th scope="col"><span class="clavaris-visually-hidden">Actions</span></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="connection : ${connections}">
+                                        <td>
+                                            <a class="clavaris-connection"
+                                               th:href="@{/platform/dashboard/organizations/{id}/connections/{provider}(id=${organizationId}, provider=${#strings.toLowerCase(connection.provider().name())})}">
+                                                <span class="clavaris-connection__icon" aria-hidden="true">
+                                                    <span th:replace="~{__${'fragments/social-icon-' + #strings.toLowerCase(connection.provider().name())}__ :: icon}"></span>
+                                                </span>
+                                                <span class="clavaris-connection__name">
+                                                    <strong th:text="${connection.provider().displayName()}">Google</strong>
+                                                    <small>Social provider</small>
+                                                </span>
+                                            </a>
+                                        </td>
+                                        <td th:switch="${connection.status().name()}">
+                                            <span th:case="'ENABLED'" class="clavaris-badge clavaris-badge--success">Used for sign-in</span>
+                                            <span th:case="'SETUP_REQUIRED'" class="clavaris-badge clavaris-badge--warning">Setup required</span>
+                                            <span th:case="*" class="clavaris-badge clavaris-badge--muted">Disabled</span>
+                                        </td>
+                                        <td>
+                                            <a class="clavaris-button clavaris-button--secondary clavaris-button--inline"
+                                               th:href="@{/platform/dashboard/organizations/{id}/connections/{provider}(id=${organizationId}, provider=${#strings.toLowerCase(connection.provider().name())})}">Manage</a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </th:block>
+
+                    <!--/* One provider's own page: the switch, the credentials and the options. */-->
+                    <th:block th:if="${connection != null}">
+                        <div class="clavaris-page-header">
+                            <div class="clavaris-connection-header">
+                                <span class="clavaris-connection__icon clavaris-connection__icon--large" aria-hidden="true">
+                                    <span th:replace="~{__${'fragments/social-icon-' + #strings.toLowerCase(connection.provider().name())}__ :: icon}"></span>
+                                </span>
+                                <div>
+                                    <h1>
+                                        <span th:text="${connection.provider().displayName()}">Google</span>
+                                        <span th:switch="${connection.status().name()}">
+                                            <span th:case="'ENABLED'" class="clavaris-badge clavaris-badge--success">Enabled</span>
+                                            <span th:case="'SETUP_REQUIRED'" class="clavaris-badge clavaris-badge--warning">Setup required</span>
+                                            <span th:case="*" class="clavaris-badge clavaris-badge--muted">Disabled</span>
+                                        </span>
+                                    </h1>
+                                    <p>People can sign up and sign in with this provider.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <output class="clavaris-alert clavaris-alert--success" th:if="${param.saved}">Connection saved.</output>
+                        <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">Credentials removed. The connection is switched off.</output>
+                        <p class="clavaris-alert clavaris-alert--warning" th:if="${connection.status().name() == 'SETUP_REQUIRED'}">This connection is switched on, but this Organization has no credentials of its own for it, so it is not offered on the sign-in page. Add them below.</p>
+
+                        <output class="clavaris-visually-hidden" aria-live="polite" data-copy-status></output>
+
+                        <div class="clavaris-section">
+                            <form th:action="@{/platform/dashboard/organizations/{id}/connections/{provider}(id=${organizationId}, provider=${#strings.toLowerCase(connection.provider().name())})}"
+                                  th:object="${connectionForm}" method="post">
+                                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                                <div class="clavaris-section-card">
+                                    <div class="clavaris-toggle-list">
+                                        <label class="clavaris-toggle clavaris-toggle--row" for="connection-enabled">
+                                            <!--/* Not th:field: it adds a hidden input after the checkbox, which breaks the
+                                                 "checkbox + track" selector the toggle's styling depends on. An unchecked
+                                                 box is simply absent from the submission, which binds to false. */-->
+                                            <input id="connection-enabled" type="checkbox" name="enabled" value="true"
+                                                   th:checked="*{enabled}"/>
+                                            <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                            <span class="clavaris-toggle__label">
+                                                <span class="clavaris-toggle__title">Enable for sign-up and sign-in</span>
+                                                <span class="clavaris-toggle__hint">People can sign up or sign in to this Organization's application with this provider. When off, the provider is not offered.</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="clavaris-section-card" th:unless="${production}">
+                                    <h2>Shared credentials</h2>
+                                    <p class="clavaris-field-hint">A development Organization signs in through Clavaris's own app for this provider, so there is nothing to set up here. To use your own app, and show your own name on the provider's consent screen, use a production Organization.</p>
+                                    <p class="clavaris-field-hint" th:if="${linkedEnvironmentId == null}">
+                                        <a th:href="@{/platform/dashboard/organizations/{id}/promote-to-production(id=${organizationId})}">Promote to production</a>
+                                    </p>
+                                    <p class="clavaris-field-hint" th:if="${linkedEnvironmentId != null}">
+                                        <a th:href="@{/platform/dashboard/organizations/{id}/connections/{provider}(id=${linkedEnvironmentId}, provider=${#strings.toLowerCase(connection.provider().name())})}">Set up this connection in the production Organization</a>
+                                    </p>
+                                    <!--/* The credential fields are not drawn here, so a refusal of credentials sent
+                                         anyway (not something this page lets a person do) is shown on its own. */-->
+                                    <p class="clavaris-field-error" role="alert" th:if="${#fields.hasErrors('clientId')}" th:errors="*{clientId}">Credentials error</p>
+                                </div>
+
+                                <div class="clavaris-section-card" th:if="${production}">
+                                    <h2>Use your own credentials</h2>
+                                    <p class="clavaris-field-hint">A production Organization signs in through its own app, so people see its name on the provider's consent screen. Create an OAuth app with the provider, register the redirect URI below, then paste the app's client ID and client secret here.</p>
+
+                                    <div th:replace="~{organization/platform/fragments/copy-field-row :: row('connection-redirect-uri', 'Authorized redirect URI', 'Add this URL to the OAuth app you create with the provider.', ${connection.redirectUri()})}"></div>
+
+                                    <div class="clavaris-field">
+                                        <label for="connection-client-id">Client ID</label>
+                                        <input id="connection-client-id" type="text" name="clientId" autocomplete="off"
+                                               th:value="*{clientId}" maxlength="255"
+                                               th:attr="aria-invalid=${#fields.hasErrors('clientId')} ? 'true'"/>
+                                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('clientId')}" th:errors="*{clientId}">Client ID error</p>
+                                    </div>
+
+                                    <div class="clavaris-field">
+                                        <label for="connection-client-secret">Client secret</label>
+                                        <input id="connection-client-secret" type="password" name="clientSecret" autocomplete="new-password"
+                                               maxlength="1000" th:aria-describedby="${connection.hasCredentials()} ? 'connection-client-secret-saved-hint' : 'connection-client-secret-new-hint'"
+                                               th:attr="aria-invalid=${#fields.hasErrors('clientSecret')} ? 'true'"/>
+                                        <p id="connection-client-secret-saved-hint" class="clavaris-field-hint" th:if="${connection.hasCredentials()}">A saved secret is never shown again. Leave this empty to keep it, or type a new one to replace it.</p>
+                                        <p id="connection-client-secret-new-hint" class="clavaris-field-hint" th:unless="${connection.hasCredentials()}">Both the client ID and the client secret are needed the first time.</p>
+                                        <p class="clavaris-field-error" th:if="${#fields.hasErrors('clientSecret')}" th:errors="*{clientSecret}">Client secret error</p>
+                                    </div>
+                                </div>
+
+                                <div class="clavaris-section-card">
+                                    <h2>Sign-in options</h2>
+                                    <div class="clavaris-toggle-list">
+                                        <label class="clavaris-toggle clavaris-toggle--row" for="connection-block-subaddresses">
+                                            <input id="connection-block-subaddresses" type="checkbox" name="blockEmailSubaddresses" value="true"
+                                                   th:checked="*{blockEmailSubaddresses}"/>
+                                            <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                            <span class="clavaris-toggle__label">
+                                                <span class="clavaris-toggle__title">Block email subaddresses</span>
+                                                <span class="clavaris-toggle__hint">Refuse sign-ins with an address that has a tag, such as name+tag@example.com, name=tag@ or name#tag@. Recommended: a subaddress can get around the provider's own organisation controls. Accounts that already signed in this way are refused too.</span>
+                                            </span>
+                                        </label>
+                                        <label class="clavaris-toggle clavaris-toggle--row" for="connection-account-selector">
+                                            <input id="connection-account-selector" type="checkbox" name="alwaysShowAccountSelector" value="true"
+                                                   th:checked="*{alwaysShowAccountSelector}"/>
+                                            <span class="clavaris-toggle__track"><span class="clavaris-toggle__thumb"></span></span>
+                                            <span class="clavaris-toggle__label">
+                                                <span class="clavaris-toggle__title">Always show account selector prompt</span>
+                                                <span class="clavaris-toggle__hint">Ask the provider to show its account chooser every time, even when someone is already signed in to it.</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <button class="clavaris-button clavaris-button--inline" type="submit">Save changes</button>
+                            </form>
+                        </div>
+
+                        <div class="clavaris-section clavaris-section--danger" th:if="${production and connection.hasCredentials()}">
+                            <div class="clavaris-section-card clavaris-section-card--danger">
+                                <h2>Danger zone</h2>
+                                <p>Removing this Organization's credentials also switches the connection off: the provider stops being offered until new credentials are saved.</p>
+                                <form th:action="@{/platform/dashboard/organizations/{id}/connections/{provider}/credentials/remove(id=${organizationId}, provider=${#strings.toLowerCase(connection.provider().name())})}"
+                                      method="post"
+                                      data-confirm="This removes the saved credentials and switches the connection off. People will not be able to sign in with this provider until you save new ones."
+                                      data-confirm-title="Remove credentials?"
+                                      data-confirm-label="Remove credentials"
+                                      data-confirm-tone="danger">
+                                    <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button class="clavaris-button clavaris-button--danger clavaris-button--inline" type="submit">Remove credentials</button>
+                                </form>
+                            </div>
+                        </div>
+                    </th:block>
+</div>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:if="${connection != null}" th:src="${#resourceUrl != null ? #resourceUrl.url('/js/copy-to-clipboard.js') : '/js/copy-to-clipboard.js'}" defer></script>
+</body>
+</html>
