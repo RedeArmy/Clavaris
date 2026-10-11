@@ -19,7 +19,7 @@ import org.springframework.session.web.http.CookieSerializer.CookieValue;
 class AdaptiveSameSiteSessionCookieSerializerTest {
 
   private final AdaptiveSameSiteSessionCookieSerializer serializer =
-      new AdaptiveSameSiteSessionCookieSerializer();
+      new AdaptiveSameSiteSessionCookieSerializer("/platform/");
 
   @Test
   void anInsecureRequestGetsTheLaxFallback() {
@@ -140,6 +140,22 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
         new Cookie("SESSION", tenantValue), new Cookie("PLATFORM_SESSION", platformValue));
 
     assertThat(serializer.readCookieValues(request)).containsExactly("tenant-id");
+  }
+
+  // Sonar java:S1075: the platform path prefix is a constructor parameter
+  // (clavaris.session.platform-path-prefix), not a hardcoded literal — proven here with a
+  // different value than every other test in this class uses.
+  @Test
+  void aCustomPlatformPathPrefixIsHonoredInsteadOfTheHardcodedDefault() {
+    AdaptiveSameSiteSessionCookieSerializer customSerializer =
+        new AdaptiveSameSiteSessionCookieSerializer("/ops-console/");
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/ops-console/dashboard");
+    request.setSecure(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    customSerializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie")).startsWith("PLATFORM_SESSION=");
   }
 
   @Test

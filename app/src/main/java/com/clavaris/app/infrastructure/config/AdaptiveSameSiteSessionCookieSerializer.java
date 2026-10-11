@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
@@ -77,17 +78,26 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 @SuppressWarnings("PMD.LongVariable")
 final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer {
 
-  // PlatformDashboardSecurityConfig's own securityMatcher — see this class's own Javadoc for why
-  // this is checked here as a plain string prefix rather than reused as a Spring construct.
-  private static final String PLATFORM_PATH_PREFIX = "/platform/";
   private static final String PLATFORM_COOKIE_NAME = "PLATFORM_SESSION";
+
+  // Sonar java:S1075 ("URIs should not be hardcoded"): PlatformDashboardSecurityConfig's own
+  // securityMatcher("/platform/**") is itself a plain literal, not an externalized property — but
+  // this class's own copy of it is now a constructor parameter
+  // (clavaris.session.platform-path-prefix,
+  // defaulted to the same value) so a deployment could move the platform tier to a different mount
+  // path without a source change, same pattern this codebase's own
+  // CachingAccountAuthenticationPolicyProvider/RedisIdempotencyKeyStore constructors already use.
+  private final String platformPathPrefix;
 
   private final DefaultCookieSerializer tenantLaxSerializer = new DefaultCookieSerializer();
   private final DefaultCookieSerializer tenantNoneSerializer = new DefaultCookieSerializer();
   private final DefaultCookieSerializer platformLaxSerializer = new DefaultCookieSerializer();
   private final DefaultCookieSerializer platformNoneSerializer = new DefaultCookieSerializer();
 
-  /* package */ AdaptiveSameSiteSessionCookieSerializer() {
+  /* package */ AdaptiveSameSiteSessionCookieSerializer(
+      @Value("${clavaris.session.platform-path-prefix:/platform/}")
+          final String platformPathPrefix) {
+    this.platformPathPrefix = platformPathPrefix;
     // Secure is left at DefaultCookieSerializer's own adaptive default on all four (mirrors
     // request.isSecure()), never hardcoded — SameSite and cookie name are the only two axes this
     // class itself decides.
@@ -119,7 +129,10 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
   @SuppressWarnings("PMD.OnlyOneReturn")
   private DefaultCookieSerializer serializerFor(final HttpServletRequest request) {
     final String path = request.getRequestURI();
-    final boolean isPlatform = path.startsWith(PLATFORM_PATH_PREFIX) || "/platform".equals(path);
+    final String platformPathWithoutTrailingSlash =
+        platformPathPrefix.substring(0, platformPathPrefix.length() - 1);
+    final boolean isPlatform =
+        path.startsWith(platformPathPrefix) || platformPathWithoutTrailingSlash.equals(path);
     final boolean isSecure = request.isSecure();
     if (isPlatform) {
       return isSecure ? platformNoneSerializer : platformLaxSerializer;
