@@ -180,6 +180,50 @@ class PlatformSocialConnectionsControllerTest {
     assertThat(html).contains("shared").contains("Promote to production");
   }
 
+  // Once promoted, the production Organization is where the connection is set up.
+  @Test
+  void aPromotedDevelopmentOrganizationPointsToItsProductionOne() throws Exception {
+    final UUID productionId = UUID.randomUUID();
+    final Organization promoted =
+        Organization.reconstitute(
+            organization.id(),
+            organization.name(),
+            organization.createdAt(),
+            organization.ownerPlatformAccountId(),
+            false,
+            List.of(),
+            OrganizationEnvironment.DEVELOPMENT,
+            productionId);
+    when(getOrganization.handle(any())).thenReturn(Optional.of(promoted));
+
+    final String html =
+        mockMvc
+            .perform(get(base() + "/google"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("/platform/dashboard/organizations/" + productionId + "/connections/google")
+        .contains("Set up this connection in the production Organization")
+        .doesNotContain("promote-to-production");
+  }
+
+  @Test
+  void aDevelopmentOrganizationThatWasNeverPromotedOffersToPromote() throws Exception {
+    final String html =
+        mockMvc
+            .perform(get(base() + "/google"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("/promote-to-production").contains("Promote to production");
+    assertThat(html).doesNotContain("Set up this connection in the production Organization");
+  }
+
   @Test
   void aProductionProviderPageShowsTheRedirectUriAndNeverTheSecret() throws Exception {
     when(getConnections.handle(organization.id()))

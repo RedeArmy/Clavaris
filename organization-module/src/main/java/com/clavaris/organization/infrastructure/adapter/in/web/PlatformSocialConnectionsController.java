@@ -174,6 +174,10 @@ public class PlatformSocialConnectionsController {
     model.addAttribute("organizationId", organization.id());
     model.addAttribute("organizationName", organization.name());
     model.addAttribute("production", connections.production());
+    // A development Organization that was already promoted has a production one linked to it: its
+    // connections are set up there, so the page points to it instead of offering to promote again.
+    model.addAttribute(
+        "linkedEnvironmentId", organization.linkedEnvironmentOrganizationId().orElse(null));
     model.addAttribute("connections", connections.connections());
   }
 

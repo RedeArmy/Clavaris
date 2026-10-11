@@ -129,3 +129,11 @@ msgstr "Error en el secreto de cliente"
 
 msgid "Credentials error"
 msgstr "Error en las credenciales"
+
+# The audit page spells out the detail keys of a saved connection (alwaysShowAccountSelector, and
+# blockEmailSubaddresses, whose text is above) in these exact words.
+msgid "Always show account selector"
+msgstr "Mostrar siempre el selector de cuenta"
+
+msgid "Set up this connection in the production Organization"
+msgstr "Configura esta conexión en la Organización de producción"

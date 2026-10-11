@@ -77,8 +77,11 @@
                             <div class="clavaris-section-card" th:unless="${production}">
                                 <h2>Shared credentials</h2>
                                 <p class="clavaris-field-hint">A development Organization signs in through Clavaris's own app for this provider, so there is nothing to set up here. To use your own app, and show your own name on the provider's consent screen, use a production Organization.</p>
-                                <p class="clavaris-field-hint">
+                                <p class="clavaris-field-hint" th:if="${linkedEnvironmentId == null}">
                                     <a th:href="@{/platform/dashboard/organizations/{id}/promote-to-production(id=${organizationId})}">Promote to production</a>
+                                </p>
+                                <p class="clavaris-field-hint" th:if="${linkedEnvironmentId != null}">
+                                    <a th:href="@{/platform/dashboard/organizations/{id}/connections/{provider}(id=${linkedEnvironmentId}, provider=${#strings.toLowerCase(connection.provider().name())})}">Set up this connection in the production Organization</a>
                                 </p>
                                 <!--/* The credential fields are not drawn here, so a refusal of credentials sent
                                      anyway (not something this page lets a person do) is shown on its own. */-->
