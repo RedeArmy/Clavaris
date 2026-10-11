@@ -19,7 +19,7 @@ import org.springframework.session.web.http.CookieSerializer.CookieValue;
 class AdaptiveSameSiteSessionCookieSerializerTest {
 
   private final AdaptiveSameSiteSessionCookieSerializer serializer =
-      new AdaptiveSameSiteSessionCookieSerializer();
+      new AdaptiveSameSiteSessionCookieSerializer("/platform/");
 
   @Test
   void anInsecureRequestGetsTheLaxFallback() {
@@ -71,6 +71,91 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
 
     assertThat(response.getHeader("Set-Cookie")).contains("SameSite=Lax");
+  }
+
+  // Real bug found live, 2026-10-10: see this class's own Javadoc addendum — an operator logged
+  // into the platform dashboard who then also logs into a tenant Account in the same browser used
+  // to get silently kicked back out of the dashboard, because both tiers wrote the exact same
+  // cookie name, so the later login's own session overwrote the earlier one's in the browser's
+  // own cookie jar.
+  @Test
+  void aTenantPathGetsTheOrdinarySessionCookieName() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/o/some-org/login");
+    request.setSecure(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie")).startsWith("SESSION=");
+  }
+
+  @Test
+  void aPlatformPathGetsItsOwnDistinctCookieName() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/platform/dashboard");
+    request.setSecure(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie"))
+        .startsWith("PLATFORM_SESSION=")
+        .contains("SameSite=None")
+        .contains("Secure");
+  }
+
+  @Test
+  void aPlatformLoginPathAlsoGetsThePlatformCookieName() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/platform/login");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie"))
+        .startsWith("PLATFORM_SESSION=")
+        .contains("SameSite=Lax");
+  }
+
+  @Test
+  void readsBackThePlatformCookieNameOnAPlatformPath() {
+    String base64Value =
+        Base64.getEncoder()
+            .encodeToString("a-platform-session-id".getBytes(StandardCharsets.UTF_8));
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/platform/dashboard");
+    request.setCookies(new Cookie("PLATFORM_SESSION", base64Value));
+
+    assertThat(serializer.readCookieValues(request)).containsExactly("a-platform-session-id");
+  }
+
+  // The actual regression: a tenant-tier request must never resolve the platform cookie, even if
+  // one happens to be present in the same browser (e.g. an operator also browsing the dashboard).
+  @Test
+  void aTenantPathNeverReadsThePlatformCookieEvenIfBothArePresent() {
+    String tenantValue =
+        Base64.getEncoder().encodeToString("tenant-id".getBytes(StandardCharsets.UTF_8));
+    String platformValue =
+        Base64.getEncoder().encodeToString("platform-id".getBytes(StandardCharsets.UTF_8));
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/o/some-org/account/profile");
+    request.setCookies(
+        new Cookie("SESSION", tenantValue), new Cookie("PLATFORM_SESSION", platformValue));
+
+    assertThat(serializer.readCookieValues(request)).containsExactly("tenant-id");
+  }
+
+  // Sonar java:S1075: the platform path prefix is a constructor parameter
+  // (clavaris.session.platform-path-prefix), not a hardcoded literal — proven here with a
+  // different value than every other test in this class uses.
+  @Test
+  void aCustomPlatformPathPrefixIsHonoredInsteadOfTheHardcodedDefault() {
+    AdaptiveSameSiteSessionCookieSerializer customSerializer =
+        new AdaptiveSameSiteSessionCookieSerializer("/ops-console/");
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/ops-console/dashboard");
+    request.setSecure(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    customSerializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie")).startsWith("PLATFORM_SESSION=");
   }
 
   @Test

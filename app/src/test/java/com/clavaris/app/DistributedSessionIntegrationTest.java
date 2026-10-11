@@ -158,17 +158,23 @@ class DistributedSessionIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   private String extractSessionCookieValue() {
-    // Spring Session's own DefaultCookieSerializer names the session cookie "SESSION", not the
-    // servlet container's usual "JSESSIONID", and Base64-encodes the actual session id by default
+    // Spring Session's own DefaultCookieSerializer names the session cookie "SESSION" by default,
+    // not the servlet container's usual "JSESSIONID", and Base64-encodes the actual session id
     // (useBase64Encoding=true, confirmed by reading its source directly after this test's own
     // first run failed here) — the raw cookie value is not the Redis key's own id, it must be
     // decoded first.
+    //
+    // Real bug found live, 2026-10-10 (see AdaptiveSameSiteSessionCookieSerializer's own Javadoc):
+    // this whole test logs in through /platform/..., the platform tier, which now gets its own
+    // distinct cookie name ("PLATFORM_SESSION") precisely so a platform login never collides with
+    // a tenant one sharing the same browser — "SESSION" alone would no longer find anything here.
     String rawCookieValue =
         cookieManager.getCookieStore().getCookies().stream()
-            .filter(cookie -> "SESSION".equalsIgnoreCase(cookie.getName()))
+            .filter(cookie -> "PLATFORM_SESSION".equalsIgnoreCase(cookie.getName()))
             .map(HttpCookie::getValue)
             .findFirst()
-            .orElseThrow(() -> new AssertionError("no SESSION cookie after a successful login"));
+            .orElseThrow(
+                () -> new AssertionError("no PLATFORM_SESSION cookie after a successful login"));
     return new String(Base64.getDecoder().decode(rawCookieValue), StandardCharsets.UTF_8);
   }
 

@@ -1,5 +1,6 @@
 package com.clavaris.app.infrastructure.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
@@ -44,7 +45,7 @@ import org.springframework.session.web.http.CookieSerializer;
  * real minute-by-minute cleanup, is untouched.
  *
  * <p><b>SDE-III review, 2026-09-15 — real bug found and closed, superseded 2026-10-10:</b> {@link
- * #sessionCookieSerializer()} below is Spring Session's own documented customization point (a
+ * #sessionCookieSerializer(String)} below is Spring Session's own documented customization point (a
  * {@code CookieSerializer} bean anywhere in the context is auto-wired into {@code
  * SpringHttpSessionConfiguration}, which {@code @EnableRedisIndexedHttpSession} builds on top of,
  * with no further wiring needed here) — left unset before this fix, so the session cookie shipped
@@ -65,8 +66,14 @@ class DistributedSessionConfig {
     // Intentionally empty — this class holds no state, only the class-level annotation above.
   }
 
+  // PMD.LongVariable: same "abbreviating would only make this harder to read" precedent this
+  // codebase's own PlatformScopes/AdaptiveSameSiteSessionCookieSerializer suppressions already
+  // establish for this exact name.
+  @SuppressWarnings("PMD.LongVariable")
   @Bean
-  /* package */ CookieSerializer sessionCookieSerializer() {
-    return new AdaptiveSameSiteSessionCookieSerializer();
+  /* package */ CookieSerializer sessionCookieSerializer(
+      @Value("${clavaris.session.platform-path-prefix:/platform/}")
+          final String platformPathPrefix) {
+    return new AdaptiveSameSiteSessionCookieSerializer(platformPathPrefix);
   }
 }
