@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SaveSocialConnectionService implements SaveSocialConnectionUseCase {
 
   private static final String ORGANIZATION_ENTITY = "Organization";
+  private static final String PROVIDER_DETAIL = "provider=";
 
   private final OrganizationRepository organizations;
   private final OrganizationSocialCredentialRepository credentials;
@@ -73,19 +74,19 @@ public class SaveSocialConnectionService implements SaveSocialConnectionUseCase 
     final boolean settingsChanged = saveSettings(command);
 
     if (credentialsChanged) {
-      audit(command, "organization.social_credential_set", "provider=" + command.provider());
+      audit(command, "organization.social_credential_set", PROVIDER_DETAIL + command.provider());
     }
     if (policyChanged) {
       audit(
           command,
           "social_login_policy.set",
-          "provider=" + command.provider() + " enabled=" + command.enabled());
+          PROVIDER_DETAIL + command.provider() + " enabled=" + command.enabled());
     }
     if (settingsChanged) {
       audit(
           command,
           "organization.social_connection_updated",
-          "provider="
+          PROVIDER_DETAIL
               + command.provider()
               + " blockEmailSubaddresses="
               + command.blockEmailSubaddresses()

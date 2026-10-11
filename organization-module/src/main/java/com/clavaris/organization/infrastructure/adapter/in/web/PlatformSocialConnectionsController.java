@@ -51,7 +51,6 @@ public class PlatformSocialConnectionsController {
 
   private static final String LIST_VIEW = "organization/platform/organization-connections";
   private static final String DETAIL_VIEW = "organization/platform/organization-connection-detail";
-  private static final String CONNECTIONS_PATH_PREFIX = "/platform/dashboard/organizations/";
   private static final String CLIENT_ID_FIELD = "clientId";
   private static final String CLIENT_SECRET_FIELD = "clientSecret";
   private static final String FORM_ATTRIBUTE = "connectionForm";
@@ -115,7 +114,9 @@ public class PlatformSocialConnectionsController {
       try {
         saveConnection.handle(
             form.toCommand(organizationId, socialProvider, AuditActor.platformAccount(owner)));
-        return "redirect:" + connectionPath(organizationId, socialProvider) + "?saved";
+        return "redirect:"
+            + SocialConnectionPaths.pageOf(organizationId, socialProvider)
+            + "?saved";
       } catch (final OrganizationNotFoundException e) {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found", e);
       } catch (final CredentialsRequiredException _) {
@@ -150,7 +151,7 @@ public class PlatformSocialConnectionsController {
     deleteCredentials.handle(
         new DeleteOrganizationSocialCredentialCommand(
             organizationId, socialProvider, AuditActor.platformAccount(owner)));
-    return "redirect:" + connectionPath(organizationId, socialProvider) + "?removed";
+    return "redirect:" + SocialConnectionPaths.pageOf(organizationId, socialProvider) + "?removed";
   }
 
   private SocialConnection connectionOf(
@@ -189,13 +190,6 @@ public class PlatformSocialConnectionsController {
     form.setBlockEmailSubaddresses(connection.blockEmailSubaddresses());
     form.setAlwaysShowAccountSelector(connection.alwaysShowAccountSelector());
     return form;
-  }
-
-  private static String connectionPath(final UUID organizationId, final SocialProvider provider) {
-    return CONNECTIONS_PATH_PREFIX
-        + organizationId
-        + "/connections/"
-        + provider.name().toLowerCase(Locale.ROOT);
   }
 
   // The URL names a provider in lower case ("google"); anything else is not a page.

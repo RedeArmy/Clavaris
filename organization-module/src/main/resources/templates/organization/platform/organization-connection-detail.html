@@ -46,8 +46,8 @@
                         </div>
                     </div>
 
-                    <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.saved}">Connection saved.</p>
-                    <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${param.removed}">Credentials removed. The connection is switched off.</p>
+                    <output class="clavaris-alert clavaris-alert--success" th:if="${param.saved}">Connection saved.</output>
+                    <output class="clavaris-alert clavaris-alert--success" th:if="${param.removed}">Credentials removed. The connection is switched off.</output>
                     <p class="clavaris-alert clavaris-alert--warning" th:if="${connection.status().name() == 'SETUP_REQUIRED'}">This connection is switched on, but this Organization has no credentials of its own for it, so it is not offered on the sign-in page. Add them below.</p>
 
                     <output class="clavaris-visually-hidden" aria-live="polite" data-copy-status></output>
@@ -105,10 +105,10 @@
                                 <div class="clavaris-field">
                                     <label for="connection-client-secret">Client secret</label>
                                     <input id="connection-client-secret" type="password" name="clientSecret" autocomplete="new-password"
-                                           maxlength="1000" aria-describedby="connection-client-secret-hint"
+                                           maxlength="1000" th:aria-describedby="${connection.hasCredentials()} ? 'connection-client-secret-saved-hint' : 'connection-client-secret-new-hint'"
                                            th:attr="aria-invalid=${#fields.hasErrors('clientSecret')} ? 'true'"/>
-                                    <p id="connection-client-secret-hint" class="clavaris-field-hint" th:if="${connection.hasCredentials()}">A saved secret is never shown again. Leave this empty to keep it, or type a new one to replace it.</p>
-                                    <p id="connection-client-secret-hint" class="clavaris-field-hint" th:unless="${connection.hasCredentials()}">Both the client ID and the client secret are needed the first time.</p>
+                                    <p id="connection-client-secret-saved-hint" class="clavaris-field-hint" th:if="${connection.hasCredentials()}">A saved secret is never shown again. Leave this empty to keep it, or type a new one to replace it.</p>
+                                    <p id="connection-client-secret-new-hint" class="clavaris-field-hint" th:unless="${connection.hasCredentials()}">Both the client ID and the client secret are needed the first time.</p>
                                     <p class="clavaris-field-error" th:if="${#fields.hasErrors('clientSecret')}" th:errors="*{clientSecret}">Client secret error</p>
                                 </div>
                             </div>

@@ -4514,3 +4514,8 @@ body:has(.htmx-request)::after {
   align-items: center;
   gap: var(--space-2);
 }
+
+/* A status message that is an <output> (so it is announced politely) still reads as a block alert. */
+output.clavaris-alert {
+  display: block;
+}

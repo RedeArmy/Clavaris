@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -140,10 +141,11 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).contains("Google", "GitHub", "Disabled", "Setup required");
-    assertThat(html).contains(base() + "/google", base() + "/github");
     // Development: the shared apps are used, so the page says there is nothing to set up.
-    assertThat(html).contains("shared Google and GitHub apps");
+    assertThat(html)
+        .contains("Google", "GitHub", "Disabled", "Setup required")
+        .contains(base() + "/google", base() + "/github")
+        .contains("shared Google and GitHub apps");
   }
 
   @Test
@@ -159,8 +161,7 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).doesNotContain("shared Google and GitHub apps");
-    assertThat(html).contains("Used for sign-in");
+    assertThat(html).doesNotContain("shared Google and GitHub apps").contains("Used for sign-in");
   }
 
   @Test
@@ -174,10 +175,13 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).contains("Enable for sign-up and sign-in", "Block email subaddresses");
-    assertThat(html).contains("Always show account selector prompt");
-    assertThat(html).doesNotContain("name=\"clientId\"").doesNotContain("name=\"clientSecret\"");
-    assertThat(html).contains("shared").contains("Promote to production");
+    assertThat(html)
+        .contains("Enable for sign-up and sign-in", "Block email subaddresses")
+        .contains("Always show account selector prompt")
+        .doesNotContain("name=\"clientId\"")
+        .doesNotContain("name=\"clientSecret\"")
+        .contains("shared")
+        .contains("Promote to production");
   }
 
   // Once promoted, the production Organization is where the connection is set up.
@@ -220,8 +224,10 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).contains("/promote-to-production").contains("Promote to production");
-    assertThat(html).doesNotContain("Set up this connection in the production Organization");
+    assertThat(html)
+        .contains("/promote-to-production")
+        .contains("Promote to production")
+        .doesNotContain("Set up this connection in the production Organization");
   }
 
   @Test
@@ -237,11 +243,13 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).contains("https://id.example/login/oauth2/code/google");
-    assertThat(html).contains("my-client-id").contains("name=\"clientSecret\"");
     // The secret input is never pre-filled, and nothing in the page can hold a secret.
-    assertThat(html).doesNotContain("encrypted");
-    assertThat(html).contains("Remove credentials");
+    assertThat(html)
+        .contains("https://id.example/login/oauth2/code/google")
+        .contains("my-client-id")
+        .contains("name=\"clientSecret\"")
+        .doesNotContain("encrypted")
+        .contains("Remove credentials");
   }
 
   @Test
@@ -257,8 +265,9 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).doesNotContain("Remove credentials");
-    assertThat(html).contains("not offered on the sign-in page");
+    assertThat(html)
+        .doesNotContain("Remove credentials")
+        .contains("not offered on the sign-in page");
   }
 
   @Test
@@ -318,8 +327,7 @@ class PlatformSocialConnectionsControllerTest {
   void enablingWithoutCredentialsShowsThePageAgainWithTheReason() throws Exception {
     when(getConnections.handle(organization.id()))
         .thenReturn(connections(OrganizationEnvironment.PRODUCTION, false));
-    org.mockito.Mockito.doThrow(
-            new CredentialsRequiredException(organization.id(), SocialProvider.GOOGLE))
+    doThrow(new CredentialsRequiredException(organization.id(), SocialProvider.GOOGLE))
         .when(saveConnection)
         .handle(any());
 
@@ -342,9 +350,7 @@ class PlatformSocialConnectionsControllerTest {
       throws Exception {
     when(getConnections.handle(organization.id()))
         .thenReturn(connections(OrganizationEnvironment.PRODUCTION, false));
-    org.mockito.Mockito.doThrow(new IncompleteCredentialsException())
-        .when(saveConnection)
-        .handle(any());
+    doThrow(new IncompleteCredentialsException()).when(saveConnection).handle(any());
 
     final String html =
         mockMvc
@@ -357,13 +363,15 @@ class PlatformSocialConnectionsControllerTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).contains("Enter both the client ID and the client secret");
-    assertThat(html).contains("only-id").doesNotContain("typed-secret");
+    assertThat(html)
+        .contains("Enter both the client ID and the client secret")
+        .contains("only-id")
+        .doesNotContain("typed-secret");
   }
 
   @Test
   void credentialsForADevelopmentOrganizationAreRefusedWithTheReason() throws Exception {
-    org.mockito.Mockito.doThrow(new CustomCredentialsNotAllowedException(organization.id()))
+    doThrow(new CustomCredentialsNotAllowedException(organization.id()))
         .when(saveConnection)
         .handle(any());
 
