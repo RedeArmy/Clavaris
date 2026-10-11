@@ -104,23 +104,25 @@ class SetOrganizationSocialCredentialServiceTest {
     verifyNoInteractions(auditEvents, cipher);
   }
 
+  // A PRODUCTION Organization has to bring its own credentials before it can enable a provider, so
+  // they must be settable while the provider is still off.
   @Test
-  void rejectsAProviderSocialLoginHasNotBeenEnabledFor() {
+  void savesCredentialsForAProviderThatIsNotEnabledYet() {
     UUID organizationId = UUID.randomUUID();
     Organization production =
-        Organization.registerProductionEnvironment("Acme", UUID.randomUUID(), UUID.randomUUID())
-            .withSocialLoginPolicy(true, List.of("GITHUB"));
+        Organization.registerProductionEnvironment("Acme", UUID.randomUUID(), UUID.randomUUID());
     when(organizations.findById(organizationId))
         .thenReturn(Optional.of(withId(production, organizationId)));
-    SetOrganizationSocialCredentialCommand command =
-        new SetOrganizationSocialCredentialCommand(
-            organizationId, SocialProvider.GOOGLE, "client-id", "raw-secret", ACTOR);
+    when(credentials.findByOrganizationIdAndProvider(organizationId, SocialProvider.GOOGLE))
+        .thenReturn(Optional.empty());
+    when(cipher.encrypt("raw-secret")).thenReturn("encrypted-secret");
 
-    assertThatExceptionOfType(SocialLoginNotEnabledForProviderException.class)
-        .isThrownBy(() -> service.handle(command));
+    SetOrganizationSocialCredentialResult result =
+        service.handle(
+            new SetOrganizationSocialCredentialCommand(
+                organizationId, SocialProvider.GOOGLE, "client-id", "raw-secret", ACTOR));
 
-    verify(credentials, never()).save(any());
-    verifyNoInteractions(auditEvents, cipher);
+    verify(credentials).save(result.credential());
   }
 
   @Test

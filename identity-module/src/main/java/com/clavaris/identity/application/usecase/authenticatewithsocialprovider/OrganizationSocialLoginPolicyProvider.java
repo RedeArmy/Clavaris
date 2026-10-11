@@ -48,4 +48,16 @@ public interface OrganizationSocialLoginPolicyProvider {
     }
     return allowed;
   }
+
+  /**
+   * Whether the Organization refuses sign-ins whose email is a subaddress ({@code name+tag@},
+   * {@code name=tag@}, {@code name#tag@}) for this provider: one can otherwise get around a
+   * provider's own organisation controls. The default is {@code false}, how social login behaved
+   * before an Organization could choose, so an Organization that never saved its connection is
+   * unchanged.
+   */
+  default boolean blocksEmailSubaddresses(
+      final OrganizationId organizationId, final SocialProvider provider) {
+    return false;
+  }
 }

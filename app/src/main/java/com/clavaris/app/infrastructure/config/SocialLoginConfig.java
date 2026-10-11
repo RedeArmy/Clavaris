@@ -34,6 +34,7 @@ import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizati
 import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -243,6 +244,7 @@ class SocialLoginConfig {
           socialLoginAccessTokenResponseClient,
       final SocialLoginAuthenticationSuccessHandler successHandler,
       final SocialLoginAuthenticationFailureHandler failureHandler,
+      final OAuth2AuthorizationRequestResolver authorizationRequestResolver,
       final RateLimiter rateLimiter,
       final RateLimitKeyHasher rateLimitKeyHasher,
       final RateLimitPolicyRepository rateLimitPolicies,
@@ -275,6 +277,11 @@ class SocialLoginConfig {
                     .tokenEndpoint(
                         token ->
                             token.accessTokenResponseClient(socialLoginAccessTokenResponseClient))
+                    // Adds prompt=select_account when the Organization asked for the provider's
+                    // account chooser every time.
+                    .authorizationEndpoint(
+                        endpoint ->
+                            endpoint.authorizationRequestResolver(authorizationRequestResolver))
                     .successHandler(successHandler)
                     .failureHandler(failureHandler))
         .securityContext(context -> context.securityContextRepository(contextRepository))

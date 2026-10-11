@@ -51,6 +51,11 @@ public final class AuditActionCatalog {
         AuditTone.DELETED,
         "Social login credential removed");
     add(
+        "organization.social_connection_updated",
+        AuditCategory.ORGANIZATION,
+        AuditTone.UPDATED,
+        "Social connection updated");
+    add(
         "account_authentication_policy.set",
         AuditCategory.ORGANIZATION,
         AuditTone.UPDATED,

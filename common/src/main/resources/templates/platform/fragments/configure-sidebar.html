@@ -54,6 +54,8 @@ account-behavior policies (Workspace Roles, Sessions) ahead of the two capacity/
        th:classappend="${active == 'workspace-roles'} ? 'active'" th:attr="aria-current=${active == 'workspace-roles'} ? 'page'">Workspace Roles</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/session-policy(id=${organizationId})}"
        th:classappend="${active == 'sessions'} ? 'active'" th:attr="aria-current=${active == 'sessions'} ? 'page'">Sessions</a>
+    <a th:href="@{/platform/dashboard/organizations/{id}/connections(id=${organizationId})}"
+       th:classappend="${active == 'connections'} ? 'active'" th:attr="aria-current=${active == 'connections'} ? 'page'">Connections</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/rate-limit-policy(id=${organizationId})}"
        th:classappend="${active == 'rate-limit'} ? 'active'" th:attr="aria-current=${active == 'rate-limit'} ? 'page'">Rate Limit</a>
     <a th:href="@{/platform/dashboard/organizations/{id}/danger-zone(id=${organizationId})}"

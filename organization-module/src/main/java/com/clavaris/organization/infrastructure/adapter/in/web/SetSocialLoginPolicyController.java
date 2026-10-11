@@ -5,6 +5,7 @@ import com.clavaris.organization.application.usecase.setsocialloginpolicyfororga
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationCommand;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationResult;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SetSocialLoginPolicyForOrganizationUseCase;
+import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SocialCredentialsRequiredException;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.SocialLoginEnabledWithNoProvidersException;
 import com.clavaris.organization.application.usecase.setsocialloginpolicyfororganization.UnknownSocialProviderException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,7 +38,8 @@ class SetSocialLoginPolicyController {
     this.useCase = useCase;
   }
 
-  // Three exits (404 on a bogus organizationId, 400 on an unknown provider name, 200 on success) —
+  // Four exits (404 on a bogus organizationId, 400 on an unknown provider name, 409 on a missing
+  // credential, 200 on success) —
   // same rationale as SetRateLimitPolicyController's own suppression.
   @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an Organization's social-login policy (ADR-0020 Decision 3)")
@@ -47,6 +49,10 @@ class SetSocialLoginPolicyController {
       description =
           "providers names a provider outside the known allowlist, or enabled=true with an"
               + " empty providers list")
+  @ApiResponse(
+      responseCode = "409",
+      description =
+          "A PRODUCTION Organization enabled a provider it has no credentials of its own for")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
   @PutMapping("/api/v1/admin/organizations/{organizationId}/social-login-policy")
   /* package */ ResponseEntity<SetSocialLoginPolicyResponse> set(
@@ -69,6 +75,8 @@ class SetSocialLoginPolicyController {
       return ResponseEntity.notFound().build();
     } catch (final UnknownSocialProviderException | SocialLoginEnabledWithNoProvidersException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    } catch (final SocialCredentialsRequiredException _) {
+      return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
     return ResponseEntity.ok(SetSocialLoginPolicyResponse.from(result.organization()));
   }

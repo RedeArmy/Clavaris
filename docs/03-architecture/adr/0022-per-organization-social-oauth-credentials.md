@@ -78,3 +78,51 @@ sets to carry "which Organization initiated this login"). The registration-id sc
 - **A single shared secret-encryption key across every at-rest secret in the system** — rejected,
   inconsistent with this codebase's own established "one dedicated key per secret class" convention
   (`.env.example`'s own commentary on every existing key already states this explicitly).
+
+## Addendum — PRODUCTION must bring its own credentials; the "Connections" page (2026-10-11)
+
+The shared Clavaris app was meant as the zero-setup default, and for `DEVELOPMENT` it still is. For a
+`PRODUCTION` Organization the fallback turned out to defeat the purpose of this ADR: people on a
+production application would see "Clavaris" on Google's or GitHub's own consent screen whenever an
+Organization had enabled a provider and not (yet) brought its own app. Clerk and Auth0 draw the same
+line, development keys for testing and your own keys for production. So, amending Decisions 1 and 2:
+
+1. **A `PRODUCTION` Organization signs in only through its own credentials.** It cannot enable a
+   provider it has none for (`SocialCredentialsRequiredException` on the policy endpoint,
+   `CredentialsRequiredException` on the dashboard), and the login pages and the sign-in re-check do
+   not offer such a provider (`OrganizationSocialLoginPolicyProviderBridge`). Removing a provider's
+   credentials switches that provider off in the same transaction. There is no fallback to the shared
+   app for `PRODUCTION` any more.
+2. **`DEVELOPMENT` is unchanged**: always the shared app, no credentials to bring (still refused if
+   given), so nothing about trying social login out got harder.
+3. **Credentials can be set before the provider is enabled.** The old guard (the provider had to be
+   enabled first) is gone: it made "enable needs credentials, credentials need enabled" impossible
+   to satisfy. Enabling is still what the policy gate decides, and it is what now checks credentials.
+
+**The dashboard.** Configure gets a "Connections" page (`PlatformSocialConnectionsController`): a list
+of providers with their status (used for sign-in, setup required, disabled) and one page per provider
+with the switch, the credentials, the redirect URI to register with the provider (the shared callback
+`{base}/login/oauth2/code/{provider}`, same whoever's credentials are used), and a danger zone that
+removes the credentials. `SaveSocialConnectionService` saves the three together in one transaction,
+writes only what changed and audits each change, never with the secret. A blank client id or secret
+keeps the saved one, because a saved secret is never shown again.
+
+**Two per-connection options** (new table `organization_social_connection_settings`, one optional row
+per Organization and provider; no row means the behaviour from before they existed):
+
+- *Block email subaddresses*: refuses a social sign-in whose email has `+`, `=` or `#` in its local
+  part, which can otherwise get around a provider's own organisation controls. Checked on every
+  sign-in, returning accounts included, so turning it on also stops those that already used one. It is
+  a method of `OrganizationSocialLoginPolicyProvider` (default `false`), checked by
+  `AuthenticateWithSocialProviderService`, the same place the provider-allowed rule is re-verified.
+- *Always show account selector*: adds `prompt=select_account` to the redirect to the provider
+  (`AccountSelectorAuthorizationRequestResolver`), only for a tenant login that asked for it.
+
+**Consequences.**
+
+- An Organization that was `PRODUCTION` with a provider enabled and no credentials stops offering that
+  provider until it saves some. It is not lost: the page shows it as "Setup required".
+- The REST admin API changes in two places: `PUT .../social-login-policy` answers 409 for a `PRODUCTION`
+  provider with no credentials, and `PUT .../social-credentials/{provider}` no longer answers 409 for
+  a provider that is not enabled yet.
+- Scopes are not editable: Clavaris asks for the minimum each provider needs for sign-in.
