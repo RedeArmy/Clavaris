@@ -21,7 +21,9 @@ function run({ search = "", stored = null }) {
   global.document = {
     documentElement: {
       style: { setProperty: (name, value) => { props[name] = value; } },
-      setAttribute: (name, value) => { props[name] = value; },
+      dataset: {
+        set appearance(value) { props["data-appearance"] = value; },
+      },
     },
   };
   delete require.cache[require.resolve(SCRIPT_PATH)];

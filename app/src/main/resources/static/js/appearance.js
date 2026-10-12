@@ -48,8 +48,8 @@
     document.documentElement.style.setProperty("--clavaris-bg", colour);
     // The palette (text, surfaces) follows the colour's brightness, not the OS colour scheme, so a
     // light application background never gets the dark palette's near-white text and vice versa.
-    const [red, green, blue] = [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16));
+    const [red, green, blue] = [1, 3, 5].map((i) => Number.parseInt(colour.slice(i, i + 2), 16));
     const light = (0.299 * red + 0.587 * green + 0.114 * blue) / 255 > 0.55;
-    document.documentElement.setAttribute("data-appearance", light ? "light" : "dark");
+    document.documentElement.dataset.appearance = light ? "light" : "dark";
   }
 })();
