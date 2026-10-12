@@ -51,6 +51,24 @@ class ContentSecurityPolicyHeaderWriterTest {
       new ContentSecurityPolicyHeaderWriter(
           mock(EmbeddingEligibilityChecker.class), mock(RedirectUriOriginResolver.class));
 
+  // consumer-head loads appearance.js on every page the consuming application's people see, so
+  // those pages need script-src 'self'; anything outside /o/{org}/... and the consent page (the
+  // platform tier's own pages) must keep script-src 'none'.
+  @Test
+  void aPlatformPageOutsideTheDashboardStaysOnScriptSrcNone() {
+    HttpServletRequest request = requestWithUri("/platform/login");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
   @Test
   void setsTheStrictPolicyOnAnHtmlResponseForAnOrdinaryHostedUiPath() {
     HttpServletRequest request = requestWithUri(ORG_REGISTER_PATH);
@@ -61,7 +79,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }
@@ -143,7 +161,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }
@@ -185,7 +203,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }
@@ -203,7 +221,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }
@@ -239,7 +257,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
                 + "img-src 'self' https://cdn.acme.test; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
@@ -270,7 +288,7 @@ class ContentSecurityPolicyHeaderWriterTest {
     verify(response)
         .setHeader(
             HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
                 + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
                 + "form-action 'self'; frame-ancestors 'none'");
   }

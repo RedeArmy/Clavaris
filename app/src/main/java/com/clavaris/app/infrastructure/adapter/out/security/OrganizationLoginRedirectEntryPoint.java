@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -36,6 +37,10 @@ import org.springframework.security.web.AuthenticationEntryPoint;
  * reaches {@code /o/{organizationId}/login} — the login page needs {@code clientId} to resolve
  * embedding eligibility and {@code display} to know it's being rendered inside an iframe at all.
  *
+ * <p>Also forwards {@code appearance_bg} (a plain {@code #rrggbb}, checked here; anything else is
+ * dropped): the consuming application's own page background, which the hosted pages adopt so they
+ * blend into it (see {@code appearance.js}).
+ *
  * <p>TD-FUT-045 (security finding, 2026-10-08): this entry point also fires for every other
  * authenticated path on {@code ACCOUNT_SELF_SERVICE_PATH_PATTERN} ({@code /o/*&#47;account/**}),
  * including the self-service profile page's own embedded-iframe access — and THAT originally-
@@ -52,6 +57,8 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   private static final String LOGIN_SUFFIX = "/login";
   private static final String DISPLAY_PARAM = "display";
   private static final String CLIENT_ID_PARAM = "clientId";
+  private static final String BG_COLOR_PARAM = "appearance_bg";
+  private static final Pattern HEX_COLOUR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 
   // Same PMD.LongVariable suppression ContentSecurityPolicyHeaderWriter's own identically-named
   // constant already carries.
@@ -83,14 +90,22 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
     final String organizationId = nextSlash < 0 ? afterPrefix : afterPrefix.substring(0, nextSlash);
     final String loginUrl = request.getContextPath() + PREFIX + organizationId + LOGIN_SUFFIX;
     final String oauth2ClientId = request.getParameter(OAUTH2_CLIENT_ID_PARAM);
+    final String pageBackground = request.getParameter(BG_COLOR_PARAM);
     response.sendRedirect(
         appendIfPresent(
             appendIfPresent(
-                loginUrl,
-                CLIENT_ID_PARAM,
-                oauth2ClientId != null ? oauth2ClientId : request.getParameter(CLIENT_ID_PARAM)),
-            DISPLAY_PARAM,
-            request.getParameter(DISPLAY_PARAM)));
+                appendIfPresent(
+                    loginUrl,
+                    CLIENT_ID_PARAM,
+                    oauth2ClientId != null
+                        ? oauth2ClientId
+                        : request.getParameter(CLIENT_ID_PARAM)),
+                DISPLAY_PARAM,
+                request.getParameter(DISPLAY_PARAM)),
+            BG_COLOR_PARAM,
+            pageBackground != null && HEX_COLOUR.matcher(pageBackground).matches()
+                ? pageBackground
+                : null));
   }
 
   // Two genuinely distinct outcomes (nothing to append / append one param) — same "each outcome

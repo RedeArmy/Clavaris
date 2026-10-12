@@ -124,8 +124,10 @@
   color-scheme: light;
 }
 
+/* data-appearance is set by appearance.js from the consuming application's own page background:
+   light/dark follows that colour rather than the OS setting, so the text stays readable on it. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-appearance="light"]) {
     --clavaris-bg: #0f0f11;
     --clavaris-surface: #18181b;
     --clavaris-surface-subtle: #131316;
@@ -162,6 +164,44 @@
 
     color-scheme: dark;
   }
+}
+
+:root[data-appearance="dark"] {
+    --clavaris-bg: #0f0f11;
+    --clavaris-surface: #18181b;
+    --clavaris-surface-subtle: #131316;
+    --clavaris-text-primary: #f7f7f8;
+    --clavaris-text-muted: #9394a1;
+    --clavaris-border: #2f3037;
+    --clavaris-border-subtle: #25262c;
+    --clavaris-border-strong: #42434d;
+    --clavaris-highlight: #2b2210;
+    --clavaris-warning-text: #fcd34d;
+    --clavaris-danger-text: #fca5a5;
+    --clavaris-danger-bg: #2a1414;
+    --clavaris-success-text: #86efac;
+    --clavaris-success-bg: #10261a;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.28);
+    --shadow-raised-hover: 0 2px 4px rgba(0, 0, 0, 0.45), 0 18px 40px rgba(0, 0, 0, 0.4);
+    --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-dialog: 0 26px 72px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --backdrop: rgba(0, 0, 0, 0.6);
+
+    --auth-bg:
+      radial-gradient(circle at 12% 10%, rgba(251, 191, 36, 0.1), transparent 29rem),
+      radial-gradient(circle at 88% 88%, rgba(217, 119, 6, 0.08), transparent 31rem),
+      linear-gradient(135deg, #0f0f11 0%, #141417 52%, #121113 100%);
+    --auth-shape: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+    --auth-shape-border: rgba(255, 255, 255, 0.05);
+    --auth-card-edge: rgba(255, 255, 255, 0.08);
+    --auth-card-shadow:
+      0 28px 60px rgba(0, 0, 0, 0.55), 0 3px 9px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --auth-footer-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.04));
+
+    color-scheme: dark;
 }
 
 /* ==========================================================================

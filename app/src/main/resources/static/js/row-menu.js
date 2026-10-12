@@ -8,6 +8,13 @@
   // .clavaris-table-wrapper, which needs overflow: hidden for its own rounded corners, and that
   // would otherwise clip an open dropdown extending past the table. Positioned here, from the
   // trigger's own bounding rect.
+  //
+  // Real bug found live, 2026-10-12: always anchoring below the trigger (rect.bottom + 6) clips the
+  // panel against the viewport's own bottom edge for a row near the end of a table (most visibly
+  // the LAST row) — there is no more page below for the fixed-position panel to occupy. Flip
+  // upward (anchor above the trigger instead) whenever the panel wouldn't fully fit below but does
+  // fit above — the same "flip on collision" behavior every mainstream dropdown (Radix, Headless
+  // UI) already applies, rather than growing the page to make room for an overlay.
   const positionPanel = (details) => {
     const panel = details.querySelector(".clavaris-menu__panel");
     const trigger = details.querySelector(".clavaris-menu__trigger");
@@ -15,7 +22,13 @@
       return;
     }
     const rect = trigger.getBoundingClientRect();
-    panel.style.top = `${rect.bottom + 6}px`;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const fitsBelow = spaceBelow - 6 >= panel.offsetHeight;
+    const shouldFlipUp = !fitsBelow && spaceAbove > spaceBelow;
+    panel.style.top = shouldFlipUp
+      ? `${Math.max(8, rect.top - 6 - panel.offsetHeight)}px`
+      : `${rect.bottom + 6}px`;
     panel.style.left = `${Math.max(8, rect.right - panel.offsetWidth)}px`;
   };
 

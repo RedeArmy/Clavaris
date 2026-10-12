@@ -181,6 +181,14 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
           + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
+  // Every other page the consuming application's people see (sign-up, password reset, consent):
+  // STRICT_POLICY except script-src 'self', because consumer-head loads appearance.js on all of
+  // them. With script-src 'none' the app's page background was blocked on every screen but login,
+  // passkeys and profile, and vanished on the next page of the flow. Same-origin files only; still
+  // no inline script, connect-src or framing.
+  private static final String CONSUMER_POLICY =
+      STRICT_POLICY.replace("script-src 'none'", "script-src 'self'");
+
   // Matches only ConsentController's own flat, org-agnostic GET — see CONSENT_PATH_PATTERN's own
   // comment in OrganizationAuthorizationServerConfig for why this is not "/o/*/oauth2/consent".
   // Never the platform tier (client_credentials only, BR-PLATFORM-01, no interactive consent to
@@ -389,6 +397,9 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
           CLIENT_ID_PARAM,
           organizationIdFromPath(requestUri));
     }
+    if (ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri).matches()) {
+      return CONSUMER_POLICY;
+    }
     return STRICT_POLICY;
   }
 
@@ -459,16 +470,18 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     // withRelaxedFrameAncestorsIfDisplayModal
     // just closed.
     if (DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
-      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
+      return relaxFrameAncestors(
+          CONSUMER_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
     }
     final HttpSession session = request.getSession(false);
     final String pendingState =
         session == null ? null : (String) session.getAttribute(MODAL_STATE_SESSION_ATTRIBUTE);
     if (pendingState != null
         && Objects.equals(pendingState, request.getParameter(OAuth2ParameterNames.STATE))) {
-      return relaxFrameAncestors(STRICT_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
+      return relaxFrameAncestors(
+          CONSUMER_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
     }
-    return STRICT_POLICY;
+    return CONSUMER_POLICY;
   }
 
   @SuppressWarnings("PMD.LongVariable")

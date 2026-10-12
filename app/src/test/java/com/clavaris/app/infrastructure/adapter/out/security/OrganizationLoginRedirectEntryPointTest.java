@@ -41,6 +41,29 @@ class OrganizationLoginRedirectEntryPointTest {
         .isEqualTo("/o/" + ORGANIZATION_ID + "/login?clientId=jobseeker-web&display=modal");
   }
 
+  // The consuming application's own page background rides along so the hosted login can blend
+  // into it; only a plain #rrggbb is forwarded, anything else is dropped.
+  @Test
+  void forwardsAValidAppearanceBackgroundAndDropsAnInvalidOne() throws Exception {
+    MockHttpServletRequest valid =
+        new MockHttpServletRequest("GET", "/o/" + ORGANIZATION_ID + "/oauth2/authorize");
+    valid.setParameter("client_id", "jobseeker-web");
+    valid.setParameter("appearance_bg", "#ecfdf5");
+    MockHttpServletResponse validResponse = new MockHttpServletResponse();
+    MockHttpServletRequest invalid =
+        new MockHttpServletRequest("GET", "/o/" + ORGANIZATION_ID + "/oauth2/authorize");
+    invalid.setParameter("appearance_bg", "red;}body{display:none");
+    MockHttpServletResponse invalidResponse = new MockHttpServletResponse();
+
+    entryPoint.commence(valid, validResponse, anAuthenticationException());
+    entryPoint.commence(invalid, invalidResponse, anAuthenticationException());
+
+    assertThat(validResponse.getRedirectedUrl())
+        .isEqualTo(
+            "/o/" + ORGANIZATION_ID + "/login?clientId=jobseeker-web&appearance_bg=%23ecfdf5");
+    assertThat(invalidResponse.getRedirectedUrl()).isEqualTo("/o/" + ORGANIZATION_ID + "/login");
+  }
+
   @Test
   void forwardsOnlyClientIdWhenDisplayIsAbsent() throws Exception {
     MockHttpServletRequest request =

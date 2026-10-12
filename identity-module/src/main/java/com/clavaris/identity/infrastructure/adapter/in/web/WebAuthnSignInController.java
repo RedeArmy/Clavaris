@@ -99,6 +99,13 @@ public class WebAuthnSignInController {
     request
         .getSession()
         .setAttribute(WebAuthnAuthenticationPendingState.ATTRIBUTE, assertionRequest.toJson());
+    // Real bug found live, 2026-10-11: toCredentialsGetJson() wraps the options under a top-level
+    // "publicKey" key, built for navigator.credentials.get({publicKey: ...}) directly — and, unlike
+    // PublicKeyCredentialCreationOptions (registration side), PublicKeyCredentialRequestOptions
+    // offers no unwrapped toJson() alternative to call instead. The fix lives client-side:
+    // webauthn-login.js now unwraps optionsJson.publicKey itself before handing it to
+    // PublicKeyCredential.parseRequestOptionsFromJSON(), which needs the unwrapped shape (challenge
+    // at the top level).
     return ResponseEntity.ok(assertionRequest.toCredentialsGetJson());
   }
 

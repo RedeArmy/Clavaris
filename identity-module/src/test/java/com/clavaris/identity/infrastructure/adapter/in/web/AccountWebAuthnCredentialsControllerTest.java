@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -128,17 +129,28 @@ class AccountWebAuthnCredentialsControllerTest {
         .andExpect(view().name("identity/account/passkeys"));
   }
 
+  // Real bug found live, 2026-10-11 (see WebAuthnSignInControllerTest's own identical fix): this
+  // test used to stub/ignore toCredentialsCreateJson() (the
+  // navigator.credentials.create({publicKey:
+  // ...})-shaped wrapper) while the real browser-facing client (webauthn-register.js) calls
+  // PublicKeyCredential.parseCreationOptionsFromJSON() on this same response — which needs the
+  // UNWRAPPED PublicKeyCredentialCreationOptionsJSON, challenge at the top level, not nested under
+  // "publicKey". Asserting the response body against the real options' own toJson() output closes
+  // the gap a mock-everything test previously hid.
   @Test
-  void startRegistrationReturnsTheCredentialsCreateJsonAndStashesTheOptionsInSession()
+  void startRegistrationReturnsTheUnwrappedOptionsJsonAndStashesTheOptionsInSession()
       throws Exception {
+    String optionsJson = realCreationOptionsJson();
     PublicKeyCredentialCreationOptions options = mock(PublicKeyCredentialCreationOptions.class);
-    when(options.toJson()).thenReturn(realCreationOptionsJson());
-    when(options.toCredentialsCreateJson()).thenReturn("{\"publicKey\":{}}");
+    when(options.toJson()).thenReturn(optionsJson);
     when(startRegistration.handle(any())).thenReturn(options);
 
     mockMvc
         .perform(post("/o/{organizationId}/account/passkeys/registration/start", ORGANIZATION_ID))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(content().json(optionsJson))
+        .andExpect(jsonPath("$.challenge").exists())
+        .andExpect(jsonPath("$.publicKey").doesNotExist());
   }
 
   @Test
@@ -156,7 +168,6 @@ class AccountWebAuthnCredentialsControllerTest {
   void finishRegistrationWithAFailedCeremonyReturnsBadRequest() throws Exception {
     PublicKeyCredentialCreationOptions options = mock(PublicKeyCredentialCreationOptions.class);
     when(options.toJson()).thenReturn(realCreationOptionsJson());
-    when(options.toCredentialsCreateJson()).thenReturn("{\"publicKey\":{}}");
     when(startRegistration.handle(any())).thenReturn(options);
     doThrow(new InvalidWebAuthnRegistrationException("boom"))
         .when(completeRegistration)
@@ -182,7 +193,6 @@ class AccountWebAuthnCredentialsControllerTest {
   void finishRegistrationOnSuccessReturnsNoContent() throws Exception {
     PublicKeyCredentialCreationOptions options = mock(PublicKeyCredentialCreationOptions.class);
     when(options.toJson()).thenReturn(realCreationOptionsJson());
-    when(options.toCredentialsCreateJson()).thenReturn("{\"publicKey\":{}}");
     when(startRegistration.handle(any())).thenReturn(options);
 
     MvcResult startResult =
