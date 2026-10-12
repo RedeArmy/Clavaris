@@ -10,7 +10,9 @@
      this attribute, so a plain in-frame link would otherwise dead-end there). -->
 <body th:attr="data-modal=${modal}">
 <main>
-    <div class="clavaris-card">
+    <div class="clavaris-card" th:classappend="${homeUrl != null and modal != true} ? 'clavaris-card--with-home'">
+        <!--/* The way back to the application (see identity/fragments/home-link). */-->
+        <a th:replace="~{identity/fragments/home-link :: link}"></a>
         <!--/* This is the consuming application's sign-in, so it shows that application's own branding
                 and nothing of Clavaris: its logo or initial, and "Sign in to <name>". An application
                 with no branding gets a plain "Sign in". The name sits in its own element so the

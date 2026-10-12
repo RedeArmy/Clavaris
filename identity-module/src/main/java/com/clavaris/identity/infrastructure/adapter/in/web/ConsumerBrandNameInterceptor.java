@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
+import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -51,9 +52,12 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
   private static final String CLIENT_PARAM = "clientId";
 
   private final ClientBrandingProvider brandingProvider;
+  private final ClientHomeUrlResolver homeUrlResolver;
 
-  public ConsumerBrandNameInterceptor(final ClientBrandingProvider brandingProvider) {
+  public ConsumerBrandNameInterceptor(
+      final ClientBrandingProvider brandingProvider, final ClientHomeUrlResolver homeUrlResolver) {
     this.brandingProvider = brandingProvider;
+    this.homeUrlResolver = homeUrlResolver;
   }
 
   @Override
@@ -77,6 +81,7 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
       final ModelAndView modelAndView,
       final OrganizationId organization) {
     final String clientId = request.getParameter(CLIENT_PARAM);
+    addHomeLink(modelAndView, organization, clientId);
     final boolean needsName = !modelAndView.getModel().containsKey(BRAND_NAME);
     brandingOf(modelAndView, needsName, organization, clientId)
         .ifPresent(
@@ -93,6 +98,18 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
                           modelAndView.addObject(
                               THEME_URL, ConsumerThemeController.urlFor(organization, clientId)));
             });
+  }
+
+  // Where the application's own home page is, so a page can offer the way back to it (the house
+  // icon on sign-in and sign-up). Only when the request names a client of this Organization, and
+  // never overriding a page that already set its own; see ReturnToApplicationLink.
+  private void addHomeLink(
+      final ModelAndView modelAndView, final OrganizationId organization, final String clientId) {
+    if (!modelAndView.getModel().containsKey(ReturnToApplicationLink.HOME_URL)) {
+      homeUrlResolver
+          .resolve(organization, clientId)
+          .ifPresent(url -> modelAndView.addObject(ReturnToApplicationLink.HOME_URL, url));
+    }
   }
 
   // The branding the page was given, else (only when it still needs a name) the one looked up.

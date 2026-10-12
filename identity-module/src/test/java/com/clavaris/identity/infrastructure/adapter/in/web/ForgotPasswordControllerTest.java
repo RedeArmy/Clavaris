@@ -69,7 +69,7 @@ class ForgotPasswordControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new ForgotPasswordController(useCase, new ReturnToApplicationLink(homeUrls)))
-            .addInterceptors(new ConsumerBrandNameInterceptor(branding))
+            .addInterceptors(new ConsumerBrandNameInterceptor(branding, homeUrls))
             .setViewResolvers(viewResolver)
             .build();
   }
