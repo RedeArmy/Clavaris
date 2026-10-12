@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
@@ -36,6 +37,7 @@ import com.clavaris.identity.application.usecase.requestemailverification.EmailV
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
+import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectAction;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
@@ -73,6 +75,7 @@ class LoginControllerTest {
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private RedirectUrlResolver redirectUrlResolver;
   private ClientBrandingProvider clientBrandingProvider;
+  private ClientHomeUrlResolver homeUrls;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -87,6 +90,7 @@ class LoginControllerTest {
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     redirectUrlResolver = mock(RedirectUrlResolver.class);
     clientBrandingProvider = mock(ClientBrandingProvider.class);
+    homeUrls = mock(ClientHomeUrlResolver.class);
     // Matches today's real default (no redirect policy configured) — every existing test below
     // predates this feature and expects the controller's own hardcoded literal fallback.
     when(redirectUrlResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -128,6 +132,7 @@ class LoginControllerTest {
                     redirectUrlResolver,
                     clientBrandingProvider,
                     recordLoginEvent))
+            .addInterceptors(new ConsumerBrandNameInterceptor(clientBrandingProvider, homeUrls))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -463,5 +468,59 @@ class LoginControllerTest {
 
     verify(sessionEstablisher, never()).establish(any(), any(), any(), anyBoolean(), anyString());
     verifyNoInteractions(recordLoginDevice);
+  }
+
+  // The way back to the application: a house icon, only for a client with a home page to return to.
+  @Test
+  void aSignInForAClientWithAHomePageOffersTheWayBackToIt() throws Exception {
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+
+    final String html =
+        mockMvc
+            .perform(
+                get("/o/{organizationId}/login", ORGANIZATION_ID).param("clientId", "acme-web"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("href=\"https://app.acme.test/\"")
+        .contains("aria-label=\"Back to home\"")
+        .contains("clavaris-card--with-home");
+  }
+
+  @Test
+  void aSignInWithNoClientOffersNoWayBack() throws Exception {
+    final String html =
+        mockMvc
+            .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).doesNotContain("Back to home").doesNotContain("clavaris-card--with-home");
+  }
+
+  // Inside the application's own iframe the application is already around the page.
+  @Test
+  void aSignInInsideTheApplicationsOwnFrameOffersNoWayBack() throws Exception {
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+
+    final String html =
+        mockMvc
+            .perform(
+                get("/o/{organizationId}/login", ORGANIZATION_ID)
+                    .param("clientId", "acme-web")
+                    .param("display", "modal"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).doesNotContain("Back to home").doesNotContain("app.acme.test");
   }
 }

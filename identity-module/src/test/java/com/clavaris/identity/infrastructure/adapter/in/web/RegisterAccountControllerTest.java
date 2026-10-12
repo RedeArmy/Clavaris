@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -35,6 +36,8 @@ import com.clavaris.identity.application.usecase.requestemailverification.EmailV
 import com.clavaris.identity.application.usecase.requestemailverification.MailDeliveryException;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationCommand;
 import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
@@ -72,6 +75,7 @@ class RegisterAccountControllerTest {
   private RequestEmailSignInLinkUseCase requestEmailSignInLink;
   private OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
   private ClientHomeUrlResolver homeUrls;
+  private ClientBrandingProvider brandingProvider;
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -83,6 +87,9 @@ class RegisterAccountControllerTest {
     requestEmailSignInLink = mock(RequestEmailSignInLinkUseCase.class);
     socialLoginPolicyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
     homeUrls = mock(ClientHomeUrlResolver.class);
+    brandingProvider = mock(ClientBrandingProvider.class);
+    when(brandingProvider.brandingFor(any(), any()))
+        .thenReturn(ClientBrandingSnapshot.unconfigured());
     // Matches today's real default (ADR-0024) — every existing test below predates this policy.
     when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(AccountAuthenticationPolicySnapshot.defaults());
@@ -117,6 +124,7 @@ class RegisterAccountControllerTest {
                     requestEmailSignInLink,
                     socialLoginPolicyProvider,
                     new ReturnToApplicationLink(homeUrls)))
+            .addInterceptors(new ConsumerBrandNameInterceptor(brandingProvider, homeUrls))
             .setViewResolvers(viewResolver)
             .build();
   }
@@ -676,5 +684,59 @@ class RegisterAccountControllerTest {
                 .param("clientId", "acme-web"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("login?clientId=acme-web")));
+  }
+
+  // The way back to the application: a house icon, only for a client with a home page to return to.
+  @Test
+  void aSignUpForAClientWithAHomePageOffersTheWayBackToIt() throws Exception {
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+
+    final String html =
+        mockMvc
+            .perform(
+                get("/o/{organizationId}/register", ORGANIZATION_ID).param("clientId", "acme-web"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("href=\"https://app.acme.test/\"")
+        .contains("aria-label=\"Back to home\"")
+        .contains("clavaris-card--with-home");
+  }
+
+  @Test
+  void aSignUpWithNoClientOffersNoWayBack() throws Exception {
+    final String html =
+        mockMvc
+            .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).doesNotContain("Back to home").doesNotContain("clavaris-card--with-home");
+  }
+
+  // A rejected submission shows the form again: the way back must still be there.
+  @Test
+  void theWayBackSurvivesARejectedSignUp() throws Exception {
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION_ID), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+
+    final String html =
+        mockMvc
+            .perform(
+                post("/o/{organizationId}/register", ORGANIZATION_ID)
+                    .param("clientId", "acme-web")
+                    .param("email", "not-an-email"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("href=\"https://app.acme.test/\"").contains("Back to home");
   }
 }
