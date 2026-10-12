@@ -50,6 +50,8 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
   private static final String PLATFORM_PREFIX = "identity/platform/";
   private static final String ORG_VARIABLE = "organizationId";
   private static final String CLIENT_PARAM = "clientId";
+  private static final String DISPLAY_PARAM = "display";
+  private static final String MODAL_DISPLAY = "modal";
 
   private final ClientBrandingProvider brandingProvider;
   private final ClientHomeUrlResolver homeUrlResolver;
@@ -81,7 +83,7 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
       final ModelAndView modelAndView,
       final OrganizationId organization) {
     final String clientId = request.getParameter(CLIENT_PARAM);
-    addHomeLink(modelAndView, organization, clientId);
+    addHomeLink(request, modelAndView, organization, clientId);
     final boolean needsName = !modelAndView.getModel().containsKey(BRAND_NAME);
     brandingOf(modelAndView, needsName, organization, clientId)
         .ifPresent(
@@ -102,10 +104,16 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
 
   // Where the application's own home page is, so a page can offer the way back to it (the house
   // icon on sign-in and sign-up). Only when the request names a client of this Organization, and
-  // never overriding a page that already set its own; see ReturnToApplicationLink.
+  // never overriding a page that already set its own; see ReturnToApplicationLink. Not when the
+  // page is being shown inside the application's own iframe (display=modal): the application is
+  // already around it, and the link would load the application inside its own frame.
   private void addHomeLink(
-      final ModelAndView modelAndView, final OrganizationId organization, final String clientId) {
-    if (!modelAndView.getModel().containsKey(ReturnToApplicationLink.HOME_URL)) {
+      final HttpServletRequest request,
+      final ModelAndView modelAndView,
+      final OrganizationId organization,
+      final String clientId) {
+    final boolean framed = MODAL_DISPLAY.equals(request.getParameter(DISPLAY_PARAM));
+    if (!framed && !modelAndView.getModel().containsKey(ReturnToApplicationLink.HOME_URL)) {
       homeUrlResolver
           .resolve(organization, clientId)
           .ifPresent(url -> modelAndView.addObject(ReturnToApplicationLink.HOME_URL, url));

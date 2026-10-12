@@ -4563,6 +4563,8 @@ output.clavaris-alert {
 /* The way back to the application: a house icon in the top-left corner of the sign-in and sign-up card. */
 .clavaris-card--with-home {
   position: relative;
+  /* Room for the icon above the content, so even a very wide logo cannot run into it. */
+  padding-top: var(--space-12);
 }
 
 .clavaris-card__home {

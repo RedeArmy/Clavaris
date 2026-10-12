@@ -4,10 +4,11 @@ corner of the card. The address is the application's own home page, worked out f
 registered (see ReturnToApplicationLink), never from anything the request carries, so it cannot be turned
 into an open redirect. It only exists when the request names a client of this Organization; a direct
 visit has nothing to go back to and shows no button. Inside the consuming application's own iframe
-(display=modal) the application is already around the page, so a login rendered there does not draw it.
+(display=modal) the application is already around the page, so ConsumerBrandNameInterceptor does not
+supply an address there and nothing is drawn.
 -->
 <a th:fragment="link" class="clavaris-icon-button clavaris-card__home"
-   th:if="${homeUrl != null and modal != true}"
+   th:if="${homeUrl != null}"
    th:href="${homeUrl}" aria-label="Back to home" title="Back to home">
     <svg class="clavaris-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
 </a>

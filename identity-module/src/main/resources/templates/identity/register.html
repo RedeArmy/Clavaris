@@ -5,7 +5,7 @@
 </head>
 <body>
 <main>
-    <div class="clavaris-card" th:classappend="${homeUrl != null and modal != true} ? 'clavaris-card--with-home'">
+    <div class="clavaris-card" th:classappend="${homeUrl != null} ? 'clavaris-card--with-home'">
         <!--/* The way back to the application (see identity/fragments/home-link). */-->
         <a th:replace="~{identity/fragments/home-link :: link}"></a>
         <h1>Create an account</h1>
