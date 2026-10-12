@@ -329,6 +329,21 @@ class ConsumerBrandNameInterceptorTest {
     assertThat(page.getModel()).containsEntry("homeUrl", "https://app.acme.test/");
   }
 
+  // Inside the application's own iframe the link would load the application inside its own frame.
+  @Test
+  void aPageShownInsideTheApplicationsOwnFrameGetsNoHomeAddress() {
+    inOrganization();
+    request.setParameter("clientId", "acme-web");
+    request.setParameter("display", "modal");
+    when(homeUrls.resolve(any(), any())).thenReturn(Optional.of("https://app.acme.test/"));
+    when(branding.brandingFor(any(), any())).thenReturn(named("Acme"));
+
+    final ModelAndView view = run(new ModelAndView("identity/register"));
+
+    assertThat(view.getModel()).doesNotContainKey("homeUrl");
+    verify(homeUrls, never()).resolve(any(), any());
+  }
+
   // Clavaris's own pages never get an application's home address.
   @Test
   void aPlatformViewGetsNoHomeAddress() {
