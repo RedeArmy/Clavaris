@@ -7,10 +7,10 @@
  * gets decided, by feature detection alone.
  *
  * Uses the WebAuthn Level 3 JSON convenience methods (PublicKeyCredential.parseRequestOptionsFromJSON,
- * credential.toJSON()) rather than hand-rolled base64url<->ArrayBuffer conversion — these exist
- * specifically to interop with the exact JSON shape Yubico's own server-side
- * AssertionRequest#toCredentialsGetJson()/PublicKeyCredential#parseAssertionResponseJson produce and
- * consume.
+ * credential.toJSON()) rather than hand-rolled base64url<->ArrayBuffer conversion. The server sends
+ * Yubico's own AssertionRequest#toCredentialsGetJson() shape ({"publicKey": {...}}), which this
+ * script unwraps before calling parseRequestOptionsFromJSON() — see that call site's own comment,
+ * real bug found live, 2026-10-11.
  */
 (function () {
   "use strict";
@@ -69,7 +69,14 @@
         return response.json();
       })
       .then(function (optionsJson) {
-        var options = PublicKeyCredential.parseRequestOptionsFromJSON(optionsJson);
+        // Real bug found live, 2026-10-11: the server returns Yubico's own
+        // AssertionRequest#toCredentialsGetJson() shape, {"publicKey": {...}} — convenient for
+        // navigator.credentials.get() directly, but parseRequestOptionsFromJSON() (the WebAuthn
+        // Level 3 convenience method) wants the UNWRAPPED PublicKeyCredentialRequestOptionsJSON
+        // (challenge at the top level), not this one extra level of nesting. Unwrap here rather
+        // than on the server: PublicKeyCredentialRequestOptions has no plain toJson() of its own
+        // to switch to (unlike the registration side's PublicKeyCredentialCreationOptions).
+        var options = PublicKeyCredential.parseRequestOptionsFromJSON(optionsJson.publicKey);
         return navigator.credentials.get({ publicKey: options });
       })
       .then(function (assertion) {

@@ -114,7 +114,13 @@ public class AccountWebAuthnCredentialsController {
             new StartWebAuthnRegistrationCommand(
                 accountId, new OrganizationId(organizationId), account.email().value()));
     request.getSession().setAttribute(WebAuthnRegistrationPendingState.ATTRIBUTE, options.toJson());
-    return ResponseEntity.ok(options.toCredentialsCreateJson());
+    // Real bug found live, 2026-10-11 (see WebAuthnSignInController's own identical fix):
+    // toCredentialsCreateJson() wraps the options under a top-level "publicKey" key, built for
+    // navigator.credentials.create({publicKey: ...}) directly — but webauthn-register.js instead
+    // feeds this response straight into PublicKeyCredential.parseCreationOptionsFromJSON(), which
+    // expects the plain, unwrapped PublicKeyCredentialCreationOptionsJSON. toJson() (already used
+    // two lines above to persist the pending state) is that same unwrapped shape.
+    return ResponseEntity.ok(options.toJson());
   }
 
   @PostMapping("/registration/finish")

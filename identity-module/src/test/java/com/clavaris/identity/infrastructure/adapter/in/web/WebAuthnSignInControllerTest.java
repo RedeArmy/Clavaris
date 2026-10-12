@@ -90,25 +90,38 @@ class WebAuthnSignInControllerTest {
   // The controller's own /finish round-trips this through the REAL AssertionRequest.fromJson(...)
   // static deserializer — a fabricated JSON string would fail that parse, so this must be a
   // genuinely valid serialization, not just any string.
-  private static String realAssertionRequestJson() throws Exception {
-    PublicKeyCredentialRequestOptions options =
-        PublicKeyCredentialRequestOptions.builder()
-            .challenge(new ByteArray(new byte[] {1, 2, 3}))
-            .build();
-    return AssertionRequest.builder().publicKeyCredentialRequestOptions(options).build().toJson();
+  private static PublicKeyCredentialRequestOptions realOptions() {
+    return PublicKeyCredentialRequestOptions.builder()
+        .challenge(new ByteArray(new byte[] {1, 2, 3}))
+        .build();
   }
 
+  private static AssertionRequest realAssertionRequest(
+      final PublicKeyCredentialRequestOptions options) {
+    return AssertionRequest.builder().publicKeyCredentialRequestOptions(options).build();
+  }
+
+  // Real bug found live, 2026-10-11: the /start response carries Yubico's own
+  // AssertionRequest#toCredentialsGetJson() shape, {"publicKey": {challenge, ...}} — a mock that
+  // just returns an arbitrary wrapped literal (the old "{\"publicKey\":{}}" stub) never proves the
+  // real browser-facing client (webauthn-login.js) can actually read a challenge back out of it.
+  // Asserting against the REAL options' own toCredentialsGetJson() output, with the challenge
+  // genuinely nested one level deep, is what would have caught this live bug.
   @Test
-  void startReturnsTheCredentialsGetJsonAndStashesTheRequestInSession() throws Exception {
+  void startReturnsTheWrappedCredentialsGetJsonAndStashesTheRequestInSession() throws Exception {
+    PublicKeyCredentialRequestOptions options = realOptions();
+    AssertionRequest realAssertionRequest = realAssertionRequest(options);
     AssertionRequest assertionRequest = mock(AssertionRequest.class);
-    when(assertionRequest.toJson()).thenReturn(realAssertionRequestJson());
-    when(assertionRequest.toCredentialsGetJson()).thenReturn("{\"publicKey\":{}}");
+    when(assertionRequest.toJson()).thenReturn(realAssertionRequest.toJson());
+    when(assertionRequest.toCredentialsGetJson())
+        .thenReturn(realAssertionRequest.toCredentialsGetJson());
     when(startAuthentication.handle()).thenReturn(assertionRequest);
 
     mockMvc
         .perform(post("/o/{organizationId}/login/webauthn/start", ORGANIZATION_ID))
         .andExpect(status().isOk())
-        .andExpect(content().json("{\"publicKey\":{}}"));
+        .andExpect(content().json(realAssertionRequest.toCredentialsGetJson()))
+        .andExpect(jsonPath("$.publicKey.challenge").exists());
   }
 
   @Test
@@ -124,9 +137,9 @@ class WebAuthnSignInControllerTest {
 
   @Test
   void finishWithAnInvalidAssertionReturnsBadRequestAndNeverEstablishesASession() throws Exception {
+    AssertionRequest realAssertionRequest = realAssertionRequest(realOptions());
     AssertionRequest assertionRequest = mock(AssertionRequest.class);
-    when(assertionRequest.toJson()).thenReturn(realAssertionRequestJson());
-    when(assertionRequest.toCredentialsGetJson()).thenReturn("{\"publicKey\":{}}");
+    when(assertionRequest.toJson()).thenReturn(realAssertionRequest.toJson());
     when(startAuthentication.handle()).thenReturn(assertionRequest);
     when(authenticate.handle(any())).thenThrow(new InvalidWebAuthnAssertionException());
 
@@ -149,9 +162,9 @@ class WebAuthnSignInControllerTest {
 
   @Test
   void finishOnSuccessReturnsTheRedirectTargetAndRecordsTheLoginDeviceAndEvent() throws Exception {
+    AssertionRequest realAssertionRequest = realAssertionRequest(realOptions());
     AssertionRequest assertionRequest = mock(AssertionRequest.class);
-    when(assertionRequest.toJson()).thenReturn(realAssertionRequestJson());
-    when(assertionRequest.toCredentialsGetJson()).thenReturn("{\"publicKey\":{}}");
+    when(assertionRequest.toJson()).thenReturn(realAssertionRequest.toJson());
     when(startAuthentication.handle()).thenReturn(assertionRequest);
 
     Account account = newAccount();
