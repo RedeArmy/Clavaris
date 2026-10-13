@@ -13,6 +13,7 @@ import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegis
 import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
@@ -237,12 +238,14 @@ public class OrganizationAuthorizationServerConfig {
         new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles);
     final ProfilePictureClaimsCustomizer profilePictureClaims =
         new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
+    final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
           authenticationContextClaims.customize(context);
           workspaceRoleClaims.customize(context);
           profilePictureClaims.customize(context);
+          emailClaims.customize(context);
         });
     return new DelegatingOAuth2TokenGenerator(
         jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));

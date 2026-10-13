@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -96,6 +97,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   private int port;
 
   @Autowired private PlatformAccountRepository platformAccounts;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private final CookieManager cookieManager = new CookieManager();
   private final HttpClient httpClient =
@@ -117,6 +119,60 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.statusCode()).isEqualTo(200);
     JsonNode body = objectMapper.readTree(response.body());
     assertThat(body.get("sub").asString()).isEqualTo(tokens.subject());
+  }
+
+  // The email scope (OIDC Core §5.4) must put email/email_verified on the ID token and, through
+  // the same scope gate, on /userinfo — real bug found live: a client that requested email got
+  // only sub (and picture) from both. The access token stays free of them.
+  @Test
+  void theEmailAndProfileScopesPutTheClaimsOnTheIdTokenAndUserInfo() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "email-claims@example.com", "openid profile email", true);
+
+    JsonNode idToken = decodePayload(tokens.tokenResponse().idToken());
+    assertThat(idToken.get("email").asString()).isEqualTo("email-claims@example.com");
+    assertThat(idToken.get("email_verified").asBoolean()).isTrue();
+    JsonNode userInfo = getUserInfo(tokens);
+    assertThat(userInfo.get("email").asString()).isEqualTo("email-claims@example.com");
+    assertThat(userInfo.get("email_verified").asBoolean()).isTrue();
+    assertThat(userInfo.get("name").asString()).isEqualTo("Eder Test");
+    assertThat(decodePayload(tokens.tokenResponse().accessToken()).has("email")).isFalse();
+  }
+
+  @Test
+  void anUnverifiedEmailIsReportedAsFalseNotOmitted() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "unverified-claims@example.com", "openid email", false);
+
+    assertThat(decodePayload(tokens.tokenResponse().idToken()).get("email_verified").asBoolean())
+        .isFalse();
+    assertThat(getUserInfo(tokens).get("email_verified").asBoolean()).isFalse();
+  }
+
+  @Test
+  void withoutTheEmailScopeNoEmailClaimIsIssued() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "no-email-scope@example.com", "openid profile", true);
+
+    assertThat(decodePayload(tokens.tokenResponse().idToken()).has("email")).isFalse();
+    JsonNode userInfo = getUserInfo(tokens);
+    assertThat(userInfo.has("email")).isFalse();
+    assertThat(userInfo.has("email_verified")).isFalse();
+  }
+
+  private JsonNode getUserInfo(IssuedTokens tokens) throws Exception {
+    HttpResponse<String> response =
+        getWithBearer(
+            "/o/" + tokens.organizationId() + "/userinfo", tokens.tokenResponse().accessToken());
+    assertThat(response.statusCode()).isEqualTo(200);
+    return objectMapper.readTree(response.body());
+  }
+
+  private JsonNode decodePayload(String jwt) throws Exception {
+    return objectMapper.readTree(new String(base64UrlDecode(jwt.split("\\.")[1])));
   }
 
   @Test
@@ -265,15 +321,30 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   // suite is about userinfo/logout, not consent (which has its own dedicated coverage).
   private IssuedTokens completeARealAuthorizationCodeExchange(String email)
       throws IOException, InterruptedException, NoSuchAlgorithmException {
+    return completeARealAuthorizationCodeExchange(email, "openid", false);
+  }
+
+  // markVerified also gives the Account a first/last name, so the same flow can assert both the
+  // email claim group and the (name-dependent) profile one.
+  private IssuedTokens completeARealAuthorizationCodeExchange(
+      String email, String scope, boolean markVerified)
+      throws IOException, InterruptedException, NoSuchAlgorithmException {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "UserInfo/Logout Co " + email);
     ClientCredentials client = registerOAuthClient(platformToken, organizationId);
     registerAccount(organizationId, email, "a-correct-password");
+    if (markVerified) {
+      jdbcTemplate.update(
+          "update accounts set email_verified_at = now(), first_name = 'Eder', last_name = 'Test'"
+              + " where organization_id = ? and email = ?",
+          organizationId,
+          email);
+    }
 
     String codeVerifier = generateCodeVerifier();
     String codeChallenge = deriveCodeChallenge(codeVerifier);
 
-    getAuthorize(organizationId, client.clientId(), codeChallenge, "state-value");
+    getAuthorize(organizationId, client.clientId(), codeChallenge, "state-value", scope);
     String loginCsrfToken = fetchLoginCsrfToken(organizationId);
     HttpResponse<Void> loginResponse =
         submitLogin(organizationId, loginCsrfToken, email, "a-correct-password");
@@ -361,7 +432,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         {
           "redirectUris": ["%s"],
           "allowedGrantTypes": ["authorization_code"],
-          "allowedScopes": ["openid"],
+          "allowedScopes": ["openid", "profile", "email"],
           "requireConsent": false%s
         }
         """
@@ -410,13 +481,20 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   private void getAuthorize(
       UUID organizationId, String clientId, String codeChallenge, String state)
       throws IOException, InterruptedException {
+    getAuthorize(organizationId, clientId, codeChallenge, state, "openid");
+  }
+
+  private void getAuthorize(
+      UUID organizationId, String clientId, String codeChallenge, String state, String scope)
+      throws IOException, InterruptedException {
     String query =
         "response_type=code"
             + "&client_id="
             + clientId
             + "&redirect_uri="
             + urlEncode(REDIRECT_URI)
-            + "&scope=openid"
+            + "&scope="
+            + urlEncode(scope)
             + "&code_challenge="
             + codeChallenge
             + "&code_challenge_method=S256"
