@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcAuthorizationRequestParamsFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationRateLimitRules;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
@@ -14,6 +15,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenti
 import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
@@ -54,7 +56,9 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -417,6 +421,11 @@ public class OrganizationAuthorizationServerConfig {
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
 
+    // Explicit rather than SAS's own implicit default, so OidcAuthorizationRequestParamsFilter
+    // (prompt=consent) and the authorization endpoint provably share one consent store.
+    final OAuth2AuthorizationConsentService consentService =
+        new InMemoryOAuth2AuthorizationConsentService();
+
     // TD-SEC-003: same fix, same rationale as the platform tier's own config — see this class's
     // sibling comment there and the migration's own comment for why both tiers deliberately share
     // one physical oauth2_authorization table. This is the tier that actually matters most for
@@ -465,6 +474,7 @@ public class OrganizationAuthorizationServerConfig {
                     .registeredClientRepository(registeredClients)
                     .authorizationServerSettings(settings)
                     .authorizationService(authorizationService)
+                    .authorizationConsentService(consentService)
                     .tokenGenerator(tokenGenerator)
                     // BR-ID-03: replaces SAS's own OAuth2RefreshTokenAuthenticationProvider
                     // entirely for the refresh grant — same provider-swap extension point already
@@ -498,9 +508,13 @@ public class OrganizationAuthorizationServerConfig {
                     .oidc(
                         oidc ->
                             oidc.userInfoEndpoint(
-                                userInfo ->
-                                    userInfo.userInfoMapper(
-                                        new WorkspaceAwareOidcUserInfoMapper())))
+                                    userInfo ->
+                                        userInfo.userInfoMapper(
+                                            new WorkspaceAwareOidcUserInfoMapper()))
+                                .providerConfigurationEndpoint(
+                                    provider ->
+                                        provider.providerConfigurationCustomizer(
+                                            OidcDiscoveryMetadataCustomizer::customize)))
                     // Same fix as the platform tier's chain, same root cause — extracted to
                     // Argon2ClientAuthenticationSupport (code review finding: this exact block was
                     // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
@@ -611,6 +625,11 @@ public class OrganizationAuthorizationServerConfig {
         .addFilterAfter(
             new TenantSessionConcurrencyFilter(sessionRegistry),
             OrganizationCapacityRateLimitingFilter.class)
+        // OIDC Core §3.1.2.1/§3.1.2.6: prompt=none/login/consent and max_age, which SAS ignores.
+        .addFilterAfter(
+            new OidcAuthorizationRequestParamsFilter(
+                oauthClients, consentService, contextRepository),
+            TenantSessionConcurrencyFilter.class)
         // TD-SEC-028: /userinfo is a Bearer-token-protected API endpoint, not a browser page — a
         // real OIDC client calling it with a missing/invalid access token needs a clean 401,
         // never OrganizationLoginRedirectEntryPoint's redirect-to-the-hosted-login-page (correct
