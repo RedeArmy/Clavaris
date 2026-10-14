@@ -371,6 +371,21 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(replay.body()).contains("Sign out?");
   }
 
+  // A request that cannot present the real token (another site posting with the visitor's cookie)
+  // must not burn it, or the visitor's own Sign out click would then fail.
+  @Test
+  void aWrongConfirmationTokenDoesNotUseUpTheRealOne() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Logout Grief Co");
+    String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
+
+    HttpResponse<String> forged = postLogout(organizationId, "confirmation_token=forged");
+    HttpResponse<String> real = postLogout(organizationId, "confirmation_token=" + token);
+
+    assertThat(forged.body()).contains("Sign out?");
+    assertThat(real.body()).contains("Signed out");
+  }
+
   private HttpResponse<String> getLogoutConfirmation(UUID organizationId, String query)
       throws IOException, InterruptedException {
     return httpClient.send(

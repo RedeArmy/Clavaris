@@ -9,16 +9,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -26,7 +26,6 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * OpenID Connect Core 1.0 §3.1.2.1 / §3.1.2.6: the {@code prompt} and {@code max_age} parameters of
@@ -48,6 +47,12 @@ import org.springframework.web.util.UriComponentsBuilder;
  *       carries no {@code prompt}, so it does not loop.
  * </ul>
  *
+ * <p>{@code prompt=none} mixed with another value is {@code invalid_request}, and with a {@code
+ * max_age} the session is older than it is {@code login_required}. The two actions that change the
+ * End-User's state (dropping the session, forgetting a consent) only happen for a navigation, not
+ * for an image or script another site makes with the End-User's cookie ({@link
+ * OidcRequestParameters#isNavigation}).
+ *
  * <p>An error is only ever sent to a {@code redirect_uri} that is registered for the client of this
  * very Organization (exact match), never to a value taken from the request alone (open redirect,
  * RFC 6749 §10.15); otherwise the request is left to SAS, which shows its own error page.
@@ -57,14 +62,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
 public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFilter {
 
-  private static final String REAUTH_REQUESTED_AT = "clavaris.oidc.reauth.requested-at";
+  /* package */ static final String REAUTH_REQUESTED_AT = "clavaris.oidc.reauth.requested-at";
 
   private static final Pattern AUTHORIZE_PATH =
       Pattern.compile("^/o/([0-9a-fA-F-]{36})/oauth2/authorize$");
-  private static final String ROLE_ACCOUNT = "ROLE_ACCOUNT";
   // OIDC Core §3.1.2.6 error code; not among spring-security-oauth2-core's own OAuth2ErrorCodes.
   private static final String LOGIN_REQUIRED = "login_required";
   private static final String INVALID_REQUEST = "invalid_request";
+  private static final int SINGLE_VALUE = 1;
 
   private final OAuthClientRepository oauthClients;
   private final OAuth2AuthorizationConsentService consents;
@@ -110,18 +115,38 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       throws IOException {
     final List<String> prompts = OidcRequestParameters.promptValues(request.getParameter("prompt"));
     final Optional<OAuthClient> client = registeredClient(org, request);
-    final Authentication authentication = signedInAccount();
+    final Authentication authentication = OidcRequestParameters.signedInAccount();
     final String maxAgeParam = request.getParameter("max_age");
     final Long maxAge = OidcRequestParameters.parseMaxAge(maxAgeParam);
 
-    if (prompts.size() == 1 && prompts.contains("none")) {
-      return answerWithError(
-          authentication == null && client.isPresent(), LOGIN_REQUIRED, request, response);
-    }
     if (maxAgeParam != null && maxAge == null) {
       return answerWithError(client.isPresent(), INVALID_REQUEST, request, response);
     }
-    if (authentication == null || client.isEmpty()) {
+    if (prompts.contains("none")) {
+      return answerPromptNone(
+          prompts, client.isPresent(), authentication, maxAge, request, response);
+    }
+    return answerSignedInState(request, response, prompts, maxAge, client, authentication);
+  }
+
+  // The login-related parameters once a registered client is known: noting a fresh login that was
+  // asked for, or re-authenticating / forgetting the consent for a signed-in End-User.
+  private boolean answerSignedInState(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final List<String> prompts,
+      final Long maxAge,
+      final Optional<OAuthClient> client,
+      final Authentication authentication)
+      throws IOException {
+    if (client.isEmpty()) {
+      return false;
+    }
+    if (authentication == null) {
+      OidcRequestParameters.rememberLoginRequest(request, prompts, maxAge);
+      return false;
+    }
+    if (!OidcRequestParameters.isNavigation(request)) {
       return false;
     }
     if (reauthenticationRequired(request, authentication, prompts, maxAge)) {
@@ -132,6 +157,23 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       forgetConsent(client.get(), authentication);
     }
     return false;
+  }
+
+  // §3.1.2.1: none cannot be combined with another value; alone, it never shows a page, so a
+  // missing or too old authentication is login_required.
+  private boolean answerPromptNone(
+      final List<String> prompts,
+      final boolean registeredClient,
+      final Authentication authentication,
+      final Long maxAge,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws IOException {
+    final boolean combined = prompts.size() != SINGLE_VALUE;
+    final boolean loginNeeded =
+        authentication == null || OidcRequestParameters.exceedsMaxAge(authentication, maxAge);
+    final String error = combined ? INVALID_REQUEST : LOGIN_REQUIRED;
+    return answerWithError(registeredClient && (combined || loginNeeded), error, request, response);
   }
 
   private void forgetConsent(final OAuthClient client, final Authentication authentication) {
@@ -160,13 +202,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final List<String> prompts,
       final Long maxAge) {
     final boolean wanted =
-        prompts.contains("login")
-            || (maxAge != null
-                && (maxAge == 0
-                    || Duration.between(
-                                OidcRequestParameters.latestFactorAt(authentication), Instant.now())
-                            .compareTo(Duration.ofSeconds(maxAge))
-                        > 0));
+        prompts.contains("login") || OidcRequestParameters.exceedsMaxAge(authentication, maxAge);
     if (!wanted) {
       return false;
     }
@@ -193,14 +229,11 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   private void redirectWithError(
       final HttpServletRequest request, final HttpServletResponse response, final String error)
       throws IOException {
-    final UriComponentsBuilder target =
-        UriComponentsBuilder.fromUriString(request.getParameter("redirect_uri"))
-            .queryParam("error", error);
-    final String state = request.getParameter("state");
-    if (state != null) {
-      target.queryParam("state", state);
-    }
-    response.sendRedirect(target.build().encode().toUriString());
+    final Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("error", error);
+    parameters.put("state", request.getParameter("state"));
+    response.sendRedirect(
+        OidcRequestParameters.withQuery(request.getParameter("redirect_uri"), parameters));
   }
 
   // Only an exact match of a redirect_uri registered for this Organization's active client makes
@@ -223,17 +256,5 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
         .filter(OAuthClient::active)
         .filter(client -> client.organizationId().equals(organization))
         .filter(client -> client.redirectUris().contains(redirectUri));
-  }
-
-  private static Authentication signedInAccount() {
-    final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || !authentication.isAuthenticated()) {
-      return null;
-    }
-    final boolean isAccount =
-        authentication.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .anyMatch(ROLE_ACCOUNT::equals);
-    return isAccount ? authentication : null;
   }
 }

@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
@@ -51,16 +52,28 @@ public class RpInitiatedLogoutController {
       @RequestParam(name = "state", required = false) final String state,
       final HttpServletRequest request,
       final Model model) {
-    final byte[] bytes = new byte[32];
-    RANDOM.nextBytes(bytes);
-    final String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    request.getSession().setAttribute(CONFIRMATION_TOKEN_ATTRIBUTE, token);
+    // A token already waiting in this session is kept, not replaced: a rejected POST shows this
+    // page
+    // again, and minting a new token then would invalidate the one on the page the visitor is
+    // looking at (another site could keep doing that to stop them signing out).
+    final HttpSession session = request.getSession();
+    final String token =
+        session.getAttribute(CONFIRMATION_TOKEN_ATTRIBUTE) instanceof String existing
+            ? existing
+            : newToken();
+    session.setAttribute(CONFIRMATION_TOKEN_ATTRIBUTE, token);
     model.addAttribute("organizationId", organizationId);
     model.addAttribute("confirmationToken", token);
     model.addAttribute("clientId", clientId);
     model.addAttribute("postLogoutRedirectUri", postLogoutRedirectUri);
     model.addAttribute("state", state);
     return "identity/logout-confirm";
+  }
+
+  private static String newToken() {
+    final byte[] bytes = new byte[32];
+    RANDOM.nextBytes(bytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
   @RequestMapping("/done")

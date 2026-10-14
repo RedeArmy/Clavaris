@@ -12,13 +12,14 @@ import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * OpenID Connect RP-Initiated Logout 1.0 §2 makes {@code id_token_hint} RECOMMENDED, not required,
@@ -80,12 +81,9 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
     logoutHandler.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
     final String redirectUri = request.getParameter("post_logout_redirect_uri");
     if (registeredPostLogoutUri(org, request.getParameter("client_id"), redirectUri)) {
-      final UriComponentsBuilder target = UriComponentsBuilder.fromUriString(redirectUri);
-      final String state = request.getParameter("state");
-      if (state != null) {
-        target.queryParam("state", state);
-      }
-      response.sendRedirect(target.build().encode().toUriString());
+      final Map<String, String> parameters = new LinkedHashMap<>();
+      parameters.put("state", request.getParameter("state"));
+      response.sendRedirect(OidcRequestParameters.withQuery(redirectUri, parameters));
     } else {
       forwardAsGet(request, response, "/o/" + org + "/logout/done");
     }
@@ -107,7 +105,9 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
     request.getRequestDispatcher(target).forward(asGet, response);
   }
 
-  // The token is single use: it is removed from the session whether or not it matches.
+  // The token is single use: it is removed once it has been accepted. A wrong one is not allowed to
+  // use it up, or another site posting with the visitor's cookie could make their own Sign out
+  // click fail (the token itself is long enough that guessing it is not a way in).
   private static boolean confirmationValid(final HttpServletRequest request) {
     final HttpSession session = request.getSession(false);
     final String submitted = request.getParameter("confirmation_token");
@@ -116,10 +116,14 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
     }
     final Object expected =
         session.getAttribute(RpInitiatedLogoutController.CONFIRMATION_TOKEN_ATTRIBUTE);
-    session.removeAttribute(RpInitiatedLogoutController.CONFIRMATION_TOKEN_ATTRIBUTE);
-    return expected instanceof String token
-        && MessageDigest.isEqual(
-            token.getBytes(StandardCharsets.UTF_8), submitted.getBytes(StandardCharsets.UTF_8));
+    final boolean valid =
+        expected instanceof String token
+            && MessageDigest.isEqual(
+                token.getBytes(StandardCharsets.UTF_8), submitted.getBytes(StandardCharsets.UTF_8));
+    if (valid) {
+      session.removeAttribute(RpInitiatedLogoutController.CONFIRMATION_TOKEN_ATTRIBUTE);
+    }
+    return valid;
   }
 
   private boolean registeredPostLogoutUri(

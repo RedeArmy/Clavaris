@@ -899,6 +899,132 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         .isGreaterThan(beforeReauthentication);
   }
 
+  // OIDC Core §3.1.2.1: none must not be combined with another value, and a request that is not
+  // allowed to show a page is answered with an error, never a login page.
+  @Test
+  void promptNoneCombinedWithAnotherValueIsInvalidRequestEvenWithASession() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None Combined Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "none-combined@example.com");
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId, client.clientId(), REDIRECT_URI, "state-nc2", "&prompt=none%20login");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("invalid_request");
+    assertThat(queryParam(location, "state")).isEqualTo("state-nc2");
+  }
+
+  // §3.1.2.1 (max_age): an authentication older than max_age with prompt=none cannot be refreshed
+  // without UI, so it is login_required rather than a silently granted code.
+  @Test
+  void promptNoneWithMaxAgeZeroAndASessionIsLoginRequired() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None MaxAge Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "none-maxage@example.com");
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId, client.clientId(), REDIRECT_URI, "state-ma", "&prompt=none&max_age=0");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("login_required");
+    assertThat(queryParam(location, "code")).isNull();
+  }
+
+  // prompt=login with no session: the one login the End-User is shown must be enough; before, the
+  // resumed request asked for a second one.
+  @Test
+  void promptLoginWithoutASessionNeedsOnlyOneLogin() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt Login One Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String email = "login-once@example.com";
+    signIn(organizationId, client, email);
+    cookieManager.getCookieStore().removeAll();
+
+    HttpResponse<Void> response =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-once", "&prompt=login");
+    assertThat(response.headers().firstValue("Location").orElseThrow()).contains("/login");
+    HttpResponse<Void> login =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> resumed =
+        getAbsoluteDiscardingBody(login.headers().firstValue("Location").orElseThrow());
+
+    String location = resumed.headers().firstValue("Location").orElseThrow();
+    assertThat(location).as("granted after one login").startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "code")).isNotBlank();
+  }
+
+  // A page on another site can make the browser send a request with the End-User's cookie (an
+  // image tag is enough). That must never end their session or erase their consent.
+  @Test
+  void aCrossSiteSubresourceCannotEndTheSessionWithPromptLogin() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Subresource Login Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "subresource-login@example.com");
+
+    authorizeAs(organizationId, client.clientId(), "&prompt=login", "openid", "image");
+    HttpResponse<Void> after =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-after", "");
+
+    assertThat(after.headers().firstValue("Location").orElseThrow())
+        .as("the session must still be signed in")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  @Test
+  void aCrossSiteSubresourceCannotForgetAStoredConsentWithPromptConsent() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Subresource Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "subresource-consent@example.com");
+
+    authorizeAs(organizationId, client.clientId(), "&prompt=consent", "openid profile", "image");
+    HttpResponse<Void> after =
+        authorize(
+            organizationId, client.clientId(), REDIRECT_URI, "state-c2", "", "openid profile");
+
+    assertThat(after.headers().firstValue("Location").orElseThrow())
+        .as("the consent must still be remembered")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // A navigation (what a browser does for the real flow) carries Sec-Fetch-Dest: document, or none
+  // at all for a non-browser client; anything else is a subresource request.
+  private HttpResponse<Void> authorizeAs(
+      UUID organizationId, String clientId, String extraQuery, String scope, String fetchDest)
+      throws IOException, InterruptedException {
+    String query =
+        "response_type=code&client_id="
+            + clientId
+            + "&redirect_uri="
+            + urlEncode(REDIRECT_URI)
+            + "&scope="
+            + urlEncode(scope)
+            + "&code_challenge="
+            + deriveCodeChallenge(generateCodeVerifier())
+            + "&code_challenge_method=S256&state=sub"
+            + extraQuery;
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/authorize?" + query))
+            .header("Sec-Fetch-Dest", fetchDest)
+            .header("Sec-Fetch-Site", "cross-site")
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.discarding());
+  }
+
   private HttpResponse<Void> authorize(
       UUID organizationId, String clientId, String redirectUri, String state, String extraQuery)
       throws IOException, InterruptedException {
