@@ -93,6 +93,8 @@ import com.clavaris.identity.application.usecase.recordaccountlogindevice.Record
 import com.clavaris.identity.application.usecase.recordloginevent.LoginEventRepository;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventService;
 import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
+import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdService;
+import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
@@ -314,6 +316,12 @@ class IdentityUseCaseConfig {
       final AccountAuthenticationPolicyProvider policyProvider) {
     return new AuthenticateWithPasswordService(
         accountRepository, passwordVerifier, securityMetrics, policyProvider);
+  }
+
+  @Bean
+  /* package */ RecordSessionOidcIdUseCase recordSessionOidcIdUseCase(
+      final SessionRepository sessions) {
+    return new RecordSessionOidcIdService(sessions);
   }
 
   @Bean

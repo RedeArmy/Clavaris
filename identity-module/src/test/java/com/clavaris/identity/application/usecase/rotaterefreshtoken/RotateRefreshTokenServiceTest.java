@@ -27,6 +27,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
+import com.clavaris.identity.domain.model.SessionTimestamps;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -142,6 +143,55 @@ class RotateRefreshTokenServiceTest {
     return new RotateRefreshTokenCommand(rawValue, List.of(), newExpiresAt);
   }
 
+  // OIDC Core §2/§12.2: the refreshed ID token's auth_time is the authentication instant, the one
+  // the first ID token carried, not the Session's later opening time.
+  @Test
+  void theResultCarriesTheAuthenticationInstantNotTheSessionOpeningTime() {
+    Instant login = Instant.now().minusSeconds(45);
+    Session session = Session.open(accountId, List.of("openid"), login);
+    String rawValue = "a-valid-refresh-token-value";
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+
+    RotateRefreshTokenResult result =
+        service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
+
+    assertThat(result.authenticatedAt()).isEqualTo(login);
+    assertThat(result.authenticatedAt()).isNotEqualTo(session.createdAt());
+  }
+
+  // OIDC Core 12.2: a refreshed ID token repeats the sid of the first one, which the Session kept;
+  // a Session that predates recording it has none and the caller falls back to the Session id.
+  @Test
+  void theResultCarriesTheSidOfTheFirstIdTokenWhenTheSessionKeptOne() {
+    Session session = Session.open(accountId, List.of("openid"));
+    session.recordOidcSid("the-sid-of-the-first-id-token");
+    String rawValue = "a-valid-refresh-token-value";
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+
+    RotateRefreshTokenResult result =
+        service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
+
+    assertThat(result.oidcSid()).isEqualTo("the-sid-of-the-first-id-token");
+  }
+
+  @Test
+  void theResultHasNoSidForASessionThatNeverRecordedOne() {
+    Session session = Session.open(accountId, List.of("openid"));
+    String rawValue = "a-valid-refresh-token-value";
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+
+    RotateRefreshTokenResult result =
+        service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
+
+    assertThat(result.oidcSid()).isNull();
+  }
+
   @Test
   void rotatesAnActiveTokenIntoANewOneAndRevokesTheOld() {
     Session session = activeSession();
@@ -180,8 +230,11 @@ class RotateRefreshTokenServiceTest {
             UUID.randomUUID(),
             accountId,
             List.of("openid", "profile"),
-            Instant.now().minus(31, ChronoUnit.DAYS),
-            Instant.now(), // recently active — only the lifetime bound is exceeded
+            new SessionTimestamps(
+                Instant.now().minus(31, ChronoUnit.DAYS),
+                Instant.now().minus(31, ChronoUnit.DAYS),
+                Instant.now()), // recently active — only the lifetime bound is exceeded
+            null,
             null);
     String rawValue = "a-valid-refresh-token-value";
     RefreshToken active = activeTokenFor(oldSession, rawValue);
@@ -213,8 +266,11 @@ class RotateRefreshTokenServiceTest {
             UUID.randomUUID(),
             accountId,
             List.of("openid", "profile"),
-            Instant.now().minus(2, ChronoUnit.DAYS), // well within the lifetime bound
-            Instant.now().minus(2, ChronoUnit.DAYS), // but never touched since
+            new SessionTimestamps(
+                Instant.now().minus(2, ChronoUnit.DAYS), // well within the lifetime bound
+                Instant.now().minus(2, ChronoUnit.DAYS),
+                Instant.now().minus(2, ChronoUnit.DAYS)), // but never touched since
+            null,
             null);
     String rawValue = "a-valid-refresh-token-value";
     RefreshToken active = activeTokenFor(staleSession, rawValue);

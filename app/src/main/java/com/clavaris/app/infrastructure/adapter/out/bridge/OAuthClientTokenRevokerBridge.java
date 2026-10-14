@@ -33,5 +33,10 @@ class OAuthClientTokenRevokerBridge implements OAuthClientTokenRevoker {
     jdbcTemplate.update(
         "delete from oauth2_authorization where registered_client_id = ?",
         oauthClientId.toString());
+    // An approved consent for a client that no longer issues tokens would let a later client with
+    // the same id skip the consent page; remove it with the tokens.
+    jdbcTemplate.update(
+        "delete from oauth2_authorization_consent where registered_client_id = ?",
+        oauthClientId.toString());
   }
 }

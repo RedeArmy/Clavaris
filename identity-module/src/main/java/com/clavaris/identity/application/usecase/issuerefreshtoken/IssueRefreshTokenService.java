@@ -85,7 +85,8 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
     // TD-PERF-019: insert, not save — Session.open/RefreshToken.issue guarantee both are
     // brand-new aggregates, one per login. See SessionRepository#insert/RefreshTokenRepository
     // #insert's own Javadoc.
-    final Session session = Session.open(command.accountId(), command.authorizedScopes());
+    final Session session =
+        Session.open(command.accountId(), command.authorizedScopes(), command.authenticatedAt());
     sessions.insert(session);
 
     final String rawValue = RefreshTokenSecret.generateRawValue();

@@ -1,5 +1,7 @@
 package com.clavaris.app.infrastructure.config;
 
+import com.clavaris.identity.application.usecase.resolveorganizationforclient.OrganizationForClientResolver;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -72,8 +74,9 @@ class DistributedSessionConfig {
   @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ CookieSerializer sessionCookieSerializer(
-      @Value("${clavaris.session.platform-path-prefix:/platform/}")
-          final String platformPathPrefix) {
-    return new AdaptiveSameSiteSessionCookieSerializer(platformPathPrefix);
+      @Value("${clavaris.session.platform-path-prefix:/platform/}") final String platformPathPrefix,
+      final ObjectProvider<OrganizationForClientResolver> organizationForClient) {
+    return new AdaptiveSameSiteSessionCookieSerializer(
+        platformPathPrefix, new SessionBackedFlatPathLookup(organizationForClient));
   }
 }

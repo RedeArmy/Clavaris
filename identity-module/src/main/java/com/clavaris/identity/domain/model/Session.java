@@ -17,12 +17,15 @@ import java.util.UUID;
  * unpopulated — rotation/reuse-detection never needed it; the self-service sessions page ({@code
  * AccountSessionsController}) is built on {@code HttpSession} state instead.
  *
- * <p>PMD suppressions below: coding-standards.md §3a.
+ * <p>PMD suppressions below: coding-standards.md §3a. TooManyMethods: an aggregate whose methods
+ * are its two factories, three state changes and one accessor per field; the new {@code
+ * authenticatedAt} field is what tipped it over, and splitting accessors off would only scatter it.
  */
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
-  "PMD.ShortMethodName"
+  "PMD.ShortMethodName",
+  "PMD.TooManyMethods"
 })
 public final class Session {
 
@@ -30,40 +33,78 @@ public final class Session {
   private final AccountId accountId;
   private final List<String> scopes;
   private final Instant createdAt;
+  private final Instant authenticatedAt;
   private Instant lastSeenAt;
   private Instant revokedAt;
+  private String oidcSid;
 
   private Session(
       final UUID id,
       final AccountId accountId,
       final List<String> scopes,
-      final Instant createdAt,
-      final Instant lastSeenAt,
-      final Instant revokedAt) {
+      final SessionTimestamps timestamps,
+      final Instant revokedAt,
+      final String oidcSid) {
+    Objects.requireNonNull(timestamps, "timestamps must not be null");
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
     this.scopes = List.copyOf(Objects.requireNonNull(scopes, "scopes must not be null"));
-    this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
-    this.lastSeenAt = Objects.requireNonNull(lastSeenAt, "lastSeenAt must not be null");
+    this.createdAt = Objects.requireNonNull(timestamps.createdAt(), "createdAt must not be null");
+    this.authenticatedAt =
+        Objects.requireNonNull(timestamps.authenticatedAt(), "authenticatedAt must not be null");
+    this.lastSeenAt =
+        Objects.requireNonNull(timestamps.lastSeenAt(), "lastSeenAt must not be null");
     this.revokedAt = revokedAt;
+    this.oidcSid = oidcSid;
   }
 
   /**
    * Opens a brand-new session — the interactive grant that mints the first {@link RefreshToken}.
    */
   public static Session open(final AccountId accountId, final List<String> scopes) {
+    return open(accountId, scopes, null);
+  }
+
+  /**
+   * OIDC Core §2 / §12.2: {@code authenticatedAt} is when the End-User actually authenticated (the
+   * login, or the re-authentication a {@code prompt=login} / {@code max_age} forced), which is
+   * earlier than this Session's {@code createdAt} (opened later, when the code is exchanged). A
+   * refreshed ID token must keep reporting it as {@code auth_time}. Absent, or claimed to be later
+   * than now, it falls back to the moment the Session opens, never a future instant.
+   */
+  public static Session open(
+      final AccountId accountId, final List<String> scopes, final Instant authenticatedAt) {
     final Instant now = Instant.now();
-    return new Session(UUID.randomUUID(), accountId, scopes, now, now, null);
+    final Instant authTime =
+        authenticatedAt == null || authenticatedAt.isAfter(now) ? now : authenticatedAt;
+    return new Session(
+        UUID.randomUUID(),
+        accountId,
+        scopes,
+        new SessionTimestamps(now, authTime, now),
+        null,
+        null);
   }
 
   public static Session reconstitute(
       final UUID id,
       final AccountId accountId,
       final List<String> scopes,
-      final Instant createdAt,
-      final Instant lastSeenAt,
-      final Instant revokedAt) {
-    return new Session(id, accountId, scopes, createdAt, lastSeenAt, revokedAt);
+      final SessionTimestamps timestamps,
+      final Instant revokedAt,
+      final String oidcSid) {
+    return new Session(id, accountId, scopes, timestamps, revokedAt, oidcSid);
+  }
+
+  /**
+   * OIDC Core 12.2: remembers the {@code sid} Spring Authorization Server put on this Session's
+   * first ID token, so a refreshed one can repeat it. Set once: a Session that already has one
+   * keeps it, and a blank value is ignored.
+   */
+  public void recordOidcSid(final String sid) {
+    if (this.oidcSid == null && sid != null && !sid.isBlank()) {
+      this.oidcSid = sid;
+    }
   }
 
   /**
@@ -102,8 +143,17 @@ public final class Session {
     return createdAt;
   }
 
+  public Instant authenticatedAt() {
+    return authenticatedAt;
+  }
+
   public Instant lastSeenAt() {
     return lastSeenAt;
+  }
+
+  /** The {@code sid} of this Session's first ID token, when it was recorded. */
+  public Optional<String> oidcSid() {
+    return Optional.ofNullable(oidcSid);
   }
 
   public Optional<Instant> revokedAt() {

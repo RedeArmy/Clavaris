@@ -2150,8 +2150,14 @@ msgstr "Iniciar sesión — Clavaris"
 msgid "Sign out"
 msgstr "Cerrar sesión"
 
+msgid "Sign out?"
+msgstr "¿Cerrar sesión?"
+
 msgid "Sign up with"
 msgstr "Registrarse con"
+
+msgid "Signed out"
+msgstr "Sesión cerrada"
 
 msgid "Sign up with GitHub"
 msgstr "Registrarse con GitHub"
@@ -2903,3 +2909,8 @@ msgstr "© Clavaris"
 msgid "— None —"
 msgstr "— Ninguno —"
 
+msgid "You will be signed out of your account on this device."
+msgstr "Se cerrará la sesión de tu cuenta en este dispositivo."
+
+msgid "You have been signed out. You can close this page."
+msgstr "Has cerrado sesión. Puedes cerrar esta página."

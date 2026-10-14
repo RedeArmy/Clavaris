@@ -419,10 +419,11 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   // Same "SESSION", not "JSESSIONID" rationale as AuthorizationCodeFlowIntegrationTest's own
-  // identical helper (TD-ARCH-002: Spring Session, not the servlet container's own tracking).
+  // identical helper (TD-ARCH-002: Spring Session, not the servlet container's own tracking), and
+  // the same per-tenant "SESSION_<organizationId>" name (each test signs in to one Organization).
   private String currentSessionId() {
     return cookieManager.getCookieStore().getCookies().stream()
-        .filter(cookie -> "SESSION".equalsIgnoreCase(cookie.getName()))
+        .filter(cookie -> cookie.getName().matches("(?i)SESSION(_[0-9a-f]{32})?"))
         .map(HttpCookie::getValue)
         .findFirst()
         .orElse(null);

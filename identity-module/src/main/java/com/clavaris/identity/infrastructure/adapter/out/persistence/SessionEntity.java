@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import com.clavaris.identity.domain.model.SessionTimestamps;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -27,11 +28,17 @@ public class SessionEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "authenticated_at", nullable = false)
+  private Instant authenticatedAt;
+
   @Column(name = "last_seen_at", nullable = false)
   private Instant lastSeenAt;
 
   @Column(name = "revoked_at")
   private Instant revokedAt;
+
+  @Column(name = "oidc_sid")
+  private String oidcSid;
 
   protected SessionEntity() {}
 
@@ -39,15 +46,17 @@ public class SessionEntity {
       final UUID id,
       final UUID accountId,
       final String scopes,
-      final Instant createdAt,
-      final Instant lastSeenAt,
-      final Instant revokedAt) {
+      final SessionTimestamps timestamps,
+      final Instant revokedAt,
+      final String oidcSid) {
     this.id = id;
     this.accountId = accountId;
     this.scopes = scopes;
-    this.createdAt = createdAt;
-    this.lastSeenAt = lastSeenAt;
+    this.createdAt = timestamps.createdAt();
+    this.authenticatedAt = timestamps.authenticatedAt();
+    this.lastSeenAt = timestamps.lastSeenAt();
     this.revokedAt = revokedAt;
+    this.oidcSid = oidcSid;
   }
 
   public UUID getId() {
@@ -66,8 +75,16 @@ public class SessionEntity {
     return createdAt;
   }
 
+  public Instant getAuthenticatedAt() {
+    return authenticatedAt;
+  }
+
   public Instant getLastSeenAt() {
     return lastSeenAt;
+  }
+
+  public String getOidcSid() {
+    return oidcSid;
   }
 
   public Instant getRevokedAt() {

@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -96,6 +97,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   private int port;
 
   @Autowired private PlatformAccountRepository platformAccounts;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   private final CookieManager cookieManager = new CookieManager();
   private final HttpClient httpClient =
@@ -119,6 +121,60 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(body.get("sub").asString()).isEqualTo(tokens.subject());
   }
 
+  // The email scope (OIDC Core §5.4) must put email/email_verified on the ID token and, through
+  // the same scope gate, on /userinfo — real bug found live: a client that requested email got
+  // only sub (and picture) from both. The access token stays free of them.
+  @Test
+  void theEmailAndProfileScopesPutTheClaimsOnTheIdTokenAndUserInfo() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "email-claims@example.com", "openid profile email", true);
+
+    JsonNode idToken = decodePayload(tokens.tokenResponse().idToken());
+    assertThat(idToken.get("email").asString()).isEqualTo("email-claims@example.com");
+    assertThat(idToken.get("email_verified").asBoolean()).isTrue();
+    JsonNode userInfo = getUserInfo(tokens);
+    assertThat(userInfo.get("email").asString()).isEqualTo("email-claims@example.com");
+    assertThat(userInfo.get("email_verified").asBoolean()).isTrue();
+    assertThat(userInfo.get("name").asString()).isEqualTo("Eder Test");
+    assertThat(decodePayload(tokens.tokenResponse().accessToken()).has("email")).isFalse();
+  }
+
+  @Test
+  void anUnverifiedEmailIsReportedAsFalseNotOmitted() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "unverified-claims@example.com", "openid email", false);
+
+    assertThat(decodePayload(tokens.tokenResponse().idToken()).get("email_verified").asBoolean())
+        .isFalse();
+    assertThat(getUserInfo(tokens).get("email_verified").asBoolean()).isFalse();
+  }
+
+  @Test
+  void withoutTheEmailScopeNoEmailClaimIsIssued() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "no-email-scope@example.com", "openid profile", true);
+
+    assertThat(decodePayload(tokens.tokenResponse().idToken()).has("email")).isFalse();
+    JsonNode userInfo = getUserInfo(tokens);
+    assertThat(userInfo.has("email")).isFalse();
+    assertThat(userInfo.has("email_verified")).isFalse();
+  }
+
+  private JsonNode getUserInfo(IssuedTokens tokens) throws Exception {
+    HttpResponse<String> response =
+        getWithBearer(
+            "/o/" + tokens.organizationId() + "/userinfo", tokens.tokenResponse().accessToken());
+    assertThat(response.statusCode()).isEqualTo(200);
+    return objectMapper.readTree(response.body());
+  }
+
+  private JsonNode decodePayload(String jwt) throws Exception {
+    return objectMapper.readTree(new String(base64UrlDecode(jwt.split("\\.")[1])));
+  }
+
   @Test
   void userInfoRejectsARequestWithNoBearerTokenAtAll() throws Exception {
     String platformToken = requestPlatformAccessToken();
@@ -130,6 +186,9 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
             HttpResponse.BodyHandlers.ofString());
 
     assertThat(response.statusCode()).isEqualTo(401);
+    // RFC 6750 §3: no credentials at all is challenged without an error code.
+    String challenge = response.headers().firstValue("WWW-Authenticate").orElse("");
+    assertThat(challenge).startsWith("Bearer").doesNotContain("error=");
   }
 
   @Test
@@ -141,6 +200,51 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         getWithBearer("/o/" + organizationId + "/userinfo", "not-a-real-jwt-at-all");
 
     assertThat(response.statusCode()).isEqualTo(401);
+    assertThat(response.headers().firstValue("WWW-Authenticate").orElse(""))
+        .startsWith("Bearer")
+        .contains("error=\"invalid_token\"");
+  }
+
+  // OIDC Core 12.2 / Session Management: sid identifies the session, so an ID token issued by a
+  // refresh must repeat the original's. Real bug found validating this branch: it carried the
+  // Clavaris Session id instead of the sid Spring Authorization Server put on the original token,
+  // so an RP that sent its latest (refreshed) ID token as the logout hint got a 400 and stayed
+  // signed in.
+  @Test
+  void aRefreshedIdTokenKeepsTheSidAndWorksAsTheLogoutHint() throws Exception {
+    IssuedTokens tokens = completeARealAuthorizationCodeExchange("logout-refreshed@example.com");
+
+    HttpResponse<String> refreshed = refreshTokens(tokens);
+    assertThat(refreshed.statusCode()).isEqualTo(200);
+    String refreshedIdToken = objectMapper.readTree(refreshed.body()).get("id_token").asString();
+    assertThat(decodePayload(refreshedIdToken).get("sid").asString())
+        .isEqualTo(decodePayload(tokens.tokenResponse().idToken()).get("sid").asString());
+
+    HttpResponse<Void> response =
+        getDiscardingBody(
+            "/o/"
+                + tokens.organizationId()
+                + "/connect/logout?id_token_hint="
+                + urlEncode(refreshedIdToken));
+
+    assertThat(response.statusCode()).isEqualTo(302);
+  }
+
+  private HttpResponse<String> refreshTokens(IssuedTokens tokens)
+      throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString(
+                (tokens.client().clientId() + ":" + tokens.client().clientSecret()).getBytes());
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + tokens.organizationId() + "/oauth2/token"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "grant_type=refresh_token&refresh_token=" + urlEncode(tokens.refreshToken())))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   @Test
@@ -216,19 +320,160 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         .contains(postLogoutRedirectUri);
   }
 
+  // RP-Initiated Logout §2: id_token_hint is only RECOMMENDED, so a logout without one asks the
+  // End-User to confirm instead of failing with SAS's 400.
   @Test
-  void endSessionRejectsAMissingIdTokenHint() throws Exception {
+  void endSessionWithoutAHintAsksTheEndUserToConfirm() throws Exception {
+    UUID organizationId = signedInOrganization("logout-nohint@example.com");
+
+    HttpResponse<String> response = getLogoutConfirmation(organizationId, "");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Sign out?").contains("name=\"confirmation_token\"");
+  }
+
+  // Nobody signed in on this Organization means nothing to confirm or end: the page that says so is
+  // shown, and no session is created for the request (no cookie is set).
+  @Test
+  void endSessionWithoutAHintAndWithoutASessionJustSaysSignedOutAndSetsNoCookie() throws Exception {
     String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout No Hint Co");
+    UUID organizationId = createOrganization(platformToken, "Logout No Session Co");
+
+    HttpResponse<String> response = getLogoutConfirmation(organizationId, "");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Signed out").doesNotContain("confirmation_token");
+    assertThat(response.headers().allValues("Set-Cookie"))
+        .as("a request with no session must not start one")
+        .isEmpty();
+  }
+
+  @Test
+  void endSessionWithoutAHintDoesNothingWithoutTheConfirmationToken() throws Exception {
+    UUID organizationId = signedInOrganization("logout-notoken@example.com");
+
+    HttpResponse<String> response = postLogout(organizationId, "confirmation_token=forged");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Sign out?");
+  }
+
+  @Test
+  void aConfirmedLogoutRedirectsToARegisteredPostLogoutUriWithTheState() throws Exception {
+    String postLogoutRedirectUri = "https://client.example.test/logged-out";
+    UUID organizationId = signedInOrganization("logout-confirmed@example.com");
+    ClientCredentials client =
+        registerOAuthClient(requestPlatformAccessToken(), organizationId, postLogoutRedirectUri);
+    String query =
+        "?client_id="
+            + client.clientId()
+            + "&post_logout_redirect_uri="
+            + urlEncode(postLogoutRedirectUri)
+            + "&state=bye";
+    String token = confirmationToken(getLogoutConfirmation(organizationId, query).body());
 
     HttpResponse<String> response =
-        httpClient.send(
-            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/connect/logout"))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
+        postLogout(
+            organizationId,
+            "confirmation_token="
+                + token
+                + "&client_id="
+                + client.clientId()
+                + "&post_logout_redirect_uri="
+                + urlEncode(postLogoutRedirectUri)
+                + "&state=bye");
 
-    assertThat(response.statusCode()).isEqualTo(400);
+    assertThat(response.statusCode()).isEqualTo(302);
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(postLogoutRedirectUri);
+    assertThat(queryParam(location, "state")).isEqualTo("bye");
+  }
+
+  @Test
+  void aConfirmedLogoutNeverRedirectsToAnUnregisteredUri() throws Exception {
+    UUID organizationId = signedInOrganization("logout-evil@example.com");
+    ClientCredentials client =
+        registerOAuthClient(
+            requestPlatformAccessToken(), organizationId, "https://client.example.test/ok");
+    String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
+
+    HttpResponse<String> response =
+        postLogout(
+            organizationId,
+            "confirmation_token="
+                + token
+                + "&client_id="
+                + client.clientId()
+                + "&post_logout_redirect_uri="
+                + urlEncode("https://evil.example/steal"));
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.headers().firstValue("Location")).isEmpty();
+    assertThat(response.body()).contains("Signed out");
+  }
+
+  @Test
+  void theLogoutConfirmationTokenWorksOnlyOnce() throws Exception {
+    UUID organizationId = signedInOrganization("logout-replay@example.com");
+    String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
+
+    HttpResponse<String> first = postLogout(organizationId, "confirmation_token=" + token);
+    HttpResponse<String> replay = postLogout(organizationId, "confirmation_token=" + token);
+
+    assertThat(first.body()).contains("Signed out");
+    assertThat(replay.body())
+        .as("the session is gone, so there is nothing left to confirm or end")
+        .contains("Signed out");
+    assertThat(getLogoutConfirmation(organizationId, "").body())
+        .as("a new visit finds no session either")
+        .doesNotContain("confirmation_token");
+  }
+
+  // A request that cannot present the real token (another site posting with the visitor's cookie)
+  // must not burn it, or the visitor's own Sign out click would then fail.
+  @Test
+  void aWrongConfirmationTokenDoesNotUseUpTheRealOne() throws Exception {
+    UUID organizationId = signedInOrganization("logout-grief@example.com");
+    String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
+
+    HttpResponse<String> forged = postLogout(organizationId, "confirmation_token=forged");
+    HttpResponse<String> real = postLogout(organizationId, "confirmation_token=" + token);
+
+    assertThat(forged.body()).contains("Sign out?");
+    assertThat(real.body()).contains("Signed out");
+  }
+
+  // A real sign-in on a fresh Organization: the shared cookie jar then holds that Organization's
+  // session, which is what makes a logout without a hint ask for confirmation.
+  private UUID signedInOrganization(String email) throws Exception {
+    return completeARealAuthorizationCodeExchange(email).organizationId();
+  }
+
+  private HttpResponse<String> getLogoutConfirmation(UUID organizationId, String query)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/connect/logout" + query))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postLogout(UUID organizationId, String formBody)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/connect/logout"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(formBody))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static String confirmationToken(String html) {
+    java.util.regex.Matcher matcher =
+        java.util.regex.Pattern.compile("name=\"confirmation_token\" value=\"([^\"]+)\"")
+            .matcher(html);
+    assertThat(matcher.find()).as("the page must carry a confirmation token").isTrue();
+    return matcher.group(1);
   }
 
   @Test
@@ -265,15 +510,30 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   // suite is about userinfo/logout, not consent (which has its own dedicated coverage).
   private IssuedTokens completeARealAuthorizationCodeExchange(String email)
       throws IOException, InterruptedException, NoSuchAlgorithmException {
+    return completeARealAuthorizationCodeExchange(email, "openid", false);
+  }
+
+  // markVerified also gives the Account a first/last name, so the same flow can assert both the
+  // email claim group and the (name-dependent) profile one.
+  private IssuedTokens completeARealAuthorizationCodeExchange(
+      String email, String scope, boolean markVerified)
+      throws IOException, InterruptedException, NoSuchAlgorithmException {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "UserInfo/Logout Co " + email);
     ClientCredentials client = registerOAuthClient(platformToken, organizationId);
     registerAccount(organizationId, email, "a-correct-password");
+    if (markVerified) {
+      jdbcTemplate.update(
+          "update accounts set email_verified_at = now(), first_name = 'Eder', last_name = 'Test'"
+              + " where organization_id = ? and email = ?",
+          organizationId,
+          email);
+    }
 
     String codeVerifier = generateCodeVerifier();
     String codeChallenge = deriveCodeChallenge(codeVerifier);
 
-    getAuthorize(organizationId, client.clientId(), codeChallenge, "state-value");
+    getAuthorize(organizationId, client.clientId(), codeChallenge, "state-value", scope);
     String loginCsrfToken = fetchLoginCsrfToken(organizationId);
     HttpResponse<Void> loginResponse =
         submitLogin(organizationId, loginCsrfToken, email, "a-correct-password");
@@ -289,13 +549,15 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     JsonNode tokenBody = objectMapper.readTree(tokenResponse.body());
     String accessToken = tokenBody.get("access_token").asString();
     String idToken = tokenBody.get("id_token").asString();
+    String refreshToken = tokenBody.get("refresh_token").asString();
     String subject =
         objectMapper
             .readTree(new String(base64UrlDecode(idToken.split("\\.")[1])))
             .get("sub")
             .asString();
 
-    return new IssuedTokens(organizationId, new TokenResponse(accessToken, idToken), subject);
+    return new IssuedTokens(
+        organizationId, new TokenResponse(accessToken, idToken), subject, client, refreshToken);
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
@@ -360,8 +622,8 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         """
         {
           "redirectUris": ["%s"],
-          "allowedGrantTypes": ["authorization_code"],
-          "allowedScopes": ["openid"],
+          "allowedGrantTypes": ["authorization_code", "refresh_token"],
+          "allowedScopes": ["openid", "profile", "email"],
           "requireConsent": false%s
         }
         """
@@ -410,13 +672,20 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   private void getAuthorize(
       UUID organizationId, String clientId, String codeChallenge, String state)
       throws IOException, InterruptedException {
+    getAuthorize(organizationId, clientId, codeChallenge, state, "openid");
+  }
+
+  private void getAuthorize(
+      UUID organizationId, String clientId, String codeChallenge, String state, String scope)
+      throws IOException, InterruptedException {
     String query =
         "response_type=code"
             + "&client_id="
             + clientId
             + "&redirect_uri="
             + urlEncode(REDIRECT_URI)
-            + "&scope=openid"
+            + "&scope="
+            + urlEncode(scope)
             + "&code_challenge="
             + codeChallenge
             + "&code_challenge_method=S256"
@@ -534,5 +803,10 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
 
   private record TokenResponse(String accessToken, String idToken) {}
 
-  private record IssuedTokens(UUID organizationId, TokenResponse tokenResponse, String subject) {}
+  private record IssuedTokens(
+      UUID organizationId,
+      TokenResponse tokenResponse,
+      String subject,
+      ClientCredentials client,
+      String refreshToken) {}
 }

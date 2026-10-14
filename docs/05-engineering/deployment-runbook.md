@@ -427,7 +427,7 @@ domain scoped to the consumer's own registrable domain); this section is the "ho
 gap that ADR's own "Open questions" section and `technical-debt-register.md` TD-FUT-028 both named:
 nothing previously explained what an operator actually runs. Everything referenced below
 (`ClientBranding`, `ClientDomainConfig`, `CustomDomainRequestRewriteFilter`, the CSP
-`frame-ancestors` relaxation, the modal-aware session cookie) is already real, shipped, tested
+`frame-ancestors` relaxation, the adaptive per-tenant session cookie, ADR-0030) is already real, shipped, tested
 application code — this section only documents how to drive it.
 
 ### 9a. When this applies
@@ -565,8 +565,9 @@ server {
   (`EmbeddingEligibilityChecker`) — a `DEVELOPMENT`-tier Organization's client gets a wildcard
   (`*`) instead, with a warning logged, a deliberate testing convenience never used in production.
 - Confirm the session cookie's own `Set-Cookie` header shows `SameSite=None; Secure` on this same
-  flow (`ModalAwareSessionCookieSerializer`) — `SameSite=Lax` here means the embedded/iframe flow
-  will silently drop the session on its first cross-site navigation back to the parent page.
+  flow (`AdaptiveSameSiteSessionCookieSerializer`; the cookie is named `SESSION_<organization id>`
+  per tenant, see ADR-0030) — `SameSite=Lax` here means the embedded/iframe flow will silently drop
+  the session on its first cross-site navigation back to the parent page.
 
 ### 9h. Troubleshooting
 
@@ -576,3 +577,25 @@ server {
 | `409` on §9c | `hostname` already claimed by a different `OAuthClient` (a different tenant, or a stale leftover from this same client under a different id) | Pick a different hostname, or resolve the conflicting claim first — this is ownership verification working as intended, not a bug |
 | `frame-ancestors` still `'none'` after a `VERIFIED` domain | No `embeddingOrigin` was set on the domain-config request (§9c), or the client belongs to a different Organization than the one in the URL | Re-check the `embeddingOrigin` field on `GET .../domain-config`; confirm `organizationId` in the request matches the client's own owning Organization |
 | TLS handshake fails on the custom domain | Caddy's own ACME challenge couldn't complete (DNS not pointed at this host yet, port 80 not reachable) | `docker compose logs caddy` — same pointer §1/§2 already give for the primary domain's own ACME flow |
+
+## 10. Applying the ADR-0030 migrations to a database with data
+
+Three Flyway migrations arrive together (`V20261012130000` `sessions.authenticated_at`,
+`V20261012130100` `oauth2_authorization_consent`, `V20261014120000` `sessions.oidc_sid`). They run on
+start-up like every other migration; only the first one needs care on a large `sessions` table:
+
+- It runs `ALTER TABLE ... ADD COLUMN`, `UPDATE sessions SET authenticated_at = created_at`, then
+  `SET NOT NULL`, in one transaction, so `sessions` is locked (`ACCESS EXCLUSIVE`) until it commits.
+  Measured on PostgreSQL 16 with one million rows: about 1.6 s and a table twice its size until
+  vacuumed. With the usual thousands of rows it is unnoticeable. Check first:
+  `SELECT count(*), pg_size_pretty(pg_total_relation_size('sessions')) FROM sessions;`
+- During a rolling deploy, an old instance that inserts a session while the migration waits for its
+  lock just waits; after it, the column has `DEFAULT now()`, so an old instance's inserts still
+  succeed (its `auth_time` would be the insert time, as before).
+- The migration cannot be pre-run in batches: it adds the column itself, so a column created by
+  hand beforehand would make it fail. If `sessions` is large enough for about 1.6 s of lock per
+  million rows to matter, deploy in a quiet window (or revoke and delete the long-dead revoked rows
+  first to shrink the table); otherwise nothing needs doing.
+- Sessions created before the deploy live under the old `SESSION` cookie and are no longer read on
+  tenant paths: every signed-in end user signs in once more (ADR-0030, section 1).
+

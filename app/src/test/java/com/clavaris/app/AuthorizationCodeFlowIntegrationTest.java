@@ -82,7 +82,10 @@ import tools.jackson.databind.ObjectMapper;
 @TestPropertySource(
     properties = {
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
-      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
+      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret",
+      // Every test here asks the platform tier for its own access token, and the class now has more
+      // tests than the default per-client token limit (20 a minute) allows.
+      "clavaris.rate-limit.token.per-client-limit=500"
     })
 class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
@@ -464,6 +467,790 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         .isNull();
   }
 
+  // ---- OIDC Core §3.1.2.1 / §3.1.2.6: prompt and max_age ----
+
+  @Test
+  void promptNoneWithNoSignedInUserRedirectsLoginRequiredToTheRegisteredRedirectUri()
+      throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> response =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-none", "&prompt=none");
+
+    assertThat(response.statusCode()).isEqualTo(302);
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("login_required");
+    assertThat(queryParam(location, "state")).isEqualTo("state-none");
+  }
+
+  // An error must never be sent to a redirect_uri the client did not register (RFC 6749 §10.15).
+  @Test
+  void promptNoneNeverRedirectsToAnUnregisteredRedirectUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None Evil Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId,
+            client.clientId(),
+            "https://evil.example/cb",
+            "state-evil",
+            "&prompt=none");
+
+    assertThat(response.headers().firstValue("Location").orElse("")).doesNotContain("evil.example");
+  }
+
+  // ---- RFC 6749 §4.1.2.1 / OIDC Core §6: unsupported response_type, request, request_uri ----
+
+  @Test
+  void anUnsupportedResponseTypeRedirectsTheErrorToTheRegisteredRedirectUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Response Type Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> response =
+        getUnsupportedAuthorize(
+            organizationId, client.clientId(), REDIRECT_URI, "response_type=token", "state-rt");
+
+    assertThat(response.statusCode()).isEqualTo(302);
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("unsupported_response_type");
+    assertThat(queryParam(location, "state")).isEqualTo("state-rt");
+  }
+
+  @Test
+  void anUnsupportedResponseTypeNeverRedirectsToAnUnregisteredRedirectUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Response Type Evil Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> response =
+        getUnsupportedAuthorize(
+            organizationId,
+            client.clientId(),
+            "https://evil.example/cb",
+            "response_type=id_token",
+            "state-evil");
+
+    assertThat(response.headers().firstValue("Location").orElse("")).doesNotContain("evil.example");
+  }
+
+  @Test
+  void aRequestObjectAndARequestUriAreAnsweredWithTheirOwnErrorCodes() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Request Object Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> byValue =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-req", "&request=abc");
+    HttpResponse<Void> byReference =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "state-uri",
+            "&request_uri=" + urlEncode("https://client.example/request.jwt"));
+
+    assertThat(queryParam(byValue.headers().firstValue("Location").orElseThrow(), "error"))
+        .isEqualTo("request_not_supported");
+    assertThat(queryParam(byReference.headers().firstValue("Location").orElseThrow(), "error"))
+        .isEqualTo("request_uri_not_supported");
+  }
+
+  @Test
+  void discoveryDeclaresRequestObjectsUnsupported() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Discovery Request Co");
+
+    JsonNode discovery =
+        objectMapper.readTree(
+            getWithBody("/o/" + organizationId + "/.well-known/openid-configuration").body());
+
+    assertThat(discovery.get("request_parameter_supported").asBoolean(true)).isFalse();
+    assertThat(discovery.get("request_uri_parameter_supported").asBoolean(true)).isFalse();
+  }
+
+  // RFC 6749 §5.2: a failed Authorization-header client authentication is a 401 that challenges.
+  @Test
+  void aFailedBasicClientAuthenticationIsA401WithAWwwAuthenticateChallenge() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Basic Challenge Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String wrongBasic =
+        Base64.getEncoder().encodeToString((client.clientId() + ":wrong-secret").getBytes());
+
+    HttpResponse<String> response =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/token"))
+                .header("Authorization", "Basic " + wrongBasic)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString("grant_type=authorization_code&code=x"))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode()).isEqualTo(401);
+    assertThat(response.headers().firstValue("WWW-Authenticate").orElse("")).startsWith("Basic");
+    assertThat(objectMapper.readTree(response.body()).get("error").asString())
+        .isEqualTo("invalid_client");
+  }
+
+  @Test
+  void maxAgeZeroMakesASignedInUserAuthenticateAgainWithoutALoop() throws Exception {
+    assertReauthenticates("&max_age=0", "max-age-zero@example.com");
+  }
+
+  @Test
+  void promptLoginMakesASignedInUserAuthenticateAgainWithoutALoop() throws Exception {
+    assertReauthenticates("&prompt=login", "prompt-login@example.com");
+  }
+
+  @Test
+  void aMaxAgeLargerThanTheSessionAgeDoesNotAskForAnotherLogin() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Max Age Fresh Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "max-age-fresh@example.com");
+
+    HttpResponse<Void> response =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "s", "&max_age=3600");
+
+    assertThat(response.headers().firstValue("Location").orElseThrow())
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  @Test
+  void anInvalidMaxAgeIsRejectedAsInvalidRequestAtTheRegisteredRedirectUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Max Age Invalid Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "max-age-invalid@example.com");
+
+    HttpResponse<Void> response =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "s", "&max_age=abc");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("invalid_request");
+  }
+
+  @Test
+  void promptConsentShowsTheConsentScreenAgainEvenAfterTheScopesWereApproved() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    String email = "prompt-consent@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+
+    HttpResponse<Void> first =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "s1", "", "openid profile");
+    assertThat(first.statusCode()).isEqualTo(302);
+    HttpResponse<Void> loginResponse =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> toConsent =
+        getAbsoluteDiscardingBody(loginResponse.headers().firstValue("Location").orElseThrow());
+    String consentUrl = toConsent.headers().firstValue("Location").orElseThrow();
+    assertThat(consentUrl).contains("/oauth2/consent");
+    HttpResponse<String> consentPage = getAbsoluteWithBody(consentUrl);
+    HttpResponse<Void> approved =
+        submitConsent(
+            organizationId, client.clientId(), extractState(consentPage.body()), "profile");
+    assertThat(approved.headers().firstValue("Location").orElseThrow()).contains("code=");
+
+    HttpResponse<Void> remembered =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "s2", "", "openid profile");
+    assertThat(remembered.headers().firstValue("Location").orElseThrow())
+        .as("an approved consent is remembered, no screen without prompt=consent")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+
+    HttpResponse<Void> forced =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "s3",
+            "&prompt=consent",
+            "openid profile");
+    assertThat(forced.headers().firstValue("Location").orElseThrow()).contains("/oauth2/consent");
+  }
+
+  @Test
+  void discoveryAdvertisesWhatClavarisActuallySupports() throws Exception {
+    UUID organizationId = createOrganization(requestPlatformAccessToken(), "Discovery Co");
+
+    HttpResponse<String> response =
+        getWithBody("/o/" + organizationId + "/.well-known/openid-configuration");
+
+    JsonNode metadata = objectMapper.readTree(response.body());
+    assertThat(texts(metadata.get("scopes_supported")))
+        .contains("openid", "profile", "email", "offline_access");
+    assertThat(texts(metadata.get("claims_supported")))
+        .contains("sub", "auth_time", "email", "email_verified", "name", "preferred_username");
+    assertThat(texts(metadata.get("token_endpoint_auth_methods_supported")))
+        .containsExactlyInAnyOrder("client_secret_basic", "client_secret_post");
+    assertThat(metadata.has("tls_client_certificate_bound_access_tokens")).isFalse();
+    assertThat(metadata.has("dpop_signing_alg_values_supported")).isFalse();
+    assertThat(texts(metadata.get("code_challenge_methods_supported"))).containsExactly("S256");
+  }
+
+  private static List<String> texts(JsonNode array) {
+    List<String> values = new java.util.ArrayList<>();
+    array.forEach(node -> values.add(node.asString()));
+    return values;
+  }
+
+  // Registers an Account and signs it in through the hosted login, leaving a live session behind.
+  // OIDC Core §3.1.2.1: prompt=none with a signed-in End-User and no consent yet is
+  // consent_required (never a consent page); the state comes back with it.
+  @Test
+  void promptNoneWithASessionButNoConsentIsConsentRequired() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None No Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signIn(organizationId, client, "none-no-consent@example.com");
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "state-nc",
+            "&prompt=none",
+            "openid profile");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("consent_required");
+    assertThat(queryParam(location, "state")).isEqualTo("state-nc");
+  }
+
+  // The same End-User once the consent exists: prompt=none succeeds silently with a code.
+  @Test
+  void promptNoneWithASessionAndAnExistingConsentIssuesACodeWithoutAnyScreen() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "none-consent@example.com");
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "state-c",
+            "&prompt=none",
+            "openid profile");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "code")).isNotBlank();
+    assertThat(queryParam(location, "error")).isNull();
+  }
+
+  // prompt=consent: the screen is shown again, approving it issues a code, and the consent saved
+  // by that approval is remembered afterwards (a plain authorize needs no screen again).
+  @Test
+  void promptConsentThenApproveIssuesACodeAndTheNewConsentIsRemembered() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt Consent Approve Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "consent-approve@example.com");
+
+    String forcedUrl =
+        authorize(
+                organizationId,
+                client.clientId(),
+                REDIRECT_URI,
+                "s-forced",
+                "&prompt=consent",
+                "openid profile")
+            .headers()
+            .firstValue("Location")
+            .orElseThrow();
+    assertThat(forcedUrl).contains("/oauth2/consent");
+    HttpResponse<Void> approved =
+        submitConsent(
+            organizationId,
+            client.clientId(),
+            extractState(getAbsoluteWithBody(forcedUrl).body()),
+            "profile");
+    assertThat(approved.headers().firstValue("Location").orElseThrow()).contains("code=");
+
+    HttpResponse<Void> remembered =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "s-after", "", "openid profile");
+    assertThat(remembered.headers().firstValue("Location").orElseThrow())
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // prompt=consent ignores the stored consent for that request only and deletes nothing, so an
+  // End-User who leaves the screen without approving still has the consent they had: the next
+  // plain authorize is granted straight away.
+  @Test
+  void abandoningAPromptConsentScreenLeavesTheStoredConsentForTheNextAuthorize() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt Consent Abandon Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "consent-abandon@example.com");
+
+    HttpResponse<Void> forced =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "s-forced",
+            "&prompt=consent",
+            "openid profile");
+    assertThat(forced.headers().firstValue("Location").orElseThrow()).contains("/oauth2/consent");
+
+    HttpResponse<Void> next =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "s-next", "", "openid profile");
+    assertThat(next.headers().firstValue("Location").orElseThrow())
+        .as("the consent was not deleted by the abandoned prompt=consent")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // OIDC Core §2 / §12.2: auth_time is when the End-User authenticated. The code is exchanged
+  // (and the Session opened) later, and a refresh later still; the ID token must report the same
+  // auth_time throughout, not the Session's opening time or the refresh time.
+  @Test
+  void authTimeStaysTheLoginInstantAcrossTheCodeExchangeAndEveryRefresh() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Auth Time Co");
+    ClientCredentials client =
+        registerOAuthClient(
+            platformToken,
+            organizationId,
+            false,
+            List.of("openid"),
+            "\"authorization_code\",\"refresh_token\"");
+    String email = "auth-time@example.com";
+    signIn(organizationId, client, email);
+    long loginAt = java.time.Instant.now().getEpochSecond();
+    awaitNextSecond();
+
+    String codeVerifier = generateCodeVerifier();
+    HttpResponse<Void> authorized =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "s1",
+            "",
+            "openid",
+            deriveCodeChallenge(codeVerifier));
+    String code = queryParam(authorized.headers().firstValue("Location").orElseThrow(), "code");
+    JsonNode first =
+        objectMapper.readTree(exchangeCode(organizationId, client, code, codeVerifier).body());
+    long original = authTimeOf(first.get("id_token").asString());
+    assertThat(original).isBetween(loginAt - 2, loginAt + 1);
+
+    String refreshToken = first.get("refresh_token").asString();
+    for (int i = 0; i < 2; i++) {
+      awaitNextSecond();
+      JsonNode refreshed =
+          objectMapper.readTree(refresh(organizationId, client, refreshToken).body());
+      assertThat(authTimeOf(refreshed.get("id_token").asString()))
+          .as("refresh %s keeps the original auth_time", i + 1)
+          .isEqualTo(original);
+      refreshToken = refreshed.get("refresh_token").asString();
+    }
+  }
+
+  @Test
+  void anApprovedConsentIsStoredInPostgresAndKeptByPromptConsent() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Stored Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    String email = "stored-consent@example.com";
+
+    signInAndApproveConsent(organizationId, client, email);
+
+    String sql =
+        "select count(*) from oauth2_authorization_consent c"
+            + " join accounts a on a.id::text = c.principal_name"
+            + " where a.email = ? and a.organization_id = ?";
+    assertThat(jdbcTemplate.queryForObject(sql, Integer.class, email, organizationId))
+        .as("the approved consent is a row in Postgres, so it survives a restart")
+        .isEqualTo(1);
+
+    authorize(
+        organizationId, client.clientId(), REDIRECT_URI, "s9", "&prompt=consent", "openid profile");
+
+    assertThat(jdbcTemplate.queryForObject(sql, Integer.class, email, organizationId))
+        .as("prompt=consent ignores the stored consent for its request but never deletes it")
+        .isEqualTo(1);
+  }
+
+  private void signInAndApproveConsent(UUID organizationId, ClientCredentials client, String email)
+      throws Exception {
+    registerAccount(organizationId, email, "a-correct-password");
+    authorize(organizationId, client.clientId(), REDIRECT_URI, "s1", "", "openid profile");
+    HttpResponse<Void> loginResponse =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> toConsent =
+        getAbsoluteDiscardingBody(loginResponse.headers().firstValue("Location").orElseThrow());
+    assertThat(toConsent.statusCode())
+        .as("the saved authorize request resumes and redirects to the consent page")
+        .isEqualTo(302);
+    HttpResponse<String> consentPage =
+        getAbsoluteWithBody(toConsent.headers().firstValue("Location").orElseThrow());
+    HttpResponse<Void> approved =
+        submitConsent(
+            organizationId, client.clientId(), extractState(consentPage.body()), "profile");
+    assertThat(approved.headers().firstValue("Location").orElseThrow()).contains("code=");
+  }
+
+  private void signIn(UUID organizationId, ClientCredentials client, String email)
+      throws Exception {
+    registerAccount(organizationId, email, "a-correct-password");
+    getAuthorize(
+        organizationId, client.clientId(), deriveCodeChallenge(generateCodeVerifier()), "init");
+    HttpResponse<Void> login =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    assertThat(login.statusCode()).isEqualTo(302);
+  }
+
+  // auth_time has one-second resolution, so these tests need the clock to move on by a second, not
+  // a
+  // fixed pause: wait until the epoch second changes (bounded, so a stuck clock fails the test).
+  private static void awaitNextSecond() {
+    final long current = java.time.Instant.now().getEpochSecond();
+    final java.time.Instant deadline = java.time.Instant.now().plusSeconds(5);
+    while (java.time.Instant.now().getEpochSecond() == current) {
+      if (java.time.Instant.now().isAfter(deadline)) {
+        throw new AssertionError("the clock did not move on by a second");
+      }
+      Thread.onSpinWait();
+    }
+  }
+
+  // The contract for both prompt=login and max_age=0: the hosted login is shown again, and after
+  // signing in the saved request resumes with a code (no redirect loop) whose ID token carries a
+  // new auth_time.
+  private void assertReauthenticates(String extraQuery, String email) throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Reauth Co " + extraQuery);
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, email);
+    awaitNextSecond();
+    long beforeReauthentication = java.time.Instant.now().getEpochSecond();
+    awaitNextSecond();
+
+    String codeVerifier = generateCodeVerifier();
+    HttpResponse<Void> response =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "reauth",
+            extraQuery,
+            "openid",
+            deriveCodeChallenge(codeVerifier));
+    assertThat(response.statusCode()).isEqualTo(302);
+    assertThat(response.headers().firstValue("Location").orElseThrow())
+        .as("the hosted login must be shown again, not a code")
+        .contains("/login")
+        .doesNotContain("code=");
+
+    HttpResponse<Void> login =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> resumed =
+        getAbsoluteDiscardingBody(login.headers().firstValue("Location").orElseThrow());
+    String location = resumed.headers().firstValue("Location").orElseThrow();
+    assertThat(location).as("no loop: the resumed request is granted").startsWith(REDIRECT_URI);
+    HttpResponse<String> token =
+        exchangeCode(organizationId, client, queryParam(location, "code"), codeVerifier);
+    assertThat(token.statusCode()).isEqualTo(200);
+    String idToken = objectMapper.readTree(token.body()).get("id_token").asString();
+    long authTime;
+    try {
+      authTime =
+          parse(idToken).getJWTClaimsSet().getDateClaim("auth_time").toInstant().getEpochSecond();
+    } catch (ParseException e) {
+      throw new IllegalStateException(e);
+    }
+    assertThat(authTime)
+        .as("auth_time reflects the new authentication, not the original login")
+        .isGreaterThan(beforeReauthentication);
+  }
+
+  // OIDC Core §3.1.2.1: none must not be combined with another value, and a request that is not
+  // allowed to show a page is answered with an error, never a login page.
+  @Test
+  void promptNoneCombinedWithAnotherValueIsInvalidRequestEvenWithASession() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None Combined Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "none-combined@example.com");
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId, client.clientId(), REDIRECT_URI, "state-nc2", "&prompt=none%20login");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("invalid_request");
+    assertThat(queryParam(location, "state")).isEqualTo("state-nc2");
+  }
+
+  // §3.1.2.1 (max_age): an authentication older than max_age with prompt=none cannot be refreshed
+  // without UI, so it is login_required rather than a silently granted code.
+  @Test
+  void promptNoneWithMaxAgeZeroAndASessionIsLoginRequired() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt None MaxAge Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "none-maxage@example.com");
+
+    HttpResponse<Void> response =
+        authorize(
+            organizationId, client.clientId(), REDIRECT_URI, "state-ma", "&prompt=none&max_age=0");
+
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("login_required");
+    assertThat(queryParam(location, "code")).isNull();
+  }
+
+  // prompt=login with no session: the one login the End-User is shown must be enough; before, the
+  // resumed request asked for a second one.
+  @Test
+  void promptLoginWithoutASessionNeedsOnlyOneLogin() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Prompt Login One Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String email = "login-once@example.com";
+    signIn(organizationId, client, email);
+    cookieManager.getCookieStore().removeAll();
+
+    HttpResponse<Void> response =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-once", "&prompt=login");
+    assertThat(response.headers().firstValue("Location").orElseThrow()).contains("/login");
+    HttpResponse<Void> login =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> resumed =
+        getAbsoluteDiscardingBody(login.headers().firstValue("Location").orElseThrow());
+
+    String location = resumed.headers().firstValue("Location").orElseThrow();
+    assertThat(location).as("granted after one login").startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "code")).isNotBlank();
+  }
+
+  // A page on another site can make the browser send a request with the End-User's cookie (an
+  // image tag is enough). That must never end their session or erase their consent.
+  @Test
+  void aCrossSiteSubresourceCannotEndTheSessionWithPromptLogin() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Subresource Login Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    signIn(organizationId, client, "subresource-login@example.com");
+
+    authorizeAs(organizationId, client.clientId(), "&prompt=login", "openid", "image");
+    HttpResponse<Void> after =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-after", "");
+
+    assertThat(after.headers().firstValue("Location").orElseThrow())
+        .as("the session must still be signed in")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  @Test
+  void aCrossSiteSubresourceCannotForgetAStoredConsentWithPromptConsent() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Subresource Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "subresource-consent@example.com");
+
+    authorizeAs(organizationId, client.clientId(), "&prompt=consent", "openid profile", "image");
+    HttpResponse<Void> after =
+        authorize(
+            organizationId, client.clientId(), REDIRECT_URI, "state-c2", "", "openid profile");
+
+    assertThat(after.headers().firstValue("Location").orElseThrow())
+        .as("the consent must still be remembered")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // The CSP only stops another site's iframe from being SHOWN; the request is still made with the
+  // visitor's cookie. It must neither end their session nor forget their consent.
+  @Test
+  void aCrossSiteIframeCannotEndTheSessionOrForgetTheConsent() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Iframe Attack Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "iframe-attack@example.com");
+
+    authorizeAs(organizationId, client.clientId(), "&prompt=login", "openid profile", "iframe");
+    authorizeAs(organizationId, client.clientId(), "&prompt=consent", "openid profile", "iframe");
+    HttpResponse<Void> after =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-i", "", "openid profile");
+
+    assertThat(after.headers().firstValue("Location").orElseThrow())
+        .as("still signed in and the consent is still remembered")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // Request A (prompt=login) is waiting for its login when request B arrives; B must not make A ask
+  // for a second login.
+  @Test
+  void anotherAuthorizeRequestInBetweenDoesNotMakeTheForcedLoginAskTwice() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Two Authorize Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String email = "two-authorize@example.com";
+    signIn(organizationId, client, email);
+    awaitNextSecond();
+
+    String verifierA = generateCodeVerifier();
+    HttpResponse<Void> a =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "state-a",
+            "&prompt=login",
+            "openid",
+            deriveCodeChallenge(verifierA));
+    assertThat(a.headers().firstValue("Location").orElseThrow()).contains("/login");
+
+    HttpResponse<Void> b =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-b", "");
+    assertThat(b.headers().firstValue("Location").orElseThrow())
+        .as("B is not disturbed")
+        .startsWith(REDIRECT_URI);
+
+    HttpResponse<Void> login =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> resumed =
+        getAbsoluteDiscardingBody(login.headers().firstValue("Location").orElseThrow());
+    assertThat(resumed.headers().firstValue("Location").orElseThrow())
+        .as("one login is enough for A")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // A navigation (what a browser does for the real flow) carries Sec-Fetch-Dest: document, or none
+  // at all for a non-browser client; anything else is a subresource request.
+  private HttpResponse<Void> authorizeAs(
+      UUID organizationId, String clientId, String extraQuery, String scope, String fetchDest)
+      throws IOException, InterruptedException {
+    String query =
+        "response_type=code&client_id="
+            + clientId
+            + "&redirect_uri="
+            + urlEncode(REDIRECT_URI)
+            + "&scope="
+            + urlEncode(scope)
+            + "&code_challenge="
+            + deriveCodeChallenge(generateCodeVerifier())
+            + "&code_challenge_method=S256&state=sub"
+            + extraQuery;
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/authorize?" + query))
+            .header("Sec-Fetch-Dest", fetchDest)
+            .header("Sec-Fetch-Site", "cross-site")
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.discarding());
+  }
+
+  private HttpResponse<Void> authorize(
+      UUID organizationId, String clientId, String redirectUri, String state, String extraQuery)
+      throws IOException, InterruptedException {
+    return authorize(organizationId, clientId, redirectUri, state, extraQuery, "openid");
+  }
+
+  private HttpResponse<Void> authorize(
+      UUID organizationId,
+      String clientId,
+      String redirectUri,
+      String state,
+      String extraQuery,
+      String scope)
+      throws IOException, InterruptedException {
+    return authorize(
+        organizationId,
+        clientId,
+        redirectUri,
+        state,
+        extraQuery,
+        scope,
+        deriveCodeChallenge(generateCodeVerifier()));
+  }
+
+  private HttpResponse<Void> authorize(
+      UUID organizationId,
+      String clientId,
+      String redirectUri,
+      String state,
+      String extraQuery,
+      String scope,
+      String codeChallenge)
+      throws IOException, InterruptedException {
+    String query =
+        "response_type=code&client_id="
+            + clientId
+            + "&redirect_uri="
+            + urlEncode(redirectUri)
+            + "&scope="
+            + urlEncode(scope)
+            + "&code_challenge="
+            + codeChallenge
+            + "&code_challenge_method=S256&state="
+            + state
+            + extraQuery;
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/authorize?" + query))
+            .GET()
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+  }
+
+  private HttpResponse<Void> getUnsupportedAuthorize(
+      UUID organizationId, String clientId, String redirectUri, String responseType, String state)
+      throws IOException, InterruptedException {
+    String query =
+        responseType
+            + "&client_id="
+            + clientId
+            + "&redirect_uri="
+            + urlEncode(redirectUri)
+            + "&scope=openid&code_challenge="
+            + deriveCodeChallenge(generateCodeVerifier())
+            + "&code_challenge_method=S256&state="
+            + state;
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/authorize?" + query))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.discarding());
+  }
+
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
     String basicAuth =
         Base64.getEncoder()
@@ -521,18 +1308,29 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   private ClientCredentials registerOAuthClient(
       String platformToken, UUID organizationId, boolean requireConsent, List<String> allowedScopes)
       throws IOException, InterruptedException {
+    return registerOAuthClient(
+        platformToken, organizationId, requireConsent, allowedScopes, "\"authorization_code\"");
+  }
+
+  private ClientCredentials registerOAuthClient(
+      String platformToken,
+      UUID organizationId,
+      boolean requireConsent,
+      List<String> allowedScopes,
+      String grantTypesJson)
+      throws IOException, InterruptedException {
     String scopesJson =
         allowedScopes.stream().map(scope -> "\"" + scope + "\"").collect(Collectors.joining(","));
     String requestBody =
         """
         {
           "redirectUris": ["%s"],
-          "allowedGrantTypes": ["authorization_code"],
+          "allowedGrantTypes": [%s],
           "allowedScopes": [%s],
           "requireConsent": %s
         }
         """
-            .formatted(REDIRECT_URI, scopesJson, requireConsent);
+            .formatted(REDIRECT_URI, grantTypesJson, scopesJson, requireConsent);
     HttpRequest request =
         HttpRequest.newBuilder(
                 baseUri("/api/v1/admin/organizations/" + organizationId + "/clients"))
@@ -648,6 +1446,34 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
+  private long authTimeOf(String idToken) {
+    try {
+      return parse(idToken)
+          .getJWTClaimsSet()
+          .getDateClaim("auth_time")
+          .toInstant()
+          .getEpochSecond();
+    } catch (ParseException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private HttpResponse<String> refresh(UUID organizationId, ClientCredentials client, String token)
+      throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString((client.clientId() + ":" + client.clientSecret()).getBytes());
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/token"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "grant_type=refresh_token&refresh_token=" + urlEncode(token)))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
   private HttpResponse<Void> getAbsoluteDiscardingBody(String absoluteUrl)
       throws IOException, InterruptedException {
     HttpRequest request = HttpRequest.newBuilder(URI.create(absoluteUrl)).GET().build();
@@ -711,10 +1537,12 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   // state — the only way to actually observe from outside the process whether the session ID
   // changed, which is the entire point of the TD-SEC-012 regression checks above. "SESSION", not
   // "JSESSIONID" — TD-ARCH-002 replaced the servlet container's own session tracking with Spring
-  // Session (DistributedSessionConfig), whose DefaultCookieSerializer names its cookie "SESSION".
+  // Session (DistributedSessionConfig), whose cookie is "SESSION_<organizationId>": one per tenant
+  // since the tenants stopped sharing a session cookie, so this matches any of them (each test here
+  // signs in to a single Organization).
   private String currentSessionId() {
     return cookieManager.getCookieStore().getCookies().stream()
-        .filter(cookie -> "SESSION".equalsIgnoreCase(cookie.getName()))
+        .filter(cookie -> cookie.getName().matches("(?i)SESSION(_[0-9a-f]{32})?"))
         .map(HttpCookie::getValue)
         .findFirst()
         .orElse(null);

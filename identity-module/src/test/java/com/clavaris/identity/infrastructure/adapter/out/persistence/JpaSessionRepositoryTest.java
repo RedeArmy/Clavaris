@@ -77,6 +77,32 @@ class JpaSessionRepositoryTest {
   }
 
   @Test
+  void theAuthenticationInstantSurvivesAPersistenceRoundTrip() {
+    Instant login = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MILLIS);
+    Session session = Session.open(accountId, List.of("openid"), login);
+
+    repository.save(session);
+
+    assertThat(repository.findById(session.id()).orElseThrow().authenticatedAt())
+        .isCloseTo(login, within(1, ChronoUnit.MILLIS));
+  }
+
+  @Test
+  void theOidcSidSurvivesAPersistenceRoundTripAndASecondSave() {
+    Session session = Session.open(accountId, List.of("openid"));
+    repository.save(session);
+
+    Session loaded = repository.findById(session.id()).orElseThrow();
+    loaded.recordOidcSid("a-sid");
+    repository.save(loaded);
+    Session touched = repository.findById(session.id()).orElseThrow();
+    touched.touch();
+    repository.save(touched);
+
+    assertThat(repository.findById(session.id()).orElseThrow().oidcSid()).contains("a-sid");
+  }
+
+  @Test
   void findByIdIsEmptyForAnUnknownId() {
     assertThat(repository.findById(UUID.randomUUID())).isEmpty();
   }

@@ -65,7 +65,10 @@ class SocialLoginRedirectControllerTest {
     mockMvc
         .perform(get("/o/{organizationId}/login/social/google", ORGANIZATION_ID))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/oauth2/authorization/google"));
+        .andExpect(
+            redirectedUrl(
+                "/oauth2/authorization/google?clavaris_tenant="
+                    + ORGANIZATION_ID.toString().replace("-", "")));
   }
 
   // Clerk "customize redirect URLs" parity: stashed in the session so app's own
@@ -86,7 +89,10 @@ class SocialLoginRedirectControllerTest {
                 .param("clientId", "test_client")
                 .param("redirectUrl", "https://app.example.com/callback"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/oauth2/authorization/google"));
+        .andExpect(
+            redirectedUrl(
+                "/oauth2/authorization/google?clavaris_tenant="
+                    + ORGANIZATION_ID.toString().replace("-", "")));
 
     org.assertj.core.api.Assertions.assertThat(
             session.getAttribute(SocialLoginRedirectController.CLIENT_ID_SESSION_ATTRIBUTE))
@@ -122,7 +128,7 @@ class SocialLoginRedirectControllerTest {
     mockMvc
         .perform(get("/platform/login/social/github"))
         .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/oauth2/authorization/github"));
+        .andExpect(redirectedUrl("/oauth2/authorization/github?clavaris_tenant=platform"));
   }
 
   @Test

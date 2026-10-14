@@ -133,4 +133,39 @@ class AccountSelectorAuthorizationRequestResolverTest {
     assertThat(result).isNotNull();
     assertThat(result.getAdditionalParameters()).containsEntry("prompt", "select_account");
   }
+
+  // The tier that started the login rides in front of the state, so the flat callback can name its
+  // session cookie; the random part, which Spring Security validates, is left as it minted it.
+  @Test
+  void aTenantTagIsPrefixedToTheStateAndTheRandomPartIsKept() {
+    final String tag = organizationId.toString().replace("-", "");
+    final MockHttpServletRequest request = tenantRequest();
+    request.setParameter("clavaris_tenant", tag);
+
+    final String state = resolver.resolve(request, "google").getState();
+
+    assertThat(state).startsWith(tag + ".");
+    assertThat(state.substring(tag.length() + 1)).isNotBlank();
+  }
+
+  @Test
+  void thePlatformTagIsPrefixedToTheState() {
+    final MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/oauth2/authorization/google");
+    request.setParameter("clavaris_tenant", "platform");
+
+    assertThat(resolver.resolve(request, "google").getState()).startsWith("platform.");
+  }
+
+  @Test
+  void aMalformedOrAbsentTagLeavesTheStateAsSpringMintedIt() {
+    final MockHttpServletRequest forged =
+        new MockHttpServletRequest("GET", "/oauth2/authorization/google");
+    forged.setParameter("clavaris_tenant", "../x.y");
+    final MockHttpServletRequest plain =
+        new MockHttpServletRequest("GET", "/oauth2/authorization/google");
+
+    assertThat(resolver.resolve(forged, "google").getState()).doesNotContain(".");
+    assertThat(resolver.resolve(plain, "google").getState()).doesNotContain(".");
+  }
 }

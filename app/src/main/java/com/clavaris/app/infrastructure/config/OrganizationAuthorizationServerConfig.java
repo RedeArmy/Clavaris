@@ -1,6 +1,8 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcAuthorizationRequestParamsFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcLogoutWithoutHintFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationRateLimitRules;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
@@ -13,6 +15,10 @@ import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegis
 import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
+import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.OidcSessionIdRecorder;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
@@ -20,6 +26,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJw
 import com.clavaris.app.infrastructure.adapter.out.security.ProfilePictureClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
+import com.clavaris.app.infrastructure.adapter.out.security.RequestScopedConsentService;
 import com.clavaris.app.infrastructure.adapter.out.security.SessionBackedRefreshTokenGenerator;
 import com.clavaris.app.infrastructure.adapter.out.security.SpringSecurityAuthenticatedSessionEstablisher;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
@@ -30,6 +37,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuth
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
@@ -43,7 +51,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
@@ -53,7 +60,9 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -63,9 +72,10 @@ import org.springframework.security.oauth2.server.authorization.token.JwtEncodin
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -224,25 +234,27 @@ public class OrganizationAuthorizationServerConfig {
   private static OAuth2TokenGenerator<?> buildTokenGenerator(
       final JWKSource<SecurityContext> signingJwkSource,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
-      final WorkspaceMembershipRepository workspaceMemberships,
-      final WorkspaceRoleRepository workspaceRoles,
+      final WorkspaceRoleClaimsCustomizer workspaceRoleClaims,
       final IssueRefreshTokenUseCase issueRefreshToken,
+      final RecordSessionOidcIdUseCase recordSessionOidcId,
       final AccountRepository accounts,
       final String clavarisBaseUrl) {
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     final AuthenticationContextClaimsCustomizer authenticationContextClaims =
         new AuthenticationContextClaimsCustomizer();
-    final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
-        new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles);
     final ProfilePictureClaimsCustomizer profilePictureClaims =
         new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
+    final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
+    final OidcSessionIdRecorder sessionIdRecorder = new OidcSessionIdRecorder(recordSessionOidcId);
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
           authenticationContextClaims.customize(context);
           workspaceRoleClaims.customize(context);
           profilePictureClaims.customize(context);
+          emailClaims.customize(context);
+          sessionIdRecorder.customize(context);
         });
     return new DelegatingOAuth2TokenGenerator(
         jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
@@ -315,6 +327,7 @@ public class OrganizationAuthorizationServerConfig {
       final WorkspaceMembershipRepository workspaceMemberships,
       final WorkspaceRoleRepository workspaceRoles,
       final IssueRefreshTokenUseCase issueRefreshToken,
+      final RecordSessionOidcIdUseCase recordSessionOidcId,
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final RateLimiter rateLimiter,
       final RateLimitPolicyRepository rateLimitPolicies,
@@ -405,14 +418,22 @@ public class OrganizationAuthorizationServerConfig {
         buildTokenGenerator(
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,
-            workspaceMemberships,
-            workspaceRoles,
+            new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles),
             issueRefreshToken,
+            recordSessionOidcId,
             accounts,
             clavarisBaseUrl);
 
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
+
+    // Stored in Postgres (oauth2_authorization_consent) so an approved consent survives a restart
+    // and is shared by every instance. Wrapped so a request with prompt=consent can ignore the
+    // stored consent for itself alone (OIDC Core 3.1.2.1) without anything being deleted: see
+    // RequestScopedConsentService.
+    final OAuth2AuthorizationConsentService consentService =
+        new RequestScopedConsentService(
+            new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClients));
 
     // TD-SEC-003: same fix, same rationale as the platform tier's own config — see this class's
     // sibling comment there and the migration's own comment for why both tiers deliberately share
@@ -462,6 +483,7 @@ public class OrganizationAuthorizationServerConfig {
                     .registeredClientRepository(registeredClients)
                     .authorizationServerSettings(settings)
                     .authorizationService(authorizationService)
+                    .authorizationConsentService(consentService)
                     .tokenGenerator(tokenGenerator)
                     // BR-ID-03: replaces SAS's own OAuth2RefreshTokenAuthenticationProvider
                     // entirely for the refresh grant — same provider-swap extension point already
@@ -495,18 +517,24 @@ public class OrganizationAuthorizationServerConfig {
                     .oidc(
                         oidc ->
                             oidc.userInfoEndpoint(
-                                userInfo ->
-                                    userInfo.userInfoMapper(
-                                        new WorkspaceAwareOidcUserInfoMapper())))
+                                    userInfo ->
+                                        userInfo.userInfoMapper(
+                                            new WorkspaceAwareOidcUserInfoMapper()))
+                                .providerConfigurationEndpoint(
+                                    provider ->
+                                        provider.providerConfigurationCustomizer(
+                                            OidcDiscoveryMetadataCustomizer::customize)))
                     // Same fix as the platform tier's chain, same root cause — extracted to
                     // Argon2ClientAuthenticationSupport (code review finding: this exact block was
                     // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
-                            clientAuth.authenticationProviders(
-                                providers ->
-                                    Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
-                                        providers, argon2BulkheadGate)))
+                            clientAuth
+                                .errorResponseHandler(new ClientAuthenticationFailureHandler())
+                                .authenticationProviders(
+                                    providers ->
+                                        Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                            providers, argon2BulkheadGate)))
                     // TD-SEC-011 (2026-09-06): the project-owned, branded replacement for SAS's own
                     // DefaultConsentPage — see ConsentController's own Javadoc for the full design
                     // and CONSENT_PATH_PATTERN's own comment above for why this is one flat,
@@ -608,6 +636,15 @@ public class OrganizationAuthorizationServerConfig {
         .addFilterAfter(
             new TenantSessionConcurrencyFilter(sessionRegistry),
             OrganizationCapacityRateLimitingFilter.class)
+        // OIDC Core §3.1.2.1/§3.1.2.6: prompt=none/login/consent and max_age, which SAS ignores.
+        .addFilterAfter(
+            new OidcAuthorizationRequestParamsFilter(oauthClients),
+            TenantSessionConcurrencyFilter.class)
+        // RP-Initiated Logout §2: id_token_hint is RECOMMENDED, so a logout without one is
+        // confirmed by the End-User instead of rejected with SAS's 400.
+        .addFilterAfter(
+            new OidcLogoutWithoutHintFilter(oauthClients),
+            OidcAuthorizationRequestParamsFilter.class)
         // TD-SEC-028: /userinfo is a Bearer-token-protected API endpoint, not a browser page — a
         // real OIDC client calling it with a missing/invalid access token needs a clean 401,
         // never OrganizationLoginRedirectEntryPoint's redirect-to-the-hosted-login-page (correct
@@ -627,7 +664,7 @@ public class OrganizationAuthorizationServerConfig {
                     DelegatingAuthenticationEntryPoint.builder()
                         .defaultEntryPoint(new OrganizationLoginRedirectEntryPoint())
                         .addEntryPointFor(
-                            new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                            userInfoEntryPoint(),
                             PathPatternRequestMatcher.pathPattern("/o/*/userinfo"))
                         .build()))
         // TD-SEC-009: the one chain serving both this project's own /o/*/login template AND SAS's
@@ -640,5 +677,14 @@ public class OrganizationAuthorizationServerConfig {
                         embeddingChecker, redirectUriOriginResolver)));
 
     return http.build();
+  }
+
+  // RFC 6750 §3: a /userinfo request with no (or a rejected) access token is a 401 with a
+  // WWW-Authenticate: Bearer challenge, not a bare 401.
+  private static AuthenticationEntryPoint userInfoEntryPoint() {
+    final BearerTokenAuthenticationEntryPoint entryPoint =
+        new BearerTokenAuthenticationEntryPoint();
+    entryPoint.setRealmName("Clavaris");
+    return entryPoint;
   }
 }

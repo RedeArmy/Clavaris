@@ -7,6 +7,7 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.RequestedSco
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenCommand;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenResult;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
+import java.security.Principal;
 import java.time.Instant;
 import java.util.Date;
 import java.util.LinkedHashSet;
@@ -128,14 +129,15 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
     final Set<String> scopes = new LinkedHashSet<>(result.authorizedScopes());
 
     // OIDC Core §2: auth_time must reflect the original login, not this rotation — carried
-    // forward from Session.createdAt(), not Instant.now().
+    // forward from Session.authenticatedAt() (the instant the original ID token reported), not
+    // Instant.now() and not Session.createdAt() (opened later, at the code exchange).
     final Authentication principal =
         UsernamePasswordAuthenticationToken.authenticated(
             result.accountId().value().toString(),
             null,
             List.of(
                 FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
-                    .issuedAt(result.sessionCreatedAt())
+                    .issuedAt(result.authenticatedAt())
                     .build()));
 
     final DefaultOAuth2TokenContext.Builder tokenContextBuilder =
@@ -151,6 +153,12 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
         OAuth2Authorization.withRegisteredClient(registeredClient)
             .id(UUID.randomUUID().toString())
             .principalName(principal.getName())
+            // RP-Initiated Logout: Spring Authorization Server loads the authorization behind an
+            // ID token hint and insists on its Principal attribute (and compares its name with the
+            // browser session's user), so the authorization saved for a refreshed ID token must
+            // carry it like the one the code exchange saved, or logging out with that ID token
+            // fails with a 400.
+            .attribute(Principal.class.getName(), principal)
             .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
             .authorizedScopes(scopes);
 
@@ -180,7 +188,9 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
       // nothing to inherit. A minimal placeholder carrying exactly the two claims that branch
       // reads — sid, auth_time (a java.util.Date, matching JwtGenerator's own
       // Date.from(...) convention exactly) — satisfies it correctly rather than working around
-      // it; the placeholder is immediately superseded in authorizationBuilder by the real,
+      // it, and the sid is the one the original ID token carried (OIDC Core 12.2), the Session id
+      // only for a Session that predates recording it; the placeholder is immediately superseded in
+      // authorizationBuilder by the real,
       // freshly-generated ID token below (OAuth2Authorization.Builder.token(T) keys by class).
       // java:S2143/PMD.ReplaceJavaUtilDate ("use java.time") don't apply here: JwtGenerator's own
       // source reads this claim back with `Date authTimeClaim = currentIdToken.getClaim(...)` —
@@ -191,17 +201,13 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
       // established convention (java:S107 elsewhere) rather than a NOSONAR comment, which this
       // SonarCloud project may not honor as a general analysis-scope setting.
       @SuppressWarnings({"java:S2143", "PMD.ReplaceJavaUtilDate"})
-      final Date authTimeClaimValue = Date.from(result.sessionCreatedAt());
+      final Date authTimeClaimValue = Date.from(result.authenticatedAt());
       final OidcIdToken priorIdTokenPlaceholder =
           new OidcIdToken(
               "placeholder-never-served-to-a-client",
               Instant.now(),
               Instant.now().plusSeconds(1),
-              Map.of(
-                  "sid",
-                  result.sessionId().toString(),
-                  IdTokenClaimNames.AUTH_TIME,
-                  authTimeClaimValue));
+              Map.of("sid", idTokenSid(result), IdTokenClaimNames.AUTH_TIME, authTimeClaimValue));
       authorizationBuilder.token(priorIdTokenPlaceholder);
 
       final OAuth2TokenContext idTokenContext =
@@ -242,6 +248,12 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
 
     return new OAuth2AccessTokenAuthenticationToken(
         registeredClient, clientPrincipal, accessToken, newRefreshToken, additionalParameters);
+  }
+
+  // OIDC Core 12.2: the sid of the original ID token; the Session id only for a Session that
+  // predates recording it.
+  private static String idTokenSid(final RotateRefreshTokenResult result) {
+    return result.oidcSid() != null ? result.oidcSid() : result.sessionId().toString();
   }
 
   // BR-ID-03: InvalidRefreshTokenException and RefreshTokenReuseDetectedException both map to the

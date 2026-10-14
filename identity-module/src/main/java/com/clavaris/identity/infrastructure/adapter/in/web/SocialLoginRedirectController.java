@@ -67,6 +67,17 @@ public class SocialLoginRedirectController {
 
   public static final String REDIRECT_URL_SESSION_ATTRIBUTE = "clavaris.socialLogin.redirectUrl";
 
+  /**
+   * The flat {@code /oauth2/authorization/{provider}} hop and the provider's callback carry no
+   * tenant of their own, yet they must read the session of the tier that started the login. This
+   * query parameter on the hop names it ({@code <organization id without dashes>} or {@link
+   * #PLATFORM_TENANT_TAG}); the authorization-request resolver then copies it into the OAuth {@code
+   * state} as a prefix, so the callback names it again.
+   */
+  public static final String TENANT_TAG_PARAMETER = "clavaris_tenant";
+
+  public static final String PLATFORM_TENANT_TAG = "platform";
+
   private final OrganizationSocialLoginPolicyProvider policyProvider;
 
   public SocialLoginRedirectController(final OrganizationSocialLoginPolicyProvider policyProvider) {
@@ -104,7 +115,11 @@ public class SocialLoginRedirectController {
     response.sendRedirect(
         request.getContextPath()
             + "/oauth2/authorization/"
-            + socialProvider.name().toLowerCase(Locale.ROOT));
+            + socialProvider.name().toLowerCase(Locale.ROOT)
+            + "?"
+            + TENANT_TAG_PARAMETER
+            + "="
+            + organizationId.toString().replace("-", ""));
   }
 
   @GetMapping("/platform/login/social/{provider}")
@@ -129,7 +144,13 @@ public class SocialLoginRedirectController {
       existingSession.removeAttribute(REDIRECT_URL_SESSION_ATTRIBUTE);
     }
     response.sendRedirect(
-        request.getContextPath() + "/oauth2/authorization/" + provider.toLowerCase(Locale.ROOT));
+        request.getContextPath()
+            + "/oauth2/authorization/"
+            + provider.toLowerCase(Locale.ROOT)
+            + "?"
+            + TENANT_TAG_PARAMETER
+            + "="
+            + PLATFORM_TENANT_TAG);
   }
 
   // Literal path segments take precedence over the {provider} variable segment above at the same

@@ -69,3 +69,9 @@ msgstr "{0} — Tus claves de acceso"
 
 msgid "{0} — Your sessions"
 msgstr "{0} — Tus sesiones"
+
+msgid "{0} — Sign out"
+msgstr "{0} — Cerrar sesión"
+
+msgid "{0} — Signed out"
+msgstr "{0} — Sesión cerrada"

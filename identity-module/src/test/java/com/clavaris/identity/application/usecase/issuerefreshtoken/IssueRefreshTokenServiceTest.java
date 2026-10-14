@@ -91,6 +91,23 @@ class IssueRefreshTokenServiceTest {
     verify(metrics).increment("clavaris.auth.token.issued", "tokenType", "refresh_token");
   }
 
+  // OIDC Core §2: the Session remembers when the user authenticated, so refreshed ID tokens repeat
+  // the first one's auth_time.
+  @Test
+  void theSessionStoresTheAuthenticationInstantItWasGiven() {
+    Instant login = Instant.now().minusSeconds(45);
+    IssueRefreshTokenCommand command =
+        new IssueRefreshTokenCommand(
+            accountId, List.of("openid"), Instant.now().plus(30, ChronoUnit.DAYS), login);
+
+    service.handle(command);
+
+    org.mockito.ArgumentCaptor<com.clavaris.identity.domain.model.Session> opened =
+        org.mockito.ArgumentCaptor.forClass(com.clavaris.identity.domain.model.Session.class);
+    verify(sessions).insert(opened.capture());
+    assertThat(opened.getValue().authenticatedAt()).isEqualTo(login);
+  }
+
   @Test
   void logsIssuanceWithoutEverLoggingTheRawTokenValue() {
     Instant expiresAt = Instant.now().plus(30, ChronoUnit.DAYS);

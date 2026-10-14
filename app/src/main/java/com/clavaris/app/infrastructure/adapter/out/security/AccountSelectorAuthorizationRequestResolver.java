@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpSession;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
@@ -19,7 +20,14 @@ import org.springframework.stereotype.Component;
 /**
  * Makes Google or GitHub show their account chooser every time, when the Organization asked for it
  * on its Connections page ("Always show account selector prompt"). It adds {@code
- * prompt=select_account} to the redirect to the provider, and only to that.
+ * prompt=select_account} to the redirect to the provider.
+ *
+ * <p>It also prefixes the OAuth {@code state} with the tier that started the login ({@code
+ * <tag>.<random>}, the tag coming from {@code SocialLoginRedirectController}'s {@code
+ * clavaris_tenant} parameter), because the provider's callback goes to one flat URL that names no
+ * tenant: the session cookie serializer reads the tag back from the callback's {@code state} to
+ * pick that tier's cookie. Two logins pending in two Organizations at once therefore never share a
+ * session.
  *
  * <p>Which Organization the login is for is read the way {@code
  * TenantAwareClientRegistrationResolver} reads it: from the session attribute {@code
@@ -31,6 +39,7 @@ import org.springframework.stereotype.Component;
 @Component
 class AccountSelectorAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 
+  private static final Pattern TENANT_TAG = Pattern.compile("^(?:platform|[0-9a-f]{32})$");
   private static final String PROMPT = "prompt";
   private static final String SELECT_ACCOUNT = "select_account";
 
@@ -58,12 +67,28 @@ class AccountSelectorAuthorizationRequestResolver implements OAuth2Authorization
 
   private OAuth2AuthorizationRequest customize(
       final OAuth2AuthorizationRequest authorizationRequest, final HttpServletRequest request) {
-    if (authorizationRequest == null || !wantsAccountSelector(authorizationRequest, request)) {
-      return authorizationRequest;
+    if (authorizationRequest == null) {
+      return null;
     }
-    return OAuth2AuthorizationRequest.from(authorizationRequest)
-        .additionalParameters(parameters -> parameters.put(PROMPT, SELECT_ACCOUNT))
-        .build();
+    final OAuth2AuthorizationRequest.Builder builder =
+        OAuth2AuthorizationRequest.from(authorizationRequest);
+    final Optional<String> tenantTag = tenantTagOf(request);
+    tenantTag.ifPresent(tag -> builder.state(tag + "." + authorizationRequest.getState()));
+    if (wantsAccountSelector(authorizationRequest, request)) {
+      builder.additionalParameters(parameters -> parameters.put(PROMPT, SELECT_ACCOUNT));
+    }
+    return tenantTag.isPresent() || wantsAccountSelector(authorizationRequest, request)
+        ? builder.build()
+        : authorizationRequest;
+  }
+
+  // The provider echoes the state back untouched, and the callback URL carries nothing else of
+  // this application's own, so the tier that started the login rides in front of the random part:
+  // "<tag>.<random>". The random part, which is what Spring Security validates, is unchanged. Only
+  // a well-formed tag is copied; anything else leaves the state exactly as Spring minted it.
+  private static Optional<String> tenantTagOf(final HttpServletRequest request) {
+    final String tag = request.getParameter(SocialLoginRedirectController.TENANT_TAG_PARAMETER);
+    return tag != null && TENANT_TAG.matcher(tag).matches() ? Optional.of(tag) : Optional.empty();
   }
 
   private boolean wantsAccountSelector(
