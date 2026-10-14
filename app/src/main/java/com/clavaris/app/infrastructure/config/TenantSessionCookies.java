@@ -34,7 +34,28 @@ final class TenantSessionCookies {
       Pattern.compile(
           "^/o/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?:/.*)?$");
 
+  private static final String PLATFORM_COOKIE = "PLATFORM_SESSION";
+  private static final Pattern TENANT_TAG = Pattern.compile("^(?:platform|[0-9a-f]{32})$");
+
   private TenantSessionCookies() {}
+
+  /**
+   * The cookie a social-login tenant tag names ({@code SocialLoginRedirectController}'s {@code
+   * clavaris_tenant}): {@code PLATFORM_SESSION} for the platform tier, {@code SESSION_<id>} for an
+   * Organization, empty for anything else (an absent, malformed or forged tag falls back to the
+   * legacy cookie in the caller, never to another tenant's).
+   */
+  /* package */ static Optional<String> nameForTag(final String tag) {
+    return Optional.ofNullable(tag)
+        .filter(candidate -> TENANT_TAG.matcher(candidate).matches())
+        .map(valid -> "platform".equals(valid) ? PLATFORM_COOKIE : PREFIX + valid);
+  }
+
+  /** The tag the authorization-request resolver put in front of an OAuth state, if any. */
+  /* package */ static Optional<String> tagOfState(final String state) {
+    final int separator = state == null ? -1 : state.indexOf('.');
+    return separator > 0 ? Optional.of(state.substring(0, separator)) : Optional.empty();
+  }
 
   /* package */ static String nameFor(final UUID organizationId) {
     return PREFIX + organizationId.toString().replace("-", "");

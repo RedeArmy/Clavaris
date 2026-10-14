@@ -1,10 +1,9 @@
 package com.clavaris.app.infrastructure.config;
 
-import jakarta.servlet.http.Cookie;
+import com.clavaris.identity.infrastructure.adapter.in.web.SocialLoginRedirectController;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
@@ -90,16 +89,16 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
  *       A {@code client_id} that belongs to no Organization reads no session at all, never another
  *       Organization's.
  *   <li>{@code /oauth2/authorization/**} and {@code /login/oauth2/code/**} (the social-login round
- *       trip, flat for the same reason): the tenant cookie whose session started a social login
- *       that is still in progress; with none, {@code SESSION} as before, which is also what the
- *       platform's own social login uses.
+ *       trip, flat for the same reason): the tier that started the login travels with it, as the
+ *       {@code clavaris_tenant} parameter on the first hop and as a prefix of the OAuth {@code
+ *       state} on the provider's callback, so two logins pending in two Organizations each read
+ *       their own cookie, and the platform's own social login reads {@code PLATFORM_SESSION}. A
+ *       request without a well-formed tag keeps {@code SESSION}.
  *   <li>Any other flat path: {@code SESSION}, exactly as before.
  * </ul>
  *
  * Sessions created before this change live under {@code SESSION} and are no longer read on tenant
- * paths: each user signs in once more, and the old cookie is ignored from then on. Two social
- * logins pending in two Organizations at once would resolve to one of them; a known limit of a flat
- * callback URL that carries no tenant.
+ * paths: each user signs in once more, and the old cookie is ignored from then on.
  */
 // PMD.LongVariable: every name here names exactly what it holds — same "abbreviating would only
 // make this harder to read" precedent this codebase's own PlatformScopes/
@@ -113,8 +112,9 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
   private static final String PLATFORM_COOKIE_NAME = "PLATFORM_SESSION";
   private static final String CONSENT_PATH = "/oauth2/consent";
   private static final String CLIENT_ID_PARAM = "client_id";
-  private static final List<String> SOCIAL_LOGIN_PREFIXES =
-      List.of("/oauth2/authorization/", "/login/oauth2/code/");
+  private static final String SOCIAL_START_PREFIX = "/oauth2/authorization/";
+  private static final String SOCIAL_CALLBACK_PREFIX = "/login/oauth2/code/";
+  private static final String STATE_PARAM = "state";
 
   // The cookie a flat request resolved to, kept on the request so the write that follows the read
   // does not look it up (and scan sessions) a second time.
@@ -166,8 +166,15 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
     if (CONSENT_PATH.equals(path)) {
       return resolvedOnce(request, () -> consentCookie(request));
     }
-    if (SOCIAL_LOGIN_PREFIXES.stream().anyMatch(path::startsWith)) {
-      return resolvedOnce(request, () -> Optional.of(socialLoginCookie(request)));
+    if (path.startsWith(SOCIAL_START_PREFIX)) {
+      return Optional.of(
+          socialLoginCookie(
+              request.getParameter(SocialLoginRedirectController.TENANT_TAG_PARAMETER)));
+    }
+    if (path.startsWith(SOCIAL_CALLBACK_PREFIX)) {
+      return Optional.of(
+          socialLoginCookie(
+              TenantSessionCookies.tagOfState(request.getParameter(STATE_PARAM)).orElse(null)));
     }
     return Optional.of(TenantSessionCookies.LEGACY_NAME);
   }
@@ -192,25 +199,13 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
     return flatPathLookup.organizationForClient(clientId).map(TenantSessionCookies::nameFor);
   }
 
-  private String socialLoginCookie(final HttpServletRequest request) {
-    return tenantCookieNames(request)
-        .filter(
-            name ->
-                serializerFor(request, name).readCookieValues(request).stream()
-                    .anyMatch(flatPathLookup::hasSocialLoginInProgress))
-        .findFirst()
-        .orElse(TenantSessionCookies.LEGACY_NAME);
-  }
-
-  private static Stream<String> tenantCookieNames(final HttpServletRequest request) {
-    final Cookie[] cookies = request.getCookies();
-    return cookies == null
-        ? Stream.empty()
-        : Stream.of(cookies)
-            .map(Cookie::getName)
-            .filter(TenantSessionCookies::isTenantCookie)
-            .distinct()
-            .sorted();
+  // The tag names the tier that started this social login (see SocialLoginRedirectController), so
+  // two logins pending at once in two Organizations each read their own session. A request with no
+  // tag, or one that is not a well-formed tag, keeps the legacy cookie: a forged tag can only pick
+  // another cookie of the same browser, and Spring Security then fails to find the saved
+  // authorization request for that state in it.
+  private static String socialLoginCookie(final String tag) {
+    return TenantSessionCookies.nameForTag(tag).orElse(TenantSessionCookies.LEGACY_NAME);
   }
 
   // A cheap, throwaway serializer per call rather than a cache keyed by cookie name: tenant cookie

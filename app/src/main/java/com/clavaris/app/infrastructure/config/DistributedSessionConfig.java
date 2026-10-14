@@ -5,7 +5,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.session.SessionRepository;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
 import org.springframework.session.web.http.CookieSerializer;
 
@@ -76,9 +75,8 @@ class DistributedSessionConfig {
   @Bean
   /* package */ CookieSerializer sessionCookieSerializer(
       @Value("${clavaris.session.platform-path-prefix:/platform/}") final String platformPathPrefix,
-      final ObjectProvider<OrganizationForClientResolver> organizationForClient,
-      final ObjectProvider<SessionRepository<?>> sessions) {
+      final ObjectProvider<OrganizationForClientResolver> organizationForClient) {
     return new AdaptiveSameSiteSessionCookieSerializer(
-        platformPathPrefix, new SessionBackedFlatPathLookup(organizationForClient, sessions));
+        platformPathPrefix, new SessionBackedFlatPathLookup(organizationForClient));
   }
 }

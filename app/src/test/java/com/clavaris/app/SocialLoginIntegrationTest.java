@@ -17,6 +17,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.CookieManager;
+import java.net.HttpCookie;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -27,10 +28,12 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -315,14 +318,82 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(socialIdentityCount).isZero();
   }
 
+  // Two social logins pending at once in two Organizations of the same browser used to resolve to
+  // one of them: the callback URL is flat and carries no tenant, so the session cookie was guessed
+  // from "whichever tenant session has a social login in progress". The tenant now travels in the
+  // OAuth state, so each callback reads its own Organization's session.
+  @Test
+  void twoSocialLoginsPendingAtOnceInTwoTenantsEachCompleteInTheirOwnTenant() throws Exception {
+    final String platformToken =
+        requestPlatformAccessToken(
+            "platform:organizations:write platform:social-login-policy:write");
+    final UUID tenantA = createOrganization(platformToken, "Social Tenant A");
+    final UUID tenantB = createOrganization(platformToken, "Social Tenant B");
+    enableGitHubSocialLogin(platformToken, tenantA);
+    enableGitHubSocialLogin(platformToken, tenantB);
+
+    final SessionClient sharedBrowser = new SessionClient();
+    final String stateA = beginGitHubLogin(sharedBrowser, "/o/" + tenantA);
+    final String stateB = beginGitHubLogin(sharedBrowser, "/o/" + tenantB);
+
+    CURRENT_STUB_USER.set(new StubGitHubUser(990101, "tenant-a-user", "a-user@example.test"));
+    final String redirectA = finishGitHubLogin(sharedBrowser, stateA);
+    CURRENT_STUB_USER.set(new StubGitHubUser(990102, "tenant-b-user", "b-user@example.test"));
+    final String redirectB = finishGitHubLogin(sharedBrowser, stateB);
+
+    assertThat(redirectA).endsWith("/o/" + tenantA + "/login?authenticated");
+    assertThat(redirectB).endsWith("/o/" + tenantB + "/login?authenticated");
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select email from accounts where organization_id = ?", String.class, tenantA))
+        .containsExactly("a-user@example.test");
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select email from accounts where organization_id = ?", String.class, tenantB))
+        .containsExactly("b-user@example.test");
+    assertThat(sharedBrowser.cookieNames())
+        .contains(
+            "SESSION_" + tenantA.toString().replace("-", ""),
+            "SESSION_" + tenantB.toString().replace("-", ""));
+  }
+
+  // The platform's own social login used to land its authenticated session under SESSION (the flat
+  // callback had no tenant to name a cookie after) while /platform/** reads PLATFORM_SESSION, so a
+  // successful platform social login never reached the dashboard.
+  @Test
+  void aPlatformSocialLoginKeepsItsSessionUnderPlatformSession() throws Exception {
+    CURRENT_STUB_USER.set(
+        new StubGitHubUser(990201, "platform-user", "platform-social@example.test"));
+    final SessionClient browser = new SessionClient();
+
+    final String state = beginGitHubLogin(browser, "/platform");
+    final String finalRedirect = finishGitHubLogin(browser, state);
+
+    assertThat(finalRedirect).endsWith("/platform/dashboard");
+    assertThat(browser.cookieNames()).contains("PLATFORM_SESSION").doesNotContain("SESSION");
+    assertThat(browser.get(baseUri("/platform/dashboard")).statusCode())
+        .as("the platform session written by the callback must authenticate /platform/**")
+        .isEqualTo(200);
+  }
+
   /**
    * Walks the entire redirect chain for one GitHub sign-in attempt on the given {@code client}'s
    * own session, returning the final redirect target's path.
    */
   private String completeGitHubLogin(final SessionClient client, final UUID organizationId)
       throws IOException, InterruptedException {
+    return finishGitHubLogin(client, beginGitHubLogin(client, "/o/" + organizationId));
+  }
+
+  /**
+   * The first half of a sign-in: the entry link under {@code tenantOrPlatformPath}, then the hop to
+   * Spring Security's own authorization endpoint, which redirects to the provider. Returns the
+   * {@code state} it minted, which is all the provider hands back on the callback.
+   */
+  private String beginGitHubLogin(final SessionClient client, final String tenantOrPlatformPath)
+      throws IOException, InterruptedException {
     final HttpResponse<String> entry =
-        client.get(baseUri("/o/" + organizationId + "/login/social/github"));
+        client.get(baseUri(tenantOrPlatformPath + "/login/social/github"));
     assertThat(entry.statusCode()).isEqualTo(302);
     final String authorizationRedirect = entry.headers().firstValue("Location").orElseThrow();
     assertThat(authorizationRedirect).contains("/oauth2/authorization/github");
@@ -338,9 +409,16 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(providerUrl).contains("/login/oauth/authorize");
     final String state = queryParam(providerUrl, "state");
     assertThat(state).as("Spring Security must have minted a real state value").isNotBlank();
+    return state;
+  }
 
-    // Simulates the provider's own redirect back — never actually calls the stub authorization
-    // endpoint itself (no consent screen to simulate; only the callback's own effects matter here).
+  /**
+   * The provider's own redirect back, with the {@code state} it was given. Never actually calls the
+   * stub authorization endpoint itself (no consent screen to simulate; only the callback's own
+   * effects matter here).
+   */
+  private String finishGitHubLogin(final SessionClient client, final String state)
+      throws IOException, InterruptedException {
     final HttpResponse<String> callback =
         client.get(
             URI.create(
@@ -484,11 +562,18 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
    * CookieManager} for its own single-session flow.
    */
   private static final class SessionClient {
+    private final CookieManager cookies = new CookieManager();
     private final HttpClient httpClient =
         HttpClient.newBuilder()
-            .cookieHandler(new CookieManager())
+            .cookieHandler(cookies)
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+
+    Set<String> cookieNames() {
+      return cookies.getCookieStore().getCookies().stream()
+          .map(HttpCookie::getName)
+          .collect(Collectors.toSet());
+    }
 
     HttpResponse<String> get(final URI uri) throws IOException, InterruptedException {
       final HttpRequest request = HttpRequest.newBuilder(uri).GET().build();

@@ -6,10 +6,8 @@ import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -31,7 +29,6 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
 
   // Stands in for the client->Organization resolver and the session repository.
   private final Map<String, UUID> clientOrganizations = new HashMap<>();
-  private final Set<String> socialLoginSessions = new HashSet<>();
   private final AdaptiveSameSiteSessionCookieSerializer serializer =
       new AdaptiveSameSiteSessionCookieSerializer(
           "/platform/",
@@ -39,11 +36,6 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
             @Override
             public Optional<UUID> organizationForClient(final String clientId) {
               return Optional.ofNullable(clientOrganizations.get(clientId));
-            }
-
-            @Override
-            public boolean hasSocialLoginInProgress(final String sessionId) {
-              return socialLoginSessions.contains(sessionId);
             }
           });
 
@@ -216,11 +208,6 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
       public Optional<UUID> organizationForClient(final String clientId) {
         return Optional.empty();
       }
-
-      @Override
-      public boolean hasSocialLoginInProgress(final String sessionId) {
-        return false;
-      }
     };
   }
 
@@ -319,10 +306,16 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     assertThat(serializer.readCookieValues(request)).isEmpty();
   }
 
+  private static final String TAG_A = "11111111111111111111111111111111";
+  private static final String TAG_B = "22222222222222222222222222222222";
+
+  // The callback URL is flat and the provider echoes only the state back, so the tier that started
+  // the login rides in front of the state: two logins pending in two Organizations each read their
+  // own cookie, however many tenant cookies the browser holds.
   @Test
-  void aSocialLoginCallbackReadsTheTenantSessionThatStartedTheLogin() {
-    socialLoginSessions.add("session-of-b");
-    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/oauth2/code/google");
+  void aSocialLoginCallbackReadsTheCookieNamedByTheStateTag() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/oauth2/code/github");
+    request.setParameter("state", TAG_B + ".random-part");
     request.setCookies(
         new Cookie(COOKIE_A, encoded("session-of-a")),
         new Cookie(COOKIE_B, encoded("session-of-b")),
@@ -331,22 +324,60 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     assertThat(serializer.readCookieValues(request)).containsExactly("session-of-b");
   }
 
-  // The platform's own social login uses the same flat endpoints: it must not be handed an
-  // authenticated tenant session (it would overwrite it), only the shared cookie as before.
   @Test
-  void aSocialLoginEndpointWithNoTenantLoginInProgressKeepsTheSharedCookie() {
+  void theFirstHopOfASocialLoginReadsTheCookieNamedByTheTenantParameter() {
     MockHttpServletRequest request =
-        new MockHttpServletRequest("GET", "/oauth2/authorization/google");
+        new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+    request.setParameter("clavaris_tenant", TAG_A);
     request.setCookies(
-        new Cookie(COOKIE_A, encoded("session-of-a")), new Cookie("SESSION", encoded("legacy")));
+        new Cookie(COOKIE_A, encoded("session-of-a")),
+        new Cookie(COOKIE_B, encoded("session-of-b")));
 
-    assertThat(serializer.readCookieValues(request)).containsExactly("legacy");
+    assertThat(serializer.readCookieValues(request)).containsExactly("session-of-a");
+  }
+
+  // The platform's own social login uses the same flat endpoints: its tag names PLATFORM_SESSION,
+  // so its authenticated session lands where /platform/** reads it, and never in a tenant's.
+  @Test
+  void aPlatformTaggedSocialLoginReadsAndWritesThePlatformCookie() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/oauth2/code/github");
+    request.setParameter("state", "platform.random-part");
+    request.setCookies(
+        new Cookie(COOKIE_A, encoded("session-of-a")),
+        new Cookie("PLATFORM_SESSION", encoded("platform-id")),
+        new Cookie("SESSION", encoded("legacy")));
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThat(serializer.readCookieValues(request)).containsExactly("platform-id");
+    serializer.writeCookieValue(new CookieValue(request, response, "rotated-id"));
+    assertThat(response.getHeader("Set-Cookie")).startsWith("PLATFORM_SESSION=");
+  }
+
+  // A forged or malformed tag can only pick another cookie of the same browser (Spring Security
+  // then fails to find the saved authorization request for that state in it); it never throws and
+  // never reaches anything but the shared cookie.
+  @Test
+  void anInvalidOrMissingTagKeepsTheSharedCookie() {
+    for (String state :
+        new String[] {null, "", "no-dot", ".leading", "not-a-tag.random", "../etc.random", TAG_A}) {
+      MockHttpServletRequest request =
+          new MockHttpServletRequest("GET", "/login/oauth2/code/github");
+      if (state != null) {
+        request.setParameter("state", state);
+      }
+      request.setCookies(
+          new Cookie(COOKIE_A, encoded("session-of-a")), new Cookie("SESSION", encoded("legacy")));
+
+      assertThat(serializer.readCookieValues(request))
+          .as("state=%s", state)
+          .containsExactly("legacy");
+    }
   }
 
   @Test
   void theWriteThatFollowsAFlatReadUsesTheSameCookie() {
-    socialLoginSessions.add("session-of-a");
-    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/oauth2/code/google");
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/oauth2/code/github");
+    request.setParameter("state", TAG_A + ".random-part");
     request.setCookies(new Cookie(COOKIE_A, encoded("session-of-a")));
     MockHttpServletResponse response = new MockHttpServletResponse();
 
