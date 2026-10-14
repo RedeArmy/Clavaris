@@ -28,10 +28,8 @@ import org.springframework.web.bind.annotation.RequestParam;
  * request parameters back as hidden fields.
  */
 // PMD.AtLeastOneConstructor: no state, only two stateless handlers. PMD.LongVariable: the attribute
-// name says what it holds. PMD.LawOfDemeter: request.getSession() is the standard Servlet API
-// shape,
-// same rationale as the sibling controllers' own identical suppression.
-@SuppressWarnings({"PMD.AtLeastOneConstructor", "PMD.LongVariable", "PMD.LawOfDemeter"})
+// name says what it holds.
+@SuppressWarnings({"PMD.AtLeastOneConstructor", "PMD.LongVariable"})
 @Controller
 @RequestMapping("/o/{organizationId}/logout")
 public class RpInitiatedLogoutController {
@@ -52,22 +50,29 @@ public class RpInitiatedLogoutController {
       @RequestParam(name = "state", required = false) final String state,
       final HttpServletRequest request,
       final Model model) {
-    // A token already waiting in this session is kept, not replaced: a rejected POST shows this
-    // page
-    // again, and minting a new token then would invalidate the one on the page the visitor is
-    // looking at (another site could keep doing that to stop them signing out).
-    final HttpSession session = request.getSession();
-    final String token =
-        session.getAttribute(CONFIRMATION_TOKEN_ATTRIBUTE) instanceof String existing
-            ? existing
-            : newToken();
-    session.setAttribute(CONFIRMATION_TOKEN_ATTRIBUTE, token);
-    model.addAttribute("organizationId", organizationId);
-    model.addAttribute("confirmationToken", token);
-    model.addAttribute("clientId", clientId);
-    model.addAttribute("postLogoutRedirectUri", postLogoutRedirectUri);
-    model.addAttribute("state", state);
-    return "identity/logout-confirm";
+    // Only an End-User who is signed in gets here (the filter completes any other request without a
+    // page), so the session already exists; one that has gone in the meantime is not recreated just
+    // to hold a token for nothing.
+    final HttpSession session = request.getSession(false);
+    String view = "identity/logout-confirm";
+    if (session == null) {
+      view = done(organizationId, model);
+    } else {
+      // A token already waiting in this session is kept, not replaced: a rejected POST shows this
+      // page again, and minting a new token then would invalidate the one on the page the visitor
+      // is looking at (another site could keep doing that to stop them signing out).
+      final String token =
+          session.getAttribute(CONFIRMATION_TOKEN_ATTRIBUTE) instanceof String existing
+              ? existing
+              : newToken();
+      session.setAttribute(CONFIRMATION_TOKEN_ATTRIBUTE, token);
+      model.addAttribute("organizationId", organizationId);
+      model.addAttribute("confirmationToken", token);
+      model.addAttribute("clientId", clientId);
+      model.addAttribute("postLogoutRedirectUri", postLogoutRedirectUri);
+      model.addAttribute("state", state);
+    }
+    return view;
   }
 
   private static String newToken() {

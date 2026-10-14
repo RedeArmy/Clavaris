@@ -66,18 +66,70 @@ got a 400. A Session that predates the column keeps reporting its own id as befo
 ### 5. `prompt`, `max_age` and logout
 
 `OidcAuthorizationRequestParamsFilter` implements `prompt=none|login|consent` and `max_age` (OIDC
-Core 3.1.2.1/3.1.2.6); the actions that change the user's state (ending the session, forgetting a
-consent) only happen on a navigation (`Sec-Fetch-Dest`), never for a subresource another site
-requests. Errors go to a `redirect_uri` only when it is registered for the client of that
-Organization (exact match). Logout without `id_token_hint` shows a confirmation page protected by a
-single-use token and redirects only to a registered `post_logout_redirect_uri`.
+Core 3.1.2.1/3.1.2.6). Errors go to a `redirect_uri` only when it is registered for the client of
+that Organization (exact match).
+
+**A request never destroys the End-User's state.** The first version dropped the session on
+`prompt=login` and deleted the stored consent on `prompt=consent`, guarded only by `Sec-Fetch-Dest`
+(a navigation, not an image). That is not enough: the CSP `frame-ancestors` stops another site's
+iframe from being *shown*, but the request is still made with the visitor's cookie, so a hostile
+page could log a visitor out or wipe their consents. Now:
+
+- `prompt=login` / an expired `max_age`: the request is saved, a note is left and the hosted login
+  is shown. The current authentication stays until a new login replaces it (the login page does not
+  skip itself for a signed-in visitor), and the resumed request passes once a factor newer than the
+  note exists. From another site the worst case is a login page the visitor never sees.
+- `prompt=consent`: the filter only marks the request; `RequestScopedConsentService` makes the
+  authorization endpoint see no stored consent for that request alone. Nothing is deleted, an
+  approval replaces the stored consent, and an abandoned screen leaves the old one in place (the
+  next plain authorize is granted).
+- Residual, accepted: a request from another site can still save an authorize request and leave a
+  note in the visitor's session (saving a request to resume after login is what Spring Security
+  does for any unauthenticated authorize). It is bounded and expires (below), and resuming it
+  only reaches a registered redirect URI of a registered client with the visitor's own login.
+
+**Notes per request.** `ReauthenticationMarker` keeps one note per request (its sorted parameters,
+without Spring's `continue`), at most five, each valid for ten minutes, used up when it counts. A
+second authorize request while the first waits for its login no longer discards the first's note, so
+the resumed request needs only one login. A note counts only for a login made after it was left.
+
+**Every login method counts.** The new authentication instant is the latest
+`FactorGrantedAuthority.issuedAt`; password, social (`AUTHORIZATION_CODE`), magic link (`OTT`) and
+passkey (`WEBAUTHN`) sign-ins each put one on the context, and a device-trust step-up adds another
+(`OidcRequestParametersTest`).
+
+**Logout without `id_token_hint`.** A confirmation page protected by a single-use token kept in the
+End-User's own session, redirecting only to a registered `post_logout_redirect_uri`. When nobody is
+signed in on that Organization there is nothing to confirm or end: the request completes at once
+(registered redirect, else the "signed out" page) and **no session is created for it**; before, an
+anonymous request opened an empty session just to hold a token. A stateless signed token was
+considered and not needed: the token is only ever issued to a visitor who already has a session.
+
+### 6. `nonce` on a refreshed ID token
+
+OIDC Core 12.2: an ID token issued by a refresh request SHOULD NOT carry `nonce`, and if it does
+its value MUST equal the original. Clavaris's refreshed ID token carries none, which conforms; the
+other claims that must be repeated (`iss`, `sub`, `aud`, `auth_time`, `sid`) are.
+
+### 7. Migrations on tables that already have rows
+
+`V20261012130000` (`sessions.authenticated_at`) adds a nullable column, backfills it with `UPDATE ...
+SET authenticated_at = created_at` and then makes it `NOT NULL DEFAULT now()`. The `UPDATE` rewrites
+every row of `sessions`, unlike adding the column with a default (metadata only on PostgreSQL 16:
+`now()` is stable, so the value is stored once). Measured on PostgreSQL 16 with a temporary table of
+one million rows: the backfill takes about 1.4 s, `SET NOT NULL` another 0.2 s, and the table is
+twice the size until vacuumed (355 MB against 182 MB); the `ACCESS EXCLUSIVE` lock is held for the
+whole migration transaction. The table is small in practice (35 rows in the local database), and the
+migrations are not on `master` or deployed by any workflow, but the local development database has
+them applied, so editing the file would break Flyway's checksum validation there. They are left as
+they are and the operational note is in the deployment runbook (section 10).
 
 ## Consequences
 
 - Two Organizations in one browser are independent sessions; a browser holds one cookie
   (~100 bytes) per Organization signed in to.
 - Two social logins pending at once in two Organizations complete in their own tenant.
-- Known limits: a frame (`Sec-Fetch-Dest: iframe`) from another site can still trigger
-  `prompt=login`/`prompt=consent` for a registered client (the embedded modal of ADR-0009 needs
-  frames); the cost is a forced re-login. The re-authentication note expires after ten minutes and
-  a second authorize request in the same session discards it, which can ask for a second login.
+- A request from another site cannot end a session or forget a consent (see 5).
+- Consents of deleted Accounts remain as inert rows: deleting an Account shares its token revoker
+  with refresh-token reuse and password reset, where wiping consents would force a new consent
+  screen at every login.

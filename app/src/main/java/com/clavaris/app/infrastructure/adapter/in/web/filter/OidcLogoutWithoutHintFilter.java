@@ -29,7 +29,11 @@ import org.springframework.web.util.UrlPathHelper;
  * untouched and behaves exactly as before.
  *
  * <ul>
- *   <li>GET, no hint: forwarded to the confirmation page ({@link RpInitiatedLogoutController}).
+ *   <li>GET, no hint, with an End-User signed in on this Organization: forwarded to the
+ *       confirmation page ({@link RpInitiatedLogoutController}).
+ *   <li>No hint and nobody signed in on this Organization: there is nothing to confirm or end, so
+ *       the request is completed straight away (the redirect below, or the "signed out" page). No
+ *       session is created for it, so a request without a session leaves no state behind.
  *   <li>POST, no hint, with the confirmation token that page put in the session: the End-User's
  *       session on this Organization is ended. The End-User is sent on to {@code
  *       post_logout_redirect_uri} (with {@code state}) only when {@code client_id} names an active
@@ -70,17 +74,21 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
       return;
     }
     final String organization = path.group(1);
-    if ("POST".equals(request.getMethod()) && confirmationValid(request)) {
-      signOut(request, response, organization);
+    if (OidcRequestParameters.signedInAccount() == null) {
+      completeLogout(request, response, organization);
+    } else if ("POST".equals(request.getMethod()) && confirmationValid(request)) {
+      logoutHandler.logout(
+          request, response, SecurityContextHolder.getContext().getAuthentication());
+      completeLogout(request, response, organization);
     } else {
       forwardAsGet(request, response, "/o/" + organization + "/logout/confirm");
     }
   }
 
-  private void signOut(
+  // Where the End-User goes once signed out: the registered post-logout URI, else the plain page.
+  private void completeLogout(
       final HttpServletRequest request, final HttpServletResponse response, final String org)
       throws ServletException, IOException {
-    logoutHandler.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
     final String redirectUri = request.getParameter("post_logout_redirect_uri");
     if (registeredPostLogoutUri(org, request.getParameter("client_id"), redirectUri)) {
       final Map<String, String> parameters = new LinkedHashMap<>();

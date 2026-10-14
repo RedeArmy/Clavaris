@@ -26,6 +26,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJw
 import com.clavaris.app.infrastructure.adapter.out.security.ProfilePictureClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
+import com.clavaris.app.infrastructure.adapter.out.security.RequestScopedConsentService;
 import com.clavaris.app.infrastructure.adapter.out.security.SessionBackedRefreshTokenGenerator;
 import com.clavaris.app.infrastructure.adapter.out.security.SpringSecurityAuthenticatedSessionEstablisher;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
@@ -430,12 +431,13 @@ public class OrganizationAuthorizationServerConfig {
     final RegisteredClientRepository registeredClients =
         new OrganizationRegisteredClientRepository(oauthClients);
 
-    // Explicit rather than SAS's own implicit default, so OidcAuthorizationRequestParamsFilter
-    // (prompt=consent) and the authorization endpoint provably share one consent store.
     // Stored in Postgres (oauth2_authorization_consent) so an approved consent survives a restart
-    // and is shared by every instance.
+    // and is shared by every instance. Wrapped so a request with prompt=consent can ignore the
+    // stored consent for itself alone (OIDC Core 3.1.2.1) without anything being deleted: see
+    // RequestScopedConsentService.
     final OAuth2AuthorizationConsentService consentService =
-        new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClients);
+        new RequestScopedConsentService(
+            new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClients));
 
     // TD-SEC-003: same fix, same rationale as the platform tier's own config — see this class's
     // sibling comment there and the migration's own comment for why both tiers deliberately share
@@ -640,8 +642,7 @@ public class OrganizationAuthorizationServerConfig {
             OrganizationCapacityRateLimitingFilter.class)
         // OIDC Core §3.1.2.1/§3.1.2.6: prompt=none/login/consent and max_age, which SAS ignores.
         .addFilterAfter(
-            new OidcAuthorizationRequestParamsFilter(
-                oauthClients, consentService, contextRepository),
+            new OidcAuthorizationRequestParamsFilter(oauthClients),
             TenantSessionConcurrencyFilter.class)
         // RP-Initiated Logout §2: id_token_hint is RECOMMENDED, so a logout without one is
         // confirmed by the End-User instead of rejected with SAS's 400.

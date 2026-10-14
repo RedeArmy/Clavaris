@@ -794,11 +794,11 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         .contains("code=");
   }
 
-  // prompt=consent removes the stored consent before the screen is shown, so an End-User who
-  // leaves that screen without approving is asked again by the next plain authorize.
+  // prompt=consent ignores the stored consent for that request only and deletes nothing, so an
+  // End-User who leaves the screen without approving still has the consent they had: the next
+  // plain authorize is granted straight away.
   @Test
-  void abandoningAPromptConsentScreenLeavesTheNextAuthorizeAskingForConsentAgain()
-      throws Exception {
+  void abandoningAPromptConsentScreenLeavesTheStoredConsentForTheNextAuthorize() throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Prompt Consent Abandon Co");
     ClientCredentials client =
@@ -817,7 +817,10 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
     HttpResponse<Void> next =
         authorize(organizationId, client.clientId(), REDIRECT_URI, "s-next", "", "openid profile");
-    assertThat(next.headers().firstValue("Location").orElseThrow()).contains("/oauth2/consent");
+    assertThat(next.headers().firstValue("Location").orElseThrow())
+        .as("the consent was not deleted by the abandoned prompt=consent")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
   }
 
   // OIDC Core §2 / §12.2: auth_time is when the End-User authenticated. The code is exchanged
@@ -868,7 +871,7 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   }
 
   @Test
-  void anApprovedConsentIsStoredInPostgresAndForgottenByPromptConsent() throws Exception {
+  void anApprovedConsentIsStoredInPostgresAndKeptByPromptConsent() throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Stored Consent Co");
     ClientCredentials client =
@@ -889,8 +892,8 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
         organizationId, client.clientId(), REDIRECT_URI, "s9", "&prompt=consent", "openid profile");
 
     assertThat(jdbcTemplate.queryForObject(sql, Integer.class, email, organizationId))
-        .as("prompt=consent forgets the stored consent")
-        .isZero();
+        .as("prompt=consent ignores the stored consent for its request but never deletes it")
+        .isEqualTo(1);
   }
 
   private void signInAndApproveConsent(UUID organizationId, ClientCredentials client, String email)
@@ -1072,6 +1075,67 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(after.headers().firstValue("Location").orElseThrow())
         .as("the consent must still be remembered")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // The CSP only stops another site's iframe from being SHOWN; the request is still made with the
+  // visitor's cookie. It must neither end their session nor forget their consent.
+  @Test
+  void aCrossSiteIframeCannotEndTheSessionOrForgetTheConsent() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Iframe Attack Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    signInAndApproveConsent(organizationId, client, "iframe-attack@example.com");
+
+    authorizeAs(organizationId, client.clientId(), "&prompt=login", "openid profile", "iframe");
+    authorizeAs(organizationId, client.clientId(), "&prompt=consent", "openid profile", "iframe");
+    HttpResponse<Void> after =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-i", "", "openid profile");
+
+    assertThat(after.headers().firstValue("Location").orElseThrow())
+        .as("still signed in and the consent is still remembered")
+        .startsWith(REDIRECT_URI)
+        .contains("code=");
+  }
+
+  // Request A (prompt=login) is waiting for its login when request B arrives; B must not make A ask
+  // for a second login.
+  @Test
+  void anotherAuthorizeRequestInBetweenDoesNotMakeTheForcedLoginAskTwice() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Two Authorize Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String email = "two-authorize@example.com";
+    signIn(organizationId, client, email);
+    Thread.sleep(1100);
+
+    String verifierA = generateCodeVerifier();
+    HttpResponse<Void> a =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "state-a",
+            "&prompt=login",
+            "openid",
+            deriveCodeChallenge(verifierA));
+    assertThat(a.headers().firstValue("Location").orElseThrow()).contains("/login");
+
+    HttpResponse<Void> b =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-b", "");
+    assertThat(b.headers().firstValue("Location").orElseThrow())
+        .as("B is not disturbed")
+        .startsWith(REDIRECT_URI);
+
+    HttpResponse<Void> login =
+        submitLogin(
+            organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
+    HttpResponse<Void> resumed =
+        getAbsoluteDiscardingBody(login.headers().firstValue("Location").orElseThrow());
+    assertThat(resumed.headers().firstValue("Location").orElseThrow())
+        .as("one login is enough for A")
         .startsWith(REDIRECT_URI)
         .contains("code=");
   }

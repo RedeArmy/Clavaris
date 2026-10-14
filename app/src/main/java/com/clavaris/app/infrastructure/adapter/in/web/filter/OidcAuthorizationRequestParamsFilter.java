@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.adapter.in.web.filter;
 
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
+import com.clavaris.app.infrastructure.adapter.out.security.RequestScopedConsentService;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import jakarta.servlet.FilterChain;
@@ -18,10 +19,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -37,21 +34,28 @@ import org.springframework.web.util.UrlPathHelper;
  *       redirect_uri}; SAS itself already rejects {@code none} mixed with other values and answers
  *       {@code consent_required} when a consent would be needed.
  *   <li>{@code prompt=login}, or a {@code max_age} the current authentication is older than (0
- *       means always): the End-User must authenticate again. The current authentication is dropped,
- *       the request is saved and the hosted login is shown; once the End-User has signed in again
- *       (a factor newer than the marker this filter left in the session) the saved request resumes
- *       and passes through, so there is no redirect loop. The new login also produces the new
- *       {@code auth_time}.
- *   <li>{@code prompt=consent}: the stored consent for this client and End-User is removed, so the
- *       consent page is shown even for scopes already approved. The consent form's own submission
- *       carries no {@code prompt}, so it does not loop.
+ *       means always): the End-User must authenticate again. The request is saved and the hosted
+ *       login is shown; once the End-User has signed in again (a factor newer than the note this
+ *       filter left in the session) the saved request resumes and passes through, so there is no
+ *       redirect loop. The new login also produces the new {@code auth_time}.
+ *   <li>{@code prompt=consent}: the consent page is shown even for scopes already approved. The
+ *       stored consent is only ignored for this request ({@link RequestScopedConsentService}),
+ *       never deleted, and the consent form's own submission carries no {@code prompt}, so it does
+ *       not loop.
  * </ul>
  *
+ * <p>Nothing here destroys the End-User's state on a request alone. Dropping the session or
+ * forgetting a consent when the request arrives would let any page that can make the browser issue
+ * it (an iframe of another site: the CSP only stops it being <em>shown</em>, not the request from
+ * being made) log the visitor out or wipe their consents. The current authentication stays until a
+ * new login replaces it, and a consent stays until a new approval replaces it; a request from
+ * another site can at most cause a login page to be asked for. The note and the saved request it
+ * writes are the only state, and they expire ({@link ReauthenticationMarker}).
+ *
  * <p>{@code prompt=none} mixed with another value is {@code invalid_request}, and with a {@code
- * max_age} the session is older than it is {@code login_required}. The two actions that change the
- * End-User's state (dropping the session, forgetting a consent) only happen for a navigation, not
- * for an image or script another site makes with the End-User's cookie ({@link
- * OidcRequestParameters#isNavigation}).
+ * max_age} the session is older than it is {@code login_required}. Saving the request and leaving a
+ * note only happen for a navigation, not for an image or script another site makes with the
+ * End-User's cookie ({@link OidcRequestParameters#isNavigation}).
  *
  * <p>An error is only ever sent to a {@code redirect_uri} that is registered for the client of this
  * very Organization (exact match), never to a value taken from the request alone (open redirect,
@@ -70,29 +74,19 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   private static final int SINGLE_VALUE = 1;
 
   private final OAuthClientRepository oauthClients;
-  private final OAuth2AuthorizationConsentService consents;
-  private final SecurityContextRepository contextRepository;
   private final Clock clock;
   private final RequestCache requestCache = new HttpSessionRequestCache();
   private final OrganizationLoginRedirectEntryPoint loginEntryPoint =
       new OrganizationLoginRedirectEntryPoint();
 
-  public OidcAuthorizationRequestParamsFilter(
-      final OAuthClientRepository oauthClients,
-      final OAuth2AuthorizationConsentService consents,
-      final SecurityContextRepository contextRepository) {
-    this(oauthClients, consents, contextRepository, Clock.systemUTC());
+  public OidcAuthorizationRequestParamsFilter(final OAuthClientRepository oauthClients) {
+    this(oauthClients, Clock.systemUTC());
   }
 
   /* package */ OidcAuthorizationRequestParamsFilter(
-      final OAuthClientRepository oauthClients,
-      final OAuth2AuthorizationConsentService consents,
-      final SecurityContextRepository contextRepository,
-      final Clock clock) {
+      final OAuthClientRepository oauthClients, final Clock clock) {
     super();
     this.oauthClients = oauthClients;
-    this.consents = consents;
-    this.contextRepository = contextRepository;
     this.clock = clock;
   }
 
@@ -106,7 +100,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       chain.doFilter(request, response);
       return;
     }
-    ReauthenticationMarker.discardUnlessFor(request, clock.instant());
+    ReauthenticationMarker.discardExpired(request, clock.instant());
     final String unsupported = OidcRequestParameters.unsupportedRequestError(request);
     final boolean relevant =
         unsupported != null
@@ -152,21 +146,20 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
     if (client.isEmpty()) {
       return false;
     }
+    if (prompts.contains("consent")) {
+      request.setAttribute(
+          RequestScopedConsentService.IGNORE_STORED_CONSENT_ATTRIBUTE, Boolean.TRUE);
+    }
     if (authentication == null) {
       ReauthenticationMarker.leaveIfFreshLoginWanted(request, prompts, maxAge, clock.instant());
       return false;
     }
-    if (!OidcRequestParameters.isNavigation(request)) {
+    if (!OidcRequestParameters.isNavigation(request)
+        || !reauthenticationRequired(request, authentication, prompts, maxAge)) {
       return false;
     }
-    if (reauthenticationRequired(request, authentication, prompts, maxAge)) {
-      startReauthentication(request, response);
-      return true;
-    }
-    if (prompts.contains("consent")) {
-      forgetConsent(client.get(), authentication);
-    }
-    return false;
+    startReauthentication(request, response);
+    return true;
   }
 
   // §3.1.2.1: none cannot be combined with another value; alone, it never shows a page, so a
@@ -184,14 +177,6 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
         authentication == null || OidcRequestParameters.exceedsMaxAge(authentication, maxAge);
     final String error = combined ? INVALID_REQUEST : LOGIN_REQUIRED;
     return answerWithError(registeredClient && (combined || loginNeeded), error, request, response);
-  }
-
-  private void forgetConsent(final OAuthClient client, final Authentication authentication) {
-    final OAuth2AuthorizationConsent stored =
-        consents.findById(client.id().toString(), authentication.getName());
-    if (stored != null) {
-      consents.remove(stored);
-    }
   }
 
   private boolean answerWithError(
@@ -222,8 +207,6 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final HttpServletRequest request, final HttpServletResponse response) throws IOException {
     requestCache.saveRequest(request, response);
     ReauthenticationMarker.leave(request, clock.instant());
-    SecurityContextHolder.clearContext();
-    contextRepository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
     loginEntryPoint.commence(
         request, response, new InsufficientAuthenticationException("re-authentication requested"));
   }

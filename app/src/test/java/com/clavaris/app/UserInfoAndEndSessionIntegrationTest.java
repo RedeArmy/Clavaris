@@ -325,8 +325,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   // End-User to confirm instead of failing with SAS's 400.
   @Test
   void endSessionWithoutAHintAsksTheEndUserToConfirm() throws Exception {
-    String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout No Hint Co");
+    UUID organizationId = signedInOrganization("logout-nohint@example.com");
 
     HttpResponse<String> response = getLogoutConfirmation(organizationId, "");
 
@@ -334,10 +333,25 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.body()).contains("Sign out?").contains("name=\"confirmation_token\"");
   }
 
+  // Nobody signed in on this Organization means nothing to confirm or end: the page that says so is
+  // shown, and no session is created for the request (no cookie is set).
+  @Test
+  void endSessionWithoutAHintAndWithoutASessionJustSaysSignedOutAndSetsNoCookie() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Logout No Session Co");
+
+    HttpResponse<String> response = getLogoutConfirmation(organizationId, "");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Signed out").doesNotContain("confirmation_token");
+    assertThat(response.headers().allValues("Set-Cookie"))
+        .as("a request with no session must not start one")
+        .isEmpty();
+  }
+
   @Test
   void endSessionWithoutAHintDoesNothingWithoutTheConfirmationToken() throws Exception {
-    String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout No Token Co");
+    UUID organizationId = signedInOrganization("logout-notoken@example.com");
 
     HttpResponse<String> response = postLogout(organizationId, "confirmation_token=forged");
 
@@ -348,10 +362,9 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
   @Test
   void aConfirmedLogoutRedirectsToARegisteredPostLogoutUriWithTheState() throws Exception {
     String postLogoutRedirectUri = "https://client.example.test/logged-out";
-    String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout Confirmed Co");
+    UUID organizationId = signedInOrganization("logout-confirmed@example.com");
     ClientCredentials client =
-        registerOAuthClient(platformToken, organizationId, postLogoutRedirectUri);
+        registerOAuthClient(requestPlatformAccessToken(), organizationId, postLogoutRedirectUri);
     String query =
         "?client_id="
             + client.clientId()
@@ -379,10 +392,10 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
 
   @Test
   void aConfirmedLogoutNeverRedirectsToAnUnregisteredUri() throws Exception {
-    String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout Evil Co");
+    UUID organizationId = signedInOrganization("logout-evil@example.com");
     ClientCredentials client =
-        registerOAuthClient(platformToken, organizationId, "https://client.example.test/ok");
+        registerOAuthClient(
+            requestPlatformAccessToken(), organizationId, "https://client.example.test/ok");
     String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
 
     HttpResponse<String> response =
@@ -402,23 +415,26 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
 
   @Test
   void theLogoutConfirmationTokenWorksOnlyOnce() throws Exception {
-    String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout Replay Co");
+    UUID organizationId = signedInOrganization("logout-replay@example.com");
     String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
 
     HttpResponse<String> first = postLogout(organizationId, "confirmation_token=" + token);
     HttpResponse<String> replay = postLogout(organizationId, "confirmation_token=" + token);
 
     assertThat(first.body()).contains("Signed out");
-    assertThat(replay.body()).contains("Sign out?");
+    assertThat(replay.body())
+        .as("the session is gone, so there is nothing left to confirm or end")
+        .contains("Signed out");
+    assertThat(getLogoutConfirmation(organizationId, "").body())
+        .as("a new visit finds no session either")
+        .doesNotContain("confirmation_token");
   }
 
   // A request that cannot present the real token (another site posting with the visitor's cookie)
   // must not burn it, or the visitor's own Sign out click would then fail.
   @Test
   void aWrongConfirmationTokenDoesNotUseUpTheRealOne() throws Exception {
-    String platformToken = requestPlatformAccessToken();
-    UUID organizationId = createOrganization(platformToken, "Logout Grief Co");
+    UUID organizationId = signedInOrganization("logout-grief@example.com");
     String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
 
     HttpResponse<String> forged = postLogout(organizationId, "confirmation_token=forged");
@@ -426,6 +442,12 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(forged.body()).contains("Sign out?");
     assertThat(real.body()).contains("Signed out");
+  }
+
+  // A real sign-in on a fresh Organization: the shared cookie jar then holds that Organization's
+  // session, which is what makes a logout without a hint ask for confirmation.
+  private UUID signedInOrganization(String email) throws Exception {
+    return completeARealAuthorizationCodeExchange(email).organizationId();
   }
 
   private HttpResponse<String> getLogoutConfirmation(UUID organizationId, String query)

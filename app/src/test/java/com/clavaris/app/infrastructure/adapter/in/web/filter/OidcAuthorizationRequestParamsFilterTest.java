@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.app.infrastructure.adapter.out.security.RequestScopedConsentService;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import java.time.Clock;
@@ -23,13 +24,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
-import org.springframework.security.web.context.SecurityContextRepository;
 
 /**
- * The note the filter leaves in the session when it asks for a fresh login must never let a later
- * prompt=login through: it expires, applies only to the request it was left for, and is cleared by
- * any other authorize request. A controllable clock makes the expiry exact.
+ * The notes the filter leaves in the session when it asks for a fresh login must never let a later
+ * prompt=login through (they expire and apply only to the request they were left for), and must
+ * never be lost to another authorize request while their own request waits for the login. Nothing
+ * the filter does destroys the End-User's authentication or consent. A controllable clock makes the
+ * expiry exact.
  */
 class OidcAuthorizationRequestParamsFilterTest {
 
@@ -39,7 +40,6 @@ class OidcAuthorizationRequestParamsFilterTest {
   private static final Instant T0 = Instant.parse("2026-10-13T12:00:00Z");
 
   private final OAuthClientRepository clients = mock(OAuthClientRepository.class);
-  private final SecurityContextRepository contextRepository = mock(SecurityContextRepository.class);
 
   @AfterEach
   void clearContext() {
@@ -53,11 +53,7 @@ class OidcAuthorizationRequestParamsFilterTest {
     when(client.redirectUris()).thenReturn(List.of(REDIRECT));
     when(client.id()).thenReturn(UUID.randomUUID());
     when(clients.findByClientId(CLIENT)).thenReturn(Optional.of(client));
-    return new OidcAuthorizationRequestParamsFilter(
-        clients,
-        mock(OAuth2AuthorizationConsentService.class),
-        contextRepository,
-        Clock.fixed(now, ZoneOffset.UTC));
+    return new OidcAuthorizationRequestParamsFilter(clients, Clock.fixed(now, ZoneOffset.UTC));
   }
 
   private static MockHttpServletRequest authorize(final MockHttpSession session, final String q) {
@@ -72,7 +68,7 @@ class OidcAuthorizationRequestParamsFilterTest {
     return request;
   }
 
-  private static ReauthenticationMarker.Note markerFor(final String q, final Instant at) {
+  private static ReauthenticationMarker.Notes markerFor(final String q, final Instant at) {
     return ReauthenticationMarker.create(authorize(new MockHttpSession(), q), at);
   }
 
@@ -154,8 +150,10 @@ class OidcAuthorizationRequestParamsFilterTest {
     assertThat(passedThrough(session, T0.plusSeconds(60), QUERY)).isFalse();
   }
 
+  // The note of a request that is waiting for its login must survive another authorize request
+  // (a second tab, a retry): wiping it made the resumed request ask for a second login.
   @Test
-  void anyOtherAuthorizeRequestClearsALeftoverNote() throws Exception {
+  void anotherAuthorizeRequestLeavesTheNoteOfAWaitingRequestAlone() throws Exception {
     MockHttpSession session = new MockHttpSession();
     session.setAttribute(ReauthenticationMarker.SESSION_ATTRIBUTE, markerFor(QUERY, T0));
     signedInSince(T0.plusSeconds(30));
@@ -164,7 +162,73 @@ class OidcAuthorizationRequestParamsFilterTest {
             passedThrough(
                 session, T0.plusSeconds(60), "client_id=" + CLIENT + "&redirect_uri=" + REDIRECT))
         .isTrue();
+    assertThat(session.getAttribute(ReauthenticationMarker.SESSION_ATTRIBUTE)).isNotNull();
+    assertThat(passedThrough(session, T0.plusSeconds(61), QUERY)).isTrue();
     assertThat(session.getAttribute(ReauthenticationMarker.SESSION_ATTRIBUTE)).isNull();
+  }
+
+  // A prompt=login, then another request, then back to the first after the login: the one login is
+  // enough, and the other request is not disturbed.
+  @Test
+  void requestAThenRequestBThenTheResumedRequestAStillNeedsOnlyOneLogin() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    String other = "client_id=" + CLIENT + "&redirect_uri=" + REDIRECT + "&prompt=login&state=b";
+    // Nobody is signed in: A asks for its login and leaves its note, then B does the same.
+    assertThat(passedThrough(session, T0, QUERY)).isTrue();
+    assertThat(passedThrough(session, T0.plusSeconds(5), other)).isTrue();
+
+    signedInSince(T0.plusSeconds(30));
+
+    assertThat(passedThrough(session, T0.plusSeconds(60), QUERY)).isTrue();
+    assertThat(passedThrough(session, T0.plusSeconds(61), other)).isTrue();
+    assertThat(session.getAttribute(ReauthenticationMarker.SESSION_ATTRIBUTE)).isNull();
+  }
+
+  @Test
+  void theNextAuthorizeRequestForgetsTheNotesThatHaveExpired() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    session.setAttribute(ReauthenticationMarker.SESSION_ATTRIBUTE, markerFor(QUERY, T0));
+    Instant later = T0.plus(ReauthenticationMarker.TTL).plusSeconds(1);
+
+    passedThrough(session, later, "client_id=" + CLIENT + "&redirect_uri=" + REDIRECT);
+
+    assertThat(session.getAttribute(ReauthenticationMarker.SESSION_ATTRIBUTE)).isNull();
+  }
+
+  // A request from another site must never log the visitor out: asking for a fresh login only
+  // shows the login page, the current authentication stays until a new login replaces it.
+  @Test
+  void promptLoginNeverDropsTheCurrentAuthentication() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    signedInSince(T0.minus(Duration.ofHours(1)));
+    MockHttpServletRequest request = authorize(session, QUERY);
+    request.addHeader("Sec-Fetch-Dest", "iframe");
+    request.addHeader("Sec-Fetch-Site", "cross-site");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filterAt(T0).doFilter(request, response, new MockFilterChain());
+
+    assertThat(response.getRedirectedUrl()).contains("/login");
+    assertThat(SecurityContextHolder.getContext().getAuthentication())
+        .as("the visitor is still signed in")
+        .isNotNull();
+  }
+
+  // prompt=consent only marks the request: the stored consent is ignored for it alone and nothing
+  // is deleted (RequestScopedConsentService does the ignoring).
+  @Test
+  void promptConsentMarksTheRequestAndDeletesNothing() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    signedInSince(T0);
+    MockHttpServletRequest request =
+        authorize(session, "client_id=" + CLIENT + "&redirect_uri=" + REDIRECT + "&prompt=consent");
+    MockFilterChain chain = new MockFilterChain();
+
+    filterAt(T0.plusSeconds(1)).doFilter(request, new MockHttpServletResponse(), chain);
+
+    assertThat(chain.getRequest()).isNotNull();
+    assertThat(request.getAttribute(RequestScopedConsentService.IGNORE_STORED_CONSENT_ATTRIBUTE))
+        .isEqualTo(Boolean.TRUE);
   }
 
   // The saved request that resumes after the login carries Spring Security's own "continue"

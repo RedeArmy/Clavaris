@@ -6,23 +6,28 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * The note {@link OidcAuthorizationRequestParamsFilter} leaves in the session when it asks the
+ * The notes {@link OidcAuthorizationRequestParamsFilter} leaves in the session when it asks the
  * End-User for a fresh login (prompt=login, or a max_age the session has outlived): when, and for
  * which request. Once the End-User has signed in again, the saved request resumes and passes
- * through because this note says that login was the one asked for, so there is no redirect loop.
+ * through because a note says that login was the one asked for, so there is no redirect loop.
  *
- * <p>The note never outlives its purpose: it expires after {@link #TTL}, counts only for the very
- * request it was left for, and is cleared by any other authorize request, so an abandoned request
- * can never let a later prompt=login through.
+ * <p>There is one note per request (identified by its parameters), not a single slot: another
+ * authorize request made while the End-User is on the login page (a second tab, a retry) must not
+ * wipe the note of the request that is waiting, or its resumption would ask for a second login. The
+ * notes are bounded ({@link #MAX_NOTES}, the oldest goes first) and each expires after {@link
+ * #TTL}, so abandoned requests cannot pile up or let a later prompt=login through: a note counts
+ * only for the very request it was left for, only until it expires, and only for a login made after
+ * it was left, and it is used up when it counts.
  */
-// PMD.LawOfDemeter: request.getSession() is the standard Servlet API shape, same rationale as the
-// sibling filters in this package. PMD.OnlyOneReturn: "consumed" and "not consumed" are two
-// distinct outcomes.
-@SuppressWarnings({"PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
+// PMD.OnlyOneReturn: "consumed" and "not consumed" are two distinct outcomes.
+@SuppressWarnings("PMD.OnlyOneReturn")
 /* package */ final class ReauthenticationMarker {
 
   /* package */ static final String SESSION_ATTRIBUTE = "clavaris.oidc.reauth.requested-at";
@@ -30,13 +35,19 @@ import java.util.TreeMap;
   // Long enough to sign in again, short enough that an abandoned note cannot linger.
   /* package */ static final Duration TTL = Duration.ofMinutes(10);
 
+  // More than the requests one browser plausibly has waiting for a login at once.
+  /* package */ static final int MAX_NOTES = 5;
+
   private ReauthenticationMarker() {}
 
-  // When, and for which request. Serializable because the session is shared through Redis.
-  /* package */ record Note(Instant requestedAt, String request) implements Serializable {}
+  // Request fingerprint to when the note was left. Serializable because the session is shared
+  // through Redis; a copy is stored on every change so that the session sees the new value.
+  /* package */ record Notes(Map<String, Instant> requestedAt) implements Serializable {}
 
-  /* package */ static Note create(final HttpServletRequest request, final Instant now) {
-    return new Note(now, fingerprint(request));
+  /* package */ static Notes create(final HttpServletRequest request, final Instant now) {
+    final Map<String, Instant> notes = new LinkedHashMap<>();
+    notes.put(fingerprint(request), now);
+    return new Notes(notes);
   }
 
   // The request's parameters, sorted, as a string. Not the raw query string: the saved request that
@@ -56,15 +67,48 @@ import java.util.TreeMap;
     return result.toString();
   }
 
-  private static boolean isFor(
-      final Note note, final HttpServletRequest request, final Instant now) {
-    return note.request().equals(fingerprint(request))
-        && Duration.between(note.requestedAt(), now).compareTo(TTL) <= 0;
+  private static boolean expired(final Instant leftAt, final Instant now) {
+    return Duration.between(leftAt, now).compareTo(TTL) > 0;
   }
 
-  // Leaves the note for this request (the End-User is about to sign in again).
+  // The notes still alive, as a copy that can be changed freely.
+  private static Map<String, Instant> liveNotes(final HttpSession session, final Instant now) {
+    final Map<String, Instant> live = new LinkedHashMap<>();
+    if (session != null && session.getAttribute(SESSION_ATTRIBUTE) instanceof Notes stored) {
+      stored
+          .requestedAt()
+          .forEach(
+              (request, leftAt) -> {
+                if (!expired(leftAt, now)) {
+                  live.put(request, leftAt);
+                }
+              });
+    }
+    return live;
+  }
+
+  private static void store(final HttpSession session, final Map<String, Instant> notes) {
+    if (notes.isEmpty()) {
+      session.removeAttribute(SESSION_ATTRIBUTE);
+    } else {
+      session.setAttribute(SESSION_ATTRIBUTE, new Notes(new LinkedHashMap<>(notes)));
+    }
+  }
+
+  // Leaves the note for this request (the End-User is about to sign in again), dropping the oldest
+  // ones beyond the bound.
   /* package */ static void leave(final HttpServletRequest request, final Instant now) {
-    request.getSession().setAttribute(SESSION_ATTRIBUTE, create(request, now));
+    final HttpSession session = request.getSession();
+    final Map<String, Instant> notes = liveNotes(session, now);
+    final String fingerprint = fingerprint(request);
+    notes.remove(fingerprint);
+    notes.put(fingerprint, now);
+    final Iterator<String> oldest = notes.keySet().iterator();
+    while (notes.size() > MAX_NOTES) {
+      oldest.next();
+      oldest.remove();
+    }
+    store(session, notes);
   }
 
   // With no one signed in the End-User gets the login page anyway; noting that this very request
@@ -80,28 +124,30 @@ import java.util.TreeMap;
     }
   }
 
-  // True, and the note is used up, when it was left for this very request and the End-User has
-  // signed in again since.
+  // True, and the note is used up, when it was left for this very request, has not expired and the
+  // End-User has signed in again since.
   /* package */ static boolean consumedByLoginSince(
       final HttpServletRequest request, final Instant latestFactorAt, final Instant now) {
     final HttpSession session = request.getSession(false);
-    final Object stored = session == null ? null : session.getAttribute(SESSION_ATTRIBUTE);
-    if (stored instanceof Note note
-        && isFor(note, request, now)
-        && latestFactorAt.isAfter(note.requestedAt())) {
-      session.removeAttribute(SESSION_ATTRIBUTE);
+    final Map<String, Instant> notes = liveNotes(session, now);
+    final Instant leftAt = notes.get(fingerprint(request));
+    if (leftAt != null && latestFactorAt.isAfter(leftAt)) {
+      notes.remove(fingerprint(request));
+      store(session, notes);
       return true;
     }
     return false;
   }
 
-  // Any other authorize request (a new one, a different one, one that arrives after the note
-  // expired) clears a leftover note.
-  /* package */ static void discardUnlessFor(final HttpServletRequest request, final Instant now) {
+  // Forgets the notes that have expired; the ones still alive belong to requests that may yet be
+  // resumed, so another authorize request must leave them alone.
+  /* package */ static void discardExpired(final HttpServletRequest request, final Instant now) {
     final HttpSession session = request.getSession(false);
-    final Object stored = session == null ? null : session.getAttribute(SESSION_ATTRIBUTE);
-    if (stored != null && !(stored instanceof Note note && isFor(note, request, now))) {
-      session.removeAttribute(SESSION_ATTRIBUTE);
+    if (session != null && session.getAttribute(SESSION_ATTRIBUTE) instanceof Notes stored) {
+      final Map<String, Instant> live = liveNotes(session, now);
+      if (live.size() != stored.requestedAt().size()) {
+        store(session, live);
+      }
     }
   }
 }
