@@ -1,7 +1,10 @@
 package com.clavaris.app.infrastructure.config;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
@@ -71,72 +74,166 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
  * PlatformDashboardSecurityConfig}'s own {@code securityMatcher("/platform/**")} scopes that whole
  * chain — a plain prefix check, not a Spring Security construct, since this class runs for every
  * request on every chain alike, before any chain-specific filter does.
+ *
+ * <p><b>Second real bug, 2026-10-14: every tenant shared {@code SESSION}.</b> Separating the
+ * platform from the tenants left the tenants themselves on one cookie: signing in to a second
+ * Organization in the same browser reused the first one's {@code HttpSession} and overwrote its
+ * {@code SecurityContext}, signing the first one out. Each Organization now has its own cookie,
+ * {@code SESSION_<organizationId>} (see {@link TenantSessionCookies}), picked from the request:
+ *
+ * <ul>
+ *   <li>{@code /o/{organizationId}/...}: that Organization's cookie. This is every tenant page and
+ *       endpoint, and also what a verified custom domain is rewritten to before the session filter
+ *       runs.
+ *   <li>{@code /oauth2/consent}: flat, because Spring Authorization Server fixes that URL, so the
+ *       Organization comes from its {@code client_id} (the page already resolves it the same way).
+ *       A {@code client_id} that belongs to no Organization reads no session at all, never another
+ *       Organization's.
+ *   <li>{@code /oauth2/authorization/**} and {@code /login/oauth2/code/**} (the social-login round
+ *       trip, flat for the same reason): the tenant cookie whose session started a social login
+ *       that is still in progress; with none, {@code SESSION} as before, which is also what the
+ *       platform's own social login uses.
+ *   <li>Any other flat path: {@code SESSION}, exactly as before.
+ * </ul>
+ *
+ * Sessions created before this change live under {@code SESSION} and are no longer read on tenant
+ * paths: each user signs in once more, and the old cookie is ignored from then on. Two social
+ * logins pending in two Organizations at once would resolve to one of them; a known limit of a flat
+ * callback URL that carries no tenant.
  */
 // PMD.LongVariable: every name here names exactly what it holds — same "abbreviating would only
 // make this harder to read" precedent this codebase's own PlatformScopes/
 // OrganizationAuthorizationServerConfig class-level suppressions already establish.
-@SuppressWarnings("PMD.LongVariable")
+// java:S1075: the consent and social-login paths are fixed by Spring Authorization Server and
+// Spring Security, not deployment settings (the platform prefix, which is, stays a parameter).
+// PMD.OnlyOneReturn: one exit per distinct outcome, as everywhere else in this codebase.
+@SuppressWarnings({"PMD.LongVariable", "java:S1075", "PMD.OnlyOneReturn"})
 final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer {
 
   private static final String PLATFORM_COOKIE_NAME = "PLATFORM_SESSION";
+  private static final String CONSENT_PATH = "/oauth2/consent";
+  private static final String CLIENT_ID_PARAM = "client_id";
+  private static final List<String> SOCIAL_LOGIN_PREFIXES =
+      List.of("/oauth2/authorization/", "/login/oauth2/code/");
+
+  // The cookie a flat request resolved to, kept on the request so the write that follows the read
+  // does not look it up (and scan sessions) a second time.
+  private static final String RESOLVED_NAME_ATTRIBUTE =
+      AdaptiveSameSiteSessionCookieSerializer.class.getName() + ".RESOLVED_NAME";
 
   // Sonar java:S1075 ("URIs should not be hardcoded"): PlatformDashboardSecurityConfig's own
   // securityMatcher("/platform/**") is itself a plain literal, not an externalized property — but
-  // this class's own copy of it is now a constructor parameter
-  // (clavaris.session.platform-path-prefix,
+  // this class's own copy of it is a constructor parameter (clavaris.session.platform-path-prefix,
   // defaulted to the same value) so a deployment could move the platform tier to a different mount
   // path without a source change, same pattern this codebase's own
   // CachingAccountAuthenticationPolicyProvider/RedisIdempotencyKeyStore constructors already use.
   private final String platformPathPrefix;
-
-  private final DefaultCookieSerializer tenantLaxSerializer = new DefaultCookieSerializer();
-  private final DefaultCookieSerializer tenantNoneSerializer = new DefaultCookieSerializer();
-  private final DefaultCookieSerializer platformLaxSerializer = new DefaultCookieSerializer();
-  private final DefaultCookieSerializer platformNoneSerializer = new DefaultCookieSerializer();
+  private final FlatPathSessionLookup flatPathLookup;
 
   /* package */ AdaptiveSameSiteSessionCookieSerializer(
-      @Value("${clavaris.session.platform-path-prefix:/platform/}")
-          final String platformPathPrefix) {
+      @Value("${clavaris.session.platform-path-prefix:/platform/}") final String platformPathPrefix,
+      final FlatPathSessionLookup flatPathLookup) {
     this.platformPathPrefix = platformPathPrefix;
-    // Secure is left at DefaultCookieSerializer's own adaptive default on all four (mirrors
-    // request.isSecure()), never hardcoded — SameSite and cookie name are the only two axes this
-    // class itself decides.
-    tenantNoneSerializer.setSameSite("None");
-    platformLaxSerializer.setCookieName(PLATFORM_COOKIE_NAME);
-    platformNoneSerializer.setCookieName(PLATFORM_COOKIE_NAME);
-    platformNoneSerializer.setSameSite("None");
+    this.flatPathLookup = flatPathLookup;
   }
 
   @Override
   public void writeCookieValue(final CookieValue cookieValue) {
     final HttpServletRequest request = cookieValue.getRequest();
-    serializerFor(request).writeCookieValue(cookieValue);
+    serializerFor(request, cookieNameFor(request).orElse(TenantSessionCookies.LEGACY_NAME))
+        .writeCookieValue(cookieValue);
   }
 
   // SameSite/Secure are response-only attributes — reading back an already-sent cookie value never
-  // depends on either, so within one tier this delegates to either inner serializer identically
-  // (the Lax one is an arbitrary, equally-correct choice between the two); only the cookie NAME
-  // actually matters for a read, which is why tier alone (not tier+secure) selects the serializer
-  // here.
+  // depends on either, so only the cookie NAME matters for a read. A request that resolves to no
+  // cookie at all (a consent page for a client of no Organization) reads no session.
   @Override
   public List<String> readCookieValues(final HttpServletRequest request) {
-    return serializerFor(request).readCookieValues(request);
+    return cookieNameFor(request)
+        .map(name -> serializerFor(request, name).readCookieValues(request))
+        .orElse(List.of());
   }
 
-  // PMD.OnlyOneReturn: "platform tier" and "tenant tier" are two genuinely distinct outcomes —
-  // same "one exit per distinct outcome" rationale every other early-return guard in this
-  // codebase already applies.
-  @SuppressWarnings("PMD.OnlyOneReturn")
-  private DefaultCookieSerializer serializerFor(final HttpServletRequest request) {
-    final String path = request.getRequestURI();
-    final String platformPathWithoutTrailingSlash =
-        platformPathPrefix.substring(0, platformPathPrefix.length() - 1);
-    final boolean isPlatform =
-        path.startsWith(platformPathPrefix) || platformPathWithoutTrailingSlash.equals(path);
-    final boolean isSecure = request.isSecure();
-    if (isPlatform) {
-      return isSecure ? platformNoneSerializer : platformLaxSerializer;
+  private Optional<String> cookieNameFor(final HttpServletRequest request) {
+    final String path = pathWithinContext(request);
+    if (isPlatform(path)) {
+      return Optional.of(PLATFORM_COOKIE_NAME);
     }
-    return isSecure ? tenantNoneSerializer : tenantLaxSerializer;
+    final Optional<String> tenant = TenantSessionCookies.nameForPath(path);
+    if (tenant.isPresent()) {
+      return tenant;
+    }
+    if (CONSENT_PATH.equals(path)) {
+      return resolvedOnce(request, () -> consentCookie(request));
+    }
+    if (SOCIAL_LOGIN_PREFIXES.stream().anyMatch(path::startsWith)) {
+      return resolvedOnce(request, () -> Optional.of(socialLoginCookie(request)));
+    }
+    return Optional.of(TenantSessionCookies.LEGACY_NAME);
+  }
+
+  private Optional<String> resolvedOnce(
+      final HttpServletRequest request,
+      final java.util.function.Supplier<Optional<String>> resolve) {
+    final Object cached = request.getAttribute(RESOLVED_NAME_ATTRIBUTE);
+    if (cached instanceof String name) {
+      return Optional.of(name);
+    }
+    final Optional<String> resolved = resolve.get();
+    resolved.ifPresent(name -> request.setAttribute(RESOLVED_NAME_ATTRIBUTE, name));
+    return resolved;
+  }
+
+  private Optional<String> consentCookie(final HttpServletRequest request) {
+    final String clientId = request.getParameter(CLIENT_ID_PARAM);
+    if (clientId == null || clientId.isBlank()) {
+      return Optional.empty();
+    }
+    return flatPathLookup.organizationForClient(clientId).map(TenantSessionCookies::nameFor);
+  }
+
+  private String socialLoginCookie(final HttpServletRequest request) {
+    return tenantCookieNames(request)
+        .filter(
+            name ->
+                serializerFor(request, name).readCookieValues(request).stream()
+                    .anyMatch(flatPathLookup::hasSocialLoginInProgress))
+        .findFirst()
+        .orElse(TenantSessionCookies.LEGACY_NAME);
+  }
+
+  private static Stream<String> tenantCookieNames(final HttpServletRequest request) {
+    final Cookie[] cookies = request.getCookies();
+    return cookies == null
+        ? Stream.empty()
+        : Stream.of(cookies)
+            .map(Cookie::getName)
+            .filter(TenantSessionCookies::isTenantCookie)
+            .distinct()
+            .sorted();
+  }
+
+  // A cheap, throwaway serializer per call rather than a cache keyed by cookie name: tenant cookie
+  // names come from the browser and from URLs, so a cache would grow with whatever a client sends.
+  // Secure is left at DefaultCookieSerializer's own adaptive default (mirrors request.isSecure()),
+  // never hardcoded — SameSite and the cookie name are the only two axes this class decides.
+  private static DefaultCookieSerializer serializerFor(
+      final HttpServletRequest request, final String cookieName) {
+    final DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+    serializer.setCookieName(cookieName);
+    if (request.isSecure()) {
+      serializer.setSameSite("None");
+    }
+    return serializer;
+  }
+
+  private boolean isPlatform(final String path) {
+    final String withoutTrailingSlash =
+        platformPathPrefix.substring(0, platformPathPrefix.length() - 1);
+    return path.startsWith(platformPathPrefix) || withoutTrailingSlash.equals(path);
+  }
+
+  private static String pathWithinContext(final HttpServletRequest request) {
+    return request.getRequestURI().substring(request.getContextPath().length());
   }
 }

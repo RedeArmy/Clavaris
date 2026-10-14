@@ -1459,10 +1459,12 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   // state — the only way to actually observe from outside the process whether the session ID
   // changed, which is the entire point of the TD-SEC-012 regression checks above. "SESSION", not
   // "JSESSIONID" — TD-ARCH-002 replaced the servlet container's own session tracking with Spring
-  // Session (DistributedSessionConfig), whose DefaultCookieSerializer names its cookie "SESSION".
+  // Session (DistributedSessionConfig), whose cookie is "SESSION_<organizationId>": one per tenant
+  // since the tenants stopped sharing a session cookie, so this matches any of them (each test here
+  // signs in to a single Organization).
   private String currentSessionId() {
     return cookieManager.getCookieStore().getCookies().stream()
-        .filter(cookie -> "SESSION".equalsIgnoreCase(cookie.getName()))
+        .filter(cookie -> cookie.getName().matches("(?i)SESSION(_[0-9a-f]{32})?"))
         .map(HttpCookie::getValue)
         .findFirst()
         .orElse(null);
