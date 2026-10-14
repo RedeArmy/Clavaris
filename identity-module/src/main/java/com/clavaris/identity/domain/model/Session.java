@@ -42,18 +42,18 @@ public final class Session {
       final UUID id,
       final AccountId accountId,
       final List<String> scopes,
-      final Instant createdAt,
-      final Instant authenticatedAt,
-      final Instant lastSeenAt,
+      final SessionTimestamps timestamps,
       final Instant revokedAt,
       final String oidcSid) {
+    Objects.requireNonNull(timestamps, "timestamps must not be null");
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
     this.scopes = List.copyOf(Objects.requireNonNull(scopes, "scopes must not be null"));
-    this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
+    this.createdAt = Objects.requireNonNull(timestamps.createdAt(), "createdAt must not be null");
     this.authenticatedAt =
-        Objects.requireNonNull(authenticatedAt, "authenticatedAt must not be null");
-    this.lastSeenAt = Objects.requireNonNull(lastSeenAt, "lastSeenAt must not be null");
+        Objects.requireNonNull(timestamps.authenticatedAt(), "authenticatedAt must not be null");
+    this.lastSeenAt =
+        Objects.requireNonNull(timestamps.lastSeenAt(), "lastSeenAt must not be null");
     this.revokedAt = revokedAt;
     this.oidcSid = oidcSid;
   }
@@ -77,20 +77,23 @@ public final class Session {
     final Instant now = Instant.now();
     final Instant authTime =
         authenticatedAt == null || authenticatedAt.isAfter(now) ? now : authenticatedAt;
-    return new Session(UUID.randomUUID(), accountId, scopes, now, authTime, now, null, null);
+    return new Session(
+        UUID.randomUUID(),
+        accountId,
+        scopes,
+        new SessionTimestamps(now, authTime, now),
+        null,
+        null);
   }
 
   public static Session reconstitute(
       final UUID id,
       final AccountId accountId,
       final List<String> scopes,
-      final Instant createdAt,
-      final Instant authenticatedAt,
-      final Instant lastSeenAt,
+      final SessionTimestamps timestamps,
       final Instant revokedAt,
       final String oidcSid) {
-    return new Session(
-        id, accountId, scopes, createdAt, authenticatedAt, lastSeenAt, revokedAt, oidcSid);
+    return new Session(id, accountId, scopes, timestamps, revokedAt, oidcSid);
   }
 
   /**

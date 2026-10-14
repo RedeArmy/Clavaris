@@ -234,8 +234,7 @@ public class OrganizationAuthorizationServerConfig {
   private static OAuth2TokenGenerator<?> buildTokenGenerator(
       final JWKSource<SecurityContext> signingJwkSource,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
-      final WorkspaceMembershipRepository workspaceMemberships,
-      final WorkspaceRoleRepository workspaceRoles,
+      final WorkspaceRoleClaimsCustomizer workspaceRoleClaims,
       final IssueRefreshTokenUseCase issueRefreshToken,
       final RecordSessionOidcIdUseCase recordSessionOidcId,
       final AccountRepository accounts,
@@ -244,8 +243,6 @@ public class OrganizationAuthorizationServerConfig {
     final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
     final AuthenticationContextClaimsCustomizer authenticationContextClaims =
         new AuthenticationContextClaimsCustomizer();
-    final WorkspaceRoleClaimsCustomizer workspaceRoleClaims =
-        new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles);
     final ProfilePictureClaimsCustomizer profilePictureClaims =
         new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
     final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
@@ -421,8 +418,7 @@ public class OrganizationAuthorizationServerConfig {
         buildTokenGenerator(
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,
-            workspaceMemberships,
-            workspaceRoles,
+            new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles),
             issueRefreshToken,
             recordSessionOidcId,
             accounts,

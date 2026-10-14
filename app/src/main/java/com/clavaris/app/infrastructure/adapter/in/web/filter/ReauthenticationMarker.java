@@ -74,15 +74,15 @@ import java.util.TreeMap;
   // The notes still alive, as a copy that can be changed freely.
   private static Map<String, Instant> liveNotes(final HttpSession session, final Instant now) {
     final Map<String, Instant> live = new LinkedHashMap<>();
-    if (session != null && session.getAttribute(SESSION_ATTRIBUTE) instanceof Notes stored) {
-      stored
-          .requestedAt()
-          .forEach(
-              (request, leftAt) -> {
-                if (!expired(leftAt, now)) {
-                  live.put(request, leftAt);
-                }
-              });
+    if (session != null
+        && session.getAttribute(SESSION_ATTRIBUTE)
+            instanceof Notes(final Map<String, Instant> stored)) {
+      stored.forEach(
+          (request, leftAt) -> {
+            if (!expired(leftAt, now)) {
+              live.put(request, leftAt);
+            }
+          });
     }
     return live;
   }
@@ -143,9 +143,11 @@ import java.util.TreeMap;
   // resumed, so another authorize request must leave them alone.
   /* package */ static void discardExpired(final HttpServletRequest request, final Instant now) {
     final HttpSession session = request.getSession(false);
-    if (session != null && session.getAttribute(SESSION_ATTRIBUTE) instanceof Notes stored) {
+    if (session != null
+        && session.getAttribute(SESSION_ATTRIBUTE)
+            instanceof Notes(final Map<String, Instant> stored)) {
       final Map<String, Instant> live = liveNotes(session, now);
-      if (live.size() != stored.requestedAt().size()) {
+      if (live.size() != stored.size()) {
         store(session, live);
       }
     }

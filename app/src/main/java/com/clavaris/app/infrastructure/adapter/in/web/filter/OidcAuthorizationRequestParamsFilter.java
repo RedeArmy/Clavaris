@@ -106,8 +106,10 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
         unsupported != null
             || request.getParameter("prompt") != null
             || request.getParameter("max_age") != null;
-    if (unsupported != null && registeredClient(path.group(1), request).isPresent()) {
-      redirectWithError(request, response, unsupported);
+    final Optional<String> unsupportedTarget =
+        unsupported == null ? Optional.empty() : registeredRedirectUri(path.group(1), request);
+    if (unsupportedTarget.isPresent()) {
+      redirectWithError(unsupportedTarget.get(), request, response, unsupported);
     } else if (!relevant || !answered(request, response, path.group(1))) {
       chain.doFilter(request, response);
     }
@@ -118,17 +120,16 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final HttpServletRequest request, final HttpServletResponse response, final String org)
       throws IOException {
     final List<String> prompts = OidcRequestParameters.promptValues(request.getParameter("prompt"));
-    final Optional<OAuthClient> client = registeredClient(org, request);
+    final Optional<String> client = registeredRedirectUri(org, request);
     final Authentication authentication = OidcRequestParameters.signedInAccount();
     final String maxAgeParam = request.getParameter("max_age");
     final Long maxAge = OidcRequestParameters.parseMaxAge(maxAgeParam);
 
     if (maxAgeParam != null && maxAge == null) {
-      return answerWithError(client.isPresent(), INVALID_REQUEST, request, response);
+      return answerWithError(client, INVALID_REQUEST, request, response);
     }
     if (prompts.contains("none")) {
-      return answerPromptNone(
-          prompts, client.isPresent(), authentication, maxAge, request, response);
+      return answerPromptNone(prompts, client, authentication, maxAge, request, response);
     }
     return answerSignedInState(request, response, prompts, maxAge, client, authentication);
   }
@@ -140,7 +141,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final HttpServletResponse response,
       final List<String> prompts,
       final Long maxAge,
-      final Optional<OAuthClient> client,
+      final Optional<String> client,
       final Authentication authentication)
       throws IOException {
     if (client.isEmpty()) {
@@ -166,7 +167,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   // missing or too old authentication is login_required.
   private boolean answerPromptNone(
       final List<String> prompts,
-      final boolean registeredClient,
+      final Optional<String> registeredUri,
       final Authentication authentication,
       final Long maxAge,
       final HttpServletRequest request,
@@ -176,19 +177,20 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
     final boolean loginNeeded =
         authentication == null || OidcRequestParameters.exceedsMaxAge(authentication, maxAge);
     final String error = combined ? INVALID_REQUEST : LOGIN_REQUIRED;
-    return answerWithError(registeredClient && (combined || loginNeeded), error, request, response);
+    return answerWithError(
+        registeredUri.filter(uri -> combined || loginNeeded), error, request, response);
   }
 
   private boolean answerWithError(
-      final boolean applicable,
+      final Optional<String> registeredUri,
       final String error,
       final HttpServletRequest request,
       final HttpServletResponse response)
       throws IOException {
-    if (applicable) {
-      redirectWithError(request, response, error);
+    if (registeredUri.isPresent()) {
+      redirectWithError(registeredUri.get(), request, response, error);
     }
-    return applicable;
+    return registeredUri.isPresent();
   }
 
   private boolean reauthenticationRequired(
@@ -211,19 +213,23 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
         request, response, new InsufficientAuthenticationException("re-authentication requested"));
   }
 
+  // registeredUri is the value from the client's registered list, not the request's own parameter.
   private void redirectWithError(
-      final HttpServletRequest request, final HttpServletResponse response, final String error)
+      final String registeredUri,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final String error)
       throws IOException {
     final Map<String, String> parameters = new LinkedHashMap<>();
     parameters.put("error", error);
     parameters.put("state", request.getParameter("state"));
-    response.sendRedirect(
-        OidcRequestParameters.withQuery(request.getParameter("redirect_uri"), parameters));
+    response.sendRedirect(OidcRequestParameters.withQuery(registeredUri, parameters));
   }
 
-  // Only an exact match of a redirect_uri registered for this Organization's active client makes
-  // an error redirect safe — see this class's own Javadoc.
-  private Optional<OAuthClient> registeredClient(
+  // The redirect_uri registered for this Organization's active client that equals the request's
+  // (exact match); only such a registered value makes an error redirect safe — see this class's
+  // own Javadoc.
+  private Optional<String> registeredRedirectUri(
       final String organizationId, final HttpServletRequest request) {
     final String clientId = request.getParameter("client_id");
     final String redirectUri = request.getParameter("redirect_uri");
@@ -240,6 +246,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
         .findByClientId(clientId)
         .filter(OAuthClient::active)
         .filter(client -> client.organizationId().equals(organization))
-        .filter(client -> client.redirectUris().contains(redirectUri));
+        .flatMap(
+            client -> OidcRequestParameters.registeredMatch(client.redirectUris(), redirectUri));
   }
 }

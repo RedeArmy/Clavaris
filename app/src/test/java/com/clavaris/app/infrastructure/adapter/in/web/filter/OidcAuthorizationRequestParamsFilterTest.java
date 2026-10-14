@@ -241,4 +241,42 @@ class OidcAuthorizationRequestParamsFilterTest {
 
     assertThat(passedThrough(session, T0.plusSeconds(60), QUERY + "&continue=")).isTrue();
   }
+
+  // The error redirect goes to the URI the client registered, built with the new parameters
+  // appended; a URI that merely resembles it (another path, host case, userinfo, fragment, scheme
+  // or a longer host) is not registered, so nothing redirects to it.
+  @Test
+  void anErrorRedirectGoesToTheRegisteredUriAndNeverToALookAlike() throws Exception {
+    MockHttpServletResponse registered = new MockHttpServletResponse();
+    filterAt(T0)
+        .doFilter(
+            authorize(
+                new MockHttpSession(),
+                "client_id=" + CLIENT + "&redirect_uri=" + REDIRECT + "&prompt=none&state=s1"),
+            registered,
+            new MockFilterChain());
+    assertThat(registered.getRedirectedUrl())
+        .isEqualTo(REDIRECT + "?error=login_required&state=s1");
+
+    for (String lookAlike :
+        List.of(
+            REDIRECT + "/",
+            "https://APP.example.com/cb",
+            "https://user@app.example.com/cb",
+            REDIRECT + "#fragment",
+            "http://app.example.com/cb",
+            "https://app.example.com.evil.example/cb",
+            "https://evil.example/cb")) {
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      MockFilterChain chain = new MockFilterChain();
+      filterAt(T0)
+          .doFilter(
+              authorize(
+                  new MockHttpSession(),
+                  "client_id=" + CLIENT + "&redirect_uri=" + lookAlike + "&prompt=none&state=s1"),
+              response,
+              chain);
+      assertThat(response.getRedirectedUrl()).as(lookAlike).isNull();
+    }
+  }
 }

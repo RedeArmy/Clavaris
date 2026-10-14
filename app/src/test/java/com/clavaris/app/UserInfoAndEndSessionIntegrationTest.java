@@ -188,8 +188,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.statusCode()).isEqualTo(401);
     // RFC 6750 §3: no credentials at all is challenged without an error code.
     String challenge = response.headers().firstValue("WWW-Authenticate").orElse("");
-    assertThat(challenge).startsWith("Bearer");
-    assertThat(challenge).doesNotContain("error=");
+    assertThat(challenge).startsWith("Bearer").doesNotContain("error=");
   }
 
   @Test

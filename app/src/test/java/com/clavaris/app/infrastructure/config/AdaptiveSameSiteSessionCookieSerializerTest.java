@@ -32,12 +32,8 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
   private final AdaptiveSameSiteSessionCookieSerializer serializer =
       new AdaptiveSameSiteSessionCookieSerializer(
           "/platform/",
-          new FlatPathSessionLookup() {
-            @Override
-            public Optional<UUID> organizationForClient(final String clientId) {
-              return Optional.ofNullable(clientOrganizations.get(clientId));
-            }
-          });
+          (FlatPathSessionLookup)
+              clientId -> Optional.ofNullable(clientOrganizations.get(clientId)));
 
   private static String encoded(final String sessionId) {
     return Base64.getEncoder().encodeToString(sessionId.getBytes(StandardCharsets.UTF_8));
@@ -218,12 +214,7 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
   }
 
   private static FlatPathSessionLookup noLookup() {
-    return new FlatPathSessionLookup() {
-      @Override
-      public Optional<UUID> organizationForClient(final String clientId) {
-        return Optional.empty();
-      }
-    };
+    return clientId -> Optional.empty();
   }
 
   // The bug: both tenants wrote the same cookie, so the second login replaced the first one's

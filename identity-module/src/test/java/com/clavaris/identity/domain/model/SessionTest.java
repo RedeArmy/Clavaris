@@ -56,9 +56,7 @@ class SessionTest {
             persistedId,
             accountId,
             List.of("openid"),
-            createdAt,
-            createdAt,
-            lastSeenAt,
+            new SessionTimestamps(createdAt, createdAt, lastSeenAt),
             null,
             null);
 

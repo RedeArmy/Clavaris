@@ -7,6 +7,7 @@ import java.util.Base64;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,7 +42,7 @@ public class RpInitiatedLogoutController {
 
   // PMD.LongVariable: the post_logout_redirect_uri parameter name is the spec's own.
   @SuppressWarnings("PMD.LongVariable")
-  @RequestMapping("/confirm")
+  @GetMapping("/confirm")
   public String confirm(
       @PathVariable final UUID organizationId,
       @RequestParam(name = "client_id", required = false) final String clientId,
@@ -81,7 +82,7 @@ public class RpInitiatedLogoutController {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
-  @RequestMapping("/done")
+  @GetMapping("/done")
   public String done(@PathVariable final UUID organizationId, final Model model) {
     model.addAttribute("organizationId", organizationId);
     return "identity/logged-out";

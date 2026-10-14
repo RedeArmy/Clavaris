@@ -24,8 +24,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 class OidcSessionIdRecorderTest {
 
-  private final RecordSessionOidcIdUseCase record = mock(RecordSessionOidcIdUseCase.class);
-  private final OidcSessionIdRecorder recorder = new OidcSessionIdRecorder(record);
+  private final RecordSessionOidcIdUseCase recordSessionOidcId =
+      mock(RecordSessionOidcIdUseCase.class);
+  private final OidcSessionIdRecorder recorder = new OidcSessionIdRecorder(recordSessionOidcId);
 
   @AfterEach
   void clearRequest() {
@@ -59,7 +60,7 @@ class OidcSessionIdRecorderTest {
 
     recorder.customize(idTokenContext(AuthorizationGrantType.AUTHORIZATION_CODE, "the-sid"));
 
-    verify(record).handle(sessionId, "the-sid");
+    verify(recordSessionOidcId).handle(sessionId, "the-sid");
   }
 
   @Test
@@ -68,7 +69,7 @@ class OidcSessionIdRecorderTest {
 
     recorder.customize(idTokenContext(AuthorizationGrantType.AUTHORIZATION_CODE, null));
 
-    verifyNoInteractions(record);
+    verifyNoInteractions(recordSessionOidcId);
   }
 
   @Test
@@ -77,7 +78,7 @@ class OidcSessionIdRecorderTest {
 
     recorder.customize(idTokenContext(AuthorizationGrantType.REFRESH_TOKEN, "the-sid"));
 
-    verifyNoInteractions(record);
+    verifyNoInteractions(recordSessionOidcId);
   }
 
   @Test
@@ -87,16 +88,16 @@ class OidcSessionIdRecorderTest {
 
     recorder.customize(idTokenContext(AuthorizationGrantType.AUTHORIZATION_CODE, "the-sid"));
 
-    verifyNoInteractions(record);
+    verifyNoInteractions(recordSessionOidcId);
   }
 
   @Test
   void aFailureToRecordNeverBreaksTokenIssuance() {
     aSessionOpenedByThisRequest();
-    doThrow(new IllegalStateException("db down")).when(record).handle(any(), any());
+    doThrow(new IllegalStateException("db down")).when(recordSessionOidcId).handle(any(), any());
 
     recorder.customize(idTokenContext(AuthorizationGrantType.AUTHORIZATION_CODE, "the-sid"));
 
-    verify(record).handle(any(), any());
+    verify(recordSessionOidcId).handle(any(), any());
   }
 }

@@ -146,4 +146,30 @@ class OidcLogoutWithoutHintFilterTest {
 
     assertThat(chain.getRequest()).isNotNull();
   }
+
+  // The post-logout redirect goes to the URI the client registered; one that only resembles it is
+  // not registered, so the End-User lands on the plain signed-out page instead.
+  @Test
+  void theRedirectGoesToTheRegisteredUriAndNeverToALookAlike() throws Exception {
+    registeredClient();
+    MockHttpServletResponse registered = new MockHttpServletResponse();
+    filter.doFilter(logout("GET"), registered, new MockFilterChain());
+    assertThat(registered.getRedirectedUrl()).isEqualTo(LOGOUT_URI + "?state=s1");
+
+    for (String lookAlike :
+        List.of(
+            LOGOUT_URI + "/",
+            "https://APP.example.com/bye",
+            "https://user@app.example.com/bye",
+            LOGOUT_URI + "#fragment",
+            "http://app.example.com/bye",
+            "https://app.example.com.evil.example/bye")) {
+      MockHttpServletRequest request = logout("GET");
+      request.setParameter("post_logout_redirect_uri", lookAlike);
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      filter.doFilter(request, response, new MockFilterChain());
+      assertThat(response.getRedirectedUrl()).as(lookAlike).isNull();
+      assertThat(response.getForwardedUrl()).as(lookAlike).endsWith("/logout/done");
+    }
+  }
 }

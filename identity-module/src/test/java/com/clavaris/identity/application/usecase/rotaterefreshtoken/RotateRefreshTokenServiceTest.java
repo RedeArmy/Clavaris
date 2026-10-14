@@ -27,6 +27,7 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.RefreshToken;
 import com.clavaris.identity.domain.model.Session;
+import com.clavaris.identity.domain.model.SessionTimestamps;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -229,9 +230,10 @@ class RotateRefreshTokenServiceTest {
             UUID.randomUUID(),
             accountId,
             List.of("openid", "profile"),
-            Instant.now().minus(31, ChronoUnit.DAYS),
-            Instant.now().minus(31, ChronoUnit.DAYS),
-            Instant.now(), // recently active — only the lifetime bound is exceeded
+            new SessionTimestamps(
+                Instant.now().minus(31, ChronoUnit.DAYS),
+                Instant.now().minus(31, ChronoUnit.DAYS),
+                Instant.now()), // recently active — only the lifetime bound is exceeded
             null,
             null);
     String rawValue = "a-valid-refresh-token-value";
@@ -264,9 +266,10 @@ class RotateRefreshTokenServiceTest {
             UUID.randomUUID(),
             accountId,
             List.of("openid", "profile"),
-            Instant.now().minus(2, ChronoUnit.DAYS), // well within the lifetime bound
-            Instant.now().minus(2, ChronoUnit.DAYS),
-            Instant.now().minus(2, ChronoUnit.DAYS), // but never touched since
+            new SessionTimestamps(
+                Instant.now().minus(2, ChronoUnit.DAYS), // well within the lifetime bound
+                Instant.now().minus(2, ChronoUnit.DAYS),
+                Instant.now().minus(2, ChronoUnit.DAYS)), // but never touched since
             null,
             null);
     String rawValue = "a-valid-refresh-token-value";

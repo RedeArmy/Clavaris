@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
 public class EmailClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
+  // The email scope and the email claim share a name (OIDC Core 5.4).
   private static final String EMAIL_SCOPE = "email";
 
   private final AccountRepository accounts;
@@ -59,7 +60,7 @@ public class EmailClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingC
             (final Account account) ->
                 context
                     .getClaims()
-                    .claim("email", account.email().value())
+                    .claim(EMAIL_SCOPE, account.email().value())
                     .claim("email_verified", account.emailVerifiedAt().isPresent()));
   }
 }

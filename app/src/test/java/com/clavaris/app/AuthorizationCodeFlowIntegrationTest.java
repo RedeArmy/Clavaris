@@ -840,7 +840,7 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     String email = "auth-time@example.com";
     signIn(organizationId, client, email);
     long loginAt = java.time.Instant.now().getEpochSecond();
-    Thread.sleep(2200);
+    awaitNextSecond();
 
     String codeVerifier = generateCodeVerifier();
     HttpResponse<Void> authorized =
@@ -860,7 +860,7 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
     String refreshToken = first.get("refresh_token").asString();
     for (int i = 0; i < 2; i++) {
-      Thread.sleep(1100);
+      awaitNextSecond();
       JsonNode refreshed =
           objectMapper.readTree(refresh(organizationId, client, refreshToken).body());
       assertThat(authTimeOf(refreshed.get("id_token").asString()))
@@ -927,6 +927,20 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(login.statusCode()).isEqualTo(302);
   }
 
+  // auth_time has one-second resolution, so these tests need the clock to move on by a second, not
+  // a
+  // fixed pause: wait until the epoch second changes (bounded, so a stuck clock fails the test).
+  private static void awaitNextSecond() {
+    final long current = java.time.Instant.now().getEpochSecond();
+    final java.time.Instant deadline = java.time.Instant.now().plusSeconds(5);
+    while (java.time.Instant.now().getEpochSecond() == current) {
+      if (java.time.Instant.now().isAfter(deadline)) {
+        throw new AssertionError("the clock did not move on by a second");
+      }
+      Thread.onSpinWait();
+    }
+  }
+
   // The contract for both prompt=login and max_age=0: the hosted login is shown again, and after
   // signing in the saved request resumes with a code (no redirect loop) whose ID token carries a
   // new auth_time.
@@ -935,9 +949,9 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     UUID organizationId = createOrganization(platformToken, "Reauth Co " + extraQuery);
     ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
     signIn(organizationId, client, email);
-    Thread.sleep(1100);
+    awaitNextSecond();
     long beforeReauthentication = java.time.Instant.now().getEpochSecond();
-    Thread.sleep(1100);
+    awaitNextSecond();
 
     String codeVerifier = generateCodeVerifier();
     HttpResponse<Void> response =
@@ -1109,7 +1123,7 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
     String email = "two-authorize@example.com";
     signIn(organizationId, client, email);
-    Thread.sleep(1100);
+    awaitNextSecond();
 
     String verifierA = generateCodeVerifier();
     HttpResponse<Void> a =

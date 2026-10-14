@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -89,11 +90,15 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
   private void completeLogout(
       final HttpServletRequest request, final HttpServletResponse response, final String org)
       throws ServletException, IOException {
-    final String redirectUri = request.getParameter("post_logout_redirect_uri");
-    if (registeredPostLogoutUri(org, request.getParameter("client_id"), redirectUri)) {
+    final Optional<String> registeredUri =
+        registeredPostLogoutUri(
+            org,
+            request.getParameter("client_id"),
+            request.getParameter("post_logout_redirect_uri"));
+    if (registeredUri.isPresent()) {
       final Map<String, String> parameters = new LinkedHashMap<>();
       parameters.put("state", request.getParameter("state"));
-      response.sendRedirect(OidcRequestParameters.withQuery(redirectUri, parameters));
+      response.sendRedirect(OidcRequestParameters.withQuery(registeredUri.get(), parameters));
     } else {
       forwardAsGet(request, response, "/o/" + org + "/logout/done");
     }
@@ -136,22 +141,25 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
     return valid;
   }
 
-  private boolean registeredPostLogoutUri(
+  // The registered post-logout URI equal to the request's (exact match), taken from the list.
+  private Optional<String> registeredPostLogoutUri(
       final String organizationId, final String clientId, final String redirectUri) {
     if (clientId == null || redirectUri == null) {
-      return false;
+      return Optional.empty();
     }
     final UUID organization;
     try {
       organization = UUID.fromString(organizationId);
     } catch (final IllegalArgumentException _) {
-      return false;
+      return Optional.empty();
     }
     return oauthClients
         .findByClientId(clientId)
         .filter(OAuthClient::active)
         .filter(client -> client.organizationId().equals(organization))
-        .filter(client -> client.postLogoutRedirectUris().contains(redirectUri))
-        .isPresent();
+        .flatMap(
+            client ->
+                OidcRequestParameters.registeredMatch(
+                    client.postLogoutRedirectUris(), redirectUri));
   }
 }

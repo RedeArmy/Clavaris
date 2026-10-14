@@ -84,4 +84,18 @@ class OidcRequestParametersTest {
           .isEqualTo(t0.plusSeconds(90));
     }
   }
+
+  // Whatever a caller redirects to is taken from the registered list itself.
+  @Test
+  void aRegisteredUriIsMatchedExactlyAndReturnedFromTheList() {
+    java.util.List<String> registered = java.util.List.of("https://app.example.com/cb");
+
+    assertThat(OidcRequestParameters.registeredMatch(registered, "https://app.example.com/cb"))
+        .containsSame(registered.get(0));
+    assertThat(OidcRequestParameters.registeredMatch(registered, "https://app.example.com/cb/"))
+        .isEmpty();
+    assertThat(OidcRequestParameters.registeredMatch(registered, "https://APP.example.com/cb"))
+        .isEmpty();
+    assertThat(OidcRequestParameters.registeredMatch(registered, null)).isEmpty();
+  }
 }

@@ -3,6 +3,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Session;
+import com.clavaris.identity.domain.model.SessionTimestamps;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -59,9 +60,7 @@ class JpaSessionRepository implements SessionRepository {
         session.id(),
         session.accountId().value(),
         objectMapper.writeValueAsString(session.scopes()),
-        session.createdAt(),
-        session.authenticatedAt(),
-        session.lastSeenAt(),
+        new SessionTimestamps(session.createdAt(), session.authenticatedAt(), session.lastSeenAt()),
         session.revokedAt().orElse(null),
         session.oidcSid().orElse(null));
   }
@@ -78,9 +77,8 @@ class JpaSessionRepository implements SessionRepository {
         entity.getId(),
         new AccountId(entity.getAccountId()),
         scopes,
-        entity.getCreatedAt(),
-        entity.getAuthenticatedAt(),
-        entity.getLastSeenAt(),
+        new SessionTimestamps(
+            entity.getCreatedAt(), entity.getAuthenticatedAt(), entity.getLastSeenAt()),
         entity.getRevokedAt(),
         entity.getOidcSid());
   }

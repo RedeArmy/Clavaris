@@ -5,13 +5,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 /**
@@ -98,28 +100,27 @@ final class OidcRequestParameters {
         || "frame".equals(destination);
   }
 
+  // The registered URI equal to the candidate, taken from the trusted list itself: whatever a
+  // caller
+  // redirects to is a value the client registered, never the string a request carried.
+  /* package */ static Optional<String> registeredMatch(
+      final Collection<String> registered, final String candidate) {
+    return registered.stream().filter(uri -> uri.equals(candidate)).findFirst();
+  }
+
   // Appends query parameters to an already-registered URI. Only the new values are encoded: the
   // registered URI is exactly what the client sent at registration and must not be encoded twice
   // (a %20 already in it would become %2520). A null value is skipped.
-  /* package */ static String withQuery(final String uri, final Map<String, String> parameters) {
-    final Map<String, String> present = new LinkedHashMap<>();
+  /* package */ static String withQuery(
+      final String registeredUri, final Map<String, String> parameters) {
+    final UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(registeredUri);
     parameters.forEach(
         (name, value) -> {
           if (value != null) {
-            present.put(name, value);
+            builder.queryParam(name, UriUtils.encodeQueryParam(value, StandardCharsets.UTF_8));
           }
         });
-    final StringBuilder result = new StringBuilder(uri);
-    char separator = uri.indexOf('?') >= 0 ? '&' : '?';
-    for (final Map.Entry<String, String> parameter : present.entrySet()) {
-      result
-          .append(separator)
-          .append(parameter.getKey())
-          .append('=')
-          .append(UriUtils.encodeQueryParam(parameter.getValue(), StandardCharsets.UTF_8));
-      separator = '&';
-    }
-    return result.toString();
+    return builder.build(true).toUriString();
   }
 
   // The signed-in tenant Account of this request, or null: an anonymous visitor or any other kind

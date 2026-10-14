@@ -1,5 +1,6 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
+import com.clavaris.identity.domain.model.SessionTimestamps;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -45,17 +46,15 @@ public class SessionEntity {
       final UUID id,
       final UUID accountId,
       final String scopes,
-      final Instant createdAt,
-      final Instant authenticatedAt,
-      final Instant lastSeenAt,
+      final SessionTimestamps timestamps,
       final Instant revokedAt,
       final String oidcSid) {
     this.id = id;
     this.accountId = accountId;
     this.scopes = scopes;
-    this.createdAt = createdAt;
-    this.authenticatedAt = authenticatedAt;
-    this.lastSeenAt = lastSeenAt;
+    this.createdAt = timestamps.createdAt();
+    this.authenticatedAt = timestamps.authenticatedAt();
+    this.lastSeenAt = timestamps.lastSeenAt();
     this.revokedAt = revokedAt;
     this.oidcSid = oidcSid;
   }
