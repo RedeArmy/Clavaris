@@ -75,6 +75,9 @@ public final class SessionBackedRefreshTokenGenerator
                 expiresAt,
                 authenticationInstant(principal)));
 
+    // The ID token of this same code exchange is generated next: it records its sid on this
+    // Session.
+    OidcSessionIdRecorder.rememberSession(result.sessionId());
     return new OAuth2RefreshToken(result.rawToken(), Instant.now(), result.expiresAt());
   }
 

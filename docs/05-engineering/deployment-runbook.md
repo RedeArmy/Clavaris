@@ -427,7 +427,7 @@ domain scoped to the consumer's own registrable domain); this section is the "ho
 gap that ADR's own "Open questions" section and `technical-debt-register.md` TD-FUT-028 both named:
 nothing previously explained what an operator actually runs. Everything referenced below
 (`ClientBranding`, `ClientDomainConfig`, `CustomDomainRequestRewriteFilter`, the CSP
-`frame-ancestors` relaxation, the modal-aware session cookie) is already real, shipped, tested
+`frame-ancestors` relaxation, the adaptive per-tenant session cookie, ADR-0030) is already real, shipped, tested
 application code — this section only documents how to drive it.
 
 ### 9a. When this applies
@@ -565,8 +565,9 @@ server {
   (`EmbeddingEligibilityChecker`) — a `DEVELOPMENT`-tier Organization's client gets a wildcard
   (`*`) instead, with a warning logged, a deliberate testing convenience never used in production.
 - Confirm the session cookie's own `Set-Cookie` header shows `SameSite=None; Secure` on this same
-  flow (`ModalAwareSessionCookieSerializer`) — `SameSite=Lax` here means the embedded/iframe flow
-  will silently drop the session on its first cross-site navigation back to the parent page.
+  flow (`AdaptiveSameSiteSessionCookieSerializer`; the cookie is named `SESSION_<organization id>`
+  per tenant, see ADR-0030) — `SameSite=Lax` here means the embedded/iframe flow will silently drop
+  the session on its first cross-site navigation back to the parent page.
 
 ### 9h. Troubleshooting
 

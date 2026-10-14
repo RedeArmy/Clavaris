@@ -36,6 +36,7 @@ public final class Session {
   private final Instant authenticatedAt;
   private Instant lastSeenAt;
   private Instant revokedAt;
+  private String oidcSid;
 
   private Session(
       final UUID id,
@@ -44,7 +45,8 @@ public final class Session {
       final Instant createdAt,
       final Instant authenticatedAt,
       final Instant lastSeenAt,
-      final Instant revokedAt) {
+      final Instant revokedAt,
+      final String oidcSid) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
     this.scopes = List.copyOf(Objects.requireNonNull(scopes, "scopes must not be null"));
@@ -53,6 +55,7 @@ public final class Session {
         Objects.requireNonNull(authenticatedAt, "authenticatedAt must not be null");
     this.lastSeenAt = Objects.requireNonNull(lastSeenAt, "lastSeenAt must not be null");
     this.revokedAt = revokedAt;
+    this.oidcSid = oidcSid;
   }
 
   /**
@@ -74,7 +77,7 @@ public final class Session {
     final Instant now = Instant.now();
     final Instant authTime =
         authenticatedAt == null || authenticatedAt.isAfter(now) ? now : authenticatedAt;
-    return new Session(UUID.randomUUID(), accountId, scopes, now, authTime, now, null);
+    return new Session(UUID.randomUUID(), accountId, scopes, now, authTime, now, null, null);
   }
 
   public static Session reconstitute(
@@ -84,8 +87,21 @@ public final class Session {
       final Instant createdAt,
       final Instant authenticatedAt,
       final Instant lastSeenAt,
-      final Instant revokedAt) {
-    return new Session(id, accountId, scopes, createdAt, authenticatedAt, lastSeenAt, revokedAt);
+      final Instant revokedAt,
+      final String oidcSid) {
+    return new Session(
+        id, accountId, scopes, createdAt, authenticatedAt, lastSeenAt, revokedAt, oidcSid);
+  }
+
+  /**
+   * OIDC Core 12.2: remembers the {@code sid} Spring Authorization Server put on this Session's
+   * first ID token, so a refreshed one can repeat it. Set once: a Session that already has one
+   * keeps it, and a blank value is ignored.
+   */
+  public void recordOidcSid(final String sid) {
+    if (this.oidcSid == null && sid != null && !sid.isBlank()) {
+      this.oidcSid = sid;
+    }
   }
 
   /**
@@ -130,6 +146,11 @@ public final class Session {
 
   public Instant lastSeenAt() {
     return lastSeenAt;
+  }
+
+  /** The {@code sid} of this Session's first ID token, when it was recorded. */
+  public Optional<String> oidcSid() {
+    return Optional.ofNullable(oidcSid);
   }
 
   public Optional<Instant> revokedAt() {

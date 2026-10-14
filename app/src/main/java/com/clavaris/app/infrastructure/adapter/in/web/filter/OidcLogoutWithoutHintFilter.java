@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * OpenID Connect RP-Initiated Logout 1.0 §2 makes {@code id_token_hint} RECOMMENDED, not required,
@@ -60,7 +61,8 @@ public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain)
       throws ServletException, IOException {
-    final Matcher path = LOGOUT_PATH.matcher(request.getRequestURI());
+    final Matcher path =
+        LOGOUT_PATH.matcher(UrlPathHelper.defaultInstance.getPathWithinApplication(request));
     final String hint = request.getParameter("id_token_hint");
     final boolean withoutHint = path.matches() && (hint == null || hint.isBlank());
     if (!withoutHint) {

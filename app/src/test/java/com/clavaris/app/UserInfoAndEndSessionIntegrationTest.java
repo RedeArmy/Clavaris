@@ -206,6 +206,48 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         .contains("error=\"invalid_token\"");
   }
 
+  // OIDC Core 12.2 / Session Management: sid identifies the session, so an ID token issued by a
+  // refresh must repeat the original's. Real bug found validating this branch: it carried the
+  // Clavaris Session id instead of the sid Spring Authorization Server put on the original token,
+  // so an RP that sent its latest (refreshed) ID token as the logout hint got a 400 and stayed
+  // signed in.
+  @Test
+  void aRefreshedIdTokenKeepsTheSidAndWorksAsTheLogoutHint() throws Exception {
+    IssuedTokens tokens = completeARealAuthorizationCodeExchange("logout-refreshed@example.com");
+
+    HttpResponse<String> refreshed = refreshTokens(tokens);
+    assertThat(refreshed.statusCode()).isEqualTo(200);
+    String refreshedIdToken = objectMapper.readTree(refreshed.body()).get("id_token").asString();
+    assertThat(decodePayload(refreshedIdToken).get("sid").asString())
+        .isEqualTo(decodePayload(tokens.tokenResponse().idToken()).get("sid").asString());
+
+    HttpResponse<Void> response =
+        getDiscardingBody(
+            "/o/"
+                + tokens.organizationId()
+                + "/connect/logout?id_token_hint="
+                + urlEncode(refreshedIdToken));
+
+    assertThat(response.statusCode()).isEqualTo(302);
+  }
+
+  private HttpResponse<String> refreshTokens(IssuedTokens tokens)
+      throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString(
+                (tokens.client().clientId() + ":" + tokens.client().clientSecret()).getBytes());
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + tokens.organizationId() + "/oauth2/token"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "grant_type=refresh_token&refresh_token=" + urlEncode(tokens.refreshToken())))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
   @Test
   void endSessionRedirectsAfterARealIdTokenHint() throws Exception {
     IssuedTokens tokens = completeARealAuthorizationCodeExchange("logout-happy@example.com");
@@ -486,13 +528,15 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     JsonNode tokenBody = objectMapper.readTree(tokenResponse.body());
     String accessToken = tokenBody.get("access_token").asString();
     String idToken = tokenBody.get("id_token").asString();
+    String refreshToken = tokenBody.get("refresh_token").asString();
     String subject =
         objectMapper
             .readTree(new String(base64UrlDecode(idToken.split("\\.")[1])))
             .get("sub")
             .asString();
 
-    return new IssuedTokens(organizationId, new TokenResponse(accessToken, idToken), subject);
+    return new IssuedTokens(
+        organizationId, new TokenResponse(accessToken, idToken), subject, client, refreshToken);
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
@@ -557,7 +601,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         """
         {
           "redirectUris": ["%s"],
-          "allowedGrantTypes": ["authorization_code"],
+          "allowedGrantTypes": ["authorization_code", "refresh_token"],
           "allowedScopes": ["openid", "profile", "email"],
           "requireConsent": false%s
         }
@@ -738,5 +782,10 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
 
   private record TokenResponse(String accessToken, String idToken) {}
 
-  private record IssuedTokens(UUID organizationId, TokenResponse tokenResponse, String subject) {}
+  private record IssuedTokens(
+      UUID organizationId,
+      TokenResponse tokenResponse,
+      String subject,
+      ClientCredentials client,
+      String refreshToken) {}
 }

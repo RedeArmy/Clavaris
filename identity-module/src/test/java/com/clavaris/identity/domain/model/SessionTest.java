@@ -53,7 +53,14 @@ class SessionTest {
 
     Session session =
         Session.reconstitute(
-            persistedId, accountId, List.of("openid"), createdAt, createdAt, lastSeenAt, null);
+            persistedId,
+            accountId,
+            List.of("openid"),
+            createdAt,
+            createdAt,
+            lastSeenAt,
+            null,
+            null);
 
     assertThat(session.id()).isEqualTo(persistedId);
     assertThat(session.authenticatedAt()).isEqualTo(createdAt);
@@ -87,5 +94,21 @@ class SessionTest {
     Session session = Session.open(accountId, List.of("openid"), Instant.now().plusSeconds(3600));
 
     assertThat(session.authenticatedAt()).isEqualTo(session.createdAt());
+  }
+
+  // OIDC Core 12.2: the sid of the first ID token is kept once and never replaced, so every
+  // refreshed ID token repeats the same one.
+  @Test
+  void theOidcSidIsRecordedOnceAndNeverReplacedOrBlank() {
+    Session session = Session.open(accountId, List.of("openid"));
+    assertThat(session.oidcSid()).isEmpty();
+
+    session.recordOidcSid("  ");
+    session.recordOidcSid(null);
+    assertThat(session.oidcSid()).isEmpty();
+
+    session.recordOidcSid("first-sid");
+    session.recordOidcSid("second-sid");
+    assertThat(session.oidcSid()).contains("first-sid");
   }
 }

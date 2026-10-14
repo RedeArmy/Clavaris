@@ -25,6 +25,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * OpenID Connect Core 1.0 §3.1.2.1 / §3.1.2.6: the {@code prompt} and {@code max_age} parameters of
@@ -99,7 +100,8 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   protected void doFilterInternal(
       final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain)
       throws ServletException, IOException {
-    final Matcher path = AUTHORIZE_PATH.matcher(request.getRequestURI());
+    final Matcher path =
+        AUTHORIZE_PATH.matcher(UrlPathHelper.defaultInstance.getPathWithinApplication(request));
     if (!path.matches()) {
       chain.doFilter(request, response);
       return;

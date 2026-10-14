@@ -12,6 +12,9 @@ import java.util.UUID;
  * refreshed ID token's OIDC {@code auth_time} claim with when the user actually authenticated (the
  * same instant the original ID token carried), not when this rotation happened — RFC/OIDC Core §2's
  * own distinction between token issuance and authentication time, which a refresh must not blur.
+ * {@code oidcSid} is the {@code sid} the original ID token carried (null for a Session opened
+ * before it was recorded): a refreshed ID token repeats it, and the caller falls back to the
+ * Session id only when there is none.
  */
 public record RotateRefreshTokenResult(
     AccountId accountId,
@@ -19,4 +22,5 @@ public record RotateRefreshTokenResult(
     List<String> authorizedScopes,
     Instant authenticatedAt,
     String newRawToken,
-    Instant newExpiresAt) {}
+    Instant newExpiresAt,
+    String oidcSid) {}

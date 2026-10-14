@@ -18,6 +18,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
 import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
+import com.clavaris.app.infrastructure.adapter.out.security.OidcSessionIdRecorder;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
@@ -35,6 +36,7 @@ import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuth
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
+import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import com.clavaris.identity.infrastructure.adapter.out.security.OrganizationSigningKeyMaterialFactory;
@@ -234,6 +236,7 @@ public class OrganizationAuthorizationServerConfig {
       final WorkspaceMembershipRepository workspaceMemberships,
       final WorkspaceRoleRepository workspaceRoles,
       final IssueRefreshTokenUseCase issueRefreshToken,
+      final RecordSessionOidcIdUseCase recordSessionOidcId,
       final AccountRepository accounts,
       final String clavarisBaseUrl) {
     final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
@@ -245,6 +248,7 @@ public class OrganizationAuthorizationServerConfig {
     final ProfilePictureClaimsCustomizer profilePictureClaims =
         new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
     final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
+    final OidcSessionIdRecorder sessionIdRecorder = new OidcSessionIdRecorder(recordSessionOidcId);
     jwtGenerator.setJwtCustomizer(
         context -> {
           tokenIssuanceLogger.customize(context);
@@ -252,6 +256,7 @@ public class OrganizationAuthorizationServerConfig {
           workspaceRoleClaims.customize(context);
           profilePictureClaims.customize(context);
           emailClaims.customize(context);
+          sessionIdRecorder.customize(context);
         });
     return new DelegatingOAuth2TokenGenerator(
         jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
@@ -324,6 +329,7 @@ public class OrganizationAuthorizationServerConfig {
       final WorkspaceMembershipRepository workspaceMemberships,
       final WorkspaceRoleRepository workspaceRoles,
       final IssueRefreshTokenUseCase issueRefreshToken,
+      final RecordSessionOidcIdUseCase recordSessionOidcId,
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final RateLimiter rateLimiter,
       final RateLimitPolicyRepository rateLimitPolicies,
@@ -417,6 +423,7 @@ public class OrganizationAuthorizationServerConfig {
             workspaceMemberships,
             workspaceRoles,
             issueRefreshToken,
+            recordSessionOidcId,
             accounts,
             clavarisBaseUrl);
 

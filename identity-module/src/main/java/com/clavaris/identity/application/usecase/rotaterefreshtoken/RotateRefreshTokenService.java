@@ -215,7 +215,8 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         grantedScopes,
         session.authenticatedAt(),
         newRawValue,
-        command.newExpiresAt());
+        command.newExpiresAt(),
+        session.oidcSid().orElse(null));
   }
 
   // See this class's own Javadoc ("SDE-III review, 2026-09-03") for the full rationale — a

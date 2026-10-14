@@ -36,6 +36,9 @@ public class SessionEntity {
   @Column(name = "revoked_at")
   private Instant revokedAt;
 
+  @Column(name = "oidc_sid")
+  private String oidcSid;
+
   protected SessionEntity() {}
 
   public SessionEntity(
@@ -45,7 +48,8 @@ public class SessionEntity {
       final Instant createdAt,
       final Instant authenticatedAt,
       final Instant lastSeenAt,
-      final Instant revokedAt) {
+      final Instant revokedAt,
+      final String oidcSid) {
     this.id = id;
     this.accountId = accountId;
     this.scopes = scopes;
@@ -53,6 +57,7 @@ public class SessionEntity {
     this.authenticatedAt = authenticatedAt;
     this.lastSeenAt = lastSeenAt;
     this.revokedAt = revokedAt;
+    this.oidcSid = oidcSid;
   }
 
   public UUID getId() {
@@ -77,6 +82,10 @@ public class SessionEntity {
 
   public Instant getLastSeenAt() {
     return lastSeenAt;
+  }
+
+  public String getOidcSid() {
+    return oidcSid;
   }
 
   public Instant getRevokedAt() {

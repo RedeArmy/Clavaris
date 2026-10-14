@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * ADR-0009 §1/§4 / SDE-III review, 2026-09-15, superseded 2026-10-10 (real bug found live, preprod,
@@ -228,7 +229,10 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
     return path.startsWith(platformPathPrefix) || withoutTrailingSlash.equals(path);
   }
 
+  // Decoded and normalized the way Spring MVC and the security chains see it: a percent-encoded
+  // character in /o/{id}/... reaches the same endpoint as the plain path, so the cookie must be
+  // chosen from the same path or that request would use the legacy cookie.
   private static String pathWithinContext(final HttpServletRequest request) {
-    return request.getRequestURI().substring(request.getContextPath().length());
+    return UrlPathHelper.defaultInstance.getPathWithinApplication(request);
   }
 }

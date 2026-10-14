@@ -62,7 +62,8 @@ class JpaSessionRepository implements SessionRepository {
         session.createdAt(),
         session.authenticatedAt(),
         session.lastSeenAt(),
-        session.revokedAt().orElse(null));
+        session.revokedAt().orElse(null),
+        session.oidcSid().orElse(null));
   }
 
   @Override
@@ -80,6 +81,7 @@ class JpaSessionRepository implements SessionRepository {
         entity.getCreatedAt(),
         entity.getAuthenticatedAt(),
         entity.getLastSeenAt(),
-        entity.getRevokedAt());
+        entity.getRevokedAt(),
+        entity.getOidcSid());
   }
 }

@@ -120,6 +120,21 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     assertThat(response.getHeader("Set-Cookie")).startsWith(COOKIE_A + "=");
   }
 
+  // A percent-encoded character in the tenant id names the same tenant to the container and to
+  // Spring MVC, which both decode the path; the cookie must follow, or that request would read and
+  // write the legacy cookie instead of its tenant's.
+  @Test
+  void aPercentEncodedTenantPathStillGetsItsTenantsCookie() {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest(
+            "GET", "/o/%31" + TENANT_A.toString().substring(1) + "/account/profile");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie")).startsWith(COOKIE_A + "=");
+  }
+
   @Test
   void aPlatformPathGetsItsOwnDistinctCookieName() {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/platform/dashboard");

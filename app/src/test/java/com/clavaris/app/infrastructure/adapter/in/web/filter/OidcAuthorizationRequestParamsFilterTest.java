@@ -100,6 +100,29 @@ class OidcAuthorizationRequestParamsFilterTest {
     return chain.getRequest() != null;
   }
 
+  // The container and Spring MVC decode the path, so /o/%38.../oauth2/authorize reaches the same
+  // endpoint as /o/8.../oauth2/authorize: the filter must treat both alike, or an encoded character
+  // would skip prompt and max_age.
+  @Test
+  void aPercentEncodedPathIsFilteredLikeThePlainOne() throws Exception {
+    String id = ORGANIZATION.toString();
+    String encodedId = "%" + String.format("%02X", (int) id.charAt(0)) + id.substring(1);
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/o/" + encodedId + "/oauth2/authorize");
+    request.setSession(new MockHttpSession());
+    request.setParameter("client_id", CLIENT);
+    request.setParameter("redirect_uri", REDIRECT);
+    request.setParameter("prompt", "none");
+    request.setParameter("state", "s1");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filterAt(T0).doFilter(request, response, chain);
+
+    assertThat(chain.getRequest()).isNull();
+    assertThat(response.getRedirectedUrl()).contains("error=login_required");
+  }
+
   @Test
   void aFreshNoteForTheSameRequestLetsTheResumedRequestPassAfterTheNewLogin() throws Exception {
     MockHttpSession session = new MockHttpSession();
