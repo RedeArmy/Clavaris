@@ -27,6 +27,9 @@ public class SessionEntity {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @Column(name = "authenticated_at", nullable = false)
+  private Instant authenticatedAt;
+
   @Column(name = "last_seen_at", nullable = false)
   private Instant lastSeenAt;
 
@@ -40,12 +43,14 @@ public class SessionEntity {
       final UUID accountId,
       final String scopes,
       final Instant createdAt,
+      final Instant authenticatedAt,
       final Instant lastSeenAt,
       final Instant revokedAt) {
     this.id = id;
     this.accountId = accountId;
     this.scopes = scopes;
     this.createdAt = createdAt;
+    this.authenticatedAt = authenticatedAt;
     this.lastSeenAt = lastSeenAt;
     this.revokedAt = revokedAt;
   }
@@ -64,6 +69,10 @@ public class SessionEntity {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public Instant getAuthenticatedAt() {
+    return authenticatedAt;
   }
 
   public Instant getLastSeenAt() {

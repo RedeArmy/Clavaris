@@ -11,7 +11,16 @@ import java.util.Objects;
  * Authorization Server concept identity-module deliberately never depends on.
  */
 public record IssueRefreshTokenCommand(
-    AccountId accountId, List<String> authorizedScopes, Instant expiresAt) {
+    AccountId accountId,
+    List<String> authorizedScopes,
+    Instant expiresAt,
+    Instant authenticatedAt) {
+
+  /** Without a known authentication instant: the Session's own opening time stands in for it. */
+  public IssueRefreshTokenCommand(
+      final AccountId accountId, final List<String> authorizedScopes, final Instant expiresAt) {
+    this(accountId, authorizedScopes, expiresAt, null);
+  }
 
   public IssueRefreshTokenCommand {
     Objects.requireNonNull(accountId, "accountId must not be null");

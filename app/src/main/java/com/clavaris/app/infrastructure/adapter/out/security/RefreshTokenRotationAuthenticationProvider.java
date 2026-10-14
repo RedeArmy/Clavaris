@@ -128,14 +128,15 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
     final Set<String> scopes = new LinkedHashSet<>(result.authorizedScopes());
 
     // OIDC Core §2: auth_time must reflect the original login, not this rotation — carried
-    // forward from Session.createdAt(), not Instant.now().
+    // forward from Session.authenticatedAt() (the instant the original ID token reported), not
+    // Instant.now() and not Session.createdAt() (opened later, at the code exchange).
     final Authentication principal =
         UsernamePasswordAuthenticationToken.authenticated(
             result.accountId().value().toString(),
             null,
             List.of(
                 FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
-                    .issuedAt(result.sessionCreatedAt())
+                    .issuedAt(result.authenticatedAt())
                     .build()));
 
     final DefaultOAuth2TokenContext.Builder tokenContextBuilder =
@@ -191,7 +192,7 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
       // established convention (java:S107 elsewhere) rather than a NOSONAR comment, which this
       // SonarCloud project may not honor as a general analysis-scope setting.
       @SuppressWarnings({"java:S2143", "PMD.ReplaceJavaUtilDate"})
-      final Date authTimeClaimValue = Date.from(result.sessionCreatedAt());
+      final Date authTimeClaimValue = Date.from(result.authenticatedAt());
       final OidcIdToken priorIdTokenPlaceholder =
           new OidcIdToken(
               "placeholder-never-served-to-a-client",

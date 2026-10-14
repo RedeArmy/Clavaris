@@ -7,9 +7,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,12 +56,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * very Organization (exact match), never to a value taken from the request alone (open redirect,
  * RFC 6749 §10.15); otherwise the request is left to SAS, which shows its own error page.
  */
-// PMD.LongVariable/OnlyOneReturn: several independent early exits and descriptive names — same
-// rationale as the sibling filters in this package.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
+// PMD.OnlyOneReturn: several independent early exits — same rationale as the sibling filters in
+// this package.
+@SuppressWarnings("PMD.OnlyOneReturn")
 public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFilter {
-
-  /* package */ static final String REAUTH_REQUESTED_AT = "clavaris.oidc.reauth.requested-at";
 
   private static final Pattern AUTHORIZE_PATH =
       Pattern.compile("^/o/([0-9a-fA-F-]{36})/oauth2/authorize$");
@@ -74,6 +71,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   private final OAuthClientRepository oauthClients;
   private final OAuth2AuthorizationConsentService consents;
   private final SecurityContextRepository contextRepository;
+  private final Clock clock;
   private final RequestCache requestCache = new HttpSessionRequestCache();
   private final OrganizationLoginRedirectEntryPoint loginEntryPoint =
       new OrganizationLoginRedirectEntryPoint();
@@ -82,10 +80,19 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final OAuthClientRepository oauthClients,
       final OAuth2AuthorizationConsentService consents,
       final SecurityContextRepository contextRepository) {
+    this(oauthClients, consents, contextRepository, Clock.systemUTC());
+  }
+
+  /* package */ OidcAuthorizationRequestParamsFilter(
+      final OAuthClientRepository oauthClients,
+      final OAuth2AuthorizationConsentService consents,
+      final SecurityContextRepository contextRepository,
+      final Clock clock) {
     super();
     this.oauthClients = oauthClients;
     this.consents = consents;
     this.contextRepository = contextRepository;
+    this.clock = clock;
   }
 
   @Override
@@ -97,6 +104,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       chain.doFilter(request, response);
       return;
     }
+    ReauthenticationMarker.discardUnlessFor(request, clock.instant());
     final String unsupported = OidcRequestParameters.unsupportedRequestError(request);
     final boolean relevant =
         unsupported != null
@@ -143,7 +151,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       return false;
     }
     if (authentication == null) {
-      OidcRequestParameters.rememberLoginRequest(request, prompts, maxAge);
+      ReauthenticationMarker.leaveIfFreshLoginWanted(request, prompts, maxAge, clock.instant());
       return false;
     }
     if (!OidcRequestParameters.isNavigation(request)) {
@@ -203,23 +211,15 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final Long maxAge) {
     final boolean wanted =
         prompts.contains("login") || OidcRequestParameters.exceedsMaxAge(authentication, maxAge);
-    if (!wanted) {
-      return false;
-    }
-    final HttpSession session = request.getSession(false);
-    final Object marker = session == null ? null : session.getAttribute(REAUTH_REQUESTED_AT);
-    if (marker instanceof Instant requestedAt
-        && OidcRequestParameters.latestFactorAt(authentication).isAfter(requestedAt)) {
-      session.removeAttribute(REAUTH_REQUESTED_AT);
-      return false;
-    }
-    return true;
+    return wanted
+        && !ReauthenticationMarker.consumedByLoginSince(
+            request, OidcRequestParameters.latestFactorAt(authentication), clock.instant());
   }
 
   private void startReauthentication(
       final HttpServletRequest request, final HttpServletResponse response) throws IOException {
     requestCache.saveRequest(request, response);
-    request.getSession().setAttribute(REAUTH_REQUESTED_AT, Instant.now());
+    ReauthenticationMarker.leave(request, clock.instant());
     SecurityContextHolder.clearContext();
     contextRepository.saveContext(SecurityContextHolder.createEmptyContext(), request, response);
     loginEntryPoint.commence(

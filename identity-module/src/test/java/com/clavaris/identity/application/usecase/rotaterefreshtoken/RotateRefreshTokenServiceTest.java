@@ -142,6 +142,24 @@ class RotateRefreshTokenServiceTest {
     return new RotateRefreshTokenCommand(rawValue, List.of(), newExpiresAt);
   }
 
+  // OIDC Core §2/§12.2: the refreshed ID token's auth_time is the authentication instant, the one
+  // the first ID token carried, not the Session's later opening time.
+  @Test
+  void theResultCarriesTheAuthenticationInstantNotTheSessionOpeningTime() {
+    Instant login = Instant.now().minusSeconds(45);
+    Session session = Session.open(accountId, List.of("openid"), login);
+    String rawValue = "a-valid-refresh-token-value";
+    when(refreshTokens.findByTokenHash(RefreshTokenSecret.hash(rawValue)))
+        .thenReturn(Optional.of(activeTokenFor(session, rawValue)));
+    when(sessions.findById(session.id())).thenReturn(Optional.of(session));
+
+    RotateRefreshTokenResult result =
+        service.handle(commandFor(rawValue, Instant.now().plus(30, ChronoUnit.DAYS)));
+
+    assertThat(result.authenticatedAt()).isEqualTo(login);
+    assertThat(result.authenticatedAt()).isNotEqualTo(session.createdAt());
+  }
+
   @Test
   void rotatesAnActiveTokenIntoANewOneAndRevokesTheOld() {
     Session session = activeSession();
@@ -181,6 +199,7 @@ class RotateRefreshTokenServiceTest {
             accountId,
             List.of("openid", "profile"),
             Instant.now().minus(31, ChronoUnit.DAYS),
+            Instant.now().minus(31, ChronoUnit.DAYS),
             Instant.now(), // recently active — only the lifetime bound is exceeded
             null);
     String rawValue = "a-valid-refresh-token-value";
@@ -214,6 +233,7 @@ class RotateRefreshTokenServiceTest {
             accountId,
             List.of("openid", "profile"),
             Instant.now().minus(2, ChronoUnit.DAYS), // well within the lifetime bound
+            Instant.now().minus(2, ChronoUnit.DAYS),
             Instant.now().minus(2, ChronoUnit.DAYS), // but never touched since
             null);
     String rawValue = "a-valid-refresh-token-value";

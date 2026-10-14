@@ -60,6 +60,7 @@ class JpaSessionRepository implements SessionRepository {
         session.accountId().value(),
         objectMapper.writeValueAsString(session.scopes()),
         session.createdAt(),
+        session.authenticatedAt(),
         session.lastSeenAt(),
         session.revokedAt().orElse(null));
   }
@@ -77,6 +78,7 @@ class JpaSessionRepository implements SessionRepository {
         new AccountId(entity.getAccountId()),
         scopes,
         entity.getCreatedAt(),
+        entity.getAuthenticatedAt(),
         entity.getLastSeenAt(),
         entity.getRevokedAt());
   }

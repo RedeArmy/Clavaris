@@ -213,7 +213,7 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         presented.accountId(),
         session.id(),
         grantedScopes,
-        session.createdAt(),
+        session.authenticatedAt(),
         newRawValue,
         command.newExpiresAt());
   }

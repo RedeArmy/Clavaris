@@ -6,8 +6,10 @@ import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshT
 import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
 import com.clavaris.identity.domain.model.AccountId;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.UUID;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -68,8 +70,24 @@ public final class SessionBackedRefreshTokenGenerator
     final IssueRefreshTokenResult result =
         issueRefreshToken.handle(
             new IssueRefreshTokenCommand(
-                accountId, context.getAuthorizedScopes().stream().toList(), expiresAt));
+                accountId,
+                context.getAuthorizedScopes().stream().toList(),
+                expiresAt,
+                authenticationInstant(principal)));
 
     return new OAuth2RefreshToken(result.rawToken(), Instant.now(), result.expiresAt());
+  }
+
+  // The instant of the authentication that produced this code: the latest issuedAt among the
+  // principal's FactorGrantedAuthorities, the same value SAS's JwtGenerator reads as the original
+  // ID token's auth_time, so the Session stores exactly what the first ID token reported and a
+  // refreshed one repeats it. Null when the principal carries none (the Session then falls back to
+  // its own opening time).
+  private static Instant authenticationInstant(final Authentication principal) {
+    return principal.getAuthorities().stream()
+        .filter(FactorGrantedAuthority.class::isInstance)
+        .map(authority -> ((FactorGrantedAuthority) authority).getIssuedAt())
+        .max(Comparator.naturalOrder())
+        .orElse(null);
   }
 }

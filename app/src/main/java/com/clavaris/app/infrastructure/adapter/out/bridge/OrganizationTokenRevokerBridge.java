@@ -39,5 +39,12 @@ class OrganizationTokenRevokerBridge implements OrganizationTokenRevoker {
             + " (select id::text from oauth_clients where organization_id = ?)",
         organizationId,
         organizationId);
+    jdbcTemplate.update(
+        "delete from oauth2_authorization_consent where principal_name in"
+            + " (select id::text from accounts where organization_id = ?)"
+            + " or registered_client_id in"
+            + " (select id::text from oauth_clients where organization_id = ?)",
+        organizationId,
+        organizationId);
   }
 }

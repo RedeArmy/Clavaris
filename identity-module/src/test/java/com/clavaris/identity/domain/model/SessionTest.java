@@ -53,11 +53,39 @@ class SessionTest {
 
     Session session =
         Session.reconstitute(
-            persistedId, accountId, List.of("openid"), createdAt, lastSeenAt, null);
+            persistedId, accountId, List.of("openid"), createdAt, createdAt, lastSeenAt, null);
 
     assertThat(session.id()).isEqualTo(persistedId);
+    assertThat(session.authenticatedAt()).isEqualTo(createdAt);
     assertThat(session.createdAt()).isEqualTo(createdAt);
     assertThat(session.lastSeenAt()).isEqualTo(lastSeenAt);
     assertThat(session.revokedAt()).isEmpty();
+  }
+
+  // OIDC Core §2/§12.2: the authentication instant is kept as given (earlier than the Session's
+  // own opening, since the code is exchanged after the login), so a refreshed ID token can repeat
+  // the first one's auth_time.
+  @Test
+  void openKeepsTheAuthenticationInstantItIsGiven() {
+    Instant login = Instant.now().minusSeconds(30);
+
+    Session session = Session.open(accountId, List.of("openid"), login);
+
+    assertThat(session.authenticatedAt()).isEqualTo(login);
+    assertThat(session.createdAt()).isAfter(login);
+  }
+
+  @Test
+  void openFallsBackToItsOwnOpeningTimeWithoutAnAuthenticationInstant() {
+    Session session = Session.open(accountId, List.of("openid"));
+
+    assertThat(session.authenticatedAt()).isEqualTo(session.createdAt());
+  }
+
+  @Test
+  void openNeverTrustsAnAuthenticationInstantFromTheFuture() {
+    Session session = Session.open(accountId, List.of("openid"), Instant.now().plusSeconds(3600));
+
+    assertThat(session.authenticatedAt()).isEqualTo(session.createdAt());
   }
 }

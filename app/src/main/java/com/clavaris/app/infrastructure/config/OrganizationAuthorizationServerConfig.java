@@ -57,7 +57,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
@@ -425,8 +425,10 @@ public class OrganizationAuthorizationServerConfig {
 
     // Explicit rather than SAS's own implicit default, so OidcAuthorizationRequestParamsFilter
     // (prompt=consent) and the authorization endpoint provably share one consent store.
+    // Stored in Postgres (oauth2_authorization_consent) so an approved consent survives a restart
+    // and is shared by every instance.
     final OAuth2AuthorizationConsentService consentService =
-        new InMemoryOAuth2AuthorizationConsentService();
+        new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClients);
 
     // TD-SEC-003: same fix, same rationale as the platform tier's own config — see this class's
     // sibling comment there and the migration's own comment for why both tiers deliberately share

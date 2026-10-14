@@ -1,7 +1,6 @@
 package com.clavaris.app.infrastructure.adapter.in.web.filter;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,9 +19,8 @@ import org.springframework.web.util.UriUtils;
  * OidcAuthorizationRequestParamsFilter} acts on.
  */
 // PMD.OnlyOneReturn: each reader has distinct outcomes, same rationale as the filter these were
-// split out of. PMD.LawOfDemeter: request.getSession() and the SecurityContextHolder chain are the
-// standard Servlet/Spring Security API shape, same rationale as the sibling filters.
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
+// split out of.
+@SuppressWarnings("PMD.OnlyOneReturn")
 final class OidcRequestParameters {
 
   private static final String ROLE_ACCOUNT = "ROLE_ACCOUNT";
@@ -137,17 +135,5 @@ final class OidcRequestParameters {
             .map(GrantedAuthority::getAuthority)
             .anyMatch(ROLE_ACCOUNT::equals);
     return isAccount ? authentication : null;
-  }
-
-  // With no one signed in the End-User gets the login page anyway; noting that this very request
-  // asked for a fresh login lets the resumed request pass after that one login instead of asking
-  // for a second.
-  /* package */ static void rememberLoginRequest(
-      final HttpServletRequest request, final List<String> prompts, final Long maxAge) {
-    final boolean freshLoginWanted = prompts.contains("login") || Long.valueOf(0).equals(maxAge);
-    if (freshLoginWanted) {
-      final HttpSession session = request.getSession();
-      session.setAttribute(OidcAuthorizationRequestParamsFilter.REAUTH_REQUESTED_AT, Instant.now());
-    }
   }
 }

@@ -820,6 +820,79 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(next.headers().firstValue("Location").orElseThrow()).contains("/oauth2/consent");
   }
 
+  // OIDC Core §2 / §12.2: auth_time is when the End-User authenticated. The code is exchanged
+  // (and the Session opened) later, and a refresh later still; the ID token must report the same
+  // auth_time throughout, not the Session's opening time or the refresh time.
+  @Test
+  void authTimeStaysTheLoginInstantAcrossTheCodeExchangeAndEveryRefresh() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Auth Time Co");
+    ClientCredentials client =
+        registerOAuthClient(
+            platformToken,
+            organizationId,
+            false,
+            List.of("openid"),
+            "\"authorization_code\",\"refresh_token\"");
+    String email = "auth-time@example.com";
+    signIn(organizationId, client, email);
+    long loginAt = java.time.Instant.now().getEpochSecond();
+    Thread.sleep(2200);
+
+    String codeVerifier = generateCodeVerifier();
+    HttpResponse<Void> authorized =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "s1",
+            "",
+            "openid",
+            deriveCodeChallenge(codeVerifier));
+    String code = queryParam(authorized.headers().firstValue("Location").orElseThrow(), "code");
+    JsonNode first =
+        objectMapper.readTree(exchangeCode(organizationId, client, code, codeVerifier).body());
+    long original = authTimeOf(first.get("id_token").asString());
+    assertThat(original).isBetween(loginAt - 2, loginAt + 1);
+
+    String refreshToken = first.get("refresh_token").asString();
+    for (int i = 0; i < 2; i++) {
+      Thread.sleep(1100);
+      JsonNode refreshed =
+          objectMapper.readTree(refresh(organizationId, client, refreshToken).body());
+      assertThat(authTimeOf(refreshed.get("id_token").asString()))
+          .as("refresh %s keeps the original auth_time", i + 1)
+          .isEqualTo(original);
+      refreshToken = refreshed.get("refresh_token").asString();
+    }
+  }
+
+  @Test
+  void anApprovedConsentIsStoredInPostgresAndForgottenByPromptConsent() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Stored Consent Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, true, List.of("openid", "profile"));
+    String email = "stored-consent@example.com";
+
+    signInAndApproveConsent(organizationId, client, email);
+
+    String sql =
+        "select count(*) from oauth2_authorization_consent c"
+            + " join accounts a on a.id::text = c.principal_name"
+            + " where a.email = ? and a.organization_id = ?";
+    assertThat(jdbcTemplate.queryForObject(sql, Integer.class, email, organizationId))
+        .as("the approved consent is a row in Postgres, so it survives a restart")
+        .isEqualTo(1);
+
+    authorize(
+        organizationId, client.clientId(), REDIRECT_URI, "s9", "&prompt=consent", "openid profile");
+
+    assertThat(jdbcTemplate.queryForObject(sql, Integer.class, email, organizationId))
+        .as("prompt=consent forgets the stored consent")
+        .isZero();
+  }
+
   private void signInAndApproveConsent(UUID organizationId, ClientCredentials client, String email)
       throws Exception {
     registerAccount(organizationId, email, "a-correct-password");
@@ -829,6 +902,9 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
             organizationId, fetchLoginCsrfToken(organizationId), email, "a-correct-password");
     HttpResponse<Void> toConsent =
         getAbsoluteDiscardingBody(loginResponse.headers().firstValue("Location").orElseThrow());
+    assertThat(toConsent.statusCode())
+        .as("the saved authorize request resumes and redirects to the consent page")
+        .isEqualTo(302);
     HttpResponse<String> consentPage =
         getAbsoluteWithBody(toConsent.headers().firstValue("Location").orElseThrow());
     HttpResponse<Void> approved =
@@ -1154,18 +1230,29 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
   private ClientCredentials registerOAuthClient(
       String platformToken, UUID organizationId, boolean requireConsent, List<String> allowedScopes)
       throws IOException, InterruptedException {
+    return registerOAuthClient(
+        platformToken, organizationId, requireConsent, allowedScopes, "\"authorization_code\"");
+  }
+
+  private ClientCredentials registerOAuthClient(
+      String platformToken,
+      UUID organizationId,
+      boolean requireConsent,
+      List<String> allowedScopes,
+      String grantTypesJson)
+      throws IOException, InterruptedException {
     String scopesJson =
         allowedScopes.stream().map(scope -> "\"" + scope + "\"").collect(Collectors.joining(","));
     String requestBody =
         """
         {
           "redirectUris": ["%s"],
-          "allowedGrantTypes": ["authorization_code"],
+          "allowedGrantTypes": [%s],
           "allowedScopes": [%s],
           "requireConsent": %s
         }
         """
-            .formatted(REDIRECT_URI, scopesJson, requireConsent);
+            .formatted(REDIRECT_URI, grantTypesJson, scopesJson, requireConsent);
     HttpRequest request =
         HttpRequest.newBuilder(
                 baseUri("/api/v1/admin/organizations/" + organizationId + "/clients"))
@@ -1277,6 +1364,34 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
             .header("Authorization", "Basic " + basicAuth)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private long authTimeOf(String idToken) {
+    try {
+      return parse(idToken)
+          .getJWTClaimsSet()
+          .getDateClaim("auth_time")
+          .toInstant()
+          .getEpochSecond();
+    } catch (ParseException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private HttpResponse<String> refresh(UUID organizationId, ClientCredentials client, String token)
+      throws IOException, InterruptedException {
+    String basicAuth =
+        Base64.getEncoder()
+            .encodeToString((client.clientId() + ":" + client.clientSecret()).getBytes());
+    HttpRequest request =
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/token"))
+            .header("Authorization", "Basic " + basicAuth)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "grant_type=refresh_token&refresh_token=" + urlEncode(token)))
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
