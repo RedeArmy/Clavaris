@@ -11,7 +11,6 @@ import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +19,6 @@ import java.util.regex.Pattern;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -55,14 +53,8 @@ import org.springframework.web.util.UriComponentsBuilder;
  * RFC 6749 §10.15); otherwise the request is left to SAS, which shows its own error page.
  */
 // PMD.LongVariable/OnlyOneReturn: several independent early exits and descriptive names — same
-// rationale as the sibling filters in this package. PMD.TooManyMethods: one small method per
-// prompt/max_age rule, split out to keep each rule's complexity low rather than one long method.
-@SuppressWarnings({
-  "PMD.LongVariable",
-  "PMD.OnlyOneReturn",
-  "PMD.LawOfDemeter",
-  "PMD.TooManyMethods"
-})
+// rationale as the sibling filters in this package.
+@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
 public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFilter {
 
   private static final String REAUTH_REQUESTED_AT = "clavaris.oidc.reauth.requested-at";
@@ -96,10 +88,18 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain)
       throws ServletException, IOException {
     final Matcher path = AUTHORIZE_PATH.matcher(request.getRequestURI());
+    if (!path.matches()) {
+      chain.doFilter(request, response);
+      return;
+    }
+    final String unsupported = OidcRequestParameters.unsupportedRequestError(request);
     final boolean relevant =
-        path.matches()
-            && (request.getParameter("prompt") != null || request.getParameter("max_age") != null);
-    if (!relevant || !answered(request, response, path.group(1))) {
+        unsupported != null
+            || request.getParameter("prompt") != null
+            || request.getParameter("max_age") != null;
+    if (unsupported != null && registeredClient(path.group(1), request).isPresent()) {
+      redirectWithError(request, response, unsupported);
+    } else if (!relevant || !answered(request, response, path.group(1))) {
       chain.doFilter(request, response);
     }
   }
@@ -108,11 +108,11 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
   private boolean answered(
       final HttpServletRequest request, final HttpServletResponse response, final String org)
       throws IOException {
-    final List<String> prompts = promptValues(request.getParameter("prompt"));
+    final List<String> prompts = OidcRequestParameters.promptValues(request.getParameter("prompt"));
     final Optional<OAuthClient> client = registeredClient(org, request);
     final Authentication authentication = signedInAccount();
     final String maxAgeParam = request.getParameter("max_age");
-    final Long maxAge = parseMaxAge(maxAgeParam);
+    final Long maxAge = OidcRequestParameters.parseMaxAge(maxAgeParam);
 
     if (prompts.size() == 1 && prompts.contains("none")) {
       return answerWithError(
@@ -132,12 +132,6 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
       forgetConsent(client.get(), authentication);
     }
     return false;
-  }
-
-  private static List<String> promptValues(final String promptParam) {
-    return promptParam == null
-        ? List.of()
-        : Arrays.stream(promptParam.trim().split("\\s+")).filter(p -> !p.isEmpty()).toList();
   }
 
   private void forgetConsent(final OAuthClient client, final Authentication authentication) {
@@ -169,7 +163,8 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
         prompts.contains("login")
             || (maxAge != null
                 && (maxAge == 0
-                    || Duration.between(latestFactorAt(authentication), Instant.now())
+                    || Duration.between(
+                                OidcRequestParameters.latestFactorAt(authentication), Instant.now())
                             .compareTo(Duration.ofSeconds(maxAge))
                         > 0));
     if (!wanted) {
@@ -178,7 +173,7 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
     final HttpSession session = request.getSession(false);
     final Object marker = session == null ? null : session.getAttribute(REAUTH_REQUESTED_AT);
     if (marker instanceof Instant requestedAt
-        && latestFactorAt(authentication).isAfter(requestedAt)) {
+        && OidcRequestParameters.latestFactorAt(authentication).isAfter(requestedAt)) {
       session.removeAttribute(REAUTH_REQUESTED_AT);
       return false;
     }
@@ -240,28 +235,5 @@ public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFi
             .map(GrantedAuthority::getAuthority)
             .anyMatch(ROLE_ACCOUNT::equals);
     return isAccount ? authentication : null;
-  }
-
-  private static Long parseMaxAge(final String value) {
-    if (value == null) {
-      return null;
-    }
-    try {
-      final long parsed = Long.parseLong(value.trim());
-      return parsed < 0 ? null : parsed;
-    } catch (final NumberFormatException _) {
-      return null;
-    }
-  }
-
-  private static Instant latestFactorAt(final Authentication authentication) {
-    Instant latest = Instant.EPOCH;
-    for (final GrantedAuthority authority : authentication.getAuthorities()) {
-      if (authority instanceof FactorGrantedAuthority factor
-          && factor.getIssuedAt().isAfter(latest)) {
-        latest = factor.getIssuedAt();
-      }
-    }
-    return latest;
   }
 }

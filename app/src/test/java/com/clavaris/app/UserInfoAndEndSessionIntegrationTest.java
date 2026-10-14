@@ -186,6 +186,10 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
             HttpResponse.BodyHandlers.ofString());
 
     assertThat(response.statusCode()).isEqualTo(401);
+    // RFC 6750 §3: no credentials at all is challenged without an error code.
+    String challenge = response.headers().firstValue("WWW-Authenticate").orElse("");
+    assertThat(challenge).startsWith("Bearer");
+    assertThat(challenge).doesNotContain("error=");
   }
 
   @Test
@@ -197,6 +201,9 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         getWithBearer("/o/" + organizationId + "/userinfo", "not-a-real-jwt-at-all");
 
     assertThat(response.statusCode()).isEqualTo(401);
+    assertThat(response.headers().firstValue("WWW-Authenticate").orElse(""))
+        .startsWith("Bearer")
+        .contains("error=\"invalid_token\"");
   }
 
   @Test
@@ -272,19 +279,123 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         .contains(postLogoutRedirectUri);
   }
 
+  // RP-Initiated Logout §2: id_token_hint is only RECOMMENDED, so a logout without one asks the
+  // End-User to confirm instead of failing with SAS's 400.
   @Test
-  void endSessionRejectsAMissingIdTokenHint() throws Exception {
+  void endSessionWithoutAHintAsksTheEndUserToConfirm() throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Logout No Hint Co");
 
-    HttpResponse<String> response =
-        httpClient.send(
-            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/connect/logout"))
-                .GET()
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
+    HttpResponse<String> response = getLogoutConfirmation(organizationId, "");
 
-    assertThat(response.statusCode()).isEqualTo(400);
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Sign out?").contains("name=\"confirmation_token\"");
+  }
+
+  @Test
+  void endSessionWithoutAHintDoesNothingWithoutTheConfirmationToken() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Logout No Token Co");
+
+    HttpResponse<String> response = postLogout(organizationId, "confirmation_token=forged");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).contains("Sign out?");
+  }
+
+  @Test
+  void aConfirmedLogoutRedirectsToARegisteredPostLogoutUriWithTheState() throws Exception {
+    String postLogoutRedirectUri = "https://client.example.test/logged-out";
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Logout Confirmed Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, postLogoutRedirectUri);
+    String query =
+        "?client_id="
+            + client.clientId()
+            + "&post_logout_redirect_uri="
+            + urlEncode(postLogoutRedirectUri)
+            + "&state=bye";
+    String token = confirmationToken(getLogoutConfirmation(organizationId, query).body());
+
+    HttpResponse<String> response =
+        postLogout(
+            organizationId,
+            "confirmation_token="
+                + token
+                + "&client_id="
+                + client.clientId()
+                + "&post_logout_redirect_uri="
+                + urlEncode(postLogoutRedirectUri)
+                + "&state=bye");
+
+    assertThat(response.statusCode()).isEqualTo(302);
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(postLogoutRedirectUri);
+    assertThat(queryParam(location, "state")).isEqualTo("bye");
+  }
+
+  @Test
+  void aConfirmedLogoutNeverRedirectsToAnUnregisteredUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Logout Evil Co");
+    ClientCredentials client =
+        registerOAuthClient(platformToken, organizationId, "https://client.example.test/ok");
+    String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
+
+    HttpResponse<String> response =
+        postLogout(
+            organizationId,
+            "confirmation_token="
+                + token
+                + "&client_id="
+                + client.clientId()
+                + "&post_logout_redirect_uri="
+                + urlEncode("https://evil.example/steal"));
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.headers().firstValue("Location")).isEmpty();
+    assertThat(response.body()).contains("Signed out");
+  }
+
+  @Test
+  void theLogoutConfirmationTokenWorksOnlyOnce() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Logout Replay Co");
+    String token = confirmationToken(getLogoutConfirmation(organizationId, "").body());
+
+    HttpResponse<String> first = postLogout(organizationId, "confirmation_token=" + token);
+    HttpResponse<String> replay = postLogout(organizationId, "confirmation_token=" + token);
+
+    assertThat(first.body()).contains("Signed out");
+    assertThat(replay.body()).contains("Sign out?");
+  }
+
+  private HttpResponse<String> getLogoutConfirmation(UUID organizationId, String query)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/connect/logout" + query))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postLogout(UUID organizationId, String formBody)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/connect/logout"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString(formBody))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private static String confirmationToken(String html) {
+    java.util.regex.Matcher matcher =
+        java.util.regex.Pattern.compile("name=\"confirmation_token\" value=\"([^\"]+)\"")
+            .matcher(html);
+    assertThat(matcher.find()).as("the page must carry a confirmation token").isTrue();
+    return matcher.group(1);
   }
 
   @Test

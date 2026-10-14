@@ -7,6 +7,7 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
 import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationClientClaimCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
@@ -189,10 +190,12 @@ class PlatformAuthorizationServerConfig {
                     // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
-                            clientAuth.authenticationProviders(
-                                providers ->
-                                    Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
-                                        providers, argon2BulkheadGate))))
+                            clientAuth
+                                .errorResponseHandler(new ClientAuthenticationFailureHandler())
+                                .authenticationProviders(
+                                    providers ->
+                                        Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                            providers, argon2BulkheadGate))))
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         // ADR-0010 §6.1/BR-ID-06: this tier's own client_credentials-only anti-abuse layer — no
         // refresh_token grant exists here at all (BR-PLATFORM-04: PlatformAccount never issues an

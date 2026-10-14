@@ -66,6 +66,8 @@ public final class OidcDiscoveryMetadataCustomizer {
               scopes.addAll(OidcScopeCatalog.KNOWN);
             })
         .claim("claims_supported", CLAIMS_SUPPORTED)
+        .claim("request_parameter_supported", false)
+        .claim("request_uri_parameter_supported", false)
         .tokenEndpointAuthenticationMethods(OidcDiscoveryMetadataCustomizer::onlySecretBased)
         .tokenRevocationEndpointAuthenticationMethods(
             OidcDiscoveryMetadataCustomizer::onlySecretBased)

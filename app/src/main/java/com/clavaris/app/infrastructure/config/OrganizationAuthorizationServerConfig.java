@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.AntiAbuseRateLimitingFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcAuthorizationRequestParamsFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.OidcLogoutWithoutHintFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationCapacityRateLimitingFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.OrganizationRateLimitRules;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
@@ -14,6 +15,7 @@ import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegis
 import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
+import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
 import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
@@ -46,7 +48,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
@@ -68,9 +69,10 @@ import org.springframework.security.oauth2.server.authorization.token.JwtEncodin
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -520,10 +522,12 @@ public class OrganizationAuthorizationServerConfig {
                     // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
-                            clientAuth.authenticationProviders(
-                                providers ->
-                                    Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
-                                        providers, argon2BulkheadGate)))
+                            clientAuth
+                                .errorResponseHandler(new ClientAuthenticationFailureHandler())
+                                .authenticationProviders(
+                                    providers ->
+                                        Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                            providers, argon2BulkheadGate)))
                     // TD-SEC-011 (2026-09-06): the project-owned, branded replacement for SAS's own
                     // DefaultConsentPage — see ConsentController's own Javadoc for the full design
                     // and CONSENT_PATH_PATTERN's own comment above for why this is one flat,
@@ -630,6 +634,11 @@ public class OrganizationAuthorizationServerConfig {
             new OidcAuthorizationRequestParamsFilter(
                 oauthClients, consentService, contextRepository),
             TenantSessionConcurrencyFilter.class)
+        // RP-Initiated Logout §2: id_token_hint is RECOMMENDED, so a logout without one is
+        // confirmed by the End-User instead of rejected with SAS's 400.
+        .addFilterAfter(
+            new OidcLogoutWithoutHintFilter(oauthClients),
+            OidcAuthorizationRequestParamsFilter.class)
         // TD-SEC-028: /userinfo is a Bearer-token-protected API endpoint, not a browser page — a
         // real OIDC client calling it with a missing/invalid access token needs a clean 401,
         // never OrganizationLoginRedirectEntryPoint's redirect-to-the-hosted-login-page (correct
@@ -649,7 +658,7 @@ public class OrganizationAuthorizationServerConfig {
                     DelegatingAuthenticationEntryPoint.builder()
                         .defaultEntryPoint(new OrganizationLoginRedirectEntryPoint())
                         .addEntryPointFor(
-                            new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                            userInfoEntryPoint(),
                             PathPatternRequestMatcher.pathPattern("/o/*/userinfo"))
                         .build()))
         // TD-SEC-009: the one chain serving both this project's own /o/*/login template AND SAS's
@@ -662,5 +671,14 @@ public class OrganizationAuthorizationServerConfig {
                         embeddingChecker, redirectUriOriginResolver)));
 
     return http.build();
+  }
+
+  // RFC 6750 §3: a /userinfo request with no (or a rejected) access token is a 401 with a
+  // WWW-Authenticate: Bearer challenge, not a bare 401.
+  private static AuthenticationEntryPoint userInfoEntryPoint() {
+    final BearerTokenAuthenticationEntryPoint entryPoint =
+        new BearerTokenAuthenticationEntryPoint();
+    entryPoint.setRealmName("Clavaris");
+    return entryPoint;
   }
 }

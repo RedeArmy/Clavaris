@@ -1,0 +1,71 @@
+package com.clavaris.identity.infrastructure.adapter.in.web;
+
+import jakarta.servlet.http.HttpServletRequest;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.UUID;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+/**
+ * OpenID Connect RP-Initiated Logout 1.0 §2: {@code id_token_hint} is only RECOMMENDED, so a logout
+ * request without one must still work. Spring Authorization Server answers it with a 400, so the
+ * app's {@code OidcLogoutWithoutHintFilter} takes such a request first and forwards here: the
+ * End-User is asked to confirm (RP-Initiated Logout §4, an OP SHOULD ask before logging out on a
+ * request it cannot attribute to the user), and the page shown afterwards when there is no
+ * registered {@code post_logout_redirect_uri} to return to.
+ *
+ * <p>The confirmation carries its own single-use token, kept in the session, because Spring
+ * Authorization Server's endpoints are exempt from the chain's CSRF protection: without it any site
+ * could sign a visitor out by posting to the logout endpoint.
+ *
+ * <p>Reached only by a forward from that filter (which bypasses the security chain on purpose), so
+ * it renders nothing but these two static pages and trusts nothing it is given beyond echoing the
+ * request parameters back as hidden fields.
+ */
+// PMD.AtLeastOneConstructor: no state, only two stateless handlers. PMD.LongVariable: the attribute
+// name says what it holds. PMD.LawOfDemeter: request.getSession() is the standard Servlet API
+// shape,
+// same rationale as the sibling controllers' own identical suppression.
+@SuppressWarnings({"PMD.AtLeastOneConstructor", "PMD.LongVariable", "PMD.LawOfDemeter"})
+@Controller
+@RequestMapping("/o/{organizationId}/logout")
+public class RpInitiatedLogoutController {
+
+  /** Session attribute holding the token the confirmation form must echo back. */
+  public static final String CONFIRMATION_TOKEN_ATTRIBUTE = "clavaris.logout.confirmation-token";
+
+  private static final SecureRandom RANDOM = new SecureRandom();
+
+  // PMD.LongVariable: the post_logout_redirect_uri parameter name is the spec's own.
+  @SuppressWarnings("PMD.LongVariable")
+  @RequestMapping("/confirm")
+  public String confirm(
+      @PathVariable final UUID organizationId,
+      @RequestParam(name = "client_id", required = false) final String clientId,
+      @RequestParam(name = "post_logout_redirect_uri", required = false)
+          final String postLogoutRedirectUri,
+      @RequestParam(name = "state", required = false) final String state,
+      final HttpServletRequest request,
+      final Model model) {
+    final byte[] bytes = new byte[32];
+    RANDOM.nextBytes(bytes);
+    final String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    request.getSession().setAttribute(CONFIRMATION_TOKEN_ATTRIBUTE, token);
+    model.addAttribute("organizationId", organizationId);
+    model.addAttribute("confirmationToken", token);
+    model.addAttribute("clientId", clientId);
+    model.addAttribute("postLogoutRedirectUri", postLogoutRedirectUri);
+    model.addAttribute("state", state);
+    return "identity/logout-confirm";
+  }
+
+  @RequestMapping("/done")
+  public String done(@PathVariable final UUID organizationId, final Model model) {
+    model.addAttribute("organizationId", organizationId);
+    return "identity/logged-out";
+  }
+}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Sign out')}">
+    <title>Sign out</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Sign out?</h1>
+        <p>You will be signed out of your account on this device.</p>
+        <form method="post" th:action="@{/o/{organizationId}/connect/logout(organizationId=${organizationId})}">
+            <input type="hidden" name="confirmation_token" th:value="${confirmationToken}"/>
+            <input type="hidden" name="client_id" th:if="${clientId != null}" th:value="${clientId}"/>
+            <input type="hidden" name="post_logout_redirect_uri" th:if="${postLogoutRedirectUri != null}"
+                   th:value="${postLogoutRedirectUri}"/>
+            <input type="hidden" name="state" th:if="${state != null}" th:value="${state}"/>
+            <button class="clavaris-button" type="submit">Sign out</button>
+        </form>
+        <p>
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Cancel</a>
+        </p>
+    </div>
+</main>
+</body>
+</html>

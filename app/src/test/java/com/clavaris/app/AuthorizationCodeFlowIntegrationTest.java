@@ -82,7 +82,10 @@ import tools.jackson.databind.ObjectMapper;
 @TestPropertySource(
     properties = {
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
-      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
+      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret",
+      // Every test here asks the platform tier for its own access token, and the class now has more
+      // tests than the default per-client token limit (20 a minute) allows.
+      "clavaris.rate-limit.token.per-client-limit=500"
     })
 class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
@@ -501,6 +504,101 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(response.headers().firstValue("Location").orElse("")).doesNotContain("evil.example");
   }
 
+  // ---- RFC 6749 §4.1.2.1 / OIDC Core §6: unsupported response_type, request, request_uri ----
+
+  @Test
+  void anUnsupportedResponseTypeRedirectsTheErrorToTheRegisteredRedirectUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Response Type Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> response =
+        getUnsupportedAuthorize(
+            organizationId, client.clientId(), REDIRECT_URI, "response_type=token", "state-rt");
+
+    assertThat(response.statusCode()).isEqualTo(302);
+    String location = response.headers().firstValue("Location").orElseThrow();
+    assertThat(location).startsWith(REDIRECT_URI);
+    assertThat(queryParam(location, "error")).isEqualTo("unsupported_response_type");
+    assertThat(queryParam(location, "state")).isEqualTo("state-rt");
+  }
+
+  @Test
+  void anUnsupportedResponseTypeNeverRedirectsToAnUnregisteredRedirectUri() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Response Type Evil Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> response =
+        getUnsupportedAuthorize(
+            organizationId,
+            client.clientId(),
+            "https://evil.example/cb",
+            "response_type=id_token",
+            "state-evil");
+
+    assertThat(response.headers().firstValue("Location").orElse("")).doesNotContain("evil.example");
+  }
+
+  @Test
+  void aRequestObjectAndARequestUriAreAnsweredWithTheirOwnErrorCodes() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Request Object Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+
+    HttpResponse<Void> byValue =
+        authorize(organizationId, client.clientId(), REDIRECT_URI, "state-req", "&request=abc");
+    HttpResponse<Void> byReference =
+        authorize(
+            organizationId,
+            client.clientId(),
+            REDIRECT_URI,
+            "state-uri",
+            "&request_uri=" + urlEncode("https://client.example/request.jwt"));
+
+    assertThat(queryParam(byValue.headers().firstValue("Location").orElseThrow(), "error"))
+        .isEqualTo("request_not_supported");
+    assertThat(queryParam(byReference.headers().firstValue("Location").orElseThrow(), "error"))
+        .isEqualTo("request_uri_not_supported");
+  }
+
+  @Test
+  void discoveryDeclaresRequestObjectsUnsupported() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Discovery Request Co");
+
+    JsonNode discovery =
+        objectMapper.readTree(
+            getWithBody("/o/" + organizationId + "/.well-known/openid-configuration").body());
+
+    assertThat(discovery.get("request_parameter_supported").asBoolean(true)).isFalse();
+    assertThat(discovery.get("request_uri_parameter_supported").asBoolean(true)).isFalse();
+  }
+
+  // RFC 6749 §5.2: a failed Authorization-header client authentication is a 401 that challenges.
+  @Test
+  void aFailedBasicClientAuthenticationIsA401WithAWwwAuthenticateChallenge() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Basic Challenge Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId, false);
+    String wrongBasic =
+        Base64.getEncoder().encodeToString((client.clientId() + ":wrong-secret").getBytes());
+
+    HttpResponse<String> response =
+        httpClient.send(
+            HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/token"))
+                .header("Authorization", "Basic " + wrongBasic)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString("grant_type=authorization_code&code=x"))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode()).isEqualTo(401);
+    assertThat(response.headers().firstValue("WWW-Authenticate").orElse("")).startsWith("Basic");
+    assertThat(objectMapper.readTree(response.body()).get("error").asString())
+        .isEqualTo("invalid_client");
+  }
+
   @Test
   void maxAgeZeroMakesASignedInUserAuthenticateAgainWithoutALoop() throws Exception {
     assertReauthenticates("&max_age=0", "max-age-zero@example.com");
@@ -851,6 +949,26 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
             .GET()
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+  }
+
+  private HttpResponse<Void> getUnsupportedAuthorize(
+      UUID organizationId, String clientId, String redirectUri, String responseType, String state)
+      throws IOException, InterruptedException {
+    String query =
+        responseType
+            + "&client_id="
+            + clientId
+            + "&redirect_uri="
+            + urlEncode(redirectUri)
+            + "&scope=openid&code_challenge="
+            + deriveCodeChallenge(generateCodeVerifier())
+            + "&code_challenge_method=S256&state="
+            + state;
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/oauth2/authorize?" + query))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.discarding());
   }
 
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
