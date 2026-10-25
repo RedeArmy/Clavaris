@@ -96,7 +96,7 @@
              fails the gate). 11.0.25 confirmed present on Maven Central
              (11.0.26 is not, as of this writing) — this is the latest
              available patch release, not an arbitrary bump. -->
-        <tomcat.version>11.0.26</tomcat.version>
+        <tomcat.version>11.0.27</tomcat.version>
         <!-- CVE-2026-68497 (jackson-databind, HIGH — CPU DoS via unbounded numeric parsing),
              confirmed live via a local Trivy scan of the built app image after CI's own Trivy
              step failed silently (its findings go to an uploaded artifact, not the console log —
