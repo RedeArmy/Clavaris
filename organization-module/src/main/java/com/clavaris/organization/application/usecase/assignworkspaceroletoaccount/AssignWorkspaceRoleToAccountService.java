@@ -12,6 +12,7 @@ import com.clavaris.organization.domain.event.WorkspaceMemberRoleChangedEvent;
 import com.clavaris.organization.domain.model.Workspace;
 import com.clavaris.organization.domain.model.WorkspaceMembership;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,9 +73,13 @@ public class AssignWorkspaceRoleToAccountService implements AssignWorkspaceRoleT
     // re-resolution (rather than trusting the submitted accountId) is necessary here specifically
     // — every other cross-tenant-reachable id in this codebase can be re-verified against this
     // module's own data; accountId is the one exception, hence the cross-module directory call.
+    // TD-PERF-036: a targeted lookup of this one id, scoped to the Organization. This used to page
+    // through the Organization's entire account pool just to find a single id, so its cost grew
+    // with the tenant's size on every assignment.
     final boolean accountBelongsToThisOrganization =
-        accountDirectory.listAccountsForOrganization(workspace.organizationId()).stream()
-            .anyMatch(account -> account.accountId().equals(command.accountId()));
+        !accountDirectory
+            .listAccountsByIds(workspace.organizationId(), Set.of(command.accountId()))
+            .isEmpty();
     if (!accountBelongsToThisOrganization) {
       throw new AccountNotInOrganizationException(command.accountId(), workspace.organizationId());
     }

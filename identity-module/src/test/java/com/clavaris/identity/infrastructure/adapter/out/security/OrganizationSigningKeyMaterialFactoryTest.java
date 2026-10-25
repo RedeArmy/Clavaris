@@ -3,8 +3,11 @@ package com.clavaris.identity.infrastructure.adapter.out.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -283,5 +286,43 @@ class OrganizationSigningKeyMaterialFactoryTest {
         new OrganizationSigningKeyMaterialFactory(repository, newKeyStore());
 
     assertThat(factory.keyPairFor(organizationId)).isEmpty();
+  }
+
+  // TD-PERF-035: the JWKS endpoint is unauthenticated and polled by every resource server; it must
+  // not decrypt a PKCS12 file per key per request.
+  @Test
+  void publicKeyForKidIsServedFromMemoryAfterTheFirstRead() {
+    final SigningKeyStore keyStore = spy(newKeyStore());
+    final OrganizationSigningKeyMaterialFactory factory =
+        new OrganizationSigningKeyMaterialFactory(emptyRepository(), keyStore);
+    final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    final String kid = factory.generateFor(organizationId);
+
+    final Optional<RSAPublicKey> first = factory.publicKeyForKid(organizationId, kid);
+    final Optional<RSAPublicKey> second = factory.publicKeyForKid(organizationId, kid);
+
+    assertThat(first).isPresent();
+    assertThat(second).isEqualTo(first);
+    verify(keyStore, times(1)).find(any(), eq(kid));
+  }
+
+  @Test
+  void publicKeyForAnUnknownKidIsAbsentAndNotCached() {
+    final OrganizationSigningKeyMaterialFactory factory = newFactory();
+
+    assertThat(factory.publicKeyForKid(new OrganizationId(UUID.randomUUID()), "no-such-kid"))
+        .isEmpty();
+  }
+
+  @Test
+  void purgingAnOrganizationsKeysAlsoDropsTheirCachedPublicKeys() {
+    final OrganizationSigningKeyMaterialFactory factory = newFactory();
+    final OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    final String kid = factory.generateFor(organizationId);
+    assertThat(factory.publicKeyForKid(organizationId, kid)).isPresent();
+
+    factory.purgeAllFor(organizationId, java.util.List.of(kid));
+
+    assertThat(factory.publicKeyForKid(organizationId, kid)).isEmpty();
   }
 }

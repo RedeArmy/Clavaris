@@ -299,6 +299,9 @@ erDiagram
 | `webhook_deliveries` | `(next_attempt_at)` where `status IN ('PENDING','FAILED')` | retry-scheduler poll query (`SELECT ... FOR UPDATE SKIP LOCKED`) |
 | `webhook_deliveries` | `(endpoint_id, created_at DESC)` | per-endpoint delivery-history listing |
 | `client_domain_configs` | unique `(oauth_client_id)`, unique `(hostname)` where `hostname IS NOT NULL` | one config per client; no two clients can claim the same subdomain |
+| `accounts` | `(organization_id, created_at DESC, id DESC)` | the keyset-paged user list's sort order within one tenant (TD-PERF-038) |
+| `oauth2_authorization` | one partial index per token column (`state`, `authorization_code_value`, `access_token_value`, `oidc_id_token_value`, `refresh_token_value`, `user_code_value`, `device_code_value`), each `WHERE col IS NOT NULL` | Spring Authorization Server looks an authorization up by the presented token; the revocation/introspection query ORs all seven, so all seven are needed (TD-PERF-037) |
+| `sessions` / `refresh_tokens` | plain `(account_id)`; `refresh_tokens` also `(session_id)` | the foreign keys an account deletion cascades through; a partial index cannot serve the cascade's `WHERE account_id = $1` (TD-PERF-039) |
 
 ## 4. Migrations
 

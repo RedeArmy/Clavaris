@@ -11,9 +11,6 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
-import java.security.KeyPair;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -83,16 +80,7 @@ public final class OrganizationJwksPublishingSource implements JWKSource<Securit
     // over one anomalous row, same defensive posture OrganizationScopedJwkSource's own equivalent
     // lookup already takes.
     return keyMaterial
-        .keyPairForKid(organizationId, key.kid())
-        .map(
-            pair ->
-                new RSAKey.Builder((RSAPublicKey) pair.getPublic())
-                    .privateKey(privateKeyOf(pair))
-                    .keyID(key.kid())
-                    .build());
-  }
-
-  private static RSAPrivateKey privateKeyOf(final KeyPair pair) {
-    return (RSAPrivateKey) pair.getPrivate();
+        .publicKeyForKid(organizationId, key.kid())
+        .map(publicKey -> (JWK) new RSAKey.Builder(publicKey).keyID(key.kid()).build());
   }
 }

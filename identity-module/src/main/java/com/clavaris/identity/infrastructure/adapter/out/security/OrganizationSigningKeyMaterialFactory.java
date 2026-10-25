@@ -3,7 +3,11 @@ package com.clavaris.identity.infrastructure.adapter.out.security;
 import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.security.KeyPair;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -78,6 +82,16 @@ import org.springframework.stereotype.Component;
 public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterialGenerator {
 
   private final Map<UUID, ActiveSigningKey> activeSigningKeys = new ConcurrentHashMap<>();
+
+  // TD-PERF-035: the published JWKS needs only public keys, and a kid's public key never changes,
+  // so
+  // it is cached by "organizationId:kid". Without it every GET of the unauthenticated JWKS endpoint
+  // loaded and decrypted a PKCS12 file per published key (~40 ms each, serialised by
+  // SigningKeyStore's
+  // JVM-wide lock — roughly 25 requests a second for the whole process). Bounded and time-evicting
+  // so retired kids that fall out of the overlap window do not accumulate.
+  private final Cache<String, RSAPublicKey> publicKeys =
+      Caffeine.newBuilder().maximumSize(10_000).expireAfterAccess(Duration.ofHours(1)).build();
   private final SigningKeyRepository signingKeys;
   private final SigningKeyStore keyStore;
 
@@ -140,6 +154,7 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
     final KeyStoreScope scope = KeyStoreScope.organization(organizationId.value());
     for (final String kid : kids) {
       keyStore.delete(scope, kid);
+      publicKeys.invalidate(publicKeyCacheKey(organizationId, kid));
     }
   }
 
@@ -155,6 +170,30 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
    */
   public Optional<KeyPair> keyPairForKid(final OrganizationId organizationId, final String kid) {
     return keyStore.find(KeyStoreScope.organization(organizationId.value()), kid);
+  }
+
+  /**
+   * TD-PERF-035: the public half of {@code kid}'s key pair, for publishing in the JWKS. Served from
+   * memory after the first read; only a miss touches the key store (and decrypts the private half,
+   * which is discarded here, never retained). Absent when the key store has no such entry.
+   */
+  public Optional<RSAPublicKey> publicKeyForKid(
+      final OrganizationId organizationId, final String kid) {
+    final String cacheKey = publicKeyCacheKey(organizationId, kid);
+    final RSAPublicKey cached = publicKeys.getIfPresent(cacheKey);
+    return cached == null ? loadPublicKey(organizationId, kid, cacheKey) : Optional.of(cached);
+  }
+
+  private Optional<RSAPublicKey> loadPublicKey(
+      final OrganizationId organizationId, final String kid, final String cacheKey) {
+    final Optional<RSAPublicKey> loaded =
+        keyPairForKid(organizationId, kid).map(pair -> (RSAPublicKey) pair.getPublic());
+    loaded.ifPresent(publicKey -> publicKeys.put(cacheKey, publicKey));
+    return loaded;
+  }
+
+  private static String publicKeyCacheKey(final OrganizationId organizationId, final String kid) {
+    return organizationId.value() + ":" + kid;
   }
 
   /**

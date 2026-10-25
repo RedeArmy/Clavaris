@@ -129,7 +129,10 @@ class SigningKeyStore {
   }
 
   /** Generates a fresh RSA key pair and persists it under {@code kid}, scoped to {@code scope}. */
-  /* package */ synchronized KeyPair generate(final KeyStoreScope scope, final String kid) {
+  /* package */ KeyPair generate(final KeyStoreScope scope, final String kid) {
+    // TD-PERF-035: the RSA key generation (~0.4 s of CPU) deliberately happens before taking the
+    // store's lock; only the file write needs it. Held across the generation, it blocked every
+    // other tenant's key lookup for as long as one rotation took.
     final KeyPair keyPair = RsaKeyPairs.generate();
     store(scope, kid, keyPair);
     return keyPair;
@@ -190,7 +193,8 @@ class SigningKeyStore {
     }
   }
 
-  private void store(final KeyStoreScope scope, final String kid, final KeyPair keyPair) {
+  private synchronized void store(
+      final KeyStoreScope scope, final String kid, final KeyPair keyPair) {
     final Path filePath = fileFor(scope);
     final KeyStore keyStore = load(scope, filePath);
     try {
