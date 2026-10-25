@@ -29,16 +29,16 @@ import java.util.UUID;
  * page hosting the iframe) and independent of the DNS ownership challenge above: changing it never
  * resets {@code verificationStatus} (see {@link #withEmbeddingOrigin}).
  */
-// LongVariable: verificationStatus/dnsTxtChallengeToken name exactly what ADR-0009 §2 itself
-// calls the field, same RedirectPolicy/ClientBranding precedent. AvoidFieldNameMatchingMethodName:
-// every field's accessor is named identically to the field itself, same idiom this module's every
-// other value object already uses.
+// Only the record-style accessor idiom is suppressed (coding-standards.md §3a): a field and its
+// accessor share a name (AvoidFieldNameMatchingMethodName), as does {@code id()} (ShortMethodName/
+// ShortVariable), and ten one-line accessors plus the transitions exceed TooManyMethods. The two
+// fields whose accessors carry the long ADR-0009 §2 names are stored as {@code status} and {@code
+// challengeToken}, so LongVariable is no longer suppressed.
 @SuppressWarnings({
+  "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
-  "PMD.TooManyMethods",
-  "PMD.LongVariable",
-  "PMD.AvoidFieldNameMatchingMethodName"
+  "PMD.TooManyMethods"
 })
 public final class ClientDomainConfig {
 
@@ -52,8 +52,8 @@ public final class ClientDomainConfig {
   private final UUID oauthClientId;
   private final ClientDomainMode mode;
   private final String hostname;
-  private final DomainVerificationStatus verificationStatus;
-  private final String dnsTxtChallengeToken;
+  private final DomainVerificationStatus status;
+  private final String challengeToken;
   private final String embeddingOrigin;
   private final Instant verifiedAt;
   private final Instant createdAt;
@@ -71,8 +71,8 @@ public final class ClientDomainConfig {
       final UUID oauthClientId,
       final ClientDomainMode mode,
       final String hostname,
-      final DomainVerificationStatus verificationStatus,
-      final String dnsTxtChallengeToken,
+      final DomainVerificationStatus status,
+      final String challengeToken,
       final String embeddingOrigin,
       final Instant verifiedAt,
       final Instant createdAt,
@@ -81,8 +81,8 @@ public final class ClientDomainConfig {
     this.oauthClientId = Objects.requireNonNull(oauthClientId, "oauthClientId must not be null");
     this.mode = mode;
     this.hostname = validateHostnameIfPresent(hostname);
-    this.verificationStatus = verificationStatus;
-    this.dnsTxtChallengeToken = dnsTxtChallengeToken;
+    this.status = status;
+    this.challengeToken = challengeToken;
     this.embeddingOrigin = validateEmbeddingOriginIfPresent(embeddingOrigin);
     this.verifiedAt = verifiedAt;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
@@ -132,7 +132,7 @@ public final class ClientDomainConfig {
    * rule {@link #request} already establishes, just updating in place instead of a second row.
    */
   public ClientDomainConfig reRequest(
-      final ClientDomainMode newMode, final String newHostname, final String newEmbeddingOrigin) {
+      final ClientDomainMode newMode, final String newHostname, final String newOrigin) {
     return new ClientDomainConfig(
         id,
         oauthClientId,
@@ -140,7 +140,7 @@ public final class ClientDomainConfig {
         requireValidHostname(newHostname),
         DomainVerificationStatus.PENDING,
         generateChallengeToken(),
-        newEmbeddingOrigin,
+        newOrigin,
         null,
         createdAt,
         Instant.now());
@@ -152,15 +152,15 @@ public final class ClientDomainConfig {
    * never needs to re-prove DNS ownership: embeddingOrigin says who may embed the already-verified
    * domain, not which domain is being claimed.
    */
-  public ClientDomainConfig withEmbeddingOrigin(final String newEmbeddingOrigin) {
+  public ClientDomainConfig withEmbeddingOrigin(final String newOrigin) {
     return new ClientDomainConfig(
         id,
         oauthClientId,
         mode,
         hostname,
-        verificationStatus,
-        dnsTxtChallengeToken,
-        newEmbeddingOrigin,
+        status,
+        challengeToken,
+        newOrigin,
         verifiedAt,
         createdAt,
         Instant.now());
@@ -176,7 +176,7 @@ public final class ClientDomainConfig {
         mode,
         hostname,
         DomainVerificationStatus.VERIFIED,
-        dnsTxtChallengeToken,
+        challengeToken,
         embeddingOrigin,
         Instant.now(),
         createdAt,
@@ -195,7 +195,7 @@ public final class ClientDomainConfig {
         mode,
         hostname,
         DomainVerificationStatus.FAILED,
-        dnsTxtChallengeToken,
+        challengeToken,
         embeddingOrigin,
         verifiedAt,
         createdAt,
@@ -211,8 +211,8 @@ public final class ClientDomainConfig {
       final UUID oauthClientId,
       final ClientDomainMode mode,
       final String hostname,
-      final DomainVerificationStatus verificationStatus,
-      final String dnsTxtChallengeToken,
+      final DomainVerificationStatus status,
+      final String challengeToken,
       final String embeddingOrigin,
       final Instant verifiedAt,
       final Instant createdAt,
@@ -222,8 +222,8 @@ public final class ClientDomainConfig {
         oauthClientId,
         mode,
         hostname,
-        verificationStatus,
-        dnsTxtChallengeToken,
+        status,
+        challengeToken,
         embeddingOrigin,
         verifiedAt,
         createdAt,
@@ -303,11 +303,11 @@ public final class ClientDomainConfig {
   }
 
   public Optional<DomainVerificationStatus> verificationStatus() {
-    return Optional.ofNullable(verificationStatus);
+    return Optional.ofNullable(status);
   }
 
   public Optional<String> dnsTxtChallengeToken() {
-    return Optional.ofNullable(dnsTxtChallengeToken);
+    return Optional.ofNullable(challengeToken);
   }
 
   public Optional<String> embeddingOrigin() {
@@ -320,7 +320,7 @@ public final class ClientDomainConfig {
 
   /** BR-CLIENT-04: the single check every embedding-eligibility decision ultimately reduces to. */
   public boolean isVerified() {
-    return verificationStatus == DomainVerificationStatus.VERIFIED;
+    return status == DomainVerificationStatus.VERIFIED;
   }
 
   public Instant createdAt() {

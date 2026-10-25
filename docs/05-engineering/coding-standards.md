@@ -46,6 +46,12 @@ one-line `@SuppressWarnings` pointing back to this section (`coding-standards.md
 re-deriving the justification per class — the convention is documented once, here, so it doesn't
 have to be re-argued in every aggregate's own class Javadoc.
 
+The convention covers those three rules (and `TooManyMethods` where one-line accessors alone push a
+value object past the threshold) and nothing else. `GodClass`, `LongVariable`, `CyclomaticComplexity`
+and `TooManyFields` point at real design problems; fix them (extract validation, group state into
+value objects, shorten names) rather than adding them to the same annotation — `OAuthClient`,
+`ClientDomainConfig` and `Account` were brought back to this rule in TD-ARCH-033/035.
+
 ## 4. Security-specific conventions
 
 - Never log a credential, token, or password hash — not even at `DEBUG` level, not even temporarily during development (BR-DATA-01). If a debugging session needs to inspect a value like this, do it in a debugger, not a log statement.

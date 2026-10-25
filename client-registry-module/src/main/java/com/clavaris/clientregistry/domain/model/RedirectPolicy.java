@@ -160,7 +160,7 @@ public final class RedirectPolicy {
     if (url == null) {
       return null;
     }
-    OAuthClient.requireWellFormedAbsoluteSecureUri(url, fieldName);
+    ClientRegistrationRules.requireWellFormedAbsoluteSecureUri(url, fieldName);
     return url;
   }
 
