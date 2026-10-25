@@ -44,12 +44,17 @@ class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
   /* package */ CachedBodyHttpServletRequest(
       final HttpServletRequest request, final int maxBodyBytes) throws IOException {
+    // Refused on the declared length before the wrapper exists, so nothing is read at all.
+    requireDeclaredLengthWithin(request.getContentLengthLong(), maxBodyBytes);
     super(request);
-    if (request.getContentLengthLong() > maxBodyBytes) {
+    this.cachedBody = readAtMost(request.getInputStream(), maxBodyBytes);
+  }
+
+  private static void requireDeclaredLengthWithin(final long declaredLength, final int maxBodyBytes)
+      throws RequestBodyTooLargeException {
+    if (declaredLength > maxBodyBytes) {
       throw new RequestBodyTooLargeException(maxBodyBytes);
     }
-    final byte[] body = readAtMost(request.getInputStream(), maxBodyBytes);
-    this.cachedBody = body;
   }
 
   // One byte past the limit is enough to know it was exceeded, without reading any further.

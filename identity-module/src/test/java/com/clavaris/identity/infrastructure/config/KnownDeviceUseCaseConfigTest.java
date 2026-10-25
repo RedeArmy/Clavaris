@@ -40,7 +40,7 @@ class KnownDeviceUseCaseConfigTest {
   private static void awaitQuietly(final CountDownLatch latch) {
     try {
       latch.await(10, TimeUnit.SECONDS);
-    } catch (final InterruptedException e) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }

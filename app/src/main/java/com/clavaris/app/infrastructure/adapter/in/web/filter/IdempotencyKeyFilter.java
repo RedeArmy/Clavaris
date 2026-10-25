@@ -155,7 +155,7 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
     CachedBodyHttpServletRequest buffered = null;
     try {
       buffered = new CachedBodyHttpServletRequest(request);
-    } catch (final RequestBodyTooLargeException tooLarge) {
+    } catch (final RequestBodyTooLargeException _) {
       metrics.increment(IDEMPOTENCY_DECISION_METRIC, OUTCOME_TAG, "body_too_large");
       writeErrorResponse(
           response,
