@@ -357,6 +357,9 @@ clavaris:
   known-device:
     retention-days: ${KNOWN_DEVICE_RETENTION_DAYS:400}
     migration-cutover-at: ${KNOWN_DEVICE_MIGRATION_CUTOVER_AT:2026-08-31T10:00:00Z}
+    # TD-PERF-040: how many new-device emails may wait for one of the notification threads. Past
+    # this they are dropped (and logged), never queued without limit.
+    notification-queue-capacity: ${KNOWN_DEVICE_NOTIFICATION_QUEUE_CAPACITY:1000}
   # SDE III optimization pass, P1: optional Idempotency-Key support for /api/v1/admin/**'s own
   # mutating POST endpoints — see IdempotencyKeyFilter's own Javadoc for the full mechanism. A
   # dedicated hash secret, same "never reuse a secret across purposes" discipline as

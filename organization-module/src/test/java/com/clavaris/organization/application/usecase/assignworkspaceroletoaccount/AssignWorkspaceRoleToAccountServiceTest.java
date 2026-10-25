@@ -66,7 +66,7 @@ class AssignWorkspaceRoleToAccountServiceTest {
     when(roles.findById(plainRole.id())).thenReturn(Optional.of(plainRole));
     when(roles.findAllByOrganizationId(workspace.organizationId()))
         .thenReturn(List.of(manageMembersRole, plainRole));
-    when(accountDirectory.listAccountsForOrganization(workspace.organizationId()))
+    when(accountDirectory.listAccountsByIds(workspace.organizationId(), Set.of(accountId)))
         .thenReturn(List.of(new OrganizationAccountSummary(accountId, "ada@example.com")));
     when(memberships.findByWorkspaceIdAndAccountId(workspace.id(), accountId))
         .thenReturn(Optional.empty());
@@ -173,7 +173,7 @@ class AssignWorkspaceRoleToAccountServiceTest {
   // AccountNotInOrganizationException's own Javadoc.
   @Test
   void rejectsAnAccountThatDoesNotBelongToThisOrganization() {
-    when(accountDirectory.listAccountsForOrganization(workspace.organizationId()))
+    when(accountDirectory.listAccountsByIds(workspace.organizationId(), Set.of(accountId)))
         .thenReturn(List.of());
     AssignWorkspaceRoleToAccountCommand command =
         new AssignWorkspaceRoleToAccountCommand(workspace.id(), accountId, plainRole.id(), ACTOR);
@@ -182,5 +182,16 @@ class AssignWorkspaceRoleToAccountServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(memberships, never()).save(any());
+  }
+
+  // TD-PERF-036: validating one account must be a targeted lookup, never a walk of the whole pool.
+  @Test
+  void validatesTheAccountWithoutListingTheOrganizationsWholeAccountPool() {
+    AssignWorkspaceRoleToAccountCommand command =
+        new AssignWorkspaceRoleToAccountCommand(workspace.id(), accountId, plainRole.id(), ACTOR);
+
+    service.handle(command);
+
+    verify(accountDirectory, never()).listAccountsForOrganization(any());
   }
 }

@@ -113,6 +113,9 @@ class OrganizationOidcIssuerIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(verify(jwt, (RSAKey) publishedKey))
         .as("cryptographic proof, not just a matching kid")
         .isTrue();
+    // TD-PERF-035: the JWKS is built from cached public keys only; the private half must never
+    // be part of what is published.
+    assertThat(publishedKey.isPrivate()).as("the published key is public-only").isFalse();
   }
 
   @Test

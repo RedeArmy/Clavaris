@@ -321,4 +321,26 @@ class IdempotencyKeyFilterTest {
     SecurityContextHolder.getContext()
         .setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
   }
+
+  // TD-SEC-066: an oversized body is refused with 413 before it is buffered or claimed in Redis.
+  @Test
+  void rejectsAnOversizedBodyWith413WithoutClaimingTheKey() throws Exception {
+    IdempotencyKeyStore store = mock(IdempotencyKeyStore.class);
+    IdempotencyKeyFilter filter =
+        new IdempotencyKeyFilter(store, KEY_HASHER, OBJECT_MAPPER, NO_OP_METRICS);
+    authenticateAsClient("platform-client-a");
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("POST", "/api/v1/admin/organizations");
+    request.addHeader("Idempotency-Key", "key-1");
+    request.setContent(new byte[CachedBodyHttpServletRequest.MAX_BODY_BYTES + 1]);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(413);
+    assertThat(response.getContentAsString()).contains("request_body_too_large");
+    assertThat(chain.getRequest()).as("the controller is never reached").isNull();
+    verify(store, never()).claim(anyString(), anyString());
+  }
 }

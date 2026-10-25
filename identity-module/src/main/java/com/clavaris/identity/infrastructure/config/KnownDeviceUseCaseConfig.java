@@ -17,9 +17,11 @@ import com.clavaris.identity.application.usecase.requestemailverification.MailSe
 import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
 import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
 import java.time.Instant;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -56,9 +58,18 @@ class KnownDeviceUseCaseConfig {
   // batch webhook dispatch tick needs. destroyMethod="shutdown": same Spring-managed-lifecycle
   // discipline as that bean, so a repeatedly-started-and-stopped @SpringBootTest context doesn't
   // leak thread pools.
+  //
+  // TD-PERF-040: the queue is bounded. Executors.newFixedThreadPool queues without limit, so during
+  // a mail-provider outage (the circuit breaker only shortens each send, it does not stop new ones
+  // being queued) a burst of new-device logins would pile tasks, each holding an Account, in memory
+  // indefinitely. Past the capacity a task is rejected, which RecordAccountLoginDeviceService
+  // already
+  // catches and logs: the login is unaffected, and so is the alert token, which is minted before
+  // the task is queued. Dropping an informational email beats exhausting the heap.
   @Bean(destroyMethod = "shutdown")
   /* package */ ExecutorService newDeviceNotificationExecutor(
-      @Value("${clavaris.known-device.notification-concurrency:4}") final int concurrency) {
+      @Value("${clavaris.known-device.notification-concurrency:4}") final int concurrency,
+      @Value("${clavaris.known-device.notification-queue-capacity:1000}") final int queueCapacity) {
     final AtomicInteger threadCount = new AtomicInteger();
     final ThreadFactory namedThreads =
         runnable -> {
@@ -69,7 +80,14 @@ class KnownDeviceUseCaseConfig {
           thread.setDaemon(true);
           return thread;
         };
-    return Executors.newFixedThreadPool(concurrency, namedThreads);
+    return new ThreadPoolExecutor(
+        concurrency,
+        concurrency,
+        0L,
+        TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(queueCapacity),
+        namedThreads,
+        new ThreadPoolExecutor.AbortPolicy());
   }
 
   // New-device login email notification.

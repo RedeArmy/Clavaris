@@ -144,8 +144,10 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
 
     // Clerk dashboard "Users" tab parity (SDE-III review, 2026-09-19) — the one write this
     // otherwise read-only use case makes, and only on the success path.
+    // TD-ARCH-036: a narrow write of last_signed_in_at only. Saving the whole aggregate here would
+    // overwrite anything another writer changed since this account was loaded (a suspension, say).
     account.recordSignIn();
-    accounts.save(account);
+    accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
 
     LOG.info(
         "event=login_success organizationId={} accountId={}",

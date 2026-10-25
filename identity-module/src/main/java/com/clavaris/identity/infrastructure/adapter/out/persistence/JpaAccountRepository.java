@@ -18,6 +18,7 @@ import com.clavaris.identity.domain.model.PasswordCredential;
 import com.clavaris.identity.domain.model.RegistrationDecision;
 import com.clavaris.identity.domain.model.Username;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Implements the outbound port; maps between {@code domain.model} (framework-free) and the
  * {@code @Entity} classes in this package.
  */
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
+// PMD.ExcessiveImports: the adapter maps an Account and its value objects to and from rows.
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
 @Repository
 class JpaAccountRepository implements AccountRepository {
 
@@ -155,6 +157,19 @@ class JpaAccountRepository implements AccountRepository {
                 entity.getPublicMetadata(),
                 entity.getPrivateMetadata(),
                 entity.getUnsafeMetadata())));
+  }
+
+  @Override
+  @Transactional
+  public void recordSignIn(final AccountId accountId, final Instant signedInAt) {
+    accounts.updateLastSignedInAt(accountId.value(), signedInAt);
+  }
+
+  @Override
+  @Transactional
+  public void recordSignInVerifyingEmail(
+      final AccountId accountId, final Instant signedInAt, final Instant verifiedAt) {
+    accounts.updateLastSignedInAtVerifyingEmail(accountId.value(), signedInAt, verifiedAt);
   }
 
   // TD-PERF-028 (closed): no longer also writes the credential — see AccountRepository#save's own

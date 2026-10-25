@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,6 +23,28 @@ import org.springframework.data.repository.query.Param;
 // positive SpringDataOrganizationJpaRepository's own identical suppression documents.
 @SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidDuplicateLiterals"})
 interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
+
+  // TD-ARCH-036: narrow sign-in writes (see AccountRepository#recordSignIn). A bulk update does not
+  // load or merge the entity, so it cannot carry stale state over another writer's change; the
+  // persistence context is flushed first and cleared after so a later read in the same transaction
+  // sees the new value.
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("UPDATE AccountEntity a SET a.lastSignedInAt = :signedInAt WHERE a.id = :accountId")
+  int updateLastSignedInAt(
+      @Param("accountId") UUID accountId, @Param("signedInAt") Instant signedInAt);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      UPDATE AccountEntity a
+      SET a.lastSignedInAt = :signedInAt,
+          a.emailVerifiedAt = COALESCE(a.emailVerifiedAt, :verifiedAt)
+      WHERE a.id = :accountId
+      """)
+  int updateLastSignedInAtVerifyingEmail(
+      @Param("accountId") UUID accountId,
+      @Param("signedInAt") Instant signedInAt,
+      @Param("verifiedAt") Instant verifiedAt);
 
   boolean existsByOrganizationIdAndEmail(UUID organizationId, String email);
 

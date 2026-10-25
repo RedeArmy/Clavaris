@@ -98,9 +98,7 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
       final FilterChain filterChain)
       throws ServletException, IOException {
     final String rawIdempotencyKey = request.getHeader(IDEMPOTENCY_KEY_HEADER);
-    if (rawIdempotencyKey == null
-        || rawIdempotencyKey.isBlank()
-        || !HttpMethod.POST.matches(request.getMethod())) {
+    if (isNotAnIdempotentPost(request, rawIdempotencyKey)) {
       filterChain.doFilter(request, response);
       return;
     }
@@ -114,7 +112,10 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
       return;
     }
 
-    final CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
+    final CachedBodyHttpServletRequest cachedRequest = bufferBodyOrRefuse(request, response);
+    if (cachedRequest == null) {
+      return;
+    }
     final String requestBodyHash = sha256Hex(cachedRequest.bodyBytes());
     final String redisKey = "idempotency:" + keyHasher.hash(clientId + ":" + rawIdempotencyKey);
 
@@ -145,6 +146,31 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
         proceedAndRecordOutcome(cachedRequest, response, filterChain, redisKey, requestBodyHash);
       }
     }
+  }
+
+  // TD-SEC-066: null means the body was over the cap and a 413 has already been written — refused
+  // before anything is buffered beyond the cap, claimed in Redis or handed to a controller.
+  private CachedBodyHttpServletRequest bufferBodyOrRefuse(
+      final HttpServletRequest request, final HttpServletResponse response) throws IOException {
+    CachedBodyHttpServletRequest buffered = null;
+    try {
+      buffered = new CachedBodyHttpServletRequest(request);
+    } catch (final RequestBodyTooLargeException _) {
+      metrics.increment(IDEMPOTENCY_DECISION_METRIC, OUTCOME_TAG, "body_too_large");
+      writeErrorResponse(
+          response,
+          HttpStatus.CONTENT_TOO_LARGE,
+          "request_body_too_large",
+          "The request body exceeds the maximum accepted size.");
+    }
+    return buffered;
+  }
+
+  private static boolean isNotAnIdempotentPost(
+      final HttpServletRequest request, final String rawIdempotencyKey) {
+    return rawIdempotencyKey == null
+        || rawIdempotencyKey.isBlank()
+        || !HttpMethod.POST.matches(request.getMethod());
   }
 
   private void proceedAndRecordOutcome(
