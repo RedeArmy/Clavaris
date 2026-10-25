@@ -1,6 +1,5 @@
 package com.clavaris.clientregistry.domain.model;
 
-import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -17,43 +16,21 @@ import java.util.UUID;
  * <p>Deliberately a separate class from {@code PlatformClient} — belongs to exactly one
  * Organization, never none (data-model.md §2).
  *
- * <p>PMD's AvoidFieldNameMatchingMethodName/ShortVariable/ShortMethodName rules flag this class for
- * the same reason {@code PlatformClient} suppresses them — the deliberate record-style accessor
- * convention used throughout this codebase's value objects. TooManyMethods is the same shape of
- * false positive: eight one-line accessors plus two rehydration factories plus seven real mutators
- * ({@code deactivate}/{@code activate}/{@code rotateSecret}/{@code updateRedirectSettings}/{@code
- * updateGrantTypes}/{@code updateScopes}/{@code updateConsent}, the last three added 2026-09-24
- * when the Configuration card became editable) is what a value object with this many fields looks
- * like, not a sign this class does too much. LongVariable: {@code postLogoutRedirectUris} is the
- * exact OIDC spec term (post_logout_redirect_uris), not arbitrarily long — same precedent as {@code
- * PlatformScopes}' own identical suppression.
+ * <p>Immutable: every change returns a new instance. What a client may register is validated by
+ * {@link ClientRegistrationRules}, not here, so this class holds state and transitions only.
  */
-// PMD.GodClass: same seven-real-mutators-plus-accessors shape TooManyMethods above already
-// explains — this metric (WMC/ATFD/TCC combined) crossed its own threshold the moment
-// updateGrantTypes/updateScopes/updateConsent joined deactivate/activate/rotateSecret/
-// updateRedirectSettings, not because this class gained a new, unrelated responsibility.
+// Only the record-style accessor idiom is suppressed (coding-standards.md §3a): a field and its
+// accessor share a name (AvoidFieldNameMatchingMethodName), as does {@code id()} (ShortMethodName/
+// ShortVariable), and twelve one-line accessors plus the real transitions exceed TooManyMethods.
+// None of this hides a design smell: GodClass, LongVariable and CyclomaticComplexity are no longer
+// suppressed here — the validation moved out and the long names were shortened instead.
 @SuppressWarnings({
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
-  "PMD.TooManyMethods",
-  "PMD.LongVariable",
-  "PMD.GodClass"
+  "PMD.TooManyMethods"
 })
 public final class OAuthClient {
-
-  /**
-   * RFC 8252 §7.3: the only {@code http} scheme exception — loopback traffic never leaves the
-   * device, so there's nothing on the network path to intercept, unlike a plaintext {@code http://}
-   * redirect to an arbitrary host. {@code PMD.AvoidUsingHardCodedIP}: this is a validation literal
-   * being compared against, never a real network endpoint this class connects to — the pattern that
-   * rule exists to catch (a hardcoded address baked into outbound connection logic) doesn't apply
-   * here.
-   */
-  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
-  private static final String LOOPBACK_IP = "127.0.0.1";
-
-  private static final String LOCALHOST = "localhost";
 
   private final UUID id;
   private final UUID organizationId;
@@ -63,7 +40,7 @@ public final class OAuthClient {
   private final List<String> allowedGrantTypes;
   private final List<String> allowedScopes;
   private final boolean requireConsent;
-  private final List<String> postLogoutRedirectUris;
+  private final List<String> postLogoutUris;
   private final Instant createdAt;
   private final boolean active;
 
@@ -88,7 +65,7 @@ public final class OAuthClient {
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
       final boolean requireConsent,
-      final List<String> postLogoutRedirectUris,
+      final List<String> postLogoutUris,
       final Instant createdAt,
       final boolean active,
       final int version) {
@@ -105,18 +82,19 @@ public final class OAuthClient {
     // nothing to match against until the user adds one, so /authorize requests for this client
     // fail closed (no registered redirect URI to match) rather than being rejected at
     // registration time.
-    this.redirectUris = requireValidUris(redirectUris, "redirectUris");
+    this.redirectUris = ClientRegistrationRules.requireValidUris(redirectUris, "redirectUris");
     this.allowedGrantTypes =
-        requireKnownGrantTypes(requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
-    this.allowedScopes = requireValidScopes(allowedScopes);
+        ClientRegistrationRules.requireKnownGrantTypes(
+            ClientRegistrationRules.requireNonEmpty(allowedGrantTypes, "allowedGrantTypes"));
+    this.allowedScopes = ClientRegistrationRules.requireValidScopes(allowedScopes);
     this.requireConsent = requireConsent;
     // TD-FUT-018: genuinely optional, same as redirectUris now is (see that field's own comment
     // above) — a client with no post-logout redirect configured simply gets SAS's own bare
     // default (redirect to {clavarisBaseUrl}/). Still validated the same way (well-formed,
     // absolute) when present: RFC-shaped junk here would be un-matchable at RP-Initiated Logout
     // time either way, same requireValidUris rule redirectUris uses.
-    this.postLogoutRedirectUris =
-        requireValidUris(postLogoutRedirectUris, "postLogoutRedirectUris");
+    this.postLogoutUris =
+        ClientRegistrationRules.requireValidUris(postLogoutUris, "postLogoutRedirectUris");
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.active = active;
     this.version = version;
@@ -140,7 +118,7 @@ public final class OAuthClient {
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
       final boolean requireConsent,
-      final List<String> postLogoutRedirectUris) {
+      final List<String> postLogoutUris) {
     return new OAuthClient(
         UUID.randomUUID(),
         organizationId,
@@ -150,7 +128,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         Instant.now(),
         true,
         0);
@@ -175,7 +153,7 @@ public final class OAuthClient {
       final List<String> allowedGrantTypes,
       final List<String> allowedScopes,
       final boolean requireConsent,
-      final List<String> postLogoutRedirectUris,
+      final List<String> postLogoutUris,
       final Instant createdAt,
       final boolean active,
       final int version) {
@@ -188,7 +166,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         active,
         version);
@@ -211,7 +189,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         false,
         version);
@@ -234,7 +212,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         true,
         version);
@@ -249,17 +227,17 @@ public final class OAuthClient {
    * changing one without the other is a real, distinct operation worth its own use case.
    */
   public OAuthClient updateRedirectSettings(
-      final List<String> redirectUris, final List<String> postLogoutRedirectUris) {
+      final List<String> redirectUris, final List<String> postLogoutUris) {
     return new OAuthClient(
         id,
         organizationId,
         clientId,
         clientSecretHash,
-        requireValidUris(redirectUris, "redirectUris"),
+        ClientRegistrationRules.requireValidUris(redirectUris, "redirectUris"),
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        requireValidUris(postLogoutRedirectUris, "postLogoutRedirectUris"),
+        ClientRegistrationRules.requireValidUris(postLogoutUris, "postLogoutRedirectUris"),
         createdAt,
         active,
         version);
@@ -282,7 +260,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         active,
         version);
@@ -299,7 +277,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         active,
         version);
@@ -316,7 +294,7 @@ public final class OAuthClient {
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         active,
         version);
@@ -325,144 +303,20 @@ public final class OAuthClient {
   /**
    * Same rationale as {@code OrganizationClient#rotateSecret}/{@code PlatformClient#rotateSecret}.
    */
-  public OAuthClient rotateSecret(
-      @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
+  public OAuthClient rotateSecret(final String newSecretHash) {
     return new OAuthClient(
         id,
         organizationId,
         clientId,
-        newClientSecretHash,
+        newSecretHash,
         redirectUris,
         allowedGrantTypes,
         allowedScopes,
         requireConsent,
-        postLogoutRedirectUris,
+        postLogoutUris,
         createdAt,
         active,
         version);
-  }
-
-  private static List<String> requireNonEmpty(final List<String> values, final String fieldName) {
-    if (values == null || values.isEmpty()) {
-      throw new IllegalArgumentException(fieldName + " must not be empty");
-    }
-    return values;
-  }
-
-  // Live UX request, 2026-09-24 (Configuration card made editable): unlike allowedScopes,
-  // allowedGrantTypes genuinely IS a closed set in this system — see OAuthGrantTypeCatalog's own
-  // Javadoc for why. This is the one real guard against a value
-  // OrganizationRegisteredClientRepository
-  // would otherwise forward blindly into Spring Authorization Server.
-  private static List<String> requireKnownGrantTypes(final List<String> allowedGrantTypes) {
-    for (final String grantType : allowedGrantTypes) {
-      if (!OAuthGrantTypeCatalog.KNOWN.contains(grantType)) {
-        throw new IllegalArgumentException(
-            "allowedGrantTypes must only contain known grant types "
-                + OAuthGrantTypeCatalog.KNOWN
-                + ": "
-                + grantType);
-      }
-    }
-    return List.copyOf(allowedGrantTypes);
-  }
-
-  // TD-ARCH-004: rejects the one half of "allowedScopes is free text nothing validates" that's
-  // actually enforceable here — a scope from the reserved platform:* namespace (PlatformScopes)
-  // has no business on a tenant-facing OAuthClient at all, since it would be forwarded verbatim
-  // into SAS's own RegisteredClient.scope(...) (OrganizationRegisteredClientRepository) alongside
-  // this client's real ones. Deliberately does NOT restrict to OidcScopeCatalog.KNOWN the way
-  // PlatformClient/OrganizationClient restrict to PlatformScopes.BOOTSTRAP_DEFAULT: unlike those
-  // two (a small, fixed, Clavaris-owned admin-API vocabulary), an OAuthClient using the
-  // client_credentials grant legitimately needs arbitrary, consumer-defined API scopes Clavaris
-  // has no way to know in advance (confirmed live — SigningKeyRotationIntegrationTest/
-  // OrganizationOidcIssuerIntegrationTest both register a real OAuthClient with a custom
-  // "test.read" scope for exactly this reason) — OidcScopeCatalog.KNOWN documents which scopes
-  // this system's own login/consent/userinfo machinery actually understands, not an exhaustive
-  // allowlist of every scope an OAuthClient may ever hold. An empty list is valid (a client that
-  // only ever completes client_credentials-shaped flows genuinely needs none).
-  private static List<String> requireValidScopes(final List<String> allowedScopes) {
-    Objects.requireNonNull(allowedScopes, "allowedScopes must not be null");
-    for (final String scope : allowedScopes) {
-      if (scope.startsWith(PlatformScopes.NAMESPACE_PREFIX)) {
-        throw new IllegalArgumentException(
-            "allowedScopes must not contain a reserved platform:* scope: " + scope);
-      }
-    }
-    return List.copyOf(allowedScopes);
-  }
-
-  private static boolean isInsecureHttp(final URI uri) {
-    return "http".equalsIgnoreCase(uri.getScheme())
-        && !LOCALHOST.equalsIgnoreCase(uri.getHost())
-        && !LOOPBACK_IP.equals(uri.getHost());
-  }
-
-  /**
-   * SDE-III review, 2026-09-03 — real bug found and closed: neither caller below used to restrict
-   * scheme at all, only "well-formed and absolute" — a client could register a plaintext {@code
-   * http://} redirect URI against an arbitrary network-reachable host, exposing the authorization
-   * code (or, for {@code postLogoutRedirectUris}, the {@code id_token_hint}-bearing RP-initiated
-   * logout redirect) to interception by anything on the network path. Extracted as one shared
-   * per-entry validator, not duplicated per caller ({@code PMD.CyclomaticComplexity} was already at
-   * this codebase's own threshold on both callers before this fix even landed) — permits {@code
-   * http} against {@code localhost}/{@code 127.0.0.1} (RFC 8252 §7.3 — native-app loopback
-   * redirects are exempt everywhere else in the OAuth ecosystem for exactly this reason: loopback
-   * traffic never leaves the device, so there's nothing to intercept), and any non-http(s) scheme
-   * untouched (a native app's own custom scheme, e.g. {@code com.example.app://callback} — this
-   * class's own Javadoc already scopes "web + mobile" clients as in-scope, and a custom scheme was
-   * never interceptable over the network to begin with, unlike plaintext HTTP).
-   *
-   * <p>{@code PMD.CyclomaticComplexity}: four genuinely distinct validation rules (blank,
-   * malformed, relative, insecure-scheme), each its own branch with its own distinct error message
-   * — already the extraction that brought both callers back under this threshold; splitting this
-   * single per-entry validator further would fragment one cohesive check into several without
-   * removing any real complexity, not reduce it.
-   *
-   * <p>Package-private, not {@code private}: {@link RedirectPolicy} (same package) reuses this
-   * exact validator for its own configured URLs — a second, independently-drifting copy of these
-   * four rules would be a real duplication risk, not a reason to keep this class-private.
-   */
-  @SuppressWarnings("PMD.CyclomaticComplexity")
-  /* package */ static void requireWellFormedAbsoluteSecureUri(
-      final String uri, final String fieldName) {
-    if (uri == null || uri.isBlank()) {
-      throw new IllegalArgumentException(fieldName + " must not contain a blank entry");
-    }
-    final URI parsed;
-    try {
-      parsed = URI.create(uri);
-    } catch (final IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          fieldName + " must contain only well-formed URIs: " + uri, e);
-    }
-    if (!parsed.isAbsolute()) {
-      throw new IllegalArgumentException(fieldName + " must contain only absolute URIs: " + uri);
-    }
-    if (isInsecureHttp(parsed)) {
-      throw new IllegalArgumentException(
-          fieldName + " must use https, or http only against localhost/127.0.0.1: " + uri);
-    }
-  }
-
-  // BR-CLIENT-01: redirect_uris are an exact-match allowlist — no wildcard/partial matching is
-  // ever applied at /authorize time. That guarantee only means something if what's stored here is
-  // itself a well-formed, absolute URI to begin with; a malformed entry would be un-matchable
-  // (and un-auditable) either way, so it's rejected at registration, not discovered later.
-  //
-  // SDE-III refactor, 2026-09-23: shares one validator with postLogoutRedirectUris now that both
-  // fields allow an empty list (redirectUris' own comment in the constructor explains why) — the
-  // two were already identical except for redirectUris' now-removed non-empty requirement. Also
-  // deliberately unbounded on both (Clerk-parity check, live-verified against Clerk's own OAuth
-  // Applications "Redirect URIs" field, which is itself a multi-entry list, not a single value) —
-  // a consuming application legitimately needing web+native, or a canary/staging URL alongside
-  // production, on the same client is a real, common case, not one this system should foreclose.
-  private static List<String> requireValidUris(final List<String> uris, final String fieldName) {
-    Objects.requireNonNull(uris, fieldName + " must not be null");
-    for (final String uri : uris) {
-      requireWellFormedAbsoluteSecureUri(uri, fieldName);
-    }
-    return List.copyOf(uris);
   }
 
   public UUID id() {
@@ -498,7 +352,7 @@ public final class OAuthClient {
   }
 
   public List<String> postLogoutRedirectUris() {
-    return postLogoutRedirectUris;
+    return postLogoutUris;
   }
 
   public Instant createdAt() {

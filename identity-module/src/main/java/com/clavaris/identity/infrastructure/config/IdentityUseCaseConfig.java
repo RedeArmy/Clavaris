@@ -1,100 +1,15 @@
 package com.clavaris.identity.infrastructure.config;
 
-import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.application.port.AuditEventRecorder;
-import com.clavaris.common.application.port.SecurityMetricsRecorder;
-import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyService;
-import com.clavaris.identity.application.usecase.activateplatformsigningkey.ActivatePlatformSigningKeyUseCase;
-import com.clavaris.identity.application.usecase.activateplatformsigningkey.PlatformSigningKeyRepository;
-import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationService;
-import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.ActivateSigningKeyForOrganizationUseCase;
-import com.clavaris.identity.application.usecase.activatesigningkeyfororganization.SigningKeyRepository;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationService;
 import com.clavaris.identity.application.usecase.admincreateaccountfororganization.AdminCreateAccountForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.approveaccountregistration.ApproveAccountRegistrationService;
 import com.clavaris.identity.application.usecase.approveaccountregistration.ApproveAccountRegistrationUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeService;
-import com.clavaris.identity.application.usecase.authenticatewithemailcode.AuthenticateWithEmailCodeUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkService;
-import com.clavaris.identity.application.usecase.authenticatewithemaillink.AuthenticateWithEmailLinkUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordService;
-import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithpassword.PasswordVerifier;
-import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderService;
-import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.AuthenticateWithSocialProviderUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
-import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.PendingSocialLinkRepository;
-import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
-import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameService;
-import com.clavaris.identity.application.usecase.authenticatewithusername.AuthenticateWithUsernameUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithwebauthn.AuthenticateWithWebAuthnService;
-import com.clavaris.identity.application.usecase.authenticatewithwebauthn.AuthenticateWithWebAuthnUseCase;
-import com.clavaris.identity.application.usecase.authenticatewithwebauthn.StartWebAuthnAuthenticationService;
-import com.clavaris.identity.application.usecase.authenticatewithwebauthn.StartWebAuthnAuthenticationUseCase;
-import com.clavaris.identity.application.usecase.banaccount.BanAccountService;
-import com.clavaris.identity.application.usecase.banaccount.BanAccountUseCase;
-import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetService;
-import com.clavaris.identity.application.usecase.completeforcedpasswordreset.CompleteForcedPasswordResetUseCase;
-import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeService;
-import com.clavaris.identity.application.usecase.confirmdevicetrustchallenge.ConfirmDeviceTrustChallengeUseCase;
-import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationService;
-import com.clavaris.identity.application.usecase.confirmemailverification.ConfirmEmailVerificationUseCase;
-import com.clavaris.identity.application.usecase.confirmnewdeviceloginalert.ConfirmNewDeviceLoginAlertService;
-import com.clavaris.identity.application.usecase.confirmnewdeviceloginalert.ConfirmNewDeviceLoginAlertUseCase;
-import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetService;
-import com.clavaris.identity.application.usecase.confirmpasswordreset.ConfirmPasswordResetUseCase;
-import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkService;
-import com.clavaris.identity.application.usecase.confirmpendingsociallink.ConfirmPendingSocialLinkUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountService;
 import com.clavaris.identity.application.usecase.deleteaccount.DeleteAccountUseCase;
 import com.clavaris.identity.application.usecase.deleteaccount.WorkspaceMembershipEraser;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountService;
 import com.clavaris.identity.application.usecase.deleteownaccount.DeleteOwnAccountUseCase;
-import com.clavaris.identity.application.usecase.deletewebauthncredential.DeleteWebAuthnCredentialService;
-import com.clavaris.identity.application.usecase.deletewebauthncredential.DeleteWebAuthnCredentialUseCase;
-import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountService;
-import com.clavaris.identity.application.usecase.forcepasswordresetforaccount.ForcePasswordResetForAccountUseCase;
-import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarService;
-import com.clavaris.identity.application.usecase.getaccountavatar.GetAccountAvatarUseCase;
-import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationService;
-import com.clavaris.identity.application.usecase.getaccountfororganization.GetAccountForOrganizationUseCase;
-import com.clavaris.identity.application.usecase.getaccountprofile.GetAccountProfileService;
-import com.clavaris.identity.application.usecase.getaccountprofile.GetAccountProfileUseCase;
-import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountService;
-import com.clavaris.identity.application.usecase.getauditlogforaccount.GetAuditLogForAccountUseCase;
-import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountService;
-import com.clavaris.identity.application.usecase.getloginactivityforaccount.GetLoginActivityForAccountUseCase;
-import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountService;
-import com.clavaris.identity.application.usecase.impersonateaccount.ImpersonateAccountUseCase;
-import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenService;
-import com.clavaris.identity.application.usecase.issuerefreshtoken.IssueRefreshTokenUseCase;
-import com.clavaris.identity.application.usecase.issuerefreshtoken.RefreshTokenRepository;
-import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionPolicyProvider;
-import com.clavaris.identity.application.usecase.issuerefreshtoken.SessionRepository;
-import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationService;
-import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
-import com.clavaris.identity.application.usecase.listactivesessionsforaccount.AccountActiveSessionsRepository;
-import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountService;
-import com.clavaris.identity.application.usecase.listactivesessionsforaccount.ListActiveSessionsForAccountUseCase;
-import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountService;
-import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.ListOAuthGrantsForAccountUseCase;
-import com.clavaris.identity.application.usecase.listoauthgrantsforaccount.OAuthGrantsRepository;
-import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationService;
-import com.clavaris.identity.application.usecase.listsigningkeysfororganization.ListSigningKeysForOrganizationUseCase;
-import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountService;
-import com.clavaris.identity.application.usecase.listwebauthncredentialsforaccount.ListWebAuthnCredentialsForAccountUseCase;
-import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationService;
-import com.clavaris.identity.application.usecase.purgesigningkeyfororganization.PurgeSigningKeyForOrganizationUseCase;
-import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountService;
-import com.clavaris.identity.application.usecase.reactivateaccount.ReactivateAccountUseCase;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.KnownDeviceRepository;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceService;
-import com.clavaris.identity.application.usecase.recordaccountlogindevice.RecordAccountLoginDeviceUseCase;
-import com.clavaris.identity.application.usecase.recordloginevent.LoginEventRepository;
-import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventService;
-import com.clavaris.identity.application.usecase.recordloginevent.RecordLoginEventUseCase;
-import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdService;
-import com.clavaris.identity.application.usecase.recordsessionoidcid.RecordSessionOidcIdUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccessRestrictionPolicyProvider;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
@@ -102,94 +17,26 @@ import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWrit
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountService;
 import com.clavaris.identity.application.usecase.registeraccount.RegisterAccountUseCase;
-import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationService;
-import com.clavaris.identity.application.usecase.registerwebauthncredential.CompleteWebAuthnRegistrationUseCase;
-import com.clavaris.identity.application.usecase.registerwebauthncredential.RelyingPartyFactory;
-import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationService;
-import com.clavaris.identity.application.usecase.registerwebauthncredential.StartWebAuthnRegistrationUseCase;
-import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
 import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationService;
 import com.clavaris.identity.application.usecase.rejectaccountregistration.RejectAccountRegistrationUseCase;
-import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureService;
-import com.clavaris.identity.application.usecase.removeaccountprofilepicture.RemoveAccountProfilePictureUseCase;
-import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeService;
-import com.clavaris.identity.application.usecase.requestdevicetrustchallenge.RequestDeviceTrustChallengeUseCase;
-import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeService;
-import com.clavaris.identity.application.usecase.requestemailsignincode.RequestEmailSignInCodeUseCase;
-import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkService;
-import com.clavaris.identity.application.usecase.requestemailsigninlink.RequestEmailSignInLinkUseCase;
 import com.clavaris.identity.application.usecase.requestemailverification.AccountAuthenticationPolicyProvider;
-import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationService;
-import com.clavaris.identity.application.usecase.requestemailverification.RequestEmailVerificationUseCase;
-import com.clavaris.identity.application.usecase.requestemailverification.VerificationTokenRepository;
-import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetService;
-import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPasswordResetUseCase;
-import com.clavaris.identity.application.usecase.resolveorganizationname.OrganizationNameProvider;
-import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionService;
-import com.clavaris.identity.application.usecase.revokeaccountsession.RevokeAccountSessionUseCase;
-import com.clavaris.identity.application.usecase.revokealloauthgrantsforaccount.RevokeAllOAuthGrantsForAccountService;
-import com.clavaris.identity.application.usecase.revokealloauthgrantsforaccount.RevokeAllOAuthGrantsForAccountUseCase;
-import com.clavaris.identity.application.usecase.revokeoauthgrant.RevokeOAuthGrantService;
-import com.clavaris.identity.application.usecase.revokeoauthgrant.RevokeOAuthGrantUseCase;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessionRevoker;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
-import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenService;
-import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
-import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.RotateSigningKeyForOrganizationService;
-import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.RotateSigningKeyForOrganizationUseCase;
-import com.clavaris.identity.application.usecase.rotatesigningkeyfororganization.SigningKeyMaterialGenerator;
-import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountService;
-import com.clavaris.identity.application.usecase.suspendaccount.SuspendAccountUseCase;
-import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountService;
-import com.clavaris.identity.application.usecase.unbanaccount.UnbanAccountUseCase;
-import com.clavaris.identity.application.usecase.updateaccountmetadata.UpdateAccountMetadataService;
-import com.clavaris.identity.application.usecase.updateaccountmetadata.UpdateAccountMetadataUseCase;
-import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsService;
-import com.clavaris.identity.application.usecase.updateaccountpermissions.UpdateAccountPermissionsUseCase;
-import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileService;
-import com.clavaris.identity.application.usecase.updateaccountprofile.UpdateAccountProfileUseCase;
-import com.clavaris.identity.application.usecase.updateaccountprofilepicture.ProfilePictureStorage;
-import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureService;
-import com.clavaris.identity.application.usecase.updateaccountprofilepicture.UpdateAccountProfilePictureUseCase;
-import com.yubico.webauthn.RelyingParty;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.ObjectMapper;
 
 /**
- * Wires application-layer use cases to Spring's context. Deliberately kept out of {@code
- * application/usecase/registeraccount} itself: {@code RegisterAccountService}'s only Spring
- * dependency is the {@code @Transactional} annotation on its {@code handle} method
- * (first-vertical-slice-blueprint.md §2.3) — bean registration for it lives here, in
- * infrastructure, not as a class-level {@code @Service} on the service itself.
+ * Wires the identity use cases for: account registration, deletion and approval.
+ *
+ * <p>Deliberately kept out of {@code application/usecase} itself: a service's only Spring
+ * dependency is {@code @Transactional} on its {@code handle} method
+ * (first-vertical-slice-blueprint.md §2.3), so bean registration lives here, in infrastructure. The
+ * identity module's wiring is split by area (see the sibling {@code *UseCaseConfig} classes); beans
+ * reach each other through ordinary constructor injection, so the split changes no wiring.
  */
-// ExcessiveImports/CouplingBetweenObjects: this class exists specifically to wire together every
-// use case in the module — one import per port/service/use-case type is what that job looks like,
-// not accidental coupling to split apart. Same reasoning as app module's own AuthorizationServer
-// config classes' identical suppression for "wiring together many distinct types." AvoidDuplicate
-// Literals: the repeated string is "PMD.LongVariable" itself, used on six different parameters
-// across five methods — a real code smell would be a repeated business-logic string, not the same
-// suppression annotation value reused because the same port name (verificationTokens,
-// accountTokenRevoker) legitimately appears as a parameter that many times. TooManyMethods: one
-// @Bean method per use case is what this class's entire job looks like — deleteAccountUseCase
-// tipped this over PMD's default threshold, not a sign this class grew organically past its own
-// single responsibility.
-@SuppressWarnings({
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.AvoidDuplicateLiterals",
-  "PMD.TooManyMethods"
-})
+// PMD.LongVariable: ports are named for what they are (verificationTokens, accountTokenRevoker), as
+// in the services they are handed to.
+@SuppressWarnings("PMD.LongVariable")
 @Configuration
 class IdentityUseCaseConfig {
 
@@ -197,7 +44,7 @@ class IdentityUseCaseConfig {
   // (see its comment) — only Spring's own component scan ever needs to instantiate this class.
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ IdentityUseCaseConfig() {
-    // Intentionally empty — this class holds no state, only the @Bean method below.
+    // Intentionally empty — this class holds no state, only @Bean methods.
   }
 
   // This bean-definition method has no reason to be called directly by anything outside Spring's
@@ -209,9 +56,8 @@ class IdentityUseCaseConfig {
       final PasswordHasher passwordHasher,
       final EventOutboxWriter eventOutboxWriter,
       final AccountAuthenticationPolicyProvider policyProvider,
-      @SuppressWarnings("PMD.LongVariable")
-          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider,
+      final BreachedPasswordChecker breachedPasswordChecker) {
     return new RegisterAccountService(
         accountRepository,
         passwordHasher,
@@ -226,9 +72,8 @@ class IdentityUseCaseConfig {
   /* package */ AdminCreateAccountForOrganizationUseCase adminCreateAccountForOrganizationUseCase(
       final AccountRepository accountRepository,
       final PasswordHasher passwordHasher,
-      @SuppressWarnings("PMD.LongVariable")
-          final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final AccessRestrictionPolicyProvider accessRestrictionPolicyProvider,
+      final BreachedPasswordChecker breachedPasswordChecker) {
     return new AdminCreateAccountForOrganizationService(
         accountRepository,
         passwordHasher,
@@ -237,248 +82,11 @@ class IdentityUseCaseConfig {
   }
 
   @Bean
-  /* package */ ListAccountsForOrganizationUseCase listAccountsForOrganizationUseCase(
-      final AccountRepository accountRepository) {
-    return new ListAccountsForOrganizationService(accountRepository);
-  }
-
-  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View Profile" menu item.
-  @Bean
-  /* package */ GetAccountForOrganizationUseCase getAccountForOrganizationUseCase(
-      final AccountRepository accountRepository) {
-    return new GetAccountForOrganizationService(accountRepository);
-  }
-
-  // TD-FUT-041: Backend-API-style profile read, accountId-only (no organizationId filter — see
-  // that query's own Javadoc for why this is a separate, simpler use case from the one right
-  // above).
-  @Bean
-  /* package */ GetAccountProfileUseCase getAccountProfileUseCase(
-      final AccountRepository accountRepository) {
-    return new GetAccountProfileService(accountRepository);
-  }
-
-  @Bean
-  /* package */ ActivatePlatformSigningKeyUseCase activatePlatformSigningKeyUseCase(
-      final PlatformSigningKeyRepository platformKeys) {
-    return new ActivatePlatformSigningKeyService(platformKeys);
-  }
-
-  @Bean
-  /* package */ ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase(
-      final SigningKeyRepository signingKeys) {
-    return new ActivateSigningKeyForOrganizationService(signingKeys);
-  }
-
-  // TD-SEC-008: OrganizationSigningKeyMaterialFactory (infrastructure) already implements
-  // SigningKeyMaterialGenerator directly — Spring resolves this parameter to that same bean, no
-  // separate bridge class needed (unlike the cross-module CreateOrganizationSigningKeyBridge).
-  @Bean
-  /* package */ RotateSigningKeyForOrganizationUseCase rotateSigningKeyForOrganizationUseCase(
-      final SigningKeyRepository signingKeys,
-      final SigningKeyMaterialGenerator keyMaterial,
-      @SuppressWarnings("PMD.LongVariable")
-          final ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase,
-      final AuditEventRecorder auditEvents) {
-    return new RotateSigningKeyForOrganizationService(
-        signingKeys, keyMaterial, activateSigningKeyForOrganizationUseCase, auditEvents);
-  }
-
-  // TD-SEC-029
-  @Bean
-  /* package */ PurgeSigningKeyForOrganizationUseCase purgeSigningKeyForOrganizationUseCase(
-      final SigningKeyRepository signingKeys,
-      final SigningKeyMaterialGenerator keyMaterial,
-      @SuppressWarnings("PMD.LongVariable")
-          final ActivateSigningKeyForOrganizationUseCase activateSigningKeyForOrganizationUseCase,
-      final AuditEventRecorder auditEvents) {
-    return new PurgeSigningKeyForOrganizationService(
-        signingKeys, keyMaterial, activateSigningKeyForOrganizationUseCase, auditEvents);
-  }
-
-  // SDE-III review, 2026-09-11: the dashboard's own signing-key listing page — see
-  // ListSigningKeysForOrganizationUseCase's own Javadoc for why this bean didn't exist until now.
-  // Same jwks-overlap-hours property app's own OrganizationAuthorizationServerConfig already reads
-  // for the real JWKS-serving path — one source of truth for "what should still be visible."
-  @Bean
-  /* package */ ListSigningKeysForOrganizationUseCase listSigningKeysForOrganizationUseCase(
-      final SigningKeyRepository signingKeys,
-      @Value("${clavaris.signing-key.jwks-overlap-hours:24}") final long jwksOverlapHours) {
-    return new ListSigningKeysForOrganizationService(
-        signingKeys, Duration.ofHours(jwksOverlapHours));
-  }
-
-  @Bean
-  /* package */ AuthenticateWithPasswordUseCase authenticateWithPasswordUseCase(
-      final AccountRepository accountRepository,
-      final PasswordVerifier passwordVerifier,
-      final SecurityMetricsRecorder securityMetrics,
-      final AccountAuthenticationPolicyProvider policyProvider) {
-    return new AuthenticateWithPasswordService(
-        accountRepository, passwordVerifier, securityMetrics, policyProvider);
-  }
-
-  @Bean
-  /* package */ RecordSessionOidcIdUseCase recordSessionOidcIdUseCase(
-      final SessionRepository sessions) {
-    return new RecordSessionOidcIdService(sessions);
-  }
-
-  @Bean
-  /* package */ IssueRefreshTokenUseCase issueRefreshTokenUseCase(
-      final SessionRepository sessions,
-      final RefreshTokenRepository refreshTokens,
-      final SecurityMetricsRecorder securityMetrics,
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final SessionPolicyProvider sessionPolicyProvider,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker) {
-    return new IssueRefreshTokenService(
-        sessions,
-        refreshTokens,
-        securityMetrics,
-        accounts,
-        sessionPolicyProvider,
-        accountTokenRevoker);
-  }
-
-  @Bean
-  /* package */ RotateRefreshTokenUseCase rotateRefreshTokenUseCase(
-      final RefreshTokenRepository refreshTokens,
-      final SessionRepository sessions,
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final EventOutboxWriter eventOutboxWriter,
-      final SecurityMetricsRecorder securityMetrics,
-      @SuppressWarnings("PMD.LongVariable") final SessionPolicyProvider sessionPolicyProvider) {
-    return new RotateRefreshTokenService(
-        refreshTokens,
-        sessions,
-        accounts,
-        accountTokenRevoker,
-        accountSessionRevoker,
-        eventOutboxWriter,
-        securityMetrics,
-        sessionPolicyProvider);
-  }
-
-  @Bean
-  /* package */ RequestEmailVerificationUseCase requestEmailVerificationUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender,
-      final AccountAuthenticationPolicyProvider policyProvider) {
-    return new RequestEmailVerificationService(
-        accounts, verificationTokens, mailSender, policyProvider);
-  }
-
-  @Bean
-  /* package */ ConfirmEmailVerificationUseCase confirmEmailVerificationUseCase(
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final AccountRepository accounts,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new ConfirmEmailVerificationService(verificationTokens, accounts, eventOutboxWriter);
-  }
-
-  @Bean
-  /* package */ RequestPasswordResetUseCase requestPasswordResetUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new RequestPasswordResetService(
-        accounts, verificationTokens, mailSender, eventOutboxWriter);
-  }
-
-  @Bean
-  /* package */ ConfirmPasswordResetUseCase confirmPasswordResetUseCase(
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final AccountRepository accounts,
-      final SessionRepository sessions,
-      final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final PasswordHasher passwordHasher,
-      final EventOutboxWriter eventOutboxWriter,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
-    return new ConfirmPasswordResetService(
-        verificationTokens,
-        accounts,
-        sessions,
-        refreshTokens,
-        accountTokenRevoker,
-        accountSessionRevoker,
-        passwordHasher,
-        eventOutboxWriter,
-        breachedPasswordChecker);
-  }
-
-  // ADR-0024 §3 — passwordless email sign-in
-  @Bean
-  /* package */ RequestEmailSignInCodeUseCase requestEmailSignInCodeUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender,
-      final AccountAuthenticationPolicyProvider policyProvider) {
-    return new RequestEmailSignInCodeService(
-        accounts, verificationTokens, mailSender, policyProvider);
-  }
-
-  @Bean
-  /* package */ AuthenticateWithEmailCodeUseCase authenticateWithEmailCodeUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
-    return new AuthenticateWithEmailCodeService(accounts, verificationTokens);
-  }
-
-  @Bean
-  /* package */ RequestEmailSignInLinkUseCase requestEmailSignInLinkUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender,
-      final AccountAuthenticationPolicyProvider policyProvider) {
-    return new RequestEmailSignInLinkService(
-        accounts, verificationTokens, mailSender, policyProvider);
-  }
-
-  // ADR-0024 §4 — username sign-in
-  @Bean
-  /* package */ AuthenticateWithUsernameUseCase authenticateWithUsernameUseCase(
-      final AccountRepository accountRepository,
-      final PasswordVerifier passwordVerifier,
-      final AccountAuthenticationPolicyProvider policyProvider) {
-    return new AuthenticateWithUsernameService(accountRepository, passwordVerifier, policyProvider);
-  }
-
-  @Bean
-  /* package */ AuthenticateWithEmailLinkUseCase authenticateWithEmailLinkUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
-    return new AuthenticateWithEmailLinkService(accounts, verificationTokens);
-  }
-
-  // ADR-0024 §6 — device trust step-up challenge
-  @Bean
-  /* package */ RequestDeviceTrustChallengeUseCase requestDeviceTrustChallengeUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      final MailSender mailSender) {
-    return new RequestDeviceTrustChallengeService(accounts, verificationTokens, mailSender);
-  }
-
-  @Bean
-  /* package */ ConfirmDeviceTrustChallengeUseCase confirmDeviceTrustChallengeUseCase(
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
-    return new ConfirmDeviceTrustChallengeService(verificationTokens);
-  }
-
-  @Bean
   /* package */ DeleteAccountUseCase deleteAccountUseCase(
       final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMembershipEraser workspaceMembershipEraser,
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker,
+      final WorkspaceMembershipEraser workspaceMembershipEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new DeleteAccountService(
@@ -494,25 +102,6 @@ class IdentityUseCaseConfig {
   /* package */ DeleteOwnAccountUseCase deleteOwnAccountUseCase(
       final AccountRepository accounts, final DeleteAccountUseCase deleteAccount) {
     return new DeleteOwnAccountService(accounts, deleteAccount);
-  }
-
-  @Bean
-  /* package */ SuspendAccountUseCase suspendAccountUseCase(
-      final AccountRepository accounts,
-      final SessionRepository sessions,
-      final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new SuspendAccountService(
-        accounts,
-        sessions,
-        refreshTokens,
-        accountTokenRevoker,
-        accountSessionRevoker,
-        auditEvents,
-        eventOutboxWriter);
   }
 
   // TD-FUT-019: approve/reject a PENDING_APPROVAL self-registration.
@@ -531,338 +120,5 @@ class IdentityUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
     return new RejectAccountRegistrationService(accounts, auditEvents, eventOutboxWriter);
-  }
-
-  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab "View log" menu item.
-  @Bean
-  /* package */ GetAuditLogForAccountUseCase getAuditLogForAccountUseCase(
-      final AuditEventReader auditEvents) {
-    return new GetAuditLogForAccountService(auditEvents);
-  }
-
-  // Clerk "session tasks" parity
-  @Bean
-  /* package */ ForcePasswordResetForAccountUseCase forcePasswordResetForAccountUseCase(
-      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
-    return new ForcePasswordResetForAccountService(accounts, auditEvents);
-  }
-
-  // Clerk "session tasks" parity
-  @Bean
-  /* package */ CompleteForcedPasswordResetUseCase completeForcedPasswordResetUseCase(
-      final AccountRepository accounts,
-      final SessionRepository sessions,
-      final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final PasswordHasher hasher,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
-    return new CompleteForcedPasswordResetService(
-        accounts,
-        sessions,
-        refreshTokens,
-        accountTokenRevoker,
-        accountSessionRevoker,
-        hasher,
-        breachedPasswordChecker);
-  }
-
-  // SDE-III feature build, 2026-09-03: support/operator impersonation — see
-  // ImpersonateAccountCommand's own Javadoc for why this use case only validates+audits, never
-  // mints anything itself.
-  @Bean
-  /* package */ ImpersonateAccountUseCase impersonateAccountUseCase(
-      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
-    return new ImpersonateAccountService(accounts, auditEvents);
-  }
-
-  @Bean
-  /* package */ ReactivateAccountUseCase reactivateAccountUseCase(
-      final AccountRepository accounts,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new ReactivateAccountService(accounts, auditEvents, eventOutboxWriter);
-  }
-
-  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" parity: same shape as
-  // suspendAccountUseCase above, a deliberately separate bean/use case, not a reuse.
-  @Bean
-  /* package */ BanAccountUseCase banAccountUseCase(
-      final AccountRepository accounts,
-      final SessionRepository sessions,
-      final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new BanAccountService(
-        accounts,
-        sessions,
-        refreshTokens,
-        accountTokenRevoker,
-        accountSessionRevoker,
-        auditEvents,
-        eventOutboxWriter);
-  }
-
-  @Bean
-  /* package */ UnbanAccountUseCase unbanAccountUseCase(
-      final AccountRepository accounts,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new UnbanAccountService(accounts, auditEvents, eventOutboxWriter);
-  }
-
-  @Bean
-  /* package */ UpdateAccountProfileUseCase updateAccountProfileUseCase(
-      final AccountRepository accounts,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
-    return new UpdateAccountProfileService(accounts, auditEvents, outbox);
-  }
-
-  @Bean
-  /* package */ UpdateAccountPermissionsUseCase updateAccountPermissionsUseCase(
-      final AccountRepository accounts, final AuditEventRecorder auditEvents) {
-    return new UpdateAccountPermissionsService(accounts, auditEvents);
-  }
-
-  // TD-FUT-034, Clerk "Metadata" parity.
-  @Bean
-  /* package */ UpdateAccountMetadataUseCase updateAccountMetadataUseCase(
-      final AccountRepository accounts,
-      final AuditEventRecorder auditEvents,
-      final ObjectMapper objectMapper) {
-    return new UpdateAccountMetadataService(accounts, auditEvents, objectMapper);
-  }
-
-  // Clerk "OAuth" tab parity (ADR-0026).
-  @Bean
-  /* package */ ListOAuthGrantsForAccountUseCase listOAuthGrantsForAccountUseCase(
-      final OAuthGrantsRepository oauthGrants) {
-    return new ListOAuthGrantsForAccountService(oauthGrants);
-  }
-
-  @Bean
-  /* package */ RevokeOAuthGrantUseCase revokeOAuthGrantUseCase(
-      final OAuthGrantsRepository oauthGrants, final AuditEventRecorder auditEvents) {
-    return new RevokeOAuthGrantService(oauthGrants, auditEvents);
-  }
-
-  @Bean
-  /* package */ RevokeAllOAuthGrantsForAccountUseCase revokeAllOAuthGrantsForAccountUseCase(
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      final AuditEventRecorder auditEvents) {
-    return new RevokeAllOAuthGrantsForAccountService(accountTokenRevoker, auditEvents);
-  }
-
-  // ADR-0026: needs its own TransactionTemplate (not @Transactional on handle()) — same "the
-  // network call to the storage backend must never run inside an open database transaction"
-  // reasoning AuthenticateWithSocialProviderUseCase's own @Bean method above already documents.
-  @Bean
-  /* package */ UpdateAccountProfilePictureUseCase updateAccountProfilePictureUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
-      final AuditEventRecorder auditEvents,
-      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
-    return new UpdateAccountProfilePictureService(
-        accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
-  }
-
-  @Bean
-  /* package */ RemoveAccountProfilePictureUseCase removeAccountProfilePictureUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
-      final AuditEventRecorder auditEvents,
-      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
-    return new RemoveAccountProfilePictureService(
-        accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
-  }
-
-  @Bean
-  /* package */ GetAccountAvatarUseCase getAccountAvatarUseCase(
-      final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage) {
-    return new GetAccountAvatarService(accounts, profilePictureStorage);
-  }
-
-  // ADR-0020 Decision 1: needs its own TransactionTemplate (not @Transactional on handle()) for
-  // exactly the reason AddWorkspaceMemberUseCase's own @Bean method already documents — one branch
-  // of this flow needs an atomic multi-write, another needs a write followed by a real mail send.
-  // TD-FUT-019's own new accountAuthenticationPolicyProvider parameter pushed this to the
-  // PMD.ExcessiveParameterList threshold too — same "wiring, not sprawl" reasoning.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
-  @Bean
-  /* package */ AuthenticateWithSocialProviderUseCase authenticateWithSocialProviderUseCase(
-      final AccountRepository accounts,
-      final SocialIdentityRepository socialIdentities,
-      final PendingSocialLinkRepository pendingLinks,
-      final OrganizationSocialLoginPolicyProvider policyProvider,
-      final MailSender mailSender,
-      final EventOutboxWriter eventOutboxWriter,
-      final SecurityMetricsRecorder securityMetrics,
-      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
-      final PasswordHasher hasher,
-      @SuppressWarnings("PMD.LongVariable")
-          final AccountAuthenticationPolicyProvider accountAuthenticationPolicyProvider) {
-    return new AuthenticateWithSocialProviderService(
-        accounts,
-        socialIdentities,
-        pendingLinks,
-        policyProvider,
-        mailSender,
-        eventOutboxWriter,
-        securityMetrics,
-        new TransactionTemplate(transactionManager),
-        hasher,
-        accountAuthenticationPolicyProvider);
-  }
-
-  @Bean
-  /* package */ ConfirmPendingSocialLinkUseCase confirmPendingSocialLinkUseCase(
-      final PendingSocialLinkRepository pendingLinks,
-      final SocialIdentityRepository socialIdentities,
-      final AccountRepository accounts,
-      final EventOutboxWriter eventOutboxWriter) {
-    return new ConfirmPendingSocialLinkService(
-        pendingLinks, socialIdentities, accounts, eventOutboxWriter);
-  }
-
-  // Self-service sessions/devices page — see AccountActiveSessionsRepository's own Javadoc for
-  // why this one port backs both this bean and revokeAccountSessionUseCase below.
-  @Bean
-  /* package */ ListActiveSessionsForAccountUseCase listActiveSessionsForAccountUseCase(
-      final AccountActiveSessionsRepository activeSessions) {
-    return new ListActiveSessionsForAccountService(activeSessions);
-  }
-
-  @Bean
-  /* package */ RevokeAccountSessionUseCase revokeAccountSessionUseCase(
-      final AccountActiveSessionsRepository activeSessions,
-      final AccountRepository accounts,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
-    return new RevokeAccountSessionService(activeSessions, accounts, auditEvents, outbox);
-  }
-
-  // TD-PERF-011: a small, bounded pool of daemon threads dedicated to the new-device-login
-  // notification email — decouples RecordAccountLoginDeviceService's own outbound Resend call
-  // from the request thread completing every unrecognized-device login, the same "don't block
-  // the calling thread on a third-party HTTP call" pattern TD-PERF-004 already established for
-  // webhook delivery (webhookDeliveryExecutor, WebhookUseCaseConfig). Small on purpose: this
-  // fires only on unrecognized-device logins, not every login, nowhere near the concurrency a
-  // batch webhook dispatch tick needs. destroyMethod="shutdown": same Spring-managed-lifecycle
-  // discipline as that bean, so a repeatedly-started-and-stopped @SpringBootTest context doesn't
-  // leak thread pools.
-  @Bean(destroyMethod = "shutdown")
-  /* package */ ExecutorService newDeviceNotificationExecutor(
-      @Value("${clavaris.known-device.notification-concurrency:4}") final int concurrency) {
-    final AtomicInteger threadCount = new AtomicInteger();
-    final ThreadFactory namedThreads =
-        runnable -> {
-          final Thread thread =
-              new Thread(runnable, "new-device-notification-" + threadCount.incrementAndGet());
-          // Never blocks JVM shutdown on an in-flight notification send — same posture
-          // webhookDeliveryExecutor's own identical thread factory already establishes.
-          thread.setDaemon(true);
-          return thread;
-        };
-    return Executors.newFixedThreadPool(concurrency, namedThreads);
-  }
-
-  // New-device login email notification.
-  @Bean
-  // Code review finding (2026-09-01): the migration grandfather cutoff — see
-  // RecordAccountLoginDeviceService's own Javadoc. Defaults to V20260831100000's own timestamp,
-  // the actual moment the DeviceCookie mechanism replaced User-Agent fingerprinting; overridable
-  // only in case this ever needs re-running against a differently-timed deployment.
-  @SuppressWarnings("PMD.LongVariable") // matches that class's own identical suppression.
-  /* package */ RecordAccountLoginDeviceUseCase recordAccountLoginDeviceUseCase(
-      final KnownDeviceRepository knownDevices,
-      final AccountRepository accounts,
-      final MailSender mailSender,
-      final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox,
-      @Value("${clavaris.known-device.migration-cutover-at:2026-08-31T10:00:00Z}")
-          final Instant deviceCookieMigrationCutoverAt,
-      final ExecutorService newDeviceNotificationExecutor,
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens) {
-    return new RecordAccountLoginDeviceService(
-        knownDevices,
-        accounts,
-        mailSender,
-        auditEvents,
-        outbox,
-        deviceCookieMigrationCutoverAt,
-        newDeviceNotificationExecutor,
-        verificationTokens);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" activity heatmap parity.
-  @Bean
-  /* package */ RecordLoginEventUseCase recordLoginEventUseCase(
-      final LoginEventRepository loginEvents) {
-    return new RecordLoginEventService(loginEvents);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" activity heatmap parity.
-  @Bean
-  /* package */ GetLoginActivityForAccountUseCase getLoginActivityForAccountUseCase(
-      final LoginEventRepository loginEvents) {
-    return new GetLoginActivityForAccountService(loginEvents);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" passkeys parity.
-  @Bean
-  /* package */ StartWebAuthnRegistrationUseCase startWebAuthnRegistrationUseCase(
-      final RelyingPartyFactory relyingParties, final OrganizationNameProvider organizationNames) {
-    return new StartWebAuthnRegistrationService(relyingParties, organizationNames);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" passkeys parity.
-  @Bean
-  /* package */ CompleteWebAuthnRegistrationUseCase completeWebAuthnRegistrationUseCase(
-      final RelyingParty relyingParty, final WebAuthnCredentialRepository credentials) {
-    return new CompleteWebAuthnRegistrationService(relyingParty, credentials);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" passkeys parity.
-  @Bean
-  /* package */ StartWebAuthnAuthenticationUseCase startWebAuthnAuthenticationUseCase(
-      final RelyingParty relyingParty) {
-    return new StartWebAuthnAuthenticationService(relyingParty);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" passkeys parity.
-  @Bean
-  /* package */ AuthenticateWithWebAuthnUseCase authenticateWithWebAuthnUseCase(
-      final RelyingParty relyingParty,
-      final WebAuthnCredentialRepository credentials,
-      final AccountRepository accounts) {
-    return new AuthenticateWithWebAuthnService(relyingParty, credentials, accounts);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" passkeys parity.
-  @Bean
-  /* package */ ListWebAuthnCredentialsForAccountUseCase listWebAuthnCredentialsForAccountUseCase(
-      final WebAuthnCredentialRepository credentials) {
-    return new ListWebAuthnCredentialsForAccountService(credentials);
-  }
-
-  // TD-FUT-034, Clerk "View Profile" passkeys parity.
-  @Bean
-  /* package */ DeleteWebAuthnCredentialUseCase deleteWebAuthnCredentialUseCase(
-      final WebAuthnCredentialRepository credentials, final AuditEventRecorder auditEvents) {
-    return new DeleteWebAuthnCredentialService(credentials, auditEvents);
-  }
-
-  // TD-FUT-025: the "this wasn't me" half of the new-device login alert — see
-  // ConfirmNewDeviceLoginAlertService's own Javadoc for why this delegates straight to the
-  // already-tested suspendAccountUseCase bean above rather than duplicating its cascade.
-  @Bean
-  /* package */ ConfirmNewDeviceLoginAlertUseCase confirmNewDeviceLoginAlertUseCase(
-      @SuppressWarnings("PMD.LongVariable") final VerificationTokenRepository verificationTokens,
-      @SuppressWarnings("PMD.LongVariable") final SuspendAccountUseCase suspendAccountUseCase) {
-    return new ConfirmNewDeviceLoginAlertService(verificationTokens, suspendAccountUseCase);
   }
 }

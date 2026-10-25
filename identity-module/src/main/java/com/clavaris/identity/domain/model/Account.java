@@ -8,30 +8,25 @@ import java.util.Optional;
  * Aggregate root. BR-ID-02: never valid with zero authentication methods, enforced here so no
  * future use case can bypass it. ADR-0010: {@code organizationId} is mandatory and immutable.
  *
- * <p>PMD suppressions below back the record-style accessor convention documented once in
- * coding-standards.md §3a, not an accidental data-holder shape. {@code TooManyMethods}: one more
- * mutator per use case that touches this aggregate (BR-ID-02, BR-ID-04, BR-ID-05) is growth in the
- * right place, not a signal to split the class.
+ * <p>The optional attributes live in four small immutable values ({@link AccountProfile}, {@link
+ * AccountPermissions}, {@link RegistrationDecision}, {@link AccountMetadata}) instead of two dozen
+ * loose fields, and persistence rehydrates through one {@link AccountSnapshot} instead of a
+ * telescoping set of {@code reconstitute} overloads. The accessors below stay flat so no caller
+ * needs to know how the state is grouped.
+ *
+ * <p>PMD suppressions back the record-style accessor convention documented once in
+ * coding-standards.md §3a, not an accidental data-holder shape.
  */
-// PMD.AvoidDuplicateLiterals: the repeated string is "java:S107" itself, reused across every
-// multi-field reconstitute() overload's own suppression — same rationale AccountRevocationCascade's
-// own class-level suppression documents for its own literal-as-annotation-value case.
+// PMD.TooManyMethods/ExcessivePublicCount: one accessor per attribute plus one mutator per use case
+// that touches this aggregate (BR-ID-02, BR-ID-04, BR-ID-05) is growth in the right place, not a
+// signal to split it; the state itself is already grouped into the four values above.
 @SuppressWarnings({
   "PMD.TooManyMethods",
+  "PMD.ExcessivePublicCount",
   "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.ShortVariable",
   "PMD.ShortMethodName",
-  "PMD.LongVariable",
-  "PMD.AvoidDuplicateLiterals",
-  // TD-FUT-019's own 4 new public members (registerPendingApproval, approveRegistration,
-  // rejectRegistration, plus the new reconstitute overload) pushed this class past the default
-  // threshold — same "one mutator per use case that touches this aggregate is growth in the
-  // right place" reasoning this class's own Javadoc already documents for PMD.TooManyMethods.
-  "PMD.ExcessivePublicCount",
-  // TD-FUT-034's own 3 new metadata fields pushed this class past the default field-count
-  // threshold too - same "growth in the right place, not a signal to split the class" rationale
-  // this class's own Javadoc already documents.
-  "PMD.TooManyFields"
+  "PMD.LongVariable"
 })
 public final class Account {
 
@@ -54,60 +49,15 @@ public final class Account {
   // timestamp, not a boolean, for its audit value (same reasoning as emailVerifiedAt).
   private Instant passwordResetRequiredAt;
 
-  // Clerk dashboard "Users" parity (SDE-III review, 2026-09-19): all four nullable, optional
-  // profile attributes — email remains the one mandatory identity field (BR-ID-01), same posture
-  // as username's own "optional secondary identifier" precedent (ADR-0024 §4). No dedicated value
-  // types (unlike Email/Username): none of the four carries a real domain invariant beyond
-  // "arbitrary display/contact text" — a validated PhoneNumber type would need real phone-number
-  // parsing this codebase has no other reason to own yet.
-  private String firstName;
-  private String lastName;
-  private String phoneNumber;
-
-  // Updated by recordSignIn() on every successful password/social authentication — the "Last
-  // signed In" column the dashboard Users tab shows, mirroring Clerk's own. Deliberately a plain
-  // field mutated post-construction (like passwordResetRequiredAt), not folded into the
-  // authentication use cases' own return value — every caller that authenticates an Account
-  // already holds the aggregate and saves it back, the natural place for this side effect to live.
+  // Moved forward by recordSignIn() on every successful authentication — the "Last signed in"
+  // column. A plain field mutated post-construction: every caller that authenticates an Account
+  // already holds the aggregate and saves it back, the natural place for this side effect.
   private Instant lastSignedInAt;
 
-  // ADR-0026: the Clavaris-owned avatar endpoint's own storage key/external reference for this
-  // Account's uploaded or social-provider-sourced picture — null means "no picture set", not an
-  // error; GetAccountAvatarService's own default-avatar fallback (initials + deterministic color)
-  // covers that case, so this field is never required to be non-null anywhere downstream.
-  private String pictureUrl;
-
-  // Clerk "User permissions" parity (ADR-0026): both admin-controlled, both default false —
-  // neither is a self-toggle, only PlatformAccountSettingsController (dashboard "Settings" tab)
-  // ever mutates either. Plain booleans, not Optional-wrapped like the nullable fields above:
-  // there is no "unset" state to represent, every Account genuinely has one of exactly two values
-  // for each from the moment it's constructed.
-  private boolean canDeleteOwnAccount;
-  private boolean bypassesDeviceTrust;
-
-  // TD-FUT-019 (gated self-registration): set exactly once, by approveRegistration()/
-  // rejectRegistration(), the moment a PENDING_APPROVAL account is decided — null for every
-  // account that was never gated in the first place (the overwhelming majority). rejectionReason
-  // is only ever non-null alongside a REJECTED status; an approved account never sets it.
-  private Instant registrationDecidedAt;
-  private String registrationRejectionReason;
-
-  // TD-FUT-034 (Clerk "Metadata" parity): three raw-JSON-text tiers Clavaris never interprets,
-  // same "opaque, consumer-defined" posture OAuthClient.allowedScopes/WorkspaceRole.permissions
-  // already establish — the shape is entirely the consuming application's own business. null means
-  // never set, same convention as this class's other optional text fields.
-  // publicMetadata: admin/backend-writable only (this codebase has no self-service metadata
-  // endpoint), but semantically readable by anyone who can read this Account — never something
-  // Clavaris itself must keep secret.
-  // privateMetadata: admin/backend-writable AND admin/backend-readable only — never exposed
-  // through any account-holder-facing surface.
-  // unsafeMetadata: admin/backend-writable here (no end-user self-service surface exists yet) —
-  // named "unsafe" per Clerk's own convention because a future self-service write path would let
-  // the account holder set it directly, so no caller may ever treat its contents as trustworthy
-  // for an authorization decision.
-  private String publicMetadata;
-  private String privateMetadata;
-  private String unsafeMetadata;
+  private AccountProfile profile = AccountProfile.EMPTY;
+  private AccountPermissions permissions = AccountPermissions.DEFAULT;
+  private RegistrationDecision registration = RegistrationDecision.NONE;
+  private AccountMetadata metadata = AccountMetadata.EMPTY;
 
   private Account(
       final AccountId id,
@@ -133,11 +83,9 @@ public final class Account {
   }
 
   /**
-   * Admin-initiated creation (dashboard "Users" tab, Clerk parity) — same aggregate, same
-   * invariants as {@link #register(OrganizationId, Email)}, with the optional profile fields an
-   * operator can fill in on the create-user form. {@code firstName}/{@code lastName}/{@code
-   * phoneNumber} may each be {@code null} — every field on that form except email and password is
-   * optional.
+   * Admin-initiated creation (dashboard "Users" tab) — same aggregate and invariants as {@link
+   * #register(OrganizationId, Email)}, with the optional profile fields the create-user form takes.
+   * Each of them may be {@code null}.
    */
   public static Account register(
       final OrganizationId organizationId,
@@ -146,26 +94,99 @@ public final class Account {
       final String lastName,
       final String phoneNumber) {
     final Account account = register(organizationId, email);
-    account.firstName = firstName;
-    account.lastName = lastName;
-    account.phoneNumber = phoneNumber;
+    account.profile = new AccountProfile(firstName, lastName, phoneNumber, null);
     return account;
   }
 
   /**
-   * TD-FUT-019: same as {@link #register(OrganizationId, Email)}, but for an Organization whose own
-   * {@code AccountAuthenticationPolicy.selfRegistrationRequiresApproval()} is on — the account
-   * exists and can be found/administered, but cannot sign in ({@code AuthenticateWith*Service}
-   * rejects any non-{@code ACTIVE} account, same unconditional gate {@code SUSPENDED}/{@code
-   * BANNED} already rely on) until {@link #approveRegistration()} runs. The caller is still
-   * responsible for attaching a credential before persisting (BR-ID-02) — {@code PENDING_APPROVAL}
-   * governs usability, not the same-aggregate-invariant this class always enforces regardless of
-   * status.
+   * TD-FUT-019: for an Organization whose {@code selfRegistrationRequiresApproval()} policy is on —
+   * the account exists and can be administered but cannot sign in (every {@code AuthenticateWith*}
+   * service rejects a non-{@code ACTIVE} account) until {@link #approveRegistration()}. The caller
+   * still attaches a credential before persisting (BR-ID-02): status governs usability, not that
+   * invariant.
    */
   public static Account registerPendingApproval(
       final OrganizationId organizationId, final Email email) {
     return new Account(
         AccountId.newId(), organizationId, email, Instant.now(), AccountStatus.PENDING_APPROVAL);
+  }
+
+  /**
+   * Rehydrates an existing row from its full persisted state, preserving the real {@code id}/{@code
+   * createdAt}/{@code status}.
+   */
+  public static Account reconstitute(final AccountSnapshot snapshot) {
+    final Account account =
+        new Account(
+            snapshot.id(),
+            snapshot.organizationId(),
+            snapshot.email(),
+            snapshot.createdAt(),
+            snapshot.status());
+    account.emailVerifiedAt = snapshot.emailVerifiedAt();
+    account.passwordCredential = snapshot.passwordCredential();
+    account.username = snapshot.username();
+    account.passwordResetRequiredAt = snapshot.passwordResetRequiredAt();
+    account.lastSignedInAt = snapshot.lastSignedInAt();
+    account.profile = Objects.requireNonNull(snapshot.profile(), "profile must not be null");
+    account.permissions =
+        Objects.requireNonNull(snapshot.permissions(), "permissions must not be null");
+    account.registration =
+        Objects.requireNonNull(snapshot.registration(), "registration must not be null");
+    account.metadata = Objects.requireNonNull(snapshot.metadata(), "metadata must not be null");
+    return account;
+  }
+
+  /**
+   * Convenience for the common case of an account with none of the optional attributes set — {@code
+   * passwordCredential}/{@code username} may be {@code null} as in {@link AccountSnapshot}.
+   */
+  @SuppressWarnings("java:S107")
+  public static Account reconstitute(
+      final AccountId id,
+      final OrganizationId organizationId,
+      final Email email,
+      final Instant createdAt,
+      final Instant emailVerifiedAt,
+      final AccountStatus status,
+      final PasswordCredential passwordCredential,
+      final Username username,
+      final Instant passwordResetRequiredAt) {
+    return reconstitute(
+        new AccountSnapshot(
+            id,
+            organizationId,
+            email,
+            createdAt,
+            emailVerifiedAt,
+            status,
+            passwordCredential,
+            username,
+            passwordResetRequiredAt,
+            null,
+            AccountProfile.EMPTY,
+            AccountPermissions.DEFAULT,
+            RegistrationDecision.NONE,
+            AccountMetadata.EMPTY));
+  }
+
+  /** Everything the persistence adapter writes, in one value. */
+  public AccountSnapshot snapshot() {
+    return new AccountSnapshot(
+        id,
+        organizationId,
+        email,
+        createdAt,
+        emailVerifiedAt,
+        status,
+        passwordCredential,
+        username,
+        passwordResetRequiredAt,
+        lastSignedInAt,
+        profile,
+        permissions,
+        registration,
+        metadata);
   }
 
   /**
@@ -195,264 +216,6 @@ public final class Account {
       throw new IllegalStateException("Account " + id.value() + " already has a username assigned");
     }
     this.username = Objects.requireNonNull(username, "username must not be null");
-  }
-
-  /**
-   * Rehydrates an existing row, preserving the real {@code id}/{@code createdAt}/{@code status}.
-   * {@code passwordCredential}/{@code username} may be {@code null} (a social-identity-only
-   * account, ADR-0020; a username never assigned, ADR-0024 §4) — BR-ID-02 still guarantees at least
-   * one authentication method exists.
-   */
-  @SuppressWarnings("java:S107")
-  public static Account reconstitute(
-      final AccountId id,
-      final OrganizationId organizationId,
-      final Email email,
-      final Instant createdAt,
-      final Instant emailVerifiedAt,
-      final AccountStatus status,
-      final PasswordCredential passwordCredential,
-      final Username username,
-      final Instant passwordResetRequiredAt) {
-    return reconstitute(
-        id,
-        organizationId,
-        email,
-        createdAt,
-        emailVerifiedAt,
-        status,
-        passwordCredential,
-        username,
-        passwordResetRequiredAt,
-        null,
-        null,
-        null,
-        null,
-        null);
-  }
-
-  /**
-   * Full reconstitution including the Clerk-parity profile/last-sign-in fields (SDE-III review,
-   * 2026-09-19) — the persistence adapter's own rehydration path. The 9-arg overload above is kept,
-   * not replaced, so every existing caller that never touches these four fields (the overwhelming
-   * majority — see this class's own commit history) stays unchanged.
-   */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
-  public static Account reconstitute(
-      final AccountId id,
-      final OrganizationId organizationId,
-      final Email email,
-      final Instant createdAt,
-      final Instant emailVerifiedAt,
-      final AccountStatus status,
-      final PasswordCredential passwordCredential,
-      final Username username,
-      final Instant passwordResetRequiredAt,
-      final String firstName,
-      final String lastName,
-      final String phoneNumber,
-      final Instant lastSignedInAt) {
-    return reconstitute(
-        id,
-        organizationId,
-        email,
-        createdAt,
-        emailVerifiedAt,
-        status,
-        passwordCredential,
-        username,
-        passwordResetRequiredAt,
-        firstName,
-        lastName,
-        phoneNumber,
-        lastSignedInAt,
-        null);
-  }
-
-  /**
-   * Full reconstitution including {@code pictureUrl} (ADR-0026) — the persistence adapter's own
-   * rehydration path. The 13-arg overload above is kept, not replaced, same "every existing caller
-   * that never touches the new field stays unchanged" precedent that overload's own Javadoc already
-   * documents for the 9-arg one below it.
-   */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
-  public static Account reconstitute(
-      final AccountId id,
-      final OrganizationId organizationId,
-      final Email email,
-      final Instant createdAt,
-      final Instant emailVerifiedAt,
-      final AccountStatus status,
-      final PasswordCredential passwordCredential,
-      final Username username,
-      final Instant passwordResetRequiredAt,
-      final String firstName,
-      final String lastName,
-      final String phoneNumber,
-      final Instant lastSignedInAt,
-      final String pictureUrl) {
-    return reconstitute(
-        id,
-        organizationId,
-        email,
-        createdAt,
-        emailVerifiedAt,
-        status,
-        passwordCredential,
-        username,
-        passwordResetRequiredAt,
-        firstName,
-        lastName,
-        phoneNumber,
-        lastSignedInAt,
-        pictureUrl,
-        false,
-        false);
-  }
-
-  /**
-   * Full reconstitution including {@code canDeleteOwnAccount}/{@code bypassesDeviceTrust}
-   * (ADR-0026, Clerk "User permissions" parity) — the persistence adapter's own rehydration path.
-   * The 14-arg overload above is kept, not replaced, same "every existing caller that never touches
-   * the new fields stays unchanged" precedent that overload's own Javadoc already documents for the
-   * 13-arg one below it.
-   */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
-  public static Account reconstitute(
-      final AccountId id,
-      final OrganizationId organizationId,
-      final Email email,
-      final Instant createdAt,
-      final Instant emailVerifiedAt,
-      final AccountStatus status,
-      final PasswordCredential passwordCredential,
-      final Username username,
-      final Instant passwordResetRequiredAt,
-      final String firstName,
-      final String lastName,
-      final String phoneNumber,
-      final Instant lastSignedInAt,
-      final String pictureUrl,
-      final boolean canDeleteOwnAccount,
-      final boolean bypassesDeviceTrust) {
-    final Account account = new Account(id, organizationId, email, createdAt, status);
-    account.emailVerifiedAt = emailVerifiedAt;
-    account.passwordCredential = passwordCredential;
-    account.username = username;
-    account.passwordResetRequiredAt = passwordResetRequiredAt;
-    account.firstName = firstName;
-    account.lastName = lastName;
-    account.phoneNumber = phoneNumber;
-    account.lastSignedInAt = lastSignedInAt;
-    account.pictureUrl = pictureUrl;
-    account.canDeleteOwnAccount = canDeleteOwnAccount;
-    account.bypassesDeviceTrust = bypassesDeviceTrust;
-    return account;
-  }
-
-  /**
-   * Full reconstitution including {@code registrationDecidedAt}/{@code registrationRejectionReason}
-   * (TD-FUT-019) — the persistence adapter's own rehydration path. The 16-arg overload above is
-   * kept, not replaced, same "every existing caller that never touches the new fields stays
-   * unchanged" precedent that overload's own Javadoc already documents for the one below it.
-   */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
-  public static Account reconstitute(
-      final AccountId id,
-      final OrganizationId organizationId,
-      final Email email,
-      final Instant createdAt,
-      final Instant emailVerifiedAt,
-      final AccountStatus status,
-      final PasswordCredential passwordCredential,
-      final Username username,
-      final Instant passwordResetRequiredAt,
-      final String firstName,
-      final String lastName,
-      final String phoneNumber,
-      final Instant lastSignedInAt,
-      final String pictureUrl,
-      final boolean canDeleteOwnAccount,
-      final boolean bypassesDeviceTrust,
-      final Instant registrationDecidedAt,
-      final String registrationRejectionReason) {
-    final Account account =
-        reconstitute(
-            id,
-            organizationId,
-            email,
-            createdAt,
-            emailVerifiedAt,
-            status,
-            passwordCredential,
-            username,
-            passwordResetRequiredAt,
-            firstName,
-            lastName,
-            phoneNumber,
-            lastSignedInAt,
-            pictureUrl,
-            canDeleteOwnAccount,
-            bypassesDeviceTrust);
-    account.registrationDecidedAt = registrationDecidedAt;
-    account.registrationRejectionReason = registrationRejectionReason;
-    return account;
-  }
-
-  /**
-   * Full reconstitution including {@code publicMetadata}/{@code privateMetadata}/{@code
-   * unsafeMetadata} (TD-FUT-034) — the persistence adapter's own rehydration path. The 18-arg
-   * overload above is kept, not replaced, same "every existing caller that never touches the new
-   * fields stays unchanged" precedent that overload's own Javadoc already documents for the one
-   * below it.
-   */
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
-  public static Account reconstitute(
-      final AccountId id,
-      final OrganizationId organizationId,
-      final Email email,
-      final Instant createdAt,
-      final Instant emailVerifiedAt,
-      final AccountStatus status,
-      final PasswordCredential passwordCredential,
-      final Username username,
-      final Instant passwordResetRequiredAt,
-      final String firstName,
-      final String lastName,
-      final String phoneNumber,
-      final Instant lastSignedInAt,
-      final String pictureUrl,
-      final boolean canDeleteOwnAccount,
-      final boolean bypassesDeviceTrust,
-      final Instant registrationDecidedAt,
-      final String registrationRejectionReason,
-      final String publicMetadata,
-      final String privateMetadata,
-      final String unsafeMetadata) {
-    final Account account =
-        reconstitute(
-            id,
-            organizationId,
-            email,
-            createdAt,
-            emailVerifiedAt,
-            status,
-            passwordCredential,
-            username,
-            passwordResetRequiredAt,
-            firstName,
-            lastName,
-            phoneNumber,
-            lastSignedInAt,
-            pictureUrl,
-            canDeleteOwnAccount,
-            bypassesDeviceTrust,
-            registrationDecidedAt,
-            registrationRejectionReason);
-    account.publicMetadata = publicMetadata;
-    account.privateMetadata = privateMetadata;
-    account.unsafeMetadata = unsafeMetadata;
-    return account;
   }
 
   public AccountId id() {
@@ -492,15 +255,15 @@ public final class Account {
   }
 
   public Optional<String> firstName() {
-    return Optional.ofNullable(firstName);
+    return Optional.ofNullable(profile.firstName());
   }
 
   public Optional<String> lastName() {
-    return Optional.ofNullable(lastName);
+    return Optional.ofNullable(profile.lastName());
   }
 
   public Optional<String> phoneNumber() {
-    return Optional.ofNullable(phoneNumber);
+    return Optional.ofNullable(profile.phoneNumber());
   }
 
   public Optional<Instant> lastSignedInAt() {
@@ -508,42 +271,41 @@ public final class Account {
   }
 
   public Optional<String> pictureUrl() {
-    return Optional.ofNullable(pictureUrl);
+    return Optional.ofNullable(profile.pictureUrl());
   }
 
   public boolean canDeleteOwnAccount() {
-    return canDeleteOwnAccount;
+    return permissions.canDeleteOwnAccount();
   }
 
   public boolean bypassesDeviceTrust() {
-    return bypassesDeviceTrust;
+    return permissions.bypassesDeviceTrust();
   }
 
   public Optional<Instant> registrationDecidedAt() {
-    return Optional.ofNullable(registrationDecidedAt);
+    return Optional.ofNullable(registration.decidedAt());
   }
 
   public Optional<String> registrationRejectionReason() {
-    return Optional.ofNullable(registrationRejectionReason);
+    return Optional.ofNullable(registration.rejectionReason());
   }
 
   public Optional<String> publicMetadata() {
-    return Optional.ofNullable(publicMetadata);
+    return Optional.ofNullable(metadata.publicMetadata());
   }
 
   public Optional<String> privateMetadata() {
-    return Optional.ofNullable(privateMetadata);
+    return Optional.ofNullable(metadata.privateMetadata());
   }
 
   public Optional<String> unsafeMetadata() {
-    return Optional.ofNullable(unsafeMetadata);
+    return Optional.ofNullable(metadata.unsafeMetadata());
   }
 
   /**
    * Called by every successful authentication path (password, social) right before the account is
-   * saved back — the dashboard Users tab's "Last signed In" column (Clerk parity). Unconditional,
-   * not idempotent-guarded like {@link #verifyEmail()}: unlike a one-time confirmation, this is
-   * meant to move forward on every single sign-in, not just the first.
+   * saved back. Unconditional, not idempotent-guarded like {@link #verifyEmail()}: it is meant to
+   * move forward on every sign-in, not just the first.
    */
   public void recordSignIn() {
     this.lastSignedInAt = Instant.now();
@@ -562,8 +324,8 @@ public final class Account {
   /**
    * Password-reset flow (BR-ID-04) — replaces the hash in place; requires an existing credential.
    * {@link #attachPasswordCredential} is registration-time only, not this. Reuses the existing
-   * row's own {@code id} rather than minting a fresh one (confirmed live: a fresh id
-   * duplicate-inserts against {@code password_credentials}' own {@code UNIQUE(account_id)}).
+   * row's own {@code id} rather than minting a fresh one (a fresh id duplicate-inserts against
+   * {@code password_credentials}' own {@code UNIQUE(account_id)}).
    */
   // PMD.NullAssignment: same deliberate-clear rationale as attachPasswordCredential's own
   // identical suppression.
@@ -609,11 +371,10 @@ public final class Account {
   }
 
   /**
-   * SDE-III review, 2026-09-19 — Clerk dashboard "Users" parity: a deliberately separate action
-   * from {@link #suspend()}, not an alias — see {@link AccountStatus}'s own Javadoc for why. Same
-   * idempotent/terminal-status handling; only transitions out of {@code ACTIVE}, never out of
-   * {@code SUSPENDED} (an account already suspended must be explicitly reactivated first — the two
-   * states don't silently convert into one another).
+   * A deliberately separate action from {@link #suspend()}, not an alias — see {@link
+   * AccountStatus}'s own Javadoc. Same idempotent/terminal-status handling; only transitions out of
+   * {@code ACTIVE}, never out of {@code SUSPENDED} (an account already suspended must be explicitly
+   * reactivated first — the two states don't silently convert into one another).
    */
   public void ban() {
     if (this.status == AccountStatus.ACTIVE) {
@@ -629,145 +390,107 @@ public final class Account {
   }
 
   /**
-   * TD-FUT-019: the operator-dashboard or consuming-application-backend approval decision — only
-   * ever transitions a {@code PENDING_APPROVAL} account, idempotent/no-op from any other status,
-   * same defensive shape {@link #suspend()}/{@link #ban()} already establish. The real precondition
-   * ("was this genuinely pending") is the calling use case's own job to check and report as a typed
-   * error before calling this — this method is the safety net, not the primary signal.
+   * TD-FUT-019: only ever transitions a {@code PENDING_APPROVAL} account, a no-op from any other
+   * status — the same defensive shape as {@link #suspend()}/{@link #ban()}. Whether it was
+   * genuinely pending is the calling use case's job to check and report as a typed error; this is
+   * the safety net, not the primary signal.
    */
   public void approveRegistration() {
     if (this.status == AccountStatus.PENDING_APPROVAL) {
       this.status = AccountStatus.ACTIVE;
-      this.registrationDecidedAt = Instant.now();
+      this.registration = RegistrationDecision.approvedAt(Instant.now());
     }
   }
 
   /**
-   * TD-FUT-019: the rejection counterpart to {@link #approveRegistration()} — same idempotent,
-   * PENDING_APPROVAL-only transition shape. {@code reason} may be {@code null} (no reason given);
-   * never required, since the consuming application's own callback is not guaranteed to supply one.
+   * TD-FUT-019: the rejection counterpart to {@link #approveRegistration()}, same idempotent,
+   * {@code PENDING_APPROVAL}-only shape. {@code reason} may be {@code null}.
    */
   public void rejectRegistration(final String reason) {
     if (this.status == AccountStatus.PENDING_APPROVAL) {
       this.status = AccountStatus.REJECTED;
-      this.registrationDecidedAt = Instant.now();
-      this.registrationRejectionReason = reason;
+      this.registration = RegistrationDecision.rejectedAt(Instant.now(), reason);
     }
   }
 
   /**
-   * ADR-0026: self-service picture upload (also used by an operator-initiated change) — always
-   * overwrites, unlike {@link #applySocialProviderProfile}, since a deliberate replace is exactly
-   * what this method is for.
+   * ADR-0026: self-service picture upload (also an operator-initiated change) — always overwrites,
+   * unlike {@link #applySocialProviderProfile}, since a deliberate replace is what this is for.
    */
   public void updateProfilePicture(final String pictureUrl) {
-    this.pictureUrl = Objects.requireNonNull(pictureUrl, "pictureUrl must not be null");
+    this.profile =
+        profile.withPictureUrl(Objects.requireNonNull(pictureUrl, "pictureUrl must not be null"));
   }
 
   /** Reverts to the generated-initials default avatar (ADR-0026) — idempotent. */
-  // PMD.NullAssignment: deliberately clears pictureUrl, same convention as
-  // attachPasswordCredential's own identical suppression.
-  @SuppressWarnings("PMD.NullAssignment")
   public void removeProfilePicture() {
-    this.pictureUrl = null;
+    this.profile = profile.withoutPicture();
   }
 
   /**
-   * ADR-0026 / BR-ID-09 sibling decision: captures {@code firstName}/{@code lastName}/{@code
-   * pictureUrl} from a social provider's own profile claims — called exactly once, immediately
-   * after {@link #register(OrganizationId, Email)} in {@code
-   * AuthenticateWithSocialProviderService}'s brand-new-signup branch, never on a returning social
-   * login. Deliberately non-destructive (only fills a field that's still {@code null}) rather than
-   * an unconditional overwrite — at the one real call site every field is already null (a brand-new
-   * aggregate), but a non-destructive guard is the correct contract to publish regardless of that
-   * call site's own current behavior, not an incidental effect of it.
+   * ADR-0026 / BR-ID-09 sibling decision: captures name and picture from a social provider's own
+   * profile claims, called once right after {@link #register(OrganizationId, Email)} in a brand-new
+   * social sign-up. Non-destructive (only fills what is still {@code null}), the correct contract
+   * to publish whatever the one real call site happens to do today.
    */
   public void applySocialProviderProfile(
       final String firstName, final String lastName, final String pictureUrl) {
-    if (this.firstName == null) {
-      this.firstName = firstName;
-    }
-    if (this.lastName == null) {
-      this.lastName = lastName;
-    }
-    if (this.pictureUrl == null) {
-      this.pictureUrl = pictureUrl;
-    }
+    this.profile = profile.filledFrom(firstName, lastName, pictureUrl);
   }
 
   /**
-   * ADR-0026: self-service (via the "Update profile" page) or operator-initiated name edit — always
-   * overwrites, same "deliberate replace" posture as {@link #updateProfilePicture}. Not {@code
-   * Optional}-typed parameters: a blank submitted value is this method's own caller's job to
-   * normalize to {@code null} before calling (the same convention every controller in this codebase
-   * already follows for optional text fields), not something the domain method itself should
-   * special-case.
+   * ADR-0026: self-service or operator-initiated name edit — always overwrites. A blank submitted
+   * value is the caller's job to normalise to {@code null}, the convention every controller here
+   * follows for optional text.
    */
   public void updateProfile(final String firstName, final String lastName) {
-    this.firstName = firstName;
-    this.lastName = lastName;
+    this.profile = profile.withName(firstName, lastName);
   }
 
   /**
-   * SDE-III review, 2026-09-22 — operator-driven edit (dashboard "View Profile" > Profile tab,
-   * {@code PlatformAccountProfileAdminController}); unlike {@link #assignUsername}, phone number
-   * carries no uniqueness constraint of its own — this method itself always overwrites, same
-   * "deliberate replace" posture as {@link #updateProfile}/{@link #updateProfilePicture}. Its own
-   * caller ({@code UpdateAccountProfileService}) chooses to only ever invoke this once, mirroring
-   * username's own "view-only once set" UX at the caller's explicit request — a use-case-level
-   * policy, not a domain invariant this method itself enforces.
+   * Operator-driven edit (dashboard "View Profile" > Profile tab). Unlike {@link #assignUsername},
+   * a phone number has no uniqueness constraint, so this always overwrites; calling it only once is
+   * a use-case-level policy ({@code UpdateAccountProfileService}), not a domain invariant.
    */
   public void updatePhoneNumber(final String phoneNumber) {
-    this.phoneNumber = phoneNumber;
+    this.profile = profile.withPhoneNumber(phoneNumber);
   }
 
   /**
-   * Clerk "User permissions" parity — operator-controlled (dashboard "Settings" tab), gates {@code
-   * DeleteOwnAccountUseCase}'s own self-service "Delete account" action. Defaults to {@code false}
-   * (see the field's own comment) — an Organization opts a specific Account into this, it is never
-   * on by default.
+   * Operator-controlled (dashboard "Settings" tab): gates {@code DeleteOwnAccountUseCase}'s
+   * self-service "Delete account" action. Off by default — an Organization opts a specific Account
+   * in, never the reverse.
    */
   public void allowSelfDelete() {
-    this.canDeleteOwnAccount = true;
+    this.permissions = permissions.withSelfDelete(true);
   }
 
   /** Reverses {@link #allowSelfDelete()}. */
   public void disallowSelfDelete() {
-    this.canDeleteOwnAccount = false;
+    this.permissions = permissions.withSelfDelete(false);
   }
 
   /**
-   * Clerk "User permissions" parity — operator-controlled, checked by {@link
-   * com.clavaris.identity.infrastructure.adapter.in.web.DeviceTrustGate} (via {@code
-   * PrimaryFactorLoginCompletion}/its own two direct callers) before pausing a login for a
-   * device-trust challenge. Legitimate use: a known-safe operator or service-style Account that
-   * should never be paused, even while the owning Organization's own {@code deviceTrustEnabled}
-   * policy stays on for every other Account.
+   * Operator-controlled: checked by {@code DeviceTrustGate} before pausing a login for a
+   * device-trust challenge. For a known-safe operator or service-style Account that should never be
+   * paused while the Organization's {@code deviceTrustEnabled} policy stays on for everyone else.
    */
   public void enableDeviceTrustBypass() {
-    this.bypassesDeviceTrust = true;
+    this.permissions = permissions.withDeviceTrustBypass(true);
   }
 
   /** Reverses {@link #enableDeviceTrustBypass()}. */
   public void disableDeviceTrustBypass() {
-    this.bypassesDeviceTrust = false;
+    this.permissions = permissions.withDeviceTrustBypass(false);
   }
 
   /**
-   * TD-FUT-034 (Clerk "Metadata" parity) — replaces all three tiers at once, always a full replace,
-   * never a partial update, same "whole-object PUT" convention every other multi-field admin
-   * mutation in this codebase already follows (e.g. {@code
-   * SetAccountAuthenticationPolicyController}) rather than trying to distinguish "leave this tier
-   * alone" from "clear it" for a given argument. {@code null} means empty/cleared for that tier,
-   * same convention this class's own nullable text fields already use. Syntactic JSON validity is
-   * the caller's own job (the web/use-case layer, before this method ever runs) — this class stays
-   * free of a JSON library dependency, same "domain/ depends on nothing" rule every other method
-   * here already follows.
+   * TD-FUT-034: replaces all three metadata tiers at once — always a full replace, never a partial
+   * update, the "whole-object PUT" convention every multi-field admin mutation here follows. {@code
+   * null} means empty/cleared for that tier.
    */
   public void setMetadata(
       final String publicMetadata, final String privateMetadata, final String unsafeMetadata) {
-    this.publicMetadata = publicMetadata;
-    this.privateMetadata = privateMetadata;
-    this.unsafeMetadata = unsafeMetadata;
+    this.metadata = new AccountMetadata(publicMetadata, privateMetadata, unsafeMetadata);
   }
 }

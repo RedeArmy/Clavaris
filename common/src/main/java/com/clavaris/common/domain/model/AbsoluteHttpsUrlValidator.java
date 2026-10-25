@@ -14,11 +14,11 @@ import java.net.URI;
  * {@link AuditActor}/{@link AuditEvent}.
  *
  * <p>Deliberately <b>not</b> the same rule as client-registry-module's own {@code
- * OAuthClient.requireWellFormedAbsoluteSecureUri} — that validator also permits plain {@code http}
- * against {@code localhost}/{@code 127.0.0.1} for native-app loopback redirects (RFC 8252 §7.3), an
- * exception specific to OAuth redirect URIs. A logo, an iframe-embedding origin, and a webhook
- * delivery target have no such exception to make, so this class stays strict https-only rather than
- * being generalized with a flag to cover both rules.
+ * ClientRegistrationRules.requireWellFormedAbsoluteSecureUri} — that validator also permits plain
+ * {@code http} against {@code localhost}/{@code 127.0.0.1} for native-app loopback redirects (RFC
+ * 8252 §7.3), an exception specific to OAuth redirect URIs. A logo, an iframe-embedding origin, and
+ * a webhook delivery target have no such exception to make, so this class stays strict https-only
+ * rather than being generalized with a flag to cover both rules.
  *
  * <p>Each caller keeps its own null/blank policy — an absent logo or embedding origin is a valid
  * "not configured" state, an absent webhook url is not — this class only ever validates a non-null

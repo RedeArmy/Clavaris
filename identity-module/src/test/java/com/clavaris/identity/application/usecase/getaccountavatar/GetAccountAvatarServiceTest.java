@@ -44,12 +44,8 @@ class GetAccountAvatarServiceTest {
             AccountStatus.ACTIVE,
             null,
             null,
-            null,
-            "Ada",
-            "Lovelace",
-            null,
-            null,
             null);
+    account.updateProfile("Ada", "Lovelace");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
   }
 
