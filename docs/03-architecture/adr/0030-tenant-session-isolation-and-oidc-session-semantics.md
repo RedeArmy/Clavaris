@@ -133,3 +133,18 @@ they are and the operational note is in the deployment runbook (section 10).
 - Consents of deleted Accounts remain as inert rows: deleting an Account shares its token revoker
   with refresh-token reuse and password reset, where wiping consents would force a new consent
   screen at every login.
+
+## Addendum, 2026-10-24: `SameSite=None` is per Organization, not global
+
+Decision 1 said `SameSite` "stays adaptive (`None; Secure` over HTTPS)". In practice that wrote
+`None` for **every** cookie on an HTTPS deployment, including `PLATFORM_SESSION` and the sessions of
+Organizations that no consuming application ever frames, removing `Lax`'s protection against
+cross-site requests from all of them to support a feature only some use. It is now written only for
+`SESSION_<organizationId>` of an Organization that can be embedded: a development-environment one,
+or one with a client whose custom domain is `VERIFIED` with a registered embedding origin (the same
+rule the `frame-ancestors` header follows, `EmbeddingSessionPolicy`). The platform cookie, the legacy
+flat `SESSION` and every other tenant are `Lax`; social login and the redirect back from a consuming
+application are top-level GET navigations, which `Lax` cookies accompany. A session written `Lax`
+stays `Lax`, so the first sign-in after an Organization becomes embeddable is the one that gets the
+cross-site cookie.
+

@@ -61,6 +61,17 @@ final class TenantSessionCookies {
     return PREFIX + organizationId.toString().replace("-", "");
   }
 
+  /** The Organization a tenant cookie name belongs to; empty for any other cookie name. */
+  /* package */ static Optional<UUID> organizationOf(final String cookieName) {
+    return isTenantCookie(cookieName)
+        ? Optional.of(
+            UUID.fromString(
+                cookieName
+                    .substring(PREFIX.length())
+                    .replaceFirst("(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5")))
+        : Optional.empty();
+  }
+
   /* package */ static boolean isTenantCookie(final String cookieName) {
     return TENANT_COOKIE.matcher(cookieName).matches();
   }

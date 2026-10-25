@@ -599,8 +599,15 @@ server {
   (`*`) instead, with a warning logged, a deliberate testing convenience never used in production.
 - Confirm the session cookie's own `Set-Cookie` header shows `SameSite=None; Secure` on this same
   flow (`AdaptiveSameSiteSessionCookieSerializer`; the cookie is named `SESSION_<organization id>`
-  per tenant, see ADR-0030) — `SameSite=Lax` here means the embedded/iframe flow will silently drop
-  the session on its first cross-site navigation back to the parent page.
+  per tenant, see ADR-0030). `None` is written only for an Organization that can actually be
+  embedded — a `DEVELOPMENT` one, or a production one with a `VERIFIED` domain **and** an
+  `embeddingOrigin` — and every other Organization, and the operator dashboard
+  (`PLATFORM_SESSION`), keeps `SameSite=Lax` on purpose. So `SameSite=Lax` here means one of three
+  things: the domain is not `VERIFIED` yet, no `embeddingOrigin` is registered, or the session
+  predates either (a cookie's `SameSite` is fixed when it is written). Allow up to a minute for the
+  change to be picked up (`clavaris.session.embedding-policy-cache-ttl-seconds`), then sign out and
+  sign in again inside the frame; the embedded flow otherwise silently drops the session on its
+  first cross-site navigation back to the parent page.
 
 ### 9h. Troubleshooting
 
