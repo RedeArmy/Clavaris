@@ -107,6 +107,26 @@ if [[ -n "$hits" ]]; then
     fail=1
 fi
 
+# A row whose Status is Resolved belongs in the register's §6 (closed), never in the open tables
+# of §2/§3 — five of them had sat in §2 after being fixed, so "present debt" overstated itself.
+hits=$(awk '/^## 2\./{on=1} /^## 4\./{on=0} on && /^\| TD-/ && / \| Resolved \| /' \
+    docs/05-engineering/technical-debt-register.md | cut -c1-80 || true)
+if [[ -n "$hits" ]]; then
+    echo "FAIL: technical-debt-register.md has Resolved rows in §2/§3 — move them to §6"
+    echo "$hits" | sed 's/^/  /'
+    echo
+    fail=1
+fi
+
+# Social login shipped 2026-08-30 (ADR-0020); the README must not keep describing it as unbuilt.
+hits=$(grep -nE 'Social login.*(not yet built|unbuilt)|social login \(Google/GitHub\).*unbuilt' README.md || true)
+if [[ -n "$hits" ]]; then
+    echo "FAIL: README.md describes social login as unbuilt, but it shipped (ADR-0020)"
+    echo "$hits" | sed 's/^/  /'
+    echo
+    fail=1
+fi
+
 if [[ "$fail" -eq 0 ]]; then
     echo "OK: doc consistency checks passed."
 fi
