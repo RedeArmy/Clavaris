@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.authenticatewithemailcode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,7 +64,8 @@ class AuthenticateWithEmailCodeServiceTest {
     assertThat(token.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
     verify(tokens).save(token);
-    verify(accounts).save(account);
+    verify(accounts)
+        .recordSignInVerifyingEmail(eq(account.id()), any(Instant.class), any(Instant.class));
   }
 
   @Test

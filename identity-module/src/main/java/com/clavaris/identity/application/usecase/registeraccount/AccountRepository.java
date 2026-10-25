@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -99,6 +100,23 @@ public interface AccountRepository {
    * its own presence check first.
    */
   void saveCredential(Account account);
+
+  /**
+   * TD-ARCH-036: records a successful sign-in with a <em>narrow</em> write of only {@code
+   * last_signed_in_at}, never the whole row. {@link #save} writes every column of the aggregate the
+   * caller loaded, so a login that read the account, then spent its Argon2 verification, then saved
+   * it back overwrote anything changed in between: reproduced, a concurrent suspension was silently
+   * reverted to {@code ACTIVE}. This write cannot undo another writer's change because it touches
+   * nothing else.
+   */
+  void recordSignIn(AccountId accountId, Instant signedInAt);
+
+  /**
+   * As {@link #recordSignIn(AccountId, Instant)}, for the passwordless factors that also prove
+   * ownership of the email: {@code email_verified_at} is set to {@code verifiedAt} only if it is
+   * not already set, so an earlier verification timestamp is never overwritten.
+   */
+  void recordSignInVerifyingEmail(AccountId accountId, Instant signedInAt, Instant verifiedAt);
 
   /**
    * TD-PERF-019: same write as {@link #save}, for the two call sites that know for a fact this

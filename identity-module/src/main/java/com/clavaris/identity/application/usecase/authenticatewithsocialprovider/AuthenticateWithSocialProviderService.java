@@ -190,8 +190,10 @@ public class AuthenticateWithSocialProviderService
       // path here that needs it loaded at all.
       existingForIdentity.ifPresent(
           account -> {
+            // TD-ARCH-036: narrow write, never the whole aggregate
+            // (AccountRepository#recordSignIn).
             account.recordSignIn();
-            accounts.save(account);
+            accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
           });
       LOG.info(
           "event=social_login_success organizationId={} accountId={} provider={} outcome=returning",

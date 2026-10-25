@@ -2,6 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.within;
 
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
@@ -14,6 +15,7 @@ import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -571,4 +573,52 @@ class JpaAccountRepositoryTest {
       })
   @Import(JpaAccountRepository.class)
   static class TestConfig {}
+
+  // TD-ARCH-036: reproduced with save(): a login that loaded the account, then a suspension, then
+  // the login's whole-row save, left the account ACTIVE again. The narrow sign-in write cannot do
+  // that, because it touches nothing but the sign-in time.
+  @Test
+  void aSignInWriteNeverRevertsAChangeMadeAfterTheAccountWasLoaded() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account created = Account.register(organizationId, new Email("race@example.com"));
+    created.attachPasswordCredential("argon2id$stored-hash");
+    repository.save(created);
+    repository.saveCredential(created);
+    Account staleLogin = repository.findById(created.id()).orElseThrow();
+    Account admin = repository.findById(created.id()).orElseThrow();
+    admin.suspend();
+    repository.save(admin);
+
+    staleLogin.recordSignIn();
+    repository.recordSignIn(staleLogin.id(), staleLogin.lastSignedInAt().orElseThrow());
+
+    Account stored = repository.findById(created.id()).orElseThrow();
+    assertThat(stored.status()).as("the suspension survives").isEqualTo(AccountStatus.SUSPENDED);
+    assertThat(stored.lastSignedInAt()).as("and the sign-in is recorded").isPresent();
+  }
+
+  @Test
+  void signingInWithAPasswordlessFactorVerifiesTheEmailOnlyIfItWasNotAlready() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account unverified = Account.register(organizationId, new Email("new@example.com"));
+    unverified.attachPasswordCredential("argon2id$stored-hash");
+    Account verified = Account.register(organizationId, new Email("old@example.com"));
+    verified.attachPasswordCredential("argon2id$stored-hash");
+    verified.verifyEmail();
+    repository.save(unverified);
+    repository.save(verified);
+    Instant originalVerification = verified.emailVerifiedAt().orElseThrow();
+    Instant later = originalVerification.plusSeconds(3600).truncatedTo(ChronoUnit.MICROS);
+
+    repository.recordSignInVerifyingEmail(unverified.id(), later, later);
+    repository.recordSignInVerifyingEmail(verified.id(), later, later);
+
+    assertThat(repository.findById(unverified.id()).orElseThrow().emailVerifiedAt())
+        .contains(later);
+    assertThat(repository.findById(verified.id()).orElseThrow().emailVerifiedAt())
+        .as("an earlier verification timestamp is kept")
+        .hasValueSatisfying(
+            stored ->
+                assertThat(stored).isCloseTo(originalVerification, within(1, ChronoUnit.MILLIS)));
+  }
 }

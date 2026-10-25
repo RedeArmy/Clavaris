@@ -107,8 +107,10 @@ public class AuthenticateWithWebAuthnService implements AuthenticateWithWebAuthn
                 credentials.updateSignatureCount(
                     credentialRowId, result.getSignatureCount(), Instant.now()));
 
+    // TD-ARCH-036: a narrow write of last_signed_in_at only. Saving the whole aggregate here would
+    // overwrite anything another writer changed since this account was loaded (a suspension, say).
     account.recordSignIn();
-    accounts.save(account);
+    accounts.recordSignIn(account.id(), account.lastSignedInAt().orElseThrow());
 
     LOG.info("event=login_success accountId={} factor=webauthn", account.id());
     return account;

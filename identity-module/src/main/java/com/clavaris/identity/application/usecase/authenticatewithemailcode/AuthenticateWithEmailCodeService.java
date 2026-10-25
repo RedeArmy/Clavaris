@@ -97,8 +97,13 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
     // account.recordSignIn() — same gap AuthenticateWithUsernameService's own identical fix just
     // closed. The dashboard's "Last signed In" column (and, since TD-FUT-034, the activity
     // heatmap's own login_events write) both depend on this having actually happened.
+    // TD-ARCH-036: narrow write (sign-in time, and the email verification this factor just proved),
+    // never the whole aggregate — see AccountRepository#recordSignIn.
     account.recordSignIn();
-    accounts.save(account);
+    accounts.recordSignInVerifyingEmail(
+        account.id(),
+        account.lastSignedInAt().orElseThrow(),
+        account.emailVerifiedAt().orElseThrow());
 
     LOG.info(
         "event=email_code_sign_in_success organizationId={} accountId={}",

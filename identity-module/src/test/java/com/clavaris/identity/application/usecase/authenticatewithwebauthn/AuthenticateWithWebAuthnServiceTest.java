@@ -24,6 +24,7 @@ import com.yubico.webauthn.RelyingParty;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.exception.AssertionFailedException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -171,7 +172,7 @@ class AuthenticateWithWebAuthnServiceTest {
 
     assertThat(signedIn).isSameAs(account);
     verify(credentials).updateSignatureCount(eq(credentialRowId), eq(5L), any());
-    verify(accounts).save(account);
+    verify(accounts).recordSignIn(eq(account.id()), any(Instant.class));
   }
 
   @Test
@@ -189,6 +190,6 @@ class AuthenticateWithWebAuthnServiceTest {
 
     assertThat(signedIn).isSameAs(account);
     verify(credentials, never()).updateSignatureCount(any(), anyLong(), any());
-    verify(accounts).save(account);
+    verify(accounts).recordSignIn(eq(account.id()), any(Instant.class));
   }
 }
