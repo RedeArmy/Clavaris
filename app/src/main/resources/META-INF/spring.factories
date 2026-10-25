@@ -1,0 +1,4 @@
+# Runs before any bean exists, so a process holding the public development secrets never gets as far
+# as creating the signing keystore or opening a database connection. See the class's own Javadoc.
+org.springframework.context.ApplicationListener=\
+com.clavaris.app.infrastructure.config.DevDefaultSecretsStartupGuard

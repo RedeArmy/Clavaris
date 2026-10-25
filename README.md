@@ -24,6 +24,10 @@ cp .env.example .env   # fill in local values — never commit .env
 docker compose up --build
 ```
 
+Running the app outside Docker (from an IDE, or `java -jar`) needs `SPRING_PROFILES_ACTIVE=dev`: the
+application refuses to start with the public development secrets from `application.yml` under any
+other profile — or none — and names the settings to change.
+
 - App: `http://localhost:8080`
 - Liveness: `http://localhost:8080/actuator/health/liveness`
 - Readiness: `http://localhost:8080/actuator/health/readiness` (checks DB + Redis)

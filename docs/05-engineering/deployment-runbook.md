@@ -106,7 +106,7 @@ chmod +x deploy.sh
 (no network round trip needed) before declaring success — see §4 below for what it does if that
 check never passes.
 
-**Operational endpoints are not public — worth confirming once after the first `up`:**
+**Two guards this deployment relies on, both worth confirming once after the first `up`:**
 
 - **Operational endpoints are not public.** `/actuator/**` (health, info, prometheus) is for the
   internal Docker network only — Prometheus scrapes `app:8080`, the Dockerfile and compose
@@ -117,6 +117,16 @@ check never passes.
   `404`. An external uptime monitor therefore cannot use `/actuator/health/readiness`; point it at
   `https://<your-domain>/.well-known/openid-configuration` or a tenant's `/o/<id>/login` instead.
   `scripts/check-caddy-actuator-block.sh` proves the `Caddyfile` itself (CI runs it on every PR).
+- **The app refuses the public development secrets.** `application.yml` ships development defaults
+  for the signing-keystore password, the two AES-256-GCM keys, the three HMAC/hash secrets and the
+  database password, and this repository is public. At startup the application aborts — before any
+  bean, keystore or connection exists — if any of those seven still holds its committed default,
+  naming each setting and the variable that overrides it (never the value). This is independent of
+  `docker-compose.prod.yml`'s `${VAR:?...}` checks on purpose: a launcher that bypasses that file
+  (`java -jar`, Kubernetes, a copied compose file) is stopped too. It is relaxed only under the `dev`
+  or `test` profile, never when `prod` is active, and a process with no profile at all is enforced.
+  If a deployment fails with `Refusing to start`, set the listed variables to fresh secrets
+  (`openssl rand -base64 32`); do not set `SPRING_PROFILES_ACTIVE=dev` to get past it.
 
 `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` (BR-PLATFORM-03) are seeded into the database on first
 startup only — generate long, random, unique values for this environment before the first `up`,

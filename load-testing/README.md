@@ -34,7 +34,7 @@ revisited — tracked, not silently assumed away.
 cp .env.example .env   # fill in real values — see .env.example's own comments
 docker compose up -d postgres redis
 mvn -pl app -am package -DskipTests
-java -jar app/target/clavaris-app.jar &        # or docker compose up -d app
+SPRING_PROFILES_ACTIVE=dev java -jar app/target/clavaris-app.jar &        # or docker compose up -d app
 ./load-testing/run.sh                          # see script — runs every scenario below in order
 ```
 
