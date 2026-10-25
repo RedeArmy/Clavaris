@@ -7,10 +7,15 @@ import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeys
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
+import com.clavaris.identity.domain.model.AccountMetadata;
+import com.clavaris.identity.domain.model.AccountPermissions;
+import com.clavaris.identity.domain.model.AccountProfile;
+import com.clavaris.identity.domain.model.AccountSnapshot;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
+import com.clavaris.identity.domain.model.RegistrationDecision;
 import com.clavaris.identity.domain.model.Username;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
@@ -127,27 +132,29 @@ class JpaAccountRepository implements AccountRepository {
     final Username username =
         entity.getUsername() == null ? null : new Username(entity.getUsername());
     return Account.reconstitute(
-        accountId,
-        new OrganizationId(entity.getOrganizationId()),
-        new Email(entity.getEmail()),
-        entity.getCreatedAt(),
-        entity.getEmailVerifiedAt(),
-        AccountStatus.valueOf(entity.getStatus()),
-        credential,
-        username,
-        entity.getPasswordResetRequiredAt(),
-        entity.getFirstName(),
-        entity.getLastName(),
-        entity.getPhoneNumber(),
-        entity.getLastSignedInAt(),
-        entity.getPictureUrl(),
-        entity.isCanDeleteOwnAccount(),
-        entity.isBypassesDeviceTrust(),
-        entity.getRegistrationDecidedAt(),
-        entity.getRegistrationRejectionReason(),
-        entity.getPublicMetadata(),
-        entity.getPrivateMetadata(),
-        entity.getUnsafeMetadata());
+        new AccountSnapshot(
+            accountId,
+            new OrganizationId(entity.getOrganizationId()),
+            new Email(entity.getEmail()),
+            entity.getCreatedAt(),
+            entity.getEmailVerifiedAt(),
+            AccountStatus.valueOf(entity.getStatus()),
+            credential,
+            username,
+            entity.getPasswordResetRequiredAt(),
+            entity.getLastSignedInAt(),
+            new AccountProfile(
+                entity.getFirstName(),
+                entity.getLastName(),
+                entity.getPhoneNumber(),
+                entity.getPictureUrl()),
+            new AccountPermissions(entity.isCanDeleteOwnAccount(), entity.isBypassesDeviceTrust()),
+            new RegistrationDecision(
+                entity.getRegistrationDecidedAt(), entity.getRegistrationRejectionReason()),
+            new AccountMetadata(
+                entity.getPublicMetadata(),
+                entity.getPrivateMetadata(),
+                entity.getUnsafeMetadata())));
   }
 
   // TD-PERF-028 (closed): no longer also writes the credential — see AccountRepository#save's own

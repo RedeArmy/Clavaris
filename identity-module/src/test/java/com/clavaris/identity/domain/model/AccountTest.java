@@ -2,6 +2,7 @@ package com.clavaris.identity.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -510,5 +511,105 @@ class AccountTest {
     assertThat(account.publicMetadata()).isEmpty();
     assertThat(account.privateMetadata()).isEmpty();
     assertThat(account.unsafeMetadata()).isEmpty();
+  }
+
+  // TD-ARCH: the persistence adapter rehydrates through one AccountSnapshot instead of five
+  // telescoping overloads; a round trip must lose nothing, whichever attribute group it sits in.
+  @Test
+  void snapshotRoundTripPreservesEveryAttributeIncludingTheGroupedOnes() {
+    final Account original =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()), new Email("ada@example.com"), "Ada", "L", "+1");
+    original.attachPasswordCredential("hash");
+    original.updateProfilePicture("avatars/ada.png");
+    original.allowSelfDelete();
+    original.enableDeviceTrustBypass();
+    original.setMetadata("{\"p\":1}", "{\"q\":2}", "{\"u\":3}");
+    original.recordSignIn();
+
+    final Account copy = Account.reconstitute(original.snapshot());
+
+    assertThat(copy.snapshot()).isEqualTo(original.snapshot());
+    assertThat(copy.firstName()).contains("Ada");
+    assertThat(copy.phoneNumber()).contains("+1");
+    assertThat(copy.pictureUrl()).contains("avatars/ada.png");
+    assertThat(copy.canDeleteOwnAccount()).isTrue();
+    assertThat(copy.bypassesDeviceTrust()).isTrue();
+    assertThat(copy.privateMetadata()).contains("{\"q\":2}");
+    assertThat(copy.lastSignedInAt()).isPresent();
+  }
+
+  @Test
+  void reconstituteRejectsAGroupedAttributeThatIsNull() {
+    final AccountSnapshot good =
+        Account.register(new OrganizationId(UUID.randomUUID()), new Email("a@example.com"))
+            .snapshot();
+    final AccountSnapshot noProfile =
+        new AccountSnapshot(
+            good.id(),
+            good.organizationId(),
+            good.email(),
+            good.createdAt(),
+            null,
+            good.status(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            good.permissions(),
+            good.registration(),
+            good.metadata());
+
+    assertThatThrownBy(() -> Account.reconstitute(noProfile))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessageContaining("profile");
+  }
+
+  @Test
+  void approveRegistrationActivatesAPendingAccountAndStampsTheDecision() {
+    final Account account =
+        Account.registerPendingApproval(
+            new OrganizationId(UUID.randomUUID()), new Email("p@example.com"));
+
+    account.approveRegistration();
+
+    assertThat(account.status()).isEqualTo(AccountStatus.ACTIVE);
+    assertThat(account.registrationDecidedAt()).isPresent();
+    assertThat(account.registrationRejectionReason()).isEmpty();
+  }
+
+  @Test
+  void rejectRegistrationKeepsTheReasonAndOnlyActsOnAPendingAccount() {
+    final Account pending =
+        Account.registerPendingApproval(
+            new OrganizationId(UUID.randomUUID()), new Email("r@example.com"));
+    final Account active =
+        Account.register(new OrganizationId(UUID.randomUUID()), new Email("s@example.com"));
+
+    pending.rejectRegistration("not eligible");
+    active.rejectRegistration("ignored");
+
+    assertThat(pending.status()).isEqualTo(AccountStatus.REJECTED);
+    assertThat(pending.registrationRejectionReason()).contains("not eligible");
+    assertThat(active.status()).isEqualTo(AccountStatus.ACTIVE);
+    assertThat(active.registrationDecidedAt()).isEmpty();
+  }
+
+  @Test
+  void aSocialProfileNeverOverwritesWhatAPersonAlreadySetButStillFillsTheRest() {
+    final Account account =
+        Account.register(
+            new OrganizationId(UUID.randomUUID()),
+            new Email("c@example.com"),
+            "Chosen",
+            null,
+            null);
+
+    account.applySocialProviderProfile("Provider", "Family", "https://pic");
+
+    assertThat(account.firstName()).contains("Chosen");
+    assertThat(account.lastName()).contains("Family");
+    assertThat(account.pictureUrl()).contains("https://pic");
   }
 }

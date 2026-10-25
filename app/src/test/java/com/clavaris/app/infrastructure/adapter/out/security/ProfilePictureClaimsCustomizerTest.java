@@ -46,21 +46,19 @@ class ProfilePictureClaimsCustomizerTest {
   }
 
   private Account accountWith(final UUID accountId, final String firstName, final String lastName) {
-    return Account.reconstitute(
-        new AccountId(accountId),
-        new OrganizationId(UUID.randomUUID()),
-        new Email("ada@example.com"),
-        Instant.now(),
-        null,
-        AccountStatus.ACTIVE,
-        null,
-        null,
-        null,
-        firstName,
-        lastName,
-        null,
-        null,
-        null);
+    final Account account =
+        Account.reconstitute(
+            new AccountId(accountId),
+            new OrganizationId(UUID.randomUUID()),
+            new Email("ada@example.com"),
+            Instant.now(),
+            null,
+            AccountStatus.ACTIVE,
+            null,
+            null,
+            null);
+    account.updateProfile(firstName, lastName);
+    return account;
   }
 
   @Test

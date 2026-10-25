@@ -48,11 +48,9 @@ class GetAccountProfileControllerTest {
             AccountStatus.ACTIVE,
             null,
             new Username("ada"),
-            null,
-            "Ada",
-            "Lovelace",
-            "+502 5555-0100",
             null);
+    account.updateProfile("Ada", "Lovelace");
+    account.updatePhoneNumber("+502 5555-0100");
     when(useCase.handle(any())).thenReturn(Optional.of(account));
 
     mockMvc
