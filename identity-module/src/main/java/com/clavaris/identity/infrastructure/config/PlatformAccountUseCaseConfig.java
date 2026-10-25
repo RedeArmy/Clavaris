@@ -56,16 +56,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * ADR-0012: wires {@code PlatformAccount}'s own use cases to Spring's context — split out from
- * {@link IdentityUseCaseConfig} (which carries its own {@code PMD.ExcessiveImports}/{@code
- * CouplingBetweenObjects} suppressions for the tenant-tier's own use cases) purely to keep each
- * file a manageable size; both classes wire the same module's use cases, split by bounded concern
+ * ADR-0012: wires {@code PlatformAccount}'s own use cases to Spring's context. The tenant-tier
+ * {@code Account} use cases are wired by {@link IdentityUseCaseConfig} and its sibling {@code
+ * *UseCaseConfig} classes, split by area; both sides wire the same module, split by bounded concern
  * (tenant {@code Account} vs. platform {@code PlatformAccount}), not by anything architectural.
  * TD-FUT-026 (2026-09-02) added this class's own {@code ExcessiveImports}/{@code
- * CouplingBetweenObjects}/{@code TooManyMethods} suppressions, same rationale as that class's own
- * identical ones — one {@code @Bean} method per use case is what this class's entire job looks
- * like. AvoidDuplicateLiterals below: same "PMD.LongVariable" reused across four parameters
- * rationale as IdentityUseCaseConfig's own identical suppression.
+ * CouplingBetweenObjects}/{@code TooManyMethods} suppressions — one {@code @Bean} method per use
+ * case is what this class's entire job looks like. AvoidDuplicateLiterals below: the same
+ * "PMD.LongVariable" reused across several parameters, not a repeated business string.
  */
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
