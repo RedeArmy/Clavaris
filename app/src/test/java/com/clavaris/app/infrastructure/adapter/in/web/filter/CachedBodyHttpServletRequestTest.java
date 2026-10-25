@@ -1,6 +1,7 @@
 package com.clavaris.app.infrastructure.adapter.in.web.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -97,5 +98,41 @@ class CachedBodyHttpServletRequestTest {
     org.assertj.core.api.Assertions.assertThatCode(
             () -> wrapped.getInputStream().setReadListener(null))
         .doesNotThrowAnyException();
+  }
+
+  // TD-SEC-066: the buffer is bounded so one caller cannot exhaust the shared heap.
+  @Test
+  void aBodyExactlyAtTheLimitIsBuffered() throws Exception {
+    MockHttpServletRequest underlying = new MockHttpServletRequest("POST", "/api/v1/admin/x");
+    underlying.setContent(new byte[16]);
+
+    CachedBodyHttpServletRequest wrapped = new CachedBodyHttpServletRequest(underlying, 16);
+
+    assertThat(wrapped.bodyBytes()).hasSize(16);
+  }
+
+  @Test
+  void aBodyOverTheLimitIsRejectedBeforeItIsBuffered() {
+    MockHttpServletRequest underlying = new MockHttpServletRequest("POST", "/api/v1/admin/x");
+    underlying.setContent(new byte[17]);
+
+    assertThatThrownBy(() -> new CachedBodyHttpServletRequest(underlying, 16))
+        .isInstanceOf(RequestBodyTooLargeException.class)
+        .hasMessageContaining("16-byte limit");
+  }
+
+  @Test
+  void aBodyOverTheLimitWithNoDeclaredLengthIsStillRejected() {
+    MockHttpServletRequest underlying =
+        new MockHttpServletRequest("POST", "/api/v1/admin/x") {
+          @Override
+          public long getContentLengthLong() {
+            return -1; // chunked: the length is unknown up front
+          }
+        };
+    underlying.setContent(new byte[17]);
+
+    assertThatThrownBy(() -> new CachedBodyHttpServletRequest(underlying, 16))
+        .isInstanceOf(RequestBodyTooLargeException.class);
   }
 }

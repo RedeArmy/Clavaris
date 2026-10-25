@@ -7,9 +7,9 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import org.springframework.util.StreamUtils;
 
 /**
  * {@link IdempotencyKeyFilter} needs the raw request body twice — once, itself, to hash it before
@@ -29,11 +29,37 @@ import org.springframework.util.StreamUtils;
  */
 class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
+  /**
+   * TD-SEC-066: 1 MiB, ample for the JSON management API this wraps, and the bound that keeps one
+   * authenticated caller (a consuming system's own backend holds this credential) from exhausting
+   * the heap of an instance every other tenant shares by posting an arbitrarily large body.
+   */
+  /* package */ static final int MAX_BODY_BYTES = 1_048_576;
+
   private final byte[] cachedBody;
 
   /* package */ CachedBodyHttpServletRequest(final HttpServletRequest request) throws IOException {
+    this(request, MAX_BODY_BYTES);
+  }
+
+  /* package */ CachedBodyHttpServletRequest(
+      final HttpServletRequest request, final int maxBodyBytes) throws IOException {
     super(request);
-    this.cachedBody = StreamUtils.copyToByteArray(request.getInputStream());
+    if (request.getContentLengthLong() > maxBodyBytes) {
+      throw new RequestBodyTooLargeException(maxBodyBytes);
+    }
+    final byte[] body = readAtMost(request.getInputStream(), maxBodyBytes);
+    this.cachedBody = body;
+  }
+
+  // One byte past the limit is enough to know it was exceeded, without reading any further.
+  private static byte[] readAtMost(final InputStream stream, final int maxBodyBytes)
+      throws IOException {
+    final byte[] body = stream.readNBytes(maxBodyBytes + 1);
+    if (body.length > maxBodyBytes) {
+      throw new RequestBodyTooLargeException(maxBodyBytes);
+    }
+    return body;
   }
 
   // PMD.MethodReturnsInternalArray: deliberate, not an oversight — this is a package-private
