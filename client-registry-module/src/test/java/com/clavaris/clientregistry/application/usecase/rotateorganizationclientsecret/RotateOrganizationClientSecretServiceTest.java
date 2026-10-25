@@ -10,10 +10,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientSecretGenerator;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
 import com.clavaris.common.application.port.AuditEventRecorder;
@@ -35,7 +35,7 @@ class RotateOrganizationClientSecretServiceTest {
 
   private final UUID organizationId = UUID.randomUUID();
   private OrganizationClientRepository organizationClients;
-  private ClientSecretHasher hasher;
+  private GeneratedClientSecretHasher hasher;
   private OrganizationClientSecretGenerator secretGenerator;
   private AuditEventRecorder auditEvents;
   private RotateOrganizationClientSecretService service;
@@ -43,7 +43,7 @@ class RotateOrganizationClientSecretServiceTest {
   @BeforeEach
   void setUp() {
     organizationClients = mock(OrganizationClientRepository.class);
-    hasher = mock(ClientSecretHasher.class);
+    hasher = mock(GeneratedClientSecretHasher.class);
     secretGenerator = mock(OrganizationClientSecretGenerator.class);
     auditEvents = mock(AuditEventRecorder.class);
     service =

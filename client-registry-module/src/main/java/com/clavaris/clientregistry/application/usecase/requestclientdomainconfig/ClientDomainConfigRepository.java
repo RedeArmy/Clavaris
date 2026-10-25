@@ -27,5 +27,14 @@ public interface ClientDomainConfigRepository {
    */
   List<ClientDomainConfig> findAllVerified();
 
+  /**
+   * Whether any client of this Organization has a {@code VERIFIED} custom domain with a registered
+   * embedding origin — the production half of ADR-0009 §4's embedding-eligibility rule
+   * (BR-CLIENT-04), asked per Organization rather than per client. The session cookie is per
+   * Organization, so this is what decides whether that cookie must be allowed on cross-site
+   * requests at all.
+   */
+  boolean existsVerifiedEmbeddingByOrganizationId(UUID organizationId);
+
   void save(ClientDomainConfig config);
 }

@@ -5,9 +5,9 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitIdentifier
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitRule;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
-import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
+import com.clavaris.app.infrastructure.adapter.out.security.ClientSecretAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationClientClaimCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
@@ -186,7 +186,7 @@ class PlatformAuthorizationServerConfig {
                     .tokenRevocationEndpoint(
                         revocation -> revocation.revocationResponseHandler(tokenRevocationLogger))
                     // Same fix as the Organization tier's chain, same root cause — extracted to
-                    // Argon2ClientAuthenticationSupport (code review finding: this exact block was
+                    // ClientSecretAuthenticationSupport (code review finding: this exact block was
                     // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
@@ -194,7 +194,7 @@ class PlatformAuthorizationServerConfig {
                                 .errorResponseHandler(new ClientAuthenticationFailureHandler())
                                 .authenticationProviders(
                                     providers ->
-                                        Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                        ClientSecretAuthenticationSupport.useClientSecretEncoder(
                                             providers, argon2BulkheadGate))))
         .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
         // ADR-0010 §6.1/BR-ID-06: this tier's own client_credentials-only anti-abuse layer — no

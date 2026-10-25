@@ -70,6 +70,11 @@ class PlatformClientRotationAndRevocationIntegrationTest extends RedisBackedInte
     assertThat(rotateResponse.statusCode()).isEqualTo(200);
     String newSecret = objectMapper.readTree(rotateResponse.body()).get("clientSecret").asString();
     assertThat(newSecret).isNotEqualTo("original-secret");
+    // The target was registered with a short, person-style secret, so it was hashed with Argon2;
+    // the
+    // rotated one is server-generated (256 random bits) and moves to the fast scheme.
+    assertThat(platformClients.findByClientId(targetClientId).orElseThrow().clientSecretHash())
+        .startsWith("{sha256}");
 
     assertThat(clientCredentialsStatus(targetClientId, "original-secret"))
         .as("the old secret must no longer authenticate anything after rotation")

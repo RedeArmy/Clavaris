@@ -70,6 +70,6 @@ Inline SVG with `class="clavaris-icon"`, `viewBox="0 0 24 24"`, `aria-hidden="tr
 
 ## 5. Known limitations
 
-- **Tenant brand colour is not applied.** `fragments/head.html` injects `--clavaris-brand-color` through an inline `<style>` element, which the `style-src 'self'` CSP blocks. Fixing it needs either a per-request CSP nonce or a per-tenant stylesheet endpoint (`/o/{organizationId}/branding.css`). Tracked as TD-UX-001 in `technical-debt-register.md`.
+- **Tenant brand colour (TD-UX-001, closed 2026-10-24).** The consuming application's own pages (`fragments/consumer-head`) link `--clavaris-brand-color` as a same-origin stylesheet, `/o/{organizationId}/branding/theme.css`, served by `ConsumerThemeController`; an inline `<style>` is refused by `style-src 'self'` and the policy is deliberately not loosened. `BrandedConsumerPagesIntegrationTest` proves the whole chain against the real security chains and policy. Clavaris's own pages (`fragments/head`) carry no tenant colour by design.
 - Anything several modules render (the dashboard top bar, the Organization tab row and header, the back button, the `<head>`) lives once in `common` under `templates/platform/fragments/` (and `templates/fragments/head.html`). Add shared markup there, not as a per-module copy: templates in `common` are on every module's classpath and covered by their standalone-MockMvc tests.
 - Failed HTMX requests need no per-page code: `htmx-feedback.js`, loaded by the navigation fragment, shows the toast and handles an expired session.

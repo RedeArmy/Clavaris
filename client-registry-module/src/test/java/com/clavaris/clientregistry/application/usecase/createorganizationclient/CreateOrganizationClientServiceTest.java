@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationEnvironmentChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
 import com.clavaris.clientregistry.domain.model.PlatformScopes;
@@ -29,7 +29,7 @@ class CreateOrganizationClientServiceTest {
   private OrganizationClientRepository organizationClients;
   private OrganizationExistsChecker orgExistsChecker;
   private OrganizationEnvironmentChecker environmentChecker;
-  private ClientSecretHasher hasher;
+  private GeneratedClientSecretHasher hasher;
   private OrganizationClientSecretGenerator secretGenerator;
   private AuditEventRecorder auditEvents;
   private CreateOrganizationClientService service;
@@ -39,7 +39,7 @@ class CreateOrganizationClientServiceTest {
     organizationClients = mock(OrganizationClientRepository.class);
     orgExistsChecker = mock(OrganizationExistsChecker.class);
     environmentChecker = mock(OrganizationEnvironmentChecker.class);
-    hasher = mock(ClientSecretHasher.class);
+    hasher = mock(GeneratedClientSecretHasher.class);
     secretGenerator = mock(OrganizationClientSecretGenerator.class);
     auditEvents = mock(AuditEventRecorder.class);
     service =

@@ -42,7 +42,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * behind whichever one wins the single permit first will still be mid-Argon2id-hash (measured p95
  * in the tens-to-hundreds of milliseconds, `load-testing/README.md` §4) well past that 10ms bound.
  * {@code PLATFORM_BOOTSTRAP_CLIENT_ID}'s own {@code client_credentials} grant is the exact call
- * site `Argon2ClientAuthenticationSupport`'s own Javadoc names as what `load-testing/README.md` §2
+ * site `ClientSecretAuthenticationSupport`'s own Javadoc names as what `load-testing/README.md` §2
  * originally measured — not the interactive password-login path, a different bulkhead call site
  * with its own existing coverage ({@code Argon2PasswordVerifierTest}).
  *

@@ -1,8 +1,8 @@
 package com.clavaris.clientregistry.application.usecase.rotateplatformclientsecret;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.PlatformClientRepository;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.domain.model.PlatformClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class RotatePlatformClientSecretService implements RotatePlatformClientSecretUseCase {
 
   private final PlatformClientRepository platformClients;
-  private final ClientSecretHasher hasher;
+  private final GeneratedClientSecretHasher hasher;
   private final PlatformClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
   public RotatePlatformClientSecretService(
       final PlatformClientRepository platformClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final PlatformClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.platformClients = platformClients;

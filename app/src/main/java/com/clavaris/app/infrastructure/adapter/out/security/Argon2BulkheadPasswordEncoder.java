@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 /**
  * TD-FUT-017: a {@link PasswordEncoder} decorator bounding concurrent Argon2id {@code matches}
  * calls through the shared {@link CpuBoundVerificationGate} — installed onto {@code
- * ClientSecretAuthenticationProvider} by {@link Argon2ClientAuthenticationSupport}, the exact call
+ * ClientSecretAuthenticationProvider} by {@link ClientSecretAuthenticationSupport}, the exact call
  * site `load-testing/README.md` §2 measured as {@code /oauth2/token}'s real concurrency ceiling.
  *
  * <p><b>Throws a real {@code OAuth2AuthenticationException}, not a generic exception</b> — verified

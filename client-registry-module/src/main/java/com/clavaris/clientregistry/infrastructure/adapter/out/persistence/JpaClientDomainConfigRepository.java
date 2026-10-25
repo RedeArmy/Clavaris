@@ -44,6 +44,12 @@ class JpaClientDomainConfigRepository implements ClientDomainConfigRepository {
   }
 
   @Override
+  public boolean existsVerifiedEmbeddingByOrganizationId(final UUID organizationId) {
+    return domainConfigs.existsEmbeddingByOrganizationId(
+        organizationId, DomainVerificationStatus.VERIFIED.name());
+  }
+
+  @Override
   public void save(final ClientDomainConfig config) {
     domainConfigs.save(
         new ClientDomainConfigEntity(

@@ -71,12 +71,23 @@ class DistributedSessionConfig {
   // PMD.LongVariable: same "abbreviating would only make this harder to read" precedent this
   // codebase's own PlatformScopes/AdaptiveSameSiteSessionCookieSerializer suppressions already
   // establish for this exact name.
-  @SuppressWarnings("PMD.LongVariable")
+  // PMD.LawOfDemeter: ObjectProvider.getIfAvailable() is the only way to reach a bean lazily — same
+  // rationale SessionBackedFlatPathLookup documents for its identical suppression.
+  @SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter"})
   @Bean
   /* package */ CookieSerializer sessionCookieSerializer(
       @Value("${clavaris.session.platform-path-prefix:/platform/}") final String platformPathPrefix,
-      final ObjectProvider<OrganizationForClientResolver> organizationForClient) {
+      final ObjectProvider<OrganizationForClientResolver> organizationForClient,
+      final ObjectProvider<EmbeddingSessionPolicy> embeddingPolicy) {
+    // Looked up per call, not injected: this bean is created while the servlet context starts,
+    // before the JPA-backed beans the policy needs exist (SessionBackedFlatPathLookup documents the
+    // same ordering problem). No policy bean means no cross-site cookie, the safe direction.
     return new AdaptiveSameSiteSessionCookieSerializer(
-        platformPathPrefix, new SessionBackedFlatPathLookup(organizationForClient));
+        platformPathPrefix,
+        new SessionBackedFlatPathLookup(organizationForClient),
+        organizationId -> {
+          final EmbeddingSessionPolicy policy = embeddingPolicy.getIfAvailable();
+          return policy != null && policy.allowsCrossSiteSession(organizationId);
+        });
   }
 }

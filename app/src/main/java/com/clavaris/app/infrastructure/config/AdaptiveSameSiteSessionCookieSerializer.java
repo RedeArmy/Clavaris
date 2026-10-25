@@ -42,10 +42,24 @@ import org.springframework.web.util.UrlPathHelper;
  * would simply be rejected outright by the browser, not "relaxed," so there is nothing a plain-HTTP
  * request could gain from attempting it anyway.
  *
- * <p>A narrower CSRF surface than {@code Lax} would give is not actually lost here in practice:
- * this project already gates every state-changing request behind a real CSRF token (the mechanism
- * {@code Lax} would otherwise be the last line of defense for), the same posture every mainstream
- * hosted-login/embedded-profile provider's own session cookie already takes.
+ * <p><b>Narrowed, 2026-10-24: {@code None} is no longer global.</b> The paragraph above fixed the
+ * embedded login by writing every secure session {@code SameSite=None}, and justified the lost
+ * {@code Lax} defence by pointing at the CSRF tokens. That left the defence off for every tenant
+ * and for the operator dashboard ({@code PLATFORM_SESSION}), none of which an iframe ever needs: a
+ * cookie only has to cross sites for an Organization whose pages can actually be framed. {@code
+ * None} is now written only for an Organization's own cookie ({@code SESSION_<organizationId>})
+ * when {@link EmbeddingSessionPolicy} says it can be embedded (a development-environment
+ * Organization, or one with a client whose custom domain is {@code VERIFIED} with an embedding
+ * origin — the same rule the {@code frame-ancestors} header follows). Every other cookie — the
+ * platform's, the legacy flat {@code SESSION}, a tenant that is never embedded — is {@code Lax}, so
+ * a cross-site POST or sub-resource request does not carry it and CSRF tokens are the second layer
+ * of defence again, not the only one. Social login and the redirects back from a consuming
+ * application are top-level GET navigations, which {@code Lax} cookies do accompany.
+ *
+ * <p>Cost, stated: a session written as {@code Lax} stays {@code Lax}. When an Organization starts
+ * being embeddable, an Account already signed in there is asked to sign in once more inside the
+ * frame; the next sign-in is written {@code None}. Reading a cookie never consults the policy —
+ * {@code SameSite} is a response-only attribute.
  *
  * <p><b>Real bug found live, 2026-10-10: one shared cookie name across both tiers.</b>
  * {@code @EnableRedisIndexedHttpSession} is a single, application-wide Spring Session configuration
@@ -107,7 +121,10 @@ import org.springframework.web.util.UrlPathHelper;
 // java:S1075: the consent and social-login paths are fixed by Spring Authorization Server and
 // Spring Security, not deployment settings (the platform prefix, which is, stays a parameter).
 // PMD.OnlyOneReturn: one exit per distinct outcome, as everywhere else in this codebase.
-@SuppressWarnings({"PMD.LongVariable", "java:S1075", "PMD.OnlyOneReturn"})
+// PMD.TooManyMethods: one small private method per way a request can name its tenant (path, consent
+// client, social-login tag) plus the two serializer builders; folding them together would only hide
+// that each case has its own rule.
+@SuppressWarnings({"PMD.LongVariable", "java:S1075", "PMD.OnlyOneReturn", "PMD.TooManyMethods"})
 final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer {
 
   private static final String PLATFORM_COOKIE_NAME = "PLATFORM_SESSION";
@@ -130,19 +147,22 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
   // CachingAccountAuthenticationPolicyProvider/RedisIdempotencyKeyStore constructors already use.
   private final String platformPathPrefix;
   private final FlatPathSessionLookup flatPathLookup;
+  private final EmbeddingSessionPolicy embeddingPolicy;
 
   /* package */ AdaptiveSameSiteSessionCookieSerializer(
       @Value("${clavaris.session.platform-path-prefix:/platform/}") final String platformPathPrefix,
-      final FlatPathSessionLookup flatPathLookup) {
+      final FlatPathSessionLookup flatPathLookup,
+      final EmbeddingSessionPolicy embeddingPolicy) {
     this.platformPathPrefix = platformPathPrefix;
     this.flatPathLookup = flatPathLookup;
+    this.embeddingPolicy = embeddingPolicy;
   }
 
   @Override
   public void writeCookieValue(final CookieValue cookieValue) {
     final HttpServletRequest request = cookieValue.getRequest();
-    serializerFor(request, cookieNameFor(request).orElse(TenantSessionCookies.LEGACY_NAME))
-        .writeCookieValue(cookieValue);
+    final String cookieName = cookieNameFor(request).orElse(TenantSessionCookies.LEGACY_NAME);
+    serializerFor(request, cookieName).writeCookieValue(cookieValue);
   }
 
   // SameSite/Secure are response-only attributes — reading back an already-sent cookie value never
@@ -151,7 +171,7 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
   @Override
   public List<String> readCookieValues(final HttpServletRequest request) {
     return cookieNameFor(request)
-        .map(name -> serializerFor(request, name).readCookieValues(request))
+        .map(name -> named(name).readCookieValues(request))
         .orElse(List.of());
   }
 
@@ -212,15 +232,30 @@ final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer 
   // A cheap, throwaway serializer per call rather than a cache keyed by cookie name: tenant cookie
   // names come from the browser and from URLs, so a cache would grow with whatever a client sends.
   // Secure is left at DefaultCookieSerializer's own adaptive default (mirrors request.isSecure()),
-  // never hardcoded — SameSite and the cookie name are the only two axes this class decides.
-  private static DefaultCookieSerializer serializerFor(
+  // never hardcoded. SameSite stays at that serializer's own default, Lax, unless the cookie must
+  // cross sites (see the class Javadoc): None is only valid with Secure, so a plain-HTTP request
+  // never asks for it, and only an embeddable Organization's own cookie ever does.
+  private DefaultCookieSerializer serializerFor(
       final HttpServletRequest request, final String cookieName) {
-    final DefaultCookieSerializer serializer = new DefaultCookieSerializer();
-    serializer.setCookieName(cookieName);
-    if (request.isSecure()) {
+    final DefaultCookieSerializer serializer = named(cookieName);
+    if (request.isSecure() && needsCrossSiteSession(cookieName)) {
       serializer.setSameSite("None");
     }
     return serializer;
+  }
+
+  private static DefaultCookieSerializer named(final String cookieName) {
+    final DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+    serializer.setCookieName(cookieName);
+    return serializer;
+  }
+
+  // Only a tenant cookie can belong to an embeddable Organization: the platform and legacy flat
+  // cookies name no Organization, so they never leave Lax.
+  private boolean needsCrossSiteSession(final String cookieName) {
+    return TenantSessionCookies.organizationOf(cookieName)
+        .map(embeddingPolicy::allowsCrossSiteSession)
+        .orElse(false);
   }
 
   private boolean isPlatform(final String path) {

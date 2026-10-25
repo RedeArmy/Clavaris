@@ -1,6 +1,6 @@
 # PRD — Clavaris v1 (MVP)
 
-🟡 En revisión
+✅ Aprobado (2026-10-25) — SDE-III review: every capability row below was checked against the code and the later ADRs it had drifted from (workspace roles, branding/embedding, impersonation, delivery log); what is still marked ❌ is genuinely unbuilt. The remaining items in §5 are product questions, not blockers.
 
 ## 1. Purpose
 
@@ -23,7 +23,7 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 | Passkeys (WebAuthn, passwordless primary login) | ✅ Shipped 2026-09-30 | Self-service registration + discoverable-credential sign-in, TD-FUT-034 (`technical-debt-register.md`) — originally planned v1.1 per `clerk-feature-analysis.md` §6, pulled forward and built ahead of schedule |
 | Breached-password check at registration/password-change | ✅ Shipped 2026-10-01 | BR-ID-07; k-anonymity-style check (HIBP Pwned Passwords range query, no plaintext password ever leaves the server) — `clerk-feature-analysis.md` §6 |
 | New-device step-up MFA (force 2nd factor on unrecognized device even with correct password) | ❌ v1.1 | Scoped-down version of Clerk's "Client Trust" — `clerk-feature-analysis.md` §6 |
-| User impersonation (admin support tool) | ❌ v1.1 | `BR-ADMIN-01`; bundled with the management-API audit-logging gap already flagged in `threat-model-stride.md` §5 — building both together, not sequenced apart |
+| User impersonation (admin support tool) | ✅ Shipped | `BR-ADMIN-01`; `ImpersonationTokenIssuer` and the management-API impersonate endpoint, rate-limited (`PlatformDashboardImpersonateRateLimitIntegrationTest`) — originally planned v1.1 |
 
 ### 2.2 `client-registry-module`
 
@@ -34,8 +34,8 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 | `client_credentials` grant | ✅ | For the management API only (ADR-0006) |
 | Discovery document, JWKS, `/userinfo`, `/revoke`, end-session endpoint | ✅ | Standard OIDC surface — required for "any language, standard client library" to actually be true |
 | Self-service client registration UI | ❌ backlog | v1 clients are registered manually; a self-service developer console is a v1.1+ concern |
-| Embedded, branded login (iframe-modal + per-client custom domain) | ❌ v1.1/v2, see ADR-0009 | Requires DNS/proxy domain verification and dynamic TLS — real infra work, not a UI-only feature |
-| Per-client branding (logo, color, app name on hosted login/consent UI) | ❌ v1.1/v2, see ADR-0009 | `ClientBranding` entity, bundled with the custom-domain feature above |
+| Embedded, branded login (iframe-modal + per-client custom domain) | ✅ Shipped, see ADR-0009 | `ClientDomainConfig` with real DNS TXT verification, `CustomDomainRequestRewriteFilter`, `frame-ancestors` relaxed for `display=modal`. TLS issuance stays outside Clavaris (the operator's proxy). Cross-site session cookies are written only for an Organization that can actually be embedded (ADR-0030 addendum, TD-SEC-065) |
+| Branding (logo, brand colour, application name, description on the hosted login/consent pages, emails and passkey prompt) | ✅ Shipped, see ADR-0009 | `ClientBranding` plus the editable Organization profile; the colour is served as a linked stylesheet so the CSP stays strict (TD-UX-001) |
 
 ### 2.3 `webhook-module` — ✅ shipped 2026-09-02, see ADR-0007
 
@@ -46,7 +46,7 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 | Event catalog v1 | ✅ | Every real domain event in `identity-module`'s and `organization-module`'s own outbox writes it a row for — `account.created/suspended/reactivated/deleted/email_verified/new_device_detected`, `account.session_revoked`, `password_reset.requested/completed`, `social_identity.linked`, `refresh_token.reuse_detected`, `workspace.created`, `workspace_membership.added/removed/role_changed`, `organization.deleted`. No separate curated "catalog" — any event a producer module writes to its outbox is deliverable to a subscribed endpoint. |
 | Retry with backoff + manual replay | ✅ | BR-WEBHOOK-03; replay available via management API, never a silent drop |
 | Signing secret rotation | ✅ | Dual-secret overlap window, resolved as ADR-0007's own first open question |
-| Delivery log UI (list/inspect past deliveries) | ❌ backlog | v1 exposes this via the management API only (`GET .../deliveries`), no dedicated UI |
+| Delivery log UI (list/inspect past deliveries) | ✅ Shipped | Operator dashboard pages for endpoints, per-endpoint deliveries, the activity log and the event catalog, on top of the management API (`GET .../deliveries`) |
 
 ### 2.4 `organization-module` — 🟡 redefined by ADR-0010
 
@@ -55,17 +55,17 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 | Capability | v1 | Notes |
 |---|---|---|
 | `Organization` = tenant isolation boundary (one per consuming system) | ✅ | ADR-0010. Manual/operator-created in v1, mirroring manual `OAuthClient` registration (§2.2) — no self-service tenant creation yet. Owns an isolated `Account` pool (`identity-module`) and an isolated set of `OAuthClient`s (§2.2). |
-| Create workspace (within one Organization), invite members by email | ✅ | Renamed from "organization" to `Workspace` (ADR-0010) to free up that name for the tenant-isolation concept above |
-| Workspace roles: `OWNER` / `ADMIN` / `MEMBER` | ✅ | Fixed set in v1, not configurable per-workspace |
+| Create workspace (within one Organization), add members | ✅ | Renamed from "organization" to `Workspace` (ADR-0010) to free up that name for the tenant-isolation concept above. Members are provisioned directly as real `Account`s; there is no invitation flow (ADR-0010 §3 addendum, deferred to v1.1+) |
+| Workspace roles, consumer-defined | ✅ | ADR-0027 (supersedes the fixed `ADMIN`/`MEMBER` set): named bundles of opaque permission strings scoped to the Organization, optional single-hop parent role, one reserved system role per Organization that carries the only two permissions Clavaris itself interprets |
+| Workspace teams | ✅ | ADR-0028: a `Workspace`-scoped grouping label over a subset of roles, no permission semantics of its own |
 | Remove workspace member, transfer workspace ownership | ✅ | |
-| Custom/configurable roles per workspace | ❌ backlog | Real feature gap for future enterprise-shaped consumers, not needed by JobSeeker |
 
 ## 3. Primary user stories (developer of a consuming application)
 
 - As a developer integrating a new application, I register an OAuth client and redirect users to `/authorize` using a standard OIDC library, with no Clavaris-specific SDK.
 - As a developer, I call `/userinfo` or decode the ID token's claims to get the authenticated account's identity, and validate access tokens against the published JWKS without calling back to Clavaris on every request.
 - As a developer building a multi-tenant product, I use `organization-module`'s workspace membership/role model instead of building my own from scratch — and I get full account-pool isolation from every other consuming system for free, by construction (ADR-0010).
-- As a developer, I register a webhook endpoint for my application and receive signed `account.created`/`membership.created`/etc. events so I can keep a local read model in sync, without polling Clavaris (ADR-0007).
+- As a developer, I register a webhook endpoint for my application and receive signed `account.created`/`workspace_membership.added`/etc. events so I can keep a local read model in sync, without polling Clavaris (ADR-0007).
 - As a developer, I explore the management API's exact request/response shapes via Swagger UI (`/swagger-ui.html`, dev/local only) instead of relying on hand-written docs that may drift (ADR-0008).
 - As an operator, I can revoke a compromised account's sessions and force a password reset without touching the database directly.
 
@@ -80,7 +80,7 @@ Defines the exact functional scope of Clavaris v1 — the minimum that lets a re
 
 ## 4. Out of scope for v1 (explicit, not implicit)
 
-SAML, SCIM provisioning, self-service client registration console, configurable per-organization roles, MFA, multi-region deployment. Every one of these is a real, legitimate feature — deferred because no current consumer needs it yet, not because it's unimportant. See `docs/01-product/roadmap-and-release-plan.md` for sequencing.
+SAML, SCIM provisioning, self-service client registration console, MFA (TOTP and new-device step-up), workspace invitations, multi-region deployment. Every one of these is a real, legitimate feature — deferred because no current consumer needs it yet, not because it's unimportant. See `docs/01-product/roadmap-and-release-plan.md` for sequencing.
 
 **Explicit non-goals, not just deferrals** (per `clerk-feature-analysis.md` §6, informed by what Clerk bundles into its product that Clavaris deliberately won't): billing/subscription management, feature/plan gating, and "waitlist" launch-gating. These are product-specific business logic that belongs in each consumer's own backend — bundling them here would violate this project's own core boundary ("Clavaris doesn't know what a candidate is"), not a scope gap to close later.
 

@@ -1,9 +1,9 @@
 package com.clavaris.clientregistry.application.usecase.rotateorganizationclientsecret;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientNotFoundException;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientRepository;
 import com.clavaris.clientregistry.application.usecase.createorganizationclient.OrganizationClientSecretGenerator;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,13 +17,13 @@ public class RotateOrganizationClientSecretService
     implements RotateOrganizationClientSecretUseCase {
 
   private final OrganizationClientRepository organizationClients;
-  private final ClientSecretHasher hasher;
+  private final GeneratedClientSecretHasher hasher;
   private final OrganizationClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
   public RotateOrganizationClientSecretService(
       final OrganizationClientRepository organizationClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OrganizationClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.organizationClients = organizationClients;

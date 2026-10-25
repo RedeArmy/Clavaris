@@ -6,8 +6,10 @@ import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -18,7 +20,13 @@ import org.springframework.session.web.http.CookieSerializer.CookieValue;
  * Real bug found live, 2026-10-10 — see {@link AdaptiveSameSiteSessionCookieSerializer}'s own
  * Javadoc for the full rationale this class guards: SameSite is keyed off whether the connection is
  * secure, never off a per-request {@code display=modal} query param, so an ordinary top-level
- * session on a real HTTPS deployment is recognized by a later embedded iframe with no second login.
+ * session of an embeddable Organization on a real HTTPS deployment is recognized by a later
+ * embedded iframe with no second login.
+ *
+ * <p>Narrowed 2026-10-24: {@code SameSite=None} is written only for the cookie of an Organization
+ * {@link EmbeddingSessionPolicy} says can be embedded. Every other cookie — the platform's, the
+ * legacy flat one, a tenant that is never framed — stays {@code Lax}, which is what these tests
+ * pin.
  */
 class AdaptiveSameSiteSessionCookieSerializerTest {
 
@@ -29,11 +37,14 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
 
   // Stands in for the client->Organization resolver and the session repository.
   private final Map<String, UUID> clientOrganizations = new HashMap<>();
+  // Stands in for EmbeddingSessionPolicy: the Organizations that can be framed.
+  private final Set<UUID> embeddable = new HashSet<>();
   private final AdaptiveSameSiteSessionCookieSerializer serializer =
       new AdaptiveSameSiteSessionCookieSerializer(
           "/platform/",
           (FlatPathSessionLookup)
-              clientId -> Optional.ofNullable(clientOrganizations.get(clientId)));
+              clientId -> Optional.ofNullable(clientOrganizations.get(clientId)),
+          embeddable::contains);
 
   private static String encoded(final String sessionId) {
     return Base64.getEncoder().encodeToString(sessionId.getBytes(StandardCharsets.UTF_8));
@@ -55,12 +66,14 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     assertThat(response.getHeader("Set-Cookie")).contains("SameSite=Lax").doesNotContain("Secure");
   }
 
-  // The real regression this class closes: an ordinary, non-embedded, top-level login over HTTPS
-  // must ALSO get SameSite=None from the very first response — not just a request already known
-  // to be part of a display=modal flow — so a LATER embedded iframe (which can never retroactively
-  // widen an already-written Lax cookie) recognizes this same session with no second login.
+  // The regression the 2026-10-10 fix closes, for the Organizations that need it: an ordinary,
+  // non-embedded, top-level login over HTTPS must ALSO get SameSite=None from the very first
+  // response — not just a request already known to be part of a display=modal flow — so a LATER
+  // embedded iframe (which can never retroactively widen an already-written Lax cookie) recognizes
+  // this same session with no second login.
   @Test
-  void aSecureRequestGetsSameSiteNoneRegardlessOfAnyDisplayModalParam() {
+  void aSecureRequestOfAnEmbeddableOrganizationGetsSameSiteNoneRegardlessOfAnyDisplayModalParam() {
+    embeddable.add(TENANT_A);
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", tenantPath(TENANT_A, "/login"));
     request.setSecure(true);
@@ -72,7 +85,8 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
   }
 
   @Test
-  void aSecureRequestWithDisplayModalStillGetsSameSiteNone() {
+  void aSecureRequestWithDisplayModalOfAnEmbeddableOrganizationStillGetsSameSiteNone() {
+    embeddable.add(TENANT_A);
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", tenantPath(TENANT_A, "/login"));
     request.setSecure(true);
@@ -84,10 +98,44 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     assertThat(response.getHeader("Set-Cookie")).contains("SameSite=None");
   }
 
+  // The point of the 2026-10-24 narrowing: an Organization nobody embeds keeps the Lax defence even
+  // over HTTPS, and a display=modal query parameter — which anyone can append — widens nothing.
+  @Test
+  void aSecureRequestOfAnOrganizationThatIsNeverEmbeddedStaysLax() {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", tenantPath(TENANT_A, "/login"));
+    request.setSecure(true);
+    request.setParameter("display", "modal");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie"))
+        .startsWith(COOKIE_A + "=")
+        .contains("SameSite=Lax")
+        .contains("Secure");
+  }
+
+  @Test
+  void embeddingOneOrganizationDoesNotWidenAnother() {
+    embeddable.add(TENANT_A);
+    MockHttpServletRequest other =
+        new MockHttpServletRequest("GET", tenantPath(TENANT_B, "/login"));
+    other.setSecure(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    serializer.writeCookieValue(new CookieValue(other, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie"))
+        .startsWith(COOKIE_B + "=")
+        .contains("SameSite=Lax");
+  }
+
   // SameSite=None without Secure is simply rejected outright by any modern browser — there is
   // nothing a plain-HTTP request could gain from attempting it, display=modal or not.
   @Test
   void anInsecureRequestWithDisplayModalStillGetsOnlyTheLaxFallback() {
+    embeddable.add(TENANT_A);
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", tenantPath(TENANT_A, "/login"));
     request.setSecure(false);
@@ -131,18 +179,55 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
     assertThat(response.getHeader("Set-Cookie")).startsWith(COOKIE_A + "=");
   }
 
+  // The operator dashboard is never framed by a consuming application, so its cookie has no reason
+  // to cross sites — whatever any Organization's embedding policy says, and over HTTPS too.
   @Test
-  void aPlatformPathGetsItsOwnDistinctCookieName() {
+  void aPlatformPathGetsItsOwnDistinctCookieNameAndNeverLeavesLax() {
+    AdaptiveSameSiteSessionCookieSerializer everythingEmbeddable =
+        new AdaptiveSameSiteSessionCookieSerializer(
+            "/platform/", noLookup(), organizationId -> true);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/platform/dashboard");
     request.setSecure(true);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    serializer.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+    everythingEmbeddable.writeCookieValue(new CookieValue(request, response, "a-session-id"));
 
     assertThat(response.getHeader("Set-Cookie"))
         .startsWith("PLATFORM_SESSION=")
-        .contains("SameSite=None")
+        .contains("SameSite=Lax")
         .contains("Secure");
+  }
+
+  // A flat path names no Organization, so it cannot belong to an embeddable one either.
+  @Test
+  void theLegacyFlatCookieNeverLeavesLax() {
+    AdaptiveSameSiteSessionCookieSerializer everythingEmbeddable =
+        new AdaptiveSameSiteSessionCookieSerializer(
+            "/platform/", noLookup(), organizationId -> true);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/error");
+    request.setSecure(true);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    everythingEmbeddable.writeCookieValue(new CookieValue(request, response, "a-session-id"));
+
+    assertThat(response.getHeader("Set-Cookie")).startsWith("SESSION=").contains("SameSite=Lax");
+  }
+
+  // SameSite is a response-only attribute; reading a cookie must not cost a policy lookup (which is
+  // a cache hit at best and a query at worst) on every request of every signed-in user.
+  @Test
+  void readingACookieNeverConsultsTheEmbeddingPolicy() {
+    AdaptiveSameSiteSessionCookieSerializer throwingPolicy =
+        new AdaptiveSameSiteSessionCookieSerializer(
+            "/platform/",
+            noLookup(),
+            organizationId -> {
+              throw new AssertionError("the policy must not be consulted on a read");
+            });
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", tenantPath(TENANT_A, "/x"));
+    request.setCookies(new Cookie(COOKIE_A, encoded("a-session-id")));
+
+    assertThat(throwingPolicy.readCookieValues(request)).containsExactly("a-session-id");
   }
 
   @Test
@@ -190,7 +275,8 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
   @Test
   void aCustomPlatformPathPrefixIsHonoredInsteadOfTheHardcodedDefault() {
     AdaptiveSameSiteSessionCookieSerializer customSerializer =
-        new AdaptiveSameSiteSessionCookieSerializer("/ops-console/", noLookup());
+        new AdaptiveSameSiteSessionCookieSerializer(
+            "/ops-console/", noLookup(), organizationId -> false);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/ops-console/dashboard");
     request.setSecure(true);
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -260,6 +346,7 @@ class AdaptiveSameSiteSessionCookieSerializerTest {
 
   @Test
   void theTenantCookieKeepsTheAdaptiveSameSiteRules() {
+    embeddable.add(TENANT_A);
     MockHttpServletRequest secure =
         new MockHttpServletRequest("GET", tenantPath(TENANT_A, "/login"));
     secure.setSecure(true);

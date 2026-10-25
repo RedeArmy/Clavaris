@@ -296,6 +296,19 @@ jobs:
       - name: Run doc consistency checks
         run: ./scripts/check-doc-consistency.sh
 
+  # Runs the real ./Caddyfile in a throwaway Docker network and requests /actuator/** (plus the
+  # path tricks Tomcat would normalize back to it) through the primary domain and a per-client
+  # custom-domain site. A Caddyfile typo or matcher gap does not fail the proxy — it just leaves
+  # /actuator/prometheus public — so the only reliable check is to ask. See the script's own header.
+  edge-config:
+    name: Edge proxy blocks /actuator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify the Caddyfile never forwards /actuator
+        run: ./scripts/check-caddy-actuator-block.sh
+
   migration-immutability:
     name: Flyway migration immutability check
     runs-on: ubuntu-latest
@@ -479,6 +492,7 @@ jobs:
         docker-build,
         dependency-scan,
         doc-consistency,
+        edge-config,
         migration-immutability,
         sonarcloud,
       ]
@@ -506,6 +520,7 @@ jobs:
           DOCKER_BUILD_RESULT: ${{ needs.docker-build.result }}
           DEPENDENCY_SCAN_RESULT: ${{ needs.dependency-scan.result }}
           DOC_CONSISTENCY_RESULT: ${{ needs.doc-consistency.result }}
+          EDGE_CONFIG_RESULT: ${{ needs.edge-config.result }}
           MIGRATION_IMMUTABILITY_RESULT: ${{ needs.migration-immutability.result }}
           SONARCLOUD_RESULT: ${{ needs.sonarcloud.result }}
         run: |
@@ -514,6 +529,7 @@ jobs:
           echo "docker-build:           $DOCKER_BUILD_RESULT"
           echo "dependency-scan:        $DEPENDENCY_SCAN_RESULT"
           echo "doc-consistency:        $DOC_CONSISTENCY_RESULT"
+          echo "edge-config:            $EDGE_CONFIG_RESULT"
           echo "migration-immutability: $MIGRATION_IMMUTABILITY_RESULT"
           echo "sonarcloud:             $SONARCLOUD_RESULT"
 
@@ -521,6 +537,7 @@ jobs:
           [ "$BUILD_AND_TEST_RESULT" = "success" ] || FAILED=1
           [ "$DOCKER_BUILD_RESULT" = "success" ] || FAILED=1
           [ "$DOC_CONSISTENCY_RESULT" = "success" ] || FAILED=1
+          [ "$EDGE_CONFIG_RESULT" = "success" ] || FAILED=1
           [ "$MIGRATION_IMMUTABILITY_RESULT" = "success" ] || FAILED=1
 
           if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then

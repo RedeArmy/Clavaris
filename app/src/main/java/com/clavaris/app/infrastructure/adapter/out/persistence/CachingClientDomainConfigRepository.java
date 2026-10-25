@@ -81,6 +81,14 @@ class CachingClientDomainConfigRepository implements ClientDomainConfigRepositor
     return delegate.findAllVerified();
   }
 
+  // Passthrough, deliberately not cached here: the only caller (the session-cookie policy) keeps
+  // its
+  // own short-lived per-Organization cache, which is the right granularity for this question.
+  @Override
+  public boolean existsVerifiedEmbeddingByOrganizationId(final UUID organizationId) {
+    return delegate.existsVerifiedEmbeddingByOrganizationId(organizationId);
+  }
+
   // Write-through on both keys, not merely invalidate-and-let-the-next-read-repopulate — same
   // "an operator's own change must apply immediately" rationale
   // CachingRateLimitPolicyRepository#save's own identical comment documents. A hostname change

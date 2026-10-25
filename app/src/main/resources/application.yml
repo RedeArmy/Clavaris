@@ -279,9 +279,19 @@ clavaris:
     login:
       per-account-limit: 10
       per-ip-limit: 30
-    # client_credentials/refresh-token exchange (per PlatformClient/OAuthClient).
+    # /oauth2/token. The two tiers differ on purpose (TD-PERF-034).
+    #  - per-client-limit (20 per 5 minutes): the PLATFORM tier only, counted per claimed client_id.
+    #    Its bootstrap secret is chosen by an operator and so can be weak, which is what a strict,
+    #    client-wide cap exists to protect; platform tokens are few and cached.
+    #  - tenant-per-client-ip-limit (6000 per 5 minutes) and refresh-per-client-limit (600): the
+    #    TENANT tier (/o/*/oauth2/token), counted per client_id AND source IP. Every tenant client
+    #    secret is generated with 256 bits, so there is nothing to guess and the cap is only a runaway
+    #    backstop; it must stay above what the Organization's own capacity ceiling admits (the hard
+    #    cap below, ~5 requests per sign-in), or it silently becomes the real capacity limit again
+    #    (it was 20: one application could complete about four sign-ins a minute).
     token:
       per-client-limit: 20
+      tenant-per-client-ip-limit: 6000
       refresh-per-client-limit: 600
     # Platform-tier self-service endpoints (PlatformDashboardSecurityConfig) — each its own row
     # rather than sharing token's own limit, since these are unauthenticated-by-design entry points

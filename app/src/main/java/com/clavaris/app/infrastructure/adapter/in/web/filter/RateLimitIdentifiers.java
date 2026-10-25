@@ -66,6 +66,20 @@ public final class RateLimitIdentifiers {
     return (formClientId == null || formClientId.isBlank()) ? null : formClientId;
   }
 
+  /**
+   * The presented {@code client_id} <em>and</em> the caller's source IP, as one key. The {@code
+   * client_id} alone is not an identity: it is public (it is in every {@code /authorize} URL) and
+   * the rate limiter reads it before the client has authenticated, so a rule keyed by it alone lets
+   * anyone who knows it spend that client's whole allowance with garbage requests and lock the real
+   * application out. Adding the IP makes a caller exhaust only their own allowance. Returns {@code
+   * null} when no {@code client_id} is presented, so the rule is skipped, as for {@link
+   * #oauthClientId}.
+   */
+  public static String oauthClientIdAndSourceIp(final HttpServletRequest request) {
+    final String clientId = oauthClientId(request);
+    return clientId == null ? null : clientId + "@" + sourceIp(request);
+  }
+
   private static String clientIdFromBasicAuth(final HttpServletRequest request) {
     final String header = request.getHeader("Authorization");
     if (header == null

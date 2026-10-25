@@ -114,6 +114,98 @@ class JpaClientDomainConfigRepositoryTest {
     assertThat(found.verificationStatus()).contains(DomainVerificationStatus.VERIFIED);
   }
 
+  // ---- existsVerifiedEmbeddingByOrganizationId: the per-Organization question the session cookie
+  // policy asks. The rule mirrors the frame-ancestors one: VERIFIED and a registered embedding
+  // origin, on a client that belongs to that Organization.
+
+  @Test
+  void anOrganizationWithAVerifiedDomainAndAnEmbeddingOriginCanBeEmbedded() {
+    UUID organizationId = UUID.randomUUID();
+    UUID oauthClientId = registerARealOAuthClientOf(organizationId);
+    domainConfigs.save(
+        ClientDomainConfig.request(
+                oauthClientId,
+                ClientDomainMode.CNAME,
+                "login.embed.example.com",
+                "https://app.example.com")
+            .markVerified());
+
+    assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(organizationId)).isTrue();
+  }
+
+  @Test
+  void aDomainThatIsNotVerifiedDoesNotMakeTheOrganizationEmbeddable() {
+    UUID organizationId = UUID.randomUUID();
+    UUID pending = registerARealOAuthClientOf(organizationId);
+    UUID failed = registerARealOAuthClientOf(organizationId);
+    domainConfigs.save(
+        ClientDomainConfig.request(
+            pending,
+            ClientDomainMode.CNAME,
+            "pending.embed.example.com",
+            "https://app.example.com"));
+    domainConfigs.save(
+        ClientDomainConfig.request(
+                failed,
+                ClientDomainMode.CNAME,
+                "failed.embed.example.com",
+                "https://app.example.com")
+            .markVerified()
+            .markFailed());
+
+    assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(organizationId)).isFalse();
+  }
+
+  @Test
+  void aVerifiedDomainWithNoEmbeddingOriginDoesNotMakeTheOrganizationEmbeddable() {
+    UUID organizationId = UUID.randomUUID();
+    UUID oauthClientId = registerARealOAuthClientOf(organizationId);
+    domainConfigs.save(
+        ClientDomainConfig.request(
+                oauthClientId, ClientDomainMode.CNAME, "plain.embed.example.com", null)
+            .markVerified());
+
+    assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(organizationId)).isFalse();
+  }
+
+  @Test
+  void anotherOrganizationsVerifiedEmbeddingNeverCountsForThisOne() {
+    UUID embedded = UUID.randomUUID();
+    UUID unrelated = UUID.randomUUID();
+    UUID embeddedClient = registerARealOAuthClientOf(embedded);
+    registerARealOAuthClientOf(unrelated);
+    domainConfigs.save(
+        ClientDomainConfig.request(
+                embeddedClient,
+                ClientDomainMode.CNAME,
+                "scoped.embed.example.com",
+                "https://app.example.com")
+            .markVerified());
+
+    assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(embedded)).isTrue();
+    assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(unrelated)).isFalse();
+  }
+
+  @Test
+  void anOrganizationWithNoClientsAtAllCannotBeEmbedded() {
+    assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(UUID.randomUUID())).isFalse();
+  }
+
+  private UUID registerARealOAuthClientOf(final UUID organizationId) {
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "test_client_" + UUID.randomUUID(),
+            "argon2id$hashed",
+            List.of("https://app.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    oauthClients.save(client);
+    return client.id();
+  }
+
   private UUID registerARealOAuthClient() {
     OAuthClient client =
         OAuthClient.register(
