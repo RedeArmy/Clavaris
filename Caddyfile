@@ -7,16 +7,45 @@
 # {$CLAVARIS_DOMAIN} is substituted from docker-compose.prod.yml's own environment block — Caddy's
 # native env-var substitution, no separate templating step needed.
 
-{$CLAVARIS_DOMAIN} {
+# The edge every hostname of this deployment gets: the primary domain below and each per-client
+# custom domain (deployment-runbook.md §9e). Shared as a snippet so a new custom-domain site block
+# is a one-line `import clavaris_edge` and cannot forget the Actuator block — a copy of the primary
+# block, which is what the runbook used to tell operators to paste, would silently re-expose
+# /actuator/** on that hostname.
+(clavaris_edge) {
+	# Operational endpoints (/actuator/**: health, info, prometheus) are for the internal Docker
+	# network only — Prometheus scrapes app:8080 directly and every compose/Dockerfile healthcheck
+	# calls localhost:8080, so nothing legitimate reaches them through this public edge. Left
+	# proxied, /actuator/prometheus hands anyone on the internet the metric names, tag values and
+	# traffic shape of a credential store, and the application itself has no rule of its own to
+	# refuse them (Spring's Actuator endpoints sit under DefaultSecurityConfig's permitAll).
+	#
+	# A regexp on the word anywhere in the path, not `path /actuator/*`: Tomcat strips ";param"
+	# segments and normalizes before Spring maps the request, so "/actuator;x=1/prometheus" and
+	# "/o/x/..;/actuator/prometheus" reach the endpoint yet never match a literal prefix. Case-
+	# insensitive and prefix-free costs nothing — no real route of this application contains the
+	# word. scripts/check-caddy-actuator-block.sh proves this against the real file, bypass
+	# variants and a custom-domain site included; keep it passing when editing this block.
+	@actuator path_regexp (?i)actuator
+	handle @actuator {
+		respond 404
+	}
+
 	# Reverses to the app service by its Docker-network name — never localhost, since Caddy and
 	# app are two separate containers on the same compose network, not two processes on one host.
-	reverse_proxy app:8080
+	handle {
+		reverse_proxy app:8080
+	}
 
 	# security-architecture.md §5: standard security headers are already Spring Security's own
 	# zero-config default at the application layer (X-Content-Type-Options/X-Frame-Options/CSP).
 	# Strict-Transport-Security is added here instead, at the edge — it only makes sense once TLS
 	# actually terminates somewhere, which is Caddy, not the app container.
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+}
+
+{$CLAVARIS_DOMAIN} {
+	import clavaris_edge
 
 	# Real access logs to stdout — same "structured JSON, not opaque text" posture
 	# nfr-quality-attributes.md/TD-SEC-017 already established for the app's own logs, captured by

@@ -106,6 +106,18 @@ chmod +x deploy.sh
 (no network round trip needed) before declaring success — see §4 below for what it does if that
 check never passes.
 
+**Operational endpoints are not public — worth confirming once after the first `up`:**
+
+- **Operational endpoints are not public.** `/actuator/**` (health, info, prometheus) is for the
+  internal Docker network only — Prometheus scrapes `app:8080`, the Dockerfile and compose
+  healthchecks call `localhost:8080`, `deploy.sh` and `restore-postgres.sh` run inside the stack.
+  The `Caddyfile` answers `404` to any path containing `actuator`, on the primary domain and on every
+  custom domain (§9e). Confirm from outside the host:
+  `curl -s -o /dev/null -w '%{http_code}\n' https://<your-domain>/actuator/prometheus` must print
+  `404`. An external uptime monitor therefore cannot use `/actuator/health/readiness`; point it at
+  `https://<your-domain>/.well-known/openid-configuration` or a tenant's `/o/<id>/login` instead.
+  `scripts/check-caddy-actuator-block.sh` proves the `Caddyfile` itself (CI runs it on every PR).
+
 `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` (BR-PLATFORM-03) are seeded into the database on first
 startup only — generate long, random, unique values for this environment before the first `up`,
 the same "never reused across dev/staging/prod" discipline every other secret in `.env.example`
@@ -505,14 +517,16 @@ the production `Caddyfile`, alongside the existing `{$CLAVARIS_DOMAIN}` block:
 
 ```caddyfile
 login.example.com {
-    reverse_proxy app:8080
-    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	import clavaris_edge
 }
 ```
 
-This mirrors the primary domain's own block exactly — Caddy requests and renews its own Let's
-Encrypt certificate for this hostname automatically, same zero-manual-cert-management property §1
-already cites for `{$CLAVARIS_DOMAIN}`. Before adding this block, confirm the consumer's own DNS
+`clavaris_edge` is the snippet the primary domain's own block imports too: it carries the reverse
+proxy to `app:8080`, the HSTS header, **and the `/actuator/**` block** (§3). Write the site as this
+one-line import, never as a hand-copied `reverse_proxy app:8080` block — a copy that forgets the
+snippet would serve Prometheus metrics and `/actuator/info` to the internet on that hostname.
+Caddy requests and renews its own Let's Encrypt certificate for this hostname automatically, same
+zero-manual-cert-management property §1 already cites for `{$CLAVARIS_DOMAIN}`. Before adding this block, confirm the consumer's own DNS
 `CNAME` record (`login.example.com → {CLAVARIS_DOMAIN}`) already resolves — exactly the same
 prerequisite §2 already states for the primary domain's own ACME HTTP-01 challenge, now repeated
 per custom domain. Apply with `docker compose restart caddy` (or an in-place reload) — this is a
