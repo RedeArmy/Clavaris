@@ -84,7 +84,7 @@
              failing the build on these, not a hypothetical — so it's pinned explicitly below until
              a Spring Boot patch release pulls the fix in the normal way. CVE-2026-56820/-56817/
              -56745/etc. (netty, up to CVSS 9.1) — fixed in netty 4.2.16.Final. -->
-        <netty.version>4.2.18.Final</netty.version>
+        <netty.version>4.2.19.Final</netty.version>
         <!-- CVE-2026-54291 (pgjdbc, CVSS 8.2 — silent SCRAM channel-binding
              downgrade, defeats MITM protection) — fixed in 42.7.12+. -->
         <postgresql.version>42.7.14</postgresql.version>
