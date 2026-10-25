@@ -334,7 +334,11 @@ public class OrganizationAuthorizationServerConfig {
       final SessionRegistry sessionRegistry,
       @Value("${clavaris.rate-limit.login.per-account-limit:10}") final int loginPerAccountLimit,
       @Value("${clavaris.rate-limit.login.per-ip-limit:30}") final int loginPerIpLimit,
-      @Value("${clavaris.rate-limit.token.per-client-limit:20}") final int tokenPerClientLimit,
+      // TD-PERF-034: tenant tier only. The platform tier keeps
+      // clavaris.rate-limit.token.per-client-limit
+      // (20, all requests, keyed by client) because its bootstrap secret is operator-chosen.
+      @Value("${clavaris.rate-limit.token.tenant-per-client-ip-limit:6000}")
+          final int tokenPerClientIpLimit,
       @Value("${clavaris.rate-limit.token.refresh-per-client-limit:600}")
           final int tokenRefreshPerClientLimit,
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
@@ -610,7 +614,7 @@ public class OrganizationAuthorizationServerConfig {
                     LOGIN_PATH_PATTERN,
                     loginPerAccountLimit,
                     loginPerIpLimit,
-                    tokenPerClientLimit,
+                    tokenPerClientIpLimit,
                     tokenRefreshPerClientLimit,
                     accountSessionsListPerAccountLimit,
                     accountSessionsRevokePerAccountLimit,

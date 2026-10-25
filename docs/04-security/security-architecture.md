@@ -25,6 +25,8 @@ This document describes how Clavaris protects the credentials and tokens it is s
 ## 4. Rate limiting
 
 Bucket-based rate limiting (mirroring JobSeeker's own Bucket4j + Redis approach, ADR-0011 there — not yet formalized as its own ADR here, but the same technology choice is expected). Since ADR-0010 §6, this is two layers, not one:
+
+- **Tenant token endpoint is keyed by client + source IP (TD-PERF-034, closed 2026-10-24).** `token:client` / `token:refresh` used to be keyed by the claimed `client_id` alone, which is public and read before authentication: one application shared 20 exchanges per 5 minutes, and anyone could exhaust that allowance by naming it. They are now keyed `client_id@ip` with a backstop of 6000 (refresh 600); guessing stays bounded by the per-`(organization, IP)` rules and the per-Organization capacity ceiling. The platform tier keeps the strict per-`client_id` 20 on purpose.
 - **Anti-abuse (fixed, system-defined, never tenant-configurable)** — `/login` and `/oauth2/token`, keyed by `(organization_id, account_or_ip_identifier)`, tuned against credential stuffing, distinct (tighter) thresholds than a generic API rate limit (BR-ID-06). No tenant can loosen this, even in v1.1.
 - **Capacity ceiling (per-`Organization` aggregate, operator-managed in v1)** — keyed by `organization_id` alone, protects one tenant's traffic from exhausting budget shared with unrelated tenants (`RateLimitPolicy`, ADR-0010 §6.2). Tenant self-service is v1.1, gated on audit logging shipping first.
 - registration and verification-email resend — tuned against email-quota exhaustion, same two-layer principle applies if this ever needs per-tenant tuning (not yet a concrete requirement).

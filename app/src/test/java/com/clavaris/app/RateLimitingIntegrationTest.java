@@ -44,7 +44,11 @@ import tools.jackson.databind.ObjectMapper;
 @TestPropertySource(
     properties = {
       "PLATFORM_BOOTSTRAP_CLIENT_ID=rate-limit-test-platform-client",
-      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-rate-limit-test-platform-secret"
+      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-rate-limit-test-platform-secret",
+      // TD-PERF-034: the tenant tier's non-refresh limit defaults to 6000 now; a small one keeps
+      // the
+      // "refresh is exempt from it" test below cheap while still proving the distinction.
+      "clavaris.rate-limit.token.tenant-per-client-ip-limit=20"
     })
 class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
 
@@ -60,7 +64,7 @@ class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
   @Value("${clavaris.rate-limit.login.per-account-limit:10}")
   private int loginPerAccountLimit;
 
-  @Value("${clavaris.rate-limit.token.per-client-limit:20}")
+  @Value("${clavaris.rate-limit.token.tenant-per-client-ip-limit:20}")
   private int tokenPerClientLimit;
 
   @Autowired private PlatformAccountRepository platformAccounts;

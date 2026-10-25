@@ -259,8 +259,11 @@ because the `token:client` rule allows 20 non-refresh requests per OAuth client 
 `/o/*/oauth2/token`, and an `authorization_code` exchange is one. That is the whole client, across
 all of its users: about four sign-ins a minute. The rule exists for the secret-guessing half of the
 endpoint, but it counts every request, including successful exchanges of a single-use,
-PKCE-bound code that no one is guessing. Raising it is a security-policy decision (it is a fixed
-anti-abuse limit, ADR-0010 §6.1), so it is recorded as a follow-up and not changed here.
+PKCE-bound code that no one is guessing. **Resolved (TD-PERF-034):** the tenant-tier rule is now
+keyed by client *and* source IP and its limit is a 6000-per-5-minutes backstop, so one application's
+users no longer share 20 exchanges and a stranger naming a public `client_id` can no longer spend
+them. `TokenEndpointRateLimitIntegrationTest` pins it (45 exchanges from one address succeed). The
+30/30 result at default limits was not re-measured with this tool.
 
 ## Files
 
