@@ -39,6 +39,7 @@ import com.clavaris.clientregistry.application.usecase.listorganizationclients.L
 import com.clavaris.clientregistry.application.usecase.listorganizationclients.ListOrganizationClientsUseCase;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedService;
 import com.clavaris.clientregistry.application.usecase.listorganizationclientspaged.ListOrganizationClientsPagedUseCase;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationEnvironmentChecker;
@@ -113,7 +114,7 @@ class ClientRegistryUseCaseConfig {
   /* package */ RegisterOAuthClientUseCase registerOAuthClientUseCase(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new RegisterOAuthClientService(
@@ -149,7 +150,7 @@ class ClientRegistryUseCaseConfig {
   @Bean
   /* package */ ActivateOAuthClientUseCase activateOAuthClientUseCase(
       final OAuthClientRepository oauthClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new ActivateOAuthClientService(oauthClients, hasher, secretGenerator, auditEvents);
@@ -206,7 +207,7 @@ class ClientRegistryUseCaseConfig {
   @Bean
   /* package */ RotateOAuthClientSecretUseCase rotateOAuthClientSecretUseCase(
       final OAuthClientRepository oauthClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new RotateOAuthClientSecretService(oauthClients, hasher, secretGenerator, auditEvents);
@@ -216,7 +217,7 @@ class ClientRegistryUseCaseConfig {
   @Bean
   /* package */ RotatePlatformClientSecretUseCase rotatePlatformClientSecretUseCase(
       final PlatformClientRepository platformClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final PlatformClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new RotatePlatformClientSecretService(
@@ -236,7 +237,7 @@ class ClientRegistryUseCaseConfig {
       final OrganizationClientRepository organizationClients,
       final OrganizationExistsChecker orgExistsChecker,
       final OrganizationEnvironmentChecker environmentChecker,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OrganizationClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new CreateOrganizationClientService(
@@ -252,7 +253,7 @@ class ClientRegistryUseCaseConfig {
   @Bean
   /* package */ RotateOrganizationClientSecretUseCase rotateOrganizationClientSecretUseCase(
       final OrganizationClientRepository organizationClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OrganizationClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     return new RotateOrganizationClientSecretService(

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import java.util.List;
@@ -24,7 +23,7 @@ class RegisterOAuthClientServiceTest {
   private final UUID organizationId = UUID.randomUUID();
   private OAuthClientRepository oauthClients;
   private OrganizationExistsChecker organizationExistsChecker;
-  private ClientSecretHasher hasher;
+  private GeneratedClientSecretHasher hasher;
   // A real, simple stub rather than a Mockito mock — generatesADifferentClientIdAndSecretOnEachCall
   // below needs distinct values per call, same as the real SecureRandom-backed adapter would give.
   private final OAuthClientSecretGenerator secretGenerator = () -> UUID.randomUUID().toString();
@@ -35,7 +34,7 @@ class RegisterOAuthClientServiceTest {
   void setUp() {
     oauthClients = mock(OAuthClientRepository.class);
     organizationExistsChecker = mock(OrganizationExistsChecker.class);
-    hasher = mock(ClientSecretHasher.class);
+    hasher = mock(GeneratedClientSecretHasher.class);
     auditEvents = mock(AuditEventRecorder.class);
     service =
         new RegisterOAuthClientService(

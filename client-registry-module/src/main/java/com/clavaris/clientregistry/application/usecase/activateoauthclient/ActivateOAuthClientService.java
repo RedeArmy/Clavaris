@@ -1,6 +1,6 @@
 package com.clavaris.clientregistry.application.usecase.activateoauthclient;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientSecretGenerator;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
@@ -18,13 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ActivateOAuthClientService implements ActivateOAuthClientUseCase {
 
   private final OAuthClientRepository oauthClients;
-  private final ClientSecretHasher hasher;
+  private final GeneratedClientSecretHasher hasher;
   private final OAuthClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
   public ActivateOAuthClientService(
       final OAuthClientRepository oauthClients,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.oauthClients = oauthClients;

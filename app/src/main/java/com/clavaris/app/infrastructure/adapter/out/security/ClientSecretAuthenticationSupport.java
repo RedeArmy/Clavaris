@@ -32,9 +32,9 @@ import org.springframework.security.oauth2.server.authorization.authentication.C
  * Argon2PasswordVerifier} bulkheads its own password checks through, since both compete for the
  * same limited CPU budget.
  */
-public final class Argon2ClientAuthenticationSupport {
+public final class ClientSecretAuthenticationSupport {
 
-  private Argon2ClientAuthenticationSupport() {
+  private ClientSecretAuthenticationSupport() {
     // Static helper only — see this class's own Javadoc.
   }
 
@@ -42,12 +42,13 @@ public final class Argon2ClientAuthenticationSupport {
   // (Consumer<List<AuthenticationProvider>>) — both call sites pass this via a small lambda now
   // (not a bare method reference any more) purely to thread `gate` through; the shape at the call
   // site is otherwise unchanged from before TD-FUT-017.
-  public static void useArgon2PasswordEncoder(
+  public static void useClientSecretEncoder(
       final List<AuthenticationProvider> providers, final CpuBoundVerificationGate gate) {
-    final PasswordEncoder bulkheadedEncoder = new Argon2BulkheadPasswordEncoder(gate);
+    final PasswordEncoder encoder =
+        new ClientSecretPasswordEncoder(new Argon2BulkheadPasswordEncoder(gate));
     providers.stream()
         .filter(ClientSecretAuthenticationProvider.class::isInstance)
         .map(ClientSecretAuthenticationProvider.class::cast)
-        .forEach(provider -> provider.setPasswordEncoder(bulkheadedEncoder));
+        .forEach(provider -> provider.setPasswordEncoder(encoder));
   }
 }

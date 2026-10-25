@@ -1,6 +1,5 @@
 package com.clavaris.clientregistry.application.usecase.registeroauthclient;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import java.util.UUID;
@@ -39,14 +38,14 @@ public class RegisterOAuthClientService implements RegisterOAuthClientUseCase {
 
   private final OAuthClientRepository oauthClients;
   private final OrganizationExistsChecker orgExistsChecker;
-  private final ClientSecretHasher hasher;
+  private final GeneratedClientSecretHasher hasher;
   private final OAuthClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
   public RegisterOAuthClientService(
       final OAuthClientRepository oauthClients,
       final OrganizationExistsChecker orgExistsChecker,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OAuthClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.oauthClients = oauthClients;

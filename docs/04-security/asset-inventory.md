@@ -26,7 +26,7 @@ source of truth for structure).
 | Signing key private material | PKCS12 keystore file (`TOKEN_SIGNING_KEY_STORE_PATH`) | **Restricted** | Never in Postgres, never in a log — `security-architecture.md` §3 |
 | `PLATFORM_BOOTSTRAP_CLIENT_ID`/`SECRET` | Environment (`.env`, `chmod 600` — ADR-0019) | **Restricted** | This project's single highest-value credential — §5, root CLAUDE.md |
 | Bearer token values (access/refresh/authorization code/ID token) | Postgres (hashed, TD-SEC-019), Redis (session cache) | **Restricted** while live | Only a keyed HMAC digest persists in Postgres; the raw value exists only in transit and briefly in memory (`security-architecture.md` §2) |
-| Client secrets (`OAuthClient`, `PlatformClient`) | Postgres | **Restricted** | Hashed at rest, same principle as passwords |
+| Client secrets (`OAuthClient`, `PlatformClient`) | Postgres | **Restricted** | Hashed at rest: SHA-256 for server-generated 256-bit secrets, Argon2id for any a person chose (ADR-0005 addendum) |
 | Account email addresses | Postgres | **Confidential** | Real PII; scoped to one `Organization`'s account pool, never linked across tenants (ADR-0010) |
 | Audit event log (`audit_events`, TD-SEC-007) | Postgres | **Confidential** | Records *that* an action happened and by whom, not credential material itself |
 | Structured application logs | Log aggregation (destination TBD, `nfr-quality-attributes.md` §5) | **Internal** | Deliberately contains no credential/token/PII values by design (BR-DATA-01) — classified Internal precisely *because* Restricted/Confidential data is kept out of it, not despite it |

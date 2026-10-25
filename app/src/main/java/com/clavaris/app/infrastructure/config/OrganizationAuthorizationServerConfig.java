@@ -12,10 +12,10 @@ import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityCh
 import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
 import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
 import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegisteredClientRepository;
-import com.clavaris.app.infrastructure.adapter.out.security.Argon2ClientAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
+import com.clavaris.app.infrastructure.adapter.out.security.ClientSecretAuthenticationSupport;
 import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.OidcSessionIdRecorder;
@@ -525,7 +525,7 @@ public class OrganizationAuthorizationServerConfig {
                                         provider.providerConfigurationCustomizer(
                                             OidcDiscoveryMetadataCustomizer::customize)))
                     // Same fix as the platform tier's chain, same root cause — extracted to
-                    // Argon2ClientAuthenticationSupport (code review finding: this exact block was
+                    // ClientSecretAuthenticationSupport (code review finding: this exact block was
                     // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
                     .clientAuthentication(
                         clientAuth ->
@@ -533,7 +533,7 @@ public class OrganizationAuthorizationServerConfig {
                                 .errorResponseHandler(new ClientAuthenticationFailureHandler())
                                 .authenticationProviders(
                                     providers ->
-                                        Argon2ClientAuthenticationSupport.useArgon2PasswordEncoder(
+                                        ClientSecretAuthenticationSupport.useClientSecretEncoder(
                                             providers, argon2BulkheadGate)))
                     // TD-SEC-011 (2026-09-06): the project-owned, branded replacement for SAS's own
                     // DefaultConsentPage — see ConsentController's own Javadoc for the full design

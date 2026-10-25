@@ -1,6 +1,6 @@
 package com.clavaris.clientregistry.application.usecase.createorganizationclient;
 
-import com.clavaris.clientregistry.application.usecase.bootstrapplatformclient.ClientSecretHasher;
+import com.clavaris.clientregistry.application.usecase.registeroauthclient.GeneratedClientSecretHasher;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationEnvironmentChecker;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OrganizationExistsChecker;
 import com.clavaris.clientregistry.domain.model.OrganizationClient;
@@ -25,7 +25,7 @@ public class CreateOrganizationClientService implements CreateOrganizationClient
   private final OrganizationClientRepository organizationClients;
   private final OrganizationExistsChecker orgExistsChecker;
   private final OrganizationEnvironmentChecker environmentChecker;
-  private final ClientSecretHasher hasher;
+  private final GeneratedClientSecretHasher hasher;
   private final OrganizationClientSecretGenerator secretGenerator;
   private final AuditEventRecorder auditEvents;
 
@@ -35,7 +35,7 @@ public class CreateOrganizationClientService implements CreateOrganizationClient
       final OrganizationClientRepository organizationClients,
       final OrganizationExistsChecker orgExistsChecker,
       final OrganizationEnvironmentChecker environmentChecker,
-      final ClientSecretHasher hasher,
+      final GeneratedClientSecretHasher hasher,
       final OrganizationClientSecretGenerator secretGenerator,
       final AuditEventRecorder auditEvents) {
     this.organizationClients = organizationClients;
