@@ -4559,3 +4559,17 @@ body:has(.htmx-request)::after {
 output.clavaris-alert {
   display: block;
 }
+
+/* The way back to the application: a house icon in the top-left corner of the sign-in and sign-up card. */
+.clavaris-card--with-home {
+  position: relative;
+  /* Room for the icon above the content, so even a very wide logo cannot run into it. */
+  padding-top: var(--space-12);
+}
+
+.clavaris-card__home {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  text-decoration: none;
+}

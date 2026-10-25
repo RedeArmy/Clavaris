@@ -1,6 +1,7 @@
 package com.clavaris.identity.infrastructure.config;
 
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
+import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.infrastructure.adapter.in.web.ConsumerBrandNameInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -15,15 +16,18 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 class ConsumerBrandNameConfig implements WebMvcConfigurer {
 
   private final ClientBrandingProvider brandingProvider;
+  private final ClientHomeUrlResolver homeUrlResolver;
 
-  /* package */ ConsumerBrandNameConfig(final ClientBrandingProvider brandingProvider) {
+  /* package */ ConsumerBrandNameConfig(
+      final ClientBrandingProvider brandingProvider, final ClientHomeUrlResolver homeUrlResolver) {
     this.brandingProvider = brandingProvider;
+    this.homeUrlResolver = homeUrlResolver;
   }
 
   @Override
   public void addInterceptors(final InterceptorRegistry registry) {
     registry
-        .addInterceptor(new ConsumerBrandNameInterceptor(brandingProvider))
+        .addInterceptor(new ConsumerBrandNameInterceptor(brandingProvider, homeUrlResolver))
         // The consent screen is not under /o/{organizationId}/, but it shows the application's
         // logo too, and its logo origin has to reach the content security policy.
         .addPathPatterns("/o/**", "/oauth2/consent");

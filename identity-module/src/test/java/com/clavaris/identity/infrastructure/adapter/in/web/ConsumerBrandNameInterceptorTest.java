@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingProvider;
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
+import com.clavaris.identity.application.usecase.resolveclienthomeurl.ClientHomeUrlResolver;
 import com.clavaris.identity.domain.model.OrganizationId;
 import java.util.Map;
 import java.util.Optional;
@@ -29,8 +30,9 @@ class ConsumerBrandNameInterceptorTest {
   private static final UUID ORGANIZATION = UUID.randomUUID();
 
   private final ClientBrandingProvider branding = mock(ClientBrandingProvider.class);
+  private final ClientHomeUrlResolver homeUrls = mock(ClientHomeUrlResolver.class);
   private final ConsumerBrandNameInterceptor interceptor =
-      new ConsumerBrandNameInterceptor(branding);
+      new ConsumerBrandNameInterceptor(branding, homeUrls);
   private final MockHttpServletRequest request = new MockHttpServletRequest();
   private final MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -285,5 +287,72 @@ class ConsumerBrandNameInterceptorTest {
     interceptor.postHandle(request, response, new Object(), null);
 
     verify(branding, never()).brandingFor(any(), any());
+  }
+
+  // The way back to the application: the house icon on sign-in and sign-up.
+  @Test
+  void aPageOfAClientWithAHomePageGetsItsAddress() {
+    inOrganization();
+    request.setParameter("clientId", "acme-web");
+    when(homeUrls.resolve(new OrganizationId(ORGANIZATION), "acme-web"))
+        .thenReturn(Optional.of("https://app.acme.test/"));
+    when(branding.brandingFor(any(), any())).thenReturn(named("Acme"));
+
+    final ModelAndView view = run(new ModelAndView("identity/register"));
+
+    assertThat(view.getModel()).containsEntry("homeUrl", "https://app.acme.test/");
+  }
+
+  @Test
+  void aPageWithNoClientGetsNoHomeAddress() {
+    inOrganization();
+    when(branding.brandingFor(any(), any())).thenReturn(named("Acme"));
+    when(homeUrls.resolve(any(), org.mockito.ArgumentMatchers.isNull()))
+        .thenReturn(Optional.empty());
+
+    final ModelAndView view = run(new ModelAndView("identity/login"));
+
+    assertThat(view.getModel()).doesNotContainKey("homeUrl");
+  }
+
+  @Test
+  void aPageThatAlreadySetItsOwnHomeAddressKeepsIt() {
+    inOrganization();
+    request.setParameter("clientId", "acme-web");
+    when(homeUrls.resolve(any(), any())).thenReturn(Optional.of("https://other.test/"));
+    when(branding.brandingFor(any(), any())).thenReturn(named("Acme"));
+    final ModelAndView page = new ModelAndView("identity/register-pending-verification");
+    page.addObject("homeUrl", "https://app.acme.test/");
+
+    run(page);
+
+    assertThat(page.getModel()).containsEntry("homeUrl", "https://app.acme.test/");
+  }
+
+  // Inside the application's own iframe the link would load the application inside its own frame.
+  @Test
+  void aPageShownInsideTheApplicationsOwnFrameGetsNoHomeAddress() {
+    inOrganization();
+    request.setParameter("clientId", "acme-web");
+    request.setParameter("display", "modal");
+    when(homeUrls.resolve(any(), any())).thenReturn(Optional.of("https://app.acme.test/"));
+    when(branding.brandingFor(any(), any())).thenReturn(named("Acme"));
+
+    final ModelAndView view = run(new ModelAndView("identity/register"));
+
+    assertThat(view.getModel()).doesNotContainKey("homeUrl");
+    verify(homeUrls, never()).resolve(any(), any());
+  }
+
+  // Clavaris's own pages never get an application's home address.
+  @Test
+  void aPlatformViewGetsNoHomeAddress() {
+    inOrganization();
+    request.setParameter("clientId", "acme-web");
+
+    final ModelAndView view = run(new ModelAndView("identity/platform/login"));
+
+    assertThat(view.getModel()).doesNotContainKey("homeUrl");
+    verify(homeUrls, never()).resolve(any(), any());
   }
 }
