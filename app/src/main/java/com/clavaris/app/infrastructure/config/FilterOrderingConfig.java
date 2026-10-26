@@ -1,8 +1,10 @@
 package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.CustomDomainRequestRewriteFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.JwksCacheControlFilter;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -69,6 +71,20 @@ public class FilterOrderingConfig {
         new FilterRegistrationBean<>(new ResourceUrlEncodingFilter());
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
     registration.addUrlPatterns("/*");
+    return registration;
+  }
+
+  // TD-PERF-045: Cache-Control on the two public JWKS endpoints (per-Organization and platform,
+  // and the tenant one when reached through a custom domain). Disabled by a max-age of 0.
+  @Bean
+  public FilterRegistrationBean<JwksCacheControlFilter> jwksCacheControlFilter(
+      @Value("${clavaris.jwks.cache-max-age-seconds:60}") final int maxAgeSeconds) {
+    final FilterRegistrationBean<JwksCacheControlFilter> registration =
+        new FilterRegistrationBean<>(new JwksCacheControlFilter(maxAgeSeconds));
+    // Just behind the custom-domain rewrite, so it sees the rewritten path.
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
+    registration.addUrlPatterns("/*");
+    registration.setEnabled(maxAgeSeconds > 0);
     return registration;
   }
 }
