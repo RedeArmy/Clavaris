@@ -33,7 +33,6 @@ class SetClientBrandingController {
   // Three exits (404 on a bogus organizationId/oauthClientId pair, 400 on invalid branding
   // content, 200 on success) — same rationale as SetRateLimitPolicyController's own identical
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an OAuthClient's hosted-login branding (ADR-0009 §3)")
   @ApiResponse(responseCode = "200", description = "Branding created or updated")
   @ApiResponse(

@@ -72,7 +72,6 @@ public final class CustomDomainRequestRewriteFilter extends OncePerRequestFilter
   // "Excluded path"/"no matching verified domain"/"rewritten and forwarded" are three independent,
   // equally valid exits — same rationale as OrganizationCapacityRateLimitingFilter's own
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   protected void doFilterInternal(
       final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain)

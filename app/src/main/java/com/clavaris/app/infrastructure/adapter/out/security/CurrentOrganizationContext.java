@@ -41,7 +41,6 @@ public final class CurrentOrganizationContext {
    * Appendix C addendum) always returns a real, non-null string for a real HTTP request — confirmed
    * live, not assumed from the annotation alone.
    */
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public static Optional<UUID> currentOrganizationId() {
     final String issuer = AuthorizationServerContextHolder.getContext().getIssuer();
     final int prefixIndex = issuer.lastIndexOf(PREFIX);

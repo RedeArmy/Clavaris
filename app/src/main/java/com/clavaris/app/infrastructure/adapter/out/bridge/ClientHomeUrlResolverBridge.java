@@ -46,7 +46,6 @@ class ClientHomeUrlResolverBridge implements ClientHomeUrlResolver {
   // "https://app.example.com:8443/auth/callback?x=1" -> "https://app.example.com:8443/".
   // Three genuinely distinct outcomes (malformed, not a web address, an origin) — same rationale as
   // every other early-return chain in the bridges.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static Optional<String> originOf(final String redirectUri) {
     try {
       final URI uri = new URI(redirectUri);

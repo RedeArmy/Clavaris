@@ -28,12 +28,6 @@ public class CreateWorkspaceService implements CreateWorkspaceUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(CreateWorkspaceService.class);
 
-  // ADR-0027 §2: the reserved role's display name — consumer-renamable later (Slice 3, not yet
-  // shipped), same "opaque, consumer-owned label" posture WorkspaceRole.name()'s own Javadoc
-  // documents; this is only ever a starting default.
-  // PMD.LongVariable: RESERVED_ROLE_NAME names exactly what it is — same convention this class's
-  // own EMAIL-style constants in sibling use cases already follow.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String RESERVED_ROLE_NAME = "Admin";
 
   private final WorkspaceRepository workspaces;

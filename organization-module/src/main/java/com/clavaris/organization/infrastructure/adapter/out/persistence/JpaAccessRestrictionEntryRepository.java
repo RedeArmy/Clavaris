@@ -9,7 +9,6 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /** Implements the outbound port. */
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
 @Repository
 class JpaAccessRestrictionEntryRepository implements AccessRestrictionEntryRepository {
 

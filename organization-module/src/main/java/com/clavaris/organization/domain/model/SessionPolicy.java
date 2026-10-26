@@ -17,13 +17,7 @@ import java.util.UUID;
  *
  * <p>Same record-style-accessor PMD suppressions as {@link RateLimitPolicy}, same rationale.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods",
-  "PMD.LongVariable"
-})
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.LongVariable"})
 public final class SessionPolicy {
 
   // The bounds are public so the dashboard form and its page state them from this one place

@@ -7,6 +7,5 @@ import com.clavaris.clientregistry.domain.model.OrganizationClient;
  *     or logged" convention as {@code RegisterOAuthClientResult}/{@code
  *     BootstrapPlatformClientCommand}.
  */
-@SuppressWarnings("PMD.LongVariable") // organizationClient names exactly what it is.
 public record CreateOrganizationClientResult(
     OrganizationClient organizationClient, String rawClientSecret) {}

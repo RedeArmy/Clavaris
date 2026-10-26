@@ -15,10 +15,6 @@ import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlR
  * it already collaborates with individually — never a new dependency either controller didn't
  * already have. {@code recordLoginEvent} (TD-FUT-034) joined the original 6 the same way.
  */
-// PMD.LongVariable: requestDeviceTrustChallenge/authenticationPolicyProvider/redirectUrlResolver
-// name exactly what they hold — same precedent LoginController/UsernameSignInController's own
-// identical suppression already establishes for these same three names.
-@SuppressWarnings("PMD.LongVariable")
 /* package */ record PrimaryFactorLoginPorts(
     KnownDeviceRepository knownDevices,
     RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,

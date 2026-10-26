@@ -11,9 +11,6 @@ import java.util.UUID;
  * JPA row mapping for {@code client_brandings} — plain data holder by design, same rationale as
  * {@code RedirectPolicyEntity}. Every column is nullable — unconfigured is the normal state.
  */
-// PMD.LongVariable: same SetClientBrandingCommand precedent — applicationDisplayName names
-// exactly what ADR-0009 §3 itself calls the field, not arbitrarily long.
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
 @Entity
 @Table(name = "client_brandings")
 public class ClientBrandingEntity {

@@ -25,7 +25,6 @@ import org.springframework.ui.Model;
  * missing map key — so the template never null-checks {@code accountIdsByRoleId.get(...)}.
  */
 @Component
-@SuppressWarnings("PMD.LongVariable")
 final class WorkspaceHierarchyModel {
 
   private final WorkspaceTeamsModel teamsModel;

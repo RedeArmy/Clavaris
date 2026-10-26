@@ -50,16 +50,13 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
   private final SigningKeyRepository signingKeys;
   private final OrganizationSigningKeyMaterialFactory keyMaterial;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as every
-  // other caller of this port (ConfirmPasswordResetService, RotateRefreshTokenService,
-  // DeleteAccountService).
   private final AccountSessionRevoker accountSessionRevoker;
 
   /* package */ OrganizationIdentityDataEraserBridge(
       final AccountRepository accounts,
       final SigningKeyRepository signingKeys,
       final OrganizationSigningKeyMaterialFactory keyMaterial,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker) {
+      final AccountSessionRevoker accountSessionRevoker) {
     this.accounts = accounts;
     this.signingKeys = signingKeys;
     this.keyMaterial = keyMaterial;

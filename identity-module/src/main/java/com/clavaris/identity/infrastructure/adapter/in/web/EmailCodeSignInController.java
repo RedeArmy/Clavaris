@@ -39,11 +39,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@code ConfirmPasswordResetForm}'s own {@code token} field already establishes — no server-side
  * session state needed for this handoff.
  */
-// PMD.LongVariable: authenticateUseCase distinguishes itself from requestUseCase — a shortened
-// name would only make this class's two collaborating use cases harder to tell apart.
-// PMD.AvoidDuplicateLiterals: "form" is the Thymeleaf model attribute name every controller in
-// this package uses for its bound form object — a named constant here would only add indirection.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals"})
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-code")
 public class EmailCodeSignInController {
@@ -90,7 +85,6 @@ public class EmailCodeSignInController {
     return REQUEST_FORM_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String requestCode(
       @PathVariable final UUID organizationId,
@@ -139,7 +133,6 @@ public class EmailCodeSignInController {
 
   // Three genuinely distinct exits (validation error, invalid code, success) — same rationale as
   // ResetPasswordController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/confirm")
   public String confirm(
       @PathVariable final UUID organizationId,

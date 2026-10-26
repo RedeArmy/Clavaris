@@ -84,7 +84,7 @@ import org.springframework.web.server.ResponseStatusException;
 // growing controller in this codebase. PMD.CouplingBetweenObjects: the Workspace/Team/Role
 // selector logic this "Way 2" redesign added (SDE-III, 2026-09-27) pushed this past the default
 // threshold (20) — same "wiring, not sprawl" reasoning, not a design smell to split up.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/accounts/{accountId}/assign-role")
@@ -237,7 +237,6 @@ public class PlatformAccountWorkspaceRoleController {
   // Workspace <select> only ever offers this list) — falls back to the first real Workspace
   // instead, same "never trust a client value blindly" posture the rest of this controller holds
   // to elsewhere.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static UUID resolveActiveWorkspaceId(
       final List<Workspace> allWorkspaces, final UUID requestedWorkspaceId) {
     if (requestedWorkspaceId != null) {

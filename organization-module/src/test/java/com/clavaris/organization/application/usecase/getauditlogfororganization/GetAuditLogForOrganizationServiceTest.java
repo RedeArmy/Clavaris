@@ -1,8 +1,6 @@
 package com.clavaris.organization.application.usecase.getauditlogfororganization;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,128 +8,85 @@ import static org.mockito.Mockito.when;
 import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
-import com.clavaris.common.domain.model.AuditEventTargetRef;
-import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceMembershipRepository;
-import com.clavaris.organization.application.usecase.listworkspacesfororganization.ListWorkspacesForOrganizationUseCase;
-import com.clavaris.organization.domain.model.Workspace;
-import com.clavaris.organization.domain.model.WorkspaceMembership;
+import com.clavaris.common.domain.model.KeysetCursor;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
+/** TD-ARCH-038: the Organization's log is one tenant-keyed, paged read. */
 class GetAuditLogForOrganizationServiceTest {
 
-  @Test
-  void resolvesEveryOwnedResourceIntoATargetRefBeforeQuerying() {
-    ListWorkspacesForOrganizationUseCase listWorkspaces =
-        mock(ListWorkspacesForOrganizationUseCase.class);
-    WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
-    OAuthClientIdsForAuditLogProvider oauthClientIds =
-        mock(OAuthClientIdsForAuditLogProvider.class);
-    WebhookEndpointIdsForAuditLogProvider webhookEndpointIds =
-        mock(WebhookEndpointIdsForAuditLogProvider.class);
-    AuditEventReader auditEvents = mock(AuditEventReader.class);
+  private static final int PAGE = GetAuditLogForOrganizationService.PAGE_SIZE;
 
-    UUID organizationId = UUID.randomUUID();
-    Workspace workspace = Workspace.register(organizationId, "Engineering");
-    WorkspaceMembership membership =
-        WorkspaceMembership.join(workspace.id(), UUID.randomUUID(), UUID.randomUUID());
-    String oauthClientId = UUID.randomUUID().toString();
-    String webhookEndpointId = UUID.randomUUID().toString();
+  private final AuditEventReader reader = mock(AuditEventReader.class);
+  private final GetAuditLogForOrganizationService service =
+      new GetAuditLogForOrganizationService(reader);
+  private final UUID organizationId = UUID.randomUUID();
 
-    when(listWorkspaces.handle(any())).thenReturn(List.of(workspace));
-    when(memberships.findAllByWorkspaceIds(List.of(workspace.id())))
-        .thenReturn(List.of(membership));
-    when(oauthClientIds.oauthClientIds(organizationId)).thenReturn(List.of(oauthClientId));
-    when(webhookEndpointIds.webhookEndpointIds(organizationId))
-        .thenReturn(List.of(webhookEndpointId));
-    AuditEvent expectedEvent =
-        AuditEvent.of(
-            AuditActor.platformAccount(UUID.randomUUID()),
-            "organization.created",
-            "Organization",
-            organizationId.toString(),
-            null);
-    when(auditEvents.findRecentForTargets(any(), eq(100))).thenReturn(List.of(expectedEvent));
-
-    GetAuditLogForOrganizationService service =
-        new GetAuditLogForOrganizationService(
-            listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
-
-    List<AuditEvent> result = service.handle(organizationId);
-
-    assertThat(result).containsExactly(expectedEvent);
-    verify(auditEvents)
-        .findRecentForTargets(
-            List.of(
-                new AuditEventTargetRef("Organization", organizationId.toString()),
-                new AuditEventTargetRef("Workspace", workspace.id().toString()),
-                new AuditEventTargetRef("WorkspaceMembership", membership.id().toString()),
-                new AuditEventTargetRef("OAuthClient", oauthClientId),
-                new AuditEventTargetRef("WebhookEndpoint", webhookEndpointId)),
-            100);
+  private static AuditEvent event(final int minutesAgo) {
+    return AuditEvent.reconstitute(
+        UUID.randomUUID(),
+        AuditActor.platformAccount(UUID.randomUUID()),
+        "organization.updated",
+        "Organization",
+        UUID.randomUUID().toString(),
+        null,
+        Instant.parse("2026-10-25T12:00:00Z").minusSeconds(60L * minutesAgo));
   }
 
-  // TD-PERF-021: the whole reason this batched call exists — proves the fan-out asks for every
-  // found Workspace's own memberships in one call, not one call per Workspace (the N+1 this row
-  // fixed). Two Workspaces, one shared findAllByWorkspaceIds(...) invocation with both ids.
-  @Test
-  void batchesMembershipLookupAcrossEveryWorkspaceInOneCall() {
-    ListWorkspacesForOrganizationUseCase listWorkspaces =
-        mock(ListWorkspacesForOrganizationUseCase.class);
-    WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
-    OAuthClientIdsForAuditLogProvider oauthClientIds =
-        mock(OAuthClientIdsForAuditLogProvider.class);
-    WebhookEndpointIdsForAuditLogProvider webhookEndpointIds =
-        mock(WebhookEndpointIdsForAuditLogProvider.class);
-    AuditEventReader auditEvents = mock(AuditEventReader.class);
-
-    UUID organizationId = UUID.randomUUID();
-    Workspace engineering = Workspace.register(organizationId, "Engineering");
-    Workspace sales = Workspace.register(organizationId, "Sales");
-
-    when(listWorkspaces.handle(any())).thenReturn(List.of(engineering, sales));
-    when(memberships.findAllByWorkspaceIds(any())).thenReturn(List.of());
-    when(oauthClientIds.oauthClientIds(organizationId)).thenReturn(List.of());
-    when(webhookEndpointIds.webhookEndpointIds(organizationId)).thenReturn(List.of());
-    when(auditEvents.findRecentForTargets(any(), eq(100))).thenReturn(List.of());
-
-    GetAuditLogForOrganizationService service =
-        new GetAuditLogForOrganizationService(
-            listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
-
-    service.handle(organizationId);
-
-    // Exactly one call, covering both Workspace ids — not one call per Workspace.
-    verify(memberships).findAllByWorkspaceIds(List.of(engineering.id(), sales.id()));
+  private static List<AuditEvent> events(final int count) {
+    final List<AuditEvent> all = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      all.add(event(i));
+    }
+    return all;
   }
 
   @Test
-  void alwaysIncludesTheOrganizationsOwnTargetRefEvenWithNoOwnedResourcesAtAll() {
-    ListWorkspacesForOrganizationUseCase listWorkspaces =
-        mock(ListWorkspacesForOrganizationUseCase.class);
-    WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
-    OAuthClientIdsForAuditLogProvider oauthClientIds =
-        mock(OAuthClientIdsForAuditLogProvider.class);
-    WebhookEndpointIdsForAuditLogProvider webhookEndpointIds =
-        mock(WebhookEndpointIdsForAuditLogProvider.class);
-    AuditEventReader auditEvents = mock(AuditEventReader.class);
+  void aShortLogIsOnePageWithNothingOlder() {
+    final List<AuditEvent> fetched = events(3);
+    when(reader.findPageForOrganization(organizationId, null, PAGE + 1)).thenReturn(fetched);
 
-    UUID organizationId = UUID.randomUUID();
-    when(listWorkspaces.handle(any())).thenReturn(List.of());
-    when(memberships.findAllByWorkspaceIds(List.of())).thenReturn(List.of());
-    when(oauthClientIds.oauthClientIds(organizationId)).thenReturn(List.of());
-    when(webhookEndpointIds.webhookEndpointIds(organizationId)).thenReturn(List.of());
-    when(auditEvents.findRecentForTargets(any(), eq(100))).thenReturn(List.of());
+    final AuditLogPage page =
+        service.handle(GetAuditLogForOrganizationQuery.newest(organizationId));
 
-    GetAuditLogForOrganizationService service =
-        new GetAuditLogForOrganizationService(
-            listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
+    assertThat(page.events()).isEqualTo(fetched);
+    assertThat(page.hasOlder()).isFalse();
+  }
 
-    service.handle(organizationId);
+  @Test
+  void aFullPageAsksForOneMoreRowToKnowWhetherThereIsAnOlderPage() {
+    final List<AuditEvent> fetched = events(PAGE + 1);
+    when(reader.findPageForOrganization(organizationId, null, PAGE + 1)).thenReturn(fetched);
 
-    verify(auditEvents)
-        .findRecentForTargets(
-            List.of(new AuditEventTargetRef("Organization", organizationId.toString())), 100);
+    final AuditLogPage page =
+        service.handle(GetAuditLogForOrganizationQuery.newest(organizationId));
+
+    assertThat(page.events()).hasSize(PAGE).doesNotContain(fetched.getLast());
+    assertThat(page.hasOlder()).isTrue();
+    final AuditEvent lastShown = page.events().getLast();
+    assertThat(page.nextOlderThan())
+        .isEqualTo(new KeysetCursor(lastShown.occurredAt(), lastShown.id()));
+  }
+
+  @Test
+  void exactlyOnePageOfRowsHasNoOlderPage() {
+    when(reader.findPageForOrganization(organizationId, null, PAGE + 1)).thenReturn(events(PAGE));
+
+    assertThat(service.handle(GetAuditLogForOrganizationQuery.newest(organizationId)).hasOlder())
+        .isFalse();
+  }
+
+  @Test
+  void passesTheCursorOfThePreviousPageToTheReader() {
+    final KeysetCursor cursor =
+        new KeysetCursor(Instant.parse("2026-10-25T10:00:00Z"), UUID.randomUUID());
+    when(reader.findPageForOrganization(organizationId, cursor, PAGE + 1)).thenReturn(events(2));
+
+    service.handle(new GetAuditLogForOrganizationQuery(organizationId, cursor));
+
+    verify(reader).findPageForOrganization(organizationId, cursor, PAGE + 1);
   }
 }

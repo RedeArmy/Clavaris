@@ -32,7 +32,6 @@ class RotatePlatformClientSecretController {
 
   // Three exits (404, 409 on a concurrent revoke/rotate race, 200) — same rationale as
   // SetRateLimitPolicyController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Rotate a PlatformClient's secret (TD-SEC-018)")
   @ApiResponse(
       responseCode = "200",

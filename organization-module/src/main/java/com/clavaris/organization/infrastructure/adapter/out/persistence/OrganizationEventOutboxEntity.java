@@ -15,7 +15,6 @@ import java.util.UUID;
  * location merges every module's migrations into one shared Postgres schema in the real running
  * app) — this class only shares column boilerplate with identity-module's, never the table itself.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "organization_event_outbox")
 public class OrganizationEventOutboxEntity extends AbstractEventOutboxEntity {

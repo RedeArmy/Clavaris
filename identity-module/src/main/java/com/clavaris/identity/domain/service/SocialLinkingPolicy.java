@@ -16,10 +16,6 @@ import java.time.Duration;
  * service's own Javadoc for the explicit "if you change the linking decision here, check the other
  * one too" cross-reference.
  */
-// PMD.LongVariable: CONFIRMATION_TOKEN_TTL names exactly what it is — same convention every other
-// descriptively-named constant in this codebase follows (e.g.
-// AuthenticateWithSocialProviderCommand's own emailVerifiedByProvider).
-@SuppressWarnings("PMD.LongVariable")
 public final class SocialLinkingPolicy {
 
   // No BR pins an exact figure — same "reasonable default, not yet a tunable" reasoning as

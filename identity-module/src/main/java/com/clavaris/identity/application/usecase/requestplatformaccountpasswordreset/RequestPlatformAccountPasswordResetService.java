@@ -40,7 +40,6 @@ public class RequestPlatformAccountPasswordResetService
     this.mailSender = mailSender;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void handle(final RequestPlatformAccountPasswordResetCommand command) {
     final PlatformAccount account = accounts.findByEmail(command.email()).orElse(null);

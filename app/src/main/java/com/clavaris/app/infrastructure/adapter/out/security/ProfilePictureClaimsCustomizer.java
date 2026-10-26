@@ -34,12 +34,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * (see that class's own Javadoc for why it's constructed directly there rather than a
  * {@code @Component}).
  */
-// PMD.LongVariable: hasAnAccountPrincipal/clavarisBaseUrl name exactly what they are — same
-// convention WorkspaceRoleClaimsCustomizer's own identical suppression documents.
-// PMD.OnlyOneReturn: customize() has several genuinely independent early exits (wrong grant type,
-// scope not granted, malformed principal name, unknown Account) — same "each needs its own exit"
-// rationale WorkspaceRoleClaimsCustomizer's own identical suppression documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 public class ProfilePictureClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
   private static final String PROFILE_SCOPE = "profile";
@@ -53,8 +47,6 @@ public class ProfilePictureClaimsCustomizer implements OAuth2TokenCustomizer<Jwt
     this.clavarisBaseUrl = clavarisBaseUrl;
   }
 
-  @SuppressWarnings("PMD.LawOfDemeter") // context.getClaims()/getPrincipal() is the standard SAS
-  // API shape — same rationale WorkspaceRoleClaimsCustomizer's own identical suppression documents.
   @Override
   public void customize(final JwtEncodingContext context) {
     final AuthorizationGrantType grantType = context.getAuthorizationGrantType();

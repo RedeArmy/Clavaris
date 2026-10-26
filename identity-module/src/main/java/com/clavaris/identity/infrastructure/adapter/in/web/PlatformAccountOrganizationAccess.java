@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
  * added. Composed into each controller rather than a base class, consistent with this codebase
  * never using controller inheritance elsewhere.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class PlatformAccountOrganizationAccess {
 
   private final OrganizationForPlatformAccountResolver organizationResolver;

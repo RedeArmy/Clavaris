@@ -33,8 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
  * success. See {@link PlatformWorkspaceController} for the family this belongs to and the shared
  * ownership/HTMX conventions.
  */
-// PMD.LongVariable: collaborator names spell out the use case they hold.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceHierarchyController {

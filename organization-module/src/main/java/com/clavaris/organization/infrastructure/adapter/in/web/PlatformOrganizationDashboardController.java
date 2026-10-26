@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * redirect:}/full-page-render behavior this controller already had is unchanged — HTMX is a
  * progressive enhancement here, never a requirement for this page to work.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard")
 public class PlatformOrganizationDashboardController {
@@ -79,7 +78,6 @@ public class PlatformOrganizationDashboardController {
     return DASHBOARD_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,

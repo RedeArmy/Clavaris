@@ -84,7 +84,6 @@ class JpaOrganizationRepository implements OrganizationRepository {
   }
 
   @Override
-  @SuppressWarnings("PMD.LongVariable")
   public List<Organization> findAllOwnedBy(final UUID ownerPlatformAccountId) {
     return organizations.findAllByOwnerPlatformAccountId(ownerPlatformAccountId).stream()
         .map(this::toDomain)
@@ -95,8 +94,6 @@ class JpaOrganizationRepository implements OrganizationRepository {
   // as a tiebreaker) — see SpringDataOrganizationJpaRepository's own Javadoc for why three
   // separate @Query methods back this instead of one Pageable-driven derived method.
   @Override
-  @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"}) // three real, distinct exits —
-  // first/after/before.
   public KeysetPage<Organization> findKeysetPageOwnedBy(
       final UUID ownerPlatformAccountId, final KeysetPageRequest pageRequest) {
     final org.springframework.data.domain.PageRequest limit =

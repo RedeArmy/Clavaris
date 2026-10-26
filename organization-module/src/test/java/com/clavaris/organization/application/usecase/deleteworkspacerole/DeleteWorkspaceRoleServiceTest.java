@@ -71,7 +71,8 @@ class DeleteWorkspaceRoleServiceTest {
             org.mockito.ArgumentMatchers.eq("workspace_role.deleted"),
             org.mockito.ArgumentMatchers.eq("WorkspaceRole"),
             org.mockito.ArgumentMatchers.eq(role.id().toString()),
-            any());
+            any(),
+            org.mockito.ArgumentMatchers.eq(role.organizationId()));
     verify(outbox)
         .write(
             org.mockito.ArgumentMatchers.eq("WorkspaceRole"),

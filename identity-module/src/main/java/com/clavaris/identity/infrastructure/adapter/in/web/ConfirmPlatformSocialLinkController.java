@@ -25,7 +25,6 @@ public class ConfirmPlatformSocialLinkController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String confirm(@RequestParam final String token) {
     try {

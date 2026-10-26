@@ -62,16 +62,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * couldn't even rescue such an account. The platform-tier sibling above had the identical gap and
  * got the identical fix, same day.
  */
-// PMD.LongVariable: policyProvider/socialIdentities/pendingLinks/transactionTemplate match their
-// own collaborator type names, same convention AddWorkspaceMemberService's own class-level
-// suppression already documents. PMD.GuardLogStatement: same false positive
-// AuthenticateWithPasswordService's own identical suppression documents — every logged argument
-// across all three methods below is a cheap in-memory accessor, not an expensive computation the
-// INFO level should be checked before evaluating. PMD.OnlyOneReturn: handle() has three real
-// outcomes (two rejections that throw, and a lookup that either returns directly or delegates to
-// one of two private methods) — same rationale as SetRateLimitPolicyController's own identical
-// suppression for a multi-exit method whose branches are each a real, distinct outcome.
-@SuppressWarnings({"PMD.LongVariable", "PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
 public class AuthenticateWithSocialProviderService
     implements AuthenticateWithSocialProviderUseCase {
 

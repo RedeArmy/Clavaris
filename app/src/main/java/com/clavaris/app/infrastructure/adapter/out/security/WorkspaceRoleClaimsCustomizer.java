@@ -55,12 +55,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * likewise omitted (only {@code workspace_id} is added) when the membership itself has no role
  * assigned (ADR-0027 §5, {@code roleId == null}) — an explicitly allowed state, not an error.
  */
-// PMD.LongVariable: hasAnAccountPrincipal names exactly what it is, not an organically long name
-// that should shrink. PMD.OnlyOneReturn: customize() below has several genuinely independent early
-// exits (no account principal, malformed principal name, no Workspace membership, no role
-// assigned) — same "each needs its own exit" rationale RegisterAccountController's own identical
-// suppression documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 public class WorkspaceRoleClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
   private final WorkspaceMembershipRepository memberships;
@@ -72,10 +66,6 @@ public class WorkspaceRoleClaimsCustomizer implements OAuth2TokenCustomizer<JwtE
     this.roles = roles;
   }
 
-  // PMD.LawOfDemeter: context.getClaims()/getPrincipal() is the standard SAS API shape for reading
-  // and customizing a token's own claim set from within an OAuth2TokenCustomizer — same "there is
-  // no other way to reach it" reasoning as TokenIssuanceEventLogger's own identical suppression.
-  @SuppressWarnings("PMD.LawOfDemeter")
   @Override
   public void customize(final JwtEncodingContext context) {
     final AuthorizationGrantType grantType = context.getAuthorizationGrantType();

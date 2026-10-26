@@ -34,7 +34,6 @@ class RegisterWebhookEndpointController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Register a new WebhookEndpoint under an Organization (ADR-0007)")
   @ApiResponse(
       responseCode = "201",

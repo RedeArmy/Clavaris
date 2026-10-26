@@ -17,7 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * CurrentPlatformAccountResolverBridge), not an organically grown method that should be
  * restructured.
  */
-@SuppressWarnings("PMD.OnlyOneReturn")
 public final class RateLimitIdentifiers {
 
   private static final String BASIC_AUTH_PREFIX = "Basic ";

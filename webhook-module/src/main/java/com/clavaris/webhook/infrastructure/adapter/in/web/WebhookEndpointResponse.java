@@ -10,7 +10,6 @@ import java.util.UUID;
  * RotateWebhookEndpointSecretResponse} for the two calls that legitimately return one, exactly
  * once.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
 public record WebhookEndpointResponse(
     UUID id,
     UUID organizationId,

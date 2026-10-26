@@ -65,20 +65,12 @@ import tools.jackson.databind.ObjectMapper;
 // this one flat package, so each needs its own import where none was needed before. Real
 // collaborator count is unchanged by the move — same "wiring, not sprawl" reasoning as the
 // suppression just above, not new coupling this pass introduced.
-@SuppressWarnings({
-  "PMD.AvoidDuplicateLiterals",
-  "PMD.ExcessiveParameterList",
-  "PMD.ExcessiveImports"
-})
+@SuppressWarnings({"PMD.ExcessiveParameterList", "PMD.ExcessiveImports"})
 @Configuration
 class AdminApiSecurityConfig {
 
-  // Spring Security's own fixed prefix for a JWT scope-derived GrantedAuthority — one constant,
-  // not five repeated literals that could silently drift apart (PMD.AvoidDuplicateLiterals).
-  @SuppressWarnings("PMD.LongVariable")
   private static final String SCOPE_AUTHORITY_PREFIX = "SCOPE_";
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String ADMIN_API_PATH_PATTERN = "/api/v1/admin/**";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -95,7 +87,6 @@ class AdminApiSecurityConfig {
   // security chains share RateLimitKeyHasher and BearerTokenHasher, but this admin-API chain is
   // the sole consumer of idempotency semantics in the whole app, so this hasher and its own
   // dedicated secret live here rather than being promoted to a shared config class.
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ IdempotencyKeyHasher idempotencyKeyHasher(
       @Value("${clavaris.idempotency.key-hash-secret}") final String idempotencyKeyHashSecret) {
@@ -108,12 +99,10 @@ class AdminApiSecurityConfig {
       final HttpSecurity http,
       final JwtDecoder jwtDecoder,
       final RateLimiter rateLimiter,
-      @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.admin-api.per-client-limit:120}")
+      final RateLimitKeyHasher rateLimitKeyHasher,
+      @Value("${clavaris.rate-limit.admin-api.per-client-limit:120}")
           final int adminApiPerClientLimit,
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.admin-api.accounts-delete.per-client-limit:30}")
+      @Value("${clavaris.rate-limit.admin-api.accounts-delete.per-client-limit:30}")
           final int accountsDeletePerClientLimit,
       @SuppressWarnings("PMD.LongVariable")
           @Value("${clavaris.rate-limit.admin-api.organizations-delete.per-client-limit:5}")
@@ -137,8 +126,8 @@ class AdminApiSecurityConfig {
       final AccountRepository accounts,
       final WorkspaceRepository workspaces,
       // Optional Idempotency-Key support — see IdempotencyKeyFilter's own Javadoc.
-      @SuppressWarnings("PMD.LongVariable") final IdempotencyKeyStore idempotencyKeyStore,
-      @SuppressWarnings("PMD.LongVariable") final IdempotencyKeyHasher idempotencyKeyHasher,
+      final IdempotencyKeyStore idempotencyKeyStore,
+      final IdempotencyKeyHasher idempotencyKeyHasher,
       final ObjectMapper objectMapper,
       final SecurityMetricsRecorder securityMetrics) {
     http.securityMatcher(ADMIN_API_PATH_PATTERN)

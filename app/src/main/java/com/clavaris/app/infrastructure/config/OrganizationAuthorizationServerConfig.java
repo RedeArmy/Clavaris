@@ -178,7 +178,6 @@ public class OrganizationAuthorizationServerConfig {
   // OAuth2AuthorizationEndpointConfigurer/OAuth2ConfigurerUtils#withMultipleIssuersPattern
   // directly: that wrapping is applied to authorizationEndpointUri, never to consentPage). See
   // ConsentController's own Javadoc for the full design this path is wired into below.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String CONSENT_PATH_PATTERN = "/oauth2/consent";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")

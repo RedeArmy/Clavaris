@@ -48,7 +48,6 @@ public final class TenantAccountOnlySecurityContextFilter extends OncePerRequest
 
   // The exact authority SpringSecurityAuthenticatedSessionEstablisher (tenant tier) grants and no
   // PlatformAccount session ever carries.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String TENANT_ACCOUNT_AUTHORITY = "ROLE_ACCOUNT";
 
   // This class holds no state, so this constructor is otherwise a no-op — written out explicitly

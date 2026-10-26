@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** {@code roleId} (ADR-0027 — replaces the old fixed-enum {@code role}) may be {@code null}. */
-@SuppressWarnings("PMD.ShortVariable")
 public record WorkspaceMembershipResponse(
     UUID id, UUID workspaceId, UUID accountId, UUID roleId, Instant createdAt) {
 

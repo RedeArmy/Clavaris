@@ -68,12 +68,6 @@ class DistributedSessionConfig {
     // Intentionally empty — this class holds no state, only the class-level annotation above.
   }
 
-  // PMD.LongVariable: same "abbreviating would only make this harder to read" precedent this
-  // codebase's own PlatformScopes/AdaptiveSameSiteSessionCookieSerializer suppressions already
-  // establish for this exact name.
-  // PMD.LawOfDemeter: ObjectProvider.getIfAvailable() is the only way to reach a bean lazily — same
-  // rationale SessionBackedFlatPathLookup documents for its identical suppression.
-  @SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter"})
   @Bean
   /* package */ CookieSerializer sessionCookieSerializer(
       @Value("${clavaris.session.platform-path-prefix:/platform/}") final String platformPathPrefix,

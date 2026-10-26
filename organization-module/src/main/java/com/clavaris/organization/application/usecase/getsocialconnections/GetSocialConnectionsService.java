@@ -19,8 +19,6 @@ import java.util.UUID;
  * the page and the sign-in pages agree on what "used for sign-in" means: a provider is offered when
  * it is switched on and, for a PRODUCTION Organization, has credentials of its own.
  */
-// PMD.LongVariable: collaborator names match their own types, as in the sibling services.
-@SuppressWarnings("PMD.LongVariable")
 public class GetSocialConnectionsService implements GetSocialConnectionsUseCase {
 
   private final OrganizationRepository organizations;

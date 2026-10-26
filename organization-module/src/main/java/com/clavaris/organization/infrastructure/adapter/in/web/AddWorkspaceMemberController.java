@@ -35,7 +35,6 @@ class AddWorkspaceMemberController {
 
   // Three exits (404 unknown workspace, 409 email already registered, 201 success) — same
   // rationale as every other admin-API controller's identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Add a new member to a Workspace, provisioning a real Account (BR-WS-04)")
   @ApiResponse(responseCode = "201", description = "Account provisioned; membership created")
   @ApiResponse(

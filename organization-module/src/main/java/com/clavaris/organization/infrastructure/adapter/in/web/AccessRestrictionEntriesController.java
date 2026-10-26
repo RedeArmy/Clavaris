@@ -62,7 +62,6 @@ class AccessRestrictionEntriesController {
 
   // Two exits (409 duplicate, 201 success) — same rationale as every other admin-mutation
   // controller in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(
       summary = "Add an access-restriction entry (blocklist or allowlist) to an Organization")
   @ApiResponse(responseCode = "201", description = "Entry created")
@@ -83,7 +82,6 @@ class AccessRestrictionEntriesController {
     }
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Remove an access-restriction entry from an Organization")
   @ApiResponse(responseCode = "204", description = "Removed")
   @ApiResponse(responseCode = "404", description = "No entry exists with the given id")

@@ -65,12 +65,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * case is what this class's entire job looks like. AvoidDuplicateLiterals below: the same
  * "PMD.LongVariable" reused across several parameters, not a repeated business string.
  */
-@SuppressWarnings({
-  "PMD.AvoidDuplicateLiterals",
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @Configuration
 class PlatformAccountUseCaseConfig {
 
@@ -83,7 +78,7 @@ class PlatformAccountUseCaseConfig {
   /* package */ RegisterPlatformAccountUseCase registerPlatformAccountUseCase(
       final PlatformAccountRepository accounts,
       final PasswordHasher passwordHasher,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker) {
     return new RegisterPlatformAccountService(accounts, passwordHasher, breachedPasswordChecker);
   }
 
@@ -101,8 +96,7 @@ class PlatformAccountUseCaseConfig {
   /* package */ RequestPlatformAccountEmailVerificationUseCase
       requestPlatformAccountEmailVerificationUseCase(
           final PlatformAccountRepository accounts,
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformVerificationTokenRepository verificationTokens,
+          final PlatformVerificationTokenRepository verificationTokens,
           final PlatformMailSender mailSender) {
     return new RequestPlatformAccountEmailVerificationService(
         accounts, verificationTokens, mailSender);
@@ -111,8 +105,7 @@ class PlatformAccountUseCaseConfig {
   @Bean
   /* package */ ConfirmPlatformAccountEmailVerificationUseCase
       confirmPlatformAccountEmailVerificationUseCase(
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformVerificationTokenRepository verificationTokens,
+          final PlatformVerificationTokenRepository verificationTokens,
           final PlatformAccountRepository accounts) {
     return new ConfirmPlatformAccountEmailVerificationService(verificationTokens, accounts);
   }
@@ -121,8 +114,7 @@ class PlatformAccountUseCaseConfig {
   /* package */ RequestPlatformAccountPasswordResetUseCase
       requestPlatformAccountPasswordResetUseCase(
           final PlatformAccountRepository accounts,
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformVerificationTokenRepository verificationTokens,
+          final PlatformVerificationTokenRepository verificationTokens,
           final PlatformMailSender mailSender) {
     return new RequestPlatformAccountPasswordResetService(accounts, verificationTokens, mailSender);
   }
@@ -130,13 +122,11 @@ class PlatformAccountUseCaseConfig {
   @Bean
   /* package */ ConfirmPlatformAccountPasswordResetUseCase
       confirmPlatformAccountPasswordResetUseCase(
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformVerificationTokenRepository verificationTokens,
+          final PlatformVerificationTokenRepository verificationTokens,
           final PlatformAccountRepository accounts,
           final PlatformAccountSessionRevoker sessionRevoker,
           final PasswordHasher passwordHasher,
-          @SuppressWarnings("PMD.LongVariable")
-              final BreachedPasswordChecker breachedPasswordChecker) {
+          final BreachedPasswordChecker breachedPasswordChecker) {
     return new ConfirmPlatformAccountPasswordResetService(
         verificationTokens, accounts, sessionRevoker, passwordHasher, breachedPasswordChecker);
   }
@@ -152,7 +142,7 @@ class PlatformAccountUseCaseConfig {
           final PendingPlatformSocialLinkRepository pendingLinks,
           final PlatformMailSender mailSender,
           final SecurityMetricsRecorder securityMetrics,
-          @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager,
+          final PlatformTransactionManager transactionManager,
           final PasswordHasher hasher) {
     return new AuthenticatePlatformAccountWithSocialProviderService(
         accounts,
@@ -202,8 +192,7 @@ class PlatformAccountUseCaseConfig {
       final AuditEventRecorder auditEvents,
       @Value("${clavaris.platform-known-device.migration-cutover-at:2026-09-02T13:00:00Z}")
           final Instant platformKnownDeviceMigrationCutoverAt,
-      @SuppressWarnings("PMD.LongVariable")
-          final PlatformVerificationTokenRepository verificationTokens) {
+      final PlatformVerificationTokenRepository verificationTokens) {
     return new RecordPlatformAccountLoginDeviceService(
         knownDevices,
         accounts,
@@ -228,10 +217,8 @@ class PlatformAccountUseCaseConfig {
   // the suspendPlatformAccountUseCase bean above rather than duplicating its cascade.
   @Bean
   /* package */ ConfirmNewPlatformDeviceLoginAlertUseCase confirmNewPlatformDeviceLoginAlertUseCase(
-      @SuppressWarnings("PMD.LongVariable")
-          final PlatformVerificationTokenRepository verificationTokens,
-      @SuppressWarnings("PMD.LongVariable")
-          final SuspendPlatformAccountUseCase suspendPlatformAccountUseCase) {
+      final PlatformVerificationTokenRepository verificationTokens,
+      final SuspendPlatformAccountUseCase suspendPlatformAccountUseCase) {
     return new ConfirmNewPlatformDeviceLoginAlertService(
         verificationTokens, suspendPlatformAccountUseCase);
   }
@@ -244,10 +231,9 @@ class PlatformAccountUseCaseConfig {
   /* package */ UpdatePlatformAccountProfilePictureUseCase
       updatePlatformAccountProfilePictureUseCase(
           final PlatformAccountRepository accounts,
-          @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
+          final ProfilePictureStorage profilePictureStorage,
           final AuditEventRecorder auditEvents,
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformTransactionManager transactionManager) {
+          final PlatformTransactionManager transactionManager) {
     return new UpdatePlatformAccountProfilePictureService(
         accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
   }
@@ -256,18 +242,16 @@ class PlatformAccountUseCaseConfig {
   /* package */ RemovePlatformAccountProfilePictureUseCase
       removePlatformAccountProfilePictureUseCase(
           final PlatformAccountRepository accounts,
-          @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage,
+          final ProfilePictureStorage profilePictureStorage,
           final AuditEventRecorder auditEvents,
-          @SuppressWarnings("PMD.LongVariable")
-              final PlatformTransactionManager transactionManager) {
+          final PlatformTransactionManager transactionManager) {
     return new RemovePlatformAccountProfilePictureService(
         accounts, profilePictureStorage, auditEvents, new TransactionTemplate(transactionManager));
   }
 
   @Bean
   /* package */ GetPlatformAccountAvatarUseCase getPlatformAccountAvatarUseCase(
-      final PlatformAccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final ProfilePictureStorage profilePictureStorage) {
+      final PlatformAccountRepository accounts, final ProfilePictureStorage profilePictureStorage) {
     return new GetPlatformAccountAvatarService(accounts, profilePictureStorage);
   }
 

@@ -28,7 +28,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 // PMD.LawOfDemeter: context.getClaims()/getTokenType() is the standard SAS API shape.
 // PMD.AvoidCatchingGenericException: recording is best-effort by design (see the class Javadoc), so
 // any failure of it, whatever its type, must not stop a token being issued.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.AvoidCatchingGenericException"})
+@SuppressWarnings({"PMD.AvoidCatchingGenericException"})
 public final class OidcSessionIdRecorder implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
   /** Request attribute carrying the id of the Session opened for the current code exchange. */

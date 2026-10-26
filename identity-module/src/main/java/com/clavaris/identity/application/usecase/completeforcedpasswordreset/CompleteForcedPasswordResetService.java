@@ -26,23 +26,18 @@ import org.springframework.transaction.annotation.Transactional;
  * password-optional-account edge case {@code Account}'s own Javadoc documents (ADR-0024 §5, a
  * forced reset on an account that signed up passwordless).
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals") // "PMD.LongVariable" itself, on the constructor's
-// port parameters — same rationale as ConfirmPasswordResetService's own identical suppression.
 public class CompleteForcedPasswordResetService implements CompleteForcedPasswordResetUseCase {
 
   private final AccountRepository accounts;
   private final SessionRepository sessions;
   private final RefreshTokenRepository refreshTokens;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final AccountTokenRevoker accountTokenRevoker;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final AccountSessionRevoker accountSessionRevoker;
 
   private final PasswordHasher hasher;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final BreachedPasswordChecker breachedPasswordChecker;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
@@ -51,10 +46,10 @@ public class CompleteForcedPasswordResetService implements CompleteForcedPasswor
       final AccountRepository accounts,
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker) {
     this.accounts = accounts;
     this.sessions = sessions;
     this.refreshTokens = refreshTokens;

@@ -87,20 +87,16 @@ import org.springframework.web.server.ResponseStatusException;
 // this codebase (see e.g. RegisterOAuthClientService's own java:S107 precedent) — a synthetic
 // parameter object here would add indirection without removing complexity, and this class's own
 // job (route every Configuration-card mutation to its own use case) structurally requires knowing
-// about all of them. PMD.AvoidDuplicateLiterals: "PMD.OnlyOneReturn" as a repeated
-// @SuppressWarnings value across several genuinely-multi-exit handler methods — extracting it to
-// a named constant would not make any of those methods clearer. PMD.CyclomaticComplexity (class
-// total): the sum of every endpoint's own already-justified per-method complexity — a controller
+// about all of them. PMD.CyclomaticComplexity (class total): the sum of every endpoint's own
+// already-justified per-method complexity — a controller
 // routing eleven genuinely distinct HTTP mappings to their own use cases inherently sums to a
 // large total; each individual method stays within its own documented, reasonable complexity.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
-  "PMD.AvoidFieldNameMatchingMethodName",
   "PMD.TooManyMethods",
   "PMD.ExcessiveParameterList",
   "PMD.CouplingBetweenObjects",
-  "PMD.AvoidDuplicateLiterals",
   "PMD.CyclomaticComplexity"
 })
 @Controller
@@ -311,7 +307,6 @@ public class PlatformOAuthClientController {
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
   // controller's own identical "after a mutation succeeds" suppression. Redirects to the
   // detail page now, not the list — no secret involved in deactivation, so a redirect is safe.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{clientId}/deactivate")
   public String deactivate(
       final HttpServletRequest request,
@@ -430,7 +425,7 @@ public class PlatformOAuthClientController {
   // as a live UX bug fix, is one more genuinely distinct rejection reason, not incidental
   // branching — same "each branch is a real, separate case the caller needs to see" reasoning
   // OAuthClient#requireWellFormedAbsoluteSecureUri's own identical suppression documents.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @PostMapping("/{clientId}/redirect-settings")
   public String updateRedirectSettings(
       final HttpServletRequest request,
@@ -512,7 +507,7 @@ public class PlatformOAuthClientController {
   // (not found/inactive/malformed/concurrent conflict) plus the HTMX-vs-redirect branch, same
   // "each branch is a real, separate case" reasoning updateRedirectSettings's own identical
   // suppression documents.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @PostMapping("/{clientId}/grant-types")
   public String updateGrantTypes(
       final HttpServletRequest request,
@@ -565,7 +560,7 @@ public class PlatformOAuthClientController {
   // Blank entries (an in-progress row in the modal's own add/remove UI) are dropped, same
   // tolerance UpdateOAuthClientRedirectSettingsForm's own parse methods already give redirect URIs.
   // PMD.CyclomaticComplexity: same rationale as updateGrantTypes's own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @PostMapping("/{clientId}/scopes")
   public String updateScopes(
       final HttpServletRequest request,
@@ -617,7 +612,6 @@ public class PlatformOAuthClientController {
 
   // Same rationale/shape as updateGrantTypes/updateScopes above — a plain toggle, ADR-0017's own
   // secure-by-default posture stays the starting point, not a floor an owner can never move off.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{clientId}/consent")
   public String updateConsent(
       final HttpServletRequest request,

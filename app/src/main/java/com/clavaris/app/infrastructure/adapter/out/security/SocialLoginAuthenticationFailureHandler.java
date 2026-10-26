@@ -22,9 +22,6 @@ import org.springframework.stereotype.Component;
  * a generic {@code socialLoginError} query flag is all the redirected-to login page needs to show
  * its existing, already-generic error copy.
  */
-// PMD.LongVariable: organizationIdValue names exactly what it is, same convention
-// SocialLoginAuthenticationSuccessHandler's own identical suppression already documents.
-@SuppressWarnings("PMD.LongVariable")
 @Component
 public class SocialLoginAuthenticationFailureHandler implements AuthenticationFailureHandler {
 

@@ -15,7 +15,6 @@ import java.util.UUID;
  *     command is ever built, not inside this use case — same split the rate-limit policy's own
  *     command already documents.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record SetSessionPolicyForOrganizationCommand(
     UUID organizationId,
     int maximumLifetimeMinutes,

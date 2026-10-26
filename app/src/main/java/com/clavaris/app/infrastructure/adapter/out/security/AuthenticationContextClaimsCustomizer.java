@@ -58,12 +58,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * one customizer lambda — the same one-{@code JwtGenerator}-customizer-slot constraint that already
  * shapes how this codebase adds a second concern to token issuance.
  */
-// PMD.LongVariable: AMR_AUTHORITY_PREFIX names exactly what it is — see this class's own AMR
-// rationale above. PMD.LawOfDemeter: context.getClaims()/getPrincipal()/principal.getAuthorities()
-// are all the standard SAS/Spring Security API shape for reading a token-issuance context and its
-// principal — there is no other way to reach any of them, same reasoning
-// AntiAbuseRateLimitingFilter's own response.getWriter() suppression already documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter"})
 public class AuthenticationContextClaimsCustomizer
     implements OAuth2TokenCustomizer<JwtEncodingContext> {
 

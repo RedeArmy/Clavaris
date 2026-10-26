@@ -14,7 +14,6 @@ import java.util.UUID;
  * there. {@code DispatchOutboxEventsService} copies it unchanged onto every {@code WebhookDelivery}
  * fanned out from this event; always optional, never assumed present.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public record OutboxEvent(
     OutboxSource source,
     UUID id,

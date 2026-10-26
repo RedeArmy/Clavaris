@@ -14,7 +14,6 @@ import java.util.UUID;
  * to correct here, only to document. The dashboard's own ownership check happens before this
  * command is ever built, not inside this use case.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record RegisterWebhookEndpointCommand(
     UUID organizationId,
     String url,

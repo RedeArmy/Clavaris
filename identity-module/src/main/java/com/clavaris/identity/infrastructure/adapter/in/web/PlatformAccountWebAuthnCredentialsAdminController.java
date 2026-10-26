@@ -17,10 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * ownership-scoped delete) rather than duplicating it — same shape {@link
  * PlatformAccountSessionsAdminController} already establishes for session revocation.
  */
-// PMD.LongVariable: REDIRECT_TO_PROFILE/organizationAccess/organizationResolver/
-// currentPlatformAccount name exactly what they hold — same precedent
-// PlatformAccountSessionsAdminController's own identical suppression already establishes.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountWebAuthnCredentialsAdminController {

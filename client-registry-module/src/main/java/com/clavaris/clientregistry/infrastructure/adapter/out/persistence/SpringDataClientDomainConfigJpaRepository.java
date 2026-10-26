@@ -16,8 +16,7 @@ interface SpringDataClientDomainConfigJpaRepository
 
   // PMD.LongVariable: verificationStatus names exactly what it is — same convention
   // SpringDataWorkspaceTeamRoleJpaRepository's own identical suppression documents.
-  List<ClientDomainConfigEntity> findByVerificationStatus(
-      @SuppressWarnings("PMD.LongVariable") String verificationStatus);
+  List<ClientDomainConfigEntity> findByVerificationStatus(String verificationStatus);
 
   // PMD.LongVariable: same rationale as findByVerificationStatus above. An EXISTS over the owning
   // client rather than a join, so a client-less (orphaned) config can never count for an
@@ -32,5 +31,5 @@ interface SpringDataClientDomainConfigJpaRepository
       """)
   boolean existsEmbeddingByOrganizationId(
       @Param("organizationId") UUID organizationId,
-      @Param("verificationStatus") @SuppressWarnings("PMD.LongVariable") String verificationStatus);
+      @Param("verificationStatus") String verificationStatus);
 }

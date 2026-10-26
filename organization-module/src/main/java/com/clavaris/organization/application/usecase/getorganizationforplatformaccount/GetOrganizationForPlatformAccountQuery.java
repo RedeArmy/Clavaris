@@ -8,6 +8,5 @@ import java.util.UUID;
  *     own {@code ownerPlatformAccountId} exists to enforce.
  * @param ownerPlatformAccountId the current session's own resolved principal, never caller input.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record GetOrganizationForPlatformAccountQuery(
     UUID organizationId, UUID ownerPlatformAccountId) {}

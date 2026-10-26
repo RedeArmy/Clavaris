@@ -18,7 +18,6 @@ import java.util.UUID;
  * what it is — same convention {@link AbstractClientCredential}'s own identical suppression already
  * documents for this same constructor parameter.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public final class PlatformClient extends AbstractClientCredential {
 
   private PlatformClient(
@@ -70,8 +69,7 @@ public final class PlatformClient extends AbstractClientCredential {
    * {@code newClientSecretHash} is already hashed, same "never see a raw secret" discipline as
    * {@link #register}.
    */
-  public PlatformClient rotateSecret(
-      @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
+  public PlatformClient rotateSecret(final String newClientSecretHash) {
     return new PlatformClient(
         id(), clientId(), newClientSecretHash, allowedScopes(), createdAt(), active(), version());
   }

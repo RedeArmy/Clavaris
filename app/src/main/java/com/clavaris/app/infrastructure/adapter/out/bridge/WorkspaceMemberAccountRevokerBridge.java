@@ -19,28 +19,19 @@ import org.springframework.stereotype.Component;
  * own comparable cascade, minus the refresh-token step ({@code
  * WorkspaceMemberRefreshTokenRevokerBridge} already covers that separately, unchanged).
  */
-// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on both the
-// fields and the constructor's port parameters — same rationale AccountRevocationCascade's own
-// identical class-level suppression documents for this exact PMD-annotation-string-as-literal
-// false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Component
 class WorkspaceMemberAccountRevokerBridge implements WorkspaceMemberAccountRevoker {
 
   private final SessionRepository sessions;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent
-  // AccountRevocationCascade's own identical field already establishes.
   private final AccountTokenRevoker accountTokenRevoker;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
-  // accountTokenRevoker above.
   private final AccountSessionRevoker accountSessionRevoker;
 
   /* package */ WorkspaceMemberAccountRevokerBridge(
       final SessionRepository sessions,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker) {
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker) {
     this.sessions = sessions;
     this.accountTokenRevoker = accountTokenRevoker;
     this.accountSessionRevoker = accountSessionRevoker;

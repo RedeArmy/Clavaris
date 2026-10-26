@@ -15,9 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * inside an open database transaction" discipline {@code AuthenticateWithSocialProviderService}'s
  * own Javadoc already documents for its own mail send.
  */
-// PMD.LongVariable: transactionTemplate names exactly what it is — same convention
-// AuthenticateWithSocialProviderService's own identical class-level suppression documents.
-@SuppressWarnings("PMD.LongVariable")
 public class UpdateAccountProfilePictureService implements UpdateAccountProfilePictureUseCase {
 
   // ADR-0026: this Account's own stable storage key — key CONSTRUCTION lives here, the caller,

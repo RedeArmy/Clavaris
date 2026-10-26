@@ -18,8 +18,6 @@ package com.clavaris.organization.application.usecase.getorganizationapikeys;
  * @param latestApiVersion the newest version this deployment serves — identical to {@code
  *     configuredApiVersion} until a {@code v2} ships
  */
-@SuppressWarnings("PMD.LongVariable") // configuredApiVersion/latestApiVersion name exactly what
-// they are — mirrors Clerk's own field names, not arbitrarily long.
 public record OrganizationApiKeys(
     String publishableKey,
     String frontendApiUrl,

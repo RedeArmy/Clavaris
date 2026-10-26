@@ -33,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
  * shares one transaction, so a mid-loop failure rolls all of it back regardless of when within the
  * method {@code markPublished} used to run.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DispatchOutboxEventsService.class);
@@ -54,11 +53,6 @@ public class DispatchOutboxEventsService implements DispatchOutboxEventsUseCase 
     this.batchSizePerSource = batchSizePerSource;
   }
 
-  // PMD.GuardLogStatement false positives — the values logged are cheap in-memory accessors, same
-  // rationale as every other logging call site in this codebase (e.g.
-  // DeliverPendingWebhooksService's
-  // own identical suppression).
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public void dispatchPendingEvents() {

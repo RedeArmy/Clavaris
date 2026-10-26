@@ -38,7 +38,6 @@ class CreateProductionEnvironmentController {
 
   // Four exits (404 unknown Organization, 409 not DEVELOPMENT / already linked, 201 success) —
   // same "one exit per distinct outcome" rationale as every other admin-API controller here.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(
       summary = "Promote a DEVELOPMENT Organization by creating its paired PRODUCTION sibling")
   @ApiResponse(

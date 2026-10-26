@@ -23,7 +23,6 @@ public class VerifyPlatformAccountEmailController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String verify(@RequestParam final String token) {
     try {

@@ -9,7 +9,6 @@ import java.util.UUID;
  * Read-only — same "an empty list is a valid, safe answer either way" posture {@code
  * ListOrganizationSocialCredentialsService} already establishes.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class ListOrganizationClientsService implements ListOrganizationClientsUseCase {
 
   private final OrganizationClientRepository organizationClients;

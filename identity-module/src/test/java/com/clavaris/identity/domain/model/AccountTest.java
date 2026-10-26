@@ -559,7 +559,8 @@ class AccountTest {
             null,
             good.permissions(),
             good.registration(),
-            good.metadata());
+            good.metadata(),
+            good.version());
 
     assertThatThrownBy(() -> Account.reconstitute(noProfile))
         .isInstanceOf(NullPointerException.class)

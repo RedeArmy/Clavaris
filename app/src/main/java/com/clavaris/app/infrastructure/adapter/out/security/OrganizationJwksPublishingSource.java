@@ -55,7 +55,6 @@ public final class OrganizationJwksPublishingSource implements JWKSource<Securit
 
   // "No current Organization on this request"/"resolved" are two independent, equally valid
   // exits — same rationale as OrganizationScopedJwkSource's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public List<JWK> get(final JWKSelector jwkSelector, final SecurityContext context) {
     final Optional<UUID> organizationId = CurrentOrganizationContext.currentOrganizationId();

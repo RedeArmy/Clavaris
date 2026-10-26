@@ -77,7 +77,7 @@ import org.springframework.web.server.ResponseStatusException;
 // rotate secret) plus the small private helpers they share — each is a real, distinct endpoint or
 // a de-duplication of two of them, not a design smell to split across controllers that would then
 // each need their own copy of the ownership/render plumbing.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/secret-keys")
 public class PlatformOrganizationClientController {
@@ -173,10 +173,6 @@ public class PlatformOrganizationClientController {
         new DashboardControllerSupport.PaginatedViewNames(CLIENTS_FRAGMENT, LIST_VIEW));
   }
 
-  // Never returns "redirect:" — see this class's own Javadoc for why a one-time secret can't
-  // safely travel through one. PMD.OnlyOneReturn: create/error each need their own exit, same
-  // rationale as every other handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,
@@ -235,7 +231,6 @@ public class PlatformOrganizationClientController {
 
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
   // controller's own identical "after a mutation succeeds" suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{clientId}/deactivate")
   public String deactivate(
       final HttpServletRequest request,
@@ -331,7 +326,6 @@ public class PlatformOrganizationClientController {
     }
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private String afterMutation(
       final HttpServletRequest request,
       final Model model,

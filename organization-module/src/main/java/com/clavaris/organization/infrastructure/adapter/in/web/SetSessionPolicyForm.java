@@ -14,7 +14,6 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
  * <p>PMD.DataClass: a plain web-layer form bean is *supposed* to be just fields + getters/setters —
  * same convention {@code CreateWorkspaceTeamRoleForm}'s own Javadoc already establishes.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.DataClass"})
 public class SetSessionPolicyForm {
 
   private String maximumLifetimeValue;

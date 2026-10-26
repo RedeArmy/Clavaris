@@ -12,6 +12,7 @@ import com.clavaris.identity.domain.model.AccountPermissions;
 import com.clavaris.identity.domain.model.AccountProfile;
 import com.clavaris.identity.domain.model.AccountSnapshot;
 import com.clavaris.identity.domain.model.AccountStatus;
+import com.clavaris.identity.domain.model.ConcurrentAccountModificationException;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.PasswordCredential;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -156,7 +158,8 @@ class JpaAccountRepository implements AccountRepository {
             new AccountMetadata(
                 entity.getPublicMetadata(),
                 entity.getPrivateMetadata(),
-                entity.getUnsafeMetadata())));
+                entity.getUnsafeMetadata()),
+            entity.getVersion()));
   }
 
   @Override
@@ -184,7 +187,15 @@ class JpaAccountRepository implements AccountRepository {
     // context — Hibernate would defer executing it until the surrounding @Transactional method
     // returns and the transaction commits, by which point the try/catch block has already
     // exited and the exception would surface somewhere the service never expects it.
-    accounts.saveAndFlush(toEntity(account));
+    try {
+      final AccountEntity saved = accounts.saveAndFlush(toEntity(account));
+      // The aggregate may be saved again in the same flow; it must carry the version just written.
+      account.rememberPersistedVersion(saved.getVersion());
+    } catch (final OptimisticLockingFailureException _) {
+      // TD-ARCH-037: flushed above so the version check runs here, inside this try, not later at
+      // the caller's commit where this catch could not see it (the OAuthClient precedent).
+      throw new ConcurrentAccountModificationException(account.id());
+    }
   }
 
   // TD-PERF-028: the credential half save() used to always do unconditionally — same
@@ -239,7 +250,8 @@ class JpaAccountRepository implements AccountRepository {
         account.registrationRejectionReason().orElse(null),
         account.publicMetadata().orElse(null),
         account.privateMetadata().orElse(null),
-        account.unsafeMetadata().orElse(null));
+        account.unsafeMetadata().orElse(null),
+        account.snapshot().version());
   }
 
   // ADR-0020 (Phase 6, live-verified): a brand-new social signup (AuthenticateWithSocialProvider
@@ -307,10 +319,6 @@ class JpaAccountRepository implements AccountRepository {
         .toList();
   }
 
-  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: same TD-PERF-020 keyset
-  // pagination shape client-registry-module's own JpaOAuthClientRepository already establishes.
-  // PMD.OnlyOneReturn: three real, distinct exits — first/after/before.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   @Override
   public KeysetPage<Account> findKeysetPageByOrganizationId(
       final OrganizationId organizationId,
@@ -341,11 +349,6 @@ class JpaAccountRepository implements AccountRepository {
         fetched, pageRequest.size(), false, toDomainBatched(fetched), this::cursorOf);
   }
 
-  // TD-PERF-029: one findByAccountIdIn call for the whole page, instead of one findByAccountId
-  // per row inside toDomain — see that method's own Javadoc.
-  // PMD.LongVariable: credentialsByAccountId names exactly what it is — same convention this
-  // codebase's other descriptively-named local variables already follow.
-  @SuppressWarnings("PMD.LongVariable")
   private Function<AccountEntity, Account> toDomainBatched(final List<AccountEntity> entities) {
     final Map<UUID, PasswordCredentialEntity> credentialsByAccountId =
         credentials.findByAccountIdIn(entities.stream().map(AccountEntity::getId).toList()).stream()

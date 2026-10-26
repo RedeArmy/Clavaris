@@ -27,12 +27,8 @@ import java.util.UUID;
  * <p>Package-private: only this package's own two subclasses need it.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.AbstractClassWithoutAbstractMethod",
   "PMD.PublicMemberInNonPublicType",
-  "PMD.DataClass"
 })
 abstract class AbstractClientCredential {
 

@@ -51,10 +51,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * short and deliberately re-initiated, not silently extended indefinitely the way BR-ID-03's own
  * rotation chain extends a real login.
  */
-// PMD.LongVariable: impersonateAccount names exactly what it is (the ImpersonateAccountUseCase
-// collaborator) — same "abbreviating would only make the call site harder to read" precedent this
-// codebase's own PlatformScopes/OrganizationAuthorizationServerConfig suppressions already use.
-@SuppressWarnings("PMD.LongVariable")
 @RestController
 class ImpersonateAccountController {
 
@@ -70,7 +66,6 @@ class ImpersonateAccountController {
 
   // Four exits (404 unknown account, 409 not active, 400 bad client/scope, 200 success) — same
   // "one exit per distinct outcome" rationale as every other admin-API controller in this codebase.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Mint a short-lived Bearer access token impersonating this Account")
   @ApiResponse(responseCode = "200", description = "Access token minted")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")

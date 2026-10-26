@@ -45,7 +45,7 @@ import org.springframework.web.server.ResponseStatusException;
 // PMD.LongVariable: collaborator names spell out the use case they hold. PMD.ExcessiveImports:
 // every import is a distinct use case, command or exception this controller genuinely handles —
 // wiring, not sprawl (the whole Workspace surface used to be one class).
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+@SuppressWarnings({"PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceTeamRoleController {
@@ -84,7 +84,6 @@ public class PlatformWorkspaceTeamRoleController {
   // in after its team is later deleted. form.getTeamId() == null skips
   // AddRoleToWorkspaceTeamUseCase
   // entirely; the role this popup just created is simply left ungrouped.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/roles")
   public String createRole(
       final HttpServletRequest request,
@@ -142,7 +141,6 @@ public class PlatformWorkspaceTeamRoleController {
   // spaceRoleException isn't reachable through this UI — the reserved role never renders a delete
   // control here either, same th:unless="${role.reserved()}" guard workspace-role-detail.html's own
   // delete card already uses.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/roles/{roleId}/delete")
   public String deleteRole(
       final HttpServletRequest request,

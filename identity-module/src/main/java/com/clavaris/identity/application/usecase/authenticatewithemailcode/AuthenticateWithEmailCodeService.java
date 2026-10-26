@@ -47,7 +47,7 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
   // inactive account, invalid/expired/wrong-owner code) collapsed to one exception type, same
   // "wiring, not sprawl" reasoning AuthenticateWithPasswordService's own identical branching
   // already establishes.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public Account handle(final AuthenticateWithEmailCodeCommand command) {

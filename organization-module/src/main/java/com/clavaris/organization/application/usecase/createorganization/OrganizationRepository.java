@@ -41,8 +41,7 @@ public interface OrganizationRepository {
    */
   Optional<Organization> findById(UUID organizationId);
 
-  List<Organization> findAllOwnedBy(
-      @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId);
+  List<Organization> findAllOwnedBy(UUID ownerPlatformAccountId);
 
   /**
    * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
@@ -54,8 +53,7 @@ public interface OrganizationRepository {
    * method.
    */
   KeysetPage<Organization> findKeysetPageOwnedBy(
-      @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId,
-      KeysetPageRequest pageRequest);
+      UUID ownerPlatformAccountId, KeysetPageRequest pageRequest);
 
   /**
    * BR-DATA-02/03's own organization-level equivalent: a real, permanent hard delete. Only cascades

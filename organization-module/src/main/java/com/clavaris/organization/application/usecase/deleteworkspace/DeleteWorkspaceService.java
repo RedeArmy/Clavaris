@@ -55,9 +55,6 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  // PMD.LongVariable: refreshTokenRevoker names exactly what it is — same convention
-  // RemoveWorkspaceMemberService's own identical field documents.
-  @SuppressWarnings("PMD.LongVariable")
   private final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
 
   private final WorkspaceMemberAccountRevoker accountRevoker;
@@ -72,8 +69,7 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
       final WorkspaceMembershipRepository memberships,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
       final WorkspaceMemberAccountRevoker accountRevoker) {
     this.workspaces = workspaces;
     this.memberships = memberships;
@@ -83,9 +79,6 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
     this.accountRevoker = accountRevoker;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as every other logging call site in
-  // this codebase (e.g. DeleteOrganizationService's own identical suppression).
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public void handle(final DeleteWorkspaceCommand command) {
@@ -97,12 +90,6 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
             .findById(command.workspaceId())
             .orElseThrow(() -> new WorkspaceNotFoundException(command.workspaceId()));
 
-    // TD-WS-004: loaded before the cascade delete below erases every one of this Workspace's own
-    // WorkspaceMembership rows — this is the only chance to know who needs their own access
-    // revoked.
-    // PMD.LongVariable: workspaceMemberships names exactly what it is — same convention this
-    // codebase's other descriptively-named local variables already follow.
-    @SuppressWarnings("PMD.LongVariable")
     final List<WorkspaceMembership> workspaceMemberships =
         memberships.findAllByWorkspaceId(workspace.id());
 

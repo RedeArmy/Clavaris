@@ -31,7 +31,6 @@ class DeleteOrganizationController {
 
   // Two exits (404 on an unknown organizationId, 204 on success) — same rationale as
   // DeleteAccountController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(
       summary = "Hard-delete an Organization and its entire owned account pool (BR-DATA-02/03)")
   @ApiResponse(responseCode = "204", description = "Deleted — permanent, not reversible")

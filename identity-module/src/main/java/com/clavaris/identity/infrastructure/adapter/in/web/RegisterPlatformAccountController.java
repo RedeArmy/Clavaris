@@ -51,10 +51,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * /platform/dashboard} instead, same destination {@link PlatformLoginController}'s own identical
  * fix uses.
  */
-// Literals: the repeated string is "PMD.LongVariable" itself, used on several fields/parameters
-// below — same rationale as ConfirmPasswordResetService's own class-level suppression for this
-// exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Controller
 @RequestMapping("/platform/register")
 public class RegisterPlatformAccountController {
@@ -64,9 +60,6 @@ public class RegisterPlatformAccountController {
 
   private static final String FORM_VIEW = "identity/platform/register";
 
-  // PMD.LongVariable: DASHBOARD_REDIRECT names exactly what it is, same convention this class's
-  // own FORM_VIEW/EMAIL constants already establish.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String DASHBOARD_REDIRECT = "redirect:/platform/dashboard";
 
   // SonarCloud S1192: not a coincidence three copies matched — same rationale
@@ -75,27 +68,19 @@ public class RegisterPlatformAccountController {
 
   private final RegisterPlatformAccountUseCase useCase;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final RequestPlatformAccountEmailVerificationUseCase requestEmailVerification;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
   public RegisterPlatformAccountController(
       final RegisterPlatformAccountUseCase useCase,
-      @SuppressWarnings("PMD.LongVariable")
-          final RequestPlatformAccountEmailVerificationUseCase requestEmailVerification,
-      @SuppressWarnings("PMD.LongVariable")
-          final CurrentPlatformAccountResolver currentPlatformAccount) {
+      final RequestPlatformAccountEmailVerificationUseCase requestEmailVerification,
+      final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.useCase = useCase;
     this.requestEmailVerification = requestEmailVerification;
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // PMD.OnlyOneReturn: the already-authenticated redirect and the real form render are two
-  // genuinely distinct exits — same rationale as PlatformLoginController's own identical
-  // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showForm(final HttpServletRequest request, final Model model) {
     if (currentPlatformAccount.resolve(request).isPresent()) {
@@ -110,7 +95,6 @@ public class RegisterPlatformAccountController {
   // field declaration instead of forking. Default.class must be listed explicitly alongside it:
   // @Validated with any explicit group list replaces the implicit Default-only behavior @Valid
   // gives, it doesn't add to it.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String register(
       @Validated({Default.class, PasswordRequired.class}) @ModelAttribute("form")

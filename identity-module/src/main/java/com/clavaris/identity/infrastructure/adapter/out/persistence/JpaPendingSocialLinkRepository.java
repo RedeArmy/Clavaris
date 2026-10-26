@@ -14,7 +14,6 @@ import org.springframework.stereotype.Repository;
  * <p>PMD.LongVariable: {@code confirmationTokenHash} names exactly what it is, same convention
  * {@code PendingSocialLink}'s own class-level suppression already documents for this exact name.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Repository
 class JpaPendingSocialLinkRepository implements PendingSocialLinkRepository {
 

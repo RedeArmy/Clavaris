@@ -51,11 +51,7 @@ import org.springframework.web.server.ResponseStatusException;
 // every other controller touching HttpSession directly. PMD.OnlyOneReturn: each flagged method has
 // multiple genuinely distinct outcomes (a 400/404 error vs. the real success response).
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.LongVariable",
   "PMD.ExcessiveImports",
-  "PMD.LawOfDemeter",
-  "PMD.OnlyOneReturn"
 })
 @Controller
 @RequestMapping("/o/{organizationId}/account/passkeys")

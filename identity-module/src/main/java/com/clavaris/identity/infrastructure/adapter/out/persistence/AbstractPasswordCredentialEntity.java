@@ -17,7 +17,7 @@ import java.util.UUID;
  * persistence boilerplate with zero domain meaning of its own.
  */
 @MappedSuperclass
-@SuppressWarnings({"PMD.ShortVariable", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class AbstractPasswordCredentialEntity {
 
   @Id protected UUID id;

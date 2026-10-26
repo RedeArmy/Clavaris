@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Min;
  * duplicated here deliberately (same precedent every other Bean-Validation-backed form in this
  * codebase follows) so a bad value never even reaches the service layer.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record SetSessionPolicyRequest(
     @Min(5) @Max(5_256_000) int maximumLifetimeMinutes,
     @Min(5) @Max(525_600) int inactivityTimeoutMinutes,

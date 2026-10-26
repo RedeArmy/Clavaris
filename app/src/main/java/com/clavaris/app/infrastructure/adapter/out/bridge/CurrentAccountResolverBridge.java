@@ -35,7 +35,6 @@ class CurrentAccountResolverBridge implements CurrentAccountResolver {
 
   // "Empty"/"wrong tier"/"malformed"/"resolved" are four independent, equally-valid outcomes
   // here — same rationale as CurrentPlatformAccountResolverBridge's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<AccountId> resolve(final HttpServletRequest request) {
     final SecurityContext context = SecurityContextHolder.getContext();

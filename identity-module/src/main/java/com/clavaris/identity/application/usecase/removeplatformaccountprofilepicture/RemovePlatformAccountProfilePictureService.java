@@ -15,7 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * same shape, same "clear the reference first, delete the object after, skip external URLs"
  * discipline, see that class's own Javadoc for the full rationale.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RemovePlatformAccountProfilePictureService
     implements RemovePlatformAccountProfilePictureUseCase {
 

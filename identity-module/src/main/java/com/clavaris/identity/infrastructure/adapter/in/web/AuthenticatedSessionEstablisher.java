@@ -18,12 +18,6 @@ import java.util.UUID;
  * authenticated session," so the redirected-to {@code /oauth2/authorize} request (or whatever
  * protected URL triggered the login redirect in the first place) sees an authenticated principal.
  */
-// No longer @FunctionalInterface — ADR-0020 added establishViaSocialLogin as a second abstract
-// method, both implemented by the same SpringSecurityAuthenticatedSessionEstablisher class.
-// PMD.LongVariable: deviceTrustVerified (TD-SEC-048) names exactly what it is, same precedent
-// requestDeviceTrustChallenge/redirectUrlResolver's own identical suppressions already establish
-// elsewhere in this package.
-@SuppressWarnings("PMD.LongVariable")
 public interface AuthenticatedSessionEstablisher {
 
   /**

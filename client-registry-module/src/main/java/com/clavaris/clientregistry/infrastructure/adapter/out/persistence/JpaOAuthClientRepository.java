@@ -81,7 +81,6 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
     return oauthClients.findByClientId(clientId).map(this::toDomain);
   }
 
-  @SuppressWarnings("PMD.ShortVariable") // matches the port's own parameter naming
   @Override
   public Optional<OAuthClient> findById(final UUID id) {
     return oauthClients.findById(id).map(this::toDomain);
@@ -112,7 +111,6 @@ class JpaOAuthClientRepository implements OAuthClientRepository {
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // organization-module's own JpaOrganizationRepository#findKeysetPageOwnedBy already documents.
   @Override
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
   public KeysetPage<OAuthClient> findKeysetPageByOrganizationId(
       final UUID organizationId, final KeysetPageRequest pageRequest) {
     final org.springframework.data.domain.PageRequest limit =

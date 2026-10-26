@@ -18,7 +18,6 @@ public final class WebhookDeliveryNotReplayableException extends RuntimeExceptio
 
   private static final long serialVersionUID = 1L;
 
-  @SuppressWarnings("PMD.ShortVariable")
   public WebhookDeliveryNotReplayableException(final UUID id, final WebhookDeliveryStatus status) {
     super(
         "WebhookDelivery "

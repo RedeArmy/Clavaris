@@ -26,9 +26,6 @@ import java.util.List;
  * harmless constants class, would violate that same rule {@link PlatformScopes} already respects
  * for its own scope strings.
  */
-// PMD.DataClass: deliberately nothing but a namespaced constants holder plus the one derived list
-// — same rationale PlatformScopes' own identical suppression documents.
-@SuppressWarnings("PMD.DataClass")
 public final class OidcScopeCatalog {
 
   /** OIDC Core §3.1.2.1 — required on every authorization request this system honors at all. */

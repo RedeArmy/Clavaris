@@ -23,10 +23,6 @@ import java.util.Optional;
 @SuppressWarnings({
   "PMD.TooManyMethods",
   "PMD.ExcessivePublicCount",
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable"
 })
 public final class Account {
 
@@ -58,6 +54,10 @@ public final class Account {
   private AccountPermissions permissions = AccountPermissions.DEFAULT;
   private RegistrationDecision registration = RegistrationDecision.NONE;
   private AccountMetadata metadata = AccountMetadata.EMPTY;
+
+  // The optimistic-lock value this aggregate was loaded (or last saved) at; see
+  // ConcurrentAccountModificationException. Not domain state: it only travels with the aggregate.
+  private int version;
 
   private Account(
       final AccountId id,
@@ -134,6 +134,7 @@ public final class Account {
     account.registration =
         Objects.requireNonNull(snapshot.registration(), "registration must not be null");
     account.metadata = Objects.requireNonNull(snapshot.metadata(), "metadata must not be null");
+    account.version = snapshot.version();
     return account;
   }
 
@@ -167,7 +168,8 @@ public final class Account {
             AccountProfile.EMPTY,
             AccountPermissions.DEFAULT,
             RegistrationDecision.NONE,
-            AccountMetadata.EMPTY));
+            AccountMetadata.EMPTY,
+            0));
   }
 
   /** Everything the persistence adapter writes, in one value. */
@@ -186,7 +188,17 @@ public final class Account {
         profile,
         permissions,
         registration,
-        metadata);
+        metadata,
+        version);
+  }
+
+  /**
+   * Called by the persistence adapter after a successful save, so a second save of this same
+   * aggregate in the same flow carries the version the first one produced instead of failing
+   * against its own earlier write.
+   */
+  public void rememberPersistedVersion(final int persistedVersion) {
+    this.version = persistedVersion;
   }
 
   /**

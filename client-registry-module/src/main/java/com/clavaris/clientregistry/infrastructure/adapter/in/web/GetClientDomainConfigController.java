@@ -27,7 +27,6 @@ class GetClientDomainConfigController {
 
   // Two exits (404 on a bogus organizationId/oauthClientId pair, 200 on success) — same rationale
   // as GetClientBrandingController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Read an OAuthClient's custom domain configuration (ADR-0009 §2)")
   @ApiResponse(
       responseCode = "200",

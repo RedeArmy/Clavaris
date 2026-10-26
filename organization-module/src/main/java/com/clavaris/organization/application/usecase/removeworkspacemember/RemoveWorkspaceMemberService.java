@@ -42,10 +42,6 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
 
-  // PMD.LongVariable: refreshTokenRevoker names exactly what it is — same convention every other
-  // descriptively-named port in this codebase follows (e.g. RotateRefreshTokenService's own
-  // identical accountTokenRevoker/accountSessionRevoker fields).
-  @SuppressWarnings("PMD.LongVariable")
   private final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker;
 
   private final WorkspaceMemberAccountRevoker accountRevoker;
@@ -60,8 +56,7 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
       final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
       final WorkspaceMemberAccountRevoker accountRevoker) {
     this.memberships = memberships;
     this.workspaces = workspaces;
@@ -124,7 +119,8 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
         "workspace_membership.removed",
         "WorkspaceMembership",
         membership.id().toString(),
-        "workspaceId=" + command.workspaceId());
+        "workspaceId=" + command.workspaceId(),
+        organizationId);
 
     outbox.write(
         "WorkspaceMembership",

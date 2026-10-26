@@ -68,7 +68,6 @@ import org.springframework.web.server.ResponseStatusException;
  * wrappers took the same five parameters and did nothing else), so each controller's own {@code
  * create()} calls this method directly instead.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class DashboardControllerSupport {
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers).
@@ -162,7 +161,6 @@ final class DashboardControllerSupport {
   // knowing about either), only ever run when bindingResult actually has errors.
   // Two genuinely distinct exits (no errors / errors) — same rationale every other multi-exit
   // handler in this module documents for this exact suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ static Optional<String> renderValidationErrorsIfAny(
       final HttpServletRequest request,
       final BindingResult bindingResult,

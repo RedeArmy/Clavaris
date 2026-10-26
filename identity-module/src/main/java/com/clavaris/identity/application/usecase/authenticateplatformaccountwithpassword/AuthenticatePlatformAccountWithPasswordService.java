@@ -47,7 +47,6 @@ public class AuthenticatePlatformAccountWithPasswordService
     this.metrics = metrics;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public PlatformAccountId handle(final AuthenticatePlatformAccountWithPasswordCommand command) {
     final Optional<PlatformAccount> found = accounts.findByEmail(command.email());

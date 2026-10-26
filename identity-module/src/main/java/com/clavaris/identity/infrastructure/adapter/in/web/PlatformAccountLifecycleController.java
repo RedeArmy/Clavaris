@@ -39,7 +39,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * DeleteAccountCommand}'s own Javadoc predates this second calling tier and still only names the
  * REST admin API's.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountLifecycleController {
@@ -126,7 +125,6 @@ public class PlatformAccountLifecycleController {
   // already establishes for workspace name. A mismatch redirects back to the Users list with a
   // flash-carried id (this controller always redirects, never renders — see class Javadoc — so a
   // flash attribute, not a model attribute, is what survives the redirect) instead of deleting.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/delete")
   public String delete(
       final HttpServletRequest request,

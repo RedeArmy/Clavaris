@@ -14,11 +14,6 @@ import java.util.List;
  * production code path in this repository only ever constructs an {@code allowedGrantTypes} list
  * from a subset of these three values.
  */
-// PMD.DataClass: deliberately nothing but a namespaced constants holder plus the one derived list
-// — same rationale OidcScopeCatalog's own identical suppression documents. LongVariable:
-// AUTHORIZATION_CODE/CLIENT_CREDENTIALS are the exact OAuth2 spec grant type identifiers, not
-// arbitrarily long — same precedent PlatformScopes' own identical suppression establishes.
-@SuppressWarnings({"PMD.DataClass", "PMD.LongVariable"})
 public final class OAuthGrantTypeCatalog {
 
   /** Standard hosted-login web/mobile flow — the one every interactive OAuthClient needs. */

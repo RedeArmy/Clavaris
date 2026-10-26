@@ -14,13 +14,7 @@ import java.util.UUID;
  * until its connection is saved from the dashboard.
  */
 // Same value-object conventions as OrganizationSocialCredential's own identical suppression.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class SocialConnectionSettings {
 
   private final UUID id;

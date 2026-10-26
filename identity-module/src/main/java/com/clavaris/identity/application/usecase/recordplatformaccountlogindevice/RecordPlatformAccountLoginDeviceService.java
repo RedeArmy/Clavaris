@@ -44,12 +44,10 @@ public class RecordPlatformAccountLoginDeviceService
   private static final Logger LOG =
       LoggerFactory.getLogger(RecordPlatformAccountLoginDeviceService.class);
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String UNKNOWN_USER_AGENT = "Unknown";
 
   // TD-FUT-031: same 7-day rationale as recordaccountlogindevice.RecordAccountLoginDeviceService's
   // own identical constant.
-  @SuppressWarnings("PMD.LongVariable")
   private static final Duration NEW_DEVICE_ALERT_TOKEN_TTL = Duration.ofDays(7);
 
   private final PlatformKnownDeviceRepository knownDevices;
@@ -78,7 +76,6 @@ public class RecordPlatformAccountLoginDeviceService
 
   // Same three-genuinely-distinct-outcomes rationale as RecordAccountLoginDeviceService's own
   // identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<String> handle(final RecordPlatformAccountLoginDeviceCommand command) {
     final String presentedToken = command.presentedDeviceToken();
@@ -162,7 +159,9 @@ public class RecordPlatformAccountLoginDeviceService
 
   // Two genuinely distinct exits (minted / mint failed), same rationale as
   // recordaccountlogindevice.RecordAccountLoginDeviceService's own identical suppression.
-  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.OnlyOneReturn"})
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException",
+  })
   private String mintNewDeviceAlertTokenOrNull(final PlatformAccountId platformAccountId) {
     try {
       final String rawToken = RefreshTokenSecret.generateRawValue();
@@ -180,7 +179,9 @@ public class RecordPlatformAccountLoginDeviceService
     }
   }
 
-  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.OnlyOneReturn"})
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException",
+  })
   private PlatformAccount findPlatformAccountOrNull(final PlatformAccountId platformAccountId) {
     try {
       return platformAccounts.findById(platformAccountId).orElse(null);

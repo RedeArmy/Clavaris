@@ -41,7 +41,6 @@ class JpaPlatformClientRepository implements PlatformClientRepository {
     return platformClients.findByClientId(clientId).map(this::toDomain);
   }
 
-  @SuppressWarnings("PMD.ShortVariable") // matches the port's own parameter naming
   @Override
   public Optional<PlatformClient> findById(final UUID id) {
     return platformClients.findById(id).map(this::toDomain);

@@ -34,7 +34,6 @@ class SetRedirectPolicyController {
 
   // Three exits (404 on a bogus organizationId/oauthClientId pair, 400 on an unregistered URL,
   // 200 on success) — same rationale as SetRateLimitPolicyController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an OAuthClient's post-authentication redirect policy")
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(

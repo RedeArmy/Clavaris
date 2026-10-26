@@ -48,7 +48,6 @@ class SetRateLimitPolicyController {
 
   // Three exits (404 on a bogus organizationId, 400 on a value over the hard system-wide cap, 200
   // on success) — same rationale as RegisterOAuthClientController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an Organization's rate-limit capacity ceiling (ADR-0010 §6.2)")
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(

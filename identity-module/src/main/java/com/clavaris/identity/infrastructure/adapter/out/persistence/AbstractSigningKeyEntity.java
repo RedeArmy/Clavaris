@@ -19,7 +19,7 @@ import java.util.UUID;
  * top of this base.
  */
 @MappedSuperclass
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class AbstractSigningKeyEntity {
 
   @Id protected UUID id;

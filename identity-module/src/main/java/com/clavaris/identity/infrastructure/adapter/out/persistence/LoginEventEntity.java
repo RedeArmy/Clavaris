@@ -12,7 +12,6 @@ import java.util.UUID;
  * separate from {@code domain.model.LoginEvent}, same hexagonal-dependency rule every other {@code
  * *Entity} in this package already follows.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "login_events")
 public class LoginEventEntity {

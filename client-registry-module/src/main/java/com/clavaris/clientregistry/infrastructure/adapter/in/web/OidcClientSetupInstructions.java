@@ -15,10 +15,6 @@ import java.util.UUID;
  * /connect/logout}), not duplicated guesses — a change there must be mirrored here by hand, same as
  * every other place in this codebase that already hardcodes one of these suffixes.
  */
-// PMD.LongVariable: authorizationEndpoint/userInfoEndpoint/etc. are the exact OIDC discovery
-// document field names, not arbitrarily long — same precedent as
-// RegisterOAuthClientRequest's own postLogoutRedirectUris suppression.
-@SuppressWarnings("PMD.LongVariable")
 record OidcClientSetupInstructions(
     String issuer,
     String discoveryUrl,

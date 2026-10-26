@@ -79,14 +79,10 @@ import org.springframework.web.server.ResponseStatusException;
 // PMD.ExcessiveImports/PMD.CouplingBetweenObjects: every import/collaborator here backs a real,
 // distinct use case or form object this controller genuinely needs — same "wiring, not sprawl"
 // reasoning this codebase's own comparable controllers already document.
-// PMD.AvoidDuplicateLiterals: "PMD.OnlyOneReturn" is repeated once per handler method that
-// legitimately needs it — same false-positive class ContentSecurityPolicyHeaderWriter's own
-// identical class-level suppression already documents.
 @SuppressWarnings({
   "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.CouplingBetweenObjects",
-  "PMD.AvoidDuplicateLiterals",
   "PMD.TooManyMethods"
 })
 @Controller
@@ -149,7 +145,6 @@ public class PlatformWebhookEndpointController {
   // token — see organization-module's PlatformOrganizationDashboardController for the full
   // reasoning. This GET also branches on HX-Request — a pagination link is itself an hx-get, and
   // its hx-target can't safely receive a full HTML document.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
@@ -207,11 +202,6 @@ public class PlatformWebhookEndpointController {
     return DETAIL_VIEW;
   }
 
-  // Never returns "redirect:" on the rejected-registration paths — see this class's own Javadoc
-  // for why a re-displayed form can't safely be a fresh GET either (the SSRF-rejected value the
-  // owner just typed would be lost). PMD.OnlyOneReturn: create/validation-error/unsafe-url each
-  // need their own exit, same rationale as every other handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,
@@ -338,7 +328,6 @@ public class PlatformWebhookEndpointController {
 
   // Never returns "redirect:" on the rejected-URL path — same rationale as create() above: the
   // value the owner just typed would be lost to a fresh GET.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{endpointId}/url")
   public String updateUrl(
       final HttpServletRequest request,
@@ -398,9 +387,6 @@ public class PlatformWebhookEndpointController {
     return redirectToDetail(organizationId, endpointId);
   }
 
-  // PMD.OnlyOneReturn: the empty-selection form-error exit and the real success redirect are two
-  // genuinely distinct outcomes, same rationale as updateUrl()'s own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{endpointId}/event-types")
   public String updateEventTypes(
       final HttpServletRequest request,

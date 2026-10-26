@@ -75,7 +75,6 @@ class WorkspaceRolesController {
 
   // Three exits (404 unknown Organization/parentRoleId, 409 duplicate name, 201 success) — same
   // rationale as every other admin-mutation controller in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Create a WorkspaceRole within this Organization (ADR-0027)")
   @ApiResponse(responseCode = "201", description = "WorkspaceRole created")
   @ApiResponse(
@@ -109,7 +108,6 @@ class WorkspaceRolesController {
 
   // Four exits (404 unknown role/parentRoleId, 409 duplicate name, 422 cycle, 200 success) — same
   // rationale as every other multi-outcome handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Update a WorkspaceRole's name, permissions, or parent (ADR-0027)")
   @ApiResponse(responseCode = "200", description = "WorkspaceRole updated")
   @ApiResponse(
@@ -155,7 +153,6 @@ class WorkspaceRolesController {
 
   // Three exits (404 unknown role, 409 reserved/still-assigned, 204 success) — same rationale as
   // every other multi-outcome handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Delete a WorkspaceRole (ADR-0027 §5)")
   @ApiResponse(responseCode = "204", description = "Deleted")
   @ApiResponse(responseCode = "404", description = "No WorkspaceRole exists with the given id")

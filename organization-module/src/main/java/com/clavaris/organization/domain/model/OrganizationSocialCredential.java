@@ -29,14 +29,7 @@ import java.util.UUID;
  * with its field count, not organic complexity — same reasoning {@link Organization}'s own
  * identical suppression already documents.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable",
-  "PMD.DataClass",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class OrganizationSocialCredential {
 
   private final UUID id;

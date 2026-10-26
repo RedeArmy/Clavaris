@@ -39,7 +39,6 @@ class RegisterOAuthClientController {
   // Two exits (404 on a missing Organization, 201 on success) is clearer here than forcing a
   // single-return shape onto two genuinely different outcomes — same rationale as
   // RegisterAccountController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Register a new OAuthClient under an Organization (ADR-0010)")
   @ApiResponse(
       responseCode = "201",

@@ -28,10 +28,6 @@ import com.clavaris.identity.domain.model.AccountId;
  *     4-argument constructor below covers that case explicitly, falling back to this class's own
  *     original always-look-it-up behaviour, unchanged.
  */
-// PMD.LongVariable: presentedDeviceToken/preloadedAccount name exactly what they are — same
-// convention this codebase's own AuthenticatePlatformAccountWithSocialProviderCommand already
-// establishes for this exact class of finding.
-@SuppressWarnings("PMD.LongVariable")
 public record RecordAccountLoginDeviceCommand(
     AccountId accountId,
     String userAgent,

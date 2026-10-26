@@ -24,12 +24,6 @@ import org.springframework.stereotype.Component;
  * {@code OrganizationClientOwnershipFilter} is what actually enforces the consequence on every
  * subsequent admin-API request, this class only stamps the fact into the token itself.
  */
-// LongVariable: ORGANIZATION_ID_CLAIM/organizationClient(s) name exactly what they are.
-// LawOfDemeter:
-// JwtEncodingContext is a flat, purpose-built accessor facade, same "not a coupling smell"
-// reasoning
-// TokenIssuanceEventLogger's own identical suppression already documents for this exact type.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter"})
 @Component
 public class OrganizationClientClaimCustomizer
     implements OAuth2TokenCustomizer<JwtEncodingContext> {

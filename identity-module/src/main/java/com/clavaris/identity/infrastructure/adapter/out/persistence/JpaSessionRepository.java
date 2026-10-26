@@ -38,7 +38,6 @@ class JpaSessionRepository implements SessionRepository {
     this.entityManager = entityManager;
   }
 
-  @SuppressWarnings("PMD.ShortVariable") // matches the port's own parameter naming
   @Override
   public Optional<Session> findById(final UUID id) {
     return sessions.findById(id).map(this::toDomain);

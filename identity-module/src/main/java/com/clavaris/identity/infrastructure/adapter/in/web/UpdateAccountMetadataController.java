@@ -37,7 +37,6 @@ class UpdateAccountMetadataController {
 
   // Three exits (404 on an unknown id, 400 on invalid JSON/oversized tier, 204 on success) — same
   // rationale as SetAccountAuthenticationPolicyController's own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Replace an Account's public/private/unsafe metadata (TD-FUT-034)")
   @ApiResponse(responseCode = "204", description = "Metadata replaced")
   @ApiResponse(

@@ -51,11 +51,7 @@ import org.springframework.web.multipart.MultipartFile;
 // redirectWithEmbedParams/appendEmbedParamsIfPresent trio the 2026-10-10 bug fix added (see this
 // class's own DISPLAY_PARAM field comment) — one shared helper for a real, repeated need across
 // five distinct redirects, not organic sprawl.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ExcessiveImports",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/o/{organizationId}/account/profile")
 public class AccountProfileController {
@@ -119,7 +115,7 @@ public class AccountProfileController {
   // PMD.OnlyOneReturn: two real, distinct outcomes — a username conflict re-renders the form with
   // an error, success redirects plainly — same rationale PlatformAccountProfileAdminController's
   // own identical suppression documents.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
+  @SuppressWarnings({"java:S107"})
   @PostMapping
   public String updateProfile(
       @PathVariable final UUID organizationId,
@@ -183,10 +179,6 @@ public class AccountProfileController {
     }
   }
 
-  // PMD.OnlyOneReturn: two real, distinct outcomes — a validation error re-renders the form,
-  // success redirects — same "each outcome needs its own exit" rationale
-  // SetRateLimitPolicyController's own identical suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/picture")
   public String uploadPicture(
       @PathVariable final UUID organizationId,
@@ -213,10 +205,6 @@ public class AccountProfileController {
     return redirectToProfile(request, organizationId, "removed");
   }
 
-  // PMD.OnlyOneReturn: two real, distinct outcomes — not allowed re-renders with an error, success
-  // ends the session and redirects to login — same rationale this class's own uploadPicture
-  // suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/delete")
   public String delete(
       @PathVariable final UUID organizationId,

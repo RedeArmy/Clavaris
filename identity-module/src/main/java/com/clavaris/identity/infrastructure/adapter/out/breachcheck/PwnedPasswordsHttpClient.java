@@ -23,9 +23,6 @@ import java.util.List;
  * don't pay the full timeout again on every request" reasoning {@code ResendHttpClient}'s own
  * Javadoc documents — on the hot path of every registration/password-change, not a background job.
  */
-// PMD.LongVariable: FIRST_ERROR_STATUS names exactly what it is — same precedent ResendHttpClient's
-// own identical constant/suppression already documents.
-@SuppressWarnings("PMD.LongVariable")
 class PwnedPasswordsHttpClient {
 
   private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);

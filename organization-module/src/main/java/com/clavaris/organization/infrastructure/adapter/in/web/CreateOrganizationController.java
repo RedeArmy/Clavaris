@@ -34,7 +34,6 @@ class CreateOrganizationController {
   // Two exits (404 on a bogus ownerPlatformAccountId, 201 on success) is clearer here than forcing
   // a single-return shape onto two genuinely different outcomes — same rationale as
   // RegisterOAuthClientController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Create a new Organization (tenant isolation boundary, ADR-0010)")
   @ApiResponse(
       responseCode = "201",

@@ -30,9 +30,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * matching pending state bounces back to ordinary login" posture as {@link
  * DeviceTrustChallengeController}, which this class otherwise mirrors closely.
  */
-// PMD.LongVariable: redirectUrlResolver matches its own port type name, not arbitrarily long —
-// same precedent DeviceTrustChallengeController's own identical suppression documents.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/o/{organizationId}/login/session-task/password-reset")
 public class SessionTaskChallengeController {
@@ -60,7 +57,6 @@ public class SessionTaskChallengeController {
 
   // Two genuinely distinct exits (no pending task / render the form) — same rationale as
   // DeviceTrustChallengeController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showForm(
       @PathVariable final UUID organizationId,
@@ -76,7 +72,6 @@ public class SessionTaskChallengeController {
   // Four genuinely distinct exits (no pending task / validation error / mismatch / weak password)
   // — same "each outcome needs its own exit" rationale as ResetPasswordController's own identical
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String confirm(
       @PathVariable final UUID organizationId,
@@ -152,7 +147,6 @@ public class SessionTaskChallengeController {
 
   // Two genuinely distinct outcomes (a pending task for this exact Organization / none at all) —
   // same rationale as DeviceTrustChallengeController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private Optional<AccountId> pendingAccountId(
       final HttpServletRequest request, final UUID organizationId) {
     final HttpSession session = request.getSession(false);

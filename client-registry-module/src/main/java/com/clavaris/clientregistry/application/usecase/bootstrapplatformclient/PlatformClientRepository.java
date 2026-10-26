@@ -23,7 +23,6 @@ public interface PlatformClientRepository {
   // UnsupportedOperationException the moment authorization state actually persists.
   // "id", not "clientId" — this looks up the entity's own primary key, matching
   // RegisteredClientRepository.findById's own parameter naming (the SPI this ultimately serves).
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<PlatformClient> findById(UUID id);
 
   void save(PlatformClient platformClient);

@@ -59,12 +59,8 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdempotencyKeyFilter.class);
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
-  // Deduplicated once here (PMD.AvoidDuplicateLiterals) — every branch of the outcome switch
-  // below emits the same metric name with a different "outcome" tag value.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String IDEMPOTENCY_DECISION_METRIC = "clavaris.idempotency.decision";
 
   private static final String OUTCOME_TAG = "outcome";
@@ -86,11 +82,6 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
     this.metrics = metrics;
   }
 
-  // PMD.OnlyOneReturn: five genuinely distinct outcomes (no header/not POST passthrough, no
-  // authenticated client passthrough, in-progress, conflict, replay, claimed-then-proceed), each
-  // with its own exit — same "each outcome needs its own exit" rationale as
-  // RecordAccountLoginDeviceService's own identical suppression elsewhere in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   protected void doFilterInternal(
       final HttpServletRequest request,
@@ -202,10 +193,6 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
     }
   }
 
-  // PMD.LawOfDemeter: response.getOutputStream() is the standard Servlet API shape for writing a
-  // body directly from a filter — same rationale AntiAbuseRateLimitingFilter's own identical
-  // suppression documents for response.getWriter().
-  @SuppressWarnings("PMD.LawOfDemeter")
   private void replay(final HttpServletResponse response, final IdempotentResponse cached)
       throws IOException {
     response.setStatus(cached.status());
@@ -217,7 +204,6 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
     }
   }
 
-  @SuppressWarnings("PMD.LawOfDemeter") // same rationale as replay's own identical suppression.
   private void writeErrorResponse(
       final HttpServletResponse response,
       final HttpStatus status,

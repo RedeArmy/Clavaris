@@ -32,6 +32,5 @@ public interface OAuthClientProvisioner {
    * own response. PMD's ShortVariable rule flags {@code id} for the same record-style-accessor
    * reason {@code Account} suppresses it elsewhere in this codebase.
    */
-  @SuppressWarnings("PMD.ShortVariable")
   record ProvisionedOAuthClient(UUID id, String clientId) {}
 }

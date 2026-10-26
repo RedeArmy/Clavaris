@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
  * OrganizationScopedJwkSource}/the real JWKS endpoint itself reads) — no new key-material
  * machinery, only a PEM-encoded surfacing of the public half of what already exists.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class OrganizationSigningKeyPublicKeyProviderBridge
     implements OrganizationSigningKeyPublicKeyProvider {

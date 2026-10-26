@@ -45,7 +45,6 @@ public class RequestEmailSignInCodeService implements RequestEmailSignInCodeUseC
     this.policyProvider = policyProvider;
   }
 
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
   @Override
   public void handle(final RequestEmailSignInCodeCommand command) {
     if (!policyProvider.policyFor(command.organizationId()).emailCodeSignInEnabled()) {

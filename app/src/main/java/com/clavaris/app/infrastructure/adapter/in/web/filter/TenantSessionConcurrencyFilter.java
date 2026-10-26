@@ -47,7 +47,6 @@ public final class TenantSessionConcurrencyFilter extends OncePerRequestFilter {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final List<String> MACHINE_ENDPOINT_PATTERNS =
       List.of(
           "/o/*/oauth2/token",

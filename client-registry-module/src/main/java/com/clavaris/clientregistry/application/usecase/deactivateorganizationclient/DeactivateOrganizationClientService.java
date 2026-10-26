@@ -7,7 +7,6 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Same rationale as {@code deactivateplatformclient.DeactivatePlatformClientService}. */
-@SuppressWarnings("PMD.LongVariable")
 public class DeactivateOrganizationClientService implements DeactivateOrganizationClientUseCase {
 
   private final OrganizationClientRepository organizationClients;

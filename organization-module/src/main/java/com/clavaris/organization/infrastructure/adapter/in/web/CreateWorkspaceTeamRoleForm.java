@@ -20,10 +20,6 @@ import java.util.UUID;
  * in one submit; when absent, only the first — {@link PlatformWorkspaceController#createRole} is
  * where that composition (or lack of it) actually happens.
  */
-// PMD.DataClass: a plain web-layer form bean is *supposed* to be just fields + getters/setters —
-// same "expected here, not a smell to fix" rationale WorkspaceRoleForm's own identical suppression
-// documents.
-@SuppressWarnings("PMD.DataClass")
 public class CreateWorkspaceTeamRoleForm {
 
   @NotBlank(message = "Name is required")

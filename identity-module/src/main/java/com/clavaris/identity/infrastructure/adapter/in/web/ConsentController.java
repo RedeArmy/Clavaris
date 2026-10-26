@@ -47,10 +47,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * auto-grants it once anything else is approved) — a client requesting only {@code openid} has
  * nothing to actually show here.
  */
-// PMD.LongVariable: organizationForClient/clientBrandingProvider (field + constructor param each)
-// are long by design, not accidentally — same class-level-suppression precedent as
-// LoginController's own identical rationale.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/oauth2/consent")
 public class ConsentController {
@@ -77,7 +73,6 @@ public class ConsentController {
 
   // Two independent exits (unresolvable client_id / a resolved render) — same rationale as every
   // other early-return chain in this codebase (e.g. RedirectUrlResolverBridge's own suppression).
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showConsent(
       // OAuth2's own spec parameter name (snake_case) — SAS's own sendAuthorizationConsent()
@@ -119,7 +114,6 @@ public class ConsentController {
 
   // "Blank scope"/"resolved list" are two independent, equally valid exits — same rationale as
   // every other early-return chain in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static List<String> requestedScopesExcludingOpenid(final String scope) {
     if (scope == null || scope.isBlank()) {
       return List.of();

@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
  * separate, module-owned mapping rather than a dependency on
  * identity-module's/organization-module's own outbox entity types.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Repository
 class JpaOutboxEventReader implements OutboxEventReader {
 

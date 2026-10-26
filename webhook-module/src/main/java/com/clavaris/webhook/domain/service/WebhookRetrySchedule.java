@@ -11,7 +11,6 @@ import java.time.Duration;
  * is supplied by the caller (typically {@code ThreadLocalRandom}) rather than this class rolling
  * its own randomness, so the math itself stays deterministic and trivially testable.
  */
-@SuppressWarnings("PMD.LongVariable")
 public final class WebhookRetrySchedule {
 
   // 30s doubling — attempt 1 waits 30s, attempt 2 waits 1m, ... same order of magnitude as ADR-0007

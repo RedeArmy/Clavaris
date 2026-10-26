@@ -31,7 +31,6 @@ class ReplayWebhookDeliveryController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Manually re-trigger one past WebhookDelivery (BR-WEBHOOK-03)")
   @ApiResponse(responseCode = "200", description = "Reset to PENDING, due immediately")
   @ApiResponse(responseCode = "404", description = "No WebhookDelivery exists with this id")

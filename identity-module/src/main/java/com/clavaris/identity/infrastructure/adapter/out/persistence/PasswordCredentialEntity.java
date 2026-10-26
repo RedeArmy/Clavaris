@@ -11,7 +11,6 @@ import java.util.UUID;
  * {@link AbstractPasswordCredentialEntity} — only {@code account_id} is declared here (TD-ARCH-009,
  * closed 2026-08-31).
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "password_credentials")
 public class PasswordCredentialEntity extends AbstractPasswordCredentialEntity {

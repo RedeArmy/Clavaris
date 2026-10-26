@@ -27,7 +27,6 @@ public class ActivatePlatformSigningKeyService implements ActivatePlatformSignin
 
   @Override
   @Transactional
-  @SuppressWarnings("PMD.OnlyOneReturn") // early-return no-op path reads clearer than nesting
   public PlatformSigningKey handle(final String kid, final String algorithm) {
     final Optional<PlatformSigningKey> currentlyActive = repository.findActive();
     if (currentlyActive.isPresent() && currentlyActive.get().kid().equals(kid)) {

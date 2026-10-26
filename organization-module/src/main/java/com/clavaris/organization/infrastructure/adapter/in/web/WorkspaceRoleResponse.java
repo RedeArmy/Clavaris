@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
-@SuppressWarnings("PMD.ShortVariable")
 public record WorkspaceRoleResponse(
     UUID id,
     UUID organizationId,

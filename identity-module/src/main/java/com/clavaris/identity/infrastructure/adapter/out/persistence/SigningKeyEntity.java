@@ -11,7 +11,6 @@ import java.util.UUID;
  * columns live on {@link AbstractSigningKeyEntity} — only {@code organization_id} is declared here
  * (TD-ARCH-009, closed 2026-08-31).
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "signing_keys")
 public class SigningKeyEntity extends AbstractSigningKeyEntity {

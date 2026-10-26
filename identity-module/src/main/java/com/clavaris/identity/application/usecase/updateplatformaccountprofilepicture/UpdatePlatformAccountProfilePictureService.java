@@ -13,7 +13,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * same shape, same "validate, upload outside any transaction, then persist + audit inside one"
  * discipline, see that class's own Javadoc for the full rationale.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class UpdatePlatformAccountProfilePictureService
     implements UpdatePlatformAccountProfilePictureUseCase {
 

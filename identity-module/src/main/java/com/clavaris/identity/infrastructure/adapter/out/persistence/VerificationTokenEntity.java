@@ -16,7 +16,6 @@ import java.util.UUID;
  * declared here (TD-ARCH-009, closed 2026-08-31), same split {@link PendingSocialLinkEntity}
  * already establishes against its own {@link AbstractPendingSocialLinkEntity}.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "verification_tokens")
 public class VerificationTokenEntity extends AbstractVerificationTokenEntity {

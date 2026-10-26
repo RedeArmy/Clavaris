@@ -45,7 +45,6 @@ public final class LocalizedDateFormatter {
     return format(instant, AppLocales.current());
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public static String format(final Instant instant, final Locale locale) {
     if (instant == null) {
       return null;
@@ -92,7 +91,6 @@ public final class LocalizedDateFormatter {
 
   // 11th/12th/13th are the one irregular case (the last-digit rule would read
   // "11st"/"12nd"/"13rd").
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String ordinalSuffix(final int day) {
     if (day >= IRREGULAR_FROM && day <= IRREGULAR_TO) {
       return "th";

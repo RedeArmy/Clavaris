@@ -30,7 +30,9 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 // PMD.AtLeastOneConstructor: no state, only two stateless handlers. PMD.LongVariable: the attribute
 // name says what it holds.
-@SuppressWarnings({"PMD.AtLeastOneConstructor", "PMD.LongVariable"})
+@SuppressWarnings({
+  "PMD.AtLeastOneConstructor",
+})
 @Controller
 @RequestMapping("/o/{organizationId}/logout")
 public class RpInitiatedLogoutController {
@@ -40,8 +42,6 @@ public class RpInitiatedLogoutController {
 
   private static final SecureRandom RANDOM = new SecureRandom();
 
-  // PMD.LongVariable: the post_logout_redirect_uri parameter name is the spec's own.
-  @SuppressWarnings("PMD.LongVariable")
   @GetMapping("/confirm")
   public String confirm(
       @PathVariable final UUID organizationId,

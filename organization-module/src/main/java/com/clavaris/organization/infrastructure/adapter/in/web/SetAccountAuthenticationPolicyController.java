@@ -39,7 +39,6 @@ class SetAccountAuthenticationPolicyController {
 
   // Three exits (404 on a bogus organizationId, 400 on an invalid policy combination, 200 on
   // success) — same rationale as SetSocialLoginPolicyController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an Organization's sign-up/sign-in options policy (ADR-0024)")
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(

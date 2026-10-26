@@ -40,7 +40,6 @@ public class RequestEmailSignInLinkService implements RequestEmailSignInLinkUseC
     this.policyProvider = policyProvider;
   }
 
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
   @Override
   public void handle(final RequestEmailSignInLinkCommand command) {
     if (!policyProvider.policyFor(command.organizationId()).emailLinkSignInEnabled()) {

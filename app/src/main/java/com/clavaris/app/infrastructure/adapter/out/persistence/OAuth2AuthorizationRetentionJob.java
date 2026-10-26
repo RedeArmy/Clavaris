@@ -44,11 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
  * — there is no dispatcher-lag reason to hold onto it, only a short buffer against clock skew
  * between this instance and Postgres.
  */
-// PMD.LongVariable: DELETE_EXPIRED_SQL/retentionGraceDays both name exactly what they are — a
-// shortened identifier would only make this class harder to read, same convention every other
-// descriptively-named port/constant in this codebase follows (e.g. PlatformScopes' own class-wide
-// suppression for the identical reason).
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class OAuth2AuthorizationRetentionJob {
 

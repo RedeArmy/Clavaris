@@ -11,7 +11,6 @@ import java.util.UUID;
  * PasswordCredentialEntity}. Shared columns live on {@link AbstractPasswordCredentialEntity}
  * (TD-ARCH-009, closed 2026-08-31) — only {@code platform_account_id} is declared here.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "platform_password_credentials")
 public class PlatformPasswordCredentialEntity extends AbstractPasswordCredentialEntity {

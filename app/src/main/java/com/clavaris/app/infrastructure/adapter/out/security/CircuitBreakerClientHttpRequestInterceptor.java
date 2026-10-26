@@ -32,10 +32,6 @@ import org.springframework.http.client.ClientHttpResponse;
  * TD-FUT-022) is automatically its own isolated breaker the first time this interceptor ever sees a
  * request to its host, no code change needed here.
  */
-// PMD.LongVariable: circuitBreakersByHost/circuitBreakerConfig name exactly what they are — same
-// "deliberate, descriptive name over an arbitrary shortening" convention this codebase applies
-// everywhere else this rule fires (e.g. RedisFixedWindowRateLimiter's own identical suppression).
-@SuppressWarnings("PMD.LongVariable")
 public final class CircuitBreakerClientHttpRequestInterceptor
     implements ClientHttpRequestInterceptor {
 
@@ -56,7 +52,9 @@ public final class CircuitBreakerClientHttpRequestInterceptor
   // PMD.LawOfDemeter: request.getURI() is the standard ClientHttpRequestInterceptor API shape for
   // reading the target host — there is no other way to reach it, same rationale
   // AntiAbuseRateLimitingFilter's own response.getWriter() suppression already documents.
-  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.LawOfDemeter"})
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException",
+  })
   @Override
   public ClientHttpResponse intercept(
       final HttpRequest request, final byte[] body, final ClientHttpRequestExecution execution)

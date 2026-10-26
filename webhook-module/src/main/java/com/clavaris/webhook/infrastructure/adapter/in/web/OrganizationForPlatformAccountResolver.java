@@ -12,6 +12,5 @@ import java.util.UUID;
 @FunctionalInterface
 public interface OrganizationForPlatformAccountResolver {
 
-  @SuppressWarnings("PMD.LongVariable")
   Optional<String> resolveName(UUID organizationId, UUID ownerPlatformAccountId);
 }

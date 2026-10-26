@@ -12,7 +12,6 @@ import java.util.UUID;
  * AbstractVerificationTokenEntity} (TD-ARCH-009, closed 2026-08-31) — only {@code
  * platform_account_id} is declared here.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "platform_verification_tokens")
 public class PlatformVerificationTokenEntity extends AbstractVerificationTokenEntity {

@@ -16,6 +16,5 @@ import java.util.UUID;
  * Validation entirely and only failed at the DB as an unhandled {@code
  * DataIntegrityViolationException} (a raw 500).
  */
-@SuppressWarnings("PMD.LongVariable")
 public record CreateOrganizationRequest(
     @NotBlank @Size(max = 255) String name, @NotNull UUID ownerPlatformAccountId) {}

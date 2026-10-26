@@ -22,7 +22,7 @@ import java.util.UUID;
  * {@link AbstractVerificationTokenEntity}'s own identical suppression.
  */
 @MappedSuperclass
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class AbstractKnownDeviceEntity {
 
   @Id protected UUID id;

@@ -17,12 +17,6 @@ import java.util.UUID;
  * PMD.DataClass: deliberately nothing but an immutable link — same rationale {@link
  * SocialIdentity}'s own identical suppression documents.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.DataClass",
-  "PMD.ShortMethodName"
-})
 public final class PlatformSocialIdentity {
 
   private final UUID id;

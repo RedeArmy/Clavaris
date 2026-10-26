@@ -4,9 +4,6 @@ import com.clavaris.clientregistry.domain.model.RedirectPolicy;
 import java.time.Instant;
 import java.util.UUID;
 
-// PMD.LongVariable: same OAuthClient/RedirectPolicy precedent — these names match Clerk's own
-// equivalent concept, not arbitrarily long.
-@SuppressWarnings("PMD.LongVariable")
 public record SetRedirectPolicyResponse(
     UUID oauthClientId,
     String fallbackSignInRedirectUrl,

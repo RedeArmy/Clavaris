@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * hardcoding one. Same {@link PlatformAccountOrganizationAccess} organization-ownership prologue
  * every sibling {@code .../users/{accountId}/**} controller already shares.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountSessionsAdminController {

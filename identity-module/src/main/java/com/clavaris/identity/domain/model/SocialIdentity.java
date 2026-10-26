@@ -23,12 +23,6 @@ import java.util.UUID;
  * VerificationToken}'s own {@code consume()}/{@code isActive()} — a social link, once made, has no
  * further lifecycle in v1), not a class that should grow behavior to satisfy the metric.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.DataClass"
-})
 public final class SocialIdentity {
 
   private final UUID id;

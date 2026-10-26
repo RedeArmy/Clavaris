@@ -50,10 +50,6 @@ import org.springframework.web.server.ResponseStatusException;
  * DEVELOPMENT/PRODUCTION pair's own FK-violation risk; orphaned webhook-module data) are fixed
  * there directly, not worked around here — see that class's own Javadoc.
  */
-// PMD.LongVariable: deleteOrganization/currentPlatformAccount/ownerPlatformAccountId/
-// CONFIRMATION_TOKEN_PARAM are long by design, not accidentally — same class-level-suppression
-// precedent PlatformOrganizationDetailController's own identical rationale documents.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/delete")
 public class PlatformDeleteOrganizationController {
@@ -86,9 +82,6 @@ public class PlatformDeleteOrganizationController {
     return CONFIRM_VIEW;
   }
 
-  // PMD.OnlyOneReturn: token-invalid/name-mismatch/success each need their own exit, same
-  // rationale as every other multi-outcome handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String delete(
       final HttpServletRequest request,

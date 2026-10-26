@@ -55,7 +55,6 @@ import org.springframework.web.server.ResponseStatusException;
  * in JWKS regardless) — unlike Secret Keys/OAuth Client secrets, a successful rotation follows this
  * codebase's normal "success redirects, HTMX gets a fragment" convention, no exception needed.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/signing-keys")
 public class PlatformSigningKeyController {
@@ -100,7 +99,6 @@ public class PlatformSigningKeyController {
 
   // Two exits (HTMX fragment vs. plain redirect) — same rationale as every other dashboard
   // controller's own identical "after a mutation succeeds" suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/rotate")
   public String rotate(
       final HttpServletRequest request,

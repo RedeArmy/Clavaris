@@ -34,12 +34,7 @@ import java.util.UUID;
 // ShortVariable), and ten one-line accessors plus the transitions exceed TooManyMethods. The two
 // fields whose accessors carry the long ADR-0009 §2 names are stored as {@code status} and {@code
 // challengeToken}, so LongVariable is no longer suppressed.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class ClientDomainConfig {
 
   // RFC 1035-shaped hostname validation itself lives in HostnameValidator, not here — see that
@@ -246,7 +241,6 @@ public final class ClientDomainConfig {
   // Two exits (null passes through unchecked for the unconfigured/SHARED state, a real value is
   // validated) is clearer here than forcing a single-return shape onto "absent" vs. "present" —
   // same rationale RedirectPolicy's own validateIfPresent suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String validateHostnameIfPresent(final String hostname) {
     if (hostname == null) {
       return null;
@@ -259,7 +253,6 @@ public final class ClientDomainConfig {
 
   // Two exits (null passes through unchecked — no embedding, standalone-only — a real value is
   // validated) — same rationale validateHostnameIfPresent's own suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String validateEmbeddingOriginIfPresent(final String embeddingOrigin) {
     if (embeddingOrigin == null) {
       return null;

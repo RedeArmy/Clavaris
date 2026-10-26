@@ -4,7 +4,6 @@ import com.clavaris.organization.domain.model.SessionPolicy;
 import java.time.Instant;
 import java.util.UUID;
 
-@SuppressWarnings("PMD.LongVariable")
 public record SetSessionPolicyResponse(
     UUID organizationId,
     int maximumLifetimeMinutes,

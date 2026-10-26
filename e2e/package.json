@@ -1,0 +1,11 @@
+{
+  "name": "clavaris-e2e",
+  "private": true,
+  "description": "Browser-level tests (TD-TEST-008): the hosted pages' scripts and styles running in a real browser under the real Content-Security-Policy. Kept apart from app/package.json, which deliberately has zero dependencies.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

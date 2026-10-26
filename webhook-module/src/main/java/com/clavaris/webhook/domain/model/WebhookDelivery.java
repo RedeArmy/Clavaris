@@ -20,12 +20,7 @@ import java.util.UUID;
  * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
-  "PMD.DataClass",
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.TooManyMethods",
-  "PMD.LongVariable"
 })
 public final class WebhookDelivery {
 

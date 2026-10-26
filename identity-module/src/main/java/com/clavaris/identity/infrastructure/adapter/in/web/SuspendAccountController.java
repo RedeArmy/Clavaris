@@ -31,7 +31,6 @@ class SuspendAccountController {
 
   // Two exits (404 on an unknown id, 204 on success) — same rationale as DeleteAccountController's
   // own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Reversibly suspend/ban an Account")
   @ApiResponse(responseCode = "204", description = "Suspended — future logins rejected immediately")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")

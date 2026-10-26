@@ -1,7 +1,9 @@
 package com.clavaris.identity.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import com.clavaris.common.domain.model.KeysetPage;
@@ -10,6 +12,7 @@ import com.clavaris.identity.application.usecase.registeraccount.AccountReposito
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.AccountStatus;
+import com.clavaris.identity.domain.model.ConcurrentAccountModificationException;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.Username;
@@ -620,5 +623,57 @@ class JpaAccountRepositoryTest {
         .hasValueSatisfying(
             stored ->
                 assertThat(stored).isCloseTo(originalVerification, within(1, ChronoUnit.MILLIS)));
+  }
+
+  // TD-ARCH-037: the second of two writers that loaded the same account is refused, not merged.
+  @Test
+  void aSaveFromACopyLoadedBeforeAnotherWritersSaveIsRefused() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account created = Account.register(organizationId, new Email("lock@example.com"));
+    created.attachPasswordCredential("argon2id$stored-hash");
+    repository.save(created);
+    Account first = repository.findById(created.id()).orElseThrow();
+    Account second = repository.findById(created.id()).orElseThrow();
+    first.suspend();
+    repository.save(first);
+
+    second.updateProfile("Late", "Writer");
+
+    assertThatThrownBy(() -> repository.save(second))
+        .isInstanceOf(ConcurrentAccountModificationException.class);
+    assertThat(repository.findById(created.id()).orElseThrow().status())
+        .as("the first writer's suspension is intact")
+        .isEqualTo(AccountStatus.SUSPENDED);
+  }
+
+  @Test
+  void savingTheSameAggregateTwiceInOneFlowCarriesItsOwnNewVersion() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account account = Account.register(organizationId, new Email("twice@example.com"));
+    account.attachPasswordCredential("argon2id$stored-hash");
+    repository.save(account);
+
+    account.updateProfile("Ada", "Lovelace");
+    repository.save(account);
+    account.updatePhoneNumber("+502 5555-0100");
+    repository.save(account);
+
+    Account stored = repository.findById(account.id()).orElseThrow();
+    assertThat(stored.firstName()).contains("Ada");
+    assertThat(stored.phoneNumber()).contains("+502 5555-0100");
+  }
+
+  @Test
+  void aNarrowSignInWriteDoesNotInvalidateAnotherWritersLoadedCopy() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account created = Account.register(organizationId, new Email("signin@example.com"));
+    created.attachPasswordCredential("argon2id$stored-hash");
+    repository.save(created);
+    Account operator = repository.findById(created.id()).orElseThrow();
+
+    repository.recordSignIn(created.id(), java.time.Instant.now());
+    operator.updateProfile("Still", "Works");
+
+    assertThatCode(() -> repository.save(operator)).doesNotThrowAnyException();
   }
 }

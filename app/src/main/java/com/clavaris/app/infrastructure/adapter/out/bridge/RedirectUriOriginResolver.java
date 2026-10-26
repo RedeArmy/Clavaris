@@ -39,6 +39,5 @@ public interface RedirectUriOriginResolver {
    *     registered {@code redirectUris} resolve to, or an empty list if this client is unknown,
    *     belongs to a different Organization than expected, or has no {@code clientId} at all
    */
-  @SuppressWarnings("PMD.LongVariable")
   List<String> resolveAllowedFormActionOrigins(String clientId, UUID expectedOrganizationId);
 }

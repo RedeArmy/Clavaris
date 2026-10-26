@@ -37,14 +37,9 @@ import java.util.UUID;
 // null" is reused across every Objects.requireNonNull guard in the private constructor, same
 // false positive every other multi-field domain aggregate's constructor already triggers.
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.TooManyMethods",
-  "PMD.DataClass",
   "PMD.LongVariable",
   "PMD.ExcessiveParameterList",
-  "PMD.AvoidDuplicateLiterals"
 })
 public final class AccountAuthenticationPolicy {
 

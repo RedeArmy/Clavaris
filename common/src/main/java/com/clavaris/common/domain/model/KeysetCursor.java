@@ -26,9 +26,6 @@ import java.util.UUID;
  * documented for an equivalent case; this class simply lets {@link IllegalArgumentException}/{@link
  * java.time.format.DateTimeParseException} propagate.
  */
-@SuppressWarnings("PMD.ShortVariable") // id — same name every domain entity in this codebase
-// exposes its own identity through (Organization#id, Workspace#id, ...); this cursor just carries
-// the same one, not a fresh name for it.
 public record KeysetCursor(Instant createdAt, UUID id) {
 
   private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();

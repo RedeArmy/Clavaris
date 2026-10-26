@@ -12,7 +12,6 @@ import java.util.UUID;
  * PlatformClientEntity} via {@link AbstractClientCredentialEntity}; {@code organizationId} is this
  * credential's own addition on top of that shared shape.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "organization_clients")
 public class OrganizationClientEntity extends AbstractClientCredentialEntity {

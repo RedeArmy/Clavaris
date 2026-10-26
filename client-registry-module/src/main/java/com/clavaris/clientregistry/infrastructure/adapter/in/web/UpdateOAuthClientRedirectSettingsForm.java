@@ -16,9 +16,6 @@ import java.util.List;
  * PlatformOAuthClientController}'s own {@code add}/{@code remove} endpoints mutate this same list
  * in memory and re-render, never touching the domain until the form's own real "Save" submit does.
  */
-// PMD.LongVariable: postLogoutRedirectUris is the exact OIDC spec term, same precedent as
-// OAuthClient's own identical suppression.
-@SuppressWarnings("PMD.LongVariable")
 public class UpdateOAuthClientRedirectSettingsForm {
 
   private List<String> redirectUris = new ArrayList<>();

@@ -11,7 +11,6 @@ import java.util.UUID;
  * "shown once" convention as {@code RegisterOAuthClientResponse}. {@code toString()} overridden for
  * the same defensive reason.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public record CreateOrganizationClientResponse(
     UUID id,
     UUID organizationId,

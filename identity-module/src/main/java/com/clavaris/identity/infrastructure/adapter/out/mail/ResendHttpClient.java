@@ -39,7 +39,6 @@ final class ResendHttpClient {
 
   // Resend's API never redirects on a real request — treating 3xx as failure too, not just 4xx/5xx,
   // is deliberate: a redirect here means something is misconfigured (wrong host/path), not success.
-  @SuppressWarnings("PMD.LongVariable")
   private static final int FIRST_ERROR_STATUS = 300;
 
   // A display name longer than this is cut: mail clients truncate it anyway, and an Organization's

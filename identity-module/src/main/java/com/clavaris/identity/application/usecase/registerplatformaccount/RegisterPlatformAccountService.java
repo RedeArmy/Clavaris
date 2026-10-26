@@ -26,21 +26,17 @@ public class RegisterPlatformAccountService implements RegisterPlatformAccountUs
   private final PlatformAccountRepository accounts;
   private final PasswordHasher hasher;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
-  // RegisterAccountService's own identical field for the tenant-tier equivalent.
   private final BreachedPasswordChecker breachedPasswordChecker;
 
   public RegisterPlatformAccountService(
       final PlatformAccountRepository accounts,
       final PasswordHasher hasher,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker) {
     this.accounts = accounts;
     this.hasher = hasher;
     this.breachedPasswordChecker = breachedPasswordChecker;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement") // same false-positive rationale as
-  // AuthenticateWithPasswordService's own identical suppression.
   @Override
   @Transactional
   public PlatformAccountId handle(final RegisterPlatformAccountCommand command) {

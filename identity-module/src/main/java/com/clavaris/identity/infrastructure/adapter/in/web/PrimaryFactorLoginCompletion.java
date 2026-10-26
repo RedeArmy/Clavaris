@@ -41,7 +41,7 @@ import java.util.UUID;
   // factor, clientId, redirectUrl) that vary per invocation. Same "flat parameter list over a
   // synthetic wrapper that would only hide the real count" precedent OAuthClient's own rehydration
   // factories already establish for this codebase.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"}) // three genuinely distinct exits
+  @SuppressWarnings({"java:S107"}) // three genuinely distinct exits
   // (device-trust challenge, session-task pause, final redirect) — same "one exit per distinct
   // outcome" rationale the two controllers this replaces already documented for their own
   // identical block.

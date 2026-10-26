@@ -18,7 +18,7 @@ import jakarta.validation.constraints.Size;
  * abstractness here is "never instantiate this on its own," not "force subclasses to implement
  * something").
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class EmailPasswordForm {
 
   @NotBlank(message = "Email is required")

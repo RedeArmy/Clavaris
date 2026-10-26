@@ -27,8 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Only what actually changed is written, and each change is audited on its own, never with the
  * secret.
  */
-// PMD.LongVariable: collaborator names match their own types, as in the sibling services.
-@SuppressWarnings("PMD.LongVariable")
 public class SaveSocialConnectionService implements SaveSocialConnectionUseCase {
 
   private static final String ORGANIZATION_ENTITY = "Organization";

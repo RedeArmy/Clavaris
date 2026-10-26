@@ -11,7 +11,7 @@ import jakarta.validation.constraints.Size;
  * rationale as {@code EmailPasswordConfirmationForm} — see its own Javadoc, same
  * PMD.AbstractClassWithoutAbstractMethod suppression rationale too.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class NewPasswordConfirmationForm {
 
   @NotBlank(message = "Password is required")

@@ -73,8 +73,6 @@ public record KeysetPageRequest(KeysetCursor after, KeysetCursor before, int siz
   }
 
   /** ADR-0029: same decode logic as the two-arg overload, with an explicit page size. */
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — same rationale as every
-  // other short-circuiting lookup in this codebase.
   public static KeysetPageRequest fromCursors(
       final String after, final String before, final int size) {
     if (after != null && !after.isBlank()) {

@@ -7,7 +7,6 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Mirror of {@code DeactivateOrganizationClientService}; the secret is left exactly as it was. */
-@SuppressWarnings("PMD.LongVariable")
 public class ActivateOrganizationClientService implements ActivateOrganizationClientUseCase {
 
   private final OrganizationClientRepository organizationClients;

@@ -15,7 +15,7 @@ import java.util.UUID;
  * OAuthClientEntity}'s own {@code allowedScopes} column already establishes; this class never
  * parses it itself.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
+@SuppressWarnings({"PMD.LongVariable"})
 @Entity
 @Table(name = "organizations")
 public class OrganizationEntity {

@@ -40,7 +40,9 @@ import java.util.UUID;
  * itself, so this metric's usual "give it real methods" fix would be the wrong move here.
  */
 @MappedSuperclass
-@SuppressWarnings({"PMD.ShortVariable", "PMD.AbstractClassWithoutAbstractMethod", "PMD.DataClass"})
+@SuppressWarnings({
+  "PMD.AbstractClassWithoutAbstractMethod",
+})
 public abstract class AbstractEventOutboxEntity {
 
   @Id protected UUID id;

@@ -42,7 +42,9 @@ import com.clavaris.identity.domain.service.PasswordPolicy;
 // RegisterAccountService's own identical suppression already documents. PMD.OnlyOneReturn:
 // validateUsername's "no username submitted"/"resolved" exits are two independent, equally valid
 // outcomes, same rationale as every other early-return chain in this codebase.
-@SuppressWarnings({"PMD.LongVariable", "PMD.CyclomaticComplexity", "PMD.OnlyOneReturn"})
+@SuppressWarnings({
+  "PMD.CyclomaticComplexity",
+})
 public class AdminCreateAccountForOrganizationService
     implements AdminCreateAccountForOrganizationUseCase {
 

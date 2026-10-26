@@ -13,11 +13,6 @@ import java.util.UUID;
  * deliberate convention this codebase's domain models use throughout, not an accidental data-holder
  * shape.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
 public final class Workspace {
 
   // Matches the workspaces.name column (varchar(255), V20260827__create_workspaces_table

@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code refresh_tokens} (data-model.md §2, BR-ID-03). */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "refresh_tokens")
 public class RefreshTokenEntity {

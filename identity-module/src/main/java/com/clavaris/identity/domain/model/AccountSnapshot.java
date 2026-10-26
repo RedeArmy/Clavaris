@@ -11,10 +11,10 @@ import java.time.Instant;
  * <p>{@code passwordCredential} and {@code username} may be {@code null} (a social-only account,
  * ADR-0020; a username never assigned, ADR-0024 §4) — BR-ID-02 still guarantees at least one
  * authentication method exists. The grouped components are never {@code null}: use their {@code
- * EMPTY}/{@code DEFAULT}/{@code NONE} constants.
+ * EMPTY}/{@code DEFAULT}/{@code NONE} constants. {@code version} is the optimistic-lock value the
+ * row was read at (0 for an account never persisted); see {@link
+ * ConcurrentAccountModificationException}.
  */
-// PMD.LongVariable/ShortVariable: the component names are the Account accessors they back.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
 public record AccountSnapshot(
     AccountId id,
     OrganizationId organizationId,
@@ -29,4 +29,5 @@ public record AccountSnapshot(
     AccountProfile profile,
     AccountPermissions permissions,
     RegistrationDecision registration,
-    AccountMetadata metadata) {}
+    AccountMetadata metadata,
+    int version) {}

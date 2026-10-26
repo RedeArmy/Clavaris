@@ -99,7 +99,6 @@ import org.springframework.web.server.ResponseStatusException;
 // — same "these are code, not runtime config" reasoning PlatformWorkspaceController's own
 // identical suppression (WORKSPACES_PATH_SEGMENT) already documents.
 @SuppressWarnings({
-  "PMD.LongVariable",
   "PMD.ExcessiveImports",
   "PMD.TooManyMethods",
   "PMD.CouplingBetweenObjects",
@@ -246,7 +245,6 @@ public class PlatformWorkspaceRoleController {
     return CREATE_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,
@@ -314,7 +312,7 @@ public class PlatformWorkspaceRoleController {
   // java:S107: one parameter per real, distinct input this handler genuinely needs (request
   // context, path/form/binding, and now workspaceId for the Back button's own return target) —
   // same "wiring, not sprawl" posture this class's own constructor already documents.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107"})
+  @SuppressWarnings({"java:S107"})
   @PostMapping("/{roleId}")
   public String update(
       final HttpServletRequest request,
@@ -369,7 +367,6 @@ public class PlatformWorkspaceRoleController {
     return redirectToDetail(organizationId, updated.id());
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{roleId}/delete")
   public String delete(
       final HttpServletRequest request,

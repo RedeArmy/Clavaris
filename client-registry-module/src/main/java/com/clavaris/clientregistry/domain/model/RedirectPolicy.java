@@ -28,13 +28,7 @@ import java.util.UUID;
 // sites harder to read, same reasoning OAuthClient's own postLogoutRedirectUris suppression
 // documents. TooManyMethods: eight one-line accessors plus three rehydration/update factories is
 // what a value object with this many fields looks like, same OAuthClient precedent.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class RedirectPolicy {
 
   // PMD.AvoidDuplicateLiterals: this exact suppression string is applied on four separate
@@ -152,10 +146,6 @@ public final class RedirectPolicy {
         updatedAt);
   }
 
-  // Two exits (null passes through unchecked, a real value is validated) is clearer here than
-  // forcing a single-return shape onto "absent" vs. "present" — same rationale OAuthClient's own
-  // OnlyOneReturn suppressions document elsewhere in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String validateIfPresent(final String url, final String fieldName) {
     if (url == null) {
       return null;

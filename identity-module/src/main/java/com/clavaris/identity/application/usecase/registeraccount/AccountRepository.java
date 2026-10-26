@@ -89,6 +89,11 @@ public interface AccountRepository {
    * path in the system (every login). Only {@code ConfirmPasswordResetService} and {@code
    * CompleteForcedPasswordResetService} genuinely mutate the credential — they alone now also call
    * {@link #saveCredential}.
+   *
+   * <p>TD-ARCH-037: optimistic. If another writer saved this account after the caller loaded it,
+   * this throws {@link com.clavaris.identity.domain.model.ConcurrentAccountModificationException}
+   * instead of overwriting their change; the caller should reload and retry. On success the
+   * aggregate carries the new version, so saving it again in the same flow is safe.
    */
   void save(Account account);
 

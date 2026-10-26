@@ -12,7 +12,6 @@ import java.util.UUID;
  * use cases — same "one port, several importing use cases" precedent {@code
  * registeroauthclient.OAuthClientRepository} already establishes in client-registry-module.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
 public interface AccessRestrictionEntryRepository {
 
   boolean existsByOrganizationIdAndIdentifier(UUID organizationId, String normalizedIdentifier);

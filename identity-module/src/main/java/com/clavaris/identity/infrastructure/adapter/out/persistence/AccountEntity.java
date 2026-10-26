@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -21,7 +22,7 @@ import java.util.UUID;
 // PMD.TooManyFields: TD-FUT-019's own 2 new nullable columns pushed this past the default
 // threshold — same "a JPA entity is supposed to be a plain persistence-mapping data holder"
 // rationale this class's own Javadoc already documents for PMD.DataClass.
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable", "PMD.TooManyFields"})
+@SuppressWarnings({"PMD.TooManyFields"})
 @Entity
 @Table(name = "accounts")
 public class AccountEntity {
@@ -100,6 +101,13 @@ public class AccountEntity {
   @Column(name = "unsafe_metadata")
   private String unsafeMetadata;
 
+  // TD-ARCH-037: optimistic lock, same shape as OAuthClientEntity's. Hibernate owns it: it is read
+  // with the row, put in the WHERE of every UPDATE, incremented, and a mismatch throws. Application
+  // code only carries the value the aggregate was loaded at back in through the constructor.
+  @Version
+  @Column(nullable = false)
+  private int version;
+
   /** Required by JPA/Hibernate — never called directly by adapter code. */
   protected AccountEntity() {}
 
@@ -124,7 +132,8 @@ public class AccountEntity {
       final String registrationRejectionReason,
       final String publicMetadata,
       final String privateMetadata,
-      final String unsafeMetadata) {
+      final String unsafeMetadata,
+      final int version) {
     this.id = id;
     this.organizationId = organizationId;
     this.email = email;
@@ -145,6 +154,7 @@ public class AccountEntity {
     this.publicMetadata = publicMetadata;
     this.privateMetadata = privateMetadata;
     this.unsafeMetadata = unsafeMetadata;
+    this.version = version;
   }
 
   public UUID getId() {
@@ -225,5 +235,9 @@ public class AccountEntity {
 
   public String getUnsafeMetadata() {
     return unsafeMetadata;
+  }
+
+  public int getVersion() {
+    return version;
   }
 }

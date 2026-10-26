@@ -24,7 +24,6 @@ import java.util.UUID;
  * review, 2026-09-15) — see its own Javadoc for why this pair shares a base; {@code organizationId}
  * is this class's own field, added on top, the one thing that pair doesn't share.
  */
-@SuppressWarnings({"PMD.AvoidFieldNameMatchingMethodName", "PMD.ShortVariable"})
 public final class OrganizationClient extends AbstractClientCredential {
 
   private final UUID organizationId;
@@ -99,8 +98,7 @@ public final class OrganizationClient extends AbstractClientCredential {
   }
 
   /** Same rationale as {@code PlatformClient#rotateSecret}. */
-  public OrganizationClient rotateSecret(
-      @SuppressWarnings("PMD.LongVariable") final String newClientSecretHash) {
+  public OrganizationClient rotateSecret(final String newClientSecretHash) {
     return new OrganizationClient(
         id(),
         organizationId,

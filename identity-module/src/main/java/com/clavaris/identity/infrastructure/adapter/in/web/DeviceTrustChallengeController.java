@@ -31,9 +31,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * {@link AuthenticatedSessionEstablisher} call the interrupted login had deferred — see {@link
  * PendingAuthenticationFactor}'s own Javadoc for why only those two factors are represented.
  */
-// PMD.LongVariable: redirectUrlResolver matches its own port type name, not arbitrarily long —
-// same precedent RedirectUrlResolver's own suppression documents.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/o/{organizationId}/login/device-trust")
 public class DeviceTrustChallengeController {
@@ -61,7 +58,6 @@ public class DeviceTrustChallengeController {
 
   // Two genuinely distinct exits (no pending challenge / render the form) — same "each outcome
   // needs its own exit" rationale as DeviceCookie's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showForm(
       @PathVariable final UUID organizationId,
@@ -77,7 +73,6 @@ public class DeviceTrustChallengeController {
   // Three genuinely distinct exits (no pending challenge / validation error / invalid code) — same
   // "each outcome needs its own exit" rationale as ResetPasswordController's own identical
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String confirm(
       @PathVariable final UUID organizationId,
@@ -133,7 +128,6 @@ public class DeviceTrustChallengeController {
   // Two genuinely distinct outcomes (a pending challenge for this exact Organization / none at
   // all) — same "each outcome needs its own exit" rationale as DeviceCookie's own identical
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private Optional<AccountId> pendingAccountId(
       final HttpServletRequest request, final UUID organizationId) {
     final HttpSession session = request.getSession(false);

@@ -12,8 +12,6 @@ import java.util.UUID;
  *     is encrypted by the service before it reaches the repository, and never persisted or logged
  *     as given.
  */
-// PMD.LongVariable: the names say exactly what each setting is.
-@SuppressWarnings("PMD.LongVariable")
 public record SaveSocialConnectionCommand(
     UUID organizationId,
     SocialProvider provider,

@@ -20,11 +20,6 @@ import java.util.function.Function;
  * (`organizationId`, `workspaceId`, `ownerPlatformAccountId`, ...) and entity type genuinely differ
  * per list; only the page-shaping logic below is shared.
  */
-// PMD.LongVariable: fetchedDescendingPlusOne/fetchedAscendingPlusOne name exactly what each
-// parameter is (both the ordering direction and the "+1 row for hasNext/hasPrevious" contract) —
-// same "deliberate, descriptive name over an arbitrary shortening" convention this codebase
-// applies everywhere else this rule fires.
-@SuppressWarnings("PMD.LongVariable")
 public final class SpringDataKeysetPageMapper {
 
   private SpringDataKeysetPageMapper() {}

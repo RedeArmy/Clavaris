@@ -9,7 +9,6 @@ import java.util.UUID;
  * Deliberately excludes {@code clientSecretHash} — never round-trips out of this system, same
  * "never even the hash" posture {@code ListedOrganizationSocialCredential} already establishes.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public record ListedOrganizationClient(
     UUID id, String clientId, List<String> allowedScopes, boolean active, Instant createdAt) {
 

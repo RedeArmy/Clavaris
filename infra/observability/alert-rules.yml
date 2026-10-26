@@ -88,3 +88,170 @@ groups:
             Every consumer's login/token flow depends directly on this instance
             (nfr-quality-attributes.md §2) — this is the ≥99.5% availability target's own
             most direct violation signal.
+
+  # TD-PROC-013: saturation and lag. Every alert above says something already went wrong in a way
+  # the application itself noticed; these say the system is running out of room, or quietly
+  # falling behind, before any request fails. Metric names are the ones Spring Boot/Micrometer
+  # register on their own (hikaricp_*, jvm_*, http_server_requests_*) plus the three lag gauges
+  # added with this group (WebhookBacklogMetrics). Each is exercised by alert-rules.test.yml.
+  - name: clavaris-saturation
+    rules:
+      # A request waiting for a database connection is already slow; hikari's pool is 10 on
+      # purpose (TD-FUT-017/TD-FUT-049), so any sustained queue means demand exceeds it.
+      - alert: DatabasePoolSaturated
+        expr: max(hikaricp_connections_pending) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Requests are queueing for a database connection"
+          description: >-
+            {{ $value }} request(s) have been waiting for a pooled connection for 2 minutes. The
+            pool is deliberately small; look for a slow query or a long transaction (organization
+            deletion, the DNS reverification job) before raising it.
+
+      - alert: DatabaseConnectionTimeouts
+        expr: increase(hikaricp_connections_timeout_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Requests failed to get a database connection in time"
+          description: >-
+            A request gave up waiting for a pooled connection (connection-timeout) in the last
+            5 minutes. Users saw errors, not just slowness.
+
+      # Argon2 verification is CPU-bound and admission-controlled (TD-FUT-017). A rejection is a
+      # legitimate sign-in refused for lack of a free core, never an attack signal on its own.
+      - alert: Argon2BulkheadRejecting
+        expr: sum(rate(clavaris_auth_argon2_bulkhead_total{outcome="rejected"}[5m])) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Password verifications are being refused for lack of CPU"
+          description: >-
+            More than one sign-in every ten seconds is being rejected by the Argon2 admission gate.
+            Either a burst of real traffic outgrew the host's cores or someone is spending them;
+            compare with HighLoginFailureRate.
+
+      - alert: ServerErrorRateHigh
+        expr: >-
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count[5m])) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 2% of requests are failing with a 5xx"
+          description: >-
+            {{ $value | humanizePercentage }} of requests over the last 5 minutes returned a server
+            error. This is the user-visible half of the 99.5% availability target.
+
+      - alert: JvmHeapNearLimit
+        # Old Gen only: the young pools report a max of -1, which would skew a whole-heap ratio.
+        expr: >-
+          sum(jvm_memory_used_bytes{area="heap",id=~".*Old Gen"})
+            / sum(jvm_memory_max_bytes{area="heap",id=~".*Old Gen"}) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM old generation above 90% for 10 minutes"
+          description: >-
+            The heap is sized to survive the worst-case Argon2 working set (application.yml,
+            TD-PERF-007); sustained use this high means a leak or a load that was not sized for.
+
+      - alert: DependencyCircuitBreakerOpened
+        expr: increase(clavaris_circuit_breaker_state_transition_total{transition=~".*_TO_OPEN"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The {{ $labels.name }} circuit breaker opened"
+          description: >-
+            Calls to {{ $labels.name }} (mail provider, breached-password check or GitHub) are being
+            refused locally after repeated failures; the dependency is down or very slow.
+
+  - name: clavaris-lag
+    rules:
+      # Nothing fails when the webhook engine falls behind: the consuming system simply stops
+      # hearing about changes. The dispatcher ticks every few seconds, so five minutes behind is
+      # not a retry backoff, it is a stuck engine.
+      - alert: WebhookDeliveriesFallingBehind
+        expr: clavaris_webhook_deliveries_oldest_due_age_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook deliveries are overdue by more than five minutes"
+          description: >-
+            The oldest due delivery has waited {{ $value | humanizeDuration }}. Check the delivery
+            executor, the scheduler thread and the consuming endpoints' error rates.
+
+      - alert: OutboxNotBeingDispatched
+        expr: clavaris_outbox_oldest_unpublished_age_seconds > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The {{ $labels.source }} event outbox is not being dispatched"
+          description: >-
+            The oldest unpublished {{ $labels.source }} event has waited
+            {{ $value | humanizeDuration }}; the dispatcher is not draining it (see
+            WebhookDispatchScheduler and its advisory lock).
+
+      # The gauges above read the database; NaN means they could not, and then neither of the two
+      # alerts above can fire.
+      - alert: BacklogMetricsUnavailable
+        expr: clavaris_webhook_deliveries_due != clavaris_webhook_deliveries_due
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "The webhook and outbox lag gauges cannot read the database"
+          description: >-
+            WebhookBacklogMetrics returns NaN when its queries fail, so the lag alerts are blind.
+
+  # Multi-window burn-rate alerts on the availability target (nfr-quality-attributes.md section 2:
+  # 99.5%, so an error budget of 0.5%). A fast burn pages; a slow burn is a ticket. Requiring both
+  # a long and a short window stops a spike that already ended from paging.
+  - name: clavaris-slo
+    rules:
+      - alert: AvailabilityErrorBudgetFastBurn
+        expr: >-
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[1h]))
+              / sum(rate(http_server_requests_seconds_count[1h])) > (14.4 * 0.005)
+          )
+          and
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+              / sum(rate(http_server_requests_seconds_count[5m])) > (14.4 * 0.005)
+          )
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Burning the 30-day error budget 14x too fast"
+          description: >-
+            At this rate the month's 0.5% error budget is gone in about two days.
+
+      - alert: AvailabilityErrorBudgetSlowBurn
+        expr: >-
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[6h]))
+              / sum(rate(http_server_requests_seconds_count[6h])) > (6 * 0.005)
+          )
+          and
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[30m]))
+              / sum(rate(http_server_requests_seconds_count[30m])) > (6 * 0.005)
+          )
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Burning the 30-day error budget 6x too fast"
+          description: >-
+            At this rate the month's 0.5% error budget is gone in about five days.

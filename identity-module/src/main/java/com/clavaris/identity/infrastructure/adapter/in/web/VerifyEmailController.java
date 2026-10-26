@@ -28,7 +28,6 @@ public class VerifyEmailController {
 
   // Success vs. invalid-token each need their own exit — same rationale as
   // RegisterAccountController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String verify(@PathVariable final UUID organizationId, @RequestParam final String token) {
     try {

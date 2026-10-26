@@ -28,7 +28,6 @@ public class ConfirmDeviceTrustChallengeService implements ConfirmDeviceTrustCha
 
   @Override
   @Transactional
-  @SuppressWarnings("PMD.GuardLogStatement")
   public void handle(final ConfirmDeviceTrustChallengeCommand command) {
     final String presentedHash = RefreshTokenSecret.hash(command.presentedRawCode());
     final Optional<VerificationToken> found = tokens.findByTokenHash(presentedHash);

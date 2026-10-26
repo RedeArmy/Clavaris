@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * "false")} on each boolean here is what turns an absent checkbox into the correct {@code false},
  * not a bug workaround.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountSettingsController {

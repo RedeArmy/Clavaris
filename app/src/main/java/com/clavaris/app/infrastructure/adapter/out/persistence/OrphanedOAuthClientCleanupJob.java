@@ -32,10 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code OrganizationExistsCheckerBridge} already establishes for the synchronous check this job
  * backstops.
  */
-// PMD.LongVariable: DELETE_ORPHANED_SQL names exactly what it is — same convention
-// OAuth2AuthorizationRetentionJob's own identical suppression already documents for its sibling
-// DELETE_EXPIRED_SQL constant.
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class OrphanedOAuthClientCleanupJob {
 

@@ -118,7 +118,9 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
   // PMD.LongVariable: elapsedMicrosInCurrentBucket names exactly what it is — same "deliberate,
   // descriptive name over an arbitrary shortening" convention this codebase applies everywhere
   // else this rule fires.
-  @SuppressWarnings({"unchecked", "PMD.GuardLogStatement", "PMD.OnlyOneReturn", "PMD.LongVariable"})
+  @SuppressWarnings({
+    "unchecked",
+  })
   @Override
   public RateLimitDecision tryConsume(final String key, final int limit, final Duration window) {
     final List<Long> result;
@@ -181,19 +183,6 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
     return new RateLimitDecision(allowed, currentCount, retryAfter);
   }
 
-  // TD-FUT-010: the sliding-window-counter decision itself, extracted as a small pure function —
-  // both so tryConsume's own body stays readable and so this exact math can be proven
-  // deterministically against hand-picked boundary values (a real integration test can't reliably
-  // land two calls on opposite sides of a real Redis-clock bucket boundary without being flaky;
-  // RedisFixedWindowRateLimiterTest exercises this method directly instead). The weight applied to
-  // the *previous* bucket's count decays linearly from 1.0 (elapsed=0, i.e. the current bucket has
-  // only just started — the previous bucket's own traffic is still fully "recent") to 0.0
-  // (elapsed=windowMicros, i.e. the current bucket is about to end — none of the previous bucket's
-  // traffic is within one window-width of now any more). Package-private, not private: the test
-  // above needs direct access, same convention as this class's own package-private constructor.
-  // PMD.LongVariable: elapsedMicrosInCurrentBucket/weightOfPreviousBucket both name exactly what
-  // they are — same convention as tryConsume's own identical suppression above.
-  @SuppressWarnings("PMD.LongVariable")
   /* package */ static boolean isAllowed(
       final long currentCount,
       final long previousCount,

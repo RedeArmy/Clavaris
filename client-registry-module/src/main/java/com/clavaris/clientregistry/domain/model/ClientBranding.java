@@ -21,13 +21,7 @@ import java.util.regex.Pattern;
 // looks like, same RedirectPolicy/OAuthClient precedent. OnlyOneReturn (per-method suppressions
 // below): each validator's early-return-on-null is the clearest shape for "absent means skip
 // validation," same convention this module already uses elsewhere.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class ClientBranding {
 
   // #RGB or #RRGGBB — the two CSS hex-color shapes a "primary color" value needs to support;
@@ -112,7 +106,6 @@ public final class ClientBranding {
   // Two exits (null passes through unchecked, a real value is validated) is clearer here than
   // forcing a single-return shape onto "absent" vs. "present" — same rationale RedirectPolicy's
   // own validateIfPresent suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String validateLogoUrl(final String logoUrl) {
     if (logoUrl == null) {
       return null;
@@ -124,7 +117,6 @@ public final class ClientBranding {
     return AbsoluteHttpsUrlValidator.requireAbsoluteHttps(logoUrl, "logoUrl");
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String validatePrimaryColor(final String primaryColor) {
     if (primaryColor == null) {
       return null;
@@ -136,7 +128,6 @@ public final class ClientBranding {
     return primaryColor;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String validateDisplayName(final String applicationDisplayName) {
     if (applicationDisplayName == null) {
       return null;

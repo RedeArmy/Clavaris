@@ -59,7 +59,6 @@ public class ConfirmNewDeviceLoginAlertController {
 
   // Same "several independent rejection reasons, each needs its own exit" rationale as
   // ResetPasswordController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String confirm(
       @PathVariable final UUID organizationId,

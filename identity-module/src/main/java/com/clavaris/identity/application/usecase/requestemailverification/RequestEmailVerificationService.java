@@ -54,12 +54,6 @@ public class RequestEmailVerificationService implements RequestEmailVerification
     this.policyProvider = policyProvider;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
-  // own identical suppression: every logged argument is a cheap accessor, not an expensive
-  // computation. PMD.OnlyOneReturn: three genuinely distinct exits (already-verified no-op,
-  // test-marked-address bypass, the normal real-send path) — same "one exit per distinct
-  // outcome" rationale every admin-API controller in this codebase already applies.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
   @Override
   public void handle(final RequestEmailVerificationCommand command) {
     final Account account =

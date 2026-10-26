@@ -11,8 +11,6 @@ import java.util.Optional;
  * @param redirectUri where the provider must be told to send people back, which is the same shared
  *     callback whoever's credentials are in use
  */
-// PMD.LongVariable: the names say exactly what each setting is.
-@SuppressWarnings("PMD.LongVariable")
 public record SocialConnection(
     SocialProvider provider,
     SocialConnectionStatus status,

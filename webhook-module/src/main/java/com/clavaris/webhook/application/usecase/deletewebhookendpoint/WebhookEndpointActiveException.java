@@ -11,7 +11,6 @@ public final class WebhookEndpointActiveException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;
 
-  @SuppressWarnings("PMD.ShortVariable")
   public WebhookEndpointActiveException(final UUID id) {
     super("WebhookEndpoint " + id + " must be deactivated before it can be deleted");
   }

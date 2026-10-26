@@ -33,7 +33,7 @@ public final class WorkspaceRoleHierarchy {
   // rationale RegisterAccountController's own identical suppression documents.
   // PMD.NullAssignment: cursor = null is how this walk represents "no parent, chain ends here,"
   // not a code smell — the same sentinel effectivePermissions' own identical walk below uses.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.NullAssignment"})
+  @SuppressWarnings({"PMD.NullAssignment"})
   public static boolean wouldCreateCycle(
       final UUID roleId, final UUID candidateParentId, final Map<UUID, WorkspaceRole> rolesById) {
     final Set<UUID> visited = new HashSet<>();

@@ -89,9 +89,6 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
     this.roles = roles;
   }
 
-  // PMD.LongVariable: formerlyGroupedRoleIds/rolesToActuallyDelete each name exactly what they are
-  // — same convention this codebase's other descriptively-named variables already follow.
-  @SuppressWarnings("PMD.LongVariable")
   @Override
   @Transactional
   public void handle(final DeleteWorkspaceTeamCommand command) {
@@ -128,7 +125,8 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
         "workspace_team.deleted",
         "WorkspaceTeam",
         team.id().toString(),
-        "workspaceId=" + team.workspaceId());
+        "workspaceId=" + team.workspaceId(),
+        command.organizationId());
 
     for (final UUID roleId : rolesToActuallyDelete) {
       deleteAlreadyValidatedRole(command, roleId);

@@ -56,8 +56,6 @@ import com.clavaris.organization.application.usecase.getaccountauthenticationpol
 import com.clavaris.organization.application.usecase.getaccountauthenticationpolicyfororganization.GetAccountAuthenticationPolicyForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationService;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.getauditlogfororganization.OAuthClientIdsForAuditLogProvider;
-import com.clavaris.organization.application.usecase.getauditlogfororganization.WebhookEndpointIdsForAuditLogProvider;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysService;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.GetOrganizationApiKeysUseCase;
 import com.clavaris.organization.application.usecase.getorganizationapikeys.OrganizationSigningKeyPublicKeyProvider;
@@ -158,12 +156,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 // OrganizationAuthorizationServerConfig's
 // own class-level Javadoc already documents for an identical situation, not worth splitting a class
 // whose entire job is Spring bean assembly.
-@SuppressWarnings({
-  "PMD.AvoidDuplicateLiterals",
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @Configuration
 class OrganizationUseCaseConfig {
 
@@ -266,7 +259,6 @@ class OrganizationUseCaseConfig {
   // what "no override" actually means. TD-FUT-002 (self-service tuning, shipped): also injects
   // the same hardSystemWideCap value setRateLimitPolicyForOrganizationUseCase below already
   // does — see RateLimitPolicySnapshot's own Javadoc for why this read side now needs it too.
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicyForOrganizationUseCase(
       final RateLimitPolicyRepository policies,
@@ -318,27 +310,20 @@ class OrganizationUseCaseConfig {
     return new GetSessionPolicyForOrganizationService(policies);
   }
 
-  // ADR-0025, TD-SEC-007: the dashboard's own audit-log query — see
-  // GetAuditLogForOrganizationService's own Javadoc for the exact fan-out this performs and what's
-  // deliberately out of scope.
-  @SuppressWarnings("PMD.LongVariable")
+  // ADR-0025, TD-SEC-007: the dashboard's own audit-log query. Reads by the tenant key the audit
+  // table carries (TD-ARCH-038), one indexed page at a time.
   @Bean
   /* package */ GetAuditLogForOrganizationUseCase getAuditLogForOrganizationUseCase(
-      final ListWorkspacesForOrganizationUseCase listWorkspaces,
-      final WorkspaceMembershipRepository memberships,
-      final OAuthClientIdsForAuditLogProvider oauthClientIds,
-      final WebhookEndpointIdsForAuditLogProvider webhookEndpointIds,
       final AuditEventReader auditEvents) {
-    return new GetAuditLogForOrganizationService(
-        listWorkspaces, memberships, oauthClientIds, webhookEndpointIds, auditEvents);
+    return new GetAuditLogForOrganizationService(auditEvents);
   }
 
   @Bean
   /* package */ DeleteOrganizationUseCase deleteOrganizationUseCase(
       final OrganizationRepository organizations,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
+      final OrganizationTokenRevoker organizationTokenRevoker,
+      final OrganizationIdentityDataEraser identityDataEraser,
+      final OrganizationOAuthClientsEraser oauthClientsEraser,
       final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter) {
@@ -370,8 +355,7 @@ class OrganizationUseCaseConfig {
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter,
       // TD-WS-004 (closed): see DeleteWorkspaceService's own Javadoc.
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
       final WorkspaceMemberAccountRevoker accountRevoker) {
     return new DeleteWorkspaceService(
         workspaces,
@@ -391,10 +375,10 @@ class OrganizationUseCaseConfig {
       final WorkspaceRepository workspaces,
       final WorkspaceRoleRepository roles,
       final WorkspaceMembershipRepository memberships,
-      @SuppressWarnings("PMD.LongVariable") final AccountProvisioner accountProvisioner,
+      final AccountProvisioner accountProvisioner,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter eventOutboxWriter,
-      @SuppressWarnings("PMD.LongVariable") final PlatformTransactionManager transactionManager) {
+      final PlatformTransactionManager transactionManager) {
     return new AddWorkspaceMemberService(
         workspaces,
         roles,
@@ -443,8 +427,7 @@ class OrganizationUseCaseConfig {
       final EventOutboxWriter eventOutboxWriter,
       // TD-WS-002 (closed): see WorkspaceMemberRefreshTokenRevoker/WorkspaceMemberAccountRevoker's
       // own Javadoc.
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
       final WorkspaceMemberAccountRevoker accountRevoker) {
     return new RemoveWorkspaceMemberService(
         memberships,
@@ -512,8 +495,7 @@ class OrganizationUseCaseConfig {
   @Bean
   /* package */ DeleteWorkspaceTeamUseCase deleteWorkspaceTeamUseCase(
       final WorkspaceTeamRepository teams,
-      @SuppressWarnings("PMD.LongVariable")
-          final DeleteWorkspaceRoleUseCase deleteWorkspaceRoleUseCase,
+      final DeleteWorkspaceRoleUseCase deleteWorkspaceRoleUseCase,
       final AuditEventRecorder auditEvents,
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRoleRepository roles) {

@@ -11,7 +11,6 @@ import java.util.UUID;
  * {@link WorkspaceMembershipReadEntity}'s own Javadoc for the full data-contract reasoning. Only
  * {@code name} is mapped; the Users tab's own Role column has no need for permissions/hierarchy.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "workspace_roles")
 public class WorkspaceRoleReadEntity {

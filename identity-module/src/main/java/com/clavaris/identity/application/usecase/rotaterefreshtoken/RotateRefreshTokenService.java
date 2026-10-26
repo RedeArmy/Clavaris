@@ -67,10 +67,6 @@ import org.springframework.transaction.annotation.Transactional;
  * against a still-{@code isActive()} token; a status check alone doesn't kill an already-issued SAS
  * access token that hasn't expired yet.
  */
-// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
-// parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
-// suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RotateRefreshTokenService.class);
@@ -79,21 +75,16 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
   private final SessionRepository sessions;
   private final AccountRepository accounts;
 
-  // Descriptive over PMD's default LongVariable threshold, kept in full rather than abbreviated —
-  // same convention already used for e.g. passwordCredential elsewhere.
-  @SuppressWarnings("PMD.LongVariable")
   private final AccountTokenRevoker accountTokenRevoker;
 
   // TD-SEC-031 (SDE-III review, 2026-08-26): BR-ID-03's own reuse response revoked the SAS token
   // and this module's own Session/RefreshToken rows, but never the hosted-login-page's own
   // HttpSession — see AccountSessionRevoker's own Javadoc for the concrete consequence.
-  @SuppressWarnings("PMD.LongVariable")
   private final AccountSessionRevoker accountSessionRevoker;
 
   private final EventOutboxWriter outbox;
   private final SecurityMetricsRecorder metrics;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final SessionPolicyProvider sessionPolicyProvider;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port, same rationale as
@@ -103,11 +94,11 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
       final RefreshTokenRepository refreshTokens,
       final SessionRepository sessions,
       final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker,
       final EventOutboxWriter outbox,
       final SecurityMetricsRecorder metrics,
-      @SuppressWarnings("PMD.LongVariable") final SessionPolicyProvider sessionPolicyProvider) {
+      final SessionPolicyProvider sessionPolicyProvider) {
     this.refreshTokens = refreshTokens;
     this.sessions = sessions;
     this.accounts = accounts;
@@ -118,18 +109,6 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     this.sessionPolicyProvider = sessionPolicyProvider;
   }
 
-  // PMD.GuardLogStatement false positive, same reasoning as AuthenticateWithPasswordService's own
-  // suppression — every logged argument is a cheap in-memory accessor, not an expensive
-  // computation.
-  // noRollbackFor is load-bearing, not decorative: confirmed live (a real integration test
-  // initially failed on exactly this) that throwing RefreshTokenReuseDetectedException at the end
-  // of this method — Spring's default behavior for any unchecked exception inside
-  // @Transactional — rolled back the revocation cascade this same exception is meant to report
-  // *after* it already succeeded. The whole point of BR-ID-03's reuse response is "everything is
-  // already revoked, and here's an error telling you that" — an exception that undoes the
-  // revocation it's reporting would make every subsequent presentation of a supposedly-revoked
-  // token succeed again, silently defeating the entire invariant.
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional(noRollbackFor = RefreshTokenReuseDetectedException.class)
   public RotateRefreshTokenResult handle(final RotateRefreshTokenCommand command) {
@@ -219,11 +198,6 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
         session.oidcSid().orElse(null));
   }
 
-  // See this class's own Javadoc ("SDE-III review, 2026-09-03") for the full rationale — a
-  // dedicated, routine rejection, never the reuse-detection cascade/alert below.
-  // PMD.GuardLogStatement false positive — same rationale as handle()'s own identical
-  // suppression: every logged argument is a cheap in-memory accessor.
-  @SuppressWarnings("PMD.GuardLogStatement")
   private void assertAccountActive(final RefreshToken presented) {
     final Account account =
         accounts
@@ -246,10 +220,6 @@ public class RotateRefreshTokenService implements RotateRefreshTokenUseCase {
     }
   }
 
-  // Clerk "Sessions" settings parity — see this method's own call site comment above.
-  // PMD.GuardLogStatement false positive, same reasoning as assertAccountActive's own identical
-  // suppression.
-  @SuppressWarnings("PMD.GuardLogStatement")
   private void assertSessionWithinPolicy(final Session session, final AccountId accountId) {
     final OrganizationId organizationId =
         accounts

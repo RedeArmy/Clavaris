@@ -10,7 +10,6 @@ import java.util.UUID;
 /**
  * JPA row mapping for {@code rate_limit_policies} (ADR-0010 §6.2) — plain data holder by design.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "rate_limit_policies")
 public class RateLimitPolicyEntity {

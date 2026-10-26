@@ -13,7 +13,6 @@ import java.util.UUID;
  * enum — same convention as {@code VerificationTokenEntity.type}: this entity never references a
  * {@code domain.model} type at all, {@code JpaSocialIdentityRepository} owns the conversion.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "social_identities")
 public class SocialIdentityEntity {

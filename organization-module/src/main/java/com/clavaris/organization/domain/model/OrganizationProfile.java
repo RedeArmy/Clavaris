@@ -23,12 +23,7 @@ import java.util.regex.Pattern;
 // PMD.AvoidFieldNameMatchingMethodName/ShortVariable/LongVariable: same value-object conventions
 // Organization's own identical suppression documents. PMD.TooManyMethods: a value object with this
 // many fields, each with an accessor and a way to change it.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.LongVariable",
-  "PMD.TooManyMethods",
-  "java:S107"
-})
+@SuppressWarnings({"PMD.TooManyMethods", "java:S107"})
 public final class OrganizationProfile {
 
   public static final int MAX_DESCRIPTION_LENGTH = 500;

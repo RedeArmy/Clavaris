@@ -46,15 +46,6 @@ import org.springframework.web.bind.annotation.RestController;
  * a JSON response carries the next URL as data for the client's own {@code window.location}
  * navigation, not a server-side redirect.
  */
-// PMD.LongVariable: startAuthentication/requestDeviceTrustChallenge/authenticationPolicyProvider/
-// redirectUrlResolver name exactly what they hold — same precedent LoginController/
-// UsernameSignInController's own identical suppression already establishes for these same names.
-// PMD.LawOfDemeter: request.getSession() is the standard Servlet API shape — same rationale
-// AntiAbuseRateLimitingFilter's own response.getWriter() suppression already documents.
-// PMD.OnlyOneReturn: each flagged method has multiple genuinely distinct outcomes (a 400 error
-// body vs. the real success body) — same "each outcome needs its own exit" rationale as
-// SetRateLimitPolicyController's own identical suppression.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
 @RestController
 @RequestMapping("/o/{organizationId}/login/webauthn")
 public class WebAuthnSignInController {

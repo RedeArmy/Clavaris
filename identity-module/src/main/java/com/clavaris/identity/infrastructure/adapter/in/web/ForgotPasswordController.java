@@ -60,7 +60,6 @@ public class ForgotPasswordController {
 
   // Same "validation failure needs its own early exit" rationale as RegisterAccountController's
   // own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String requestReset(
       @PathVariable final UUID organizationId,

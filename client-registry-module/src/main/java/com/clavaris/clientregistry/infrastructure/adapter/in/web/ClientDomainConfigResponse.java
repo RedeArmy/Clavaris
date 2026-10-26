@@ -12,9 +12,6 @@ import java.util.UUID;
  * capability beyond what publishing a DNS record for a domain you already control already
  * requires).
  */
-// PMD.LongVariable: verificationStatus/dnsTxtChallengeToken name exactly what ADR-0009 §2 itself
-// calls the field, same SetClientBrandingResponse precedent.
-@SuppressWarnings("PMD.LongVariable")
 public record ClientDomainConfigResponse(
     UUID oauthClientId,
     String mode,

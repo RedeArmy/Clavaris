@@ -46,9 +46,6 @@ import org.springframework.web.util.UrlPathHelper;
  *       site from signing a visitor out.
  * </ul>
  */
-// PMD.OnlyOneReturn: each early exit is a distinct outcome, same rationale as the sibling filters
-// in this package.
-@SuppressWarnings("PMD.OnlyOneReturn")
 public final class OidcLogoutWithoutHintFilter extends OncePerRequestFilter {
 
   private static final Pattern LOGOUT_PATH =

@@ -90,14 +90,7 @@ import org.springframework.stereotype.Component;
 // requestDeviceTrustChallenge, authenticationPolicyProvider) pushed this class's own count past
 // the threshold — same "wiring, not sprawl" reasoning as PMD.ExcessiveImports above, on the same
 // class, for the same reason.
-@SuppressWarnings({
-  "PMD.LongVariable",
-  "PMD.LawOfDemeter",
-  "PMD.OnlyOneReturn",
-  "java:S1075",
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects"
-})
+@SuppressWarnings({"java:S1075", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Component
 public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
 

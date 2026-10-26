@@ -28,9 +28,6 @@ import org.springframework.context.annotation.Configuration;
  * Split from one 868-line {@code IdentityUseCaseConfig} by area; beans reach each other through
  * ordinary constructor injection, so the split changes no wiring.
  */
-// PMD.LongVariable: ports are named for what they are (verificationTokens, accountTokenRevoker), as
-// in the services they are handed to.
-@SuppressWarnings("PMD.LongVariable")
 @Configuration
 class SessionUseCaseConfig {
 

@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * per-bucket height-as-a-percentage arithmetic fine, but finding the max across a list is exactly
  * the kind of computation that belongs in Java, not SpringEL.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints/activity")
 public class PlatformWebhookActivityController {

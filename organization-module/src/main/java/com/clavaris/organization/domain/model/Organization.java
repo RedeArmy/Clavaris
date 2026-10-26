@@ -39,13 +39,7 @@ import java.util.UUID;
 // added two more factories and one more accessor pair on top of an already-legitimately-large value
 // object — same "a value object with this many fields looks like this many methods, not a sign this
 // class does too much" reasoning OAuthClient's own identical suppression already documents.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.LongVariable", "PMD.TooManyMethods"})
 public final class Organization {
 
   // Matches the organizations.name column (varchar(255), V20260818170300 migration) — enforced

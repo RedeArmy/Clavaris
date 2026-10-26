@@ -22,9 +22,6 @@ import com.clavaris.identity.domain.model.OrganizationId;
  *     population was never meant to be subject to (ADR-0024/TD-FUT-019: "separate from Workspace,
  *     and tenant-optional") would be a real correctness bug, not extra safety.
  */
-// PMD.LongVariable: publicSelfRegistration names exactly what it gates — see its own Javadoc
-// above for why a shorter name would leave out the one fact that actually matters here.
-@SuppressWarnings("PMD.LongVariable")
 public record RegisterAccountCommand(
     OrganizationId organizationId,
     Email email,

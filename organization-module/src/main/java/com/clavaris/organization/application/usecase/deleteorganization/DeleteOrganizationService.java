@@ -72,24 +72,16 @@ import org.springframework.transaction.annotation.Transactional;
  * before — the full {@code Organization} (specifically its {@code name}) is needed to build the
  * event payload.
  */
-// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's four
-// port parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
-// suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class DeleteOrganizationService implements DeleteOrganizationUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeleteOrganizationService.class);
 
   private final OrganizationRepository organizations;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
-  // identity-module's own DeleteAccountService field for AccountTokenRevoker.
   private final OrganizationTokenRevoker organizationTokenRevoker;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final OrganizationIdentityDataEraser identityDataEraser;
 
-  @SuppressWarnings("PMD.LongVariable")
   private final OrganizationOAuthClientsEraser oauthClientsEraser;
 
   private final OrganizationWebhookDataEraser webhookDataEraser;
@@ -102,9 +94,9 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
   // suppression: this cascade genuinely needs every one of these, not excess complexity to hide.
   public DeleteOrganizationService(
       final OrganizationRepository organizations,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationTokenRevoker organizationTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationIdentityDataEraser identityDataEraser,
-      @SuppressWarnings("PMD.LongVariable") final OrganizationOAuthClientsEraser oauthClientsEraser,
+      final OrganizationTokenRevoker organizationTokenRevoker,
+      final OrganizationIdentityDataEraser identityDataEraser,
+      final OrganizationOAuthClientsEraser oauthClientsEraser,
       final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
@@ -117,9 +109,6 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
     this.outbox = outbox;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as every other logging call site in
-  // this codebase (e.g. DeleteAccountService's own identical suppression).
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public void handle(final DeleteOrganizationCommand command) {

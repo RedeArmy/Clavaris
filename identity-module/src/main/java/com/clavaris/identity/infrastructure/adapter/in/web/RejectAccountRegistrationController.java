@@ -34,7 +34,6 @@ class RejectAccountRegistrationController {
 
   // Two exits (404 on an unknown id, 204 on success) — same rationale as
   // ApproveAccountRegistrationController's own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Reject a PENDING_APPROVAL self-registration")
   @ApiResponse(responseCode = "204", description = "Rejected — Account is now REJECTED")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")

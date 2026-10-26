@@ -15,7 +15,6 @@ import java.util.UUID;
  * WorkspaceRoleEntity}: {@code null} means "no role currently assigned," an explicitly allowed
  * state (ADR-0027 §5).
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "workspace_memberships")
 public class WorkspaceMembershipEntity {

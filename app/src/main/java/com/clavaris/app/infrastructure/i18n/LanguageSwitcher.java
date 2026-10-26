@@ -20,9 +20,6 @@ import org.unbescape.html.HtmlEscape;
  * its {@code lang} so a screen reader pronounces it correctly, and {@code aria-current} on the
  * language in use.
  */
-// PMD.LawOfDemeter: reading the request out of a Thymeleaf web context is a chain of calls on the
-// engine's own types (exchange, request, parameter map); there is no shorter way to the URL.
-@SuppressWarnings("PMD.LawOfDemeter")
 final class LanguageSwitcher {
 
   /* default */ static final String PARAMETER = "lang";

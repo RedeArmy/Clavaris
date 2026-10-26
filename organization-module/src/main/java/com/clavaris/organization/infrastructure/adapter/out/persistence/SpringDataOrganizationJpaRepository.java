@@ -8,15 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// existsById(UUID) is already declared by CrudRepository — nothing to add for it.
-// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, applied on four
-// separate ownerPlatformAccountId parameters — same ContentSecurityPolicyHeaderWriter precedent
-// for an identical situation.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 interface SpringDataOrganizationJpaRepository extends JpaRepository<OrganizationEntity, UUID> {
 
-  List<OrganizationEntity> findAllByOwnerPlatformAccountId(
-      @SuppressWarnings("PMD.LongVariable") UUID ownerPlatformAccountId);
+  List<OrganizationEntity> findAllByOwnerPlatformAccountId(UUID ownerPlatformAccountId);
 
   // TD-PERF-020 (keyset revision, 2026-09-14): backs OrganizationRepository#findKeysetPageOwnedBy
   // — three @Query methods (first/after/before), not a derived-name Page-returning method, since
@@ -31,9 +25,7 @@ interface SpringDataOrganizationJpaRepository extends JpaRepository<Organization
       ORDER BY o.createdAt DESC, o.id DESC
       """)
   List<OrganizationEntity> findFirstPageOwnedBy(
-      @Param("ownerPlatformAccountId") @SuppressWarnings("PMD.LongVariable")
-          UUID ownerPlatformAccountId,
-      Pageable pageable);
+      @Param("ownerPlatformAccountId") UUID ownerPlatformAccountId, Pageable pageable);
 
   @Query(
       """
@@ -44,8 +36,7 @@ interface SpringDataOrganizationJpaRepository extends JpaRepository<Organization
       ORDER BY o.createdAt DESC, o.id DESC
       """)
   List<OrganizationEntity> findPageOwnedByAfter(
-      @Param("ownerPlatformAccountId") @SuppressWarnings("PMD.LongVariable")
-          UUID ownerPlatformAccountId,
+      @Param("ownerPlatformAccountId") UUID ownerPlatformAccountId,
       @Param("cursorCreatedAt") Instant cursorCreatedAt,
       @Param("cursorId") UUID cursorId,
       Pageable pageable);
@@ -61,8 +52,7 @@ interface SpringDataOrganizationJpaRepository extends JpaRepository<Organization
       ORDER BY o.createdAt ASC, o.id ASC
       """)
   List<OrganizationEntity> findPageOwnedByBefore(
-      @Param("ownerPlatformAccountId") @SuppressWarnings("PMD.LongVariable")
-          UUID ownerPlatformAccountId,
+      @Param("ownerPlatformAccountId") UUID ownerPlatformAccountId,
       @Param("cursorCreatedAt") Instant cursorCreatedAt,
       @Param("cursorId") UUID cursorId,
       Pageable pageable);

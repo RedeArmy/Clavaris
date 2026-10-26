@@ -33,7 +33,6 @@ public final class OrganizationScopedJwkSource implements JWKSource<SecurityCont
     this.keyMaterial = keyMaterial;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public List<JWK> get(final JWKSelector jwkSelector, final SecurityContext context) {
     final Optional<UUID> organizationId = CurrentOrganizationContext.currentOrganizationId();

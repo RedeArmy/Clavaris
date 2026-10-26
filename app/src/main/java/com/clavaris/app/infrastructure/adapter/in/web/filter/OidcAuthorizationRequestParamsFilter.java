@@ -61,9 +61,6 @@ import org.springframework.web.util.UrlPathHelper;
  * very Organization (exact match), never to a value taken from the request alone (open redirect,
  * RFC 6749 §10.15); otherwise the request is left to SAS, which shows its own error page.
  */
-// PMD.OnlyOneReturn: several independent early exits — same rationale as the sibling filters in
-// this package.
-@SuppressWarnings("PMD.OnlyOneReturn")
 public final class OidcAuthorizationRequestParamsFilter extends OncePerRequestFilter {
 
   private static final Pattern AUTHORIZE_PATH =

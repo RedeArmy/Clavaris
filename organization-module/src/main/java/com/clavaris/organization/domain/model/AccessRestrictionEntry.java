@@ -19,11 +19,6 @@ import java.util.UUID;
  * must never defeat the {@code UNIQUE(organization_id, identifier)} constraint or let an entry
  * silently fail to match a real login attempt.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
 public final class AccessRestrictionEntry {
 
   private final UUID id;

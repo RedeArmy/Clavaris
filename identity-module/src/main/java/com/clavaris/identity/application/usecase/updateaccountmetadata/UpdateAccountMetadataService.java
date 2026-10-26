@@ -15,18 +15,8 @@ import tools.jackson.databind.ObjectMapper;
  * establishes, not something {@link Account} itself should own (it stays free of a JSON library
  * dependency, per its own {@code setMetadata} Javadoc).
  */
-// PMD.OnlyOneReturn: validate() has two genuinely distinct exits (nothing to validate vs. a
-// validated value to return) - same guard-clause-heavy resolution shape this codebase's own
-// comparably-structured methods already document identically elsewhere.
-@SuppressWarnings("PMD.OnlyOneReturn")
 public class UpdateAccountMetadataService implements UpdateAccountMetadataUseCase {
 
-  // PMD.LongVariable: MAX_METADATA_LENGTH names exactly what it bounds - a shorter name would
-  // only make the one call site that references it harder to read.
-  // Same order-of-magnitude reasoning as Clerk's own metadata size ceiling - generous enough for
-  // real application-level tagging, small enough that a tier can never become a de facto
-  // unbounded document store.
-  @SuppressWarnings("PMD.LongVariable")
   /* package */ static final int MAX_METADATA_LENGTH = 8192;
 
   private final AccountRepository accounts;

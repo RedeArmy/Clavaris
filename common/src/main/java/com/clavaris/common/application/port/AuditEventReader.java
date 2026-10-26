@@ -2,27 +2,33 @@ package com.clavaris.common.application.port;
 
 import com.clavaris.common.domain.model.AuditEvent;
 import com.clavaris.common.domain.model.AuditEventTargetRef;
+import com.clavaris.common.domain.model.KeysetCursor;
 import java.util.List;
+import java.util.UUID;
 
 /**
- * Read side of {@link AuditEventRecorder} (TD-SEC-007) — genuinely new, no query capability existed
- * for {@code audit_events} before this. Deliberately NOT a per-caller filter interface (no
- * organizationId, no actor, no date range parameters here): {@code audit_events} carries no {@code
- * organization_id} column, so any Organization-scoped (or otherwise entity-scoped) query is the
- * caller's own responsibility to build as a {@link AuditEventTargetRef} list first — this port only
- * ever answers "give me the most recent rows matching any of these exact target references," the
- * one primitive every such caller actually needs.
+ * Read side of {@link AuditEventRecorder} (TD-SEC-007).
  *
- * @param targets the {@code (targetType, targetId)} pairs to match, typically one entry per
- *     resource a caller has already confirmed it owns — an empty list matches nothing (never "no
- *     filter, return everything"), so a caller that resolved zero owned resources gets back an
- *     empty result, not an unbounded scan of every Organization's own audit trail.
- * @param maxResults a hard cap, same "cheap to hold in memory, no real pagination yet" posture
- *     {@code ListWebhookDeliveriesForEndpointService}'s own {@code MAX_RESULTS} already establishes
- *     — newest first.
+ * <p>Two questions, answered two ways. "What happened to these specific things" ({@link
+ * #findRecentForTargets}) takes exact {@code (targetType, targetId)} pairs the caller has already
+ * confirmed it owns; an empty list matches nothing, never "no filter". "What happened in this
+ * Organization" ({@link #findPageForOrganization}) uses the tenant key {@code audit_events} carries
+ * since TD-ARCH-038, so it needs no list of ids and covers every kind of event the Organization
+ * produced, accounts included.
  */
-@FunctionalInterface
 public interface AuditEventReader {
 
+  /**
+   * The most recent rows matching any of {@code targets}, newest first, at most {@code maxResults}.
+   * A hard cap, not pagination: callers use it for small, per-resource histories.
+   */
   List<AuditEvent> findRecentForTargets(List<AuditEventTargetRef> targets, int maxResults);
+
+  /**
+   * One page of an Organization's audit log, newest first. {@code olderThan} is the cursor of the
+   * last row of the previous page ({@code null} for the first page); {@code limit} rows are
+   * returned at most, so a caller wanting to know whether another page exists asks for one more
+   * than it shows.
+   */
+  List<AuditEvent> findPageForOrganization(UUID organizationId, KeysetCursor olderThan, int limit);
 }

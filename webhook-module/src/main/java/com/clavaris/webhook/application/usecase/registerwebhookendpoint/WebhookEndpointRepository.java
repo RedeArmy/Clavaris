@@ -53,7 +53,6 @@ public interface WebhookEndpointRepository {
    * couldn't reach anything a valid platform token doesn't already reach via the org-scoped
    * endpoints too.
    */
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<WebhookEndpoint> findById(UUID id);
 
   /**
@@ -85,7 +84,6 @@ public interface WebhookEndpointRepository {
    * DashboardControllerSupport#requireClientIdBelongsToOrganization} removal already established
    * for an identical shape of workaround (SDE-III review, 2026-09-15).
    */
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<WebhookEndpoint> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
   /**

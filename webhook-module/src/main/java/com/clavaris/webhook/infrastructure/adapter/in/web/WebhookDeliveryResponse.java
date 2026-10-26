@@ -4,7 +4,6 @@ import com.clavaris.webhook.domain.model.WebhookDelivery;
 import java.time.Instant;
 import java.util.UUID;
 
-@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
 public record WebhookDeliveryResponse(
     UUID id,
     UUID endpointId,

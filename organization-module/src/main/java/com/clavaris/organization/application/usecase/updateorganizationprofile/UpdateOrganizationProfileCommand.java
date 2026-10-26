@@ -15,7 +15,6 @@ import java.util.UUID;
  * @param newLogo an already validated image to store, or {@code null} to leave the logo as it is
  * @param removeLogo remove the current logo; ignored when {@code newLogo} is given
  */
-@SuppressWarnings("PMD.LongVariable")
 public record UpdateOrganizationProfileCommand(
     UUID organizationId,
     UUID ownerPlatformAccountId,

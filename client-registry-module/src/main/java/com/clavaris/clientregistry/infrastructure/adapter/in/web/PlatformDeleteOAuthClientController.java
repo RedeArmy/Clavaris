@@ -39,7 +39,6 @@ import org.springframework.web.server.ResponseStatusException;
  * as the link to reach this page being hidden there in the first place) and {@code POST} (the real
  * enforcement — {@link DeleteOAuthClientUseCase} itself, never trusting the GET-time check alone).
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/oauth-clients/{clientId}/delete")
@@ -64,10 +63,6 @@ public class PlatformDeleteOAuthClientController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // PMD.OnlyOneReturn: the still-active redirect and the real confirm-page render are two
-  // genuinely distinct exits, same rationale as every other multi-outcome handler in this
-  // codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showConfirmation(
       final HttpServletRequest request,
@@ -88,9 +83,6 @@ public class PlatformDeleteOAuthClientController {
     return CONFIRM_VIEW;
   }
 
-  // PMD.OnlyOneReturn: token-invalid/confirmation-mismatch/success each need their own exit, same
-  // rationale as PlatformDeleteOrganizationController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String delete(
       final HttpServletRequest request,

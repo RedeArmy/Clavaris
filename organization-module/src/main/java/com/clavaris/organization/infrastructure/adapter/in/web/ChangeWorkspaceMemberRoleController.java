@@ -36,7 +36,6 @@ class ChangeWorkspaceMemberRoleController {
 
   // Three exits (404 unknown membership, 409 last-admin guard, 200 success) — same rationale as
   // AddWorkspaceMemberController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Change or unassign a Workspace member's role (ADR-0027)")
   @ApiResponse(responseCode = "200", description = "Role changed")
   @ApiResponse(

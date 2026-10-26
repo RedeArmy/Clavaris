@@ -60,10 +60,6 @@ class OAuthGrantsRepositoryBridge implements OAuthGrantsRepository {
     return deleted > 0;
   }
 
-  // PMD.LongVariable: "registered_client_id" is the exact oauth2_authorization column term
-  // (TD-SEC-003's own upstream schema), same precedent as OAuthClient's own
-  // postLogoutRedirectUris suppression.
-  @SuppressWarnings("PMD.LongVariable")
   private OAuthGrant toGrant(final ResultSet resultSet) throws SQLException {
     final String registeredClientId = resultSet.getString("registered_client_id");
     return new OAuthGrant(
@@ -75,11 +71,6 @@ class OAuthGrantsRepositoryBridge implements OAuthGrantsRepository {
         coalesceInstant(resultSet, "access_token_expires_at", "refresh_token_expires_at"));
   }
 
-  // A dangling registered_client_id (the OAuthClient was deleted after issuing tokens still
-  // within their lifetime) is a real, expected state, not a data-integrity bug — the caller
-  // renders a fallback label for a null clientId rather than this failing the whole list.
-  // PMD.OnlyOneReturn/LongVariable: same rationale as this class's own toGrant suppression above.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   private String resolveClientId(final String registeredClientId) {
     try {
       return oauthClients
@@ -91,10 +82,6 @@ class OAuthGrantsRepositoryBridge implements OAuthGrantsRepository {
     }
   }
 
-  // PMD.OnlyOneReturn: two real, distinct outcomes — the primary column's value when present, the
-  // fallback column's otherwise — same rationale AccountProfileController's own identical
-  // suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static Instant coalesceInstant(
       final ResultSet resultSet, final String primaryColumn, final String fallbackColumn)
       throws SQLException {

@@ -58,7 +58,6 @@ public class WebhookUrlSsrfChecker {
   // Three exits (malformed/unresolvable host, a disallowed address found, everything clear) is
   // clearer here than forcing a single-return shape onto three genuinely different outcomes —
   // same rationale RegisterOAuthClientController's own identical suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public SsrfCheckResult check(final String url) {
     final String host = extractHost(url);
     if (host == null) {
@@ -85,8 +84,6 @@ public class WebhookUrlSsrfChecker {
     return SsrfCheckResult.SAFE_RESULT;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn") // a malformed URL (caught) vs. a well-formed one is two
-  // genuinely different outcomes, same rationale as check() itself just above.
   private String extractHost(final String url) {
     try {
       return URI.create(url).getHost();
@@ -95,8 +92,6 @@ public class WebhookUrlSsrfChecker {
     }
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn") // one guard per disallowed category reads clearer than a
-  // single boolean expression combining five independent JDK checks plus the manual IPv6 ULA one.
   private String disallowedReason(final InetAddress address) {
     if (address.isLoopbackAddress()) {
       return "loopback";

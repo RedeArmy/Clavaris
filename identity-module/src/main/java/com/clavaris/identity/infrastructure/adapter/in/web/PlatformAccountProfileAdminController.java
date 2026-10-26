@@ -41,11 +41,6 @@ import org.springframework.web.multipart.MultipartFile;
  * account holder resets it themselves via email, never an operator typing a value the operator then
  * knows (see that command's own Javadoc for the second-caller note this pass also added).
  */
-// PMD.AvoidFieldNameMatchingMethodName: updateProfile/removePicture/forcePasswordReset (the
-// fields) and their same-named @PostMapping handler methods name the same real concept — same
-// "the field is the collaborator, the method is the endpoint that calls it" shape every other
-// controller in this codebase already has for its own use-case fields.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidFieldNameMatchingMethodName"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountProfileAdminController {
@@ -80,10 +75,6 @@ public class PlatformAccountProfileAdminController {
         new PlatformAccountOrganizationAccess(organizationResolver, currentPlatformAccount);
   }
 
-  // PMD.OnlyOneReturn: two real, distinct outcomes — a username conflict redirects with an error
-  // message, success redirects plainly — same rationale uploadPicture's own identical suppression
-  // documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/profile")
   public String updateProfile(
       final HttpServletRequest request,
@@ -113,10 +104,6 @@ public class PlatformAccountProfileAdminController {
     return redirectToProfile(organizationId, accountId) + "?profileUpdated";
   }
 
-  // PMD.OnlyOneReturn: two real, distinct outcomes — a validation error redirects with an error
-  // message, success redirects plainly — same rationale AccountProfileController's own identical
-  // suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/picture")
   public String uploadPicture(
       final HttpServletRequest request,

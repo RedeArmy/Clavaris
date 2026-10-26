@@ -22,7 +22,7 @@ import java.util.UUID;
  * structural separation (ADR-0023: distinct trust boundaries, not one table with an optional
  * column).
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 @MappedSuperclass
 public abstract class AbstractClientCredentialEntity {
 

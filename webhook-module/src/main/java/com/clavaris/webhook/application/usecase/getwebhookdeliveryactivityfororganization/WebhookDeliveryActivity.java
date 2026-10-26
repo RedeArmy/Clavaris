@@ -11,10 +11,6 @@ import java.util.List;
  * failures and a success" — an honest approximation given what the domain actually records, not a
  * design flaw introduced here.
  */
-// PMD.LongVariable: successfulAttempts/failedAttempts name exactly what they hold, matching
-// WebhookDeliveryActivity's own class-level Javadoc terminology — same precedent this module's
-// other record fields already establish.
-@SuppressWarnings("PMD.LongVariable")
 public record WebhookDeliveryActivity(
     long successfulAttempts, long failedAttempts, List<HourlyBucket> hourlyBuckets) {
 

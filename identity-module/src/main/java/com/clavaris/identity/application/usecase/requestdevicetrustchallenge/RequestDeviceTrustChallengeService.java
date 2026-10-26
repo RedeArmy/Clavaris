@@ -41,7 +41,6 @@ public class RequestDeviceTrustChallengeService implements RequestDeviceTrustCha
     this.mailSender = mailSender;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void handle(final RequestDeviceTrustChallengeCommand command) {
     // Defensive only — every real caller just resolved this exact Account via its own primary

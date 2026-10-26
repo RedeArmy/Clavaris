@@ -37,8 +37,6 @@ import org.springframework.http.ResponseCookie;
  */
 public final class DeviceCookie {
 
-  @SuppressWarnings("PMD.LongVariable") // matches the cookie name it prefixes, not arbitrarily
-  // long — same precedent as other Clavaris-prefixed constants elsewhere in this codebase.
   private static final String COOKIE_NAME_PREFIX = "clavaris_device_";
 
   // Long-lived on purpose: this is "remember this browser," not a session-lifetime artifact.
@@ -56,7 +54,6 @@ public final class DeviceCookie {
   // "No cookies at all on this request" vs. "cookies present but none match this Organization" are
   // two distinct, equally-valid exits — same "each outcome needs its own exit" rationale as e.g.
   // RegisterAccountController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public static Optional<String> read(final HttpServletRequest request, final UUID organizationId) {
     final Cookie[] cookies = request.getCookies();
     if (cookies == null) {

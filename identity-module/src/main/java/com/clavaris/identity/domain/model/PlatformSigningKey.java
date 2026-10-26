@@ -19,7 +19,6 @@ import java.util.UUID;
  * AbstractSigningKey}'s own identical suppression already documents for this same constructor
  * parameter.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public final class PlatformSigningKey extends AbstractSigningKey {
 
   private PlatformSigningKey(

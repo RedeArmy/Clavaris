@@ -93,7 +93,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 // used on several descriptively-named fields/parameters — same rationale identity-module's own
 // IdentityUseCaseConfig class-level suppression documents for this exact
 // PMD-annotation-string-as-literal false positive.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
+@SuppressWarnings({
+  "PMD.ExcessiveImports",
+})
 @Controller
 @RequestMapping("/o/{organizationId}/register")
 public class RegisterAccountController {
@@ -125,18 +127,18 @@ public class RegisterAccountController {
 
   // Same port LoginController's own identical field already uses — no new abstraction, this
   // controller just now also reads it.
-  @SuppressWarnings("PMD.LongVariable")
   private final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider;
 
-  @SuppressWarnings({"java:S107", "PMD.LongVariable"})
+  @SuppressWarnings({
+    "java:S107",
+  })
   public RegisterAccountController(
       final RegisterAccountUseCase useCase,
       final RequestEmailVerificationUseCase requestEmailVerification,
       final AccountAuthenticationPolicyProvider policyProvider,
       final RequestEmailSignInCodeUseCase requestEmailSignInCode,
       final RequestEmailSignInLinkUseCase requestEmailSignInLink,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider,
+      final OrganizationSocialLoginPolicyProvider socialLoginPolicyProvider,
       final ReturnToApplicationLink returnToApplication) {
     this.useCase = useCase;
     this.requestEmailVerification = requestEmailVerification;
@@ -154,18 +156,6 @@ public class RegisterAccountController {
     return FORM_VIEW;
   }
 
-  // Early return per rejection reason is clearer here than accumulating a single exit through
-  // nested branching for the several independent failure modes (validation, password required,
-  // password mismatch, pending-approval, passwordless completion) that each need their own exit
-  // — PMD.OnlyOneReturn would make this harder to follow, not easier.
-  //
-  // SonarCloud's own cognitive-complexity rule (java:S3776) pushed past its threshold once
-  // BreachedPasswordException's own catch joined the others below. The fix moved the use-case call
-  // and its seven catches out into a separate helper method below, so this method now treats that
-  // whole step as a single logical unit instead of nesting every branch inline. PMD's own
-  // Cyclomatic and Cognitive Complexity checks dropped below their own thresholds as a direct
-  // result of that same extraction.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String register(
       @PathVariable final UUID organizationId,
@@ -261,7 +251,6 @@ public class RegisterAccountController {
   // reasons, register() itself only needs to know "did this succeed." Empty means an error was
   // already written into bindingResult/model and the caller should return FORM_VIEW as-is — same
   // "one exit per distinct outcome" rationale every catch below already followed inline.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private Optional<RegisterAccountResult> registerOrRejectAndPopulateModel(
       final UUID organizationId,
       final OrganizationId orgId,
@@ -342,7 +331,6 @@ public class RegisterAccountController {
   // Two genuinely distinct exits (email-code vs. email-link completion) — same "one exit per
   // distinct outcome" rationale this codebase's own guard-clause-heavy resolution logic already
   // documents elsewhere.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private String completePasswordlessSignUp(
       final UUID organizationId,
       final OrganizationId orgId,

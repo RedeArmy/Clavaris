@@ -14,14 +14,12 @@ import java.util.UUID;
  * time for an {@code OrganizationClient} (ADR-0023) — same role {@code PlatformClientRepository}'s
  * own identical Javadoc already describes for {@code PlatformClient}.
  */
-@SuppressWarnings("PMD.LongVariable")
 public interface OrganizationClientRepository {
 
   Optional<OrganizationClient> findByClientId(String clientId);
 
   // TD-SEC-010's own precedent: JdbcOAuth2AuthorizationService reconstructs a RegisteredClient by
   // its own internal id, not clientId, on every reload of a persisted OAuth2Authorization row.
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<OrganizationClient> findById(UUID id);
 
   List<OrganizationClient> findAllByOrganizationId(UUID organizationId);

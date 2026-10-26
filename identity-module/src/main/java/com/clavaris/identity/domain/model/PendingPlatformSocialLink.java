@@ -18,7 +18,6 @@ import java.util.UUID;
  * they are — same convention {@link AbstractPendingSocialLink}'s own identical suppression already
  * documents for these same two constructor parameters.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
 public final class PendingPlatformSocialLink extends AbstractPendingSocialLink<PlatformAccountId> {
 
   private PendingPlatformSocialLink(

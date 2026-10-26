@@ -149,7 +149,9 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
   // unchecked exception from the HTTP client, anything) must never abort the rest of this batch.
   // PMD.GuardLogStatement: same false-positive rationale as attemptOneDelivery's own identical
   // suppression.
-  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.GuardLogStatement"})
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException",
+  })
   private void attemptOneDeliveryIsolated(
       final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
     try {
@@ -190,14 +192,6 @@ public class DeliverPendingWebhooksService implements DeliverPendingWebhooksUseC
     }
   }
 
-  // PMD.GuardLogStatement false positives throughout — same rationale as every other logging call
-  // site in this codebase (e.g. AddWorkspaceMemberService's own identical suppression); the values
-  // logged are cheap in-memory accessors, not expensive computations the log level should gate.
-  // PMD.OnlyOneReturn: the early-return for a vanished endpoint is a genuinely distinct case from
-  // the rest of this method's own success/failure handling — same rationale
-  // ActiveSecretsEncrypted's own identical suppression documents. PMD.LongVariable:
-  // attemptCountAfterThisFailure names exactly what it is, not arbitrarily long.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn", "PMD.LongVariable"})
   private void attemptOneDelivery(
       final WebhookDelivery delivery, final Map<UUID, WebhookEndpoint> endpointsById) {
     final Optional<WebhookEndpoint> endpoint =

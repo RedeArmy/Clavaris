@@ -12,9 +12,6 @@ import java.util.Optional;
  */
 public interface PendingSocialLinkRepository {
 
-  // PMD.LongVariable: confirmationTokenHash names exactly what it is, same convention
-  // PendingSocialLink's own class-level suppression already documents for this exact name.
-  @SuppressWarnings("PMD.LongVariable")
   Optional<PendingSocialLink> findByConfirmationTokenHash(String confirmationTokenHash);
 
   void save(PendingSocialLink pendingLink);
