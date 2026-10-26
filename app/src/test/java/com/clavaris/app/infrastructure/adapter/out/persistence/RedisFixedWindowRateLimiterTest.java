@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitCheck;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitDecision;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
@@ -84,6 +85,48 @@ class RedisFixedWindowRateLimiterTest {
         .as("Retry-After must be a real, bounded remaining-window value, never negative or zero")
         .isPositive()
         .isLessThanOrEqualTo(Duration.ofMinutes(1));
+  }
+
+  // TD-PERF-046: several counters answered by one script call, each exactly as a call of its own.
+  @Test
+  void aBatchConsumesEveryCounterAndReturnsOneDecisionPerCheckInOrder() {
+    String perAccount = "test:acct:" + UUID.randomUUID();
+    String perIp = "test:ip:" + UUID.randomUUID();
+    String perClient = "test:client:" + UUID.randomUUID();
+    List<RateLimitCheck> checks =
+        List.of(
+            new RateLimitCheck(perAccount, 1, Duration.ofMinutes(1)),
+            new RateLimitCheck(perIp, 5, Duration.ofMinutes(1)),
+            new RateLimitCheck(perClient, 5, Duration.ofSeconds(30)));
+
+    List<RateLimitDecision> first = rateLimiter.tryConsumeAll(checks);
+    List<RateLimitDecision> second = rateLimiter.tryConsumeAll(checks);
+
+    assertThat(first).hasSize(3).allSatisfy(decision -> assertThat(decision.allowed()).isTrue());
+    assertThat(second.get(0).allowed()).as("per-account limit of 1 is spent").isFalse();
+    assertThat(second.get(1).allowed()).isTrue();
+    assertThat(second.get(2).allowed()).isTrue();
+    assertThat(second.get(0).currentCount()).isEqualTo(2);
+    assertThat(second.get(2).retryAfter())
+        .as("each check keeps its own window, not the first one's")
+        .isLessThanOrEqualTo(Duration.ofSeconds(30));
+    // A counter that was over its limit still counted the later ones: they were consumed anyway.
+    assertThat(rateLimiter.tryConsume(perIp, 5, Duration.ofMinutes(1)).currentCount()).isEqualTo(3);
+  }
+
+  @Test
+  void aBatchOfOneBehavesLikeASingleCall() {
+    String key = "test:" + UUID.randomUUID();
+
+    RateLimitDecision single = rateLimiter.tryConsume(key, 2, Duration.ofMinutes(1));
+    RateLimitDecision batched =
+        rateLimiter
+            .tryConsumeAll(List.of(new RateLimitCheck(key, 2, Duration.ofMinutes(1))))
+            .get(0);
+
+    assertThat(single.currentCount()).isEqualTo(1);
+    assertThat(batched.currentCount()).isEqualTo(2);
+    assertThat(batched.allowed()).isTrue();
   }
 
   @Test
