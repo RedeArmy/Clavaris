@@ -6,6 +6,7 @@ import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -74,11 +75,11 @@ class CachingClientDomainConfigRepository implements ClientDomainConfigRepositor
 
   // TD-SEC-058: straight passthrough, deliberately not cached — the only caller
   // (ClientDomainReverificationJob) is a once-daily background sweep, not a per-request hot path
-  // this cache exists for; caching "every VERIFIED config" would need its own invalidation story
+  // this cache exists for; caching a moving "stalest batch" would need its own invalidation story
   // for no real benefit here.
   @Override
-  public List<ClientDomainConfig> findAllVerified() {
-    return delegate.findAllVerified();
+  public List<ClientDomainConfig> findStalestVerified(final Instant cutoff, final int limit) {
+    return delegate.findStalestVerified(cutoff, limit);
   }
 
   // Passthrough, deliberately not cached here: the only caller (the session-cookie policy) keeps

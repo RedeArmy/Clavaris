@@ -4,9 +4,11 @@ import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.DomainVerificationStatus;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -37,8 +39,11 @@ class JpaClientDomainConfigRepository implements ClientDomainConfigRepository {
   }
 
   @Override
-  public List<ClientDomainConfig> findAllVerified() {
-    return domainConfigs.findByVerificationStatus(DomainVerificationStatus.VERIFIED.name()).stream()
+  public List<ClientDomainConfig> findStalestVerified(final Instant cutoff, final int limit) {
+    return domainConfigs
+        .findStalestByVerificationStatus(
+            DomainVerificationStatus.VERIFIED.name(), cutoff, PageRequest.of(0, limit))
+        .stream()
         .map(this::toDomain)
         .toList();
   }
