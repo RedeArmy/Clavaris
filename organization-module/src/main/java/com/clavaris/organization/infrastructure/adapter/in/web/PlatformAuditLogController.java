@@ -1,10 +1,13 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditEvent;
+import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.auditlog.AuditCategory;
 import com.clavaris.common.domain.model.auditlog.AuditDetailFormatter;
 import com.clavaris.common.domain.model.auditlog.AuditLogEntryView;
 import com.clavaris.common.domain.model.auditlog.AuditLogPresenter;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.AuditLogPage;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationQuery;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountQuery;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
@@ -15,6 +18,7 @@ import com.clavaris.organization.application.usecase.listworkspacesfororganizati
 import com.clavaris.organization.domain.model.Organization;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
@@ -34,11 +38,10 @@ import org.springframework.web.server.ResponseStatusException;
  * ADR-0025: the dashboard's own audit-log view — {@code GET
  * /platform/dashboard/organizations/{organizationId}/audit-log}. The first fully read-only
  * controller in this codebase's dashboard: no {@code @PostMapping}, no form, no HTMX fragment — a
- * plain bounded list, same "no real pagination yet" posture {@link
- * GetAuditLogForOrganizationUseCase}'s own Javadoc documents for the underlying query. Linked from
- * {@code organization-detail.html} as its own page rather than inlined (unlike the small Rate Limit
- * display) — up to 100 rows doesn't belong crammed into that page the way a single-value display
- * does.
+ * plain list, paged by cursor ("Older events") over the tenant key the audit table carries since
+ * TD-ARCH-038. Linked from {@code organization-detail.html} as its own page rather than inlined
+ * (unlike the small Rate Limit display) — up to 100 rows doesn't belong crammed into that page the
+ * way a single-value display does.
  *
  * <p>The page is written for the person reading it, not for an operator: each raw event is turned
  * into a sentence ("Secret Key deleted") with who did it ("You"), when ("3 hours ago"), and the
@@ -52,10 +55,9 @@ import org.springframework.web.server.ResponseStatusException;
  * this codebase already establishes: an organizationId this {@code PlatformAccount} doesn't own
  * 404s identically to one that doesn't exist.
  */
-// PMD.LongVariable: currentPlatformAccount/ownerPlatformAccountId are long by design, not
-// accidentally — same class-level-suppression precedent PlatformOrganizationDetailController's
-// own identical rationale documents.
-@SuppressWarnings("PMD.LongVariable")
+// PMD.ExcessiveImports: the audit-log view's presenter, categories and use case are each a distinct
+// collaborator of this one page; splitting the controller would only spread them.
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/audit-log")
 public class PlatformAuditLogController {
@@ -89,6 +91,7 @@ public class PlatformAuditLogController {
       final HttpServletRequest request,
       @PathVariable final UUID organizationId,
       @RequestParam(required = false) final String category,
+      @RequestParam(required = false) final String olderThan,
       final Model model) {
     final UUID ownerPlatformAccountId =
         currentPlatformAccount
@@ -103,7 +106,9 @@ public class PlatformAuditLogController {
                 new GetOrganizationForPlatformAccountQuery(organizationId, ownerPlatformAccountId))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-    final List<AuditEvent> events = getAuditLog.handle(organizationId);
+    final AuditLogPage page =
+        getAuditLog.handle(new GetAuditLogForOrganizationQuery(organizationId, decode(olderThan)));
+    final List<AuditEvent> events = page.events();
     final AuditLogPresenter.Context context =
         new AuditLogPresenter.Context(
             ownerPlatformAccountId.toString(), namesFor(organizationId), Instant.now(), "");
@@ -120,7 +125,21 @@ public class PlatformAuditLogController {
     model.addAttribute("categories", chipsFor(all));
     model.addAttribute("selectedCategory", selected.map(AuditCategory::slug).orElse(""));
     model.addAttribute("totalCount", all.size());
+    model.addAttribute("nextOlderThan", page.hasOlder() ? page.nextOlderThan().encode() : null);
+    model.addAttribute("onOlderPage", olderThan != null && !olderThan.isBlank());
     return AUDIT_LOG_VIEW;
+  }
+
+  // A cursor that does not decode is a malformed request, not a server error.
+  private static KeysetCursor decode(final String token) {
+    if (token == null || token.isBlank()) {
+      return null;
+    }
+    try {
+      return KeysetCursor.decode(token);
+    } catch (final IllegalArgumentException | DateTimeParseException _) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+    }
   }
 
   // Only the groups that actually hold events get a chip, in the catalog's own order.

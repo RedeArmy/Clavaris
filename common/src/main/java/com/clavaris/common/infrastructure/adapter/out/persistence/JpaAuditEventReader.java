@@ -4,11 +4,13 @@ import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
 import com.clavaris.common.domain.model.AuditEventTargetRef;
+import com.clavaris.common.domain.model.KeysetCursor;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -68,6 +70,28 @@ class JpaAuditEventReader implements AuditEventReader {
     }
     query.setMaxResults(maxResults);
 
+    return query.getResultList().stream().map(JpaAuditEventReader::toDomain).toList();
+  }
+
+  // TD-ARCH-038: keyset order (occurred_at, id) so rows written in the same instant neither repeat
+  // nor vanish between pages, served by ix_audit_events_organization_occurred.
+  @Override
+  public List<AuditEvent> findPageForOrganization(
+      final UUID organizationId, final KeysetCursor olderThan, final int limit) {
+    final String older =
+        olderThan == null ? "" : " AND (e.occurredAt < :at OR (e.occurredAt = :at AND e.id < :id))";
+    final TypedQuery<AuditEventEntity> query =
+        entityManager.createQuery(
+            "SELECT e FROM AuditEventEntity e WHERE e.organizationId = :organizationId"
+                + older
+                + " ORDER BY e.occurredAt DESC, e.id DESC",
+            AuditEventEntity.class);
+    query.setParameter("organizationId", organizationId);
+    if (olderThan != null) {
+      query.setParameter("at", olderThan.createdAt());
+      query.setParameter("id", olderThan.id());
+    }
+    query.setMaxResults(limit);
     return query.getResultList().stream().map(JpaAuditEventReader::toDomain).toList();
   }
 

@@ -1,6 +1,7 @@
 package com.clavaris.common.application.port;
 
 import com.clavaris.common.domain.model.AuditActor;
+import java.util.UUID;
 
 /**
  * TD-SEC-007: the outbound port every business module's own use-case services call, directly, from
@@ -32,4 +33,21 @@ public interface AuditEventRecorder {
   // (Java's own record-type keyword, contextual since Java 16) regardless of that this method
   // legitimately compiles fine either way.
   void write(AuditActor actor, String action, String targetType, String targetId, String detail);
+
+  /**
+   * As above, for a caller that already knows the Organization the event belongs to (TD-ARCH-038).
+   * The five-argument form works the Organization out from the target, which cannot be done once
+   * the target has been deleted; a service that deletes and then records passes it here instead.
+   * The default ignores {@code organizationId} so a minimal implementation (a no-op in a test) only
+   * has to supply the five-argument form; the persistent recorder overrides it.
+   */
+  default void write(
+      final AuditActor actor,
+      final String action,
+      final String targetType,
+      final String targetId,
+      final String detail,
+      final UUID organizationId) {
+    write(actor, action, targetType, targetId, detail);
+  }
 }

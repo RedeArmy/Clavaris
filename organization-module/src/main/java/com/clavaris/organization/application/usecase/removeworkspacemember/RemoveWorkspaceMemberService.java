@@ -60,8 +60,7 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
       final WorkspaceRoleRepository roles,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
       final WorkspaceMemberAccountRevoker accountRevoker) {
     this.memberships = memberships;
     this.workspaces = workspaces;
@@ -124,7 +123,8 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
         "workspace_membership.removed",
         "WorkspaceMembership",
         membership.id().toString(),
-        "workspaceId=" + command.workspaceId());
+        "workspaceId=" + command.workspaceId(),
+        organizationId);
 
     outbox.write(
         "WorkspaceMembership",

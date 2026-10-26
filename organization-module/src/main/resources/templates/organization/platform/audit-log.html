@@ -55,7 +55,12 @@
 
                 <div th:unless="${totalCount == 0}"
                      th:replace="~{platform/fragments/audit-table :: auditTable(${entries})}"></div>
-                <p class="clavaris-field-hint" th:if="${totalCount >= 100}">Showing the 100 most recent events.</p>
+                <p class="clavaris-links clavaris-links--split" th:if="${nextOlderThan != null or onOlderPage}">
+                    <a th:if="${onOlderPage}"
+                       th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organization.id()},category=${selectedCategory == '' ? null : selectedCategory})}">Newest events</a>
+                    <a th:if="${nextOlderThan != null}"
+                       th:href="@{/platform/dashboard/organizations/{id}/audit-log(id=${organization.id()},category=${selectedCategory == '' ? null : selectedCategory},olderThan=${nextOlderThan})}">Older events</a>
+                </p>
             </div>
         </div>
     </main>

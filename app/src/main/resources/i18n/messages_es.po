@@ -2096,11 +2096,14 @@ msgstr "Configurar"
 msgid "Settings"
 msgstr "Configuración"
 
+msgid "Newest events"
+msgstr "Eventos más recientes"
+
+msgid "Older events"
+msgstr "Eventos anteriores"
+
 msgid "Settings were updated."
 msgstr "Se actualizó la configuración."
-
-msgid "Showing the 100 most recent events."
-msgstr "Se muestran los 100 eventos más recientes."
 
 msgid "Shown once, at creation, rotation, or reactivation — Clavaris never stores or displays it again. Use \"Rotate secret\" below for a new one."
 msgstr "Se muestra una sola vez, al crearlo, rotarlo o reactivarlo; Clavaris no lo almacena ni lo vuelve a mostrar. Usa «Rotar secreto» abajo para obtener uno nuevo."

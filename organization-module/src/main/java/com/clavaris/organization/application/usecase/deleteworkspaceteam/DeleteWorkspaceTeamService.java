@@ -128,7 +128,8 @@ public class DeleteWorkspaceTeamService implements DeleteWorkspaceTeamUseCase {
         "workspace_team.deleted",
         "WorkspaceTeam",
         team.id().toString(),
-        "workspaceId=" + team.workspaceId());
+        "workspaceId=" + team.workspaceId(),
+        command.organizationId());
 
     for (final UUID roleId : rolesToActuallyDelete) {
       deleteAlreadyValidatedRole(command, roleId);

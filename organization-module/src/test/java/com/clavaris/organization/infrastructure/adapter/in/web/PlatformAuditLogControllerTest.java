@@ -13,6 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
+import com.clavaris.common.domain.model.KeysetCursor;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.AuditLogPage;
+import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationQuery;
 import com.clavaris.organization.application.usecase.getauditlogfororganization.GetAuditLogForOrganizationUseCase;
 import com.clavaris.organization.application.usecase.getorganizationforplatformaccount.GetOrganizationForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listworkspacerolesfororganization.ListWorkspaceRolesForOrganizationUseCase;
@@ -58,7 +61,7 @@ class PlatformAuditLogControllerTest {
 
     when(currentPlatformAccount.resolve(any())).thenReturn(Optional.of(OWNER_ID));
     when(getOrganization.handle(any())).thenReturn(Optional.of(organization));
-    when(getAuditLog.handle(any())).thenReturn(List.of());
+    when(getAuditLog.handle(any())).thenReturn(page());
     when(listWorkspaces.handle(any())).thenReturn(List.of());
     when(listRoles.handle(any())).thenReturn(List.of());
 
@@ -103,8 +106,8 @@ class PlatformAuditLogControllerTest {
 
   @Test
   void showsTheOrganizationsAuditLogAsPresenterRows() throws Exception {
-    when(getAuditLog.handle(organization.id()))
-        .thenReturn(List.of(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
+    when(getAuditLog.handle(newestOf(organization.id())))
+        .thenReturn(page(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
 
     mockMvc
         .perform(get(path()))
@@ -118,8 +121,8 @@ class PlatformAuditLogControllerTest {
   // The point of the page: a person reads a sentence and a name, not a machine key and a UUID.
   @Test
   void readsLikeAPersonWouldWriteItNotLikeTheRawRecord() throws Exception {
-    when(getAuditLog.handle(organization.id()))
-        .thenReturn(List.of(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
+    when(getAuditLog.handle(newestOf(organization.id())))
+        .thenReturn(page(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
 
     mockMvc
         .perform(get(path()))
@@ -133,8 +136,8 @@ class PlatformAuditLogControllerTest {
 
   @Test
   void theRawRecordIsOnlyEverInsideTheCollapsedTechnicalDetails() throws Exception {
-    when(getAuditLog.handle(organization.id()))
-        .thenReturn(List.of(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
+    when(getAuditLog.handle(newestOf(organization.id())))
+        .thenReturn(page(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
 
     final String html = mockMvc.perform(get(path())).andReturn().getResponse().getContentAsString();
     final String visible = html.substring(0, html.indexOf("<details"));
@@ -151,7 +154,7 @@ class PlatformAuditLogControllerTest {
     AuditEvent workspace =
         AuditEvent.of(
             AuditActor.platformAccount(OWNER_ID), "workspace.created", "Workspace", "ws-1", null);
-    when(getAuditLog.handle(organization.id())).thenReturn(List.of(secretKey, workspace));
+    when(getAuditLog.handle(newestOf(organization.id()))).thenReturn(page(secretKey, workspace));
 
     mockMvc
         .perform(get(path()).param("category", "secret-keys"))
@@ -165,8 +168,8 @@ class PlatformAuditLogControllerTest {
 
   @Test
   void anUnknownCategoryShowsEverything() throws Exception {
-    when(getAuditLog.handle(organization.id()))
-        .thenReturn(List.of(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
+    when(getAuditLog.handle(newestOf(organization.id())))
+        .thenReturn(page(deletedKeyBy(AuditActor.platformAccount(OWNER_ID))));
 
     mockMvc
         .perform(get(path()).param("category", "nonsense"))
@@ -189,7 +192,7 @@ class PlatformAuditLogControllerTest {
             "WorkspaceMembership",
             "m-1",
             "previousRoleId=gone-role newRoleId=" + recruiter.id());
-    when(getAuditLog.handle(organization.id())).thenReturn(List.of(changed));
+    when(getAuditLog.handle(newestOf(organization.id()))).thenReturn(page(changed));
 
     mockMvc
         .perform(get(path()))
@@ -212,5 +215,46 @@ class PlatformAuditLogControllerTest {
     when(getOrganization.handle(any())).thenReturn(Optional.empty());
 
     mockMvc.perform(get(path())).andExpect(status().isNotFound());
+  }
+
+  private static GetAuditLogForOrganizationQuery newestOf(final UUID organizationId) {
+    return GetAuditLogForOrganizationQuery.newest(organizationId);
+  }
+
+  private static AuditLogPage page(final AuditEvent... events) {
+    return new AuditLogPage(List.of(events), null);
+  }
+
+  // TD-ARCH-038: paging. A next page is offered as a link carrying its cursor, and following it
+  // hands that same cursor back to the use case.
+  @Test
+  void offersTheOlderPageAsALinkAndPassesItsCursorBack() throws Exception {
+    final AuditEvent last = deletedKeyBy(AuditActor.platformAccount(OWNER_ID));
+    final KeysetCursor cursor = new KeysetCursor(last.occurredAt(), last.id());
+    when(getAuditLog.handle(newestOf(organization.id())))
+        .thenReturn(new AuditLogPage(List.of(last), cursor));
+    when(getAuditLog.handle(new GetAuditLogForOrganizationQuery(organization.id(), cursor)))
+        .thenReturn(page());
+
+    mockMvc
+        .perform(get(path()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("nextOlderThan", cursor.encode()))
+        .andExpect(model().attribute("onOlderPage", false))
+        .andExpect(content().string(containsString("Older events")))
+        .andExpect(content().string(containsString("olderThan=")));
+
+    mockMvc
+        .perform(get(path()).param("olderThan", cursor.encode()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("onOlderPage", true))
+        .andExpect(content().string(containsString("Newest events")));
+  }
+
+  @Test
+  void aCursorThatDoesNotDecodeIsABadRequest() throws Exception {
+    mockMvc
+        .perform(get(path()).param("olderThan", "not-a-cursor"))
+        .andExpect(status().isBadRequest());
   }
 }

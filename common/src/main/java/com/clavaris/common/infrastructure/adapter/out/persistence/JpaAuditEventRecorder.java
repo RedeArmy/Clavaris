@@ -1,11 +1,15 @@
 package com.clavaris.common.infrastructure.adapter.out.persistence;
 
 import com.clavaris.common.application.port.AuditEventRecorder;
+import com.clavaris.common.application.port.AuditTenantResolver;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
 import jakarta.persistence.EntityManager;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,9 +36,12 @@ class JpaAuditEventRecorder implements AuditEventRecorder {
   private static final Logger LOG = LoggerFactory.getLogger(JpaAuditEventRecorder.class);
 
   private final EntityManager entityManager;
+  private final ObjectProvider<AuditTenantResolver> tenantResolver;
 
-  /* package */ JpaAuditEventRecorder(final EntityManager entityManager) {
+  /* package */ JpaAuditEventRecorder(
+      final EntityManager entityManager, final ObjectProvider<AuditTenantResolver> tenantResolver) {
     this.entityManager = entityManager;
+    this.tenantResolver = tenantResolver;
   }
 
   @Override
@@ -46,6 +53,22 @@ class JpaAuditEventRecorder implements AuditEventRecorder {
       final String targetId,
       final String detail) {
     final AuditEvent event = AuditEvent.of(actor, action, targetType, targetId, detail);
+    persist(event, organizationOf(event));
+  }
+
+  @Override
+  @Transactional
+  public void write(
+      final AuditActor actor,
+      final String action,
+      final String targetType,
+      final String targetId,
+      final String detail,
+      final UUID organizationId) {
+    persist(AuditEvent.of(actor, action, targetType, targetId, detail), organizationId);
+  }
+
+  private void persist(final AuditEvent event, final UUID organizationId) {
     entityManager.persist(
         new AuditEventEntity(
             event.id(),
@@ -55,7 +78,8 @@ class JpaAuditEventRecorder implements AuditEventRecorder {
             event.targetType(),
             event.targetId().orElse(null),
             event.detail().orElse(null),
-            event.occurredAt()));
+            event.occurredAt(),
+            organizationId));
     // Guarded, not unconditional: same rationale as TokenRevocationEventLogger's own identical
     // guard — SonarCloud (rule S2629, unlike PMD's GuardLogStatement elsewhere in this codebase,
     // which treats plain accessor arguments as a false positive) won't assume the accessor chain
@@ -71,6 +95,24 @@ class JpaAuditEventRecorder implements AuditEventRecorder {
           event.action(),
           event.targetType(),
           event.targetId().orElse("-"));
+    }
+  }
+
+  // TD-ARCH-038: the tenant key is a convenience for reading the log, never a reason to lose the
+  // event. A resolver that is absent (this module's own tests) or cannot answer leaves it null.
+  private UUID organizationOf(final AuditEvent event) {
+    final AuditTenantResolver resolver = tenantResolver.getIfAvailable();
+    if (resolver == null || event.targetId().isEmpty()) {
+      return null;
+    }
+    try {
+      return resolver.organizationOf(event.targetType(), event.targetId().get()).orElse(null);
+    } catch (final DataAccessException e) {
+      LOG.warn(
+          "event=audit_tenant_unresolved action={} exceptionType={}",
+          event.action(),
+          e.getClass().getName());
+      return null;
     }
   }
 }

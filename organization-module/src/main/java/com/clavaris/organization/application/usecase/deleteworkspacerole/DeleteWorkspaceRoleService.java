@@ -123,7 +123,8 @@ public class DeleteWorkspaceRoleService implements DeleteWorkspaceRoleUseCase {
         "workspace_role.deleted",
         "WorkspaceRole",
         role.id().toString(),
-        "organizationId=" + role.organizationId());
+        "organizationId=" + role.organizationId(),
+        role.organizationId());
 
     outbox.write(
         "WorkspaceRole",

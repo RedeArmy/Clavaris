@@ -35,6 +35,11 @@ public class AuditEventEntity {
   @Column(name = "occurred_at", nullable = false)
   private Instant occurredAt;
 
+  // TD-ARCH-038: the Organization the event belongs to; null for platform-level events and for
+  // events whose target could not be resolved when they were written.
+  @Column(name = "organization_id")
+  private UUID organizationId;
+
   protected AuditEventEntity() {}
 
   // java:S107: a plain persistence-mapping data holder (this class's own Javadoc) — one
@@ -50,7 +55,8 @@ public class AuditEventEntity {
       final String targetType,
       final String targetId,
       final String detail,
-      final Instant occurredAt) {
+      final Instant occurredAt,
+      final UUID organizationId) {
     this.id = id;
     this.actorType = actorType;
     this.actorId = actorId;
@@ -59,6 +65,7 @@ public class AuditEventEntity {
     this.targetId = targetId;
     this.detail = detail;
     this.occurredAt = occurredAt;
+    this.organizationId = organizationId;
   }
 
   public UUID getId() {
@@ -87,6 +94,10 @@ public class AuditEventEntity {
 
   public String getDetail() {
     return detail;
+  }
+
+  public UUID getOrganizationId() {
+    return organizationId;
   }
 
   public Instant getOccurredAt() {

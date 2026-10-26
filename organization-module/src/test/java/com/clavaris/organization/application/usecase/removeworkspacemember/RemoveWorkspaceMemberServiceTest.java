@@ -165,7 +165,8 @@ class RemoveWorkspaceMemberServiceTest {
             eq("workspace_membership.removed"),
             eq("WorkspaceMembership"),
             eq(membership.id().toString()),
-            any());
+            any(),
+            eq(organizationId));
     verify(outbox)
         .write(
             eq("WorkspaceMembership"),

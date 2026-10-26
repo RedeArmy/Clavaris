@@ -86,7 +86,8 @@ class DeleteWorkspaceTeamServiceTest {
             eq("workspace_team.deleted"),
             eq("WorkspaceTeam"),
             eq(team.id().toString()),
-            any());
+            any(),
+            eq(organizationId));
   }
 
   @Test

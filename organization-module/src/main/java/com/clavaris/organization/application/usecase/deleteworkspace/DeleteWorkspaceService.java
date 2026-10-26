@@ -72,8 +72,7 @@ public class DeleteWorkspaceService implements DeleteWorkspaceUseCase {
       final WorkspaceMembershipRepository memberships,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox,
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
+      final WorkspaceMemberRefreshTokenRevoker refreshTokenRevoker,
       final WorkspaceMemberAccountRevoker accountRevoker) {
     this.workspaces = workspaces;
     this.memberships = memberships;

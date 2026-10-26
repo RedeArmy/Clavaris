@@ -7,6 +7,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.common.domain.model.AuditEvent;
 import com.clavaris.common.domain.model.AuditEventTargetRef;
+import com.clavaris.common.domain.model.KeysetCursor;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -105,7 +106,8 @@ class JpaAuditEventReaderTest {
             "Organization",
             organizationId.toString(),
             "first",
-            earlier));
+            earlier,
+            null));
     springDataRepository.save(
         new AuditEventEntity(
             UUID.randomUUID(),
@@ -115,7 +117,8 @@ class JpaAuditEventReaderTest {
             "Organization",
             organizationId.toString(),
             "second",
-            later));
+            later,
+            null));
 
     List<AuditEvent> result =
         reader.findRecentForTargets(
@@ -154,4 +157,76 @@ class JpaAuditEventReaderTest {
   @EnableJpaRepositories(basePackageClasses = SpringDataAuditEventJpaRepository.class)
   @Import({JpaAuditEventRecorder.class, JpaAuditEventReader.class})
   static class TestConfig {}
+
+  // TD-ARCH-038: the tenant-keyed page — scoped to one Organization, newest first, resumable.
+  private void saveEvent(final UUID organizationId, final String detail, final Instant at) {
+    springDataRepository.save(
+        new AuditEventEntity(
+            UUID.randomUUID(),
+            "PLATFORM_ACCOUNT",
+            UUID.randomUUID().toString(),
+            "organization.updated",
+            "Organization",
+            organizationId == null ? null : organizationId.toString(),
+            detail,
+            at,
+            organizationId));
+  }
+
+  @Test
+  void anOrganizationsPageHoldsOnlyItsOwnEventsNewestFirst() {
+    final UUID mine = UUID.randomUUID();
+    final UUID theirs = UUID.randomUUID();
+    final Instant base = Instant.parse("2026-10-25T12:00:00Z");
+    saveEvent(mine, "oldest", base.minusSeconds(120));
+    saveEvent(theirs, "someone else's", base.minusSeconds(60));
+    saveEvent(mine, "newest", base);
+    saveEvent(null, "no organization", base.minusSeconds(30));
+
+    final List<AuditEvent> page = reader.findPageForOrganization(mine, null, 10);
+
+    assertThat(page)
+        .extracting(event -> event.detail().orElse(""))
+        .containsExactly("newest", "oldest");
+  }
+
+  @Test
+  void aCursorResumesAfterTheLastRowOfThePreviousPageWithoutRepeatsOrGaps() {
+    final UUID mine = UUID.randomUUID();
+    final Instant base = Instant.parse("2026-10-25T12:00:00Z");
+    for (int i = 0; i < 5; i++) {
+      saveEvent(mine, "event-" + i, base.minusSeconds(i));
+    }
+
+    final List<AuditEvent> first = reader.findPageForOrganization(mine, null, 2);
+    final AuditEvent lastOfFirst = first.getLast();
+    final List<AuditEvent> second =
+        reader.findPageForOrganization(
+            mine, new KeysetCursor(lastOfFirst.occurredAt(), lastOfFirst.id()), 2);
+
+    assertThat(first)
+        .extracting(event -> event.detail().orElse(""))
+        .containsExactly("event-0", "event-1");
+    assertThat(second)
+        .extracting(event -> event.detail().orElse(""))
+        .containsExactly("event-2", "event-3");
+  }
+
+  @Test
+  void rowsRecordedInTheSameInstantAreOrderedByIdSoNoneIsSkippedAtAPageBoundary() {
+    final UUID mine = UUID.randomUUID();
+    final Instant sameInstant = Instant.parse("2026-10-25T12:00:00Z");
+    for (int i = 0; i < 4; i++) {
+      saveEvent(mine, "tie-" + i, sameInstant);
+    }
+
+    final List<AuditEvent> first = reader.findPageForOrganization(mine, null, 2);
+    final List<AuditEvent> second =
+        reader.findPageForOrganization(
+            mine, new KeysetCursor(first.getLast().occurredAt(), first.getLast().id()), 2);
+
+    assertThat(java.util.stream.Stream.concat(first.stream(), second.stream()).map(AuditEvent::id))
+        .doesNotHaveDuplicates()
+        .hasSize(4);
+  }
 }
