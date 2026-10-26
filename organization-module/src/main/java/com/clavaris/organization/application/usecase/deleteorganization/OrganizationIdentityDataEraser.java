@@ -16,5 +16,12 @@ import java.util.UUID;
 @FunctionalInterface
 public interface OrganizationIdentityDataEraser {
 
-  void eraseAllFor(UUID organizationId);
+  /**
+   * Deletes the database rows (inside the caller's transaction) and returns the slow side effects
+   * that belong to them but must not run inside it: revoking every live session of the erased
+   * accounts and purging the signing-key material from the key store (TD-PERF-043). The caller runs
+   * the returned action once the transaction has committed, so a rollback leaves the key material
+   * intact and the transaction never holds a connection while those are done.
+   */
+  Runnable eraseAllFor(UUID organizationId);
 }

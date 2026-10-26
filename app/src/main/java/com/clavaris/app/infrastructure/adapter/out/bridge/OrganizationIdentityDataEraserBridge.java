@@ -64,15 +64,12 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
   }
 
   @Override
-  public void eraseAllFor(final UUID organizationId) {
+  public Runnable eraseAllFor(final UUID organizationId) {
     final OrganizationId orgId = new OrganizationId(organizationId);
 
-    for (final AccountId accountId : accounts.findAllAccountIdsByOrganizationId(orgId)) {
-      accountSessionRevoker.revokeAllSessionsFor(accountId);
-    }
-
-    // TD-SEC-052: must be read before the deleteAllByOrganizationId call below — that's the only
-    // place this Organization's full kid history (active and long-retired alike) is enumerable.
+    // Read now, while the rows exist: the ids to revoke sessions for, and (TD-SEC-052) the full kid
+    // history, which only the signing_keys rows enumerate and which is gone once they are deleted.
+    final List<AccountId> accountIds = accounts.findAllAccountIdsByOrganizationId(orgId);
     final List<String> kids = signingKeys.findAllKidsByOrganizationId(orgId);
 
     // Cascades (V20260826100000, identity-module) to each Account's own password_credentials,
@@ -81,8 +78,17 @@ class OrganizationIdentityDataEraserBridge implements OrganizationIdentityDataEr
     accounts.deleteAllByOrganizationId(orgId);
     signingKeys.deleteAllByOrganizationId(orgId);
 
-    // TD-SEC-052: last step — evicts the in-memory cache entry (if any) and every historical kid's
-    // own PKCS12 entry, the purge TD-SEC-029's emergency-revocation discipline never reached.
-    keyMaterial.purgeAllFor(orgId, kids);
+    // TD-PERF-043: the slow part waits for the commit. One Redis lookup per account and a rewrite
+    // of
+    // the key file used to run inside the transaction, holding a pooled connection (and, for the
+    // key file, state that a rollback could not restore) for minutes on a large tenant.
+    return () -> {
+      for (final AccountId accountId : accountIds) {
+        accountSessionRevoker.revokeAllSessionsFor(accountId);
+      }
+      // TD-SEC-052: evicts the in-memory cache entry (if any) and every historical kid's own PKCS12
+      // entry, the purge TD-SEC-029's emergency-revocation discipline never reached.
+      keyMaterial.purgeAllFor(orgId, kids);
+    };
   }
 }

@@ -1,5 +1,6 @@
 package com.clavaris.organization.application.usecase.deleteorganization;
 
+import com.clavaris.common.application.port.AfterCommitExecutor;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.event.OrganizationDeletedEvent;
@@ -88,6 +89,7 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
 
   private final AuditEventRecorder auditEvents;
   private final EventOutboxWriter outbox;
+  private final AfterCommitExecutor afterCommit;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — same rationale as
   // identity-module's DeleteAccountService/ConfirmPasswordResetService's own identical
@@ -99,7 +101,8 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
       final OrganizationOAuthClientsEraser oauthClientsEraser,
       final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
-      final EventOutboxWriter outbox) {
+      final EventOutboxWriter outbox,
+      final AfterCommitExecutor afterCommit) {
     this.organizations = organizations;
     this.organizationTokenRevoker = organizationTokenRevoker;
     this.identityDataEraser = identityDataEraser;
@@ -107,6 +110,7 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
     this.webhookDataEraser = webhookDataEraser;
     this.auditEvents = auditEvents;
     this.outbox = outbox;
+    this.afterCommit = afterCommit;
   }
 
   @Override
@@ -135,7 +139,10 @@ public class DeleteOrganizationService implements DeleteOrganizationUseCase {
     organizationTokenRevoker.revokeAllTokensFor(command.organizationId());
 
     // No ordering dependency between these three — see this class's own Javadoc.
-    identityDataEraser.eraseAllFor(command.organizationId());
+    // TD-PERF-043: the rows go now, in this transaction; the session revocation and the key-file
+    // purge it returns wait for the commit, so this transaction holds its connection for the
+    // database work only, and a rollback does not leave a tenant with its key material destroyed.
+    afterCommit.run(identityDataEraser.eraseAllFor(command.organizationId()));
     oauthClientsEraser.eraseAllFor(command.organizationId());
     webhookDataEraser.eraseAllFor(command.organizationId());
 
