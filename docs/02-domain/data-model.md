@@ -150,9 +150,9 @@ erDiagram
         uuid organization_id FK
         varchar client_id UK
         varchar client_secret_hash
-        text redirect_uris
-        text allowed_grant_types
-        text allowed_scopes
+        jsonb redirect_uris
+        jsonb allowed_grant_types
+        jsonb allowed_scopes
         boolean require_consent
         timestamptz created_at
     }
@@ -160,7 +160,7 @@ erDiagram
         uuid id PK
         varchar client_id UK
         varchar client_secret_hash
-        text allowed_scopes
+        jsonb allowed_scopes
         timestamptz created_at
     }
     OAUTH2_AUTHORIZATION {
@@ -257,6 +257,7 @@ erDiagram
 - **`sessions.scopes`** — BR-ID-03, real (not placeholder) shape: `text` (JSON array, same convention as `oauth_clients.allowed_scopes`), fixed at open time — RFC 6749 §6 forbids a refresh grant from ever widening scope beyond what the original authorization actually granted, so every `refresh_tokens` row in this session's chain is validated against this same, unchanging set. Replaces this document's original placeholder `user_agent` column — still no use case populates one; the "list your active sessions/devices" feature this note used to say didn't exist yet (BR-ID-13) now does, for both tiers (2026-09-02, TD-FUT-026 extended it to `PlatformAccount`), but it's built on the Spring-Session-backed `HttpSession` store instead (no table — Redis-only, see `SessionDeviceAttributes`), not on this table.
 - **`known_devices`** (BR-ID-14, new-device login email notification) — `account_id` FK (`REFERENCES accounts (id) ON DELETE CASCADE`, from day one — unlike the social-login tables, which needed a follow-up migration to add this), `user_agent varchar(512)` (the raw header, display/audit only — never the match key), `device_token_hash varchar(255)` (TD-SEC-033, 2026-08-31: the real match key — the hash of an opaque, high-entropy, `HttpOnly` cookie this system mints, `DeviceCookie`; the original `UNIQUE(account_id, user_agent)` constraint was dropped the same day a device-recognition design keyed on a client-controlled, spoofable header could never safely keep — see `KnownDevice`'s own Javadoc), `first_seen_at`/`last_seen_at timestamptz`. `UNIQUE(account_id, device_token_hash)`. Deliberately a separate table from `sessions`/`HttpSession` — a device fingerprint needs to outlive any one 30-minute-TTL `HttpSession`, which gets a brand-new id on every login even from the same physical browser.
 - **`platform_known_devices`** (BR-ID-14, TD-FUT-026, 2026-09-02) — the platform-tier mirror of `known_devices`, same shape exactly (`device_token_hash`-keyed from day one, no two-migration history to repeat), `platform_account_id` FK (`REFERENCES platform_accounts (id) ON DELETE CASCADE`) instead of `account_id`, no `organization_id` at all (same rationale `platform_accounts` itself already establishes — this identity belongs to no Organization). `UNIQUE(platform_account_id, device_token_hash)`.
+- **`accounts` trigram indexes** (TD-PERF-041, 2026-10-26) — `ix_accounts_{first_name,last_name,username,email}_trgm`, `pg_trgm` GIN indexes on the `LOWER()` of each column the Users-tab search matches (`CREATE EXTENSION pg_trgm`). The search queries always carry a pattern so the indexes stay usable under a generic plan.
 - **`accounts.version`** (TD-ARCH-037, 2026-10-26) — `integer NOT NULL DEFAULT 0`, JPA `@Version`: every administrative write to an `Account` is optimistic-locked and a stale one is refused with `ConcurrentAccountModificationException` (HTTP 409). The narrow sign-in `UPDATE` (TD-ARCH-036) deliberately does not bump it.
 - **`audit_events.organization_id`** (TD-ARCH-038, 2026-10-26) — nullable `uuid`, no FK (the audit trail must outlive the rows it describes), resolved when the event is recorded from its target; platform-tier events stay `NULL`. Partial index `ix_audit_events_organization_occurred (organization_id, occurred_at DESC, id DESC) WHERE organization_id IS NOT NULL` serves the keyset-paged per-Organization audit log.
 - **`refresh_tokens.token_hash`** — the token itself is never stored, only its hash (same principle as `verification_tokens.token_hash` and `authorization_codes.code_hash`, and the same principle JobSeeker applied to its own retired refresh-token design before this module absorbed it). Deliberately never looked up via `oauth2_authorization` below, even though that table also tracks a `refresh_token_value` column — BR-ID-03's rotation/reuse-detection logic is fully decoupled from SAS's own table, which is what kept this one hash-only from day one, before TD-SEC-019 (below) closed the same gap for `oauth2_authorization` itself.
@@ -318,5 +319,5 @@ Flyway (`org.flywaydb:flyway-core` + `flyway-database-postgresql`, versions mana
 
 - ADR-0010's own open questions (the system-wide rate-limit ceiling value, automated key-rotation trigger criteria) directly affect `rate_limit_policies` — tracked in the ADR, not duplicated here.
 - Whether `sessions`/`refresh_tokens` need partitioning or an aggressive TTL-based cleanup job once volume grows — not a concern at current expected scale (single-digit consumers), flagged for revisit once real usage data exists.
-- Exact representation of `redirect_uris`/`allowed_grant_types`/`allowed_scopes` (JSON text column vs. normalized child tables) — deferred to implementation time, noted as a real open design choice rather than settled.
+- Settled (TD-ARCH-003, 2026-10-26): `redirect_uris`/`allowed_grant_types`/`allowed_scopes`/`post_logout_redirect_uris` (and `allowed_scopes` on `organization_clients`/`platform_clients`) are `jsonb` arrays, enforced by a `CHECK (jsonb_typeof(...) = 'array')`, with `jsonb_path_ops` GIN indexes on the two URI lists — not normalized child tables, which would buy Spring Authorization Server nothing.
 - `event_outbox`/`organization_event_outbox` retention **is designed and shipped** (TD-TEST-002, 2026-08-24): `EventOutboxRetentionJob`/`OrganizationEventOutboxRetentionJob` sweep rows older than `clavaris.event-outbox.retention-days` (90 by default) daily, by age alone — `webhook-module`'s own dispatcher now exists (ADR-0007, shipped 2026-09-02) and marks rows `published_at` within seconds under normal operation, well inside that 90-day margin; a still-unpublished row past the window is swept anyway and logged as a WARN, since at that point it's a real operational signal (the dispatcher stuck/down for the whole window), not something to silently exclude. `webhook_deliveries` retention is **also shipped**: `WebhookDeliveryRetentionJob` sweeps only terminal rows (`SUCCEEDED`/`EXHAUSTED`) older than `clavaris.webhook.delivery-retention-days` (90 by default) — `PENDING`/`FAILED` rows are never touched by age alone, since a `FAILED` row's own `next_attempt_at` may still be legitimately in the future.
