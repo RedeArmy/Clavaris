@@ -181,6 +181,35 @@ passes its own readiness probe, whether or not a rollback ends up happening.
 If a rollback fires, `deploy.sh` exits non-zero with a pointer to `docker compose logs app` — fix
 the underlying issue and merge a new commit before re-running, don't just retry blind.
 
+### 4a. Verifying an image before you run it (TD-SEC-067)
+
+Every image CI pushes from `master` is signed and carries its provenance and a bill of materials,
+so a person (or a consumer's vendor assessment) can check where it came from instead of trusting a
+tag. `<owner>` is the lowercase GitHub owner and `<digest>` the `sha256:...` of the image you pulled
+(`docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/<owner>/clavaris:<tag>`):
+
+```bash
+IMAGE=ghcr.io/<owner>/clavaris@<digest>
+IDENTITY='https://github.com/<Owner>/Clavaris/.github/workflows/ci.yml@refs/heads/master'
+ISSUER=https://token.actions.githubusercontent.com
+
+# 1. The signature: made by this repository's CI workflow on master, keyless (Sigstore).
+cosign verify "$IMAGE" --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER"
+
+# 2. The CycloneDX bill of materials, signed by the same identity.
+cosign verify-attestation "$IMAGE" --type cyclonedx \
+  --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
+  | jq -r '.payload' | base64 -d | jq '.predicate.components | length'
+
+# 3. The SLSA provenance BuildKit attached: commit, workflow run, builder.
+docker buildx imagetools inspect "$IMAGE" --format '{{json .Provenance}}'
+```
+
+The same SBOM is also kept as the `sbom.cdx.json` artifact of the CI run that built the image. The
+image that is signed is the one pushed from the build cache the scanned build filled, so it has the
+same layers as the image Trivy scanned, but it is a second `buildx` invocation, not the same
+object: a tag on it never proves more than its digest does, and the digest is what is signed.
+
 ## 5. Rolling back manually (to a specific, older commit — not the immediately-previous one)
 
 Every image `ci.yml` pushes is also tagged with the exact commit SHA it was built from, not only
