@@ -250,7 +250,16 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // securityMatcher already scopes the whole /platform/** chain to ROLE_PLATFORM_ACCOUNT (this
   // sub-path included), so this pattern only needs to distinguish "dashboard" from "login/register/
   // forgot-password" on that same chain, not re-enforce authentication itself.
-  private static final Pattern DASHBOARD_PAGE_PATH = Pattern.compile("^/platform/dashboard(/.*)?$");
+  //
+  // TD-FUT-051, found by the first browser-level test (e2e/): the operator's own Manage account and
+  // Sessions pages (/platform/account, /platform/account/sessions) render inside this same app
+  // shell and load the same scripts, but were matched by nothing here and so fell through to
+  // STRICT_POLICY (script-src 'none'). Every script was refused and the page's dialogs and uploads
+  // silently did nothing. They belong to the shell, so they get its policy. The pattern is
+  // anchored on "account" followed by "/" or the end, so /platform/account-alert/lock (a one-click
+  // link from an email, no shell, no script) stays strict.
+  private static final Pattern DASHBOARD_PAGE_PATH =
+      Pattern.compile("^/platform/(dashboard|account)(/.*)?$");
 
   // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs both
   // script-src 'self' (to load at all — every other page outside the three named patterns here

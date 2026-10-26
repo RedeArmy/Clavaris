@@ -104,6 +104,41 @@ class ContentSecurityPolicyHeaderWriterTest {
                 + "form-action 'self'; frame-ancestors 'none'");
   }
 
+  // TD-FUT-051: the operator's own account pages render inside the dashboard shell and load its
+  // scripts, so they need its policy; before, they fell through to script-src 'none' and every
+  // script on them was refused. /platform/account-alert/lock is a one-click link with no shell and
+  // must stay strict.
+  @ParameterizedTest
+  @ValueSource(strings = {"/platform/account", "/platform/account/sessions"})
+  void theOperatorsOwnAccountPagesGetTheDashboardPolicy(final String path) {
+    HttpServletRequest request = requestWithUri(path);
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
+                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
+  @Test
+  void theEmailedOneClickLockLinkStaysOnTheStrictPolicy() {
+    HttpServletRequest request = requestWithUri("/platform/account-alert/lock");
+    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
+
+    writer.writeHeaders(request, response);
+
+    verify(response)
+        .setHeader(
+            HEADER_NAME,
+            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+                + "form-action 'self'; frame-ancestors 'none'");
+  }
+
   // SonarCloud finding: these three used to be separate, identically-shaped tests (request +
   // response + writeHeaders + verify one exact header string) — one row each below instead,
   // same per-page rationale each original test's own doc comment carried, now on the data
