@@ -1,0 +1,165 @@
+# TD-PROC-013: unit tests for the saturation, lag and burn-rate alerts. Run with
+#   docker run --rm -v "$PWD:/w" -w /w --entrypoint promtool prom/prometheus:v2.55.1 \
+#     test rules alert-rules.test.yml
+# (CI runs the same command.) Each case feeds synthetic series and asserts the alert fires, or does
+# not, at the stated time, so a typo in a metric name or a threshold fails here, not in production.
+rule_files:
+  - alert-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    name: a pool queue that lasts two minutes alerts
+    input_series:
+      - series: 'hikaricp_connections_pending{pool="HikariPool-1"}'
+        values: '0 0 3 3 3 3 3 3'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: DatabasePoolSaturated
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: DatabasePoolSaturated
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Requests are queueing for a database connection"
+              description: "3 request(s) have been waiting for a pooled connection for 2 minutes. The pool is deliberately small; look for a slow query or a long transaction (organization deletion, the DNS reverification job) before raising it."
+
+  - interval: 1m
+    name: a one-minute pool blip does not alert
+    input_series:
+      - series: 'hikaricp_connections_pending{pool="HikariPool-1"}'
+        values: '0 2 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DatabasePoolSaturated
+        exp_alerts: []
+
+  - interval: 1m
+    name: a connection timeout alerts immediately
+    input_series:
+      - series: 'hikaricp_connections_timeout_total{pool="HikariPool-1"}'
+        values: '0 0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: DatabaseConnectionTimeouts
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              pool: HikariPool-1
+            exp_annotations:
+              summary: "Requests failed to get a database connection in time"
+              description: "A request gave up waiting for a pooled connection (connection-timeout) in the last 5 minutes. Users saw errors, not just slowness."
+
+  - interval: 1m
+    name: argon2 rejections above one every ten seconds for three minutes alert
+    input_series:
+      - series: 'clavaris_auth_argon2_bulkhead_total{outcome="rejected"}'
+        values: '0+12x10'
+      - series: 'clavaris_auth_argon2_bulkhead_total{outcome="admitted"}'
+        values: '0+600x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: Argon2BulkheadRejecting
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Password verifications are being refused for lack of CPU"
+              description: "More than one sign-in every ten seconds is being rejected by the Argon2 admission gate. Either a burst of real traffic outgrew the host's cores or someone is spending them; compare with HighLoginFailureRate."
+
+  - interval: 1m
+    name: a lagging webhook engine and a stuck outbox alert, an idle one does not
+    input_series:
+      - series: 'clavaris_webhook_deliveries_oldest_due_age_seconds'
+        values: '0 0 400 400 400 400 400 400'
+      - series: 'clavaris_outbox_oldest_unpublished_age_seconds{source="identity"}'
+        values: '0 0 0 0 0 0 0 0'
+      - series: 'clavaris_outbox_oldest_unpublished_age_seconds{source="organization"}'
+        values: '0 0 200 200 200 200 200 200'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: WebhookDeliveriesFallingBehind
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Webhook deliveries are overdue by more than five minutes"
+              description: "The oldest due delivery has waited 6m 40s. Check the delivery executor, the scheduler thread and the consuming endpoints' error rates."
+      - eval_time: 7m
+        alertname: OutboxNotBeingDispatched
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              source: organization
+            exp_annotations:
+              summary: "The organization event outbox is not being dispatched"
+              description: "The oldest unpublished organization event has waited 3m 20s; the dispatcher is not draining it (see WebhookDispatchScheduler and its advisory lock)."
+
+  - interval: 1m
+    name: unreadable lag gauges are reported
+    input_series:
+      - series: 'clavaris_webhook_deliveries_due'
+        values: 'NaN NaN NaN NaN NaN NaN NaN'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: BacklogMetricsUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: info
+            exp_annotations:
+              summary: "The webhook and outbox lag gauges cannot read the database"
+              description: "WebhookBacklogMetrics returns NaN when its queries fail, so the lag alerts are blind."
+
+  - interval: 1m
+    name: a 10 percent error ratio burns the budget fast, a ratio that already recovered does not
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200"}'
+        values: '0+90x120'
+      - series: 'http_server_requests_seconds_count{status="500"}'
+        values: '0+10x120'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AvailabilityErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Burning the 30-day error budget 14x too fast"
+              description: "At this rate the month's 0.5% error budget is gone in about two days."
+
+  - interval: 1m
+    name: a short spike that already ended does not page
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200"}'
+        values: '0+100x120'
+      - series: 'http_server_requests_seconds_count{status="500"}'
+        values: '0+0x120'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AvailabilityErrorBudgetFastBurn
+        exp_alerts: []
+
+  - interval: 1m
+    name: a full old generation alerts, and the young pools' undefined max does not skew it
+    input_series:
+      - series: 'jvm_memory_used_bytes{area="heap",id="G1 Old Gen"}'
+        values: '950+0x15'
+      - series: 'jvm_memory_max_bytes{area="heap",id="G1 Old Gen"}'
+        values: '1000+0x15'
+      - series: 'jvm_memory_used_bytes{area="heap",id="G1 Eden Space"}'
+        values: '10+0x15'
+      - series: 'jvm_memory_max_bytes{area="heap",id="G1 Eden Space"}'
+        values: '-1+0x15'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: JvmHeapNearLimit
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "JVM old generation above 90% for 10 minutes"
+              description: "The heap is sized to survive the worst-case Argon2 working set (application.yml, TD-PERF-007); sustained use this high means a leak or a load that was not sized for."
+
