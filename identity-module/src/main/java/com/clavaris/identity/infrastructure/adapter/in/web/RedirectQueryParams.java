@@ -30,7 +30,6 @@ final class RedirectQueryParams {
 
   // Two genuinely distinct outcomes (nothing to append / append one param) — same "each outcome
   // needs its own exit" rationale as DeviceCookie's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ static String appendIfPresent(
       final String baseUrl, final String paramName, final String value) {
     if (value == null) {

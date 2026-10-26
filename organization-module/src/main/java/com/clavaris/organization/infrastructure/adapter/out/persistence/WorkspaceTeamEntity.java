@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code workspace_teams} (ADR-0028). */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "workspace_teams")
 public class WorkspaceTeamEntity {

@@ -82,7 +82,6 @@ public class TokenRevocationEventLogger implements AuthenticationSuccessHandler 
   // Early return for the expected case, falling through to the defensive one below — same
   // "clearer as two exits than one accumulated through nested branching" rationale already used
   // in LoginController/RegisterAccountController.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String clientIdOf(final OAuth2TokenRevocationAuthenticationToken revocation) {
     if (revocation.getPrincipal() instanceof OAuth2ClientAuthenticationToken clientAuth) {
       return clientAuth.getRegisteredClient().getClientId();

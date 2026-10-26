@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
  * identity-module's {@link AccessRestrictionPolicyProvider} outbound port — same bridge-lives-in-
  * {@code app} convention as {@code OrganizationSocialLoginPolicyProviderBridge}.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 public class AccessRestrictionPolicyProviderBridge implements AccessRestrictionPolicyProvider {
 

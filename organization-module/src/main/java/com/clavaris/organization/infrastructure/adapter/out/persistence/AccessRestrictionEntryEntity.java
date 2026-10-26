@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code access_restriction_entries} — plain data holder by design. */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "access_restriction_entries")
 public class AccessRestrictionEntryEntity {

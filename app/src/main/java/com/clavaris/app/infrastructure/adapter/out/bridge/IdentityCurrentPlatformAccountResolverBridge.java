@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 @Component
 class IdentityCurrentPlatformAccountResolverBridge implements CurrentPlatformAccountResolver {
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String PLATFORM_ACCOUNT_AUTHORITY = "ROLE_PLATFORM_ACCOUNT";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -31,7 +30,6 @@ class IdentityCurrentPlatformAccountResolverBridge implements CurrentPlatformAcc
     // Intentionally empty.
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<PlatformAccountId> resolve(final HttpServletRequest request) {
     final SecurityContext context = SecurityContextHolder.getContext();

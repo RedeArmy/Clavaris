@@ -26,7 +26,6 @@ class ListWebhookDeliveriesController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "List recent deliveries for one WebhookEndpoint")
   @ApiResponse(responseCode = "200", description = "Possibly empty list, newest first")
   @ApiResponse(responseCode = "404", description = "No WebhookEndpoint exists with this id")

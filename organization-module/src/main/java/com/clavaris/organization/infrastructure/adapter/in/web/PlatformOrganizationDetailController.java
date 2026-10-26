@@ -40,10 +40,6 @@ import org.springframework.web.server.ResponseStatusException;
  * standalone pages under Configure ({@code PlatformRateLimitPolicyController}'s own new {@code
  * GET}, {@code PlatformDangerZoneController}) — this controller no longer populates either.
  */
-// PMD.LongVariable: currentPlatformAccount/ownerPlatformAccountId (field/constructor param/local
-// each) are long by design, not accidentally — same class-level-suppression precedent
-// PlatformOrganizationDashboardController's own identical rationale documents.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}")
 public class PlatformOrganizationDetailController {
@@ -75,7 +71,6 @@ public class PlatformOrganizationDetailController {
   // a fragment before pagination's own Previous/Next links did): a pagination link is itself an
   // hx-get, and its hx-target (#workspaces-content) can't safely receive a full HTML document the
   // way hx-swap="outerHTML" would otherwise apply it.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showDetail(
       final HttpServletRequest request,

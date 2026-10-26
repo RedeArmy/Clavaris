@@ -36,10 +36,6 @@ public final class InvalidateAndContinueSessionExpiredStrategy
     // Intentionally empty — this class holds no state, only the strategy method below.
   }
 
-  // PMD.LawOfDemeter: event.getRequest()/getFilterChain()/getResponse() are the standard
-  // SessionInformationExpiredEvent API shape — there is no other way to reach the request this
-  // strategy needs to invalidate or the chain it needs to continue.
-  @SuppressWarnings("PMD.LawOfDemeter")
   @Override
   public void onExpiredSessionDetected(final SessionInformationExpiredEvent event)
       throws IOException, ServletException {

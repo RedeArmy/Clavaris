@@ -50,7 +50,6 @@ public class ResetPasswordController {
 
   // Same "several independent rejection reasons, each needs its own exit" rationale as
   // RegisterAccountController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String resetPassword(
       @PathVariable final UUID organizationId,

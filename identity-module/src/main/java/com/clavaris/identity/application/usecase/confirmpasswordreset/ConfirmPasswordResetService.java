@@ -48,10 +48,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Javadoc for why a conditional update, not optimistic locking, is the right primitive for a
  * single-use resource under READ COMMITTED.
  */
-// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
-// parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
-// suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(ConfirmPasswordResetService.class);
@@ -61,19 +57,13 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
   private final SessionRepository sessions;
   private final RefreshTokenRepository refreshTokens;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
-  // RotateRefreshTokenService's identical field.
   private final AccountTokenRevoker accountTokenRevoker;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
-  // accountTokenRevoker above.
   private final AccountSessionRevoker accountSessionRevoker;
 
   private final PasswordHasher hasher;
   private final EventOutboxWriter outbox;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
-  // accountTokenRevoker/accountSessionRevoker above.
   private final BreachedPasswordChecker breachedPasswordChecker;
 
   @SuppressWarnings("java:S107") // one parameter per collaborating port — see RefreshToken's own
@@ -84,11 +74,11 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
       final AccountRepository accounts,
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker,
       final PasswordHasher hasher,
       final EventOutboxWriter outbox,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessions = sessions;
@@ -104,7 +94,7 @@ public class ConfirmPasswordResetService implements ConfirmPasswordResetUseCase 
   // own identical suppression. PMD.CyclomaticComplexity: BR-ID-07's new breach-check branch is one
   // more genuinely distinct precondition on top of the real BR-ID-04 cascade already here — same
   // "wiring, not sprawl" reasoning RegisterAccountService's own identical suppression documents.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public void handle(final ConfirmPasswordResetCommand command) {

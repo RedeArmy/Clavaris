@@ -8,10 +8,6 @@ import java.util.Set;
  * identically — extracted here once both needed it (CPD), same "one algorithm, two call sites"
  * precedent {@code InitialsAvatarGenerator} already establishes for the read side.
  */
-// PMD.LongVariable: ALLOWED_CONTENT_TYPES names exactly what it is — a shortened identifier would
-// only make this class harder to read, same convention every other descriptively-named constant
-// in this codebase follows.
-@SuppressWarnings("PMD.LongVariable")
 public final class ProfilePictureValidator {
 
   // The pasted "Update profile... up to 10MB" UI copy's own stated cap, verbatim.

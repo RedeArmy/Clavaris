@@ -30,7 +30,6 @@ class DeactivateOrganizationClientController {
 
   // Three exits (404 on an unknown clientId, 409 on a concurrent rotate-secret/revoke race, 204 on
   // success) — same rationale as SetRateLimitPolicyController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Revoke an OrganizationClient / Secret Key (ADR-0023)")
   @ApiResponse(responseCode = "204", description = "Revoked — future token requests are rejected")
   @ApiResponse(

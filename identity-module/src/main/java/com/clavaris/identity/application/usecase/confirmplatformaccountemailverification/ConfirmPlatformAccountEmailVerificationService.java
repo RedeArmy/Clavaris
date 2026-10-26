@@ -33,7 +33,6 @@ public class ConfirmPlatformAccountEmailVerificationService
     this.accounts = accounts;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public void handle(final ConfirmPlatformAccountEmailVerificationCommand command) {

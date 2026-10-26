@@ -38,7 +38,6 @@ import org.springframework.web.server.ResponseStatusException;
  * identically to "doesn't exist," same anti-enumeration posture as every other dashboard
  * controller. Same HTMX-fragment-vs-redirect convention as every other dashboard mutation.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/session-policy")
 public class PlatformSessionPolicyController {
@@ -89,7 +88,6 @@ public class PlatformSessionPolicyController {
 
   // Two exits (validation error, HTMX fragment vs. plain redirect) — same rationale as every
   // other dashboard mutation's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String set(
       final HttpServletRequest request,

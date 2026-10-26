@@ -21,7 +21,6 @@ public record AccountSessionRevokedEvent(
   // "of", matching RefreshTokenReuseDetectedEvent's own static-factory convention — this event,
   // like that one, isn't derived from a fresh Account read; RevokeAccountSessionService already
   // has everything it needs from the command and its own session lookup.
-  @SuppressWarnings("PMD.ShortMethodName")
   public static AccountSessionRevokedEvent of(
       final AccountId accountId, final OrganizationId organizationId, final String sessionId) {
     return new AccountSessionRevokedEvent(accountId, organizationId, sessionId, Instant.now());

@@ -32,7 +32,6 @@ class ForcePasswordResetForAccountController {
 
   // Two exits (404 on an unknown id, 204 on success) — same rationale as SuspendAccountController's
   // own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Force an Account to set a new password before its next login can complete")
   @ApiResponse(responseCode = "204", description = "Marked — enforced by the account's next login")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")

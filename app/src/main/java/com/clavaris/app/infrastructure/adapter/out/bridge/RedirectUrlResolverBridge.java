@@ -16,11 +16,6 @@ import org.springframework.stereotype.Component;
  * same module-independence-crossing-bridge pattern {@code
  * AccountAuthenticationPolicyProviderBridge} already establishes for an identical need.
  */
-// PMD.LongVariable: requestedRedirectUrl matches Clerk's own equivalent concept, not arbitrarily
-// long — same precedent RedirectUrlResolver's own suppression documents. PMD.OnlyOneReturn: four
-// genuinely distinct early exits (no client context, unknown/cross-tenant client, a force URL, a
-// validated query-param override) — same rationale OAuthClient's own multi-exit methods document.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 @Component
 class RedirectUrlResolverBridge implements RedirectUrlResolver {
 

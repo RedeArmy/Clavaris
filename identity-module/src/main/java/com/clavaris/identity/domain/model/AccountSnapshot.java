@@ -15,8 +15,6 @@ import java.time.Instant;
  * row was read at (0 for an account never persisted); see {@link
  * ConcurrentAccountModificationException}.
  */
-// PMD.LongVariable/ShortVariable: the component names are the Account accessors they back.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
 public record AccountSnapshot(
     AccountId id,
     OrganizationId organizationId,

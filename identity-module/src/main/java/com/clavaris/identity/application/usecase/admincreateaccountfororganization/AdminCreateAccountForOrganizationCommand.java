@@ -19,10 +19,6 @@ import com.clavaris.identity.domain.model.OrganizationId;
  * {@code firstName}/{@code lastName}/{@code username}/{@code phoneNumber} may each be {@code null}
  * — every field on the create-user form except email and password is optional.
  */
-// PMD.LongVariable: ignorePasswordPolicy/ignoreAccessRestrictions name exactly what each
-// checkbox on the create-user form does — same rationale every other descriptively-named field in
-// this codebase's own class-level suppressions document.
-@SuppressWarnings("PMD.LongVariable")
 public record AdminCreateAccountForOrganizationCommand(
     OrganizationId organizationId,
     Email email,

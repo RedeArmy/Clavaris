@@ -41,7 +41,6 @@ class SetSocialLoginPolicyController {
   // Four exits (404 on a bogus organizationId, 400 on an unknown provider name, 409 on a missing
   // credential, 200 on success) —
   // same rationale as SetRateLimitPolicyController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an Organization's social-login policy (ADR-0020 Decision 3)")
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(

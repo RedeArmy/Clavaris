@@ -30,11 +30,6 @@ import org.slf4j.Logger;
 
   private KnownDeviceRetentionSweeper() {}
 
-  // PMD.LongVariable: deleteByLastSeenAtBefore names exactly what the method reference does —
-  // same "deliberate, descriptive name over an arbitrary shortening" convention
-  // DashboardControllerSupport's
-  // own class-level suppression documents for an identical situation.
-  @SuppressWarnings("PMD.LongVariable")
   /* package */ static void sweep(
       final Logger log,
       final String eventName,

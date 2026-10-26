@@ -13,8 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
  * <p>{@code after}/{@code before} are the dashboard's own page cursors, carried only so that saving
  * returns to the page the person was on.
  */
-// PMD.DataClass: a form-backing bean is nothing but its fields, same as every sibling *Form here.
-@SuppressWarnings("PMD.DataClass")
 public class UpdateOrganizationProfileForm {
 
   @NotBlank(message = "Name is required")

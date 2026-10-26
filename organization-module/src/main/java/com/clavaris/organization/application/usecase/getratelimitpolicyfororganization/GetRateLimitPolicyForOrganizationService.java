@@ -23,7 +23,6 @@ import java.util.UUID;
  * own config keys' names, not arbitrarily long — same precedent {@code
  * SetRateLimitPolicyForOrganizationService}'s own identical parameter establishes.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class GetRateLimitPolicyForOrganizationService
     implements GetRateLimitPolicyForOrganizationUseCase {
 

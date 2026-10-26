@@ -21,10 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * exception, adapted here to a redirect (this controller, like {@code
  * PlatformAccountSettingsController}, never renders directly).
  */
-// PMD.AvoidFieldNameMatchingMethodName: updateMetadata below is this controller's own POST
-// handler, same record-style-accessor-adjacent naming convention Account's own class Javadoc
-// already documents for this codebase.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidFieldNameMatchingMethodName"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountMetadataController {
@@ -49,7 +45,6 @@ public class PlatformAccountMetadataController {
   // Two exits (invalid tier -> redirect with an error param, success -> redirect with a success
   // param) — same rationale every other guard-clause-heavy dashboard-form controller in this
   // codebase already documents for its own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/metadata")
   public String updateMetadata(
       final HttpServletRequest request,

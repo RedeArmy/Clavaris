@@ -14,11 +14,6 @@ import java.util.UUID;
  * WorkspaceTeam} belongs to exactly one Workspace, so "which team a role is grouped under" can only
  * be answered per-Workspace, never as a single value on the role itself.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
 public final class WorkspaceTeam {
 
   // Matches the workspace_teams.name column — same enforce-it-in-the-domain-too discipline every

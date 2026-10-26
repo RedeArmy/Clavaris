@@ -90,7 +90,9 @@ import org.springframework.stereotype.Component;
 // own identical suppression). LongVariable: DERIVATION_MAC_ALGORITHM/
 // DERIVATION_CONTEXT_PREFIX name exactly what they hold, same precedent as every other
 // long-but-precise constant name in this codebase.
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.LongVariable"})
+@SuppressWarnings({
+  "PMD.TooManyMethods",
+})
 @Component
 class SigningKeyStore {
 
@@ -163,7 +165,6 @@ class SigningKeyStore {
   }
 
   /** Reloads the key pair previously persisted under {@code kid} in {@code scope}, if any. */
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ synchronized Optional<KeyPair> find(final KeyStoreScope scope, final String kid) {
     final Path filePath = fileFor(scope);
     final KeyStore keyStore = load(scope, filePath);
@@ -176,11 +177,7 @@ class SigningKeyStore {
           (KeyStore.SecretKeyEntry) keyStore.getEntry(privateAlias(kid), protection);
       final KeyStore.SecretKeyEntry publicEntry =
           (KeyStore.SecretKeyEntry) keyStore.getEntry(publicAlias(kid), protection);
-      // LawOfDemeter flags reaching through the SecretKeyEntry to its own wrapped key — there's no
-      // intermediate step to name here, the entry exists solely to carry these encoded bytes.
-      @SuppressWarnings("PMD.LawOfDemeter")
       final byte[] privateKeyBytes = privateEntry.getSecretKey().getEncoded();
-      @SuppressWarnings("PMD.LawOfDemeter")
       final byte[] publicKeyBytes = publicEntry.getSecretKey().getEncoded();
       final PrivateKey privateKey =
           rsaKeyFactory.generatePrivate(new PKCS8EncodedKeySpec(privateKeyBytes));

@@ -28,7 +28,6 @@ import java.util.regex.Pattern;
  * PMD.ShortVariable: {@code os} names exactly what it is, in a method whose whole body is about
  * naming a browser and an OS — a longer name would only add noise here.
  */
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
 public final class UserAgentLabel {
 
   private static final Pattern EDGE = Pattern.compile("Edg(e|A|iOS)?/");

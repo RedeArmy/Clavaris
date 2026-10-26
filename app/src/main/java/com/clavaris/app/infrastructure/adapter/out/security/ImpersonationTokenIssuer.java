@@ -100,12 +100,7 @@ import org.springframework.stereotype.Component;
 // must resolve back to on any future verification) and to OrganizationAuthorizationServerConfig's
 // own securityMatcher/tokenEndpoint/jwkSetEndpoint literals — two independently configurable copies
 // of the same structural constant could silently drift apart.
-@SuppressWarnings({
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.LongVariable",
-  "java:S1075"
-})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "java:S1075"})
 @Component
 public class ImpersonationTokenIssuer {
 
@@ -200,7 +195,6 @@ public class ImpersonationTokenIssuer {
   // Two exits (default-to-full-allowed-scopes, or the throw below) plus the final return — same
   // "one exit per distinct outcome" rationale as every other admin-API-adjacent method in this
   // codebase with the identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static Set<String> resolveScopesOrThrow(
       final OAuthClient client, final List<String> requestedScopes) {
     if (requestedScopes == null || requestedScopes.isEmpty()) {
@@ -306,27 +300,6 @@ public class ImpersonationTokenIssuer {
     return new ImpersonationToken(accessToken.getTokenValue(), accessToken.getExpiresAt(), scopes);
   }
 
-  // RFC 8693 act claim: marks this token as issued on-behalf-of the impersonated Account while
-  // acting-as the calling PlatformClient — the one structural difference between this token and one
-  // a real login of the same Account would receive, so a resource server (or a future audit query)
-  // can always tell the two apart. amr:["imp"] is this codebase's own marker, not an OIDC-standard
-  // value (no ID token is minted here for a real amr claim to matter to), kept anyway for the same
-  // "authentication context is visible in the token, not just in the audit log" reasoning
-  // AuthenticationContextClaimsCustomizer already applies to a real login's own acr/amr.
-  //
-  // Real bug found and closed by this class's own integration test: Map.of(...)/List.of(...) return
-  // package-private java.util.ImmutableCollections types — JdbcOAuth2AuthorizationService's own
-  // Jackson-based claims serialization writes those out fine, but its PolymorphicTypeValidator
-  // rejects them on READ-BACK (e.g. the very next /oauth2/revoke call), throwing a 500 from deep
-  // inside SAS's own row-mapper. Same fix, same root cause, as
-  // AuthenticationContextClaimsCustomizer's
-  // own identical `new ArrayList<>(...)` for its amr claim — plain, mutable JDK collection types
-  // the
-  // validator's allowlist actually recognizes.
-  // PMD.LawOfDemeter: context.getClaims() is the standard SAS/Spring Security extension point for
-  // exactly this — same "there is no other way to reach it" reasoning TokenIssuanceEventLogger's
-  // own identical suppression already establishes for this same JwtEncodingContext API shape.
-  @SuppressWarnings("PMD.LawOfDemeter")
   private static void addImpersonationClaims(
       final JwtEncodingContext context, final AuditActor actor) {
     final Map<String, Object> act = new LinkedHashMap<>();
@@ -385,7 +358,6 @@ public class ImpersonationTokenIssuer {
     // Parameter name matches RegisteredClientRepository's own interface signature — kept as-is for
     // readability against the SPI it implements, same precedent as
     // OrganizationRegisteredClientRepository/PlatformRegisteredClientRepository's own findById.
-    @SuppressWarnings("PMD.ShortVariable")
     @Override
     public RegisteredClient findById(final String id) {
       return registeredClient.getId().equals(id) ? registeredClient : null;

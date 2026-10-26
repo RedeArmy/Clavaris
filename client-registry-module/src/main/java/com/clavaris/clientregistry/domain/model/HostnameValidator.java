@@ -16,17 +16,15 @@ package com.clavaris.clientregistry.domain.model;
  * alphanumeric, alphanumeric/hyphen between) is simple enough that a real regex was never buying
  * more than syntax density here.
  */
-// LongVariable: MAX_HOSTNAME_LENGTH/SUPPRESS_ONLY_ONE_RETURN name exactly what they hold, same
-// idiom this module's every other value object already uses. ShortVariable: the single-character
+// ShortVariable: the single-character
 // loop/parameter variables below (c, i) are exactly what they are — a character and an index —
 // same convention ClientDomainConfig's own class-level suppression already establishes.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable"})
+@SuppressWarnings({"PMD.ShortVariable"})
 final class HostnameValidator {
 
   private static final int MAX_HOSTNAME_LENGTH = 253;
   private static final int MAX_LABEL_LENGTH = 63;
   private static final int MIN_LABEL_COUNT = 2;
-  private static final String SUPPRESS_ONLY_ONE_RETURN = "PMD.OnlyOneReturn";
 
   private HostnameValidator() {
     // Utility class — every method is static, no instance state to construct.
@@ -35,9 +33,6 @@ final class HostnameValidator {
   // A scheme, path, port, or trailing dot is deliberately rejected by MIN_LABEL_COUNT/isValidLabel
   // together — this value is compared verbatim against the inbound Host header
   // (CustomDomainRequestRewriteFilter), not parsed as a URI.
-  // PMD.OnlyOneReturn: "too long overall" / "too few labels" / "a label doesn't validate" /
-  // "valid" are four independent, equally valid exits.
-  @SuppressWarnings(SUPPRESS_ONLY_ONE_RETURN)
   /* package */ static boolean isValid(final String hostname) {
     if (hostname.length() > MAX_HOSTNAME_LENGTH) {
       return false;
@@ -54,9 +49,6 @@ final class HostnameValidator {
     return true;
   }
 
-  // PMD.OnlyOneReturn: "wrong length" / "first or last char not alphanumeric" / "valid" are three
-  // independent, equally valid exits.
-  @SuppressWarnings(SUPPRESS_ONLY_ONE_RETURN)
   private static boolean isValidLabel(final String label) {
     final int length = label.length();
     if (length < 1 || length > MAX_LABEL_LENGTH) {

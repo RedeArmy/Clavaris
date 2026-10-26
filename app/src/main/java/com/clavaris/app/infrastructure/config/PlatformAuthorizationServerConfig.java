@@ -75,9 +75,7 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 // every other PMD.LongVariable suppression in this class.
 @SuppressWarnings({
   "PMD.ExcessiveImports",
-  "PMD.AvoidDuplicateLiterals",
   "PMD.ExcessiveParameterList",
-  "PMD.LongVariable"
 })
 @Configuration
 class PlatformAuthorizationServerConfig {
@@ -97,25 +95,23 @@ class PlatformAuthorizationServerConfig {
       final BearerTokenHasher bearerTokenHasher,
       // Descriptive over PMD's default LongVariable threshold, kept in full rather than
       // abbreviated — same convention already used for e.g. passwordCredential elsewhere.
-      @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
+      final RateLimitKeyHasher rateLimitKeyHasher,
       // ADR-0023: typed as the concrete class, not the OAuth2TokenCustomizer<JwtEncodingContext>
       // interface — OrganizationClientClaimCustomizer now also implements that same interface, so
       // injecting by interface type alone became ambiguous (NoUniqueBeanDefinitionException,
       // confirmed live) the moment a second implementation existed.
-      @SuppressWarnings("PMD.LongVariable") final TokenIssuanceEventLogger tokenIssuanceLogger,
+      final TokenIssuanceEventLogger tokenIssuanceLogger,
       // ADR-0023: stamps organization_id onto an OrganizationClient's own minted token — absent
       // entirely for a PlatformClient token, see this class's own Javadoc.
       @SuppressWarnings("PMD.LongVariable")
           final OrganizationClientClaimCustomizer organizationClientClaimCustomizer,
-      @SuppressWarnings("PMD.LongVariable") final TokenRevocationEventLogger tokenRevocationLogger,
+      final TokenRevocationEventLogger tokenRevocationLogger,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl,
       final RateLimiter rateLimiter,
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.token.per-client-limit:20}")
-          final int tokenPerClientLimit,
+      @Value("${clavaris.rate-limit.token.per-client-limit:20}") final int tokenPerClientLimit,
       // TD-FUT-017: the same shared concurrency gate identity-module's Argon2PasswordVerifier
       // bulkheads its own password checks through — both compete for the same limited CPU budget.
-      @SuppressWarnings("PMD.LongVariable") final CpuBoundVerificationGate argon2BulkheadGate) {
+      final CpuBoundVerificationGate argon2BulkheadGate) {
     final AuthorizationServerSettings settings =
         AuthorizationServerSettings.builder()
             .issuer(baseUrl)
@@ -153,7 +149,6 @@ class PlatformAuthorizationServerConfig {
     // pattern this codebase uses everywhere else platform/tenant state is split.
     // TD-SEC-019: wrapped — see the Organization tier's own identical comment and
     // HashedTokenOAuth2AuthorizationService's Javadoc for the full design.
-    @SuppressWarnings("PMD.LongVariable")
     final OAuth2AuthorizationService authorizationService =
         new HashedTokenOAuth2AuthorizationService(
             new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);

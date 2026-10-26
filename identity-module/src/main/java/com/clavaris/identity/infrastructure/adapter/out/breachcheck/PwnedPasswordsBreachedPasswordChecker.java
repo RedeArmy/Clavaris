@@ -35,10 +35,6 @@ import org.springframework.stereotype.Component;
  * place that contract is actually implemented, so every real call site stays free of its own
  * try/catch.
  */
-// PMD.LongVariable: DEFAULT_RANGE_ENDPOINT/failureRateThreshold/waitDurationInOpenStateSeconds name
-// exactly what they are — same precedent ResendMailSender's own identical class-level suppression
-// already documents for this exact three-@Value CircuitBreaker-tuning shape.
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class PwnedPasswordsBreachedPasswordChecker implements BreachedPasswordChecker {
 
@@ -79,10 +75,6 @@ class PwnedPasswordsBreachedPasswordChecker implements BreachedPasswordChecker {
     this.httpClient = httpClient;
   }
 
-  // PMD.OnlyOneReturn: two genuinely distinct outcomes (the real lookup result vs. the fail-open
-  // "treat as not breached" path) — same "each outcome needs its own exit" rationale as every
-  // other identically-suppressed method in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public boolean isBreached(final String rawPassword) {
     final String hash = sha1Hex(rawPassword);
@@ -100,8 +92,6 @@ class PwnedPasswordsBreachedPasswordChecker implements BreachedPasswordChecker {
     }
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn") // an absent separator vs. a real suffix comparison are
-  // two genuinely distinct outcomes, same rationale as isBreached's own identical suppression.
   private static boolean matchesSuffix(final String responseLine, final String suffix) {
     final int separator = responseLine.indexOf(':');
     if (separator < 0) {

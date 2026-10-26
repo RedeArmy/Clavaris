@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>A page is {@value #PAGE_SIZE} events; one more is fetched to learn whether there is a next
  * page without a second query.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class GetAuditLogForOrganizationService implements GetAuditLogForOrganizationUseCase {
 
   /* package */ static final int PAGE_SIZE = 100;

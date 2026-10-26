@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
  * The organization-module use case already supplies defaults for an unconfigured Organization, so
  * this bridge never needs to express absence either.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 public class AccountAuthenticationPolicyProviderBridge
     implements AccountAuthenticationPolicyProvider {

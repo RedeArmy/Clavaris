@@ -170,7 +170,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   // OAuth2's own spec parameter name (RFC 6749 §4.1.1) — what SAS's own consent redirect actually
   // carries. See this class's own Javadoc for why the consent page can't reuse CLIENT_ID_PARAM.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String OAUTH2_CLIENT_ID_PARAM = "client_id";
 
   // font-src 'self' on every policy below: clavaris.css self-hosts Geist (/fonts/*.woff2). With
@@ -207,7 +206,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // unrelated, non-modal consent render sharing the same HttpSession (exactly the
   // AuthorizationCodeFlowIntegrationTest-caught regression this class's own Javadoc documents for
   // a blanket relaxation).
-  @SuppressWarnings("PMD.LongVariable")
   private static final String MODAL_STATE_SESSION_ATTRIBUTE =
       "clavaris.security.display-modal.pending-state";
 
@@ -239,7 +237,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // makes any fetch call at all), the browser silently blocks every single HTMX request on this
   // chain — no network entry, no visible error unless the operator opens the console — confirmed
   // live against a real browser's own CSP violation report on this exact directive.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String DASHBOARD_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
           + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
@@ -253,7 +250,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // securityMatcher already scopes the whole /platform/** chain to ROLE_PLATFORM_ACCOUNT (this
   // sub-path included), so this pattern only needs to distinguish "dashboard" from "login/register/
   // forgot-password" on that same chain, not re-enforce authentication itself.
-  @SuppressWarnings("PMD.LongVariable")
   private static final Pattern DASHBOARD_PAGE_PATH = Pattern.compile("^/platform/dashboard(/.*)?$");
 
   // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs both
@@ -263,13 +259,11 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // two-directive fix LOGIN_PAGE_POLICY's own identical comment documents, scoped to just this one
   // new page rather than widening to all of /o/*/account/** (no sibling self-service page uses a
   // script today).
-  @SuppressWarnings("PMD.LongVariable")
   private static final String ACCOUNT_PASSKEYS_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
           + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final Pattern ACCOUNT_PASSKEYS_PAGE_PATH =
       Pattern.compile("^/o/[^/]+/account/passkeys$");
 
@@ -290,13 +284,11 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // every dashboard-adjacent page already loads), connect-src 'none' (neither script makes a
   // fetch/XHR call — confirmed by reading organization-dialog.js directly, no HTMX attributes
   // anywhere in this specific template unlike the dashboard's own pages).
-  @SuppressWarnings("PMD.LongVariable")
   private static final String ACCOUNT_PROFILE_PAGE_POLICY =
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
           + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
           + "form-action 'self'; frame-ancestors 'none'";
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final Pattern ACCOUNT_PROFILE_PAGE_PATH =
       Pattern.compile("^/o/[^/]+/account/profile$");
 
@@ -309,7 +301,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   private final EmbeddingEligibilityChecker embeddingChecker;
 
   // Security finding, 2026-10-09: see this class's own Javadoc addendum.
-  @SuppressWarnings("PMD.LongVariable")
   private final RedirectUriOriginResolver redirectUriOriginResolver;
 
   // Constructed only by each SecurityFilterChain builder's own `new
@@ -318,8 +309,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // ever actually invokes it.
   public ContentSecurityPolicyHeaderWriter(
       final EmbeddingEligibilityChecker embeddingChecker,
-      @SuppressWarnings("PMD.LongVariable")
-          final RedirectUriOriginResolver redirectUriOriginResolver) {
+      final RedirectUriOriginResolver redirectUriOriginResolver) {
     this.embeddingChecker = embeddingChecker;
     this.redirectUriOriginResolver = redirectUriOriginResolver;
   }
@@ -367,7 +357,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   // Five-way, not a ternary any more — see this class's own Javadoc for why each path pattern
   // gets its own real policy/relaxation rule rather than one being folded into "everything else".
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private String policyFor(final HttpServletRequest request) {
     final String requestUri = request.getRequestURI();
     if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
@@ -403,13 +392,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     return STRICT_POLICY;
   }
 
-  // ADR-0009 §1/§4: see this class's own Javadoc. STRICT_POLICY/LOGIN_PAGE_POLICY both end in the
-  // exact literal "frame-ancestors 'none'" — asserted by construction, not discovered by parsing.
-  // PMD.OnlyOneReturn: three independent, equally valid exits — "not display=modal at all," the
-  // new fail-closed-on-malformed-segment middle one (security finding, 2026-10-07), and "resolved"
-  // — same rationale as every other early-return chain in this codebase. PMD.LongVariable: see
-  // EmbeddingEligibilityChecker's own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   private String withRelaxedFrameAncestorsIfDisplayModal(
       final String basePolicy,
       final HttpServletRequest request,
@@ -433,15 +415,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
         basePolicy, request.getParameter(clientIdParam), expectedOrganizationId);
   }
 
-  // Security finding, 2026-10-07: null on a malformed/missing segment — fail-safe, same posture
-  // every other UUID.fromString call site in this class's own neighborhood (e.g. this class's own
-  // callers never trust a client-suppliable value without a try/catch around it) already follows.
-  // Only ever called for a request this same method's own caller already matched against
-  // LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH, both "/o/{organizationId}/..." shaped, so the
-  // capturing group below is expected to be present and well-formed in practice — this is a
-  // defensive fallback, not the normal path. PMD.OnlyOneReturn: "doesn't even match the shape" /
-  // "malformed UUID" / "resolved" are three independent, equally valid exits.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static UUID organizationIdFromPath(final String requestUri) {
     final Matcher matcher = ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri);
     if (!matcher.matches()) {
@@ -462,7 +435,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // seen this session" flag, which would risk relaxing a later, unrelated, non-modal consent render
   // sharing the same HttpSession (the precise regression AuthorizationCodeFlowIntegrationTest
   // caught before this gate existed at all — see this class's own Javadoc).
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private String withRelaxedFrameAncestorsOnConsentPage(final HttpServletRequest request) {
     // /oauth2/consent is flat/org-agnostic (this class's own Javadoc) — genuinely no
     // organizationId to check against, the one deliberate null EmbeddingEligibilityChecker's own
@@ -484,7 +456,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     return CONSUMER_POLICY;
   }
 
-  @SuppressWarnings("PMD.LongVariable")
   private String relaxFrameAncestors(
       final String basePolicy, final String clientId, final UUID expectedOrganizationId) {
     final Optional<String> allowedOrigin =
@@ -494,15 +465,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
         .orElse(basePolicy);
   }
 
-  // Security finding, 2026-10-09: see this class's own Javadoc addendum. Unlike
-  // relaxFrameAncestors above (gated behind display=modal via the two
-  // withRelaxedFrameAncestors*/withWidenedFormAction's own callers), this widening is
-  // unconditional — every ordinary, non-embedded login/consent also ends in a cross-origin
-  // redirect to the client's own redirect_uri, not just a modal-embedded one.
-  // PMD.OnlyOneReturn: "nothing resolved, keep the base policy" / "widen it" are two genuinely
-  // distinct outcomes — same rationale every other early-return guard in this class already
-  // applies.
-  @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
   private String withWidenedFormAction(
       final String basePolicy, final String clientId, final UUID expectedOrganizationId) {
     final List<String> allowedOrigins =

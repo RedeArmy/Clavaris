@@ -58,8 +58,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * redirect:} on success — HTMX is progressive enhancement, every action works with JavaScript
  * disabled.
  */
-// PMD.LongVariable: collaborator names spell out the use case they hold.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceController {
@@ -88,7 +86,6 @@ public class PlatformWorkspaceController {
     this.deleteWorkspaceUseCase = deleteWorkspaceUseCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,
@@ -146,7 +143,6 @@ public class PlatformWorkspaceController {
   // tenant's account pool), documented there as "the single most destructive action this
   // dashboard exposes" — this is a popup, not a dedicated confirm page, matching every other
   // dialog-gated mutation already on this dashboard.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/delete")
   public String deleteWorkspace(
       final HttpServletRequest request,

@@ -60,7 +60,6 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
   // Parameter name matches RegisteredClientRepository's own interface signature — kept as-is for
   // readability against the SPI it implements, same precedent as
   // PlatformRegisteredClientRepository.
-  @SuppressWarnings({"PMD.ShortVariable", "PMD.OnlyOneReturn"})
   @Override
   public RegisteredClient findById(final String id) {
     // TD-SEC-010 (closed): JdbcOAuth2AuthorizationService (TD-SEC-003) calls this on every reload
@@ -86,7 +85,6 @@ public final class OrganizationRegisteredClientRepository implements RegisteredC
         .orElse(null);
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public RegisteredClient findByClientId(final String clientId) {
     final Optional<UUID> orgId = CurrentOrganizationContext.currentOrganizationId();

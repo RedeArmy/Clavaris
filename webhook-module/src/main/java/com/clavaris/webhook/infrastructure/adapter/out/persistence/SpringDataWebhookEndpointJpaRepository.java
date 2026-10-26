@@ -17,7 +17,6 @@ interface SpringDataWebhookEndpointJpaRepository
   // WebhookEndpointRepository#findByIdAndOrganizationId's own Javadoc — id is already the primary
   // key, so this is the same single-row lookup findById already is, plus the organizationId
   // predicate as a second WHERE clause, not an additional index or query shape.
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<WebhookEndpointEntity> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
   List<WebhookEndpointEntity> findAllByOrganizationIdAndActiveTrue(UUID organizationId);

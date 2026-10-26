@@ -15,11 +15,6 @@ import java.util.UUID;
  *
  * <p>PMD suppressions below: coding-standards.md §3a.
  */
-@SuppressWarnings({
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.AvoidFieldNameMatchingMethodName"
-})
 final class KeyStoreScope {
 
   private static final KeyStoreScope PLATFORM = new KeyStoreScope("platform");

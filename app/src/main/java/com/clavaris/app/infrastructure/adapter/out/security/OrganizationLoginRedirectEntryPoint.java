@@ -60,9 +60,6 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   private static final String BG_COLOR_PARAM = "appearance_bg";
   private static final Pattern HEX_COLOUR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 
-  // Same PMD.LongVariable suppression ContentSecurityPolicyHeaderWriter's own identically-named
-  // constant already carries.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String OAUTH2_CLIENT_ID_PARAM = OAuth2ParameterNames.CLIENT_ID;
 
   // Constructed directly (new OrganizationLoginRedirectEntryPoint()) by
@@ -111,7 +108,6 @@ public final class OrganizationLoginRedirectEntryPoint implements Authentication
   // Two genuinely distinct outcomes (nothing to append / append one param) — same "each outcome
   // needs its own exit" rationale as identity-module's own RedirectQueryParams#appendIfPresent,
   // duplicated here rather than shared across the module boundary for a two-line helper.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String appendIfPresent(
       final String baseUrl, final String paramName, final String value) {
     if (value == null) {

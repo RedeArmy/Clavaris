@@ -21,7 +21,6 @@ public record WorkspaceMemberRoleChangedEvent(
   // "of", matching AccountRegisteredEvent's own "from" static-factory convention family — a short,
   // conventional factory name, not an accidental abbreviation (same precedent
   // RefreshTokenReuseDetectedEvent's own identical suppression already established).
-  @SuppressWarnings("PMD.ShortMethodName")
   public static WorkspaceMemberRoleChangedEvent of(
       final UUID membershipId,
       final UUID workspaceId,

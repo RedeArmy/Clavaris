@@ -53,7 +53,6 @@ public class PlatformDashboardSecurityConfig {
   // Every authenticated-but-rejected path on this chain (concurrent-session expiry, permitAll
   // list, the wrong-tier accessDeniedHandler) sends the browser to the same one page — a single
   // constant, not three independent literals that could silently drift apart.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String PLATFORM_LOGIN_PATH = "/platform/login";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
@@ -108,8 +107,7 @@ public class PlatformDashboardSecurityConfig {
       @Value("${clavaris.rate-limit.platform-admin-picture.upload-per-account-limit:10}")
           final int platformAdminPictureUploadPerAccountLimit,
       final EmbeddingEligibilityChecker embeddingChecker,
-      @SuppressWarnings("PMD.LongVariable")
-          final RedirectUriOriginResolver redirectUriOriginResolver) {
+      final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.securityMatcher("/platform/**")
         .sessionManagement(
             session ->

@@ -62,21 +62,6 @@ import tools.jackson.databind.ObjectMapper;
  * own identical addition documents — a GitHub outage today means every affected login still pays
  * this class's own {@link #REQUEST_TIMEOUT} (10s) before failing.
  */
-// PMD.LongVariable: every flagged name here (VERIFIED_EMAIL_ATTRIBUTE, GITHUB_REGISTRATION_ID,
-// DEFAULT_GITHUB_EMAILS_ENDPOINT) names exactly what it is — see this class's own Javadoc.
-// PMD.LawOfDemeter: userRequest.getClientRegistration()/getAccessToken() are the standard
-// OAuth2UserRequest API shape — there is no other way to reach either, same rationale
-// AntiAbuseRateLimitingFilter's own response.getWriter() suppression already documents.
-// PMD.OnlyOneReturn: loadUser (delegate-vs-GitHub-specific) and findPrimaryVerifiedEmail
-// (found-vs-none) each have two real, distinct outcomes — same "each outcome needs its own exit"
-// rationale as SetRateLimitPolicyController's own identical suppression.
-// @Service, not @Component: SonarCloud flagged the mismatch between this class's own name
-// (ending in "Service", mirroring the Spring Security OAuth2UserService interface it implements —
-// same convention as Spring's own DefaultOAuth2UserService) and a bare @Component annotation.
-// Every other infrastructure/config bean in this package uses @Component (none of their names end
-// in "Service"), so this is a one-off, deliberately not renamed away from matching the framework
-// interface it implements just to keep @Component consistent with its siblings.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
 @Service
 public class GitHubVerifiedEmailUserService
     implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {

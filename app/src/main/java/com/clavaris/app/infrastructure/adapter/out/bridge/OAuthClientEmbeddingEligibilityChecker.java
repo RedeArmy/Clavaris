@@ -18,10 +18,6 @@ import org.springframework.stereotype.Component;
  * domain/embeddingOrigin registration required) — a deliberate, documented testing convenience, not
  * production-hardened, hence the wildcard origin and the warning log line every time it's used.
  */
-// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on three
-// methods/parameters below (security finding, 2026-10-07, expectedOrganizationId) — same false-
-// positive rationale PlatformScopes' own class-level suppression already documents.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @Component
 class OAuthClientEmbeddingEligibilityChecker implements EmbeddingEligibilityChecker {
 
@@ -35,25 +31,17 @@ class OAuthClientEmbeddingEligibilityChecker implements EmbeddingEligibilityChec
   private final OAuthClientRepository oauthClients;
   private final ClientDomainConfigRepository domainConfigs;
 
-  // PMD.LongVariable: same name/rationale as RegisterOAuthClientUseCase's own identical parameter.
-  @SuppressWarnings("PMD.LongVariable")
   private final OrganizationEnvironmentChecker environmentChecker;
 
   /* package */ OAuthClientEmbeddingEligibilityChecker(
       final OAuthClientRepository oauthClients,
       final ClientDomainConfigRepository domainConfigs,
-      @SuppressWarnings("PMD.LongVariable")
-          final OrganizationEnvironmentChecker environmentChecker) {
+      final OrganizationEnvironmentChecker environmentChecker) {
     this.oauthClients = oauthClients;
     this.domainConfigs = domainConfigs;
     this.environmentChecker = environmentChecker;
   }
 
-  // Three exits (unknown client / wrong Organization / resolved) is clearer here than forcing a
-  // single-return shape — same rationale ClientDomainConfig's own validateHostnameIfPresent
-  // suppression documents.
-  // PMD.LongVariable: same rationale as EmbeddingEligibilityChecker's own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   @Override
   public Optional<String> resolveAllowedFrameAncestor(
       final String clientId, final UUID expectedOrganizationId) {
@@ -72,17 +60,11 @@ class OAuthClientEmbeddingEligibilityChecker implements EmbeddingEligibilityChec
   // have a verified domain for ITS OWN, unrelated Organization. expectedOrganizationId == null is
   // the one deliberate opt-out (the consent page's own flat, org-agnostic path has none to check
   // against) — every other caller must pass a real value.
-  @SuppressWarnings("PMD.LongVariable")
   private static boolean belongsToExpectedOrganization(
       final OAuthClient client, final UUID expectedOrganizationId) {
     return expectedOrganizationId == null || client.organizationId().equals(expectedOrganizationId);
   }
 
-  // Two exits (dev wildcard / production domain-gated lookup) — same rationale as
-  // resolveAllowedFrameAncestor's own identical suppression. PMD.GuardLogStatement: clientId is a
-  // direct accessor already computed for this branch, not an expensive call this rule's "avoid
-  // unconditional work" concern applies to.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.GuardLogStatement"})
   private Optional<String> resolveFor(final OAuthClient client) {
     if (environmentChecker.isDevelopment(client.organizationId())) {
       // BR-DATA-01: clientId is a public OAuth2 identifier, not a secret — safe to log.

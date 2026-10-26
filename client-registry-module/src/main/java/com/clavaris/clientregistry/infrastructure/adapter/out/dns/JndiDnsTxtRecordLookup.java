@@ -49,16 +49,8 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
 
   private static final Logger LOG = LoggerFactory.getLogger(JndiDnsTxtRecordLookup.class);
 
-  // TD-PERF-008: 3s initial + up to 2 retries — a bounded, single-digit-seconds worst case for an
-  // admin-triggered, non-hot-path call, comfortably below what an operator would tolerate as "the
-  // verify button is broken" but generous enough for a real, slow-but-legitimate DNS server.
-  // PMD.LongVariable: these name exactly the two com.sun.jndi.dns.timeout.* properties they
-  // configure — same "the exact spec/API term, not arbitrarily long" precedent OAuthClient's own
-  // postLogoutRedirectUris suppression already establishes.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String DNS_TIMEOUT_INITIAL_MS = "3000";
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String DNS_TIMEOUT_RETRIES = "2";
 
   // Two exits (a real result, or an empty list on any failure) is clearer here than forcing a
@@ -67,7 +59,6 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
   // and exception message are both cheap accessors already computed for this catch block, not an
   // expensive call this rule's "avoid unconditional work" concern applies to.
   @Override
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.GuardLogStatement"})
   public List<String> lookupTxtRecords(final String fqdn) {
     final Hashtable<String, String> env = new Hashtable<>();
     env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
@@ -94,8 +85,6 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
   // either succeeded or was already handled by the caller's own NamingException catch by the time
   // this runs; a leaked-but-otherwise-idle JNDI context outliving this method a little longer is a
   // strictly smaller problem than turning a successful lookup into a failed one.
-  @SuppressWarnings("PMD.GuardLogStatement") // same rationale as lookupTxtRecords' own identical
-  // suppression above — both arguments are cheap accessors.
   private static void closeQuietly(final InitialDirContext context, final String fqdn) {
     if (context == null) {
       return;
@@ -107,10 +96,6 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
     }
   }
 
-  // PMD.OnlyOneReturn: same rationale as lookupTxtRecords above. PMD.LawOfDemeter:
-  // txtAttribute.getAll() is the standard javax.naming.directory.Attribute API shape for reading
-  // every value off one attribute, not a foreign object graph walk.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
   private List<String> readTxtValues(final Attribute txtAttribute) throws NamingException {
     if (txtAttribute == null) {
       return List.of();

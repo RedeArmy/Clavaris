@@ -19,7 +19,6 @@ import java.util.UUID;
  * AbstractKnownDevice}'s own identical suppression already documents for this same constructor
  * parameter.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public final class PlatformKnownDevice extends AbstractKnownDevice<PlatformAccountId> {
 
   private PlatformKnownDevice(

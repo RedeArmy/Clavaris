@@ -48,7 +48,6 @@ import org.thymeleaf.expression.IExpressionObjectFactory;
  * of an {@link IExpressionObjectFactory}'s own contract (one engine can register many dialects'
  * factories in a chain), same rationale as every other short-circuiting lookup in this codebase.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 @Component
 class ResourceUrlDialect extends AbstractDialect implements IExpressionObjectDialect {
 

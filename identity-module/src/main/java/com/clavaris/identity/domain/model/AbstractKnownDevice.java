@@ -24,12 +24,8 @@ import java.util.UUID;
  * AbstractVerificationToken}, same rationale.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.AbstractClassWithoutAbstractMethod",
   "PMD.PublicMemberInNonPublicType",
-  "PMD.DataClass"
 })
 abstract class AbstractKnownDevice<I> {
 

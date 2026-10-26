@@ -58,12 +58,6 @@ public class RequestPasswordResetService implements RequestPasswordResetUseCase 
     this.outbox = outbox;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as AuthenticateWithPasswordService's
-  // own identical suppression: every logged argument is a direct value-object accessor, not an
-  // expensive computation. PMD.OnlyOneReturn: three genuinely distinct exits (unknown account,
-  // test-marked-address bypass, the normal real-send path) — same "one exit per distinct
-  // outcome" rationale every admin-API controller in this codebase already applies.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
   @Override
   public void handle(final RequestPasswordResetCommand command) {
     // No account found: return normally, exactly as the found-and-sent path does — see this

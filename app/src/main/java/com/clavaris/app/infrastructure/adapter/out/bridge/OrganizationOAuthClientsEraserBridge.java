@@ -19,7 +19,6 @@ import org.springframework.stereotype.Component;
  * rather than a rename touching {@code DeleteOrganizationService}'s wiring for a purely cosmetic
  * gain; this Javadoc is the correction.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class OrganizationOAuthClientsEraserBridge implements OrganizationOAuthClientsEraser {
 

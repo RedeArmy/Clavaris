@@ -14,7 +14,6 @@ import java.util.UUID;
  * JPA row mapping for {@code organization_social_connection_settings} — a plain data holder by
  * design, same convention as {@code OrganizationSocialCredentialEntity}.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
 @Entity
 @Table(name = "organization_social_connection_settings")
 public class SocialConnectionSettingsEntity {

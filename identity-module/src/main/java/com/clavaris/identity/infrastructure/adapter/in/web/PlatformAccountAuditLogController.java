@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * from {@code PlatformAuditLogController} (the Organization-wide view) — that view's own Javadoc
  * documents why Account-level events are out of scope there; this page is exactly the complement.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}/audit-log")
 public class PlatformAccountAuditLogController {

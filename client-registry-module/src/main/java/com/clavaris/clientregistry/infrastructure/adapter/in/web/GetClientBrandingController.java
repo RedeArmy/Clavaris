@@ -26,7 +26,6 @@ class GetClientBrandingController {
 
   // Two exits (404 on a bogus organizationId/oauthClientId pair, 200 on success) — same rationale
   // as SetClientBrandingController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Read an OAuthClient's hosted-login branding (ADR-0009 §3)")
   @ApiResponse(
       responseCode = "200",

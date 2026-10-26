@@ -8,7 +8,6 @@ import jakarta.validation.constraints.Size;
  * Web-layer form object. {@code email} travels as a hidden field across the request→confirm round
  * trip, same reasoning {@link ConfirmPasswordResetForm}'s own {@code token} field documents.
  */
-@SuppressWarnings("PMD.DataClass")
 public class AuthenticateWithEmailCodeForm {
 
   @NotBlank(message = "Email is required")

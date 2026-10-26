@@ -17,9 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
  * to {@link SuspendPlatformAccountUseCase} rather than duplicating its lock cascade, exactly as the
  * tenant-tier sibling delegates to {@code SuspendAccountUseCase}.
  */
-// LongVariable: suspendPlatformAccount names exactly what it is — same convention
-// IdentityUseCaseConfig's own identical suppressions already document throughout this codebase.
-@SuppressWarnings("PMD.LongVariable")
 public class ConfirmNewPlatformDeviceLoginAlertService
     implements ConfirmNewPlatformDeviceLoginAlertUseCase {
 

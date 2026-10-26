@@ -19,7 +19,6 @@ import org.springframework.stereotype.Component;
  * throughout means two instances racing the same tick simply split the work, never double-process
  * the same row.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class WebhookDispatchScheduler {
 

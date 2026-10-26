@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 // PMD.CyclomaticComplexity: TD-FUT-019's own gating branch is one more genuinely distinct
 // outcome on top of the real validation guards already here — same "wiring, not sprawl"
 // reasoning this codebase's own comparably-shaped orchestration methods already document.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.CyclomaticComplexity"})
+@SuppressWarnings({"PMD.CyclomaticComplexity"})
 public class RegisterAccountService implements RegisterAccountUseCase {
 
   private final AccountRepository accounts;

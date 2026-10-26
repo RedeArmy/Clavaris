@@ -18,7 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
  * parameter here names exactly what it is — same deliberate, descriptive-name convention {@code
  * DashboardControllerSupport}'s own identical suppression already establishes.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class WebhookDashboardControllerSupport {
 
   // HTMX's own request header (https://htmx.org/reference/#request_headers) — same convention as

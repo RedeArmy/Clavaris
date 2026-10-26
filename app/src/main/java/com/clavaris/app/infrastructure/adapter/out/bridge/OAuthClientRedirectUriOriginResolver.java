@@ -15,10 +15,6 @@ import org.springframework.stereotype.Component;
  * {@code OAuthClient} belonging to a different Organization than expected is treated identically to
  * "unknown client".
  */
-// PMD.OnlyOneReturn: "unknown client" / "resolved" are two independent, equally valid exits — same
-// rationale OAuthClientEmbeddingEligibilityChecker's own identical suppression documents.
-// PMD.LongVariable: see RedirectUriOriginResolver's own identical suppression.
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
 @Component
 class OAuthClientRedirectUriOriginResolver implements RedirectUriOriginResolver {
 

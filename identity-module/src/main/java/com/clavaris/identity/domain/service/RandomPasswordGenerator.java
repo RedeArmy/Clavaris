@@ -19,7 +19,6 @@ import java.security.SecureRandom;
  * the same idea, same "generate a strong, never-surfaced placeholder" shape, kept local to each
  * module that needs it.
  */
-@SuppressWarnings("PMD.LongVariable")
 public final class RandomPasswordGenerator {
 
   // Long enough that brute-forcing this never-returned, never-logged, immediately-superseded

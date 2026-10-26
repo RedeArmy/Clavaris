@@ -54,12 +54,6 @@ import org.springframework.web.server.ResponseStatusException;
  * PlatformAccountSessionsController}'s own already-working standalone page, linked from the
  * Security tab, not duplicated.
  */
-// PMD.LongVariable: currentPlatformAccount names exactly what it is — same convention every other
-// controller in this codebase using CurrentPlatformAccountResolver already establishes.
-// PMD.AvoidFieldNameMatchingMethodName: removePicture (the field) and removePicture() (the
-// @PostMapping handler) name the same real concept — same rationale AccountProfileController's
-// own identical suppression documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidFieldNameMatchingMethodName"})
 @Controller
 @RequestMapping("/platform/account")
 public class PlatformAccountProfileController {
@@ -100,9 +94,6 @@ public class PlatformAccountProfileController {
     return isHtmxRequest(request) ? PROFILE_FRAGMENT : PROFILE_VIEW;
   }
 
-  // PMD.OnlyOneReturn: two real, distinct exit paths (htmx re-render vs. classic redirect) — same
-  // rationale uploadPicture's own identical suppression below documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/profile")
   public String updateProfile(
       @RequestParam(required = false) final String firstName,
@@ -121,9 +112,6 @@ public class PlatformAccountProfileController {
     return "redirect:/platform/account?updated";
   }
 
-  // PMD.OnlyOneReturn: three real, distinct exit paths (validation error, htmx re-render, classic
-  // redirect) — same rationale AccountProfileController's own identical suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/picture")
   public String uploadPicture(
       @RequestParam("file") final MultipartFile file,
@@ -152,9 +140,6 @@ public class PlatformAccountProfileController {
     return "redirect:/platform/account?updated";
   }
 
-  // PMD.OnlyOneReturn: two real, distinct exit paths (htmx re-render vs. classic redirect) — same
-  // rationale updateProfile's own identical suppression above documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/picture/remove")
   public String removePicture(final HttpServletRequest request, final Model model) {
     final PlatformAccountId platformAccountId = requireCurrentPlatformAccount(request);

@@ -12,9 +12,6 @@ import java.util.UUID;
  * {@code touch()}/{@code reconstitute} pair here, since nothing ever reads a single row back by id
  * or mutates one; {@code GetLoginActivityForAccountService} only ever reads day-bucketed counts.
  */
-// PMD.ShortVariable: id names exactly what it is — same convention KnownDevice's own identical
-// suppression already documents for this same constructor parameter.
-@SuppressWarnings("PMD.ShortVariable")
 public record LoginEvent(
     UUID id, AccountId accountId, OrganizationId organizationId, Instant occurredAt) {
 

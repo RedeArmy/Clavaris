@@ -21,9 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
  * platform:accounts:profile:write}, covering this read and {@link UpdateAccountProfileController}'s
  * own write (a deliberate choice, not an oversight — see that scope's own Javadoc).
  */
-// PMD.ShortVariable: id matches the path variable's own wire name (and GetAccountMetadataController
-// -style siblings elsewhere in this codebase) — not an organically short name that should grow.
-@SuppressWarnings("PMD.ShortVariable")
 @RestController
 class GetAccountProfileController {
 

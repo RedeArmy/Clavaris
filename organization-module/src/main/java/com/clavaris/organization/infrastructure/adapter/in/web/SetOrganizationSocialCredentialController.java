@@ -39,7 +39,6 @@ class SetOrganizationSocialCredentialController {
 
   // Three exits (404 on a bogus organizationId, 409 on a guard violation, 200 on success) — same
   // rationale as CreateProductionEnvironmentController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(
       summary = "Set an Organization's own OAuth social credentials for one provider (ADR-0022)")
   @ApiResponse(responseCode = "200", description = "Credential created or updated")

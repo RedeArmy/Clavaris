@@ -38,9 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * credential attached, so a social-only signup is never left with zero authentication methods other
  * than that one linked provider.
  */
-// PMD.LongVariable/GuardLogStatement/OnlyOneReturn: same rationale as the tenant-tier sibling's
-// own identical class-level suppression.
-@SuppressWarnings({"PMD.LongVariable", "PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
 public class AuthenticatePlatformAccountWithSocialProviderService
     implements AuthenticatePlatformAccountWithSocialProviderUseCase {
 

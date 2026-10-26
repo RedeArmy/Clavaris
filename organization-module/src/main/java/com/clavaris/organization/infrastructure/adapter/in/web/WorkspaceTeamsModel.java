@@ -42,7 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 // PMD.LongVariable/ExcessiveImports: a read model over several use cases and the domain types they
 // return — wiring, not sprawl.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+@SuppressWarnings({"PMD.ExcessiveImports"})
 final class WorkspaceTeamsModel {
 
   /* default */ static final String WORKSPACE_DETAIL_VIEW =
@@ -69,7 +69,6 @@ final class WorkspaceTeamsModel {
 
   // Shared "a team/role mutation just succeeded" tail — same rationale as
   // PlatformOrganizationDashboardController's own identical shape for its own resource.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* default */ String afterTeamMutation(
       final HttpServletRequest request,
       final Organization organization,

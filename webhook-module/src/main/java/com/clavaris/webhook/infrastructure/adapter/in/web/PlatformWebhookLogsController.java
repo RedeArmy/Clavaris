@@ -38,7 +38,6 @@ import org.springframework.web.server.ResponseStatusException;
  * repository injected directly into this controller (this module's own use-case-per-feature
  * convention) and not one query per delivery row.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints/logs")
 public class PlatformWebhookLogsController {
@@ -67,7 +66,6 @@ public class PlatformWebhookLogsController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showList(
       final HttpServletRequest request,
@@ -92,7 +90,6 @@ public class PlatformWebhookLogsController {
   // Two exits (HTMX fragment vs. plain redirect on success) plus a third for the not-replayable
   // inline error — same rationale as PlatformWebhookDeliveryController's own identical
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{endpointId}/{deliveryId}/replay")
   public String replay(
       final HttpServletRequest request,

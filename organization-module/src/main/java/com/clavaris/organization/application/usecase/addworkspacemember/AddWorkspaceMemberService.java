@@ -50,9 +50,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 // call site in this module already documents — accountId is a cheap in-memory accessor, not an
 // expensive computation the WARN level should be checked before evaluating.
 @SuppressWarnings({
-  "PMD.LongVariable",
   "PMD.AvoidCatchingGenericException",
-  "PMD.GuardLogStatement"
 })
 public class AddWorkspaceMemberService implements AddWorkspaceMemberUseCase {
 

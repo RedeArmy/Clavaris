@@ -17,9 +17,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  * AuthenticatedSessionCompletion#complete} all widened to public/accept an optional {@code
  * SocialProvider} so {@code app} can call the same two gates before establishing a social session.
  */
-// PMD.LongVariable: ONE_TIME_EMAIL_PROOF names the OIDC amr=otp factor precisely — see this
-// enum's own Javadoc; a shortened name would only make the two constants harder to tell apart.
-@SuppressWarnings("PMD.LongVariable")
 public enum PendingAuthenticationFactor {
 
   /** {@link LoginController} (email+password) and {@link UsernameSignInController}. */

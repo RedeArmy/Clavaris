@@ -25,9 +25,6 @@ public class GetPlatformAccountAvatarService implements GetPlatformAccountAvatar
     this.storage = storage;
   }
 
-  // PMD.OnlyOneReturn: each early exit is a real, distinct outcome — same rationale
-  // GetAccountAvatarService's own identical suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<PlatformAccountAvatarResult> handle(final PlatformAccountId platformAccountId) {
     final Optional<PlatformAccount> maybeAccount = accounts.findById(platformAccountId);

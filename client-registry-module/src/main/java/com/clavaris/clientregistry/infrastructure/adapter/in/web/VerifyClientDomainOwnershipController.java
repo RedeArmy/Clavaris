@@ -37,7 +37,6 @@ class VerifyClientDomainOwnershipController {
   // Three exits (404 on a bogus organizationId/oauthClientId pair, 404 on no domain ever
   // requested, 200 on a completed attempt whether VERIFIED or FAILED) — same rationale as every
   // other multi-exit controller in this module.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(
       summary = "Verify an OAuthClient's custom domain ownership via DNS TXT record (ADR-0009 §2)")
   @ApiResponse(

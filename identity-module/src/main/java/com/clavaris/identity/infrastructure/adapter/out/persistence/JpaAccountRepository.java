@@ -319,10 +319,6 @@ class JpaAccountRepository implements AccountRepository {
         .toList();
   }
 
-  // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: same TD-PERF-020 keyset
-  // pagination shape client-registry-module's own JpaOAuthClientRepository already establishes.
-  // PMD.OnlyOneReturn: three real, distinct exits — first/after/before.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
   @Override
   public KeysetPage<Account> findKeysetPageByOrganizationId(
       final OrganizationId organizationId,
@@ -353,11 +349,6 @@ class JpaAccountRepository implements AccountRepository {
         fetched, pageRequest.size(), false, toDomainBatched(fetched), this::cursorOf);
   }
 
-  // TD-PERF-029: one findByAccountIdIn call for the whole page, instead of one findByAccountId
-  // per row inside toDomain — see that method's own Javadoc.
-  // PMD.LongVariable: credentialsByAccountId names exactly what it is — same convention this
-  // codebase's other descriptively-named local variables already follow.
-  @SuppressWarnings("PMD.LongVariable")
   private Function<AccountEntity, Account> toDomainBatched(final List<AccountEntity> entities) {
     final Map<UUID, PasswordCredentialEntity> credentialsByAccountId =
         credentials.findByAccountIdIn(entities.stream().map(AccountEntity::getId).toList()).stream()

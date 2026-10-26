@@ -7,7 +7,6 @@ import com.clavaris.identity.domain.model.PlatformAccountId;
  * RecordAccountLoginDeviceCommand} — see that record's own Javadoc for the meaning of each field,
  * unchanged here beyond {@link PlatformAccountId} replacing {@code AccountId}.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record RecordPlatformAccountLoginDeviceCommand(
     PlatformAccountId platformAccountId,
     String userAgent,

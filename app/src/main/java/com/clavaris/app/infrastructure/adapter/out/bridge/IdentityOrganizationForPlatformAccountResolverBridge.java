@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
  * one class — same reasoning {@code IdentityCurrentPlatformAccountResolverBridge}'s own Javadoc
  * already documents for an identical situation.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class IdentityOrganizationForPlatformAccountResolverBridge
     implements OrganizationForPlatformAccountResolver {

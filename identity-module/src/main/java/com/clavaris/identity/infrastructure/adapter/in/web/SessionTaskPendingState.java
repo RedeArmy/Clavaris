@@ -14,7 +14,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  * genuinely nullable (Clerk "customize redirect URLs" parity) — see {@code DeviceTrustPendingState}
  * for the identical reasoning.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class SessionTaskPendingState {
 
   /* package */ static final String ACCOUNT_ID_ATTRIBUTE = "clavaris.sessionTask.pendingAccountId";

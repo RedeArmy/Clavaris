@@ -9,5 +9,4 @@ import java.util.UUID;
  * OAuthClient} itself has no separate display "name" field, so {@code clientId} is the identifying
  * label.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public record OAuthClientSummary(UUID id, String clientId, List<String> allowedScopes) {}

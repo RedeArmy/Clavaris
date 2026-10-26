@@ -32,11 +32,6 @@ class DeleteAccountController {
     this.useCase = useCase;
   }
 
-  // Two exits (404 on an unknown id, 204 on success) — same rationale as
-  // DeactivatePlatformClientController's own identical suppression. ShortVariable: "id" matches
-  // the path variable's own name in the API contract (`{id}:delete`, security-architecture.md
-  // §7) — same precedent as RegisteredClientRepository's own SPI parameter naming elsewhere.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Hard-delete an Account and everything only it owns (BR-DATA-02/03)")
   @ApiResponse(responseCode = "204", description = "Deleted — permanent, not reversible")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")

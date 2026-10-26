@@ -54,7 +54,7 @@ public final class DeviceTrustGate {
   // one parameter per collaborating port/request value, same rationale as
   // AuthenticatedSessionCompletion's own identical suppression — the two extra params
   // (clientId/redirectUrl) are what pushed this over Sonar's own lower (7) threshold.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "java:S107", "PMD.ExcessiveParameterList"})
+  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public static Optional<String> intercept(
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestChallenge,

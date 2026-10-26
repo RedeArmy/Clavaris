@@ -51,7 +51,6 @@ public class ConfirmNewPlatformDeviceLoginAlertController {
 
   // Same "several independent rejection reasons, each needs its own exit" rationale as
   // ConfirmNewDeviceLoginAlertController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String confirm(
       @Valid @ModelAttribute("form") final ConfirmNewDeviceLoginAlertForm form,

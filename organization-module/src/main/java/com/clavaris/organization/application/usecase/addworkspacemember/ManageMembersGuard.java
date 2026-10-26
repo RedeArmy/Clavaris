@@ -50,7 +50,7 @@ public final class ManageMembersGuard {
   // BR-WS-01's own invariant spelled out literally (at least one holder must remain), same
   // rationale this class's own predecessor, LastAdminGuard, already documented for its identical
   // check.
-  @SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.AvoidLiteralsInIfCondition"})
+  @SuppressWarnings({"PMD.AvoidLiteralsInIfCondition"})
   public static void assertActionKeepsAtLeastOneHolder(
       final WorkspaceMembershipRepository memberships,
       final WorkspaceRoleRepository roles,

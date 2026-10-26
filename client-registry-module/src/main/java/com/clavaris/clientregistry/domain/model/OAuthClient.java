@@ -24,12 +24,7 @@ import java.util.UUID;
 // ShortVariable), and twelve one-line accessors plus the real transitions exceed TooManyMethods.
 // None of this hides a design smell: GodClass, LongVariable and CyclomaticComplexity are no longer
 // suppressed here — the validation moved out and the long names were shortened instead.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class OAuthClient {
 
   private final UUID id;

@@ -12,11 +12,6 @@ import com.yubico.webauthn.exception.RegistrationFailedException;
 import java.io.IOException;
 import java.util.stream.Collectors;
 
-// PMD.LawOfDemeter: reading fields off Yubico's own
-// RegistrationResult/PublicKeyCredentialDescriptor
-// DTOs is the entire point of this class — same "working with a vetted library's own result type"
-// rationale as every other adapter touching this library's data types.
-@SuppressWarnings("PMD.LawOfDemeter")
 public class CompleteWebAuthnRegistrationService implements CompleteWebAuthnRegistrationUseCase {
 
   private final RelyingParty relyingParty;

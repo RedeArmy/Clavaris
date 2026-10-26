@@ -15,14 +15,6 @@ import java.util.UUID;
  * trusted: the file's own first bytes must match it, so a script renamed {@code logo.png} is
  * refused rather than stored and served.
  */
-// PMD.AvoidFieldNameMatchingMethodName/ShortMethodName/LongVariable: same value-object
-// conventions Organization's own identical suppression documents; of() is the factory name
-// every domain class here uses.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable"
-})
 public final class OrganizationLogo {
 
   public static final int MAX_BYTES = 1024 * 1024;

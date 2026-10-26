@@ -10,10 +10,6 @@ import com.clavaris.identity.domain.model.AccountId;
  * actions the way {@code BanAccountUseCase}/{@code SuspendAccountUseCase} are, since these are
  * persistent configuration, not a state-transition event.
  */
-// PMD.LongVariable: canDeleteOwnAccount/bypassesDeviceTrust name exactly what they are — mirrors
-// Account's own identical field names, same convention every other descriptively-named field in
-// this codebase follows.
-@SuppressWarnings("PMD.LongVariable")
 public record UpdateAccountPermissionsCommand(
     AccountId accountId,
     boolean canDeleteOwnAccount,

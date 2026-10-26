@@ -29,7 +29,6 @@ import org.springframework.stereotype.Repository;
  * trying {@code PlatformClient} first, then falling back to {@code OrganizationClient}, is
  * unambiguous.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Repository
 public class PlatformRegisteredClientRepository implements RegisteredClientRepository {
 
@@ -52,10 +51,6 @@ public class PlatformRegisteredClientRepository implements RegisteredClientRepos
         "PlatformClient/OrganizationClient creation never goes through this SPI (BR-PLATFORM-03, ADR-0023)");
   }
 
-  // Parameter name matches RegisteredClientRepository's own interface signature (findById(String
-  // id)) — kept as-is for readability against the SPI it implements, rather than renamed just to
-  // dodge PMD's ShortVariable rule.
-  @SuppressWarnings({"PMD.ShortVariable", "PMD.OnlyOneReturn"})
   @Override
   public RegisteredClient findById(final String id) {
     // TD-SEC-010 (closed): JdbcOAuth2AuthorizationService (TD-SEC-003) calls this on every reload
@@ -86,7 +81,6 @@ public class PlatformRegisteredClientRepository implements RegisteredClientRepos
   // This is what actually enforces Deactivate*ClientService's own consequence: the very next
   // client_credentials attempt against a revoked client fails here, before Argon2 secret
   // verification even runs.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public RegisteredClient findByClientId(final String clientId) {
     final RegisteredClient platformMatch =

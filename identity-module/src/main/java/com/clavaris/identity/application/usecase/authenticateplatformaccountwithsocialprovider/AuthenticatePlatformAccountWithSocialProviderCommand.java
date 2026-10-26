@@ -12,8 +12,5 @@ import com.clavaris.identity.domain.model.SocialProvider;
  *
  * @param emailVerifiedByProvider same defense-in-depth rationale as the tenant-tier command.
  */
-// PMD.LongVariable: emailVerifiedByProvider names exactly what it is, same convention the
-// tenant-tier sibling command's own identical suppression documents.
-@SuppressWarnings("PMD.LongVariable")
 public record AuthenticatePlatformAccountWithSocialProviderCommand(
     SocialProvider provider, String providerUserId, Email email, boolean emailVerifiedByProvider) {}

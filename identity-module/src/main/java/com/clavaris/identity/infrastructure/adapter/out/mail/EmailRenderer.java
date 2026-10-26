@@ -92,7 +92,6 @@ final class EmailRenderer {
 
   // The name the email is sent in, with the small amber dot the console uses as its eyebrow mark.
   // With no name there is nothing to show: never a fallback to Clavaris on a tenant's email.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static String wordmark(final String brand) {
     if (brand == null) {
       return "";

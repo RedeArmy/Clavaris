@@ -27,7 +27,6 @@ class ActivateWebhookEndpointController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Reactivate a previously-deactivated WebhookEndpoint")
   @ApiResponse(responseCode = "200", description = "Activated")
   @ApiResponse(responseCode = "404", description = "No WebhookEndpoint exists with this id")

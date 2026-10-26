@@ -49,7 +49,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 // imports pushed this past the default threshold — same "one import per collaborating type is
 // inherent to the design, not a code smell" rationale LoginController's own identical suppression
 // already establishes.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals", "PMD.ExcessiveImports"})
+@SuppressWarnings({"PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/o/{organizationId}/login/email-link")
 public class EmailLinkSignInController {
@@ -93,7 +93,6 @@ public class EmailLinkSignInController {
     return REQUEST_FORM_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String requestLink(
       @PathVariable final UUID organizationId,
@@ -128,7 +127,6 @@ public class EmailLinkSignInController {
     return CONFIRM_FORM_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/confirm")
   public String confirm(
       @PathVariable final UUID organizationId,

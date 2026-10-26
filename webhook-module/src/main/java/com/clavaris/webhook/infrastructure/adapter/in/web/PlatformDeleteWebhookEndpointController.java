@@ -34,7 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
  * page for a still-active endpoint) and {@code POST} (the real enforcement — {@link
  * DeleteWebhookEndpointUseCase} itself, never trusting the GET-time check alone).
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/delete")
@@ -59,10 +58,6 @@ public class PlatformDeleteWebhookEndpointController {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 
-  // PMD.OnlyOneReturn: the still-active redirect and the real confirm-page render are two
-  // genuinely distinct exits, same rationale as PlatformDeleteOAuthClientController's own
-  // identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String showConfirmation(
       final HttpServletRequest request,
@@ -86,9 +81,6 @@ public class PlatformDeleteWebhookEndpointController {
     return CONFIRM_VIEW;
   }
 
-  // PMD.OnlyOneReturn: token-invalid/confirmation-mismatch/success each need their own exit, same
-  // rationale as PlatformDeleteOAuthClientController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String delete(
       final HttpServletRequest request,

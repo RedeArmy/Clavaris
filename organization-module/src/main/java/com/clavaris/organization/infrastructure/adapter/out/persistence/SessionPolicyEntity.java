@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code session_policies} — plain data holder by design. */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
 @Entity
 @Table(name = "session_policies")
 public class SessionPolicyEntity {

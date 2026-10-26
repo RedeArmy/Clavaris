@@ -120,9 +120,6 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
     }
   }
 
-  // The branding the page was given, else (only when it still needs a name) the one looked up.
-  // PMD.OnlyOneReturn: the three exits are three different answers, not one value built up.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private Optional<ClientBrandingSnapshot> brandingOf(
       final ModelAndView modelAndView,
       final boolean needsName,
@@ -152,7 +149,6 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
 
   // "https://cdn.acme.test:8443/img/logo.png?v=2" -> "https://cdn.acme.test:8443"; anything that is
   // not an https URL with a host is no origin at all.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static Optional<String> httpsOriginOf(final String url) {
     try {
       final URI uri = new URI(url);
@@ -176,7 +172,9 @@ public class ConsumerBrandNameInterceptor implements HandlerInterceptor {
   // PMD.OnlyOneReturn: the try block and its catch each have their own exit, same rationale as
   // every
   // other parse-or-nothing helper in this package.
-  @SuppressWarnings({"unchecked", "PMD.OnlyOneReturn"})
+  @SuppressWarnings({
+    "unchecked",
+  })
   private static Optional<OrganizationId> organizationOf(final HttpServletRequest request) {
     final Object variables = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
     final String raw =

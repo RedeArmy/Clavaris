@@ -42,14 +42,6 @@ import org.springframework.web.bind.annotation.RestController;
  * — deliberately NOT a change to {@code UpdateAccountProfileService}'s own shared behavior, which
  * the other two callers' own tests already rely on staying exactly as it is.
  */
-// PMD.OnlyOneReturn: four genuinely distinct exits (404 unknown account on the initial read, 404
-// on the update itself — the same real TOCTOU-safe defensive catch
-// UpdateAccountMetadataController's
-// own identical suppression documents, 409 username conflict, 204 success).
-// PMD.ShortVariable: id matches the path variable's own wire name (and
-// UpdateAccountMetadataController's own identically-named parameter) — not an organically short
-// name that should grow.
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
 @RestController
 class UpdateAccountProfileController {
 

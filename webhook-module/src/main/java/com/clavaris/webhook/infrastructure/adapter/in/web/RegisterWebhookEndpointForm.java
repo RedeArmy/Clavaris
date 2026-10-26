@@ -18,7 +18,6 @@ import java.util.List;
  * subscribedEventTypes} matches the domain's own field name exactly, not arbitrarily long — same
  * precedent {@code WebhookEndpoint}'s own suppression already establishes.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.LongVariable"})
 public class RegisterWebhookEndpointForm {
 
   @NotBlank(message = "Enter the URL to deliver events to")

@@ -13,7 +13,6 @@ import java.util.UUID;
  * own JPA entities. Column mapping shared with {@link OrganizationClientEntity} via {@link
  * AbstractClientCredentialEntity} — see that class's own Javadoc for why.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "platform_clients")
 public class PlatformClientEntity extends AbstractClientCredentialEntity {

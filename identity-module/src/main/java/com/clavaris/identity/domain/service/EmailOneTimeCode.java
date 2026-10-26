@@ -20,7 +20,6 @@ import java.security.SecureRandom;
  * via {@link RefreshTokenSecret#hash} exactly like a link token before persistence — never stored
  * in cleartext, same BR-ID-04/BR-ID-05 invariant either raw-value shape must satisfy.
  */
-@SuppressWarnings("PMD.LongVariable")
 public final class EmailOneTimeCode {
 
   private static final int CODE_DIGIT_COUNT = 6;

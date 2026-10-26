@@ -16,7 +16,6 @@ import java.util.UUID;
  * AbstractPasswordCredential}'s own identical suppression already documents for this same
  * constructor parameter.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public final class PasswordCredential extends AbstractPasswordCredential<AccountId> {
 
   private PasswordCredential(

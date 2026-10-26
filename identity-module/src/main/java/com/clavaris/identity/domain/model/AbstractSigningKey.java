@@ -34,12 +34,8 @@ import java.util.UUID;
  * reference, when calling one of this class's inherited accessors from another package.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.AbstractClassWithoutAbstractMethod",
   "PMD.PublicMemberInNonPublicType",
-  "PMD.DataClass"
 })
 abstract class AbstractSigningKey {
 

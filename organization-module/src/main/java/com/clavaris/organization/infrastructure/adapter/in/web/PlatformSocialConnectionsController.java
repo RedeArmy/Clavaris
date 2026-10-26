@@ -44,7 +44,7 @@ import org.springframework.web.server.ResponseStatusException;
  */
 // PMD.LongVariable: names match what they are; PMD.OnlyOneReturn: each handler has a real second
 // exit (a rejected save shows the page again), same as every sibling dashboard controller.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.TooManyMethods"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/connections")
 public class PlatformSocialConnectionsController {

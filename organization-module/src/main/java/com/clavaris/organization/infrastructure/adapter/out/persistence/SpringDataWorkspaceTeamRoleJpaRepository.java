@@ -18,5 +18,5 @@ interface SpringDataWorkspaceTeamRoleJpaRepository
   // SpringDataOrganizationJpaRepository's own identical parameter-level suppressions already
   // establish.
   boolean existsByWorkspaceRoleIdAndWorkspaceTeamIdNot(
-      UUID workspaceRoleId, @SuppressWarnings("PMD.LongVariable") UUID excludedWorkspaceTeamId);
+      UUID workspaceRoleId, UUID excludedWorkspaceTeamId);
 }

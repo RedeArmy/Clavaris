@@ -60,13 +60,11 @@ public class DefaultSecurityConfig {
   public SecurityFilterChain defaultSecurityFilterChain(
       final HttpSecurity http,
       final RateLimiter rateLimiter,
-      @SuppressWarnings("PMD.LongVariable") final RateLimitKeyHasher rateLimitKeyHasher,
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.rate-limit.login-email-code-confirm.per-email-limit:10}")
+      final RateLimitKeyHasher rateLimitKeyHasher,
+      @Value("${clavaris.rate-limit.login-email-code-confirm.per-email-limit:10}")
           final int emailCodeConfirmPerEmailLimit,
       final EmbeddingEligibilityChecker embeddingChecker,
-      @SuppressWarnings("PMD.LongVariable")
-          final RedirectUriOriginResolver redirectUriOriginResolver) {
+      final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
         // TD-SEC-009: this chain is where RegisterAccountController's own hosted Thymeleaf form
         // (/o/{organizationId}/register) and every other non-SAS/non-dashboard hosted page lives —

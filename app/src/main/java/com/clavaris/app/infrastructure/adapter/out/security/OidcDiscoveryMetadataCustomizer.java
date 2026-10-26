@@ -22,9 +22,6 @@ import org.springframework.security.oauth2.server.authorization.oidc.OidcProvide
  *       not issue: removed.
  * </ul>
  */
-// PMD.LongVariable: names say what each list holds, same convention as the sibling security
-// classes.
-@SuppressWarnings("PMD.LongVariable")
 public final class OidcDiscoveryMetadataCustomizer {
 
   private static final List<String> CLAIMS_SUPPORTED =

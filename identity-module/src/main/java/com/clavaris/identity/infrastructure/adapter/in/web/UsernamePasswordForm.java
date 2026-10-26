@@ -12,7 +12,6 @@ import jakarta.validation.constraints.Size;
  */
 // A plain HTML-form data holder by design — same rationale RegisterAccountForm's own identical
 // suppression already documents.
-@SuppressWarnings("PMD.DataClass")
 public class UsernamePasswordForm {
 
   @NotBlank(message = "Username is required")

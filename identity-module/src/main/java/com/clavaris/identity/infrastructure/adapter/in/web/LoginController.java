@@ -66,7 +66,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 // already-loaded Account directly), bringing parameter count/coupling back under PMD's own
 // threshold; TD-FUT-034's own new RecordLoginEventUseCase pushed CouplingBetweenObjects back over
 // it — same rationale, one more real collaborating port, not sprawl.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects"})
 @Controller
 @RequestMapping("/o/{organizationId}/login")
 public class LoginController {
@@ -135,7 +135,6 @@ public class LoginController {
 
   // Two independent rejection reasons (form validation, invalid credentials) each need their own
   // exit — same rationale as RegisterAccountController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String login(
       @PathVariable final UUID organizationId,

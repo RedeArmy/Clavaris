@@ -23,10 +23,6 @@ import java.util.Optional;
 @SuppressWarnings({
   "PMD.TooManyMethods",
   "PMD.ExcessivePublicCount",
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.LongVariable"
 })
 public final class Account {
 

@@ -25,10 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
  * this page only links to them, exactly as {@code organization-detail.html}'s own former Danger
  * Zone section did.
  */
-// PMD.LongVariable: currentPlatformAccount/ownerPlatformAccountId (field/constructor param/local
-// each) are long by design, not accidentally — same class-level-suppression precedent
-// PlatformOrganizationDashboardController's own identical rationale documents.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/danger-zone")
 public class PlatformDangerZoneController {

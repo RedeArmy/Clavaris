@@ -69,7 +69,6 @@ class ClientBrandingProviderBridge implements ClientBrandingProvider {
 
   // Two exits (no usable client context / a resolved snapshot) — same rationale
   // RedirectUrlResolverBridge's own identical suppression documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private ClientBrandingSnapshot configuredBranding(
       final OrganizationId organizationId, final String clientId) {
     if (clientId == null) {

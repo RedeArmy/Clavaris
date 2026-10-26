@@ -30,10 +30,6 @@ import org.springframework.stereotype.Component;
  * account creation and the new member setting their own real password via the reset-link email
  * below.
  */
-// PMD.LongVariable: GENERATED_PASSWORD_LENGTH and requestPasswordReset (field/param) both name
-// exactly what they are — a shortened identifier would only make this class harder to read, same
-// convention every other descriptively-named port/constant in this codebase follows.
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class WorkspaceMemberAccountProvisionerBridge implements AccountProvisioner {
 

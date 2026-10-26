@@ -30,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
  * port method this module's use cases actually need — same "one port, several use cases" shape
  * {@code AccountRepository}'s own identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.TooManyMethods"})
 @Repository
 class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
 
@@ -141,7 +141,6 @@ class JpaWebhookEndpointRepository implements WebhookEndpointRepository {
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // organization-module's own JpaOrganizationRepository#findKeysetPageOwnedBy already documents.
   @Override
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
   public KeysetPage<WebhookEndpoint> findKeysetPageByOrganizationId(
       final UUID organizationId, final KeysetPageRequest pageRequest) {
     final org.springframework.data.domain.PageRequest limit =

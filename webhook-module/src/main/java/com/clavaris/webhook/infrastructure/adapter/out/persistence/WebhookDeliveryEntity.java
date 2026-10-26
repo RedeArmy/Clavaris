@@ -18,7 +18,7 @@ import java.util.UUID;
  * "persistence-mapping data holder, not organically grown sprawl" reasoning PMD.DataClass already
  * documents on this class.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable", "PMD.TooManyFields"})
+@SuppressWarnings({"PMD.TooManyFields"})
 @Entity
 @Table(name = "webhook_deliveries")
 public class WebhookDeliveryEntity {

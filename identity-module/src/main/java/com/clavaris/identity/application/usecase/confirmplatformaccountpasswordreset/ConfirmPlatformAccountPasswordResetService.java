@@ -38,8 +38,6 @@ public class ConfirmPlatformAccountPasswordResetService
   private final PlatformAccountSessionRevoker sessionRevoker;
   private final PasswordHasher hasher;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name — same precedent as
-  // ConfirmPasswordResetService's own identical field for the tenant-tier equivalent.
   private final BreachedPasswordChecker breachedPasswordChecker;
 
   @SuppressWarnings("java:S107")
@@ -48,7 +46,7 @@ public class ConfirmPlatformAccountPasswordResetService
       final PlatformAccountRepository accounts,
       final PlatformAccountSessionRevoker sessionRevoker,
       final PasswordHasher hasher,
-      @SuppressWarnings("PMD.LongVariable") final BreachedPasswordChecker breachedPasswordChecker) {
+      final BreachedPasswordChecker breachedPasswordChecker) {
     this.tokens = tokens;
     this.accounts = accounts;
     this.sessionRevoker = sessionRevoker;
@@ -59,7 +57,7 @@ public class ConfirmPlatformAccountPasswordResetService
   // PMD.CyclomaticComplexity: BR-ID-07's new breach-check branch is one more genuinely distinct
   // precondition on top of the real reset flow already here — same "wiring, not sprawl" reasoning
   // ConfirmPasswordResetService's own identical suppression documents for the tenant tier.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   @Transactional
   public void handle(final ConfirmPlatformAccountPasswordResetCommand command) {

@@ -43,7 +43,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 // carries" — there is no other way to reach it, same rationale as AntiAbuseRateLimitingFilter's
 // own response.getWriter() suppression. PMD.OnlyOneReturn: parseProvider's try/catch each need
 // their own exit — same rationale as RegisterAccountController's own identical suppression.
-@SuppressWarnings({"PMD.LongVariable", "PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
+@SuppressWarnings({
+  "PMD.LongVariable",
+})
 @Controller
 public class SocialLoginRedirectController {
 

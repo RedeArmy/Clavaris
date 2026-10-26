@@ -24,10 +24,6 @@ import java.util.HexFormat;
  */
 public final class RefreshTokenSecret {
 
-  // 256 bits of randomness — matches the entropy a modern access/refresh token is expected to
-  // carry; base64url keeps the value URL-safe without padding noise in a redirect/JSON context.
-  // Descriptive over PMD's default LongVariable threshold, kept in full rather than abbreviated.
-  @SuppressWarnings("PMD.LongVariable")
   private static final int RAW_VALUE_BYTE_LENGTH = 32;
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();

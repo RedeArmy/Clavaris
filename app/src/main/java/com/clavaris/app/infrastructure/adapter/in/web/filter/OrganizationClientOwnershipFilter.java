@@ -52,7 +52,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * logic. {@code PMD.LongVariable}: {@code tokenOrganizationId}/{@code targetOrganizationId}/{@code
  * organizationIdResolver} name exactly what they are.
  */
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
 public final class OrganizationClientOwnershipFilter extends OncePerRequestFilter {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();

@@ -45,9 +45,5 @@ public interface EmbeddingEligibilityChecker {
    *     embedding-eligible right now (unknown client, wrong Organization, production without a
    *     verified domain and a registered {@code embeddingOrigin}, or no {@code clientId} at all)
    */
-  // PMD.LongVariable: expectedOrganizationId names exactly what it is — same "abbreviating would
-  // only make every call site harder to read" precedent this codebase's own PlatformScopes/
-  // OrganizationAuthorizationServerConfig suppressions already use.
-  @SuppressWarnings("PMD.LongVariable")
   Optional<String> resolveAllowedFrameAncestor(String clientId, UUID expectedOrganizationId);
 }

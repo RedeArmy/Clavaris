@@ -21,7 +21,9 @@ import org.springframework.data.repository.query.Param;
 // class-level suppression already documents. PMD.AvoidDuplicateLiterals: the repeated string is
 // "organizationId" itself, the join column every one of these queries scopes by — same false
 // positive SpringDataOrganizationJpaRepository's own identical suppression documents.
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.AvoidDuplicateLiterals"})
+@SuppressWarnings({
+  "PMD.TooManyMethods",
+})
 interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UUID> {
 
   // TD-ARCH-036: narrow sign-in writes (see AccountRepository#recordSignIn). A bulk update does not

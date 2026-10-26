@@ -41,7 +41,6 @@ public class ResetPlatformAccountPasswordController {
     return FORM_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String resetPassword(
       @Valid @ModelAttribute("form") final ConfirmPasswordResetForm form,

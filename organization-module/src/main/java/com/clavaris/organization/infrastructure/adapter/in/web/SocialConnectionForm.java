@@ -11,9 +11,6 @@ import java.util.UUID;
  * the one already saved, so a connection can be edited without retyping a secret that is never
  * shown again. The limits only keep a pasted mistake from reaching the encryption or the database.
  */
-// PMD.DataClass: a form-backing bean is nothing but its fields, same as every sibling *Form here.
-// PMD.LongVariable: the names say exactly what each setting is.
-@SuppressWarnings({"PMD.DataClass", "PMD.LongVariable"})
 public class SocialConnectionForm {
 
   private boolean enabled;

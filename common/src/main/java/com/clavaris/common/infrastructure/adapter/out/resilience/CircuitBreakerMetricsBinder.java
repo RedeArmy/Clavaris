@@ -20,10 +20,8 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
  */
 public final class CircuitBreakerMetricsBinder {
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String STATE_TRANSITION_METRIC = "clavaris.circuit_breaker.state_transition";
 
-  @SuppressWarnings("PMD.LongVariable")
   private static final String CALL_NOT_PERMITTED_METRIC =
       "clavaris.circuit_breaker.call_not_permitted";
 
@@ -34,11 +32,6 @@ public final class CircuitBreakerMetricsBinder {
    * once, right after construction, same "wire it once, at startup" convention every other
    * long-lived collaborator in this codebase already follows.
    */
-  // PMD.LawOfDemeter: circuitBreaker.getEventPublisher().onXxx(...) is the standard Resilience4j
-  // API shape for subscribing to a CircuitBreaker's own events — there is no other way to reach
-  // it, same rationale AntiAbuseRateLimitingFilter's own response.getWriter() suppression
-  // documents.
-  @SuppressWarnings("PMD.LawOfDemeter")
   public static void bind(
       final CircuitBreaker circuitBreaker, final SecurityMetricsRecorder metrics) {
     circuitBreaker

@@ -35,7 +35,6 @@ class CreateOrganizationClientController {
 
   // Three exits (404 on a missing Organization, 400 on an invalid/operator-only scope, 201 on
   // success) — same rationale as RegisterOAuthClientController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Mint a new OrganizationClient / Secret Key for an Organization (ADR-0023)")
   @ApiResponse(
       responseCode = "201",

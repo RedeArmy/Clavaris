@@ -10,7 +10,6 @@ import java.util.UUID;
  * ShortVariable rule flags {@code id} for the same record-style-accessor reason {@code Account}
  * (identity-module) suppresses it elsewhere in this codebase.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public record CreateOrganizationResponse(
     UUID id, String name, Instant createdAt, SigningKeySummary signingKey) {
 
@@ -23,6 +22,5 @@ public record CreateOrganizationResponse(
             result.signingKey().id(), result.signingKey().kid(), result.signingKey().algorithm()));
   }
 
-  @SuppressWarnings("PMD.ShortVariable")
   public record SigningKeySummary(UUID id, String kid, String algorithm) {}
 }

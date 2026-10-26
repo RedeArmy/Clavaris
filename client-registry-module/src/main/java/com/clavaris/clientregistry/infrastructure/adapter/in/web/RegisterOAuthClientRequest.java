@@ -18,9 +18,6 @@ import java.util.List;
  *     empty allowlist (resolved in {@link RegisterOAuthClientController}), same behavior as before
  *     this field existed (SAS's own bare default redirect on RP-Initiated Logout).
  */
-// PMD.LongVariable: postLogoutRedirectUris is the exact OIDC spec term, not arbitrarily long —
-// same precedent as OAuthClient's own identical suppression.
-@SuppressWarnings("PMD.LongVariable")
 public record RegisterOAuthClientRequest(
     @NotEmpty List<@NotBlank String> redirectUris,
     @NotEmpty List<@NotBlank String> allowedGrantTypes,

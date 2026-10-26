@@ -13,7 +13,6 @@ import java.util.UUID;
  * <p>Shared columns live on {@link AbstractKnownDeviceEntity} (TD-ARCH-009) — only {@code
  * platform_account_id} is declared here.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "platform_known_devices")
 public class PlatformKnownDeviceEntity extends AbstractKnownDeviceEntity {

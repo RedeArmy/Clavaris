@@ -72,7 +72,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 // left the finding in place. @Repository is Spring's own generic bean stereotype plus optional
 // persistence-exception translation that never triggers here (this class never throws a
 // PersistenceException), so applying it is harmless, not just finding-suppression theatre.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 @Repository
 class TenantAwareClientRegistrationResolver implements ClientRegistrationRepository {
 

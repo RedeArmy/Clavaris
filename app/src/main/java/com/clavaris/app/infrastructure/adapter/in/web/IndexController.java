@@ -35,12 +35,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 class IndexController {
 
-  @SuppressWarnings("PMD.LongVariable")
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  /* package */ IndexController(
-      @SuppressWarnings("PMD.LongVariable")
-          final CurrentPlatformAccountResolver currentPlatformAccount) {
+  /* package */ IndexController(final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.currentPlatformAccount = currentPlatformAccount;
   }
 

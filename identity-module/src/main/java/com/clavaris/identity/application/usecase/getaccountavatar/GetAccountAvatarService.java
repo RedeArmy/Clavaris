@@ -34,11 +34,6 @@ public class GetAccountAvatarService implements GetAccountAvatarUseCase {
     this.storage = storage;
   }
 
-  // PMD.OnlyOneReturn: each early exit is a real, distinct outcome (unknown Account, wrong
-  // Organization, generated default, external redirect, stored upload) — same "each outcome
-  // needs its own exit" rationale SetRateLimitPolicyController's own identical suppression
-  // documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<AccountAvatarResult> handle(final GetAccountAvatarQuery query) {
     final Optional<Account> maybeAccount = accounts.findById(query.accountId());

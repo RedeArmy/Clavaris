@@ -15,7 +15,6 @@ import java.util.UUID;
  * JpaOAuthClientRepository}, not here. LongVariable: {@code postLogoutRedirectUris} is the exact
  * OIDC spec term, not arbitrarily long — same precedent as {@code OAuthClient}'s own suppression.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable"})
 @Entity
 @Table(name = "oauth_clients")
 public class OAuthClientEntity {

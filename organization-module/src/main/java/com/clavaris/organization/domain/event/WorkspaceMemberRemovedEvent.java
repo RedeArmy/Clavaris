@@ -15,7 +15,6 @@ public record WorkspaceMemberRemovedEvent(
   // "of", matching AccountRegisteredEvent's own "from" static-factory convention family — a short,
   // conventional factory name, not an accidental abbreviation (same precedent
   // RefreshTokenReuseDetectedEvent's own identical suppression already established).
-  @SuppressWarnings("PMD.ShortMethodName")
   public static WorkspaceMemberRemovedEvent of(
       final UUID membershipId, final UUID workspaceId, final UUID accountId) {
     return new WorkspaceMemberRemovedEvent(membershipId, workspaceId, accountId, Instant.now());

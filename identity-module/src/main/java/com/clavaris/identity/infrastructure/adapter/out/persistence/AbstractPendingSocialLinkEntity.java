@@ -30,12 +30,7 @@ import java.util.UUID;
  * subclasses to implement something."
  */
 @MappedSuperclass
-@SuppressWarnings({
-  "PMD.DataClass",
-  "PMD.ShortVariable",
-  "PMD.LongVariable",
-  "PMD.AbstractClassWithoutAbstractMethod"
-})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class AbstractPendingSocialLinkEntity {
 
   @Id protected UUID id;

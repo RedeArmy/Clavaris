@@ -21,8 +21,5 @@ import java.time.Instant;
  * the REST admin API already used, now also called by {@code PlatformRateLimitPolicyController}
  * with a {@code platformAccount} actor.
  */
-@SuppressWarnings("PMD.LongVariable") // hardCapRequestsPerMinute matches its own config key's
-// name, not arbitrarily long — same precedent SetRateLimitPolicyForOrganizationService's own
-// identical parameter already establishes.
 public record RateLimitPolicySnapshot(
     int requestsPerMinute, boolean customized, Instant updatedAt, int hardCapRequestsPerMinute) {}

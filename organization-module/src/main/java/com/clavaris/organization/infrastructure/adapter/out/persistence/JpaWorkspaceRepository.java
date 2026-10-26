@@ -74,7 +74,6 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // JpaOrganizationRepository's own identical findKeysetPageOwnedBy already documents.
   @Override
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
   public KeysetPage<Workspace> findKeysetPageByOrganizationId(
       final UUID organizationId, final KeysetPageRequest pageRequest) {
     final org.springframework.data.domain.PageRequest limit =

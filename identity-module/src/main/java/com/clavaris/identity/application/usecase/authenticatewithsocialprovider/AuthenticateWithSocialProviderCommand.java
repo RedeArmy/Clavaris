@@ -30,10 +30,6 @@ import com.clavaris.identity.domain.model.SocialProvider;
  *     GitHub {@code avatar_url}), stored on the Account as-is — never re-hosted into Clavaris's own
  *     storage (see that ADR's own Decision for why).
  */
-// PMD.LongVariable: emailVerifiedByProvider names exactly what it is — a shortened identifier
-// would only make this record harder to read, same convention every other descriptively-named
-// field in this codebase follows (e.g. PendingSocialLink's own confirmationTokenHash).
-@SuppressWarnings("PMD.LongVariable")
 public record AuthenticateWithSocialProviderCommand(
     OrganizationId organizationId,
     SocialProvider provider,

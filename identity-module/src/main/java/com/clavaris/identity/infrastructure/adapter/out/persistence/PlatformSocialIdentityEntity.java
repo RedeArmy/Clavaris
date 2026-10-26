@@ -12,7 +12,6 @@ import java.util.UUID;
  * ADR-0020) — mirrors {@link SocialIdentityEntity}, scoped to {@code platform_account_id} instead
  * of {@code account_id}.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "platform_social_identities")
 public class PlatformSocialIdentityEntity {

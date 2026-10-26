@@ -42,10 +42,9 @@ import org.springframework.web.server.ResponseStatusException;
  * its own per the ADR's §4). See {@link PlatformWorkspaceController} for the family this belongs to
  * and the shared ownership/HTMX conventions.
  */
-// PMD.LongVariable/ExcessiveImports: as above. PMD.AvoidDuplicateLiterals: "PMD.OnlyOneReturn" is
-// repeated once per handler that legitimately needs it, same false-positive class
-// ContentSecurityPolicyHeaderWriter's own identical class-level suppression documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports", "PMD.AvoidDuplicateLiterals"})
+// PMD.ExcessiveImports: every import is a distinct use case, command or exception this controller
+// handles — wiring, not sprawl (the whole Workspace surface used to be one class).
+@SuppressWarnings("PMD.ExcessiveImports")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceTeamController {
@@ -78,7 +77,6 @@ public class PlatformWorkspaceTeamController {
   // goes through the exact same use cases a future REST admin API would (none exists yet for Teams
   // — dashboard-only in this increment, same "no permission semantics of its own" posture the ADR's
   // own §4/open-question-3 documents).
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams")
   public String createTeam(
       final HttpServletRequest request,
@@ -107,7 +105,6 @@ public class PlatformWorkspaceTeamController {
     return teamsModel.afterTeamMutation(request, organization, workspace, model);
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams/{teamId}/rename")
   public String renameTeam(
       final HttpServletRequest request,
@@ -139,7 +136,6 @@ public class PlatformWorkspaceTeamController {
   // CannotDemoteLastAdminException here means the WHOLE team deletion aborted (nothing was
   // deleted, DeleteWorkspaceTeamService's own Javadoc explains why) — the confirm-and-retry
   // popup asks to redo the entire action with force=true, not just one role's own unassign.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams/{teamId}/delete")
   public String deleteTeam(
       final HttpServletRequest request,
@@ -182,7 +178,6 @@ public class PlatformWorkspaceTeamController {
   // Javadoc: idempotent per role, its own @Transactional boundary) — a failure partway through this
   // loop leaves whatever was added before it committed, same end state as if the operator had
   // submitted them one at a time.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{workspaceId}/teams/{teamId}/roles")
   public String addRoleToTeam(
       final HttpServletRequest request,

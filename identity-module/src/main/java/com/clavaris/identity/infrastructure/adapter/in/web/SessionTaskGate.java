@@ -54,7 +54,6 @@ public final class SessionTaskGate {
    */
   // Two genuinely distinct outcomes (must pause / may proceed) — same rationale as
   // DeviceTrustGate's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public static Optional<String> intercept(
       final HttpServletRequest request,
       final UUID organizationId,

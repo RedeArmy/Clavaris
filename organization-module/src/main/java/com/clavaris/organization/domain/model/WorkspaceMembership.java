@@ -22,11 +22,6 @@ import java.util.UUID;
  *
  * <p>Same record-style-accessor PMD suppressions as {@link Organization}/{@link Workspace}.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
 public final class WorkspaceMembership {
 
   private final UUID id;

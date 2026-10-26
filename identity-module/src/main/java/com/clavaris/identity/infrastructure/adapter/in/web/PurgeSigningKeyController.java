@@ -35,7 +35,6 @@ class PurgeSigningKeyController {
 
   // Two exits (404 on an unknown kid, 200 on success) — same rationale as
   // RotateSigningKeyController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(
       summary =
           "Emergency zero-overlap purge of one SigningKey for a confirmed compromise (TD-SEC-029)")

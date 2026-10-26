@@ -12,7 +12,6 @@ import java.util.UUID;
  * {@code account_id} is declared here, same split {@code EventOutboxEntity} already establishes
  * against its own {@code AbstractEventOutboxEntity}.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
 @Entity
 @Table(name = "pending_social_links")
 public class PendingSocialLinkEntity extends AbstractPendingSocialLinkEntity {

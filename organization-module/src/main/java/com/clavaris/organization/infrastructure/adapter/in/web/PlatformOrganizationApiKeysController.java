@@ -33,7 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
  * first, same anti-enumeration posture as every other dashboard controller: an organizationId
  * belonging to someone else's Organization resolves identically to "doesn't exist," a 404.
  */
-@SuppressWarnings("PMD.LongVariable") // same precedent as PlatformRateLimitPolicyController.
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/api-keys")
 public class PlatformOrganizationApiKeysController {

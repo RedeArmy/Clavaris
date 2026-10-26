@@ -38,7 +38,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * mode-switching form.
  */
 // Same class-level-suppression rationale as LoginController's own identical annotation.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/o/{organizationId}/login/username")
 public class UsernameSignInController {
@@ -83,7 +82,6 @@ public class UsernameSignInController {
   }
 
   // Same "one exit per distinct rejection reason" rationale as LoginController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String login(
       @PathVariable final UUID organizationId,

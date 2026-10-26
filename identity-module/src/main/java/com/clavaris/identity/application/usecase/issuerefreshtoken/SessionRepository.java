@@ -15,7 +15,6 @@ public interface SessionRepository {
 
   // "id", not "sessionId" — matches java.util.UUID-keyed repository conventions elsewhere in this
   // module (e.g. SigningKeyRepository).
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<Session> findById(UUID id);
 
   void save(Session session);

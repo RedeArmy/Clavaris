@@ -16,9 +16,6 @@ import java.util.UUID;
  * <p>Replaces both lists wholesale, not a merge/diff — the dashboard's own "Redirect settings" form
  * submits the full, current set of URIs every time.
  */
-// PMD.LongVariable: postLogoutRedirectUris is the exact OIDC spec term, same precedent
-// RegisterOAuthClientCommand's own identical suppression documents.
-@SuppressWarnings("PMD.LongVariable")
 public record UpdateOAuthClientRedirectSettingsCommand(
     String clientId,
     UUID organizationId,

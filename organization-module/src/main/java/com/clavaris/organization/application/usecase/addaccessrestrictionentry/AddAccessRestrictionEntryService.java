@@ -5,7 +5,6 @@ import java.util.Locale;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /** Orchestration for {@link AddAccessRestrictionEntryUseCase}. */
-@SuppressWarnings("PMD.LongVariable")
 public class AddAccessRestrictionEntryService implements AddAccessRestrictionEntryUseCase {
 
   private final AccessRestrictionEntryRepository entries;

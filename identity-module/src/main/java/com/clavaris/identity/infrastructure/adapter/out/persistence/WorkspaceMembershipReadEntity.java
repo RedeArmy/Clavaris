@@ -13,7 +13,6 @@ import java.util.UUID;
  * type, never a migration owned here). Only the columns this reader actually needs are mapped; this
  * class never writes, so the table's other columns (e.g. {@code created_at}) are irrelevant to it.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "workspace_memberships")
 public class WorkspaceMembershipReadEntity {

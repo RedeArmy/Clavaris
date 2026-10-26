@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
  * RegisteredClient} for an OrganizationClient with its internal {@code id}, which is exactly what
  * {@link OAuthClientTokenRevoker} (reused as-is, it only needs that id) deletes by.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class DeleteOrganizationClientService implements DeleteOrganizationClientUseCase {
 
   private final OrganizationClientRepository organizationClients;

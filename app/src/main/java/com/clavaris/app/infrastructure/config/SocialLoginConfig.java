@@ -84,11 +84,7 @@ import org.springframework.web.client.RestTemplate;
  * both userinfo flavors, rate limiting), each now importing from its own adapter subpackage instead
  * of sharing this one flat package.
  */
-@SuppressWarnings({
-  "PMD.AvoidDuplicateLiterals",
-  "PMD.CouplingBetweenObjects",
-  "PMD.ExcessiveImports"
-})
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
 @Configuration
 class SocialLoginConfig {
 
@@ -99,7 +95,6 @@ class SocialLoginConfig {
 
   // TD-PERF-009: shared by both new beans below — Google's token exchange and both providers'
   // userinfo calls all need the same connect/read ceiling, not two independently-tuned numbers.
-  @SuppressWarnings("PMD.LongVariable")
   private static ClientHttpRequestFactory timeoutConfiguredRequestFactory(
       final long connectTimeoutSeconds, final long readTimeoutSeconds) {
     final JdkClientHttpRequestFactory factory =
@@ -117,7 +112,6 @@ class SocialLoginConfig {
   // tuning, isolated per target host at request time (see
   // CircuitBreakerClientHttpRequestInterceptor
   // 's own Javadoc for why one shared instance, not one per bean, is still correct).
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ ClientHttpRequestInterceptor socialLoginCircuitBreakerInterceptor(
       @Value("${clavaris.resilience.social-login.failure-rate-threshold:50}")
@@ -252,8 +246,7 @@ class SocialLoginConfig {
       @Value("${clavaris.rate-limit.capacity.default-requests-per-minute:600}")
           final int capacityDefaultRequestsPerMinute,
       final EmbeddingEligibilityChecker embeddingChecker,
-      @SuppressWarnings("PMD.LongVariable")
-          final RedirectUriOriginResolver redirectUriOriginResolver) {
+      final RedirectUriOriginResolver redirectUriOriginResolver) {
     http.securityMatcher(
             "/oauth2/authorization/**",
             "/login/oauth2/code/**",

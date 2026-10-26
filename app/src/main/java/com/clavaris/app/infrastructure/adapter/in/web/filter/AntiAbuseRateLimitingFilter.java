@@ -37,10 +37,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * see {@link RateLimitKeyHasher}'s own Javadoc for the full reasoning, including why this uses a
  * dedicated secret rather than reusing {@code BearerTokenHasher}'s.
  */
-// PMD.LongVariable: TOO_MANY_REQUESTS_MESSAGE/TOO_MANY_REQUESTS_HTML each name exactly what they
-// hold — same "descriptive over short" rationale identity-module's own IdentityUseCaseConfig
-// class-level suppression already documents for this project.
-@SuppressWarnings("PMD.LongVariable")
 public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
 
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
@@ -102,12 +98,6 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  // Returns null when the rule doesn't apply/has nothing to key on/wasn't exceeded — a single
-  // return-based skip in one place, not scattered continue statements through the caller's loop
-  // (the SonarCloud finding this method exists to fix). PMD.OnlyOneReturn suppressed: same
-  // present/absent multi-exit shape RateLimitIdentifiers' own class-wide suppression already
-  // covers, not an organically grown method that should be restructured.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private Duration evaluateRule(final RateLimitRule rule, final HttpServletRequest request) {
     if (!matches(rule, request)) {
       return null;
@@ -131,22 +121,6 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
         && rule.extraCondition().test(request);
   }
 
-  // SDE-III review, 2026-09-16: this filter also protects /o/*/login (see this class's own
-  // Javadoc "Runs every matching rule" note referencing BR-ID-06) — a real browser hitting it mid
-  // sign-in used to get a bare, unstyled text/plain body, jarring next to every other page on this
-  // same origin (login.html's own serviceOverloadedError alert already establishes the "distinct,
-  // on-brand message, never a raw error" bar for the structurally identical TD-FUT-017 concurrency
-  // gate). A raw Servlet filter has no Thymeleaf/MVC context to render through, but it doesn't need
-  // one: /css/clavaris.css is a static resource the browser fetches independently regardless of
-  // which handler served the HTML that references it, so a small standalone page reusing the same
-  // class names renders identically to every MVC-rendered page. Content-negotiated on the request's
-  // own Accept header, not the response's path — a browser navigation sends "text/html" there; an
-  // API/fetch client (including /oauth2/token, this filter's other real caller) typically doesn't,
-  // and keeps the original plain-text body unchanged.
-  //
-  // PMD.LawOfDemeter: response.getWriter() is the standard Servlet API shape for writing a body
-  // directly from a filter — there is no other way to reach it.
-  @SuppressWarnings("PMD.LawOfDemeter")
   private void respondTooManyRequests(
       final HttpServletRequest request,
       final HttpServletResponse response,

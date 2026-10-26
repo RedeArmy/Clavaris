@@ -16,6 +16,5 @@ import java.util.UUID;
  *     the calling {@code PlatformClient}, which may differ from the Organization's eventual owner
  *     (an operator provisioning on someone else's behalf).
  */
-@SuppressWarnings("PMD.LongVariable")
 public record CreateOrganizationCommand(
     String name, UUID ownerPlatformAccountId, AuditActor actor) {}

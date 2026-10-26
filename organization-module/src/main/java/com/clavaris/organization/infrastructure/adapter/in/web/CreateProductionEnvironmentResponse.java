@@ -8,7 +8,7 @@ import java.util.UUID;
  * Same shape as {@code CreateOrganizationResponse}, plus the development sibling it was promoted
  * from.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
+@SuppressWarnings({"PMD.LongVariable"})
 public record CreateProductionEnvironmentResponse(
     UUID id,
     String name,

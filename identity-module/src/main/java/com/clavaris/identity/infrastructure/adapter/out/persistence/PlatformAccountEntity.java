@@ -11,7 +11,6 @@ import java.util.UUID;
  * JPA row mapping for {@code platform_accounts} (data-model.md §2, ADR-0012) — mirrors {@link
  * AccountEntity}, no {@code organization_id} column.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "platform_accounts")
 public class PlatformAccountEntity {

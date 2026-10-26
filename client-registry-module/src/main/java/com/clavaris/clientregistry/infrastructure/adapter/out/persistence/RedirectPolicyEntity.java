@@ -11,7 +11,6 @@ import java.util.UUID;
  * JPA row mapping for {@code redirect_policies} — plain data holder by design, same rationale as
  * {@code RateLimitPolicyEntity}. Every URL column is nullable — unconfigured is the normal state.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
 @Entity
 @Table(name = "redirect_policies")
 public class RedirectPolicyEntity {

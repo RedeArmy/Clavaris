@@ -42,10 +42,6 @@ import org.springframework.web.server.ResponseStatusException;
  * same anti-enumeration posture every other dashboard controller in this codebase already
  * establishes.
  */
-// PMD.LongVariable: createProductionEnvironment/currentPlatformAccount/ownerPlatformAccountId are
-// long by design, not accidentally — same class-level-suppression precedent
-// PlatformOrganizationDetailController's own identical rationale documents.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/promote-to-production")
 public class PlatformCreateProductionEnvironmentController {
@@ -80,9 +76,6 @@ public class PlatformCreateProductionEnvironmentController {
     return FORM_VIEW;
   }
 
-  // PMD.OnlyOneReturn: validation-error/business-error/success each need their own exit, same
-  // rationale as every other create-shaped handler in this codebase.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,

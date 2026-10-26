@@ -28,7 +28,6 @@ class DeactivateWebhookEndpointController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Deactivate a WebhookEndpoint (reversible)")
   @ApiResponse(responseCode = "200", description = "Deactivated")
   @ApiResponse(responseCode = "404", description = "No WebhookEndpoint exists with this id")

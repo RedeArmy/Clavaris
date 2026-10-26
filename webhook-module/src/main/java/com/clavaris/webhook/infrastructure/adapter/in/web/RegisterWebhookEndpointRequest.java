@@ -8,7 +8,6 @@ import java.util.List;
  * HTTP request body for {@code POST
  * /api/v1/admin/organizations/{organizationId}/webhook-endpoints}.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record RegisterWebhookEndpointRequest(
     @NotBlank String url,
     String description,

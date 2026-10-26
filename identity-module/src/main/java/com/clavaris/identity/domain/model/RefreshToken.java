@@ -17,11 +17,6 @@ import java.util.UUID;
  *
  * <p>PMD suppressions below: coding-standards.md §3a.
  */
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName"
-})
 public final class RefreshToken {
 
   private final UUID id;

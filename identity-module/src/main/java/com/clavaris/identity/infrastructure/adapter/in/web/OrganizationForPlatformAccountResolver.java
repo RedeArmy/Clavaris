@@ -16,7 +16,6 @@ import java.util.Optional;
 @FunctionalInterface
 public interface OrganizationForPlatformAccountResolver {
 
-  @SuppressWarnings("PMD.LongVariable")
   Optional<String> resolveName(
       OrganizationId organizationId, PlatformAccountId ownerPlatformAccountId);
 }

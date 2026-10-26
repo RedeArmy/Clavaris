@@ -32,7 +32,6 @@ class RotateOrganizationClientSecretController {
 
   // Three exits (404, 409 on a concurrent revoke/rotate race, 200) — same rationale as
   // SetRateLimitPolicyController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Rotate an OrganizationClient's secret (ADR-0023)")
   @ApiResponse(
       responseCode = "200",

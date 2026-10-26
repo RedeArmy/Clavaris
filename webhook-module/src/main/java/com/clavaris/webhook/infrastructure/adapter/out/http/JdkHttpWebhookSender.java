@@ -34,7 +34,6 @@ import org.springframework.stereotype.Component;
 // Two exits per catch clause below is clearer here than forcing a single-return shape onto three
 // genuinely different outcomes (IOException, InterruptedException, a real response) — same
 // rationale RegisterOAuthClientController's own identical suppression documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.OnlyOneReturn"})
 @Component
 class JdkHttpWebhookSender implements WebhookHttpSender {
 

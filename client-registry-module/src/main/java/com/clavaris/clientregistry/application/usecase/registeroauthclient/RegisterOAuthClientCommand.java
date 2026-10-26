@@ -28,9 +28,6 @@ import java.util.UUID;
  *     for the identical situation) — the dashboard's own ownership check happens before this
  *     command is ever built, not inside this use case.
  */
-// PMD.LongVariable: postLogoutRedirectUris is the exact OIDC spec term (post_logout_redirect_uris)
-// — same "the name is right, not arbitrarily long" precedent as PlatformScopes' own suppression.
-@SuppressWarnings("PMD.LongVariable")
 public record RegisterOAuthClientCommand(
     UUID organizationId,
     List<String> redirectUris,

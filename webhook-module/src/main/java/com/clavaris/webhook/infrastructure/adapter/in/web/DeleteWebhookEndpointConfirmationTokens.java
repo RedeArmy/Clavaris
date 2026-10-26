@@ -21,7 +21,6 @@ import java.util.UUID;
  * check, whether the submitted token matches or not — a stale confirm page, reloaded or
  * auto-submitted a second time, can never re-trigger a delete with the same token.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class DeleteWebhookEndpointConfirmationTokens {
 
   private static final String SESSION_ATTRIBUTE_PREFIX =
@@ -40,10 +39,6 @@ final class DeleteWebhookEndpointConfirmationTokens {
     return token;
   }
 
-  // PMD.OnlyOneReturn: two distinct "not valid" exits (no session, no/expired entry) plus the
-  // real match check — same rationale as DeleteOAuthClientConfirmationTokens' own identical
-  // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ static boolean consume(
       final HttpServletRequest request, final UUID endpointId, final String submittedToken) {
     final HttpSession session = request.getSession(false);

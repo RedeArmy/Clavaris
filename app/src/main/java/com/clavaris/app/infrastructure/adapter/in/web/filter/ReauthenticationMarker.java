@@ -26,8 +26,6 @@ import java.util.TreeMap;
  * only for the very request it was left for, only until it expires, and only for a login made after
  * it was left, and it is used up when it counts.
  */
-// PMD.OnlyOneReturn: "consumed" and "not consumed" are two distinct outcomes.
-@SuppressWarnings("PMD.OnlyOneReturn")
 /* package */ final class ReauthenticationMarker {
 
   /* package */ static final String SESSION_ATTRIBUTE = "clavaris.oidc.reauth.requested-at";

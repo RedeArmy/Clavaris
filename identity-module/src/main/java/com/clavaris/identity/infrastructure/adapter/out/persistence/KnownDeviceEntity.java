@@ -14,7 +14,6 @@ import java.util.UUID;
  * here (TD-ARCH-009), same split {@link VerificationTokenEntity} already establishes against its
  * own {@link AbstractVerificationTokenEntity}.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "known_devices")
 public class KnownDeviceEntity extends AbstractKnownDeviceEntity {

@@ -53,7 +53,6 @@ import org.springframework.web.server.ResponseStatusException;
  * this codebase's normal "success redirects, HTMX gets a fragment" convention — unlike
  * register/rotate-secret on the endpoints page.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/webhook-endpoints/{endpointId}/deliveries")
@@ -113,7 +112,6 @@ public class PlatformWebhookDeliveryController {
   // Two exits (HTMX fragment vs. plain redirect on success) plus a third for the not-replayable
   // inline error — same rationale as every other dashboard controller's own identical "after a
   // mutation" suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping("/{deliveryId}/replay")
   public String replay(
       final HttpServletRequest request,

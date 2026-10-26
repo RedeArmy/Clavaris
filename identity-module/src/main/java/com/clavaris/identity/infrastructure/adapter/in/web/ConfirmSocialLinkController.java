@@ -30,7 +30,6 @@ public class ConfirmSocialLinkController {
 
   // Success vs. invalid-token each need their own exit — same rationale as
   // VerifyEmailController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping
   public String confirm(@PathVariable final UUID organizationId, @RequestParam final String token) {
     try {

@@ -40,7 +40,7 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 // make the call site harder to read" precedent PlatformScopes' own class-wide suppression already
 // documents. PMD.AtLeastOneConstructor: this class holds no state, only the apply() method below —
 // same "intentionally empty" precedent AdminApiSecurityConfig's own identical suppression uses.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AtLeastOneConstructor"})
+@SuppressWarnings({"PMD.AtLeastOneConstructor"})
 public class WorkspaceAwareOidcUserInfoMapper
     implements Function<OidcUserInfoAuthenticationContext, OidcUserInfo> {
 
@@ -68,10 +68,6 @@ public class WorkspaceAwareOidcUserInfoMapper
   private static final String WORKSPACE_ROLE_CLAIM = "workspace_role";
   private static final String WORKSPACE_PERMISSIONS_CLAIM = "workspace_permissions";
 
-  // PMD.LawOfDemeter: context.getAuthorization()/getAccessToken() is the standard SAS API shape
-  // for this extension point — same "there is no other way to reach it" reasoning as
-  // TokenIssuanceEventLogger's own identical suppression.
-  @SuppressWarnings("PMD.LawOfDemeter")
   @Override
   public OidcUserInfo apply(final OidcUserInfoAuthenticationContext context) {
     final OAuth2Authorization.Token<OidcIdToken> idTokenAuthorization =

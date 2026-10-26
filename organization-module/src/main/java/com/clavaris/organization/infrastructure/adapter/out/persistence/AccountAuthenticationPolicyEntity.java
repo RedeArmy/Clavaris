@@ -14,12 +14,7 @@ import java.util.UUID;
  * JPA row mapping for {@code account_authentication_policies} (ADR-0024) — plain data holder by
  * design, same convention as {@code RateLimitPolicyEntity}.
  */
-@SuppressWarnings({
-  "PMD.ShortVariable",
-  "PMD.DataClass",
-  "PMD.LongVariable",
-  "PMD.ExcessiveParameterList"
-})
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveParameterList"})
 @Entity
 @Table(name = "account_authentication_policies")
 public class AccountAuthenticationPolicyEntity {

@@ -29,7 +29,6 @@ public final class PlatformDeviceCookie {
 
   // "No cookies at all" vs. "no matching cookie" are two independent, equally valid exits — same
   // rationale as DeviceCookie#read's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public static Optional<String> read(final HttpServletRequest request) {
     final Cookie[] cookies = request.getCookies();
     if (cookies == null) {

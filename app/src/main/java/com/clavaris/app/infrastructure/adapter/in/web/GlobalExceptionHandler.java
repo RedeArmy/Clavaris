@@ -63,11 +63,6 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-  // PMD.GuardLogStatement false positive — same rationale as every other logging call site in
-  // this codebase (e.g. DeleteAccountService's own identical suppression): every argument below is
-  // a cheap accessor (a freshly-generated UUID string, a class name), not an expensive computation
-  // a guard would meaningfully skip.
-  @SuppressWarnings("PMD.GuardLogStatement")
   @ExceptionHandler(Exception.class)
   /* package */ ResponseEntity<ErrorResponse> handleUnanticipated(final Exception exception) {
     final String correlationId = UUID.randomUUID().toString();

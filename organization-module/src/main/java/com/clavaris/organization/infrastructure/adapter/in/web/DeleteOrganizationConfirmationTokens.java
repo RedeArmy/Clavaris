@@ -25,7 +25,6 @@ import java.util.UUID;
  * <p>PMD.LongVariable: {@code SESSION_ATTRIBUTE_PREFIX} names exactly what it is, not arbitrarily
  * long — same precedent every other codebase-wide suppression of this rule already establishes.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class DeleteOrganizationConfirmationTokens {
 
   private static final String SESSION_ATTRIBUTE_PREFIX =
@@ -44,10 +43,6 @@ final class DeleteOrganizationConfirmationTokens {
     return token;
   }
 
-  // PMD.OnlyOneReturn: two distinct "not valid" exits (no session, no/expired entry) plus the
-  // real match check — collapsing these into one boolean expression would be less readable, not
-  // more correct, for a check this security-relevant.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ static boolean consume(
       final HttpServletRequest request, final UUID organizationId, final String submittedToken) {
     final HttpSession session = request.getSession(false);

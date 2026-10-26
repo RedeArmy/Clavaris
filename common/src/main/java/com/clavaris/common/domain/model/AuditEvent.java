@@ -24,12 +24,6 @@ import java.util.UUID;
 // Same record-style-accessor PMD suppressions as RateLimitPolicy/Organization, same rationale:
 // plain accessors matching the field name are the deliberate convention this codebase's domain
 // models use throughout, not an organically grown JavaBean that should be renamed.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.DataClass"
-})
 public final class AuditEvent {
 
   private final UUID id;

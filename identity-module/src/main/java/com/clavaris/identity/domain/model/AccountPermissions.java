@@ -10,8 +10,6 @@ package com.clavaris.identity.domain.model;
  *     device-trust challenge while the Organization's {@code deviceTrustEnabled} stays on for
  *     everyone else
  */
-// PMD.LongVariable: the component names are the Account accessors they back.
-@SuppressWarnings("PMD.LongVariable")
 public record AccountPermissions(boolean canDeleteOwnAccount, boolean bypassesDeviceTrust) {
 
   public static final AccountPermissions DEFAULT = new AccountPermissions(false, false);

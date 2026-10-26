@@ -31,11 +31,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * assumed), so {@link #pending}'s own dual-mode check still sees it correctly without this
  * controller needing a separate non-redirect success branch.
  */
-// PMD.LongVariable: INSIDE_DIALOG_ATTRIBUTE names exactly what it is — same convention every other
-// descriptively-named constant in this codebase already establishes (e.g.
-// PlatformAccountProfileController's
-// own class-level suppression for the same rule).
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/forgot-password")
 public class ForgotPlatformAccountPasswordController {
@@ -61,7 +56,6 @@ public class ForgotPlatformAccountPasswordController {
     return isHtmxRequest(request) ? FORM_FRAGMENT : FORM_VIEW;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String requestReset(
       @Valid @ModelAttribute("form") final RequestPasswordResetForm form,

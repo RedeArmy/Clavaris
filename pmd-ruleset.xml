@@ -6,13 +6,61 @@
 
     <description>
         Clean-code rules (coding-standards.md §1, pom.xml). Imports PMD's own
-        curated categories wholesale, minus rules that don't apply to this
-        project without configuration this repo has no use for.
+        curated categories wholesale, then states once, here, the handful of
+        rules this codebase's own conventions contradict (TD-PROC-015). Before
+        this, each of them was silenced class by class: about 1,500
+        @SuppressWarnings across src/main, most of them the same six rules, so a
+        suppression that marked a real exception was indistinguishable from
+        noise. A rule is tuned or excluded below only when the codebase has a
+        documented convention that conflicts with it; everything else still
+        fails the build and still needs a targeted, commented suppression.
     </description>
 
-    <rule ref="category/java/bestpractices.xml"/>
-    <rule ref="category/java/errorprone.xml"/>
-    <rule ref="category/java/codestyle.xml"/>
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Declaring a log guard around an SLF4J call with {} placeholders only adds noise: the
+             arguments are cheap accessors, and the message is not built unless the level is on. -->
+        <exclude name="GuardLogStatement"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml">
+        <!-- Annotation values are the literals it counts (the same "PMD.X" repeated on several
+             members); skipAnnotations below stops that, but the rule is otherwise kept. -->
+        <exclude name="AvoidDuplicateLiterals"/>
+        <!-- Accessors share their field's name (coding-standards.md §3a), the shape a Java record
+             gets for free. -->
+        <exclude name="AvoidFieldNameMatchingMethodName"/>
+    </rule>
+    <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
+        <properties>
+            <property name="skipAnnotations" value="true"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/codestyle.xml">
+        <!-- Guard clauses and early returns are this codebase's idiom (an absent or invalid case
+             returns first, then the main path). 264 methods carried a suppression for it. -->
+        <exclude name="OnlyOneReturn"/>
+        <exclude name="LongVariable"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="ShortMethodName"/>
+    </rule>
+    <!-- Descriptive names are the house style: LongVariable fires at 17 characters, which the
+         spec terms this system uses (post_logout_redirect_uris, verificationTokens) exceed. 30
+         still catches a genuinely unreadable name. -->
+    <rule ref="category/java/codestyle.xml/LongVariable">
+        <properties>
+            <property name="minimum" value="30"/>
+        </properties>
+    </rule>
+    <!-- id, to, in: two letters are readable names here, one letter is not. -->
+    <rule ref="category/java/codestyle.xml/ShortVariable">
+        <properties>
+            <property name="minimum" value="2"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/codestyle.xml/ShortMethodName">
+        <properties>
+            <property name="minimum" value="2"/>
+        </properties>
+    </rule>
     <rule ref="category/java/design.xml">
         <!-- Needs an explicit allowed-package list to mean anything; Clavaris's
              module boundary is already enforced by ArchUnit
@@ -20,6 +68,13 @@
              module — a second, differently-shaped coupling rule here would
              just be unconfigured noise, not a real check. -->
         <exclude name="LoosePackageCoupling"/>
+        <!-- Law of Demeter counts every chained call on a framework type (response.getWriter(),
+             request.getHeader(...)); the 36 suppressions all said so. Hexagonal layering and
+             ArchUnit enforce the dependency direction that matters. -->
+        <exclude name="LawOfDemeter"/>
+        <!-- Domain objects with accessors and few behaviours are deliberate value types
+             (coding-standards.md §3a); 61 suppressions. -->
+        <exclude name="DataClass"/>
     </rule>
 
 </ruleset>

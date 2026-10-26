@@ -20,9 +20,6 @@ import org.springframework.web.util.UriUtils;
  * Pure readers of the OIDC authorization request parameters {@link
  * OidcAuthorizationRequestParamsFilter} acts on.
  */
-// PMD.OnlyOneReturn: each reader has distinct outcomes, same rationale as the filter these were
-// split out of.
-@SuppressWarnings("PMD.OnlyOneReturn")
 final class OidcRequestParameters {
 
   private static final String ROLE_ACCOUNT = "ROLE_ACCOUNT";

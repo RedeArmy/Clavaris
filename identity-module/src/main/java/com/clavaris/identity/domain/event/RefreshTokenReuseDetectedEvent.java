@@ -17,7 +17,6 @@ public record RefreshTokenReuseDetectedEvent(
 
   // "of", matching AccountRegisteredEvent's own "from" static-factory convention family — a short,
   // conventional factory name, not an accidental abbreviation.
-  @SuppressWarnings("PMD.ShortMethodName")
   public static RefreshTokenReuseDetectedEvent of(
       final AccountId accountId, final OrganizationId organizationId) {
     return new RefreshTokenReuseDetectedEvent(accountId, organizationId, Instant.now());

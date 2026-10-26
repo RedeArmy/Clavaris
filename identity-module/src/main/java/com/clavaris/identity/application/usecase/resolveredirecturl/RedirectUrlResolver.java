@@ -18,9 +18,6 @@ import java.util.Optional;
  * Implemented in {@code app} by delegating to client-registry-module's own {@code
  * OAuthClientRepository}/{@code GetRedirectPolicyForClientUseCase}.
  */
-// PMD.LongVariable: requestedRedirectUrl matches Clerk's own equivalent concept (redirect_url),
-// not arbitrarily long — same precedent RedirectPolicy's own suppression documents.
-@SuppressWarnings("PMD.LongVariable")
 @FunctionalInterface
 public interface RedirectUrlResolver {
 

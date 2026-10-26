@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
  * rotating {@code SOCIAL_CREDENTIAL_ENCRYPTION_KEY} without re-encrypting existing rows breaks
  * decryption of rows written under the old key.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class AesGcmOrganizationSocialCredentialCipher implements OrganizationSocialCredentialCipher {
 

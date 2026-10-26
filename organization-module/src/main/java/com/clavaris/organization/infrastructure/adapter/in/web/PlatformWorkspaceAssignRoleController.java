@@ -264,7 +264,6 @@ public class PlatformWorkspaceAssignRoleController {
   // PlatformAccountWorkspaceRoleController's own save() already establishes — so
   // workspace-teams-hierarchy.html's own hierarchy fragment (listening on document.body)
   // self-refreshes with the newly assigned member, no full page reload.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private String processAssignRole(
       final HttpServletRequest request,
       final HttpServletResponse response,

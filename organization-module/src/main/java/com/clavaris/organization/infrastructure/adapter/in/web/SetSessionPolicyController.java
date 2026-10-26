@@ -36,7 +36,6 @@ class SetSessionPolicyController {
 
   // Two exits (404 on a bogus organizationId, 200 on success) — same rationale as every sibling
   // policy controller's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Set an Organization's session policy (Clerk Sessions parity)")
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")

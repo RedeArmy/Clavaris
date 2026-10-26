@@ -22,7 +22,6 @@ import org.springframework.stereotype.Component;
  * <p>TD-SEC-054 (closed): key material now lives in its own {@link KeyStoreScope#platform} file,
  * separate from every Organization's own. PMD suppressions below: coding-standards.md §3a.
  */
-@SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 @Component
 public class PlatformSigningKeyMaterial {
 

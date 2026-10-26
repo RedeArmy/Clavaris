@@ -23,12 +23,8 @@ import java.util.UUID;
  * AbstractPendingSocialLink}, same rationale.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.AbstractClassWithoutAbstractMethod",
   "PMD.PublicMemberInNonPublicType",
-  "PMD.DataClass"
 })
 abstract class AbstractVerificationToken<I> {
 

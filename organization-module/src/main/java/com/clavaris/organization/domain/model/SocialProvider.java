@@ -12,9 +12,6 @@ package com.clavaris.organization.domain.model;
  * <p>{@link #displayName} is how the provider writes its own name ("GitHub", not "Github"), for the
  * dashboard's Connections page.
  */
-// PMD.AvoidFieldNameMatchingMethodName: the accessor is named like the field, the record-style
-// convention every domain type here uses.
-@SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 public enum SocialProvider {
   GOOGLE("Google"),
   GITHUB("GitHub");

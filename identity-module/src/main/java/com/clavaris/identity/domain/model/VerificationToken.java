@@ -18,7 +18,6 @@ import java.util.UUID;
  * AbstractVerificationToken}'s own identical suppression already documents for this same
  * constructor parameter.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public final class VerificationToken extends AbstractVerificationToken<AccountId> {
 
   private VerificationToken(

@@ -10,9 +10,6 @@ import java.util.UUID;
  * response shape either way" convention {@code SetClientBrandingResponse} already establishes for
  * its own sibling read/write pair.
  */
-// PMD.ShortVariable: id matches the wire field name (and every sibling response record's own
-// identically-named field) — not an organically short name that should grow.
-@SuppressWarnings("PMD.ShortVariable")
 public record AccountProfileResponse(
     UUID id, String email, String firstName, String lastName, String username, String phoneNumber) {
 

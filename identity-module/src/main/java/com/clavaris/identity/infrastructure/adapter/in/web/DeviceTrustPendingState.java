@@ -14,9 +14,6 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  * challenge controller's own path already names the Organization, but a session that started a
  * challenge under one Organization's login must never be resumable from another's URL.
  */
-// PMD.LongVariable: descriptive session-attribute-key constant names, deliberately long — same
-// "deliberate record-style naming" precedent as KnownDevice's own class-level suppression.
-@SuppressWarnings("PMD.LongVariable")
 final class DeviceTrustPendingState {
 
   /* package */ static final String ACCOUNT_ID_ATTRIBUTE = "clavaris.deviceTrust.pendingAccountId";

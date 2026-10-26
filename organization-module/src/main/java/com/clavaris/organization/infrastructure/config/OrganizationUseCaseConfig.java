@@ -156,12 +156,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 // OrganizationAuthorizationServerConfig's
 // own class-level Javadoc already documents for an identical situation, not worth splitting a class
 // whose entire job is Spring bean assembly.
-@SuppressWarnings({
-  "PMD.AvoidDuplicateLiterals",
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @Configuration
 class OrganizationUseCaseConfig {
 
@@ -264,7 +259,6 @@ class OrganizationUseCaseConfig {
   // what "no override" actually means. TD-FUT-002 (self-service tuning, shipped): also injects
   // the same hardSystemWideCap value setRateLimitPolicyForOrganizationUseCase below already
   // does — see RateLimitPolicySnapshot's own Javadoc for why this read side now needs it too.
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ GetRateLimitPolicyForOrganizationUseCase getRateLimitPolicyForOrganizationUseCase(
       final RateLimitPolicyRepository policies,

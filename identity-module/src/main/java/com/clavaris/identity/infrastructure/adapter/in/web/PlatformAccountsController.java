@@ -50,7 +50,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 // PMD.ExcessiveImports: ADR-0029 added a search/pagination-affecting request param and a new
 // read-only role-display collaborator to a class that already sat right at PMD's own threshold —
 // wiring, not sprawl, same reasoning every other growing controller in this codebase documents.
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+@SuppressWarnings({"PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users")
 public class PlatformAccountsController {
@@ -113,7 +113,6 @@ public class PlatformAccountsController {
   // a full-page re-render on validation error (data-dialog-open-on-load) and a full-page redirect
   // on success (the dialog's own <dialog> element isn't preserved across an HTMX swap the way the
   // rest of this page's own HX-Request branch assumes).
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String create(
       final HttpServletRequest request,

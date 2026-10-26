@@ -43,7 +43,7 @@ public class AuthenticateWithUsernameService implements AuthenticateWithUsername
     this.policyProvider = policyProvider;
   }
 
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   public Account handle(final AuthenticateWithUsernameCommand command) {
     final Optional<Account> found =

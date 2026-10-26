@@ -14,7 +14,6 @@ import java.util.UUID;
  * responsibility {@link WorkspaceMembershipEntity}'s sibling in {@code webhook-module} ({@code
  * WebhookEndpointEntity#subscribedEventTypes}) already establishes for an identical shape.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "workspace_roles")
 public class WorkspaceRoleEntity {

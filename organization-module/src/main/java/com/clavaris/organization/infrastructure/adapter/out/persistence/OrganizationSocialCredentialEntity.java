@@ -14,7 +14,6 @@ import java.util.UUID;
  * JPA row mapping for {@code organization_social_credentials} (ADR-0022) — plain data holder by
  * design, same convention as {@code RateLimitPolicyEntity}.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
 @Entity
 @Table(name = "organization_social_credentials")
 public class OrganizationSocialCredentialEntity {

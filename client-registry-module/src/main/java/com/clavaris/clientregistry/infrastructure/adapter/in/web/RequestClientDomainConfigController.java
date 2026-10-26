@@ -38,7 +38,6 @@ class RequestClientDomainConfigController {
   // Four exits (404 on a bogus organizationId/oauthClientId pair, 409 on a hostname already
   // claimed elsewhere, 400 on invalid domain content, 200 on success) — same rationale as
   // SetRateLimitPolicyController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Request/re-request an OAuthClient's custom domain (ADR-0009 §2)")
   @ApiResponse(responseCode = "200", description = "Domain request created or updated, PENDING")
   @ApiResponse(

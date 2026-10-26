@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * actually need — same "one port, several use cases" shape {@code JpaWebhookEndpointRepository}'s
  * own identical suppression documents, not a design smell to split up.
  */
-@SuppressWarnings({"PMD.LongVariable", "PMD.ShortVariable", "PMD.TooManyMethods"})
+@SuppressWarnings({"PMD.TooManyMethods"})
 @Repository
 class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
 
@@ -101,13 +101,6 @@ class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
         .toList();
   }
 
-  // See DeliverPendingWebhooksService's own Javadoc for why claiming is its own short, dedicated
-  // transaction — everything below commits and releases its row locks before this method returns,
-  // well before any HTTP call the caller goes on to make.
-  // PMD.OnlyOneReturn: the empty-batch early exit skips two DB round trips (lease + re-select)
-  // that would otherwise run against an empty id list — a genuinely distinct case, not worth
-  // forcing through a single-exit shape.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   @Transactional
   public List<WebhookDelivery> claimDueBatch(final int limit) {
@@ -132,7 +125,6 @@ class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
   // Same "three @Query methods back one keyset page" shape as JpaWebhookEndpointRepository's own
   // identical findKeysetPageByOrganizationId.
   @Override
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
   public KeysetPage<WebhookDelivery> findKeysetPageByOrganizationId(
       final UUID organizationId, final KeysetPageRequest pageRequest) {
     final PageRequest limit = PageRequest.of(0, pageRequest.size() + 1);

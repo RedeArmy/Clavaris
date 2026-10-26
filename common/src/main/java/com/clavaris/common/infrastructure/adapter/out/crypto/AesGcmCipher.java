@@ -33,7 +33,6 @@ import javax.crypto.spec.SecretKeySpec;
  * rotating a caller's own key without re-encrypting existing rows breaks decryption of rows written
  * under the old key (tracked per-module, in each caller's own technical-debt-register.md row).
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.LongVariable"})
 public final class AesGcmCipher {
 
   private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";

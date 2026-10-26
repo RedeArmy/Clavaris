@@ -36,8 +36,6 @@ public class PlatformAccountAvatarController {
     this.getAvatar = getAvatar;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn") // two real, distinct exits — same rationale
-  // AccountAvatarController's own identical suppression documents.
   @GetMapping("/platform/avatars/{platformAccountId}")
   @ResponseBody
   public ResponseEntity<byte[]> show(@PathVariable final UUID platformAccountId) {

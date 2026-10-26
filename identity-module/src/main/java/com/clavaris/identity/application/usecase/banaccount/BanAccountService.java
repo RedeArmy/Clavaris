@@ -30,8 +30,8 @@ public class BanAccountService implements BanAccountUseCase {
       final AccountRepository accounts,
       final SessionRepository sessions,
       final RefreshTokenRepository refreshTokens,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.accounts = accounts;

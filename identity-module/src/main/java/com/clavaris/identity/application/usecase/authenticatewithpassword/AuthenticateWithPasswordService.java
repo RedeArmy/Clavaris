@@ -75,7 +75,7 @@ public class AuthenticateWithPasswordService implements AuthenticateWithPassword
   // (EmailNotVerifiedException) alongside the four this method already had — each branch is a
   // genuinely distinct rejection reason this class's own Javadoc already explains are
   // deliberately collapsed to one exception type at the boundary, not organic complexity.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.CyclomaticComplexity"})
+  @SuppressWarnings({"PMD.CyclomaticComplexity"})
   @Override
   public Account handle(final AuthenticateWithPasswordCommand command) {
     final Optional<Account> found =

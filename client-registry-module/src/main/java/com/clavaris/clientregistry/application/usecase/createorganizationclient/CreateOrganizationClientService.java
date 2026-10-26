@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
  * RegisterOAuthClientService} already established for {@code test_}/{@code live_}, reused here via
  * the same {@link OrganizationEnvironmentChecker} port.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class CreateOrganizationClientService implements CreateOrganizationClientUseCase {
 
   private static final String DEVELOPMENT_CLIENT_ID_PREFIX = "sk_test_";

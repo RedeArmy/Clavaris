@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
  * cross-module-but-one-database atomicity {@code CreateOrganizationService}'s own Javadoc already
  * establishes.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class CreateProductionEnvironmentService implements CreateProductionEnvironmentUseCase {
 
   private final OrganizationRepository organizations;

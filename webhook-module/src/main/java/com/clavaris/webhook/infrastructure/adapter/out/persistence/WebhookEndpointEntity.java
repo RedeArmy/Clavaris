@@ -13,7 +13,6 @@ import java.util.UUID;
  * {@code OAuthClientEntity}'s own three JSON-array columns; serialization happens in {@link
  * JpaWebhookEndpointRepository}, not here.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable"})
 @Entity
 @Table(name = "webhook_endpoints")
 public class WebhookEndpointEntity {

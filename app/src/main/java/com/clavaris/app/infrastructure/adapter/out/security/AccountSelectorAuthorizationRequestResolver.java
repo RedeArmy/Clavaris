@@ -34,8 +34,6 @@ import org.springframework.stereotype.Component;
  * SocialLoginRedirectController} set just before handing off. A platform login has none, so it is
  * never touched, and neither is an Organization that did not turn this on.
  */
-// PMD.OnlyOneReturn: several guard exits (no request, no session, no organization, not enabled).
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LongVariable"})
 @Component
 class AccountSelectorAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 

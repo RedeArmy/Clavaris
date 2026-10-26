@@ -36,7 +36,6 @@ public interface WebhookDeliveryRepository {
    * Addressed by this id alone — see {@code WebhookEndpointRepository#findById}'s own Javadoc for
    * why no additional Organization-scoping check applies on this admin API surface.
    */
-  @SuppressWarnings("PMD.ShortVariable")
   Optional<WebhookDelivery> findById(UUID id);
 
   List<WebhookDelivery> findAllByEndpointId(UUID endpointId, int limit);

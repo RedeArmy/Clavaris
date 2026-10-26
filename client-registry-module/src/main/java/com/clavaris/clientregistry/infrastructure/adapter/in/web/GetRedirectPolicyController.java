@@ -37,7 +37,6 @@ class GetRedirectPolicyController {
   // GetClientDomainConfigController's own identical checks already establish. See
   // GetRedirectPolicyForClientService's own Javadoc for the module-level check this now relies on
   // instead of app-layer plumbing that was never actually wired for this route anyway.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Read an OAuthClient's post-authentication redirect policy")
   @ApiResponse(
       responseCode = "200",

@@ -40,7 +40,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * PlatformClient} bearer token, neither of which a session-authenticated dashboard POST carries, so
  * it would not otherwise be covered at all.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}/impersonate")
 public class PlatformAccountImpersonationController {

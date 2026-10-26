@@ -17,10 +17,6 @@ import java.util.Locale;
  * all (the default, every existing Organization today) allows everything — this policy is opt-in,
  * never a silent new gate on registrations that never asked for one.
  */
-// PMD.OnlyOneReturn: isAllowed's allowlist-wins early exit and matches' domain-vs-exact branch are
-// each two genuinely distinct outcomes, not a single flow forced into two exits — same rationale
-// every other early-return chain in this codebase documents.
-@SuppressWarnings("PMD.OnlyOneReturn")
 public final class AccessRestrictionPolicy {
 
   private AccessRestrictionPolicy() {}

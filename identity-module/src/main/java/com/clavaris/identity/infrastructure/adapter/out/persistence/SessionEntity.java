@@ -9,7 +9,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code sessions} (data-model.md §2, BR-ID-03). */
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable"})
 @Entity
 @Table(name = "sessions")
 public class SessionEntity {

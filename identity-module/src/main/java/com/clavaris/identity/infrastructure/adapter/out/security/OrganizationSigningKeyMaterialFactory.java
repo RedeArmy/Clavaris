@@ -210,7 +210,6 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
    * see this class's own Javadoc for why {@code OrganizationScopedJwkSource} needed this instead of
    * its own separate {@code SigningKeyRepository.findActive} query on every token issuance.
    */
-  @SuppressWarnings("PMD.OnlyOneReturn") // early-return cache-hit path reads clearer than nesting
   public Optional<ActiveSigningKey> activeSigningKeyFor(final OrganizationId organizationId) {
     final ActiveSigningKey cached = activeSigningKeys.get(organizationId.value());
     if (cached != null) {

@@ -42,7 +42,6 @@ class CurrentPlatformAccountResolverBridge
 
   // The exact authority SpringSecurityPlatformAuthenticatedSessionEstablisher grants and no
   // tenant-tier session ever carries — see this constant's use in resolve() below.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String PLATFORM_ACCOUNT_AUTHORITY = "ROLE_PLATFORM_ACCOUNT";
 
   // This class holds no state, so this constructor is otherwise a no-op — written out explicitly
@@ -55,7 +54,6 @@ class CurrentPlatformAccountResolverBridge
   // "Empty"/"wrong tier"/"malformed"/"resolved" are four independent, equally-valid outcomes
   // here — each needs its own exit, same rationale as e.g. RegisterAccountController's own
   // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<UUID> resolve(final HttpServletRequest request) {
     final SecurityContext context = SecurityContextHolder.getContext();

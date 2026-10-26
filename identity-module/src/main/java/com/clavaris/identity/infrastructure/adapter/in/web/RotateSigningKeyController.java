@@ -33,7 +33,6 @@ class RotateSigningKeyController {
 
   // Two exits (404 on an Organization with no active key, 200 on success) — same rationale as
   // SetRateLimitPolicyController's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Rotate an Organization's signing key, with JWKS overlap (ADR-0010 §5.2)")
   @ApiResponse(responseCode = "200", description = "Rotated — the new kid is now signing")
   @ApiResponse(

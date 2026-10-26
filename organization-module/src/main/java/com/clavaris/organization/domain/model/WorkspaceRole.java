@@ -30,12 +30,7 @@ import java.util.UUID;
 // PMD.TooManyMethods: every method here is a real, distinct accessor or immutable-copy-with
 // mutator this entity's own callers actually need (same shape Workspace/Organization already
 // establish, just with more fields to expose) — not a design smell to split up.
-@SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.TooManyMethods"})
 public final class WorkspaceRole {
 
   // Matches the workspace_roles.name column (varchar(255)) — same enforce-it-in-the-domain-too

@@ -24,7 +24,6 @@ import java.util.UUID;
  * "read the framework type at the edge, hand the application layer an opaque string" pattern {@code
  * RateLimitIdentifiers} already established for rate-limit keys.
  */
-@SuppressWarnings("PMD.ShortVariable")
 public record AuditActor(AuditActorType type, String id) {
 
   public AuditActor {

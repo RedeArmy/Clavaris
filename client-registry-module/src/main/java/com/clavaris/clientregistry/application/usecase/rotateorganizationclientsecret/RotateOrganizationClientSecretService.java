@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Same rationale as {@code rotateplatformclientsecret.RotatePlatformClientSecretService} — the
  * real, code-driven way to rotate this credential, never bundled with revocation.
  */
-@SuppressWarnings("PMD.LongVariable")
 public class RotateOrganizationClientSecretService
     implements RotateOrganizationClientSecretUseCase {
 

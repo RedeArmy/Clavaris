@@ -21,10 +21,6 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
  * existing {@code email} scope gate, with no change to it. The verification flag is always sent,
  * {@code false} included, so a relying party can tell "unverified" from "not provided".
  */
-// PMD.OnlyOneReturn: several independent early exits (not an ID token, no end user, scope not
-// granted, malformed principal, unknown Account) — same rationale ProfilePictureClaimsCustomizer's
-// own identical suppression documents.
-@SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
 public class EmailClaimsCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 
   // The email scope and the email claim share a name (OIDC Core 5.4).

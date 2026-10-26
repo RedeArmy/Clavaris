@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** Persistence shape of {@code OrganizationProfile}: one optional row per Organization. */
-@SuppressWarnings("PMD.DataClass")
 @Entity
 @Table(name = "organization_profiles")
 public class OrganizationProfileEntity {

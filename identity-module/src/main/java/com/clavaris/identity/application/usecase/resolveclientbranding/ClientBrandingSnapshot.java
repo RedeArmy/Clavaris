@@ -8,9 +8,6 @@ import java.util.Optional;
  * AccountAuthenticationPolicySnapshot} already establishes for an identical cross-module need.
  * Every field mirrors the domain aggregate's own accessor one-to-one.
  */
-// PMD.LongVariable: applicationDisplayName names exactly what ADR-0009 §3 itself calls the
-// field, same ClientBranding precedent.
-@SuppressWarnings("PMD.LongVariable")
 public record ClientBrandingSnapshot(
     Optional<String> logoUrl,
     Optional<String> primaryColor,

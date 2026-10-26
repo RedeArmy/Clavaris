@@ -70,14 +70,6 @@ import org.springframework.dao.DataIntegrityViolationException;
  * occurrence — a genuinely new device for that same Account next month still notifies as normal. An
  * Account created after the cutover is a real signup with no migration artifact to suppress.
  */
-// LongVariable: deviceCookieMigrationCutoverAt (field/param/bean-method-param) and the two local
-// booleans in handle() below are all long by design, not accidentally — same "deliberate
-// record-style naming" precedent as KnownDevice's own class-level suppression.
-// AvoidDuplicateLiterals: "PMD.AvoidCatchingGenericException" repeats across this class's several
-// defensive catch sites, same rationale as EmailLinkSignInController's own class-level suppression
-// of this exact rule — extracting a constant for a suppression string would be needless
-// indirection.
-@SuppressWarnings({"PMD.LongVariable", "PMD.AvoidDuplicateLiterals"})
 public class RecordAccountLoginDeviceService implements RecordAccountLoginDeviceUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RecordAccountLoginDeviceService.class);
@@ -85,7 +77,6 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   // A non-browser/UA-stripping client is still a real device worth tracking under the
   // cookie-based design (unlike the old UA-keyed one, this mechanism doesn't depend on the
   // header at all for its security property) — this is display/audit filler only.
-  @SuppressWarnings("PMD.LongVariable")
   private static final String UNKNOWN_USER_AGENT = "Unknown";
 
   // TD-FUT-025: a week is deliberately generous compared to VerificationToken's other, more
@@ -128,7 +119,6 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   // Three genuinely distinct outcomes (recognized via cookie / lost the negligible token-
   // collision race / newly-seen device, notified), each with its own exit — same "each outcome
   // needs its own exit" rationale as e.g. RegisterAccountController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public Optional<String> handle(final RecordAccountLoginDeviceCommand command) {
     final String presentedToken = command.presentedDeviceToken();
@@ -242,7 +232,6 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   @SuppressWarnings({
     "PMD.AvoidCatchingGenericException", // AccountRepository#findById can throw a Spring
     // DataAccessException like any other read; must never propagate (see class Javadoc).
-    "PMD.OnlyOneReturn"
   })
   private Account findAccountOrNull(final AccountId accountId) {
     try {
@@ -259,7 +248,9 @@ public class RecordAccountLoginDeviceService implements RecordAccountLoginDevice
   // login.
   // Two genuinely distinct exits (minted / mint failed), same "each outcome needs its own exit"
   // rationale as findAccountOrNull's own identical suppression above.
-  @SuppressWarnings({"PMD.AvoidCatchingGenericException", "PMD.OnlyOneReturn"})
+  @SuppressWarnings({
+    "PMD.AvoidCatchingGenericException",
+  })
   private String mintNewDeviceAlertTokenOrNull(final AccountId accountId) {
     try {
       final String rawToken = RefreshTokenSecret.generateRawValue();

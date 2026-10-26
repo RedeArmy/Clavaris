@@ -38,7 +38,6 @@ import org.springframework.web.util.UriComponentsBuilder;
  * <p>An Organization that is not the signed-in account's is a 404, the same as one that does not
  * exist: the dialog cannot be used to probe ids.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/profile")
 public class PlatformOrganizationProfileController {
@@ -63,7 +62,6 @@ public class PlatformOrganizationProfileController {
 
   // Three exits (rejected, saved, not the caller's): each is a different response, not a branch of
   // one — same rationale as the sibling dashboard controllers' own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public String update(
       @PathVariable final UUID organizationId,
@@ -103,10 +101,6 @@ public class PlatformOrganizationProfileController {
     return reopenDialog(model, owner, organizationId, form, bindingResult);
   }
 
-  // The uploaded image, checked as the domain checks it (type, size, and that its bytes really are
-  // that type). A problem is a message on the logo field; no upload is simply "no change".
-  // PMD.LawOfDemeter: the form hands over its upload and this is the one place that reads it.
-  @SuppressWarnings("PMD.LawOfDemeter")
   private static OrganizationLogo readLogo(
       final UUID organizationId,
       final UpdateOrganizationProfileForm form,
@@ -149,9 +143,6 @@ public class PlatformOrganizationProfileController {
     return DASHBOARD_VIEW;
   }
 
-  // The cursors come from this page's own hidden fields; a tampered one just means "first page".
-  // PMD.OnlyOneReturn: the decoded page, or the first one; the two exits are the whole method.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static KeysetPageRequest pageRequest(final UpdateOrganizationProfileForm form) {
     try {
       return KeysetPageRequest.fromCursors(

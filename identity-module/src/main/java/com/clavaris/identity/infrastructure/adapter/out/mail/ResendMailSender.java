@@ -43,7 +43,9 @@ import tools.jackson.databind.ObjectMapper;
 // descriptively-named fields/parameters (DEFAULT_RESEND_ENDPOINT, failureRateThreshold,
 // waitDurationInOpenStateSeconds) — same rationale as identity-module's own IdentityUseCaseConfig
 // class-level suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.LongVariable"})
+@SuppressWarnings({
+  "PMD.TooManyMethods",
+})
 @Component
 class ResendMailSender implements MailSender, PlatformMailSender {
 

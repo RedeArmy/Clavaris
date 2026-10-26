@@ -80,7 +80,9 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 // it's modeled on — renaming them shorter to satisfy PMD would make that comparison harder, not
 // the class actually clearer. Same reasoning as the sibling AuthorizationServerConfig classes'
 // own ExcessiveImports suppression for "wiring together many distinct SAS protocol types."
-@SuppressWarnings({"PMD.ExcessiveImports", "PMD.LongVariable"})
+@SuppressWarnings({
+  "PMD.ExcessiveImports",
+})
 public final class RefreshTokenRotationAuthenticationProvider implements AuthenticationProvider {
 
   private static final String ERROR_URI =
@@ -285,7 +287,6 @@ public final class RefreshTokenRotationAuthenticationProvider implements Authent
   // Own equivalent of SAS's package-private OAuth2AuthenticationProviderUtils (confirmed by
   // reading its 7.1.0 source — not public, and this provider lives in a different package on
   // purpose, so reaching into that class's own package wasn't an option worth taking).
-  @SuppressWarnings("PMD.LawOfDemeter") // Authentication.getPrincipal() is the SPI's own contract
   private static OAuth2ClientAuthenticationToken authenticatedClientOrThrowInvalidClient(
       final Authentication authentication) {
     final Object principal = authentication.getPrincipal();

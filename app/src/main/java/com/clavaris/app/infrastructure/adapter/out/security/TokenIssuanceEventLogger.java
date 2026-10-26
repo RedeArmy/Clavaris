@@ -45,13 +45,6 @@ public class TokenIssuanceEventLogger implements OAuth2TokenCustomizer<JwtEncodi
   }
 
   @Override
-  // PMD.GuardLogStatement: every argument below is a cheap accessor on an already-built
-  // context/token, not an expensive computation the rule exists to guard against.
-  // PMD.LawOfDemeter: JwtEncodingContext is a flat, purpose-built accessor facade (the same shape
-  // as a DTO/builder), not an object graph this rule's "don't reach through collaborators" concern
-  // applies to — extracting a handful of independent fields from it is the API's intended use, not
-  // a coupling smell.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.LawOfDemeter"})
   public void customize(final JwtEncodingContext context) {
     final Authentication principal = context.getPrincipal();
     final String tokenType = context.getTokenType().getValue();

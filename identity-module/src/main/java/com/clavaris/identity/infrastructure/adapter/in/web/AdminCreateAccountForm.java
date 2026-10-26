@@ -13,10 +13,6 @@ import jakarta.validation.constraints.Size;
  * The form posts the phone number as {@code phoneCountryCode} + {@code phoneNumberLocal} (see
  * {@link PhoneNumberInput}); {@code phoneNumber} stays as a single-string fallback.
  */
-// PMD.LongVariable: ignorePasswordPolicy/ignoreAccessRestrictions name exactly what each checkbox
-// on the create-user form does — same rationale AdminCreateAccountForOrganizationCommand's own
-// identical suppression documents.
-@SuppressWarnings({"PMD.DataClass", "PMD.LongVariable"})
 public class AdminCreateAccountForm {
 
   private String firstName;

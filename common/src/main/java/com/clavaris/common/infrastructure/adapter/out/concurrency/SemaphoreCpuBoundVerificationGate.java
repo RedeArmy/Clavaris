@@ -42,10 +42,6 @@ class SemaphoreCpuBoundVerificationGate implements CpuBoundVerificationGate {
   private final Duration maxWait;
   private final SecurityMetricsRecorder metrics;
 
-  // PMD.LongVariable: maxConcurrentVerifications names exactly what it holds — shortening it would
-  // make the constructor's own @Value default expression (spelling out the same concept) harder to
-  // read, not easier.
-  @SuppressWarnings("PMD.LongVariable")
   /* package */ SemaphoreCpuBoundVerificationGate(
       @Value(
               "${clavaris.security.argon2.max-concurrent-verifications:"
@@ -62,7 +58,6 @@ class SemaphoreCpuBoundVerificationGate implements CpuBoundVerificationGate {
   // exit per distinct outcome" rationale PrimaryFactorLoginCompletion's own identical suppression
   // already establishes in identity-module.
   @Override
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public Optional<Boolean> runBounded(final BooleanSupplier verification) {
     final boolean acquired;
     try {

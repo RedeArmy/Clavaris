@@ -19,7 +19,7 @@ import java.util.UUID;
  * own Javadoc) — parsed into a {@code Set<String>} by {@link PlatformWorkspaceRoleController}
  * before building the command, never here.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class WorkspaceRoleForm {
 
   @NotBlank(message = "Name is required")

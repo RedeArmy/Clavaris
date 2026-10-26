@@ -60,10 +60,6 @@ public class AccountAvatarController {
     this.getAvatar = getAvatar;
   }
 
-  // PMD.OnlyOneReturn: two real, distinct exits — a redirect to an external provider URL, or a
-  // real content response — same rationale AccountAvatarResult's own sealed-interface shape
-  // documents.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @GetMapping("/o/{organizationId}/avatars/{accountId}")
   @ResponseBody
   public ResponseEntity<byte[]> show(

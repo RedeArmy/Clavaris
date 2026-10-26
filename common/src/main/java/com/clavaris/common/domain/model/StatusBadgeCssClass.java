@@ -47,7 +47,7 @@ public final class StatusBadgeCssClass {
   // (SUCCEEDED/FAILED/EXHAUSTED) this method exists specifically to branch on — spelled out
   // literally is the whole point, same rationale this codebase's other status-name comparisons
   // already document for an identical case.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.AvoidLiteralsInIfCondition"})
+  @SuppressWarnings({"PMD.AvoidLiteralsInIfCondition"})
   public static String forDeliveryStatus(final String statusName) {
     if ("SUCCEEDED".equals(statusName)) {
       return "clavaris-badge--success";

@@ -11,10 +11,6 @@ import java.util.Objects;
  * {@link BinaryContentEquality} helper, as that command's own identical one — see its own Javadoc
  * for why.
  */
-// PMD.LongVariable: otherPlatformAccountId (the equals() destructuring pattern variable) mirrors
-// the record's own platformAccountId component name — matching it exactly reads better than an
-// arbitrarily shortened one.
-@SuppressWarnings("PMD.LongVariable")
 public record UpdatePlatformAccountProfilePictureCommand(
     PlatformAccountId platformAccountId, byte[] content, String contentType) {
 

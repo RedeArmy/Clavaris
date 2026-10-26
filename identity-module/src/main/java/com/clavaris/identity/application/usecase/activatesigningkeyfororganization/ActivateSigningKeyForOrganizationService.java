@@ -53,7 +53,6 @@ public class ActivateSigningKeyForOrganizationService
 
   @Override
   @Transactional
-  @SuppressWarnings("PMD.OnlyOneReturn") // early-return no-op path reads clearer than nesting
   public SigningKey handle(
       final OrganizationId organizationId, final String kid, final String algorithm) {
     // See this class's own Javadoc — must happen before the read below, not after, or there is

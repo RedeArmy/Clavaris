@@ -34,11 +34,6 @@ class JpaAuditEventReader implements AuditEventReader {
     this.entityManager = entityManager;
   }
 
-  // PMD.OnlyOneReturn: the empty-targets short circuit avoids ever building a WHERE-less query
-  // (which would match the whole table) — same "an empty input list means an empty result, not
-  // 'no filter'" contract AuditEventReader's own Javadoc documents, worth its own early exit
-  // rather than folding into the main return via a ternary.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public List<AuditEvent> findRecentForTargets(
       final List<AuditEventTargetRef> targets, final int maxResults) {

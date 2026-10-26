@@ -26,11 +26,7 @@ import java.util.UUID;
  * <p>PMD suppressions below: coding-standards.md §3a.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.TooManyMethods",
-  "PMD.LongVariable"
 })
 public final class WebhookEndpoint {
 
@@ -255,7 +251,6 @@ public final class WebhookEndpoint {
   // Two exits (rotation overlap still open vs. not) is clearer here than forcing a single-return
   // shape onto two genuinely different cases — same rationale as RegisterOAuthClientController's
   // own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   public List<String> activeSecretsEncrypted(final Instant now) {
     if (previousSecretEncrypted != null
         && previousSecretExpiresAt != null

@@ -69,7 +69,6 @@ public final class HashedTokenOAuth2AuthorizationService implements OAuth2Author
   // Parameter name matches OAuth2AuthorizationService's own interface signature — kept as-is for
   // readability against the SPI it implements, same precedent as
   // OrganizationRegisteredClientRepository/PlatformRegisteredClientRepository's own findById.
-  @SuppressWarnings("PMD.ShortVariable")
   @Override
   public OAuth2Authorization findById(final String id) {
     // Id-keyed, same reasoning as remove() — every consumer of a findById result in this
@@ -83,7 +82,6 @@ public final class HashedTokenOAuth2AuthorizationService implements OAuth2Author
   // clearer as guard clauses than nested inside a single trailing return — same precedent as
   // ActivateSigningKeyForOrganizationService/ActivatePlatformSigningKeyService's own identical
   // suppression for an early-return no-op path.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Override
   public OAuth2Authorization findByToken(final String token, final OAuth2TokenType tokenType) {
     if (isNeverHashed(tokenType)) {
@@ -201,14 +199,6 @@ public final class HashedTokenOAuth2AuthorizationService implements OAuth2Author
     return restored ? builder.build() : authorization;
   }
 
-  // PMD.LawOfDemeter: existing.getToken().getTokenValue() walks OAuth2Authorization.Token's own
-  // two-level accessor shape — the SPI's own contract for reaching a stored token's value, not an
-  // organically grown chain (same reasoning as
-  // SpringSecurityPlatformAuthenticatedSessionEstablisher's
-  // request.getSession() suppression for a standard framework accessor shape). PMD.OnlyOneReturn:
-  // an early "no match" return reads clearer here than threading a match/no-match flag through to
-  // one trailing return, same precedent as this class's own findByToken above.
-  @SuppressWarnings({"PMD.LawOfDemeter", "PMD.OnlyOneReturn"})
   private static <T extends OAuth2Token> boolean restoreIfHashMatches(
       final OAuth2Authorization.Builder builder,
       final OAuth2Authorization source,

@@ -15,7 +15,6 @@ import java.util.UUID;
  * matters. Every domain-specific column is nullable — {@code SHARED} mode (never a custom domain
  * requested) is the normal state.
  */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass", "PMD.LongVariable"})
 @Entity
 @Table(name = "client_domain_configs")
 public class ClientDomainConfigEntity {

@@ -28,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * it is — same "deliberate, descriptive name over an arbitrary shortening" convention this codebase
  * applies everywhere else this rule fires.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/account/sessions")
 public class PlatformAccountSessionsController {

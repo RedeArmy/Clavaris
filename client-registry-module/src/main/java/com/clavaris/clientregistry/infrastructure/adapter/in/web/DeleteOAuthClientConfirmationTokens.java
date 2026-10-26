@@ -23,7 +23,6 @@ import java.util.UUID;
  * submitted token matches or not — a stale confirm page, reloaded or auto-submitted a second time,
  * can never re-trigger a delete with the same token.
  */
-@SuppressWarnings("PMD.LongVariable")
 final class DeleteOAuthClientConfirmationTokens {
 
   private static final String SESSION_ATTRIBUTE_PREFIX =
@@ -42,10 +41,6 @@ final class DeleteOAuthClientConfirmationTokens {
     return token;
   }
 
-  // PMD.OnlyOneReturn: two distinct "not valid" exits (no session, no/expired entry) plus the
-  // real match check — same rationale as DeleteOrganizationConfirmationTokens' own identical
-  // suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   /* package */ static boolean consume(
       final HttpServletRequest request, final String clientId, final String submittedToken) {
     final HttpSession session = request.getSession(false);

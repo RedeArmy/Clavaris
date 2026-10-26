@@ -80,8 +80,7 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
       final ObjectMapper objectMapper,
       final SecurityMetricsRecorder metrics,
       @Value("${clavaris.idempotency.claim-ttl-seconds:30}") final long claimTtlSeconds,
-      @SuppressWarnings("PMD.LongVariable")
-          @Value("${clavaris.idempotency.completed-ttl-seconds:86400}")
+      @Value("${clavaris.idempotency.completed-ttl-seconds:86400}")
           final long completedTtlSeconds) {
     this.redisTemplate = redisTemplate;
     this.objectMapper = objectMapper;
@@ -90,13 +89,6 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
     this.completedTtl = Duration.ofSeconds(completedTtlSeconds);
   }
 
-  // PMD.GuardLogStatement false positive — every logged argument is a cheap in-memory accessor,
-  // same rationale as every other logging call site in this codebase (e.g.
-  // RedisFixedWindowRateLimiter's own identical suppression). PMD.OnlyOneReturn: four genuinely
-  // distinct outcomes (fail-open, claimed, in-progress, replay, conflict), each with its own exit
-  // — same "each outcome needs its own exit" rationale as IdempotencyKeyFilter's own identical
-  // suppression.
-  @SuppressWarnings({"PMD.GuardLogStatement", "PMD.OnlyOneReturn"})
   @Override
   public IdempotencyClaimResult claim(final String key, final String requestBodyHash) {
     final String claimPayload =
@@ -127,7 +119,6 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
     return IdempotencyClaimResult.conflict();
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void complete(
       final String key, final String requestBodyHash, final IdempotentResponse response) {
@@ -146,7 +137,6 @@ class RedisIdempotencyKeyStore implements IdempotencyKeyStore {
     }
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   public void release(final String key) {
     try {

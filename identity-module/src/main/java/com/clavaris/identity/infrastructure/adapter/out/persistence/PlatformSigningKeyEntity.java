@@ -10,7 +10,6 @@ import java.util.UUID;
  * {@link AbstractSigningKeyEntity} (TD-ARCH-009, closed 2026-08-31) — this table adds no owning-id
  * column at all, see that class's own Javadoc for why.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "platform_signing_keys")
 public class PlatformSigningKeyEntity extends AbstractSigningKeyEntity {

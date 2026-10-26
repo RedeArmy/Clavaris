@@ -17,10 +17,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * external URL, never a Clavaris-managed upload — {@link ProfilePictureReference#isExternalUrl}
  * makes that distinction, same as {@code GetAccountAvatarService}'s own read-side check.
  */
-// PMD.LongVariable: transactionTemplate/previousPictureUrl name exactly what they are — same
-// convention AuthenticateWithSocialProviderService's own identical class-level suppression
-// documents for this exact field.
-@SuppressWarnings("PMD.LongVariable")
 public class RemoveAccountProfilePictureService implements RemoveAccountProfilePictureUseCase {
 
   private final AccountRepository accounts;

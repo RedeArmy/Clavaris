@@ -32,7 +32,6 @@ class CreateWorkspaceController {
 
   // Two exits (404 on an unknown organizationId, 201 on success) — same rationale as
   // CreateOrganizationController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Create a Workspace within this Organization (ADR-0010 §3)")
   @ApiResponse(responseCode = "201", description = "Workspace created")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")

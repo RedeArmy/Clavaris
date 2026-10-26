@@ -20,7 +20,6 @@ import tools.jackson.databind.ObjectMapper;
  * (framework-free) and {@link OrganizationClientEntity} — same shape as {@code
  * JpaPlatformClientRepository}.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Repository
 class JpaOrganizationClientRepository implements OrganizationClientRepository {
 
@@ -39,7 +38,6 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
     return organizationClients.findByClientId(clientId).map(this::toDomain);
   }
 
-  @SuppressWarnings("PMD.ShortVariable")
   @Override
   public Optional<OrganizationClient> findById(final UUID id) {
     return organizationClients.findById(id).map(this::toDomain);
@@ -89,7 +87,6 @@ class JpaOrganizationClientRepository implements OrganizationClientRepository {
   // TD-PERF-020 (keyset revision, 2026-09-14): newest-first, id as a tiebreaker — same reasoning
   // organization-module's own JpaOrganizationRepository#findKeysetPageOwnedBy already documents.
   @Override
-  @SuppressWarnings("PMD.OnlyOneReturn") // three real, distinct exits — first/after/before.
   public KeysetPage<OrganizationClient> findKeysetPageByOrganizationId(
       final UUID organizationId, final KeysetPageRequest pageRequest) {
     final org.springframework.data.domain.PageRequest limit =

@@ -43,11 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
  * own reuse response has no such concern: there, nuking the current session along with everything
  * else is the correct, intended full lockout.
  */
-// PMD.LongVariable: sessionPolicyProvider/accountTokenRevoker name exactly what they hold, same
-// convention RotateRefreshTokenService's own identical fields already establish — a class-level
-// suppression here, not one per occurrence, since AvoidDuplicateLiterals otherwise flags the
-// repeated annotation string.
-@SuppressWarnings("PMD.LongVariable")
 public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(IssueRefreshTokenService.class);
@@ -74,9 +69,6 @@ public class IssueRefreshTokenService implements IssueRefreshTokenUseCase {
     this.accountTokenRevoker = accountTokenRevoker;
   }
 
-  // PMD.GuardLogStatement false positive, same reasoning as AuthenticateWithPasswordService's own
-  // suppression — every logged argument is a cheap in-memory accessor.
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public IssueRefreshTokenResult handle(final IssueRefreshTokenCommand command) {

@@ -51,7 +51,6 @@ import org.springframework.web.server.ResponseStatusException;
  * every other dashboard mutation: an {@code HX-Request} gets back just the {@code rateLimit}
  * fragment, re-rendered in place; a plain form submit redirects back to this same page.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/rate-limit-policy")
 public class PlatformRateLimitPolicyController {
@@ -101,7 +100,6 @@ public class PlatformRateLimitPolicyController {
 
   // Three exits (validation error, hard-cap-exceeded error, HTMX fragment vs. plain redirect) —
   // same rationale as every other dashboard mutation's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @PostMapping
   public String set(
       final HttpServletRequest request,

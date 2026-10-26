@@ -16,6 +16,5 @@ import java.util.UUID;
  *     with, so nothing needed correcting here, only documenting, same posture {@code
  *     RegisterWebhookEndpointCommand}'s own Javadoc already establishes for an identical situation.
  */
-@SuppressWarnings("PMD.LongVariable")
 public record CreateProductionEnvironmentCommand(
     UUID developmentOrganizationId, String name, AuditActor actor) {}

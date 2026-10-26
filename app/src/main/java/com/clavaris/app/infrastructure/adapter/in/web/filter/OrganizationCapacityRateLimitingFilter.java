@@ -31,7 +31,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * purpose: it depends only on the port, exactly as hexagonal architecture intends, so the caching
  * decision could be made entirely at the composition-root/adapter level with zero changes here.
  */
-@SuppressWarnings("PMD.LongVariable")
 public final class OrganizationCapacityRateLimitingFilter extends OncePerRequestFilter {
 
   // Matches /o/{organizationId}/... — the same path shape every rule this filter's own chain
@@ -54,7 +53,6 @@ public final class OrganizationCapacityRateLimitingFilter extends OncePerRequest
 
   // "Nothing to aggregate"/"under the ceiling"/"over the ceiling" are three independent, equally
   // valid exits — same rationale as RegisterAccountController's own suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
   @Override
   protected void doFilterInternal(
       final HttpServletRequest request,
@@ -92,7 +90,6 @@ public final class OrganizationCapacityRateLimitingFilter extends OncePerRequest
 
   // "No path match"/"malformed id"/"resolved" are three independent, equally valid exits — same
   // rationale as CurrentPlatformAccountResolverBridge's own suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static UUID extractOrganizationId(final HttpServletRequest request) {
     final Matcher matcher = ORGANIZATION_ID_PATH_SEGMENT.matcher(request.getRequestURI());
     if (!matcher.matches()) {

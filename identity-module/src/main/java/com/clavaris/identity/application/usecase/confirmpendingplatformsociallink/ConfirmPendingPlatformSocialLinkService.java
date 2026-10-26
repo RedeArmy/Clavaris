@@ -40,7 +40,6 @@ public class ConfirmPendingPlatformSocialLinkService
     this.accounts = accounts;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public PlatformAccountId handle(final ConfirmPendingPlatformSocialLinkCommand command) {

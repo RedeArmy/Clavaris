@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Size;
  * domain type" rationale as {@link EmailPasswordForm} — see its own Javadoc, same
  * PMD.AbstractClassWithoutAbstractMethod suppression rationale too.
  */
-@SuppressWarnings({"PMD.DataClass", "PMD.AbstractClassWithoutAbstractMethod"})
+@SuppressWarnings({"PMD.AbstractClassWithoutAbstractMethod"})
 public abstract class EmailPasswordConfirmationForm {
 
   // Max mirrors domain.model.Email.MAX_LENGTH (254, RFC 5321 §4.5.3.1.3's actual protocol limit)

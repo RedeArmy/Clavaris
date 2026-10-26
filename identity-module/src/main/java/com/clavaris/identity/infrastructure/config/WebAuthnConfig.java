@@ -30,7 +30,9 @@ import org.springframework.context.annotation.Configuration;
 // fields — Spring never calls a constructor on it directly, same precedent every other
 // constructor-less *Config class in this package already establishes. PMD.LongVariable:
 // RELYING_PARTY_NAME/credentialRepository name exactly what they are.
-@SuppressWarnings({"PMD.AtLeastOneConstructor", "PMD.LongVariable"})
+@SuppressWarnings({
+  "PMD.AtLeastOneConstructor",
+})
 @Configuration
 class WebAuthnConfig {
 

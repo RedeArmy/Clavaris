@@ -18,12 +18,8 @@ import java.util.UUID;
  * record-style-accessor and structural-metric PMD suppressions as its siblings.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.AbstractClassWithoutAbstractMethod",
   "PMD.PublicMemberInNonPublicType",
-  "PMD.DataClass"
 })
 abstract class AbstractPasswordCredential<I> {
 

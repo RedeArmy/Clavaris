@@ -19,11 +19,7 @@ import java.util.Optional;
  * <p>Same record-style-accessor PMD suppressions as {@link Account}, same rationale.
  */
 @SuppressWarnings({
-  "PMD.AvoidFieldNameMatchingMethodName",
-  "PMD.ShortVariable",
-  "PMD.ShortMethodName",
   "PMD.TooManyMethods",
-  "PMD.LongVariable"
 })
 public final class PlatformAccount {
 

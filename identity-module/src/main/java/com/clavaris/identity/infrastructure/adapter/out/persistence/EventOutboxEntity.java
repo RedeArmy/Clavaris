@@ -12,7 +12,6 @@ import java.util.UUID;
  * OrganizationEventOutboxEntity} shares the same seven-column shape against its own, separate
  * table; only the {@code @Table} name differs.
  */
-@SuppressWarnings("PMD.ShortVariable")
 @Entity
 @Table(name = "event_outbox")
 public class EventOutboxEntity extends AbstractEventOutboxEntity {

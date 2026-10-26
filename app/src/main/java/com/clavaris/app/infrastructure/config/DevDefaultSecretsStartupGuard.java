@@ -115,12 +115,6 @@ public final class DevDefaultSecretsStartupGuard
     return found;
   }
 
-  // The default only exists in the source that still holds the unresolved placeholder
-  // (application.yml). Environment variables and system properties hold real values, never a
-  // placeholder, so they are skipped here and win at resolution time.
-  // PMD.LawOfDemeter: walking the environment's property sources is the only way Spring exposes
-  // them — there is no lookup-by-name that returns the raw, unresolved value.
-  @SuppressWarnings("PMD.LawOfDemeter")
   private static Optional<CommittedDefault> committedDefault(
       final ConfigurableEnvironment environment, final String key) {
     return StreamSupport.stream(environment.getPropertySources().spliterator(), false)

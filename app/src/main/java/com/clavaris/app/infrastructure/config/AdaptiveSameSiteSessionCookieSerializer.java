@@ -124,7 +124,7 @@ import org.springframework.web.util.UrlPathHelper;
 // PMD.TooManyMethods: one small private method per way a request can name its tenant (path, consent
 // client, social-login tag) plus the two serializer builders; folding them together would only hide
 // that each case has its own rule.
-@SuppressWarnings({"PMD.LongVariable", "java:S1075", "PMD.OnlyOneReturn", "PMD.TooManyMethods"})
+@SuppressWarnings({"java:S1075", "PMD.TooManyMethods"})
 final class AdaptiveSameSiteSessionCookieSerializer implements CookieSerializer {
 
   private static final String PLATFORM_COOKIE_NAME = "PLATFORM_SESSION";

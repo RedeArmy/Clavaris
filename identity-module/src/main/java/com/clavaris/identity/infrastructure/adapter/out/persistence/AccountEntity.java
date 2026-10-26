@@ -22,7 +22,7 @@ import java.util.UUID;
 // PMD.TooManyFields: TD-FUT-019's own 2 new nullable columns pushed this past the default
 // threshold — same "a JPA entity is supposed to be a plain persistence-mapping data holder"
 // rationale this class's own Javadoc already documents for PMD.DataClass.
-@SuppressWarnings({"PMD.DataClass", "PMD.ShortVariable", "PMD.LongVariable", "PMD.TooManyFields"})
+@SuppressWarnings({"PMD.TooManyFields"})
 @Entity
 @Table(name = "accounts")
 public class AccountEntity {

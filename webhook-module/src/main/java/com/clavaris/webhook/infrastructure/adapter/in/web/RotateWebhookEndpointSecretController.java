@@ -28,7 +28,6 @@ class RotateWebhookEndpointSecretController {
     this.useCase = useCase;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Rotate a WebhookEndpoint's signing secret (ADR-0007)")
   @ApiResponse(
       responseCode = "200",

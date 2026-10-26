@@ -28,7 +28,6 @@ class ReactivateAccountController {
 
   // Two exits (404 on an unknown id, 204 on success) — same rationale as SuspendAccountController's
   // own identical suppression.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.ShortVariable"})
   @Operation(summary = "Reverse a previous Account suspension")
   @ApiResponse(responseCode = "204", description = "Reactivated")
   @ApiResponse(responseCode = "404", description = "No Account exists with the given id")

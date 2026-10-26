@@ -32,7 +32,6 @@ public class AuthenticateWithEmailLinkService implements AuthenticateWithEmailLi
     this.tokens = tokens;
   }
 
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public Account handle(final AuthenticateWithEmailLinkCommand command) {

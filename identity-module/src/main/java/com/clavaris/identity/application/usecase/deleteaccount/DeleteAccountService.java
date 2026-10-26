@@ -39,26 +39,16 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code HttpSession}, or a browser that was already past login could still mint a fresh
  * authorization code for an {@code Account} whose row is already gone.
  */
-// Literals: the repeated string is "PMD.LongVariable" itself, used on the constructor's port
-// parameters — same rationale as identity-module's own IdentityUseCaseConfig class-level
-// suppression for this exact PMD-annotation-string-as-literal false positive.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class DeleteAccountService implements DeleteAccountUseCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(DeleteAccountService.class);
 
   private final AccountRepository accounts;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as every
-  // other caller of this port (RotateRefreshTokenService, ConfirmPasswordResetService).
   private final AccountTokenRevoker accountTokenRevoker;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
-  // accountTokenRevoker above.
   private final AccountSessionRevoker accountSessionRevoker;
 
-  @SuppressWarnings("PMD.LongVariable") // matches the port's own name, same precedent as
-  // accountTokenRevoker/accountSessionRevoker above.
   private final WorkspaceMembershipEraser workspaceMembershipEraser;
 
   private final AuditEventRecorder auditEvents;
@@ -68,10 +58,9 @@ public class DeleteAccountService implements DeleteAccountUseCase {
   // ConfirmPasswordResetService's own identical suppression.
   public DeleteAccountService(
       final AccountRepository accounts,
-      @SuppressWarnings("PMD.LongVariable") final AccountTokenRevoker accountTokenRevoker,
-      @SuppressWarnings("PMD.LongVariable") final AccountSessionRevoker accountSessionRevoker,
-      @SuppressWarnings("PMD.LongVariable")
-          final WorkspaceMembershipEraser workspaceMembershipEraser,
+      final AccountTokenRevoker accountTokenRevoker,
+      final AccountSessionRevoker accountSessionRevoker,
+      final WorkspaceMembershipEraser workspaceMembershipEraser,
       final AuditEventRecorder auditEvents,
       final EventOutboxWriter outbox) {
     this.accounts = accounts;
@@ -82,9 +71,6 @@ public class DeleteAccountService implements DeleteAccountUseCase {
     this.outbox = outbox;
   }
 
-  // PMD.GuardLogStatement false positive — same rationale as every other logging call site in
-  // this module (e.g. AuthenticateWithPasswordService's own identical suppression).
-  @SuppressWarnings("PMD.GuardLogStatement")
   @Override
   @Transactional
   public void handle(final DeleteAccountCommand command) {

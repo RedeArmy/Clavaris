@@ -90,12 +90,7 @@ import org.springframework.context.annotation.Configuration;
 // OrganizationUseCaseConfig's own class-level suppression already documents for an identical
 // situation. PMD.TooManyMethods: same reasoning — one more @Bean method (listOAuthClientsUseCase)
 // tipped this count over threshold too.
-@SuppressWarnings({
-  "PMD.LongVariable",
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.ExcessiveImports", "PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @Configuration
 class ClientRegistryUseCaseConfig {
 

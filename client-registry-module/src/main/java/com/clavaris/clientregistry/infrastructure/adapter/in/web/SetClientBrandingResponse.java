@@ -4,9 +4,6 @@ import com.clavaris.clientregistry.domain.model.ClientBranding;
 import java.time.Instant;
 import java.util.UUID;
 
-// PMD.LongVariable: same SetClientBrandingCommand precedent — applicationDisplayName names
-// exactly what ADR-0009 §3 itself calls the field, not arbitrarily long.
-@SuppressWarnings("PMD.LongVariable")
 public record SetClientBrandingResponse(
     UUID oauthClientId,
     String logoUrl,

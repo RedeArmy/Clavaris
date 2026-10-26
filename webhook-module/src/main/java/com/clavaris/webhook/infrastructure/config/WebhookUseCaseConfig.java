@@ -164,7 +164,6 @@ class WebhookUseCaseConfig {
     return new DeleteWebhookEndpointService(endpoints, auditEvents);
   }
 
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ DispatchOutboxEventsUseCase dispatchOutboxEventsUseCase(
       final OutboxEventReader outboxEvents,
@@ -200,9 +199,6 @@ class WebhookUseCaseConfig {
     return Executors.newFixedThreadPool(concurrency, namedThreads);
   }
 
-  // PMD.LongVariable: webhookDeliveryExecutor names exactly what it is — the bean above, injected
-  // by type — a shortened identifier would only make this parameter list harder to read.
-  @SuppressWarnings("PMD.LongVariable")
   @Bean
   /* package */ DeliverPendingWebhooksUseCase deliverPendingWebhooksUseCase(
       final WebhookDeliveryRepository deliveries,

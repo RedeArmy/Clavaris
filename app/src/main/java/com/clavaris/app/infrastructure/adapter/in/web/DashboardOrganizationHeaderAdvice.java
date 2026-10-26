@@ -176,7 +176,6 @@ class DashboardOrganizationHeaderAdvice {
     return organization.environment() == OrganizationEnvironment.PRODUCTION;
   }
 
-  @SuppressWarnings("PMD.OnlyOneReturn")
   private static Optional<Page> pageOf(final HttpServletRequest request) {
     if (isHtmxRequest(request)) {
       return Optional.empty();

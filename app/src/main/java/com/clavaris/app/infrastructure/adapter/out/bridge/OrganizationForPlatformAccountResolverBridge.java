@@ -20,7 +20,6 @@ import org.springframework.stereotype.Component;
  * for both, same identical-erasure reasoning {@link CurrentPlatformAccountResolverBridge}'s own
  * Javadoc documents for its own three interfaces.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Component
 class OrganizationForPlatformAccountResolverBridge
     implements OrganizationForPlatformAccountResolver,

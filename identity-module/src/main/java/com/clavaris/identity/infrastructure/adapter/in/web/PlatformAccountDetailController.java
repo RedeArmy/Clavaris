@@ -40,9 +40,6 @@ import org.springframework.web.bind.annotation.RequestParam;
  * (wrong Organization, or none at all) 404s identically via {@link
  * GetAccountForOrganizationUseCase}'s own Organization-scoped lookup.
  */
-// PMD.LongVariable: ownerPlatformAccountId and similar names state exactly what they hold, same
-// class-level suppression the sibling dashboard controllers document.
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/users/{accountId}")
 public class PlatformAccountDetailController {

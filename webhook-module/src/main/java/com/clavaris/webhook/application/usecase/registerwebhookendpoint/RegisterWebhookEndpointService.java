@@ -36,8 +36,6 @@ public class RegisterWebhookEndpointService implements RegisterWebhookEndpointUs
   // enough to keep one Organization's worst-case per-event fan-out cost bounded and predictable.
   // Package-private (not private): RegisterWebhookEndpointServiceTest asserts against it directly
   // rather than duplicating the literal 25 as a magic number of its own.
-  @SuppressWarnings("PMD.LongVariable") // names exactly what it holds — same precedent
-  // MAX_DISPLAY_NAME_LENGTH's own class-level suppression documents for an identically-shaped name.
   /* package */ static final int MAX_ENDPOINTS_PER_ORGANIZATION = 25;
 
   private final WebhookEndpointRepository endpoints;

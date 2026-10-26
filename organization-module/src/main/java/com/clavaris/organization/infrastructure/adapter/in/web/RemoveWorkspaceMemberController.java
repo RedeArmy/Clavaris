@@ -32,7 +32,6 @@ class RemoveWorkspaceMemberController {
 
   // Three exits (404 unknown membership, 409 last-admin guard, 204 success) — same rationale as
   // ChangeWorkspaceMemberRoleController's own identical suppression.
-  @SuppressWarnings("PMD.OnlyOneReturn")
   @Operation(summary = "Remove a member from a Workspace (BR-WS-03)")
   @ApiResponse(responseCode = "204", description = "Removed")
   @ApiResponse(

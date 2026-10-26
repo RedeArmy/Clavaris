@@ -48,12 +48,6 @@ public final class SessionBackedRefreshTokenGenerator
     this.issueRefreshToken = issueRefreshToken;
   }
 
-  // OnlyOneReturn: the early "not my token type/grant" exit is OAuth2TokenGenerator's own
-  // documented contract (return null so DelegatingOAuth2TokenGenerator tries the next generator),
-  // not a style choice to nest around. LawOfDemeter: OAuth2TokenContext's own accessor chain
-  // (getPrincipal()/getRegisteredClient().getTokenSettings()) is the SPI this class implements
-  // against, not a real "reaching past a collaborator" concern.
-  @SuppressWarnings({"PMD.OnlyOneReturn", "PMD.LawOfDemeter"})
   @Override
   public OAuth2RefreshToken generate(final OAuth2TokenContext context) {
     if (!OAuth2TokenType.REFRESH_TOKEN.equals(context.getTokenType())

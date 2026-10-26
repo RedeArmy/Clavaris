@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code audit_events} (TD-SEC-007) — plain data holder by design. */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "audit_events")
 public class AuditEventEntity {

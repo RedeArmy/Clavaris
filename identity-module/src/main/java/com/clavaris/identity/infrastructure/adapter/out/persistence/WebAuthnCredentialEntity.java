@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 /** JPA row mapping for {@code webauthn_credentials} (TD-FUT-034, passkeys parity). */
-@SuppressWarnings({"PMD.ShortVariable", "PMD.DataClass"})
 @Entity
 @Table(name = "webauthn_credentials")
 public class WebAuthnCredentialEntity {

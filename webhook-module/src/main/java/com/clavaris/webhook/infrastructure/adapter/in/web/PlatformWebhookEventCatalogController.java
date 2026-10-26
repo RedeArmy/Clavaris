@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * event-type-picker.html} reads it directly via a SpringEL {@code T(...)} expression rather than a
  * model attribute a use case would populate.
  */
-@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping(
     "/platform/dashboard/organizations/{organizationId}/webhook-endpoints/event-catalog")
