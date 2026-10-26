@@ -10,19 +10,13 @@ import com.clavaris.organization.application.usecase.assignworkspaceroletoaccoun
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountCommand;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.AssignWorkspaceRoleToAccountUseCase;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
-import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
-import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersQuery;
 import com.clavaris.organization.application.usecase.listworkspacemembers.ListWorkspaceMembersUseCase;
 import com.clavaris.organization.domain.model.Workspace;
-import com.clavaris.organization.domain.model.WorkspaceMembership;
 import com.clavaris.organization.domain.model.WorkspaceRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -41,16 +35,16 @@ import org.springframework.web.server.ResponseStatusException;
  * invariant, so {@code AssignWorkspaceRoleToAccountService} does not enforce it). See {@link
  * PlatformWorkspaceController} for the family this belongs to.
  */
-// PMD.LongVariable: collaborator names spell out the use case they hold. PMD.ExcessiveImports:
-// every import is a distinct use case, command or exception this controller genuinely handles —
-// wiring, not sprawl (the whole Workspace surface used to be one class).
-@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
+// PMD.LongVariable: collaborator names spell out the use case they hold.
+@SuppressWarnings("PMD.LongVariable")
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceAssignRoleController {
 
   private static final String ASSIGN_ROLE_FORM_FRAGMENT =
       "organization/platform/fragments/team-assign-role-form :: assignRoleForm";
+  private static final String ACCOUNT_OPTIONS_FRAGMENT =
+      "organization/platform/fragments/team-assign-role-form :: accountOptions";
   private static final String ASSIGN_ROLE_SAVED_FRAGMENT =
       "organization/platform/fragments/team-assign-role-form :: assignRoleSaved";
   // htmx's own response-header convention — same ADR-0029 event name/purpose
@@ -65,8 +59,7 @@ public class PlatformWorkspaceAssignRoleController {
 
   private final WorkspaceDashboardSupport access;
   private final WorkspaceTeamsModel teamsModel;
-  private final ListWorkspaceMembersUseCase listMembersUseCase;
-  private final OrganizationAccountDirectory accountDirectory;
+  private final AssignRoleCandidates candidates;
   private final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase;
 
   public PlatformWorkspaceAssignRoleController(
@@ -77,8 +70,7 @@ public class PlatformWorkspaceAssignRoleController {
       final AssignWorkspaceRoleToAccountUseCase assignRoleToAccountUseCase) {
     this.access = access;
     this.teamsModel = teamsModel;
-    this.listMembersUseCase = listMembersUseCase;
-    this.accountDirectory = accountDirectory;
+    this.candidates = new AssignRoleCandidates(accountDirectory, listMembersUseCase);
     this.assignRoleToAccountUseCase = assignRoleToAccountUseCase;
   }
 
@@ -226,23 +218,32 @@ public class PlatformWorkspaceAssignRoleController {
       final Workspace workspace,
       final List<WorkspaceRole> groupRoles,
       final String assignRoleAction) {
-    final Set<UUID> accountsWithARole = accountsWithAnyRole(workspace);
-    final List<OrganizationAccountSummary> eligibleAccounts =
-        accountDirectory.listAccountsForOrganization(organizationId).stream()
-            .filter(account -> !accountsWithARole.contains(account.accountId()))
-            .sorted(Comparator.comparing(OrganizationAccountSummary::label))
-            .toList();
-
-    model.addAttribute("eligibleAccounts", eligibleAccounts);
+    candidates.addEligibleAccounts(model, organizationId, workspace, null);
+    model.addAttribute(
+        "assignRoleSearchAction",
+        "/platform/dashboard/organizations/"
+            + organizationId
+            + WORKSPACES_PATH_SEGMENT
+            + workspace.id()
+            + "/assign-role/accounts");
     model.addAttribute("groupRoles", groupRoles);
     model.addAttribute("assignRoleAction", assignRoleAction);
   }
 
-  private Set<UUID> accountsWithAnyRole(final Workspace workspace) {
-    return listMembersUseCase.handle(new ListWorkspaceMembersQuery(workspace.id())).stream()
-        .filter(membership -> membership.roleId() != null)
-        .map(WorkspaceMembership::accountId)
-        .collect(Collectors.toSet());
+  // The picker's search-as-you-type: the same eligibility rules, a term typed by the operator,
+  // answered as just the <option> list that replaces the select's contents.
+  @GetMapping("/{workspaceId}/assign-role/accounts")
+  public String searchEligibleAccounts(
+      final HttpServletRequest request,
+      @PathVariable final UUID organizationId,
+      @PathVariable final UUID workspaceId,
+      @RequestParam(name = "q", required = false) final String searchTerm,
+      final Model model) {
+    final UUID ownerPlatformAccountId = access.requireCurrentPlatformAccount(request);
+    access.requireOwnedOrganization(organizationId, ownerPlatformAccountId);
+    final Workspace workspace = access.requireOwnedWorkspace(organizationId, workspaceId);
+    candidates.addEligibleAccounts(model, organizationId, workspace, searchTerm);
+    return ACCOUNT_OPTIONS_FRAGMENT;
   }
 
   // SonarCloud finding, 2026-09-28: processAssignRole's own 7 context values (organizationId,
@@ -283,7 +284,7 @@ public class PlatformWorkspaceAssignRoleController {
     // a stale form (someone else assigned this account a role elsewhere while this popup was
     // open), not a real user mistake — re-rendered as a form error, not a raw 400, since it's a
     // real, reachable outcome rather than tampering.
-    if (accountsWithAnyRole(attempt.workspace()).contains(attempt.accountId())) {
+    if (candidates.accountsWithAnyRole(attempt.workspace()).contains(attempt.accountId())) {
       model.addAttribute(ACCOUNT_ALREADY_HAS_A_ROLE_ERROR_ATTRIBUTE, true);
       populateAssignRoleModel(
           model,

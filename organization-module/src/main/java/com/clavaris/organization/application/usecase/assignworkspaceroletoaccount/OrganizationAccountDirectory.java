@@ -10,19 +10,23 @@ import java.util.UUID;
  * for an identical cross-module boundary (module-graph hexagonal dependency rule: neither
  * organization-module nor identity-module has a Maven dependency on the other). Backed by an
  * app-module bridge delegating to identity-module's own already-built {@code
- * ListAccountsForOrganizationUseCase} — see that bridge's own Javadoc for why it loops every page
- * rather than returning just the first one (this port's own contract is "every account," not "a
- * page of them" — the Workspace-detail Teams tab's own "assign a role" picker needs the whole list
- * to filter against, not a paginated slice).
+ * ListAccountsForOrganizationUseCase}.
  */
 public interface OrganizationAccountDirectory {
 
-  List<OrganizationAccountSummary> listAccountsForOrganization(UUID organizationId);
+  /**
+   * TD-PERF-042: a bounded search, not "every account". The newest {@code limit} accounts of the
+   * Organization whose name, username or email contains {@code term} (all of them, newest first,
+   * when {@code term} is blank), at most {@code limit}, which must be 1 to 100. The "assign a role"
+   * picker used to page the whole account pool into memory and render it as one {@code <select>};
+   * it now asks for what the operator typed.
+   */
+  List<OrganizationAccountSummary> searchAccounts(UUID organizationId, String term, int limit);
 
   /**
    * TD-PERF-027: scoped to a bounded, caller-known set of ids — the Workspace Teams Hierarchy
-   * dashboard's own member-label lookup needs labels for a specific handful of accounts, not {@link
-   * #listAccountsForOrganization}'s own "every account in the Organization" contract.
+   * dashboard's own member-label lookup needs labels for a specific handful of accounts, not a
+   * search over the whole Organization.
    */
   List<OrganizationAccountSummary> listAccountsByIds(UUID organizationId, Set<UUID> accountIds);
 }

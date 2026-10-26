@@ -1,6 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -119,7 +120,7 @@ abstract class WorkspaceDashboardControllerTestBase {
     when(listMembers.handle(any())).thenReturn(List.of());
     when(listMembersPaged.handle(any()))
         .thenReturn(new KeysetPage<>(List.of(), null, null, false, false));
-    when(accountDirectory.listAccountsForOrganization(any())).thenReturn(List.of());
+    when(accountDirectory.searchAccounts(any(), any(), anyInt())).thenReturn(List.of());
     when(accountDirectory.listAccountsByIds(any(), any())).thenReturn(List.of());
 
     GenericApplicationContext applicationContext = new GenericApplicationContext();

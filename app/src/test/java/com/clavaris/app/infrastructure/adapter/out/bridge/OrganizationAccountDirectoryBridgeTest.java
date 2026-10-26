@@ -3,10 +3,13 @@ package com.clavaris.app.infrastructure.adapter.out.bridge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.clavaris.common.domain.model.KeysetCursor;
 import com.clavaris.common.domain.model.KeysetPage;
+import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationQuery;
 import com.clavaris.identity.application.usecase.listaccountsfororganization.ListAccountsForOrganizationUseCase;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.domain.model.Account;
@@ -18,6 +21,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Proves the one nontrivial piece of logic this bridge adds over a plain delegate call: looping
@@ -32,22 +36,28 @@ class OrganizationAccountDirectoryBridgeTest {
   private final OrganizationAccountDirectoryBridge bridge =
       new OrganizationAccountDirectoryBridge(listAccounts, accounts);
 
+  // TD-PERF-042: one bounded page with the operator's term, never a loop over every page.
   @Test
-  void returnsEveryAccountAcrossMultiplePages() {
+  void searchAsksForOneBoundedPageWithTheTermAndLabelsTheAccounts() {
     UUID organizationId = UUID.randomUUID();
     Account first = anAccount(organizationId, "ada@example.com");
     Account second = anAccount(organizationId, "bo@example.com");
     KeysetCursor cursor = new KeysetCursor(Instant.now(), first.id().value());
     when(listAccounts.handle(any()))
-        .thenReturn(new KeysetPage<>(List.of(first), cursor, cursor, true, false))
-        .thenReturn(new KeysetPage<>(List.of(second), cursor, cursor, false, true));
+        .thenReturn(new KeysetPage<>(List.of(first, second), cursor, cursor, true, false));
 
-    List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
+    List<OrganizationAccountSummary> summaries = bridge.searchAccounts(organizationId, "a", 25);
 
     assertThat(summaries)
-        .containsExactlyInAnyOrder(
+        .containsExactly(
             new OrganizationAccountSummary(first.id().value(), "ada@example.com"),
             new OrganizationAccountSummary(second.id().value(), "bo@example.com"));
+    ArgumentCaptor<ListAccountsForOrganizationQuery> query =
+        ArgumentCaptor.forClass(ListAccountsForOrganizationQuery.class);
+    verify(listAccounts, times(1)).handle(query.capture());
+    assertThat(query.getValue().searchTerm()).isEqualTo("a");
+    assertThat(query.getValue().pageRequest().size()).isEqualTo(25);
+    assertThat(query.getValue().pageRequest().isFirst()).isTrue();
   }
 
   // Live UX request, 2026-09-28: the Teams hierarchy's own member list needed a friendly label,
@@ -60,7 +70,7 @@ class OrganizationAccountDirectoryBridgeTest {
     when(listAccounts.handle(any()))
         .thenReturn(new KeysetPage<>(List.of(account), null, null, false, false));
 
-    List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
+    List<OrganizationAccountSummary> summaries = bridge.searchAccounts(organizationId, null, 25);
 
     assertThat(summaries)
         .containsExactly(new OrganizationAccountSummary(account.id().value(), "Ada Lovelace"));
@@ -72,7 +82,7 @@ class OrganizationAccountDirectoryBridgeTest {
     when(listAccounts.handle(any()))
         .thenReturn(new KeysetPage<>(List.of(), null, null, false, false));
 
-    List<OrganizationAccountSummary> summaries = bridge.listAccountsForOrganization(organizationId);
+    List<OrganizationAccountSummary> summaries = bridge.searchAccounts(organizationId, null, 25);
 
     assertThat(summaries).isEmpty();
   }

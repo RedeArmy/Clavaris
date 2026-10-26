@@ -8,7 +8,7 @@
      time, workspace-wide; PlatformWorkspaceController's own populateAssignRoleModel) — this
      fragment never re-filters, it only renders whatever the controller already resolved. -->
 <div th:fragment="assignRoleForm">
-    <div th:if="${#lists.isEmpty(eligibleAccounts)}">
+    <div th:if="${#lists.isEmpty(eligibleAccounts) and #strings.isEmpty(accountSearchTerm)}">
         <p class="clavaris-empty-state">Every account in this Organization already has a role in this Workspace. To make one eligible here, first use Remove on their current role.</p>
     </div>
     <div th:if="${#lists.isEmpty(groupRoles)}">
@@ -19,7 +19,7 @@
          link expression, since it's already fully resolved server-side and the two call sites
          (per-team vs. the synthetic "No team" group) would otherwise need this exact form
          duplicated once per URL shape instead of shared here. -->
-    <form th:if="${!#lists.isEmpty(eligibleAccounts) and !#lists.isEmpty(groupRoles)}" method="post"
+    <form th:if="${(!#lists.isEmpty(eligibleAccounts) or !#strings.isEmpty(accountSearchTerm)) and !#lists.isEmpty(groupRoles)}" method="post"
           th:action="${assignRoleAction}"
           th:attr="hx-post=${assignRoleAction}"
           hx-target="#team-assign-role-dialog-body" hx-swap="innerHTML">
@@ -34,12 +34,28 @@
             This account already has a role in this Workspace. First use Remove on their current role.
         </p>
 
+        <!-- TD-PERF-042: the picker lists a bounded handful of candidates and finds the rest by what is
+             typed here, instead of rendering every account of the Organization. The search input
+             is named q so htmx sends its value with the hx-get (no hx-vals/eval, which the CSP
+             forbids); the form's own POST ignores it. Only the <option> list is swapped. Without
+             JavaScript the first candidates are still listed. -->
+        <div class="clavaris-field">
+            <label for="assignRoleAccountSearch">Search users</label>
+            <input type="search" id="assignRoleAccountSearch" name="q" autocomplete="off"
+                   placeholder="Name, username or email"
+                   th:attr="hx-get=${assignRoleSearchAction}"
+                   hx-trigger="input changed delay:300ms, search"
+                   hx-target="#assignRoleAccountId" hx-swap="innerHTML"/>
+        </div>
+
         <div class="clavaris-field">
             <label for="assignRoleAccountId">User</label>
             <select id="assignRoleAccountId" name="accountId" required>
-                <option th:each="account : ${eligibleAccounts}" th:value="${account.accountId()}"
-                        th:text="${account.label()}">Account</option>
+                <th:block th:replace="~{:: accountOptions}"></th:block>
             </select>
+            <p class="clavaris-hint" th:if="${accountsTruncated}">
+                More accounts match; type in the search box to narrow them down.
+            </p>
         </div>
 
         <div class="clavaris-field">
@@ -55,6 +71,12 @@
         </div>
     </form>
 </div>
+<!-- The <option> list alone, for the search box's hx-get and for the first render above. -->
+<th:block th:fragment="accountOptions">
+    <option th:each="account : ${eligibleAccounts}" th:value="${account.accountId()}"
+            th:text="${account.label()}">Account</option>
+    <option th:if="${#lists.isEmpty(eligibleAccounts)}" value="" disabled>No matching users</option>
+</th:block>
 <div th:fragment="assignRoleSaved">
     <p class="clavaris-empty-state">Role assigned.</p>
 </div>
