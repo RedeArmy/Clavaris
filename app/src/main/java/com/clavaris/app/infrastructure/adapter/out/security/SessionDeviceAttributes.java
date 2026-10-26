@@ -10,11 +10,10 @@ package com.clavaris.app.infrastructure.adapter.out.security;
  * in both places, so the two can never silently drift apart — same "tiny, private-constructor
  * constants class" shape as {@code SocialLinkingPolicy}.
  *
- * <p>Plain {@code String} values only: this deployment has no {@code
- * springSessionDefaultRedisSerializer} bean, so {@code RedisTemplate} falls back to {@code
- * JdkSerializationRedisSerializer} for session attribute values — {@code String} is safely
- * serializable under it without any extra wiring; an arbitrary record/POJO would not be, without
- * also adding a serializer bean nothing here currently needs.
+ * <p>Plain {@code String} values only: session attributes are stored in Redis as typed JSON under
+ * an allow-list (TD-ARCH-039, {@code SessionJsonSerializerFactory}), and only Spring Security's own
+ * types are on it. Anything of ours stored in a session should stay a {@code String}, or a {@code
+ * LinkedHashMap}/{@code ArrayList} of them; an arbitrary record or POJO would fail to read back.
  */
 public final class SessionDeviceAttributes {
 

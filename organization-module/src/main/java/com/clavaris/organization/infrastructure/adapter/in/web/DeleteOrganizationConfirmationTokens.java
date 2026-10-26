@@ -2,7 +2,6 @@ package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -30,6 +29,7 @@ final class DeleteOrganizationConfirmationTokens {
   private static final String SESSION_ATTRIBUTE_PREFIX =
       "clavaris.deleteOrganization.confirmationToken.";
   private static final Duration TTL = Duration.ofMinutes(10);
+  private static final char SEPARATOR = '|';
 
   private DeleteOrganizationConfirmationTokens() {
     // Utility class — never instantiated.
@@ -39,7 +39,7 @@ final class DeleteOrganizationConfirmationTokens {
     final String token = UUID.randomUUID().toString();
     request
         .getSession(true)
-        .setAttribute(attributeName(organizationId), new Entry(token, Instant.now().plus(TTL)));
+        .setAttribute(attributeName(organizationId), encode(token, Instant.now().plus(TTL)));
     return token;
   }
 
@@ -53,23 +53,31 @@ final class DeleteOrganizationConfirmationTokens {
     final Object raw = session.getAttribute(attributeName);
     // Single-use: removed on this very first check, regardless of the outcome below.
     session.removeAttribute(attributeName);
-    if (!(raw instanceof Entry(String token, Instant expiresAt))
-        || Instant.now().isAfter(expiresAt)) {
+    if (!(raw instanceof String stored)) {
       return false;
     }
-    return token.equals(submittedToken);
+    final int separator = stored.indexOf(SEPARATOR);
+    if (separator < 0) {
+      return false;
+    }
+    final Instant expiresAt;
+    try {
+      expiresAt = Instant.ofEpochMilli(Long.parseLong(stored.substring(separator + 1)));
+    } catch (final NumberFormatException _) {
+      return false;
+    }
+    return !Instant.now().isAfter(expiresAt)
+        && stored.substring(0, separator).equals(submittedToken);
   }
 
   private static String attributeName(final UUID organizationId) {
     return SESSION_ATTRIBUTE_PREFIX + organizationId;
   }
 
-  // This app's own HttpSession is Redis-backed (Spring Session, not in-memory) — any object
-  // stored as a session attribute must survive real serialization, not just work by accident in a
-  // single-JVM test. String/Instant are both already Serializable; this record just needs to
-  // declare it too.
-  private record Entry(String token, Instant expiresAt) implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+  // TD-ARCH-039: a session attribute is a plain String (token and expiry joined), so the Redis
+  // session serializer can store it as JSON without a type of ours in its allow-list. The token is
+  // a UUID, so the separator cannot occur in it.
+  private static String encode(final String token, final Instant expiresAt) {
+    return token + SEPARATOR + expiresAt.toEpochMilli();
   }
 }

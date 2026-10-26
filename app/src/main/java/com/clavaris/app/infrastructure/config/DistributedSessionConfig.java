@@ -5,6 +5,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
 import org.springframework.session.web.http.CookieSerializer;
 
@@ -66,6 +67,15 @@ class DistributedSessionConfig {
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   /* package */ DistributedSessionConfig() {
     // Intentionally empty — this class holds no state, only the class-level annotation above.
+  }
+
+  // TD-ARCH-039: the name is the one Spring Session looks up; with it present the session
+  // attributes are stored as typed JSON under an allow-list, not as JDK-serialized bytes. See
+  // SessionJsonSerializerFactory for why. Existing sessions written in the old format are not
+  // readable and end as signed-out users, which is acceptable before the first consumer's traffic.
+  @Bean
+  /* package */ RedisSerializer<Object> springSessionDefaultRedisSerializer() {
+    return SessionJsonSerializerFactory.create(Thread.currentThread().getContextClassLoader());
   }
 
   @Bean
