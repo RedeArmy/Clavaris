@@ -22,7 +22,9 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -49,6 +51,7 @@ class JpaOAuthClientRepositoryTest {
 
   @Autowired private OAuthClientRepository repository;
   @Autowired private PlatformTransactionManager transactionManager;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
   void savesAndReadsBackAnOAuthClient_reconstituteKeepsTheRealPersistedId() {
@@ -85,6 +88,47 @@ class JpaOAuthClientRepositoryTest {
         .containsExactly("https://jobseeker.example.com/logged-out");
     // SDE-III review, 2026-09-11: a freshly-registered client is active by default.
     assertThat(found.get().active()).isTrue();
+  }
+
+  // TD-ARCH-003: the four list columns are jsonb now, the database refuses anything that is not
+  // an array, and a containment query answers "which clients allow this redirect URI?".
+  @Test
+  void theListColumnsAreJsonbArraysTheDatabaseValidatesAndCanQueryByElement() {
+    UUID organizationId = UUID.randomUUID();
+    OAuthClient client =
+        OAuthClient.register(
+            organizationId,
+            "jsonb-client",
+            "argon2id$hashed",
+            List.of("https://shared.example.com/callback", "https://other.example.com/callback"),
+            List.of("authorization_code"),
+            List.of("openid"),
+            true,
+            List.of());
+    repository.save(client);
+
+    List<String> columnTypes =
+        jdbcTemplate.queryForList(
+            "SELECT data_type FROM information_schema.columns WHERE table_name = 'oauth_clients'"
+                + " AND column_name IN ('redirect_uris','allowed_grant_types','allowed_scopes',"
+                + "'post_logout_redirect_uris')",
+            String.class);
+    List<String> owners =
+        jdbcTemplate.queryForList(
+            "SELECT client_id FROM oauth_clients WHERE redirect_uris @> ?::jsonb",
+            String.class,
+            "[\"https://shared.example.com/callback\"]");
+
+    assertThat(columnTypes).hasSize(4).containsOnly("jsonb");
+    assertThat(owners).containsExactly("jsonb-client");
+    assertThatExceptionOfType(DataIntegrityViolationException.class)
+        .as("a JSON object is valid jsonb but not a list of URIs")
+        .isThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "UPDATE oauth_clients SET redirect_uris = ?::jsonb WHERE client_id = ?",
+                    "{\"not\": \"an array\"}",
+                    "jsonb-client"));
   }
 
   // Live UX request, 2026-09-24: the first single-entity hard delete for this credential type —
