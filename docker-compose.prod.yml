@@ -27,7 +27,7 @@
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16@sha256:9e2cf6287f25c3151f4c9421ccce2b17f3e60061c111a29165e0d2cdd9ff0a97
     environment:
       POSTGRES_USER: ${DB_PROD_USER:?DB_PROD_USER must be set explicitly in .env}
       POSTGRES_PASSWORD: ${DB_PROD_PASSWORD:?DB_PROD_PASSWORD must be set explicitly in .env}
@@ -48,7 +48,10 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7
+    image: redis:7@sha256:bd28fff4b665fdf1b73e8b5b73ec05d2f858f4fa3c8ea0d7c9bc09f7f6bf7039
+    # TD-PROC-014: append-only file, fsync once a second, so a restart loses at most the last
+    # second of sessions and rate-limit counters instead of the last snapshot interval (minutes).
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
     volumes:
       - clavaris-redis-data:/data
     restart: unless-stopped
@@ -143,7 +146,7 @@ services:
     # this host. One less thing exposed to the internet than local dev has.
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2-alpine@sha256:504a44d7d74bd2bc28a66afc4774912fc21223ca8a67734af1c54ab2f999b489
     restart: unless-stopped
     ports:
       - "80:80"

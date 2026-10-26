@@ -275,6 +275,22 @@ name silently miss the real one in production. Fixed by adding explicit `name:` 
 that file, confirmed safe to do now (before any real production instance holds real data) rather
 than a live migration hazard.
 
+### 6e. What Redis keeps across a restart (TD-PROC-014)
+
+Redis holds HTTP sessions, rate-limit counters and idempotency keys, none of it a system of record,
+but a restart is not free: it signs every person out and resets every counter. `redis` runs with the
+append-only file on (`--appendonly yes --appendfsync everysec`) over the `clavaris-redis-data`
+volume, so a restart or a crashed container loses **at most the last second** of that state, where
+the default snapshot schedule lost the last several minutes. That is persistence, not a backup:
+`backup-postgres.sh` deliberately does not capture Redis, and losing the volume signs everyone out
+and resets the counters, nothing more. A session that was written before the 2026-10-26 change from
+JDK serialization to JSON (TD-ARCH-039) cannot be read afterwards and ends as a sign-out; there is
+nothing to migrate.
+
+The three base images (`postgres`, `redis`, `caddy`) are pinned by digest in both compose files and
+Dependabot's `docker-compose` ecosystem proposes the bumps weekly, so a base-image change arrives as
+a pull request to review, not silently on the next `docker compose pull`.
+
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 
 Everything in §1–§7 above describes the single-VM artifact itself, deployable to any host with a
