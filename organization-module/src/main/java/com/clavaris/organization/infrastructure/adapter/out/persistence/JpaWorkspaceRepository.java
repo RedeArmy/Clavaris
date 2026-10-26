@@ -7,7 +7,6 @@ import com.clavaris.common.infrastructure.adapter.out.persistence.SpringDataKeys
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRepository;
 import com.clavaris.organization.domain.model.Workspace;
 import jakarta.persistence.EntityManager;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -53,11 +52,6 @@ class JpaWorkspaceRepository implements WorkspaceRepository {
   @Override
   public Optional<Workspace> findById(final UUID workspaceId) {
     return workspaces.findById(workspaceId).map(this::toDomain);
-  }
-
-  @Override
-  public List<Workspace> findAllByOrganizationId(final UUID organizationId) {
-    return workspaces.findAllByOrganizationId(organizationId).stream().map(this::toDomain).toList();
   }
 
   @Override

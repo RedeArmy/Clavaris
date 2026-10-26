@@ -3,7 +3,6 @@ package com.clavaris.organization.application.usecase.createworkspace;
 import com.clavaris.common.domain.model.KeysetPage;
 import com.clavaris.common.domain.model.KeysetPageRequest;
 import com.clavaris.organization.domain.model.Workspace;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -11,9 +10,9 @@ import java.util.UUID;
  * Outbound port — implemented by {@code
  * infrastructure/adapter/out/persistence/JpaWorkspaceRepository}. Parked under {@code
  * createworkspace} because that's this module's first Workspace use case, not because {@code
- * findById}/{@code findAllByOrganizationId} are scoped to it — {@code addworkspacemember} and
- * {@code listworkspacesfororganization} are the other consumers, same precedent this module's own
- * {@code OrganizationRepository} already established.
+ * findById}/{@code findKeysetPageByOrganizationId} are scoped to it — {@code addworkspacemember}
+ * and {@code listworkspacesfororganization} are the other consumers, same precedent this module's
+ * own {@code OrganizationRepository} already established.
  */
 public interface WorkspaceRepository {
 
@@ -21,14 +20,10 @@ public interface WorkspaceRepository {
 
   Optional<Workspace> findById(UUID workspaceId);
 
-  List<Workspace> findAllByOrganizationId(UUID organizationId);
-
   /**
-   * TD-PERF-020 (keyset revision, 2026-09-14): the dashboard's own paginated sibling of {@link
-   * #findAllByOrganizationId} — used only by {@code ListWorkspacesForOrganizationPagedService}.
-   * {@link #findAllByOrganizationId} itself stays untouched: {@code
-   * GetAuditLogForOrganizationService}/{@code ListWorkspacesController} (the REST admin API) both
-   * genuinely need the full, unbounded list.
+   * TD-PERF-020 (keyset revision, 2026-09-14): a page of an Organization's workspaces, oldest
+   * first. TD-PERF-032: the only way to list them — there is no unbounded variant any more; the
+   * REST admin API pages for its caller and the dashboard listing reads bounded pages.
    */
   KeysetPage<Workspace> findKeysetPageByOrganizationId(
       UUID organizationId, KeysetPageRequest pageRequest);
