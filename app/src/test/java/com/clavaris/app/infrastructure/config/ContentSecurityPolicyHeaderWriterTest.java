@@ -47,6 +47,19 @@ class ContentSecurityPolicyHeaderWriterTest {
   private static final String DASHBOARD_PATH =
       "/platform/dashboard/organizations/11111111-1111-1111-1111-111111111111/oauth-clients";
 
+  private static final String STRICT_POLICY_NO_SCRIPTS =
+      "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
+          + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+  private static final String HOSTED_UI_POLICY =
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
+          + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+  private static final String DASHBOARD_POLICY =
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
+          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+          + "form-action 'self'; frame-ancestors 'none'";
+
   private final ContentSecurityPolicyHeaderWriter writer =
       new ContentSecurityPolicyHeaderWriter(
           mock(EmbeddingEligibilityChecker.class), mock(RedirectUriOriginResolver.class));
@@ -54,89 +67,35 @@ class ContentSecurityPolicyHeaderWriterTest {
   // consumer-head loads appearance.js on every page the consuming application's people see, so
   // those pages need script-src 'self'; anything outside /o/{org}/... and the consent page (the
   // platform tier's own pages) must keep script-src 'none'.
-  @Test
-  void aPlatformPageOutsideTheDashboardStaysOnScriptSrcNone() {
-    HttpServletRequest request = requestWithUri("/platform/login");
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
-  }
-
-  @Test
-  void setsTheStrictPolicyOnAnHtmlResponseForAnOrdinaryHostedUiPath() {
-    HttpServletRequest request = requestWithUri(ORG_REGISTER_PATH);
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
-  }
-
-  // SDE-III review, 2026-09-16 — real bug, found live: this path previously had zero test
+  //
+  // SDE-III review, 2026-09-16 — real bug, found live: the dashboard path previously had zero test
   // coverage at all, which is exactly how a connect-src 'none' on an HTMX-driven page (every
   // dashboard mutation/pagination link) shipped unnoticed — a real browser blocks the request
   // outright with no visible error unless the operator opens the console. See
   // ContentSecurityPolicyHeaderWriter's own DASHBOARD_PAGE_POLICY comment for the fix.
-  @Test
-  void setsTheDashboardPolicyWithConnectSrcSelfSoHtmxRequestsAreNotBlocked() {
-    HttpServletRequest request = requestWithUri(DASHBOARD_PATH);
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
-  }
-
+  //
   // TD-FUT-051: the operator's own account pages render inside the dashboard shell and load its
-  // scripts, so they need its policy; before, they fell through to script-src 'none' and every
-  // script on them was refused. /platform/account-alert/lock is a one-click link with no shell and
-  // must stay strict.
-  @ParameterizedTest
-  @ValueSource(strings = {"/platform/account", "/platform/account/sessions"})
-  void theOperatorsOwnAccountPagesGetTheDashboardPolicy(final String path) {
+  // scripts, so they need its policy. /platform/account-alert/lock is a one-click link with no
+  // shell and must stay strict.
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("pathsAndTheirPolicy")
+  void eachKindOfPageGetsItsOwnPolicy(final String path, final String expectedPolicy) {
     HttpServletRequest request = requestWithUri(path);
     HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
 
     writer.writeHeaders(request, response);
 
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
-                + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
+    verify(response).setHeader(HEADER_NAME, expectedPolicy);
   }
 
-  @Test
-  void theEmailedOneClickLockLinkStaysOnTheStrictPolicy() {
-    HttpServletRequest request = requestWithUri("/platform/account-alert/lock");
-    HttpServletResponse response = responseWithContentType("text/html;charset=UTF-8");
-
-    writer.writeHeaders(request, response);
-
-    verify(response)
-        .setHeader(
-            HEADER_NAME,
-            "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
-                + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
-                + "form-action 'self'; frame-ancestors 'none'");
+  private static Stream<Arguments> pathsAndTheirPolicy() {
+    return Stream.of(
+        Arguments.of("/platform/login", STRICT_POLICY_NO_SCRIPTS),
+        Arguments.of("/platform/account-alert/lock", STRICT_POLICY_NO_SCRIPTS),
+        Arguments.of(ORG_REGISTER_PATH, HOSTED_UI_POLICY),
+        Arguments.of(DASHBOARD_PATH, DASHBOARD_POLICY),
+        Arguments.of("/platform/account", DASHBOARD_POLICY),
+        Arguments.of("/platform/account/sessions", DASHBOARD_POLICY));
   }
 
   // SonarCloud finding: these three used to be separate, identically-shaped tests (request +

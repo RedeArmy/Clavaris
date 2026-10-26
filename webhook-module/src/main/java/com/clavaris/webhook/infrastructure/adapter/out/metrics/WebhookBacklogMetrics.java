@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.binder.MeterBinder;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,7 @@ import org.springframework.stereotype.Component;
 public class WebhookBacklogMetrics implements MeterBinder {
 
   private static final Logger LOG = LoggerFactory.getLogger(WebhookBacklogMetrics.class);
+  private static final String SECONDS = "seconds";
   private static final Duration CACHE_FOR = Duration.ofSeconds(10);
 
   private static final String DUE_SQL =
@@ -59,8 +61,9 @@ public class WebhookBacklogMetrics implements MeterBinder {
   private final JdbcTemplate jdbc;
   private final Clock clock;
 
-  private volatile Snapshot snapshot = Snapshot.UNAVAILABLE;
-  private volatile Instant takenAt = Instant.MIN;
+  // One reference, replaced whole: the snapshot and the moment it was taken are never seen apart.
+  private final AtomicReference<Cached> cached =
+      new AtomicReference<>(new Cached(Snapshot.UNAVAILABLE, Instant.MIN));
 
   // @Autowired: the second constructor exists for tests, and with two Spring needs to be told
   // which.
@@ -84,7 +87,7 @@ public class WebhookBacklogMetrics implements MeterBinder {
             this,
             m -> m.current().deliveryLagSeconds())
         .description("Seconds the oldest due webhook delivery has been waiting")
-        .baseUnit("seconds")
+        .baseUnit(SECONDS)
         .register(registry);
     Gauge.builder(
             "clavaris.outbox.oldest_unpublished_age_seconds",
@@ -92,7 +95,7 @@ public class WebhookBacklogMetrics implements MeterBinder {
             m -> m.current().identityOutboxLagSeconds())
         .tag("source", "identity")
         .description("Seconds the oldest unpublished outbox event has been waiting")
-        .baseUnit("seconds")
+        .baseUnit(SECONDS)
         .register(registry);
     Gauge.builder(
             "clavaris.outbox.oldest_unpublished_age_seconds",
@@ -100,24 +103,26 @@ public class WebhookBacklogMetrics implements MeterBinder {
             m -> m.current().organizationOutboxLagSeconds())
         .tag("source", "organization")
         .description("Seconds the oldest unpublished outbox event has been waiting")
-        .baseUnit("seconds")
+        .baseUnit(SECONDS)
         .register(registry);
   }
 
   private synchronized Snapshot current() {
     final Instant now = clock.instant();
-    if (Duration.between(takenAt, now).compareTo(CACHE_FOR) >= 0) {
-      snapshot = read();
-      takenAt = now;
+    final Cached last = cached.get();
+    if (Duration.between(last.takenAt(), now).compareTo(CACHE_FOR) < 0) {
+      return last.snapshot();
     }
-    return snapshot;
+    final Snapshot fresh = read();
+    cached.set(new Cached(fresh, now));
+    return fresh;
   }
 
   private Snapshot read() {
     try {
       final Long due = jdbc.queryForObject(DUE_SQL, Long.class);
       return new Snapshot(
-          due == null ? 0 : due,
+          due == null ? 0.0 : (double) due,
           lagSeconds(DELIVERY_LAG_SQL),
           lagSeconds(IDENTITY_OUTBOX_LAG_SQL),
           lagSeconds(ORGANIZATION_OUTBOX_LAG_SQL));
@@ -132,6 +137,8 @@ public class WebhookBacklogMetrics implements MeterBinder {
     final Double seconds = jdbc.queryForObject(sql, Double.class);
     return seconds == null ? 0.0 : Math.max(0.0, seconds);
   }
+
+  private record Cached(Snapshot snapshot, Instant takenAt) {}
 
   private record Snapshot(
       double dueDeliveries,

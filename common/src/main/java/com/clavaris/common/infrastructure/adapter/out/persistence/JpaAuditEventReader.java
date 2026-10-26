@@ -28,6 +28,15 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JpaAuditEventReader implements AuditEventReader {
 
+  // Constants, not built at run time: the cursor changes the predicate, never the SQL's shape.
+  private static final String ORGANIZATION_PAGE_FIRST =
+      "SELECT e FROM AuditEventEntity e WHERE e.organizationId = :organizationId"
+          + " ORDER BY e.occurredAt DESC, e.id DESC";
+  private static final String ORGANIZATION_PAGE_OLDER =
+      "SELECT e FROM AuditEventEntity e WHERE e.organizationId = :organizationId"
+          + " AND (e.occurredAt < :at OR (e.occurredAt = :at AND e.id < :id))"
+          + " ORDER BY e.occurredAt DESC, e.id DESC";
+
   private final EntityManager entityManager;
 
   /* package */ JpaAuditEventReader(final EntityManager entityManager) {
@@ -73,13 +82,9 @@ class JpaAuditEventReader implements AuditEventReader {
   @Override
   public List<AuditEvent> findPageForOrganization(
       final UUID organizationId, final KeysetCursor olderThan, final int limit) {
-    final String older =
-        olderThan == null ? "" : " AND (e.occurredAt < :at OR (e.occurredAt = :at AND e.id < :id))";
     final TypedQuery<AuditEventEntity> query =
         entityManager.createQuery(
-            "SELECT e FROM AuditEventEntity e WHERE e.organizationId = :organizationId"
-                + older
-                + " ORDER BY e.occurredAt DESC, e.id DESC",
+            olderThan == null ? ORGANIZATION_PAGE_FIRST : ORGANIZATION_PAGE_OLDER,
             AuditEventEntity.class);
     query.setParameter("organizationId", organizationId);
     if (olderThan != null) {
