@@ -12,7 +12,10 @@ import com.clavaris.identity.application.usecase.impersonateaccount.Impersonatio
 import com.clavaris.identity.application.usecase.impersonateaccount.MintedImpersonationToken;
 import com.clavaris.identity.domain.model.AccountId;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -106,7 +109,7 @@ public class PlatformAccountImpersonationController {
               parseScopes(scopes),
               actor,
               baseUrl);
-      redirectAttributes.addFlashAttribute("impersonationToken", token);
+      redirectAttributes.addFlashAttribute("impersonationToken", flashFormOf(token));
     } catch (final AccountNotActiveException _) {
       redirectAttributes.addFlashAttribute(
           IMPERSONATION_ERROR_ATTRIBUTE, "This Account is not ACTIVE and cannot be impersonated.");
@@ -119,6 +122,18 @@ public class PlatformAccountImpersonationController {
           IMPERSONATION_ERROR_ATTRIBUTE,
           "One or more requested scopes aren't allowed for that OAuth Client.");
     }
+  }
+
+  // TD-ARCH-039: a flash attribute is stored in the Redis-backed session, which now holds typed
+  // JSON under an allow-list, so the token travels as a map of Strings rather than as the record
+  // itself (a type of ours the list would have to know). The template reads the same four names.
+  private static Map<String, String> flashFormOf(final MintedImpersonationToken token) {
+    final Map<String, String> form = new LinkedHashMap<>();
+    form.put("accessToken", token.accessToken());
+    form.put("tokenType", token.tokenType());
+    form.put("expiresAt", token.expiresAt().toString());
+    form.put("scope", String.join(" ", new TreeSet<>(token.scope())));
+    return form;
   }
 
   private static List<String> parseScopes(final String scopes) {

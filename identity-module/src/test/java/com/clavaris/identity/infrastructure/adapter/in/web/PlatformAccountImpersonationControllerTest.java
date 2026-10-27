@@ -93,7 +93,15 @@ class PlatformAccountImpersonationControllerTest {
         .perform(post(path()).param("clientId", "jobseeker-web").param("scopes", "openid"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl(redirectTarget()))
-        .andExpect(flash().attribute("impersonationToken", token));
+        .andExpect(
+            flash()
+                .attribute(
+                    "impersonationToken",
+                    java.util.Map.of(
+                        "accessToken", "raw-access-token",
+                        "tokenType", "Bearer",
+                        "expiresAt", token.expiresAt().toString(),
+                        "scope", "openid")));
   }
 
   @Test

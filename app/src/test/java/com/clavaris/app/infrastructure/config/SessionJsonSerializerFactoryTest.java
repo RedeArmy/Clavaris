@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.security.web.savedrequest.DefaultSavedRequest;
+import org.springframework.web.servlet.FlashMap;
 
 /**
  * TD-ARCH-039: the session-compatibility test the register asked for. Every kind of value this
@@ -110,6 +111,27 @@ class SessionJsonSerializerFactoryTest {
     // A mutable list, not List.of(...): the JDK's immutable collections carry no type id.
     assertThat(roundTrip(new java.util.ArrayList<>(List.of("a", "b"))))
         .isEqualTo(List.of("a", "b"));
+  }
+
+  // Found by the full suite, not by this test the first time: an impersonation redirect keeps its
+  // flash attribute in the session as a CopyOnWriteArrayList of FlashMaps (SessionFlashMapManager).
+  @Test
+  void theFlashAttributesOfARedirectSurvive() {
+    FlashMap flash = new FlashMap();
+    flash.put("impersonationError", "This Account is not ACTIVE.");
+    Map<String, String> form = new LinkedHashMap<>();
+    form.put("accessToken", "raw-access-token");
+    flash.put("impersonationToken", form);
+    java.util.List<FlashMap> flashMaps = new java.util.concurrent.CopyOnWriteArrayList<>();
+    flashMaps.add(flash);
+
+    Object read = roundTrip(flashMaps);
+
+    assertThat(read).isInstanceOf(java.util.concurrent.CopyOnWriteArrayList.class);
+    Map<String, Object> restored = (FlashMap) ((java.util.List<?>) read).get(0);
+    assertThat(restored)
+        .containsEntry("impersonationError", "This Account is not ACTIVE.")
+        .containsEntry("impersonationToken", form);
   }
 
   @Test
