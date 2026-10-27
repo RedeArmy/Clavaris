@@ -10,6 +10,12 @@
             <a th:href="@{/o/{organizationId}/account/sessions(organizationId=${organizationId})}">Your sessions</a>
             <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
             <a th:href="@{/o/{organizationId}/account/passkeys(organizationId=${organizationId})}">Your passkeys</a>
+            <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            <a th:href="@{/o/{organizationId}/account/password(organizationId=${organizationId})}">Change password</a>
+            <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            <a th:href="@{/o/{organizationId}/account/email(organizationId=${organizationId})}">Change email</a>
+            <span class="clavaris-breadcrumb__sep" aria-hidden="true">&middot;</span>
+            <a th:href="@{/o/{organizationId}/account/connections(organizationId=${organizationId})}">Connected accounts</a>
         </p>
         <h1>Update profile</h1>
 
@@ -21,6 +27,12 @@
         </output>
         <output class="clavaris-alert clavaris-alert--success" th:if="${param.profileUpdated}">
             Your profile was updated.
+        </output>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.passwordChanged}">
+            Your password was changed.
+        </output>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.emailChangeRequested}">
+            If that address can be used, a confirmation link is on its way. Your email stays the same until you open it.
         </output>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${uploadError}" th:text="${uploadError}">
             Upload error

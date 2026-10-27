@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Connected accounts')}">
+    <title>Connected accounts</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <p class="clavaris-breadcrumb">
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
+        </p>
+        <h1>Connected accounts</h1>
+
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.connected}">
+            The account was connected.
+        </output>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${param.disconnected}">
+            The account was disconnected.
+        </output>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.lastMethod}">
+            That is your only way to sign in. Set a password or add a passkey first.
+        </p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.alreadyLinked}">
+            That account is already connected to another user here, or to this one.
+        </p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${param.connectError}">
+            The account could not be connected. Please try again.
+        </p>
+
+        <p th:if="${linked.isEmpty()}" class="clavaris-empty-state">No accounts are connected.</p>
+        <div class="clavaris-table-wrapper" th:unless="${linked.isEmpty()}">
+            <table class="clavaris-table">
+                <tbody>
+                <tr th:each="provider : ${linked}">
+                    <td th:text="${provider.name() == 'GITHUB' ? 'GitHub' : 'Google'}">Google</td>
+                    <td>
+                        <form method="post" th:action="@{/o/{organizationId}/account/connections/{provider}/disconnect(organizationId=${organizationId},provider=${#strings.toLowerCase(provider.name())})}">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button class="clavaris-button clavaris-button--secondary clavaris-button--inline" type="submit">Disconnect</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="clavaris-table-wrapper" th:unless="${connectable.isEmpty()}">
+            <table class="clavaris-table">
+                <tbody>
+                <tr th:each="provider : ${connectable}">
+                    <td th:text="${provider.name() == 'GITHUB' ? 'GitHub' : 'Google'}">GitHub</td>
+                    <td>
+                        <form method="post" th:action="@{/o/{organizationId}/account/connections/{provider}/connect(organizationId=${organizationId},provider=${#strings.toLowerCase(provider.name())})}">
+                            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button class="clavaris-button clavaris-button--inline" type="submit">Connect</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

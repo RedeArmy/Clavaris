@@ -96,7 +96,9 @@ class SocialLoginAuthenticationSuccessHandlerTest {
             knownDevices,
             requestDeviceTrustChallenge,
             authenticationPolicyProvider,
-            recordLoginEvent);
+            recordLoginEvent,
+            // TD-FUT-043: no link intent by default (the mock answers false), i.e. a plain sign-in.
+            mock(SocialIdentityLinkCompletion.class));
   }
 
   private Account stubAccount(final UUID organizationId, final AccountId accountId) {

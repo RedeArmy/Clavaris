@@ -110,6 +110,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
   private final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final RecordLoginEventUseCase recordLoginEvent;
+  private final SocialIdentityLinkCompletion linkCompletion;
   private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
 
   // one parameter per collaborating port — same rationale as
@@ -129,7 +130,8 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
       final KnownDeviceRepository knownDevices,
       final RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge,
       final AccountAuthenticationPolicyProvider authenticationPolicyProvider,
-      final RecordLoginEventUseCase recordLoginEvent) {
+      final RecordLoginEventUseCase recordLoginEvent,
+      final SocialIdentityLinkCompletion linkCompletion) {
     this.tenantUseCase = tenantUseCase;
     this.platformUseCase = platformUseCase;
     this.tenantSessions = tenantSessions;
@@ -141,6 +143,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     this.requestDeviceTrustChallenge = requestDeviceTrustChallenge;
     this.authenticationPolicyProvider = authenticationPolicyProvider;
     this.recordLoginEvent = recordLoginEvent;
+    this.linkCompletion = linkCompletion;
   }
 
   @Override
@@ -183,6 +186,11 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
       return;
     }
     final OAuth2User principal = oauthToken.getPrincipal();
+    // TD-FUT-043: a signed-in End-User connecting a provider is not a sign-in at all.
+    if (linkCompletion.completeIfRequested(
+        request, response, session, organizationIdValue, provider, principal.getName())) {
+      return;
+    }
     // getName() resolves to whichever attribute each registration's own userNameAttributeName
     // names (sub for Google, id for GitHub) — the provider's own opaque, stable subject
     // identifier, uniformly, regardless of which OAuth2UserService produced this principal.

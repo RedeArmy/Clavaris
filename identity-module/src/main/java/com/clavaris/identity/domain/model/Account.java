@@ -28,7 +28,7 @@ public final class Account {
 
   private final AccountId id;
   private final OrganizationId organizationId;
-  private final Email email;
+  private Email email;
   private final Instant createdAt;
   private Instant emailVerifiedAt;
 
@@ -331,6 +331,17 @@ public final class Account {
     if (this.emailVerifiedAt == null) {
       this.emailVerifiedAt = Instant.now();
     }
+  }
+
+  /**
+   * TD-FUT-043: the self-service email change's final step — only ever called after a single-use
+   * link delivered to the <em>new</em> address was consumed, so possession of it is itself the
+   * verification and {@code email_verified_at} is stamped now. The caller owns the per-Organization
+   * uniqueness check (the unique constraint remains the backstop).
+   */
+  public void changeEmail(final Email newEmail) {
+    this.email = Objects.requireNonNull(newEmail, "newEmail must not be null");
+    this.emailVerifiedAt = Instant.now();
   }
 
   /**

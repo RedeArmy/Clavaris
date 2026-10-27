@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Change email')}">
+    <title>Change email</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <p class="clavaris-breadcrumb">
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Update profile</a>
+        </p>
+        <h1>Change email</h1>
+
+        <!-- TD-FUT-043: the new address only replaces the current one once its owner opens the
+             link mailed there; the current address is told about the request. -->
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${noPassword}">
+            This account does not sign in with a password, so its email cannot be changed here.
+        </p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${serviceOverloadedError}">
+            Too many people are signing in right now. Please try again in a moment.
+        </p>
+
+        <form th:unless="${noPassword}" method="post" th:object="${changeEmailForm}"
+              th:action="@{/o/{organizationId}/account/email(organizationId=${organizationId})}">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
+            <input type="hidden" th:if="${param.clientId}" name="clientId" th:value="${param.clientId}"/>
+
+            <div class="clavaris-field">
+                <label for="newEmail">New email address</label>
+                <input id="newEmail" type="email" th:field="*{newEmail}" autocomplete="email" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('newEmail')}" th:errors="*{newEmail}">Email error</p>
+            </div>
+
+            <div class="clavaris-field">
+                <label for="currentPassword">Current password</label>
+                <input id="currentPassword" type="password" th:field="*{currentPassword}" autocomplete="current-password" required/>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('currentPassword')}" th:errors="*{currentPassword}">Password error</p>
+            </div>
+
+            <p class="clavaris-field-hint">
+                We will send a confirmation link to the new address. Your email stays the same
+                until you open it.
+            </p>
+            <button class="clavaris-button" type="submit">Send confirmation link</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

@@ -15,6 +15,8 @@ import java.time.Instant;
  * not know about (§7.2's dependency rule) — the adapter, which already knows its own deployment's
  * {@code CLAVARIS_BASE_URL}, is where that link actually gets assembled.
  */
+// PMD.TooManyMethods: one send method per distinct email (TD-FUT-043 added three more).
+@SuppressWarnings("PMD.TooManyMethods")
 public interface MailSender {
 
   void sendEmailVerification(String toAddress, OrganizationId organizationId, String rawToken);
@@ -65,4 +67,27 @@ public interface MailSender {
       String sourceIp,
       Instant occurredAt,
       String rawAlertToken);
+
+  /**
+   * TD-FUT-043: tells the address of record that the password was just changed from a signed-in
+   * session. A notice, not a token: there is nothing for the reader to click, so a failure to send
+   * it must never undo the change (the caller catches {@link MailDeliveryException}).
+   */
+  void sendPasswordChangedNotice(String toAddress, OrganizationId organizationId);
+
+  /**
+   * TD-FUT-043: sent to the <em>new</em> address a signed-in person wants as their email, with the
+   * single-use link that makes the change; nothing changes until it is followed, which is what
+   * proves they control that address.
+   */
+  void sendEmailChangeVerification(
+      String newAddress, OrganizationId organizationId, String rawToken);
+
+  /**
+   * TD-FUT-043: sent to the <em>current</em> address when a change to {@code newAddress} is
+   * requested ({@code completed} false) and again when it takes effect ({@code completed} true), so
+   * the real owner of an account whose session was taken over hears about it either way.
+   */
+  void sendEmailChangeNotice(
+      String currentAddress, OrganizationId organizationId, String newAddress, boolean completed);
 }

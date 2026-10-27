@@ -213,6 +213,35 @@ class ResendMailSender implements MailSender, PlatformMailSender {
   }
 
   @Override
+  public void sendPasswordChangedNotice(
+      final String toAddress, final OrganizationId organizationId) {
+    sendAsOrganization(toAddress, organizationId, Emails::passwordChanged);
+  }
+
+  @Override
+  public void sendEmailChangeVerification(
+      final String newAddress, final OrganizationId organizationId, final String rawToken) {
+    sendAsOrganization(
+        newAddress,
+        organizationId,
+        brand ->
+            Emails.emailChangeVerification(
+                brand, link(organizationId, "account/email/confirm", rawToken)));
+  }
+
+  @Override
+  public void sendEmailChangeNotice(
+      final String currentAddress,
+      final OrganizationId organizationId,
+      final String newAddress,
+      final boolean completed) {
+    sendAsOrganization(
+        currentAddress,
+        organizationId,
+        brand -> Emails.emailChangeNotice(brand, newAddress, completed));
+  }
+
+  @Override
   public void sendEmailSignInCode(
       final String toAddress, final OrganizationId organizationId, final String rawCode) {
     sendAsOrganization(toAddress, organizationId, brand -> Emails.signInCode(brand, rawCode));

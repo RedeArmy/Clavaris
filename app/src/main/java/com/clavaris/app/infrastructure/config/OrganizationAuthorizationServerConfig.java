@@ -23,6 +23,7 @@ import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPubl
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJwkSource;
+import com.clavaris.app.infrastructure.adapter.out.security.PhoneClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.ProfilePictureClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
 import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
@@ -245,6 +246,7 @@ public class OrganizationAuthorizationServerConfig {
     final ProfilePictureClaimsCustomizer profilePictureClaims =
         new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
     final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
+    final PhoneClaimsCustomizer phoneClaims = new PhoneClaimsCustomizer(accounts);
     final OidcSessionIdRecorder sessionIdRecorder = new OidcSessionIdRecorder(recordSessionOidcId);
     jwtGenerator.setJwtCustomizer(
         context -> {
@@ -253,6 +255,7 @@ public class OrganizationAuthorizationServerConfig {
           workspaceRoleClaims.customize(context);
           profilePictureClaims.customize(context);
           emailClaims.customize(context);
+          phoneClaims.customize(context);
           sessionIdRecorder.customize(context);
         });
     return new DelegatingOAuth2TokenGenerator(
@@ -355,6 +358,8 @@ public class OrganizationAuthorizationServerConfig {
       // OrganizationRateLimitRules's own account-picture:upload rule for the full rationale.
       @Value("${clavaris.rate-limit.account-picture.upload-per-account-limit:10}")
           final int accountPictureUploadPerAccountLimit,
+      @Value("${clavaris.rate-limit.account-credentials.change-per-account-limit:10}")
+          final int credentialChangePerAccountLimit,
       // TD-SEC-008/ADR-0010 §5.2: how long a retired key keeps being published in JWKS after
       // rotation — generous relative to SAS's own default access-token TTL (5 minutes, per
       // incident-response-signing-key-compromise.md's own decompiled-jar finding) to cover
@@ -617,7 +622,8 @@ public class OrganizationAuthorizationServerConfig {
                     tokenRefreshPerClientLimit,
                     accountSessionsListPerAccountLimit,
                     accountSessionsRevokePerAccountLimit,
-                    accountPictureUploadPerAccountLimit)),
+                    accountPictureUploadPerAccountLimit,
+                    credentialChangePerAccountLimit)),
             // Anchored after TenantAccountOnlySecurityContextFilter, not SecurityContextHolder
             // Filter directly — real bug, confirmed live: three separate addFilterAfter calls all
             // anchored at the same filter class silently only kept the last-registered one, so the

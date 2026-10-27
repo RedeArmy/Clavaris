@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.SocialProvider;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implements the outbound port; maps between {@code domain.model.SocialIdentity} (framework-free)
@@ -55,6 +56,13 @@ class JpaSocialIdentityRepository implements SocialIdentityRepository {
   @Override
   public List<SocialIdentity> findAllByAccountId(final AccountId accountId) {
     return identities.findAllByAccountId(accountId.value()).stream().map(this::toDomain).toList();
+  }
+
+  @Override
+  @Transactional
+  public boolean deleteByAccountIdAndProvider(
+      final AccountId accountId, final SocialProvider provider) {
+    return identities.deleteByAccountIdAndProvider(accountId.value(), provider.name()) > 0;
   }
 
   private SocialIdentity toDomain(final SocialIdentityEntity entity) {

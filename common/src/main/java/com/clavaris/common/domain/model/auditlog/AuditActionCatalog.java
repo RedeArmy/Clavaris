@@ -316,6 +316,32 @@ public final class AuditActionCatalog {
         "Profile picture updated");
     add("account.profile_updated", AuditCategory.USERS, AuditTone.UPDATED, "User profile updated");
     add(
+        "account.password_changed",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User changed their password");
+    add(
+        "account.email_change_requested",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User requested an email change");
+    add("account.email_changed", AuditCategory.USERS, AuditTone.SENSITIVE, "User email changed");
+    add(
+        "account.social_identity_connected",
+        AuditCategory.USERS,
+        AuditTone.UPDATED,
+        "User connected a social account");
+    add(
+        "account.social_identity_disconnected",
+        AuditCategory.USERS,
+        AuditTone.SENSITIVE,
+        "User disconnected a social account");
+    add(
+        "audit_log.partition_dropped",
+        AuditCategory.PLATFORM,
+        AuditTone.WARNING,
+        "Audit log partition dropped by retention");
+    add(
         "account.registration_approved",
         AuditCategory.USERS,
         AuditTone.CREATED,

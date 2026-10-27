@@ -16,6 +16,8 @@ import java.util.List;
  * Clavaris's own ({@link #PLATFORM_BRAND}); a tenant email is its Organization's, or nobody's when
  * that name is unknown ({@code null}), and never Clavaris's.
  */
+// PMD.TooManyMethods: one builder per distinct email (TD-FUT-043 added three more).
+@SuppressWarnings("PMD.TooManyMethods")
 final class Emails {
 
   /** The name Clavaris's own emails (to platform accounts) are sent in. */
@@ -160,6 +162,48 @@ final class Emails {
           .note(EmailCopy.text(EmailCopy.NOTE_ALERT));
     }
     return compose(brand, subject, content);
+  }
+
+  /** The password was changed from a signed-in session (TD-FUT-043). */
+  /* default */ static Composed passwordChanged(final String brand) {
+    final String subject = EmailCopy.text(EmailCopy.SUBJ_PW_CHANGED);
+    return compose(
+        brand,
+        subject,
+        EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_PW_CHANGED))
+            .paragraph(EmailCopy.text(EmailCopy.LEAD_PW_CHANGED))
+            .paragraph(EmailCopy.text(EmailCopy.ALERT_FINE))
+            .note(EmailCopy.text(EmailCopy.NOTE_PW_CHANGED)));
+  }
+
+  /** To the new address: confirm it is yours (TD-FUT-043). */
+  /* default */ static Composed emailChangeVerification(final String brand, final String link) {
+    final String subject = EmailCopy.text(EmailCopy.SUBJ_EMAIL_CHANGE);
+    return compose(
+        brand,
+        subject,
+        EmailContent.titled(subject, EmailCopy.text(EmailCopy.PRE_EMAIL_CHANGE))
+            .paragraph(EmailCopy.text(EmailCopy.LEAD_EMAIL_CHANGE))
+            .action(EmailCopy.text(EmailCopy.BTN_EMAIL_CHANGE), link)
+            .note(EmailCopy.text(EmailCopy.NOTE_EMAIL_CHANGE)));
+  }
+
+  /** To the current address: a change to {@code newAddress} was asked for, or has happened. */
+  /* default */ static Composed emailChangeNotice(
+      final String brand, final String newAddress, final boolean completed) {
+    final String subject =
+        EmailCopy.text(completed ? EmailCopy.SUBJ_EMAIL_DONE : EmailCopy.SUBJ_EMAIL_ASKED);
+    final String preview =
+        EmailCopy.text(completed ? EmailCopy.PRE_EMAIL_DONE : EmailCopy.PRE_EMAIL_ASKED);
+    final String lead =
+        EmailCopy.text(
+            completed ? EmailCopy.LEAD_EMAIL_DONE : EmailCopy.LEAD_EMAIL_ASKED, newAddress);
+    return compose(
+        brand,
+        subject,
+        EmailContent.titled(subject, preview)
+            .paragraph(lead)
+            .note(EmailCopy.text(EmailCopy.NOTE_EMAIL_NOT_YOU)));
   }
 
   private static Composed compose(

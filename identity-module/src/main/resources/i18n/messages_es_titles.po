@@ -75,3 +75,14 @@ msgstr "{0} — Cerrar sesión"
 
 msgid "{0} — Signed out"
 msgstr "{0} — Sesión cerrada"
+
+msgid "{0} — Change email"
+msgstr "{0} — Cambiar correo electrónico"
+
+
+msgid "{0} — Change password"
+msgstr "{0} — Cambiar contraseña"
+
+
+msgid "{0} — Connected accounts"
+msgstr "{0} — Cuentas conectadas"
