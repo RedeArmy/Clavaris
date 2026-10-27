@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class OidcScopeCatalogTest {
 
   @Test
-  void knownListsExactlyTheFourConstants() {
+  void knownListsExactlyTheFiveConstants() {
     // Guards against a constant being added without also adding it to KNOWN, or vice versa — the
     // same "the derived list and the individual constants can't silently drift apart" property
     // PlatformScopes.BOOTSTRAP_DEFAULT relies on for OAuthClient/PlatformClient's own validators.
@@ -24,6 +24,7 @@ class OidcScopeCatalogTest {
             OidcScopeCatalog.OPENID,
             OidcScopeCatalog.PROFILE,
             OidcScopeCatalog.EMAIL,
+            OidcScopeCatalog.PHONE,
             OidcScopeCatalog.OFFLINE_ACCESS);
   }
 
