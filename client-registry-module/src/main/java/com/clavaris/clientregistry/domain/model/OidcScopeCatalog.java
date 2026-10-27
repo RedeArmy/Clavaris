@@ -38,6 +38,13 @@ public final class OidcScopeCatalog {
   public static final String EMAIL = "email";
 
   /**
+   * OIDC Core §5.4 — gates `phone_number`/`phone_number_verified` on the ID token and `/userinfo`
+   * response (TD-FUT-042). Clavaris never verifies a phone number, so `phone_number_verified` is
+   * always `false` when a number is present.
+   */
+  public static final String PHONE = "phone";
+
+  /**
    * Not an OIDC Core scope — the de facto cross-implementation convention (Google, Microsoft,
    * Auth0, and this codebase's own {@code RefreshTokenRotationAuthenticationProvider}) for "this
    * client may hold a refresh token," requested alongside {@code allowedGrantTypes} containing
@@ -49,7 +56,7 @@ public final class OidcScopeCatalog {
    * Every scope this system's own OIDC flow gives real meaning to — reference only, not an
    * exhaustive allowlist; see this class's own Javadoc for why.
    */
-  public static final List<String> KNOWN = List.of(OPENID, PROFILE, EMAIL, OFFLINE_ACCESS);
+  public static final List<String> KNOWN = List.of(OPENID, PROFILE, EMAIL, PHONE, OFFLINE_ACCESS);
 
   private OidcScopeCatalog() {
     // Constants holder — no instances.

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Change email')}">
+    <title>Change email</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Change email</h1>
+        <output class="clavaris-alert clavaris-alert--success" th:if="${confirmed}">
+            Your email address has been changed and verified.
+        </output>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${invalid}">
+            This link is invalid or has expired. Request the change again from your profile.
+        </p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${taken}">
+            That address is already in use by another account, so it could not be applied.
+        </p>
+        <p>
+            <a th:href="@{/o/{organizationId}/account/profile(organizationId=${organizationId})}">Back to Update profile</a>
+        </p>
+    </div>
+</main>
+</body>
+</html>

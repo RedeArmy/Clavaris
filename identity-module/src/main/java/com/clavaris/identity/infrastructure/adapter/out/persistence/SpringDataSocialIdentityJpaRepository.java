@@ -11,4 +11,6 @@ interface SpringDataSocialIdentityJpaRepository extends JpaRepository<SocialIden
       UUID organizationId, String provider, String providerUserId);
 
   List<SocialIdentityEntity> findAllByAccountId(UUID accountId);
+
+  long deleteByAccountIdAndProvider(UUID accountId, String provider);
 }

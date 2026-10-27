@@ -123,6 +123,45 @@ class SocialLoginRedirectControllerTest {
         .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login?socialLoginError"));
   }
 
+  // TD-FUT-043: an abandoned "connect a provider" intent must never turn a later sign-in into a
+  // link to the old Account, so both sign-in entry points clear it.
+  @Test
+  void aSignInButtonClearsAnAbandonedConnectIntent() throws Exception {
+    when(policyProvider.isProviderAllowed(
+            new OrganizationId(ORGANIZATION_ID), SocialProvider.GOOGLE))
+        .thenReturn(true);
+    org.springframework.mock.web.MockHttpSession session =
+        new org.springframework.mock.web.MockHttpSession();
+    session.setAttribute(SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE, "acct");
+    session.setAttribute(
+        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, java.time.Instant.now());
+
+    mockMvc.perform(
+        get("/o/{organizationId}/login/social/google", ORGANIZATION_ID).session(session));
+
+    org.assertj.core.api.Assertions.assertThat(
+            session.getAttribute(SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE))
+        .isNull();
+    org.assertj.core.api.Assertions.assertThat(
+            session.getAttribute(SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE))
+        .isNull();
+  }
+
+  @Test
+  void thePlatformSignInButtonClearsAnAbandonedConnectIntent() throws Exception {
+    org.springframework.mock.web.MockHttpSession session =
+        new org.springframework.mock.web.MockHttpSession();
+    session.setAttribute(SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE, "acct");
+    session.setAttribute(
+        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, java.time.Instant.now());
+
+    mockMvc.perform(get("/platform/login/social/github").session(session));
+
+    org.assertj.core.api.Assertions.assertThat(
+            session.getAttribute(SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE))
+        .isNull();
+  }
+
   @Test
   void platformRedirectsToTheProviderAuthorizationEndpoint() throws Exception {
     mockMvc

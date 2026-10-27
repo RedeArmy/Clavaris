@@ -30,6 +30,11 @@ final class EmailCopy {
   /* default */ static final String SUBJ_DEVICE = "Confirm this new device";
   /* default */ static final String SUBJ_ALERT = "New sign-in to your account";
   /* default */ static final String SUBJ_ALERT_PLAT = "New sign-in to your Clavaris account";
+  /* default */ static final String SUBJ_PW_CHANGED = "Your password was changed";
+  /* default */ static final String SUBJ_EMAIL_CHANGE = "Confirm your new email address";
+  /* default */ static final String SUBJ_EMAIL_ASKED =
+      "A change to your email address was requested";
+  /* default */ static final String SUBJ_EMAIL_DONE = "Your email address was changed";
 
   // The preview line mail apps show beside the subject.
   /* default */ static final String PRE_VERIFY =
@@ -46,6 +51,14 @@ final class EmailCopy {
       "Enter this code to confirm it's you. It expires in 10 minutes.";
   /* default */ static final String PRE_ALERT =
       "A new device or browser signed in to your account.";
+  /* default */ static final String PRE_PW_CHANGED =
+      "The password for your account was just changed.";
+  /* default */ static final String PRE_EMAIL_CHANGE =
+      "Confirm that you want to use this address for your account.";
+  /* default */ static final String PRE_EMAIL_ASKED =
+      "Someone asked to move your account to a different email address.";
+  /* default */ static final String PRE_EMAIL_DONE =
+      "Your account now uses a different email address.";
 
   // The opening sentence of the body.
   /* default */ static final String LEAD_VERIFY_PLAT =
@@ -80,6 +93,23 @@ final class EmailCopy {
       "If you don't recognize this activity, change your password and review your active sessions.";
 
   // Buttons and labels.
+  /* default */ static final String LEAD_PW_CHANGED =
+      "The password for your account was changed, and every other session was signed out.";
+  /* default */ static final String LEAD_EMAIL_CHANGE =
+      "Someone signed in to your account asked to use this address as its email. Confirm to make the change.";
+  /* default */ static final String LEAD_EMAIL_ASKED =
+      "A signed-in session of your account asked to change its email address to {0}. Nothing"
+          + " changes until that address confirms it.";
+  /* default */ static final String LEAD_EMAIL_DONE =
+      "The email address of your account was changed to {0}. Sign-in links and password resets now"
+          + " go there.";
+  /* default */ static final String NOTE_PW_CHANGED =
+      "If this wasn't you, reset your password straight away and review your active sessions.";
+  /* default */ static final String NOTE_EMAIL_CHANGE =
+      "The link expires in 1 hour. If you didn't ask for this, ignore this email and nothing changes.";
+  /* default */ static final String NOTE_EMAIL_NOT_YOU =
+      "If this wasn't you, change your password now and review your active sessions.";
+  /* default */ static final String BTN_EMAIL_CHANGE = "Confirm email address";
   /* default */ static final String BTN_VERIFY = "Verify email";
   /* default */ static final String BTN_RESET = "Reset password";
   /* default */ static final String BTN_SOCIAL = "Confirm link";

@@ -205,3 +205,66 @@ msgctxt "email"
 msgid "This is an automated message, so replies are not monitored."
 msgstr "Es un mensaje automático, así que las respuestas no se supervisan."
 
+msgctxt "email"
+msgid "Your password was changed"
+msgstr "Se cambió tu contraseña"
+
+msgctxt "email"
+msgid "Confirm your new email address"
+msgstr "Confirma tu nuevo correo electrónico"
+
+msgctxt "email"
+msgid "A change to your email address was requested"
+msgstr "Se solicitó un cambio de tu correo electrónico"
+
+msgctxt "email"
+msgid "Your email address was changed"
+msgstr "Se cambió tu correo electrónico"
+
+msgctxt "email"
+msgid "The password for your account was just changed."
+msgstr "La contraseña de tu cuenta acaba de cambiar."
+
+msgctxt "email"
+msgid "Confirm that you want to use this address for your account."
+msgstr "Confirma que quieres usar esta dirección para tu cuenta."
+
+msgctxt "email"
+msgid "Someone asked to move your account to a different email address."
+msgstr "Alguien pidió pasar tu cuenta a otro correo electrónico."
+
+msgctxt "email"
+msgid "Your account now uses a different email address."
+msgstr "Tu cuenta ahora usa otro correo electrónico."
+
+msgctxt "email"
+msgid "The password for your account was changed, and every other session was signed out."
+msgstr "La contraseña de tu cuenta cambió y se cerraron todas las demás sesiones."
+
+msgctxt "email"
+msgid "Someone signed in to your account asked to use this address as its email. Confirm to make the change."
+msgstr "Alguien con sesión iniciada en tu cuenta pidió usar esta dirección como su correo electrónico. Confirma para hacer el cambio."
+
+msgctxt "email"
+msgid "A signed-in session of your account asked to change its email address to {0}. Nothing changes until that address confirms it."
+msgstr "Una sesión iniciada de tu cuenta pidió cambiar su correo electrónico a {0}. No cambia nada hasta que esa dirección lo confirme."
+
+msgctxt "email"
+msgid "The email address of your account was changed to {0}. Sign-in links and password resets now go there."
+msgstr "El correo electrónico de tu cuenta cambió a {0}. Los enlaces de inicio de sesión y los restablecimientos de contraseña ahora van allí."
+
+msgctxt "email"
+msgid "If this wasn't you, reset your password straight away and review your active sessions."
+msgstr "Si no fuiste tú, restablece tu contraseña de inmediato y revisa tus sesiones activas."
+
+msgctxt "email"
+msgid "The link expires in 1 hour. If you didn't ask for this, ignore this email and nothing changes."
+msgstr "El enlace caduca en 1 hora. Si no lo pediste, ignora este correo y no cambia nada."
+
+msgctxt "email"
+msgid "If this wasn't you, change your password now and review your active sessions."
+msgstr "Si no fuiste tú, cambia tu contraseña ahora y revisa tus sesiones activas."
+
+msgctxt "email"
+msgid "Confirm email address"
+msgstr "Confirmar correo electrónico"

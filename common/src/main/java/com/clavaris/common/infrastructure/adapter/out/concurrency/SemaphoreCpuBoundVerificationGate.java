@@ -24,6 +24,11 @@ import org.springframework.stereotype.Component;
  * clavaris.security.argon2.max-concurrent-verifications} for a production host with a known,
  * different core count once one exists (TD-FUT-013).
  *
+ * <p>The 1000 ms wait default is measured, not guessed (`load-testing/README.md` §4a, 3 cores, 30
+ * concurrent PKCE logins): 250 ms shed 91 of 300 flows with 503, 1000 ms shed 7, 2500 ms shed none
+ * but pushed the whole-flow p95 from 6.6 s to 8.9 s — 1000 ms is the knee, where nearly every burst
+ * is absorbed without letting a queued login wait longer than a user will.
+ *
  * <p>A <b>fair</b> semaphore ({@code new Semaphore(n, true)}), not the default unfair one — under
  * sustained overload an unfair semaphore can starve a request that arrived first in favour of one
  * that arrived later and got lucky with scheduling; fairness costs a small amount of throughput in
@@ -47,7 +52,7 @@ class SemaphoreCpuBoundVerificationGate implements CpuBoundVerificationGate {
               "${clavaris.security.argon2.max-concurrent-verifications:"
                   + "#{T(java.lang.Runtime).getRuntime().availableProcessors()}}")
           final int maxConcurrentVerifications,
-      @Value("${clavaris.security.argon2.max-wait-millis:250}") final long maxWaitMillis,
+      @Value("${clavaris.security.argon2.max-wait-millis:1000}") final long maxWaitMillis,
       final SecurityMetricsRecorder metrics) {
     this.permits = new Semaphore(maxConcurrentVerifications, true);
     this.maxWait = Duration.ofMillis(maxWaitMillis);

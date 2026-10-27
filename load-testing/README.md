@@ -235,7 +235,7 @@ sign-ins (`503`).
 - The code exchange stopped being the problem. What is left is the password POST: one Argon2id
   verification of a *human-chosen* secret, which is exactly what Argon2id is for (ADR-0005) and is
   not made cheaper here. At 10 concurrent sign-ins on this machine a whole flow takes ~1.4 s at
-  p95; at 30 the admission control (permits = CPU cores, 250 ms maximum wait,
+  p95; at 30 the admission control (permits = CPU cores, maximum wait now 1000 ms per §5d,
   `clavaris.security.argon2.*`) sheds about one in five sign-ins by design instead of letting the
   host collapse. Those two settings trade refusals for latency; they were not changed, because the
   right values depend on a production host this repository does not have yet (TD-FUT-017).
@@ -264,6 +264,48 @@ keyed by client *and* source IP and its limit is a 6000-per-5-minutes backstop, 
 users no longer share 20 exchanges and a stranger naming a public `client_id` can no longer spend
 them. `TokenEndpointRateLimitIntegrationTest` pins it (45 exchanges from one address succeed). The
 30/30 result at default limits was not re-measured with this tool.
+
+### 5d. Sizing the Argon2 admission wait (2026-10-26, TD-FUT-017)
+
+Same flow as §5b (30 accounts, no consent, 3 cores shared with the generator), app restarted per
+row with only `clavaris.security.argon2.max-wait-millis` changed; permits stayed at the core count.
+
+| max-wait | c | Flows | OK | 503 | sign-in p95 | whole-flow p95 |
+|---|---|---|---|---|---|---|
+| 250 ms | 10 | 100 | 97 | 3 | 1534 ms | 3138 ms |
+| 250 ms | 30 | 300 | 209 | 91 | 2278 ms | 6478 ms |
+| 1000 ms | 10 | 100 | **100** | 0 | 1268 ms | 3128 ms |
+| 1000 ms | 30 | 300 | 293 | 7 | 2565 ms | 6639 ms |
+| 2500 ms | 10 | 100 | 100 | 0 | 1727 ms | 3989 ms |
+| 2500 ms | 30 | 300 | 300 | 0 | 3591 ms | 8921 ms |
+
+1000 ms is the knee: against 250 ms it removes 92% of the refusals at c=30 (91 → 7) and all of them
+at c=10 with no change in whole-flow p95; 2500 ms removes the rest but adds ~2.3 s to the p95 for
+the callers that did queue. **Decision:** the default moves from 250 ms to 1000 ms. The permit
+count stays at the core count (more permits only add contention, §4). The ceiling itself
+(`/oauth2/token` and sign-in shed with `503` + `Retry-After` beyond it) is unchanged and still
+pinned by `Argon2TokenEndpointSaturationIntegrationTest`; a production host with a different core
+count should re-run this table (TD-FUT-013) rather than trust these absolute numbers.
+
+### 5e. Virtual threads (`spring.threads.virtual.enabled`), measured (2026-10-26, TD-FUT-046)
+
+Same app, same fixture, only the flag changed (Argon2 wait 1000 ms; JWKS via `ab -n 20000`).
+
+| | platform threads (Tomcat cap 50) | virtual threads |
+|---|---|---|
+| JWKS, c=100 | 347 req/s, p99 833 ms | 409 req/s, p99 633 ms |
+| JWKS, c=300 | 515 req/s, p99 1098 ms | 686 req/s, p99 1303 ms |
+| PKCE flow c=10 | 100/100, flow p95 3.2 s | 100/100, flow p95 4.0 s |
+| PKCE flow c=30 | 280/300, flow p95 7.1 s | **270/300, flow p95 26.6 s**, 30 × `500` |
+
+Virtual threads help the cheap endpoints (+18% / +33%) and hurt the expensive ones. The `500`s are
+`Failed to obtain JDBC Connection` / `Could not open JPA EntityManager`: the 50-thread Tomcat cap
+(TD-PERF-007) is also what keeps concurrent database work below the Hikari pool size, and
+virtual threads remove it, so 30 simultaneous flows queue on the pool until it times out. The
+Argon2 gate does not bound this, it only bounds hashing. **Decision:** leave the flag off. Revisit
+only together with an explicit bound on database concurrency (a semaphore in front of the
+transaction boundary, or a pool sized for it), and re-run this table. JWKS and discovery are
+already cached and are not the bottleneck at the load this table shows.
 
 ## Files
 

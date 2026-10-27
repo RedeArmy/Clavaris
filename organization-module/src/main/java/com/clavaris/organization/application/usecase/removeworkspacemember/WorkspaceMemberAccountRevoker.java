@@ -11,16 +11,13 @@ import java.util.UUID;
  * specifically because of today's real Account-Workspace 1:1 invariant, below) and should stay
  * independently revertable if that invariant ever changes, without touching the always-safe half.
  *
- * <p>Safe to call today because {@code AddWorkspaceMemberService}'s own Javadoc (cited directly by
- * {@code WorkspaceRoleClaimsCustomizer}) documents that an Account can only ever belong to one
- * Workspace right now — every add-member call provisions a brand-new Account, and no flow attaches
- * an existing one to a second Workspace. Removing a member from their one and only Workspace really
- * does mean "this Account has no more standing anywhere in this Organization right now," so
- * revoking its entire live session/token is correct, not merely convenient. TD-WS-005 (new,
- * `technical-debt-register.md` §3) tracks the one real consequence: the moment v1.1 ships
- * multi-workspace membership, this call site — and this port's own implementation — will need to
- * check for other surviving memberships before revoking, or a member removed from one Workspace
- * would lose access to every other Workspace they still legitimately belong to.
+ * <p>TD-WS-005 (closed, 2026-10-27): safe to call when the removal leaves the Account with no
+ * Workspace. This used to be called unconditionally, which was correct only while {@code
+ * AddWorkspaceMemberService} guaranteed an Account belongs to at most one Workspace (every add
+ * provisioned a brand-new Account, no flow attached an existing one to a second). {@code
+ * RemoveWorkspaceMemberService} now checks for other surviving memberships first and skips this
+ * call while one remains, so a member removed from one Workspace keeps its session and tokens for
+ * the others; the refresh-token revocation beside it needs no such check.
  */
 @FunctionalInterface
 public interface WorkspaceMemberAccountRevoker {

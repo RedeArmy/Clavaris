@@ -138,17 +138,52 @@ class RemoveWorkspaceMemberServiceTest {
     verify(refreshTokenRevoker).revokeAllRefreshTokensFor(accountId);
   }
 
-  // TD-WS-002 (closed): the rest of the cascade — see WorkspaceMemberAccountRevoker's own Javadoc
-  // for why this is safe to run unconditionally under today's real Account-Workspace 1:1 invariant.
+  // TD-WS-002 (closed): the rest of the cascade, run when the removal leaves the Account with no
+  // Workspace at all (TD-WS-005, below, for when it does not).
   @Test
-  void revokesTheRemovedMembersAccountAccessOnSuccess() {
+  void revokesTheRemovedMembersAccountAccessWhenItWasTheirLastWorkspace() {
     UUID workspaceId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     existingMembership(workspaceId, accountId, plainRole.id());
+    when(memberships.findAllByAccountId(accountId)).thenReturn(List.of());
 
     service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
 
     verify(accountRevoker).revokeAllAccessFor(accountId);
+  }
+
+  // TD-WS-005: an Account that still belongs to another Workspace keeps its session and tokens for
+  // it; only the refresh tokens (always safe to rotate out) are revoked.
+  @Test
+  void keepsTheAccountsSessionAndTokensWhenItStillBelongsToAnotherWorkspace() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, plainRole.id());
+    WorkspaceMembership other =
+        WorkspaceMembership.join(UUID.randomUUID(), accountId, plainRole.id());
+    when(memberships.findAllByAccountId(accountId)).thenReturn(List.of(other));
+
+    service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
+
+    verify(memberships).deleteById(any());
+    verify(refreshTokenRevoker).revokeAllRefreshTokensFor(accountId);
+    verify(accountRevoker, never()).revokeAllAccessFor(any());
+  }
+
+  @Test
+  void stillRecordsTheAuditAndOutboxEventsWhenTheAccountKeepsAnotherWorkspace() {
+    UUID workspaceId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    existingMembership(workspaceId, accountId, plainRole.id());
+    when(memberships.findAllByAccountId(accountId))
+        .thenReturn(
+            List.of(WorkspaceMembership.join(UUID.randomUUID(), accountId, plainRole.id())));
+
+    service.handle(new RemoveWorkspaceMemberCommand(workspaceId, accountId, ACTOR));
+
+    verify(auditEvents)
+        .write(any(), eq("workspace_membership.removed"), any(), any(), any(), eq(organizationId));
+    verify(outbox).write(any(), eq("workspace_membership.removed"), any(), any(), any());
   }
 
   @Test

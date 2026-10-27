@@ -321,6 +321,50 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- TD-FUT-048: the stylesheets are minified in target/classes, never in the source tree. A
+                 whitespace-and-comments pass, deliberately: it never reads a value, so it cannot
+                 mishandle a modern one. A real CSS compressor was tried first (ph-css) and dropped a
+                 whole rule silently (.clavaris-dialog, which uses min() and dvh), found only by
+                 comparing computed styles in a browser; this pass keeps every token and only
+                 removes what is whitespace or a comment. It strips: comments; runs of whitespace
+                 (to one space); the space around { } ; , and after a colon (a colon followed by a
+                 space is never part of a selector); the last ; before a }. No string or url() in
+                 these stylesheets contains any of those followed or preceded by a space, which
+                 StylesheetMinificationTest checks, along with the rule count surviving. Runs after
+                 maven-resources-plugin has copied the originals, in the same phase. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>minify-stylesheets</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <replaceregexp flags="gs" match="/\*.*?\*/" replace="">
+                                    <fileset dir="${project.build.outputDirectory}/static/css" includes="*.css"/>
+                                </replaceregexp>
+                                <replaceregexp flags="g" match="\s+" replace=" ">
+                                    <fileset dir="${project.build.outputDirectory}/static/css" includes="*.css"/>
+                                </replaceregexp>
+                                <replaceregexp flags="g" match=" ?([{};,]) ?" replace="\1">
+                                    <fileset dir="${project.build.outputDirectory}/static/css" includes="*.css"/>
+                                </replaceregexp>
+                                <replaceregexp flags="g" match=": " replace=":">
+                                    <fileset dir="${project.build.outputDirectory}/static/css" includes="*.css"/>
+                                </replaceregexp>
+                                <replaceregexp flags="g" match=";\}" replace="}">
+                                    <fileset dir="${project.build.outputDirectory}/static/css" includes="*.css"/>
+                                </replaceregexp>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

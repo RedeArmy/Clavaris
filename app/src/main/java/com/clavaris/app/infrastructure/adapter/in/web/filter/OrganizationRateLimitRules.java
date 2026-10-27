@@ -33,7 +33,8 @@ public final class OrganizationRateLimitRules {
       final int tokenRefreshPerClientIpLimit,
       final int accountSessionsListPerAccountLimit,
       final int accountSessionsRevokePerAccountLimit,
-      final int accountPictureUploadPerAccountLimit) {
+      final int accountPictureUploadPerAccountLimit,
+      final int credentialChangePerAccountLimit) {
     return List.of(
         new RateLimitRule(
             "login:account",
@@ -121,6 +122,25 @@ public final class OrganizationRateLimitRules {
             RateLimitRule.always(),
             RateLimitIdentifiers::authenticatedAccountId,
             accountPictureUploadPerAccountLimit,
+            Duration.ofMinutes(5)),
+        // TD-FUT-043: both forms below ask for the current password, so each is a password oracle
+        // for anyone holding a signed-in session (a stolen cookie, an unattended browser). Keyed by
+        // the authenticated Account like the rules above, and well under the sign-in limit.
+        new RateLimitRule(
+            "account-password:change",
+            HttpMethod.POST,
+            "/o/*/account/password",
+            RateLimitRule.always(),
+            RateLimitIdentifiers::authenticatedAccountId,
+            credentialChangePerAccountLimit,
+            Duration.ofMinutes(5)),
+        new RateLimitRule(
+            "account-email:change",
+            HttpMethod.POST,
+            "/o/*/account/email",
+            RateLimitRule.always(),
+            RateLimitIdentifiers::authenticatedAccountId,
+            credentialChangePerAccountLimit,
             Duration.ofMinutes(5)));
   }
 }

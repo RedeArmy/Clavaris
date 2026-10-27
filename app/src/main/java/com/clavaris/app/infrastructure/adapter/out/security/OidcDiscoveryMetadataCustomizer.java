@@ -39,6 +39,8 @@ public final class OidcDiscoveryMetadataCustomizer {
           "azp",
           "email",
           "email_verified",
+          "phone_number",
+          "phone_number_verified",
           "name",
           "given_name",
           "family_name",

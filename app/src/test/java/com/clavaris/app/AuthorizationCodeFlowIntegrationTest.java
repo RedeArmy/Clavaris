@@ -691,9 +691,17 @@ class AuthorizationCodeFlowIntegrationTest extends RedisBackedIntegrationTest {
 
     JsonNode metadata = objectMapper.readTree(response.body());
     assertThat(texts(metadata.get("scopes_supported")))
-        .contains("openid", "profile", "email", "offline_access");
+        .contains("openid", "profile", "email", "phone", "offline_access");
     assertThat(texts(metadata.get("claims_supported")))
-        .contains("sub", "auth_time", "email", "email_verified", "name", "preferred_username");
+        .contains(
+            "sub",
+            "auth_time",
+            "email",
+            "email_verified",
+            "phone_number",
+            "phone_number_verified",
+            "name",
+            "preferred_username");
     assertThat(texts(metadata.get("token_endpoint_auth_methods_supported")))
         .containsExactlyInAnyOrder("client_secret_basic", "client_secret_post");
     assertThat(metadata.has("tls_client_certificate_bound_access_tokens")).isFalse();

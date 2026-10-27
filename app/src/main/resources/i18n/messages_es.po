@@ -2926,3 +2926,96 @@ msgstr "Se cerrará la sesión de tu cuenta en este dispositivo."
 
 msgid "You have been signed out. You can close this page."
 msgstr "Has cerrado sesión. Puedes cerrar esta página."
+
+msgid "Back to Update profile"
+msgstr "Volver a Actualizar perfil"
+
+msgid "Change email"
+msgstr "Cambiar correo electrónico"
+
+msgid "Connect"
+msgstr "Conectar"
+
+msgid "Disconnect"
+msgstr "Desconectar"
+
+msgid "Send confirmation link"
+msgstr "Enviar enlace de confirmación"
+
+msgid "Current password"
+msgstr "Contraseña actual"
+
+msgid "New email address"
+msgstr "Nueva dirección de correo electrónico"
+
+msgid "If that address can be used, a confirmation link is on its way. Your email stays the same until you open it."
+msgstr "Si esa dirección se puede usar, un enlace de confirmación está en camino. Tu correo electrónico no cambia hasta que lo abras."
+
+msgid "The account was connected."
+msgstr "La cuenta se conectó."
+
+msgid "The account was disconnected."
+msgstr "La cuenta se desconectó."
+
+msgid "Your password was changed."
+msgstr "Tu contraseña se cambió."
+
+msgid "Changing your password signs you out of every other device and ends the access your applications hold."
+msgstr "Cambiar tu contraseña cierra tu sesión en todos los demás dispositivos y termina el acceso que tienen tus aplicaciones."
+
+msgid "No accounts are connected."
+msgstr "No hay cuentas conectadas."
+
+msgid "That account is already connected to another user here, or to this one."
+msgstr "Esa cuenta ya está conectada a otro usuario aquí, o a este."
+
+msgid "That address is already in use by another account, so it could not be applied."
+msgstr "Esa dirección ya la usa otra cuenta, por lo que no se pudo aplicar."
+
+msgid "That is your only way to sign in. Set a password or add a passkey first."
+msgstr "Es tu única forma de iniciar sesión. Primero establece una contraseña o añade una llave de acceso."
+
+msgid "The account could not be connected. Please try again."
+msgstr "No se pudo conectar la cuenta. Inténtalo de nuevo."
+
+msgid "This account does not sign in with a password, so its email cannot be changed here."
+msgstr "Esta cuenta no inicia sesión con contraseña, por lo que su correo electrónico no se puede cambiar aquí."
+
+msgid "This account does not sign in with a password, so there is none to change."
+msgstr "Esta cuenta no inicia sesión con contraseña, por lo que no hay ninguna que cambiar."
+
+msgid "This link is invalid or has expired. Request the change again from your profile."
+msgstr "Este enlace no es válido o ha caducado. Solicita el cambio de nuevo desde tu perfil."
+
+msgid "Too many people are signing in right now. Please try again in a moment."
+msgstr "Demasiadas personas están iniciando sesión ahora mismo. Inténtalo de nuevo en un momento."
+
+msgid "We will send a confirmation link to the new address. Your email stays the same until you open it."
+msgstr "Enviaremos un enlace de confirmación a la nueva dirección. Tu correo electrónico no cambia hasta que lo abras."
+
+msgid "Your email address has been changed and verified."
+msgstr "Tu dirección de correo electrónico se cambió y se verificó."
+
+msgid "The current password is incorrect"
+msgstr "La contraseña actual no es correcta"
+
+msgid "Please enter your current password"
+msgstr "Introduce tu contraseña actual"
+
+msgid "User changed their password"
+msgstr "El usuario cambió su contraseña"
+
+msgid "User requested an email change"
+msgstr "El usuario solicitó cambiar su correo electrónico"
+
+msgid "User email changed"
+msgstr "Correo electrónico del usuario cambiado"
+
+msgid "User connected a social account"
+msgstr "El usuario conectó una cuenta social"
+
+msgid "User disconnected a social account"
+msgstr "El usuario desconectó una cuenta social"
+
+msgid "Audit log partition dropped by retention"
+msgstr "Partición del registro de auditoría eliminada por retención"

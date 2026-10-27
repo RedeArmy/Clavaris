@@ -70,6 +70,16 @@ public class SocialLoginRedirectController {
   public static final String REDIRECT_URL_SESSION_ATTRIBUTE = "clavaris.socialLogin.redirectUrl";
 
   /**
+   * TD-FUT-043: set by the signed-in "connect a provider" action (never by the sign-in buttons) so
+   * the provider callback links the identity to this Account instead of signing anyone in. The
+   * value is the Account's id; the timestamp bounds how long the intent stays usable.
+   */
+  public static final String LINK_ACCOUNT_ID_SESSION_ATTRIBUTE = "clavaris.socialLink.accountId";
+
+  public static final String LINK_REQUESTED_AT_SESSION_ATTRIBUTE =
+      "clavaris.socialLink.requestedAt";
+
+  /**
    * The flat {@code /oauth2/authorization/{provider}} hop and the provider's callback carry no
    * tenant of their own, yet they must read the session of the tier that started the login. This
    * query parameter on the hop names it ({@code <organization id without dashes>} or {@link
@@ -107,6 +117,10 @@ public class SocialLoginRedirectController {
     // through a Redis-backed HttpSession (DistributedSessionConfig), no assumption about how the
     // configured session serializer handles an arbitrary class needed.
     final HttpSession session = request.getSession();
+    // A sign-in button must never inherit an abandoned "connect a provider" intent (TD-FUT-043),
+    // or the next callback would link to that old Account instead of signing the person in.
+    session.removeAttribute(LINK_ACCOUNT_ID_SESSION_ATTRIBUTE);
+    session.removeAttribute(LINK_REQUESTED_AT_SESSION_ATTRIBUTE);
     session.setAttribute(ORGANIZATION_ID_SESSION_ATTRIBUTE, organizationId.toString());
     if (clientId != null) {
       session.setAttribute(CLIENT_ID_SESSION_ATTRIBUTE, clientId);
@@ -141,6 +155,8 @@ public class SocialLoginRedirectController {
     // must never leak into a platform-tier one.
     final HttpSession existingSession = request.getSession(false);
     if (existingSession != null) {
+      existingSession.removeAttribute(LINK_ACCOUNT_ID_SESSION_ATTRIBUTE);
+      existingSession.removeAttribute(LINK_REQUESTED_AT_SESSION_ATTRIBUTE);
       existingSession.removeAttribute(ORGANIZATION_ID_SESSION_ATTRIBUTE);
       existingSession.removeAttribute(CLIENT_ID_SESSION_ATTRIBUTE);
       existingSession.removeAttribute(REDIRECT_URL_SESSION_ATTRIBUTE);

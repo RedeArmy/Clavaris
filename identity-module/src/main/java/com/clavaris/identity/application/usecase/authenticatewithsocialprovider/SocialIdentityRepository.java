@@ -33,4 +33,12 @@ public interface SocialIdentityRepository {
    * KnownDeviceRepository#findAllByAccountId}'s own identical addition documents.
    */
   List<SocialIdentity> findAllByAccountId(AccountId accountId);
+
+  /**
+   * TD-FUT-043: unlinks one provider from the Account, scoped by {@code accountId} so a caller can
+   * only ever remove its own link.
+   *
+   * @return {@code true} if a link was removed
+   */
+  boolean deleteByAccountIdAndProvider(AccountId accountId, SocialProvider provider);
 }

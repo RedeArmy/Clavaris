@@ -140,6 +140,33 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(decodePayload(tokens.tokenResponse().accessToken()).has("email")).isFalse();
   }
 
+  // TD-FUT-042: the phone scope (OIDC Core 5.4) puts phone_number on the ID token and, through the
+  // mapper's existing phone gate, on /userinfo. Clavaris never verifies a number, so the flag is
+  // false, and the access token stays free of both.
+  @Test
+  void thePhoneScopePutsThePhoneNumberOnTheIdTokenAndUserInfo() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange("phone-claims@example.com", "openid phone", true);
+
+    JsonNode idToken = decodePayload(tokens.tokenResponse().idToken());
+    assertThat(idToken.get("phone_number").asString()).isEqualTo("+50255551234");
+    assertThat(idToken.get("phone_number_verified").asBoolean()).isFalse();
+    JsonNode userInfo = getUserInfo(tokens);
+    assertThat(userInfo.get("phone_number").asString()).isEqualTo("+50255551234");
+    assertThat(userInfo.get("phone_number_verified").asBoolean()).isFalse();
+    assertThat(decodePayload(tokens.tokenResponse().accessToken()).has("phone_number")).isFalse();
+  }
+
+  @Test
+  void withoutThePhoneScopeNoPhoneClaimIsIssued() throws Exception {
+    IssuedTokens tokens =
+        completeARealAuthorizationCodeExchange(
+            "no-phone-scope@example.com", "openid profile email", true);
+
+    assertThat(decodePayload(tokens.tokenResponse().idToken()).has("phone_number")).isFalse();
+    assertThat(getUserInfo(tokens).has("phone_number")).isFalse();
+  }
+
   @Test
   void anUnverifiedEmailIsReportedAsFalseNotOmitted() throws Exception {
     IssuedTokens tokens =
@@ -524,8 +551,8 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
     registerAccount(organizationId, email, "a-correct-password");
     if (markVerified) {
       jdbcTemplate.update(
-          "update accounts set email_verified_at = now(), first_name = 'Eder', last_name = 'Test'"
-              + " where organization_id = ? and email = ?",
+          "update accounts set email_verified_at = now(), first_name = 'Eder', last_name = 'Test',"
+              + " phone_number = '+50255551234' where organization_id = ? and email = ?",
           organizationId,
           email);
     }
@@ -560,7 +587,19 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         organizationId, new TokenResponse(accessToken, idToken), subject, client, refreshToken);
   }
 
+  // One platform token for the whole class: every test used to ask for its own, and the platform
+  // client's token endpoint is rate-limited (20 per 5 minutes per client, ADR-0010 section 6), a
+  // limit this class's test count was already close to; adding two tests tipped it over.
+  private static String cachedPlatformToken;
+
   private String requestPlatformAccessToken() throws IOException, InterruptedException {
+    if (cachedPlatformToken == null) {
+      cachedPlatformToken = fetchPlatformAccessToken();
+    }
+    return cachedPlatformToken;
+  }
+
+  private String fetchPlatformAccessToken() throws IOException, InterruptedException {
     String basicAuth =
         Base64.getEncoder()
             .encodeToString("test-platform-client:a-test-platform-secret".getBytes());
@@ -623,7 +662,7 @@ class UserInfoAndEndSessionIntegrationTest extends RedisBackedIntegrationTest {
         {
           "redirectUris": ["%s"],
           "allowedGrantTypes": ["authorization_code", "refresh_token"],
-          "allowedScopes": ["openid", "profile", "email"],
+          "allowedScopes": ["openid", "profile", "email", "phone"],
           "requireConsent": false%s
         }
         """

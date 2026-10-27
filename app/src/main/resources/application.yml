@@ -505,6 +505,9 @@ server:
     mime-types: text/html,text/css,application/javascript,application/json,text/plain
   tomcat:
     threads:
+      # TD-FUT-046: spring.threads.virtual.enabled was measured and left off — it lifts this cap,
+      # and 30 concurrent sign-ins then exhaust the JDBC pool (30 x 500, flow p95 7 s -> 27 s).
+      # See load-testing/README.md §5e before changing either.
       # TD-PERF-007: previously left at Spring Boot's own default (200), with no reasoning behind
       # it against this system's own real, measured bottleneck — TD-FUT-017's own load test found
       # /oauth2/token (Argon2id, ADR-0005, ~16-19MiB working memory per concurrent verification)
