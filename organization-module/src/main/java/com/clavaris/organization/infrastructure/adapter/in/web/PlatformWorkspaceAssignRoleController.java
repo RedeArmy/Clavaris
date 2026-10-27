@@ -35,8 +35,11 @@ import org.springframework.web.server.ResponseStatusException;
  * invariant, so {@code AssignWorkspaceRoleToAccountService} does not enforce it). See {@link
  * PlatformWorkspaceController} for the family this belongs to.
  */
-// PMD.LongVariable: collaborator names spell out the use case they hold.
-@SuppressWarnings("PMD.LongVariable")
+// PMD.LongVariable: collaborator names spell out the use case they hold. java:S1075: the
+// organizations path is this dashboard's own route, the same one the class-level @RequestMapping
+// serves; it is built into the form actions the popups post back to, not an external URI that a
+// deployment could configure.
+@SuppressWarnings({"PMD.LongVariable", "java:S1075"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceAssignRoleController {
