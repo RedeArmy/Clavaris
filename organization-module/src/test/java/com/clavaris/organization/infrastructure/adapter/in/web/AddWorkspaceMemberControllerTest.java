@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
+import com.clavaris.organization.application.usecase.addworkspacemember.AccountAlreadyExistsException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceRoleNotFoundException;
@@ -106,9 +106,7 @@ class AddWorkspaceMemberControllerTest {
   @Test
   void returns409WhenTheEmailIsAlreadyRegistered() throws Exception {
     when(useCase.handle(any()))
-        .thenThrow(
-            new AccountProvisioner.AccountAlreadyExistsException(
-                UUID.randomUUID(), "taken@example.com"));
+        .thenThrow(new AccountAlreadyExistsException(UUID.randomUUID(), "taken@example.com"));
 
     mockMvc
         .perform(

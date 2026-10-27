@@ -23,6 +23,7 @@ import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPas
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.organization.application.usecase.addworkspacemember.AccountAlreadyExistsException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -104,7 +105,7 @@ class WorkspaceMemberAccountProvisionerBridgeTest {
     when(registerAccount.handle(any()))
         .thenThrow(new EmailAlreadyRegisteredException(new OrganizationId(organizationId)));
 
-    assertThatExceptionOfType(AccountProvisioner.AccountAlreadyExistsException.class)
+    assertThatExceptionOfType(AccountAlreadyExistsException.class)
         .isThrownBy(() -> bridge.provisionAndSendWelcome(organizationId, "taken@example.com"));
 
     verify(requestPasswordReset, never()).handle(any());
