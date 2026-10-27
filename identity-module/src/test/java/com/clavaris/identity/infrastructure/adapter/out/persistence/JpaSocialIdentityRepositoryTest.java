@@ -76,6 +76,25 @@ class JpaSocialIdentityRepositoryTest {
     assertThat(found.get().providerUserId()).isEqualTo("google-sub-1");
   }
 
+  // TD-FUT-043: unlinking removes only that provider of that Account.
+  @Test
+  void deletesOnlyTheNamedProviderOfTheNamedAccount() {
+    repository.save(SocialIdentity.link(accountId, organizationId, SocialProvider.GOOGLE, "g-1"));
+    repository.save(SocialIdentity.link(accountId, organizationId, SocialProvider.GITHUB, "h-1"));
+
+    assertThat(repository.deleteByAccountIdAndProvider(accountId, SocialProvider.GITHUB)).isTrue();
+
+    assertThat(repository.findAllByAccountId(accountId))
+        .extracting(SocialIdentity::provider)
+        .containsExactly(SocialProvider.GOOGLE);
+    assertThat(repository.deleteByAccountIdAndProvider(accountId, SocialProvider.GITHUB)).isFalse();
+    assertThat(
+            repository.deleteByAccountIdAndProvider(
+                new AccountId(UUID.randomUUID()), SocialProvider.GOOGLE))
+        .as("another account's call cannot remove this link")
+        .isFalse();
+  }
+
   @Test
   void findIsEmptyForAnUnknownTriple() {
     assertThat(

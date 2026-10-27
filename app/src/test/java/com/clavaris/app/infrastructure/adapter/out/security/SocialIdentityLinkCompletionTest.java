@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.clavaris.identity.application.usecase.connectsocialidentity.ConnectSocialIdentityCommand;
 import com.clavaris.identity.application.usecase.connectsocialidentity.ConnectSocialIdentityUseCase;
+import com.clavaris.identity.application.usecase.connectsocialidentity.SocialConnectionNotAllowedException;
 import com.clavaris.identity.application.usecase.connectsocialidentity.SocialIdentityAlreadyLinkedException;
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
@@ -112,5 +113,42 @@ class SocialIdentityLinkCompletionTest {
     verify(sessions)
         .establishViaSocialLogin(
             any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any());
+  }
+
+  @Test
+  void withoutASessionItIsAPlainSignIn() throws Exception {
+    assertThat(
+            completion.completeIfRequested(
+                request, response, null, organizationId.toString(), SocialProvider.GITHUB, "gh-1"))
+        .isFalse();
+  }
+
+  @Test
+  void anIntentWithoutAnOrganizationIsDroppedAndIgnored() throws Exception {
+    plantIntent(Instant.now());
+
+    assertThat(
+            completion.completeIfRequested(
+                request, response, session, null, SocialProvider.GITHUB, "gh-1"))
+        .isFalse();
+    verify(connect, never()).handle(any());
+  }
+
+  @Test
+  void aProviderTheOrganizationDisabledMidFlowStillRestoresTheSession() throws Exception {
+    plantIntent(Instant.now());
+    doThrow(new SocialConnectionNotAllowedException()).when(connect).handle(any());
+
+    assertThat(run()).isTrue();
+
+    assertThat(response.getRedirectedUrl()).endsWith("/account/connections?connectError");
+    verify(sessions)
+        .establishViaSocialLogin(
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.eq(accountId),
+            any(),
+            org.mockito.ArgumentMatchers.eq(false),
+            any());
   }
 }

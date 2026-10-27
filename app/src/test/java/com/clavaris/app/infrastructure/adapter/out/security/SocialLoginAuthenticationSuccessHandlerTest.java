@@ -62,6 +62,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
   private RequestDeviceTrustChallengeUseCase requestDeviceTrustChallenge;
   private AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private RecordLoginEventUseCase recordLoginEvent;
+  private SocialIdentityLinkCompletion linkCompletion;
   private SocialLoginAuthenticationSuccessHandler handler;
 
   @BeforeEach
@@ -77,6 +78,8 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     requestDeviceTrustChallenge = mock(RequestDeviceTrustChallengeUseCase.class);
     authenticationPolicyProvider = mock(AccountAuthenticationPolicyProvider.class);
     recordLoginEvent = mock(RecordLoginEventUseCase.class);
+    // TD-FUT-043: no link intent by default (the mock answers false), i.e. a plain sign-in.
+    linkCompletion = mock(SocialIdentityLinkCompletion.class);
     when(redirectUrlResolver.resolve(any(), any(), any(), any()))
         .thenReturn(java.util.Optional.empty());
     // TD-SEC-055: neither gate fires by default — every pre-existing test in this class exercises
@@ -97,8 +100,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
             requestDeviceTrustChallenge,
             authenticationPolicyProvider,
             recordLoginEvent,
-            // TD-FUT-043: no link intent by default (the mock answers false), i.e. a plain sign-in.
-            mock(SocialIdentityLinkCompletion.class));
+            linkCompletion);
   }
 
   private Account stubAccount(final UUID organizationId, final AccountId accountId) {
@@ -131,6 +133,27 @@ class SocialLoginAuthenticationSuccessHandlerTest {
     DefaultOAuth2User principal =
         new DefaultOAuth2User(List.of(new SimpleGrantedAuthority("ROLE_USER")), attributes, "id");
     return new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "github");
+  }
+
+  // TD-FUT-043: a callback that finishes a "connect a provider" action is answered by the link
+  // completion and must never reach the sign-in use case.
+  @Test
+  void aCallbackThatCompletesAConnectIsNotASignIn() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE,
+            organizationId.toString());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    when(linkCompletion.completeIfRequested(
+            any(), any(), any(), eq(organizationId.toString()), any(), eq("google-sub-123")))
+        .thenReturn(true);
+
+    handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
+
+    org.mockito.Mockito.verify(tenantUseCase, org.mockito.Mockito.never()).handle(any());
   }
 
   @Test

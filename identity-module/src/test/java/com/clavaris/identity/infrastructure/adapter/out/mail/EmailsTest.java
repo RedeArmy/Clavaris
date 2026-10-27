@@ -49,7 +49,11 @@ class EmailsTest {
         Emails.signInCode(ORG, "111222"),
         Emails.signInLink(ORG, LINK),
         Emails.deviceTrustCode(ORG, "999888"),
-        Emails.newDeviceAlert(ORG, "Mozilla/5.0 Test Browser", "203.0.113.5", AT, LINK, false));
+        Emails.newDeviceAlert(ORG, "Mozilla/5.0 Test Browser", "203.0.113.5", AT, LINK, false),
+        Emails.passwordChanged(ORG),
+        Emails.emailChangeVerification(ORG, LINK),
+        Emails.emailChangeNotice(ORG, "new@example.com", false),
+        Emails.emailChangeNotice(ORG, "new@example.com", true));
   }
 
   private static List<Emails.Composed> platformEmails() {

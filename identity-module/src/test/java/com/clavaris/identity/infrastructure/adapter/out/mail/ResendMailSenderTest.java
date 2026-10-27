@@ -87,6 +87,34 @@ class ResendMailSenderTest {
         .contains(BASE_URL + "/o/" + organizationId + "/verify-email?token=the-raw-token");
   }
 
+  // TD-FUT-043: the three emails of the self-service credential changes go out through the same
+  // request shape, and the verification link points at the confirm page of the right Organization.
+  @Test
+  void theSelfServiceCredentialEmailsAreSentWithTheirOwnSubjectAndLink() {
+    respondWith(200, "");
+    ResendMailSender sender = senderPointedAtTheStubServer();
+    UUID organizationId = UUID.randomUUID();
+    OrganizationId org = new OrganizationId(organizationId);
+
+    sender.sendPasswordChangedNotice("owner@example.com", org);
+    JsonNode changed = objectMapper.readTree(capturedRequest.body);
+    assertThat(changed.get("to").get(0).asString()).isEqualTo("owner@example.com");
+    assertThat(changed.get("subject").asString()).isEqualTo("Your password was changed");
+
+    sender.sendEmailChangeVerification("new@example.com", org, "the-raw-token");
+    JsonNode verification = objectMapper.readTree(capturedRequest.body);
+    assertThat(verification.get("to").get(0).asString()).isEqualTo("new@example.com");
+    assertThat(verification.get("html").asString())
+        .contains(BASE_URL + "/o/" + organizationId + "/account/email/confirm?token=the-raw-token");
+
+    sender.sendEmailChangeNotice("owner@example.com", org, "new@example.com", false);
+    JsonNode asked = objectMapper.readTree(capturedRequest.body);
+    sender.sendEmailChangeNotice("owner@example.com", org, "new@example.com", true);
+    JsonNode done = objectMapper.readTree(capturedRequest.body);
+    assertThat(asked.get("html").asString()).contains("new@example.com");
+    assertThat(done.get("subject").asString()).isNotEqualTo(asked.get("subject").asString());
+  }
+
   // A tenant's email is sent in its Organization's name: the sender's display name, the header and
   // the footer. Clavaris appears nowhere in it.
   @Test
