@@ -202,7 +202,7 @@ jobs:
 
       - name: Install cosign
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: sigstore/cosign-installer@v4.1.0
+        uses: sigstore/cosign-installer@v4.1.2
 
       # A CycloneDX SBOM of what is inside the image (OS packages and the Java dependencies in the
       # jar), generated from the pushed digest so it describes exactly that image. Kept as a build
