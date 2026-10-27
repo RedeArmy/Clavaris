@@ -60,10 +60,10 @@
             <div class="clavaris-section-card" th:if="${impersonationToken != null}">
                 <h2>Impersonation token</h2>
                 <p>This token will not be shown again — copy it now.</p>
-                <p>Access token: <code th:text="${impersonationToken.accessToken()}">token</code></p>
-                <p>Type: <span th:text="${impersonationToken.tokenType()}">Bearer</span></p>
-                <p>Expires: <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(impersonationToken.expiresAt())}">expires</span></p>
-                <p>Scope: <span th:text="${#strings.arrayJoin(impersonationToken.scope().toArray(), ' ')}">scope</span></p>
+                <p>Access token: <code th:text="${impersonationToken['accessToken']}">token</code></p>
+                <p>Type: <span th:text="${impersonationToken['tokenType']}">Bearer</span></p>
+                <p>Expires: <span th:text="${T(com.clavaris.common.i18n.LocalizedDateFormatter).format(T(java.time.Instant).parse(impersonationToken['expiresAt']))}">expires</span></p>
+                <p>Scope: <span th:text="${impersonationToken['scope']}">scope</span></p>
             </div>
 
             <output class="clavaris-alert clavaris-alert--success" th:if="${param.profileUpdated}">Profile was updated.</output>

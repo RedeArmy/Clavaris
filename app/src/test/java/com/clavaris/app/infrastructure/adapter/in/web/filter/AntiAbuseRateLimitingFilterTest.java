@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +35,7 @@ class AntiAbuseRateLimitingFilterTest {
 
   @Test
   void allowsARequestThatMatchesNoRuleWithoutConsultingTheRateLimiterAtAll() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
@@ -58,9 +59,60 @@ class AntiAbuseRateLimitingFilterTest {
     verify(rateLimiter, never()).tryConsume(any(), anyInt(), any());
   }
 
+  // TD-PERF-046: every rule a request matches is consumed in one limiter call, so a store that
+  // answers a batch in one round trip serves a login (three rules) with a single trip.
+  @Test
+  void handsEveryMatchingRuleToTheLimiterInOneBatch() throws Exception {
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+    when(rateLimiter.tryConsume(any(), anyInt(), any()))
+        .thenReturn(new RateLimitDecision(true, 1, Duration.ofMinutes(1)));
+    AntiAbuseRateLimitingFilter filter =
+        new AntiAbuseRateLimitingFilter(
+            rateLimiter,
+            KEY_HASHER,
+            List.of(
+                new RateLimitRule(
+                    "login:account",
+                    HttpMethod.POST,
+                    "/o/*/login",
+                    RateLimitRule.always(),
+                    RateLimitIdentifiers::emailFormField,
+                    10,
+                    Duration.ofMinutes(5)),
+                new RateLimitRule(
+                    "login:ip",
+                    HttpMethod.POST,
+                    "/o/*/login",
+                    RateLimitRule.always(),
+                    request -> "203.0.113.9",
+                    30,
+                    Duration.ofMinutes(5)),
+                new RateLimitRule(
+                    "token:client",
+                    HttpMethod.POST,
+                    "/o/*/oauth2/token",
+                    RateLimitRule.always(),
+                    request -> "a-client",
+                    20,
+                    Duration.ofMinutes(1))));
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/o/some-org/login");
+    request.setParameter("email", "ada@example.com");
+
+    filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+    org.mockito.ArgumentCaptor<List<RateLimitCheck>> batch =
+        org.mockito.ArgumentCaptor.forClass(List.class);
+    verify(rateLimiter, times(1)).tryConsumeAll(batch.capture());
+    assertThat(batch.getValue())
+        .as("the two rules that match this path, not the token rule")
+        .hasSize(2)
+        .extracting(RateLimitCheck::limit)
+        .containsExactly(10, 30);
+  }
+
   @Test
   void allowsARequestUnderTheLimitAndPassesItThrough() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     when(rateLimiter.tryConsume(any(), eq(10), any()))
         .thenReturn(new RateLimitDecision(true, 3, Duration.ofMinutes(5)));
     AntiAbuseRateLimitingFilter filter =
@@ -89,7 +141,7 @@ class AntiAbuseRateLimitingFilterTest {
 
   @Test
   void blocksWith429AndARetryAfterHeaderWhenTheLimitIsExceeded() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     when(rateLimiter.tryConsume(any(), eq(10), any()))
         .thenReturn(new RateLimitDecision(false, 11, Duration.ofSeconds(42)));
     AntiAbuseRateLimitingFilter filter =
@@ -121,7 +173,7 @@ class AntiAbuseRateLimitingFilterTest {
 
   @Test
   void skipsARuleWhenItsOwnKeyExtractorFindsNothingToKeyOn() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     AntiAbuseRateLimitingFilter filter =
         new AntiAbuseRateLimitingFilter(
             rateLimiter,
@@ -151,7 +203,7 @@ class AntiAbuseRateLimitingFilterTest {
     // BR-ID-06's own two-layer split (per-account, per-IP) only works if both rules actually run
     // against the same request — this proves the per-IP rule alone can block even though the
     // per-account rule for the same request would have allowed it.
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     when(rateLimiter.tryConsume(
             eq("ratelimit:login:account:" + KEY_HASHER.hash("user@example.com")), eq(10), any()))
         .thenReturn(new RateLimitDecision(true, 1, Duration.ofMinutes(5)));
@@ -194,7 +246,7 @@ class AntiAbuseRateLimitingFilterTest {
 
   @Test
   void neverLeaksWhichSpecificRuleWasHitInTheResponseBody() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     when(rateLimiter.tryConsume(any(), anyInt(), any()))
         .thenReturn(new RateLimitDecision(false, 99, Duration.ofSeconds(5)));
     AntiAbuseRateLimitingFilter filter =
@@ -223,7 +275,7 @@ class AntiAbuseRateLimitingFilterTest {
 
   @Test
   void respondsWithPlainTextByDefaultForANonBrowserCaller() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     when(rateLimiter.tryConsume(any(), anyInt(), any()))
         .thenReturn(new RateLimitDecision(false, 99, Duration.ofSeconds(5)));
     AntiAbuseRateLimitingFilter filter =
@@ -258,7 +310,7 @@ class AntiAbuseRateLimitingFilterTest {
   // respondTooManyRequests for the full rationale).
   @Test
   void respondsWithAStyledHtmlPageForABrowserRequest() throws Exception {
-    RateLimiter rateLimiter = mock(RateLimiter.class);
+    RateLimiter rateLimiter = mock(RateLimiter.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     when(rateLimiter.tryConsume(any(), anyInt(), any()))
         .thenReturn(new RateLimitDecision(false, 99, Duration.ofSeconds(5)));
     AntiAbuseRateLimitingFilter filter =

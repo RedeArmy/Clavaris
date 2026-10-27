@@ -217,4 +217,48 @@ class SigningKeyStoreTest {
                 .getPublic())
         .isEqualTo(organizationKey.getPublic());
   }
+
+  // TD-PERF-043: purging a tenant's whole kid history is one load and one write, and leaves the
+  // scope's own file gone once nothing is left in it.
+  @Test
+  void deleteAllRemovesEveryGivenKidAndTheFileWhenNothingIsLeft() {
+    SigningKeyStore store = newStore();
+    KeyStoreScope scope = KeyStoreScope.organization(UUID.randomUUID());
+    String first = UUID.randomUUID().toString();
+    String second = UUID.randomUUID().toString();
+    store.generate(scope, first);
+    store.generate(scope, second);
+
+    store.deleteAll(scope, java.util.List.of(first, second, UUID.randomUUID().toString()));
+
+    assertThat(store.find(scope, first)).isEmpty();
+    assertThat(store.find(scope, second)).isEmpty();
+    assertThat(tempDir.resolve("signing-keys-" + scope.id() + ".p12")).doesNotExist();
+  }
+
+  @Test
+  void deleteAllKeepsTheKidsItWasNotAskedToRemove() {
+    SigningKeyStore store = newStore();
+    KeyStoreScope scope = KeyStoreScope.organization(UUID.randomUUID());
+    String purged = UUID.randomUUID().toString();
+    String kept = UUID.randomUUID().toString();
+    store.generate(scope, purged);
+    store.generate(scope, kept);
+
+    store.deleteAll(scope, java.util.List.of(purged));
+
+    assertThat(store.find(scope, purged)).isEmpty();
+    assertThat(store.find(scope, kept)).isPresent();
+  }
+
+  @Test
+  void deleteAllIsANoOpForAScopeThatHasNoFileOrNoKids() {
+    SigningKeyStore store = newStore();
+    KeyStoreScope scope = KeyStoreScope.organization(UUID.randomUUID());
+
+    store.deleteAll(scope, java.util.List.of(UUID.randomUUID().toString()));
+    store.deleteAll(scope, java.util.List.of());
+
+    assertThat(store.find(scope, UUID.randomUUID().toString())).isEmpty();
+  }
 }

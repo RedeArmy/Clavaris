@@ -749,6 +749,15 @@ msgstr "Eliminar endpoint de webhook — Clavaris"
 msgid "Delete workspace"
 msgstr "Eliminar espacio de trabajo"
 
+msgid "More accounts match; type in the search box to narrow them down."
+msgstr "Hay más cuentas que coinciden; escribe en el buscador para acotarlas."
+
+msgid "Name, username or email"
+msgstr "Nombre, usuario o correo electrónico"
+
+msgid "No matching users"
+msgstr "No hay usuarios que coincidan"
+
 msgid "When disabled, signing in again revokes every other active session for that Account."
 msgstr "Si se deshabilita, volver a iniciar sesión revoca el resto de las sesiones activas de esa cuenta."
 

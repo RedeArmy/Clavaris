@@ -181,6 +181,35 @@ passes its own readiness probe, whether or not a rollback ends up happening.
 If a rollback fires, `deploy.sh` exits non-zero with a pointer to `docker compose logs app` — fix
 the underlying issue and merge a new commit before re-running, don't just retry blind.
 
+### 4a. Verifying an image before you run it (TD-SEC-067)
+
+Every image CI pushes from `master` is signed and carries its provenance and a bill of materials,
+so a person (or a consumer's vendor assessment) can check where it came from instead of trusting a
+tag. `<owner>` is the lowercase GitHub owner and `<digest>` the `sha256:...` of the image you pulled
+(`docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/<owner>/clavaris:<tag>`):
+
+```bash
+IMAGE=ghcr.io/<owner>/clavaris@<digest>
+IDENTITY='https://github.com/<Owner>/Clavaris/.github/workflows/ci.yml@refs/heads/master'
+ISSUER=https://token.actions.githubusercontent.com
+
+# 1. The signature: made by this repository's CI workflow on master, keyless (Sigstore).
+cosign verify "$IMAGE" --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER"
+
+# 2. The CycloneDX bill of materials, signed by the same identity.
+cosign verify-attestation "$IMAGE" --type cyclonedx \
+  --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
+  | jq -r '.payload' | base64 -d | jq '.predicate.components | length'
+
+# 3. The SLSA provenance BuildKit attached: commit, workflow run, builder.
+docker buildx imagetools inspect "$IMAGE" --format '{{json .Provenance}}'
+```
+
+The same SBOM is also kept as the `sbom.cdx.json` artifact of the CI run that built the image. The
+image that is signed is the one pushed from the build cache the scanned build filled, so it has the
+same layers as the image Trivy scanned, but it is a second `buildx` invocation, not the same
+object: a tag on it never proves more than its digest does, and the digest is what is signed.
+
 ## 5. Rolling back manually (to a specific, older commit — not the immediately-previous one)
 
 Every image `ci.yml` pushes is also tagged with the exact commit SHA it was built from, not only
@@ -274,6 +303,22 @@ run, not hypothesized**: Docker Compose prefixes every named volume with its own
 name silently miss the real one in production. Fixed by adding explicit `name:` to every volume in
 that file, confirmed safe to do now (before any real production instance holds real data) rather
 than a live migration hazard.
+
+### 6e. What Redis keeps across a restart (TD-PROC-014)
+
+Redis holds HTTP sessions, rate-limit counters and idempotency keys, none of it a system of record,
+but a restart is not free: it signs every person out and resets every counter. `redis` runs with the
+append-only file on (`--appendonly yes --appendfsync everysec`) over the `clavaris-redis-data`
+volume, so a restart or a crashed container loses **at most the last second** of that state, where
+the default snapshot schedule lost the last several minutes. That is persistence, not a backup:
+`backup-postgres.sh` deliberately does not capture Redis, and losing the volume signs everyone out
+and resets the counters, nothing more. A session that was written before the 2026-10-26 change from
+JDK serialization to JSON (TD-ARCH-039) cannot be read afterwards and ends as a sign-out; there is
+nothing to migrate.
+
+The three base images (`postgres`, `redis`, `caddy`) are pinned by digest in both compose files and
+Dependabot's `docker-compose` ecosystem proposes the bumps weekly, so a base-image change arrives as
+a pull request to review, not silently on the next `docker compose pull`.
 
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 

@@ -6,7 +6,7 @@
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16@sha256:9e2cf6287f25c3151f4c9421ccce2b17f3e60061c111a29165e0d2cdd9ff0a97
     environment:
       POSTGRES_USER: ${DB_DEV_USER:-clavaris}
       POSTGRES_PASSWORD: ${DB_DEV_PASSWORD:-clavaris}
@@ -28,7 +28,10 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7
+    image: redis:7@sha256:bd28fff4b665fdf1b73e8b5b73ec05d2f858f4fa3c8ea0d7c9bc09f7f6bf7039
+    # TD-PROC-014: append-only file, fsync once a second, so a restart loses at most the last
+    # second of sessions and rate-limit counters instead of the last snapshot interval (minutes).
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:

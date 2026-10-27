@@ -6,6 +6,8 @@ import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Shared column mapping for {@code platform_clients} and {@code organization_clients} — {@code
@@ -34,7 +36,8 @@ public abstract class AbstractClientCredentialEntity {
   @Column(name = "client_secret_hash", nullable = false)
   protected String clientSecretHash;
 
-  @Column(name = "allowed_scopes", nullable = false, columnDefinition = "text")
+  @Column(name = "allowed_scopes", nullable = false)
+  @JdbcTypeCode(SqlTypes.JSON)
   protected String allowedScopes;
 
   @Column(name = "created_at", nullable = false)

@@ -13,6 +13,7 @@ import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -151,16 +152,53 @@ class SigningKeyStore {
     final Path filePath = fileFor(scope);
     final KeyStore keyStore = load(scope, filePath);
     try {
-      if (keyStore.containsAlias(privateAlias(kid))) {
-        keyStore.deleteEntry(privateAlias(kid));
-      }
-      if (keyStore.containsAlias(publicAlias(kid))) {
-        keyStore.deleteEntry(publicAlias(kid));
-      }
+      removeEntries(keyStore, kid);
       persist(scope, filePath, keyStore);
     } catch (final GeneralSecurityException e) {
       throw new IllegalStateException(
           "Failed to delete signing key '" + kid + "' from the key store at " + filePath, e);
+    }
+  }
+
+  /**
+   * TD-PERF-043: removes every one of {@code kids} from {@code scope}'s store with one load and one
+   * write. {@link #delete} per kid read and rewrote the whole PKCS12 file each time, so purging a
+   * tenant with N historical keys cost N reads and N writes (about 40 ms each) while holding this
+   * store's lock. The file is removed altogether when nothing is left in it, since it is this
+   * scope's own file (TD-SEC-054) and an empty one is only residue. A kid the store never had is
+   * skipped, as in {@link #delete}.
+   */
+  /* package */ synchronized void deleteAll(
+      final KeyStoreScope scope, final java.util.Collection<String> kids) {
+    final Path filePath = fileFor(scope);
+    if (kids.isEmpty() || !Files.exists(filePath)) {
+      return;
+    }
+    final KeyStore keyStore = load(scope, filePath);
+    try {
+      for (final String kid : kids) {
+        removeEntries(keyStore, kid);
+      }
+      if (keyStore.size() == 0) {
+        Files.deleteIfExists(filePath);
+      } else {
+        persist(scope, filePath, keyStore);
+      }
+    } catch (final GeneralSecurityException e) {
+      throw new IllegalStateException(
+          "Failed to delete signing keys from the key store at " + filePath, e);
+    } catch (final IOException e) {
+      throw new UncheckedIOException("Failed to remove the empty key store at " + filePath, e);
+    }
+  }
+
+  // Both entries of a kid's pair, each only if present.
+  private void removeEntries(final KeyStore keyStore, final String kid) throws KeyStoreException {
+    if (keyStore.containsAlias(privateAlias(kid))) {
+      keyStore.deleteEntry(privateAlias(kid));
+    }
+    if (keyStore.containsAlias(publicAlias(kid))) {
+      keyStore.deleteEntry(publicAlias(kid));
     }
   }
 

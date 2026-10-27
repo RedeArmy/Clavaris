@@ -152,8 +152,9 @@ public class OrganizationSigningKeyMaterialFactory implements SigningKeyMaterial
   public void purgeAllFor(final OrganizationId organizationId, final Collection<String> kids) {
     activeSigningKeys.remove(organizationId.value());
     final KeyStoreScope scope = KeyStoreScope.organization(organizationId.value());
+    // TD-PERF-043: one load and one write for the whole kid history, not one pair per kid.
+    keyStore.deleteAll(scope, kids);
     for (final String kid : kids) {
-      keyStore.delete(scope, kid);
       publicKeys.invalidate(publicKeyCacheKey(organizationId, kid));
     }
   }

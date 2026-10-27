@@ -81,7 +81,7 @@ class OrphanedOAuthClientCleanupJobTest extends RedisBackedIntegrationTest {
     jdbcTemplate.update(
         "insert into oauth_clients (id, organization_id, client_id, client_secret_hash,"
             + " redirect_uris, allowed_grant_types, allowed_scopes)"
-            + " values (?, ?, ?, ?, ?, ?, ?)",
+            + " values (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb)",
         UUID.randomUUID(),
         organizationId,
         clientId,

@@ -105,6 +105,17 @@ class DistributedSessionIntegrationTest extends RedisBackedIntegrationTest {
       assertThat(rawRedis.keys("clavaris:sessions:sessions:*"))
           .as("a real Redis hash key must exist for the session this login just created")
           .isNotEmpty();
+      // TD-ARCH-039: and the security context in it is typed JSON, not a JDK-serialized object.
+      Object storedContext =
+          rawRedis
+              .opsForHash()
+              .get(
+                  "clavaris:sessions:sessions:" + sessionId, "sessionAttr:SPRING_SECURITY_CONTEXT");
+      assertThat(storedContext).isInstanceOf(String.class);
+      assertThat((String) storedContext)
+          .contains("\"@class\"")
+          .contains("ROLE_PLATFORM_ACCOUNT")
+          .doesNotStartWith("\u00ac\u00ed");
     } finally {
       rawConnectionFactory.destroy();
     }
@@ -114,8 +125,20 @@ class DistributedSessionIntegrationTest extends RedisBackedIntegrationTest {
     // can load that exact session by id and reconstruct who is authenticated on it — the actual
     // property TD-ARCH-002 was about (works across more than one running instance), not just
     // "some bytes exist in Redis."
+    // TD-ARCH-039: the other instance reads the same typed JSON the first one wrote, through the
+    // serializer production uses, registered under the name Spring Session looks it up by. Not a
+    // @Bean on the nested configuration: that class is also picked up by this test's own context,
+    // where the real bean already has the name.
     try (AnnotationConfigApplicationContext secondInstance =
-        new AnnotationConfigApplicationContext(SecondInstanceSessionConfig.class)) {
+        new AnnotationConfigApplicationContext()) {
+      secondInstance.register(SecondInstanceSessionConfig.class);
+      secondInstance.registerBean(
+          "springSessionDefaultRedisSerializer",
+          org.springframework.data.redis.serializer.RedisSerializer.class,
+          () ->
+              com.clavaris.app.infrastructure.config.SessionJsonSerializerFactory.create(
+                  getClass().getClassLoader()));
+      secondInstance.refresh();
       final FindByIndexNameSessionRepository<? extends Session> sessionRepository =
           secondInstance.getBean(FindByIndexNameSessionRepository.class);
       final Session session = sessionRepository.findById(sessionId);

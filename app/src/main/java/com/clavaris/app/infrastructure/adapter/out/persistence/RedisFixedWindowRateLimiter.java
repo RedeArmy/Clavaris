@@ -1,9 +1,11 @@
 package com.clavaris.app.infrastructure.adapter.out.persistence;
 
+import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitCheck;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimitDecision;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.RateLimiter;
 import com.clavaris.common.application.port.SecurityMetricsRecorder;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,27 +78,40 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
   // TTL is deliberately 2×window (below), longer than "time left in the caller-visible window",
   // since it also has to survive long enough to still be readable as *next* window's own "previous
   // bucket".
+  //
+  // TD-PERF-046: the script takes any number of counters, KEYS[i] with its window in ARGV[i], and
+  // returns the three values for each in order, flattened ({current1, previous1, elapsed1,
+  // current2, ...}). A request that matches several rules costs one round trip instead of one per
+  // rule; a single counter is the same script with one key. Every key is consumed whatever an
+  // earlier one returned. All keys must live on one Redis node (true of the standalone Redis this
+  // runs against; a cluster would need a shared hash tag).
   @SuppressWarnings("PMD.LongVariable")
   private static final RedisScript<List> INCREMENT_AND_GET_WINDOW_STATE_SCRIPT =
       new DefaultRedisScript<>(
           """
-          local windowSeconds = tonumber(ARGV[1])
-          local windowMicros = windowSeconds * 1000000
           local now = redis.call('TIME')
           local nowMicros = (tonumber(now[1]) * 1000000) + tonumber(now[2])
-          local currentBucket = math.floor(nowMicros / windowMicros)
-          local previousBucket = currentBucket - 1
-          local currentKey = KEYS[1] .. ':' .. currentBucket
-          local previousKey = KEYS[1] .. ':' .. previousBucket
+          local out = {}
+          for i = 1, #KEYS do
+            local windowSeconds = tonumber(ARGV[i])
+            local windowMicros = windowSeconds * 1000000
+            local currentBucket = math.floor(nowMicros / windowMicros)
+            local previousBucket = currentBucket - 1
+            local currentKey = KEYS[i] .. ':' .. currentBucket
+            local previousKey = KEYS[i] .. ':' .. previousBucket
 
-          local currentCount = redis.call('INCR', currentKey)
-          if tonumber(currentCount) == 1 then
-            redis.call('EXPIRE', currentKey, windowSeconds * 2)
+            local currentCount = redis.call('INCR', currentKey)
+            if tonumber(currentCount) == 1 then
+              redis.call('EXPIRE', currentKey, windowSeconds * 2)
+            end
+            local previousCount = tonumber(redis.call('GET', previousKey)) or 0
+            local elapsedMicrosInCurrent = nowMicros - (currentBucket * windowMicros)
+
+            out[#out + 1] = currentCount
+            out[#out + 1] = previousCount
+            out[#out + 1] = elapsedMicrosInCurrent
           end
-          local previousCount = tonumber(redis.call('GET', previousKey)) or 0
-          local elapsedMicrosInCurrent = nowMicros - (currentBucket * windowMicros)
-
-          return {currentCount, previousCount, elapsedMicrosInCurrent}
+          return out
           """,
           List.class);
 
@@ -109,27 +124,25 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
     this.metrics = metrics;
   }
 
-  // PMD.GuardLogStatement false positive: every logged argument below is a direct accessor/cheap
-  // call (an exception's own getClass().getSimpleName(), a private helper on an already-built
-  // String), never a constructed/formatted value expensive enough to guard — same rationale as
-  // AuthenticateWithPasswordService's own identical suppression. PMD.OnlyOneReturn: the fail-open
-  // catch block's own early return and the normal-path return are two independent, equally valid
-  // exits — same rationale as RateLimitIdentifiers' own class-wide suppression.
-  // PMD.LongVariable: elapsedMicrosInCurrentBucket names exactly what it is — same "deliberate,
-  // descriptive name over an arbitrary shortening" convention this codebase applies everywhere
-  // else this rule fires.
-  @SuppressWarnings({
-    "unchecked",
-  })
   @Override
   public RateLimitDecision tryConsume(final String key, final int limit, final Duration window) {
+    return tryConsumeAll(List.of(new RateLimitCheck(key, limit, window))).get(0);
+  }
+
+  // TD-PERF-046: one Lua call for every check of a request. @SuppressWarnings("unchecked"): the
+  // script's reply is a raw List of Longs.
+  @SuppressWarnings("unchecked")
+  @Override
+  public List<RateLimitDecision> tryConsumeAll(final List<RateLimitCheck> checks) {
     final List<Long> result;
     try {
       result =
           redisTemplate.execute(
               INCREMENT_AND_GET_WINDOW_STATE_SCRIPT,
-              List.of(key),
-              String.valueOf(window.toSeconds()));
+              checks.stream().map(RateLimitCheck::key).toList(),
+              checks.stream()
+                  .map(check -> String.valueOf(check.window().toSeconds()))
+                  .toArray(Object[]::new));
     } catch (final DataAccessException e) {
       // TD-SEC-022: fail OPEN, not closed. This class sits directly in front of every login,
       // token, and /platform/** request across all three security chains — propagating this
@@ -146,22 +159,32 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
       // TD-FUT-011: real, alertable metric alongside the log line above — alert-rules.yml fires on
       // any occurrence at all, matching a Redis outage's own "this needs a human right now"
       // severity, the same way refresh-token reuse detection does below.
-      LOG.error(
-          "event=rate_limit_fail_open key_prefix={} reason={}",
-          keyPrefixForLogging(key),
-          e.getClass().getSimpleName());
-      metrics.increment(
-          "clavaris.rate_limit.fail_open",
-          "rule",
-          keyPrefixForLogging(key),
-          "reason",
-          e.getClass().getSimpleName());
-      return new RateLimitDecision(true, 0, Duration.ZERO);
+      return checks.stream().map(check -> failOpen(check.key(), e)).toList();
     }
-    final long currentCount = result.get(0);
-    final long previousCount = result.get(1);
-    final long elapsedMicrosInCurrentBucket = result.get(2);
-    final long windowMicros = window.toSeconds() * 1_000_000L;
+    final List<RateLimitDecision> decisions = new ArrayList<>(checks.size());
+    for (int i = 0; i < checks.size(); i++) {
+      decisions.add(
+          decide(checks.get(i), result.get(3 * i), result.get(3 * i + 1), result.get(3 * i + 2)));
+    }
+    return decisions;
+  }
+
+  private RateLimitDecision failOpen(final String key, final DataAccessException failure) {
+    // Computed once, not inside the logging call: the arguments would otherwise be built even when
+    // the level is off.
+    final String rule = keyPrefixForLogging(key);
+    final String reason = failure.getClass().getSimpleName();
+    LOG.error("event=rate_limit_fail_open key_prefix={} reason={}", rule, reason);
+    metrics.increment("clavaris.rate_limit.fail_open", "rule", rule, "reason", reason);
+    return new RateLimitDecision(true, 0, Duration.ZERO);
+  }
+
+  private RateLimitDecision decide(
+      final RateLimitCheck check,
+      final long currentCount,
+      final long previousCount,
+      final long elapsedMicrosInCurrentBucket) {
+    final long windowMicros = check.window().toSeconds() * 1_000_000L;
     // How long until the *current* bucket itself rolls over — a deliberately simple, bounded
     // approximation of "when might this be allowed again," not a precise unblock time (which,
     // under a sliding window, can depend on the next bucket's own count too). Always in
@@ -170,14 +193,15 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
     final Duration retryAfter =
         Duration.ofMillis((windowMicros - elapsedMicrosInCurrentBucket) / 1000);
     final boolean allowed =
-        isAllowed(currentCount, previousCount, elapsedMicrosInCurrentBucket, windowMicros, limit);
+        isAllowed(
+            currentCount, previousCount, elapsedMicrosInCurrentBucket, windowMicros, check.limit());
     // TD-FUT-011: the exact "which rule/endpoint caused a block" attribution this row's own
     // widened description named as missing — every decision, not just fail-open ones, now carries
     // a real counter split by rule and outcome.
     metrics.increment(
         "clavaris.rate_limit.decision",
         "rule",
-        keyPrefixForLogging(key),
+        keyPrefixForLogging(check.key()),
         "outcome",
         allowed ? "allowed" : "blocked");
     return new RateLimitDecision(allowed, currentCount, retryAfter);

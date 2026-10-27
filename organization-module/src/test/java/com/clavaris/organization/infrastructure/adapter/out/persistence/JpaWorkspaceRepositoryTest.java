@@ -67,7 +67,7 @@ class JpaWorkspaceRepositoryTest {
   }
 
   @Test
-  void findAllByOrganizationIdReturnsOnlyThatOrganizationsWorkspaces() {
+  void aKeysetPageReturnsOnlyThatOrganizationsWorkspaces() {
     UUID organizationA = newPersistedOrganizationId();
     UUID organizationB = newPersistedOrganizationId();
     Workspace ownedByA1 = Workspace.register(organizationA, "A's First Workspace");
@@ -77,7 +77,10 @@ class JpaWorkspaceRepositoryTest {
     repository.save(ownedByA2);
     repository.save(ownedByB);
 
-    List<Workspace> found = repository.findAllByOrganizationId(organizationA);
+    List<Workspace> found =
+        repository
+            .findKeysetPageByOrganizationId(organizationA, KeysetPageRequest.first(100))
+            .content();
 
     assertThat(found)
         .extracting(Workspace::id)

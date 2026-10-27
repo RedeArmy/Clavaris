@@ -80,6 +80,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # TD-SEC-067: keyless signing. cosign asks GitHub for a short-lived OIDC identity token for
+      # this workflow run and has Sigstore's Fulcio certify it, so there is no signing key to store,
+      # rotate or leak; the signature is bound to this repository's workflow, not to a person.
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -170,14 +174,56 @@ jobs:
       # runbook.md's own documented flow); :<git-sha> is what an operator pins to for a
       # reproducible rollback target — "which image is actually running" should never depend on
       # remembering when :latest was last pushed.
-      - name: Tag and push image to GHCR
+      #
+      # TD-SEC-067: pushed by buildx itself rather than `docker tag` + `docker push`, because only a
+      # buildx push can attach a SLSA provenance attestation (what was built, from which commit, by
+      # which workflow run) to the image in the registry. Every layer comes from the build cache the
+      # scanned build above just filled, so this is a push, not a second compile. The digest it
+      # outputs is what is signed and attested below: a tag can move, a digest cannot.
+      # GHCR only accepts a lowercase repository path, and an owner such as RedeArmy is not.
+      - name: Name the image
+        id: image
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/clavaris" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image to GHCR, with provenance
+        id: push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: app/Dockerfile
+          push: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha
+
+      - name: Install cosign
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: sigstore/cosign-installer@v4.1.0
+
+      # A CycloneDX SBOM of what is inside the image (OS packages and the Java dependencies in the
+      # jar), generated from the pushed digest so it describes exactly that image. Kept as a build
+      # artifact for a person, and attached to the image below as a signed attestation for a tool.
+      - name: Generate the CycloneDX SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          image: ${{ steps.image.outputs.name }}@${{ steps.push.outputs.digest }}
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          artifact-name: sbom.cdx.json
+
+      - name: Sign the image and attest its SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          # Bound to the digest rather than to a tag.
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.push.outputs.digest }}
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/clavaris"
-          docker tag clavaris-app:ci "${IMAGE,,}:latest"
-          docker tag clavaris-app:ci "${IMAGE,,}:${{ github.sha }}"
-          docker push "${IMAGE,,}:latest"
-          docker push "${IMAGE,,}:${{ github.sha }}"
+          cosign sign --yes "${IMAGE}"
+          cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "${IMAGE}"
 
   dependency-scan:
     name: Dependency vulnerability scan

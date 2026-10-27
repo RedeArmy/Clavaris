@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.assignworkspaceroletoaccou
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -192,6 +193,6 @@ class AssignWorkspaceRoleToAccountServiceTest {
 
     service.handle(command);
 
-    verify(accountDirectory, never()).listAccountsForOrganization(any());
+    verify(accountDirectory, never()).searchAccounts(any(), any(), anyInt());
   }
 }

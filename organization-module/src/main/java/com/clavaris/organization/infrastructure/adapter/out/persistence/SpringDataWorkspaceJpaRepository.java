@@ -11,8 +11,6 @@ import org.springframework.data.repository.query.Param;
 
 interface SpringDataWorkspaceJpaRepository extends JpaRepository<WorkspaceEntity, UUID> {
 
-  List<WorkspaceEntity> findAllByOrganizationId(UUID organizationId);
-
   // Same "scalar projection over full-entity lookup" precedent as identity-module's own
   // SpringDataAccountJpaRepository#findOrganizationIdById.
   @Query("select w.organizationId from WorkspaceEntity w where w.id = :workspaceId")

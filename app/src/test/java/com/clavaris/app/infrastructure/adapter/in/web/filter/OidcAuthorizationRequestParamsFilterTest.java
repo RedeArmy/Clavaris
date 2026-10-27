@@ -68,7 +68,7 @@ class OidcAuthorizationRequestParamsFilterTest {
     return request;
   }
 
-  private static ReauthenticationMarker.Notes markerFor(final String q, final Instant at) {
+  private static java.util.Map<String, String> markerFor(final String q, final Instant at) {
     return ReauthenticationMarker.create(authorize(new MockHttpSession(), q), at);
   }
 

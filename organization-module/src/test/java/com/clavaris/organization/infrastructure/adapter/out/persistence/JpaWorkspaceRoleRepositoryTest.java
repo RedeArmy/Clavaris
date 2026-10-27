@@ -38,6 +38,7 @@ class JpaWorkspaceRoleRepositoryTest {
   @Autowired private WorkspaceRoleRepository repository;
 
   @Autowired private OrganizationRepository organizations;
+  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
   private UUID newPersistedOrganizationId() {
     Organization organization = Organization.register("Test Org", UUID.randomUUID());
@@ -155,4 +156,22 @@ class JpaWorkspaceRoleRepositoryTest {
       })
   @Import({JpaWorkspaceRoleRepository.class, JpaOrganizationRepository.class})
   static class TestConfig {}
+
+  // TD-PERF-047: the self-referencing foreign key is indexed, partially, so deleting a role does
+  // not
+  // scan the table for roles that still name it as their parent.
+  @Test
+  void parentRoleIdIsIndexedForTheForeignKeyCheckWithAPartialIndex() {
+    java.util.List<String> definitions =
+        jdbcTemplate.queryForList(
+            "SELECT indexdef FROM pg_indexes WHERE tablename = 'workspace_roles'"
+                + " AND indexname = 'ix_workspace_roles_parent_role_id'",
+            String.class);
+
+    org.assertj.core.api.Assertions.assertThat(definitions)
+        .singleElement()
+        .asString()
+        .contains("(parent_role_id)")
+        .contains("WHERE (parent_role_id IS NOT NULL)");
+  }
 }

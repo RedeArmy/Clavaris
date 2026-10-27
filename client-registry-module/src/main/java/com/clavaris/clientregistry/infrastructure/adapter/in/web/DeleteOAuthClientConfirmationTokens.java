@@ -1,8 +1,8 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.ConfirmationTokenCodec;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -37,7 +37,8 @@ final class DeleteOAuthClientConfirmationTokens {
     final String token = UUID.randomUUID().toString();
     request
         .getSession(true)
-        .setAttribute(attributeName(clientId), new Entry(token, Instant.now().plus(TTL)));
+        .setAttribute(
+            attributeName(clientId), ConfirmationTokenCodec.encode(token, Instant.now().plus(TTL)));
     return token;
   }
 
@@ -51,22 +52,11 @@ final class DeleteOAuthClientConfirmationTokens {
     final Object raw = session.getAttribute(attributeName);
     // Single-use: removed on this very first check, regardless of the outcome below.
     session.removeAttribute(attributeName);
-    if (!(raw instanceof Entry(String token, Instant expiresAt))
-        || Instant.now().isAfter(expiresAt)) {
-      return false;
-    }
-    return token.equals(submittedToken);
+    return raw instanceof String stored
+        && ConfirmationTokenCodec.matches(stored, submittedToken, Instant.now());
   }
 
   private static String attributeName(final String clientId) {
     return SESSION_ATTRIBUTE_PREFIX + clientId;
-  }
-
-  // This app's own HttpSession is Redis-backed (Spring Session, not in-memory) — any object
-  // stored as a session attribute must survive real serialization, not just work by accident in a
-  // single-JVM test.
-  private record Entry(String token, Instant expiresAt) implements Serializable {
-
-    private static final long serialVersionUID = 1L;
   }
 }

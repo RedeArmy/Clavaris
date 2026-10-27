@@ -497,6 +497,79 @@ class JpaAccountRepositoryTest {
     assertThat(found.content()).extracting(Account::id).containsExactly(second.id());
   }
 
+  // TD-PERF-041: a search is its own set of queries now, so forward and backward paging under a
+  // search needs its own proof, not just the first page.
+  @Test
+  void findKeysetPageByOrganizationIdPagesForwardAndBackwardWithinASearch() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    Account a = reconstituteAt(organizationId, "team-a@example.com", now.minusSeconds(30));
+    Account b = reconstituteAt(organizationId, "team-b@example.com", now.minusSeconds(20));
+    Account c = reconstituteAt(organizationId, "team-c@example.com", now.minusSeconds(10));
+    repository.insert(a);
+    repository.insert(b);
+    repository.insert(c);
+    repository.insert(reconstituteAt(organizationId, "unrelated@example.com", now));
+
+    KeysetPage<Account> first =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, null, 2), "TEAM-");
+    KeysetPage<Account> second =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(first.endCursor(), null, 2), "TEAM-");
+    KeysetPage<Account> back =
+        repository.findKeysetPageByOrganizationId(
+            organizationId, new KeysetPageRequest(null, second.startCursor(), 2), "TEAM-");
+
+    assertThat(first.content()).extracting(Account::id).containsExactly(c.id(), b.id());
+    assertThat(first.hasNext()).isTrue();
+    assertThat(second.content()).extracting(Account::id).containsExactly(a.id());
+    assertThat(second.hasNext()).isFalse();
+    assertThat(back.content()).extracting(Account::id).containsExactly(c.id(), b.id());
+  }
+
+  // The term's own LIKE metacharacters search for themselves: "%" or "_" must not match every row.
+  @Test
+  void findKeysetPageByOrganizationIdTreatsPercentAndUnderscoreInTheTermAsLiterals() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Instant now = Instant.now();
+    Account underscore = reconstituteAt(organizationId, "a_b@example.com", now.minusSeconds(20));
+    Account plain = reconstituteAt(organizationId, "axb@example.com", now.minusSeconds(10));
+    repository.insert(underscore);
+    repository.insert(plain);
+
+    List<Account> underscoreSearch =
+        repository
+            .findKeysetPageByOrganizationId(
+                organizationId, new KeysetPageRequest(null, null, 10), "a_b")
+            .content();
+    List<Account> percentSearch =
+        repository
+            .findKeysetPageByOrganizationId(
+                organizationId, new KeysetPageRequest(null, null, 10), "%")
+            .content();
+
+    assertThat(underscoreSearch).extracting(Account::id).containsExactly(underscore.id());
+    assertThat(percentSearch).isEmpty();
+  }
+
+  // TD-PERF-041: the four trigram indexes exist, on the lowered expressions the search queries use.
+  @Test
+  void theTrigramIndexesBehindTheUsersSearchExist() {
+    List<String> definitions =
+        jdbcTemplate.queryForList(
+            "SELECT indexdef FROM pg_indexes WHERE tablename = 'accounts' AND indexname LIKE '%_trgm'",
+            String.class);
+
+    assertThat(definitions)
+        .hasSize(4)
+        .allSatisfy(definition -> assertThat(definition).contains("gin_trgm_ops"))
+        .anySatisfy(definition -> assertThat(definition).contains("lower((email)::text)"))
+        .anySatisfy(definition -> assertThat(definition).contains("lower((username)::text)"))
+        .anySatisfy(definition -> assertThat(definition).contains("lower((first_name)::text)"))
+        .anySatisfy(definition -> assertThat(definition).contains("lower((last_name)::text)"));
+  }
+
   @Test
   void findKeysetPageByOrganizationIdReturnsEveryAccountWhenSearchTermIsBlank() {
     OrganizationId organizationId = new OrganizationId(UUID.randomUUID());

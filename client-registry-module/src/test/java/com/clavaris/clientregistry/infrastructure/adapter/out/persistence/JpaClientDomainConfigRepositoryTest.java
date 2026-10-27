@@ -9,6 +9,7 @@ import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
 import com.clavaris.clientregistry.domain.model.ClientDomainMode;
 import com.clavaris.clientregistry.domain.model.DomainVerificationStatus;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -189,6 +190,78 @@ class JpaClientDomainConfigRepositoryTest {
   @Test
   void anOrganizationWithNoClientsAtAllCannotBeEmbedded() {
     assertThat(domainConfigs.existsVerifiedEmbeddingByOrganizationId(UUID.randomUUID())).isFalse();
+  }
+
+  // ---- findStalestVerified (TD-PERF-044): the re-verification job's bounded, stalest-first batch.
+  // Every other test here saves configs verified just now, so a cutoff 60 days back isolates the
+  // rows this test creates.
+
+  private void saveDomainConfig(
+      final String hostname, final DomainVerificationStatus status, final Instant verifiedAt) {
+    UUID oauthClientId = registerARealOAuthClient();
+    ClientDomainConfig requested =
+        ClientDomainConfig.request(oauthClientId, ClientDomainMode.CNAME, hostname, null);
+    domainConfigs.save(
+        ClientDomainConfig.reconstitute(
+            requested.id(),
+            oauthClientId,
+            ClientDomainMode.CNAME,
+            hostname,
+            status,
+            requested.dnsTxtChallengeToken().orElseThrow(),
+            null,
+            verifiedAt,
+            requested.createdAt(),
+            requested.updatedAt()));
+  }
+
+  @Test
+  void findStalestVerifiedReturnsOnlyVerifiedConfigsBeyondTheCutoffStalestFirstAndBounded() {
+    Instant now = Instant.now();
+    saveDomainConfig(
+        "stale-70.stalest.example.com",
+        DomainVerificationStatus.VERIFIED,
+        now.minus(70, ChronoUnit.DAYS));
+    saveDomainConfig(
+        "stale-90.stalest.example.com",
+        DomainVerificationStatus.VERIFIED,
+        now.minus(90, ChronoUnit.DAYS));
+    saveDomainConfig(
+        "stale-80.stalest.example.com",
+        DomainVerificationStatus.VERIFIED,
+        now.minus(80, ChronoUnit.DAYS));
+    saveDomainConfig("never.stalest.example.com", DomainVerificationStatus.VERIFIED, null);
+    saveDomainConfig(
+        "fresh.stalest.example.com",
+        DomainVerificationStatus.VERIFIED,
+        now.minus(1, ChronoUnit.DAYS));
+    saveDomainConfig(
+        "failed.stalest.example.com",
+        DomainVerificationStatus.FAILED,
+        now.minus(95, ChronoUnit.DAYS));
+    saveDomainConfig("pending.stalest.example.com", DomainVerificationStatus.PENDING, null);
+    Instant cutoff = now.minus(60, ChronoUnit.DAYS);
+
+    List<String> all =
+        domainConfigs.findStalestVerified(cutoff, 100).stream()
+            .map(config -> config.hostname().orElseThrow())
+            .filter(hostname -> hostname.endsWith(".stalest.example.com"))
+            .toList();
+    List<String> firstTwo =
+        domainConfigs.findStalestVerified(cutoff, 2).stream()
+            .map(config -> config.hostname().orElseThrow())
+            .toList();
+
+    assertThat(all)
+        .as("never-stamped first, then oldest to newest; fresh, failed and pending are excluded")
+        .containsExactly(
+            "never.stalest.example.com",
+            "stale-90.stalest.example.com",
+            "stale-80.stalest.example.com",
+            "stale-70.stalest.example.com");
+    assertThat(firstTwo)
+        .as("the limit applies in the same order")
+        .containsExactly("never.stalest.example.com", "stale-90.stalest.example.com");
   }
 
   private UUID registerARealOAuthClientOf(final UUID organizationId) {

@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -40,7 +41,7 @@ class PlatformWorkspaceAssignRoleControllerTest extends WorkspaceDashboardContro
         new OrganizationAccountSummary(UUID.randomUUID(), "eligible@example.com");
     OrganizationAccountSummary alreadyInTeam =
         new OrganizationAccountSummary(UUID.randomUUID(), "already@example.com");
-    when(accountDirectory.listAccountsForOrganization(organization.id()))
+    when(accountDirectory.searchAccounts(organization.id(), null, 100))
         .thenReturn(List.of(eligible, alreadyInTeam));
     when(listMembers.handle(any()))
         .thenReturn(
@@ -69,7 +70,7 @@ class PlatformWorkspaceAssignRoleControllerTest extends WorkspaceDashboardContro
     OrganizationAccountSummary inAnotherTeam =
         new OrganizationAccountSummary(UUID.randomUUID(), "elsewhere@example.com");
     WorkspaceRole otherTeamRole = WorkspaceRole.define(organization.id(), "Other", null, Set.of());
-    when(accountDirectory.listAccountsForOrganization(organization.id()))
+    when(accountDirectory.searchAccounts(organization.id(), null, 100))
         .thenReturn(List.of(eligible, inAnotherTeam));
     when(listMembers.handle(any()))
         .thenReturn(
@@ -81,6 +82,70 @@ class PlatformWorkspaceAssignRoleControllerTest extends WorkspaceDashboardContro
         .perform(get(teamsPath() + "/" + teamId + "/assign-role"))
         .andExpect(status().isOk())
         .andExpect(model().attribute("eligibleAccounts", List.of(eligible)));
+  }
+
+  // TD-PERF-042: the picker asks the directory for a bounded page and shows at most 25 of the
+  // eligible ones; the rest are found by typing, which asks again with the term.
+  @Test
+  void theFormListsOnlyTheFirstTwentyFiveCandidatesAndSaysThereAreMore() throws Exception {
+    UUID teamId = UUID.randomUUID();
+    WorkspaceTeam team = WorkspaceTeam.reconstitute(teamId, workspace.id(), "QA", Instant.now());
+    when(listTeams.handle(any())).thenReturn(List.of(team));
+    stubTeamRoleIds(List.of(role.id()));
+    List<OrganizationAccountSummary> candidates =
+        IntStream.range(0, 40)
+            .mapToObj(
+                i ->
+                    new OrganizationAccountSummary(
+                        UUID.randomUUID(), String.format("user%02d@example.com", i)))
+            .toList();
+    when(accountDirectory.searchAccounts(organization.id(), null, 100)).thenReturn(candidates);
+    when(listMembers.handle(any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get(teamsPath() + "/" + teamId + "/assign-role"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("eligibleAccounts", candidates.subList(0, 25)))
+        .andExpect(model().attribute("accountsTruncated", true))
+        .andExpect(
+            model()
+                .attribute(
+                    "assignRoleSearchAction",
+                    workspacesPath() + "/" + workspace.id() + "/assign-role/accounts"));
+  }
+
+  @Test
+  void searchingPassesTheTermToTheDirectoryAndReturnsJustTheOptions() throws Exception {
+    OrganizationAccountSummary match =
+        new OrganizationAccountSummary(UUID.randomUUID(), "match@example.com");
+    OrganizationAccountSummary holdsARole =
+        new OrganizationAccountSummary(UUID.randomUUID(), "has-role@example.com");
+    when(accountDirectory.searchAccounts(organization.id(), "mat", 100))
+        .thenReturn(List.of(match, holdsARole));
+    when(listMembers.handle(any()))
+        .thenReturn(
+            List.of(WorkspaceMembership.join(workspace.id(), holdsARole.accountId(), role.id())));
+
+    mockMvc
+        .perform(
+            get(workspacesPath() + "/" + workspace.id() + "/assign-role/accounts")
+                .param("q", "mat"))
+        .andExpect(status().isOk())
+        .andExpect(
+            view().name("organization/platform/fragments/team-assign-role-form :: accountOptions"))
+        .andExpect(model().attribute("eligibleAccounts", List.of(match)))
+        .andExpect(model().attribute("accountSearchTerm", "mat"));
+  }
+
+  @Test
+  void searchingInAWorkspaceOfAnotherOrganizationIsNotFound() throws Exception {
+    when(getWorkspace.handle(any())).thenReturn(java.util.Optional.empty());
+
+    mockMvc
+        .perform(
+            get(workspacesPath() + "/" + UUID.randomUUID() + "/assign-role/accounts")
+                .param("q", "x"))
+        .andExpect(status().isNotFound());
   }
 
   @Test

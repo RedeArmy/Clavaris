@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.clavaris.common.application.port.AfterCommitExecutor;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
@@ -38,6 +39,7 @@ class DeleteOrganizationServiceTest {
   private OrganizationWebhookDataEraser webhookDataEraser;
   private AuditEventRecorder auditEvents;
   private EventOutboxWriter outbox;
+  private AfterCommitExecutor afterCommit;
   private DeleteOrganizationService service;
 
   @BeforeEach
@@ -49,6 +51,8 @@ class DeleteOrganizationServiceTest {
     webhookDataEraser = mock(OrganizationWebhookDataEraser.class);
     auditEvents = mock(AuditEventRecorder.class);
     outbox = mock(EventOutboxWriter.class);
+    afterCommit = mock(AfterCommitExecutor.class);
+    when(identityDataEraser.eraseAllFor(any())).thenReturn(() -> {});
     service =
         new DeleteOrganizationService(
             organizations,
@@ -57,7 +61,8 @@ class DeleteOrganizationServiceTest {
             oauthClientsEraser,
             webhookDataEraser,
             auditEvents,
-            outbox);
+            outbox,
+            afterCommit);
   }
 
   private Organization registeredOrganization(final UUID organizationId) {
@@ -273,5 +278,21 @@ class DeleteOrganizationServiceTest {
     verifyNoInteractions(auditEvents);
     verifyNoInteractions(outbox);
     verify(organizations, never()).deleteById(any());
+  }
+
+  // TD-PERF-043: the identity eraser's slow follow-up (session revocation, key-file purge) is
+  // handed to the after-commit port, never run by the service itself inside the transaction.
+  @Test
+  void handsTheSlowIdentityCleanupToTheAfterCommitPortInsteadOfRunningItInline() {
+    UUID organizationId = UUID.randomUUID();
+    registeredOrganization(organizationId);
+    boolean[] ran = {false};
+    Runnable cleanup = () -> ran[0] = true;
+    when(identityDataEraser.eraseAllFor(organizationId)).thenReturn(cleanup);
+
+    service.handle(new DeleteOrganizationCommand(organizationId, ACTOR));
+
+    verify(afterCommit).run(cleanup);
+    assertThat(ran[0]).as("the service must not run it itself").isFalse();
   }
 }

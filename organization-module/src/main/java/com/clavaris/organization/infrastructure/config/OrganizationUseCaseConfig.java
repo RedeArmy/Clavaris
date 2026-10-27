@@ -1,5 +1,6 @@
 package com.clavaris.organization.infrastructure.config;
 
+import com.clavaris.common.application.port.AfterCommitExecutor;
 import com.clavaris.common.application.port.AuditEventReader;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.addaccessrestrictionentry.AccessRestrictionEntryRepository;
@@ -326,7 +327,8 @@ class OrganizationUseCaseConfig {
       final OrganizationOAuthClientsEraser oauthClientsEraser,
       final OrganizationWebhookDataEraser webhookDataEraser,
       final AuditEventRecorder auditEvents,
-      final EventOutboxWriter eventOutboxWriter) {
+      final EventOutboxWriter eventOutboxWriter,
+      final AfterCommitExecutor afterCommit) {
     return new DeleteOrganizationService(
         organizations,
         organizationTokenRevoker,
@@ -334,7 +336,8 @@ class OrganizationUseCaseConfig {
         oauthClientsEraser,
         webhookDataEraser,
         auditEvents,
-        eventOutboxWriter);
+        eventOutboxWriter,
+        afterCommit);
   }
 
   @Bean

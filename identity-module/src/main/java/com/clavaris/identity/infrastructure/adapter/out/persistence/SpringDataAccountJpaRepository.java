@@ -117,32 +117,22 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
   long countOrphansAmongIds(@Param("ids") Collection<UUID> ids);
 
   // SDE-III review, 2026-09-19 — Clerk dashboard "Users" tab parity: backs
-  // AccountRepository#findKeysetPageByOrganizationId, same three-@Query keyset-pagination shape
-  // TD-PERF-020 already established for OAuthClient/Workspace lists.
+  // AccountRepository#findKeysetPageByOrganizationId, same keyset-pagination shape TD-PERF-020
+  // already established for OAuthClient/Workspace lists.
   //
-  // ADR-0029: each query below gained one added "AND (searchTerm IS NULL OR ...)" clause — a null
-  // searchTerm is a no-op (same "absence means no filter" convention RateLimitPolicy already
-  // follows), never a rewrite of the existing keyset seek predicate above it. Matches name
-  // (first/last), username, or email — a search resets to the first page, same as changing any
-  // other pagination-affecting input already does. CAST(:searchTerm AS string) everywhere below,
-  // not a bare :searchTerm: a null parameter with no other type hint gets bound as an unspecified
-  // (bytea-defaulting) type by the JDBC driver, and Postgres then rejects LOWER(bytea) — a real
-  // failure this query's own JpaAccountRepositoryTest caught, not a hypothetical.
+  // ADR-0029, TD-PERF-041: a search is a SEPARATE set of three queries (…Searching), not an
+  // "AND (:term IS NULL OR …)" clause on these. With the optional clause the planner cannot keep a
+  // trigram index in play once Postgres switches a prepared statement to a generic plan after five
+  // executions (measured: a rare term went from 0.3 ms to 215 ms and stayed there); a query that
+  // always has a pattern keeps the BitmapOr over the four pg_trgm indexes in either plan.
   @Query(
       """
       SELECT a FROM AccountEntity a
       WHERE a.organizationId = :organizationId
-        AND (CAST(:searchTerm AS string) IS NULL
-             OR LOWER(a.firstName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.username) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%')))
       ORDER BY a.createdAt DESC, a.id DESC
       """)
   List<AccountEntity> findFirstPageByOrganizationId(
-      @Param("organizationId") UUID organizationId,
-      @Param("searchTerm") String searchTerm,
-      Pageable pageable);
+      @Param("organizationId") UUID organizationId, Pageable pageable);
 
   @Query(
       """
@@ -150,18 +140,12 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
       WHERE a.organizationId = :organizationId
         AND (a.createdAt < :cursorCreatedAt
              OR (a.createdAt = :cursorCreatedAt AND a.id < :cursorId))
-        AND (CAST(:searchTerm AS string) IS NULL
-             OR LOWER(a.firstName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.username) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%')))
       ORDER BY a.createdAt DESC, a.id DESC
       """)
   List<AccountEntity> findPageByOrganizationIdAfter(
       @Param("organizationId") UUID organizationId,
       @Param("cursorCreatedAt") Instant cursorCreatedAt,
       @Param("cursorId") UUID cursorId,
-      @Param("searchTerm") String searchTerm,
       Pageable pageable);
 
   @Query(
@@ -170,17 +154,69 @@ interface SpringDataAccountJpaRepository extends JpaRepository<AccountEntity, UU
       WHERE a.organizationId = :organizationId
         AND (a.createdAt > :cursorCreatedAt
              OR (a.createdAt = :cursorCreatedAt AND a.id > :cursorId))
-        AND (CAST(:searchTerm AS string) IS NULL
-             OR LOWER(a.firstName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.lastName) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.username) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%'))
-             OR LOWER(a.email) LIKE LOWER(CONCAT('%', CAST(:searchTerm AS string), '%')))
       ORDER BY a.createdAt ASC, a.id ASC
       """)
   List<AccountEntity> findPageByOrganizationIdBefore(
       @Param("organizationId") UUID organizationId,
       @Param("cursorCreatedAt") Instant cursorCreatedAt,
       @Param("cursorId") UUID cursorId,
-      @Param("searchTerm") String searchTerm,
+      Pageable pageable);
+
+  // The search variants. :pattern is a ready LIKE pattern (see JpaAccountRepository#likePattern,
+  // which escapes the term's own % _ and the escape character !). LOWER() is applied on both sides
+  // in the database, as before, so case folding follows the database's own locale rules. Each
+  // LOWER(column) is exactly
+  // the expression a pg_trgm GIN index in V20261026120000 is built on.
+  @Query(
+      """
+      SELECT a FROM AccountEntity a
+      WHERE a.organizationId = :organizationId
+        AND (LOWER(a.firstName) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.lastName) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.username) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.email) LIKE LOWER(:pattern) ESCAPE '!')
+      ORDER BY a.createdAt DESC, a.id DESC
+      """)
+  List<AccountEntity> findFirstPageByOrganizationIdSearching(
+      @Param("organizationId") UUID organizationId,
+      @Param("pattern") String pattern,
+      Pageable pageable);
+
+  @Query(
+      """
+      SELECT a FROM AccountEntity a
+      WHERE a.organizationId = :organizationId
+        AND (a.createdAt < :cursorCreatedAt
+             OR (a.createdAt = :cursorCreatedAt AND a.id < :cursorId))
+        AND (LOWER(a.firstName) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.lastName) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.username) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.email) LIKE LOWER(:pattern) ESCAPE '!')
+      ORDER BY a.createdAt DESC, a.id DESC
+      """)
+  List<AccountEntity> findPageByOrganizationIdAfterSearching(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      @Param("pattern") String pattern,
+      Pageable pageable);
+
+  @Query(
+      """
+      SELECT a FROM AccountEntity a
+      WHERE a.organizationId = :organizationId
+        AND (a.createdAt > :cursorCreatedAt
+             OR (a.createdAt = :cursorCreatedAt AND a.id > :cursorId))
+        AND (LOWER(a.firstName) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.lastName) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.username) LIKE LOWER(:pattern) ESCAPE '!'
+             OR LOWER(a.email) LIKE LOWER(:pattern) ESCAPE '!')
+      ORDER BY a.createdAt ASC, a.id ASC
+      """)
+  List<AccountEntity> findPageByOrganizationIdBeforeSearching(
+      @Param("organizationId") UUID organizationId,
+      @Param("cursorCreatedAt") Instant cursorCreatedAt,
+      @Param("cursorId") UUID cursorId,
+      @Param("pattern") String pattern,
       Pageable pageable);
 }

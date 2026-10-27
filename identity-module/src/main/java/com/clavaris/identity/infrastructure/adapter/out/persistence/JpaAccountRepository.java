@@ -324,29 +324,53 @@ class JpaAccountRepository implements AccountRepository {
       final OrganizationId organizationId,
       final KeysetPageRequest pageRequest,
       final String searchTerm) {
-    final String normalizedSearchTerm =
-        searchTerm == null || searchTerm.isBlank() ? null : searchTerm.trim();
+    final String pattern = likePattern(searchTerm);
     final PageRequest limit = PageRequest.of(0, pageRequest.size() + 1);
+    // TD-PERF-041: with a search, the *Searching queries (always a pattern, so a trigram index
+    // stays
+    // usable in a generic plan too); without one, the plain keyset queries.
+    final boolean searching = pattern != null;
     if (pageRequest.after() != null) {
       final KeysetCursor cursor = pageRequest.after();
       final List<AccountEntity> fetched =
-          accounts.findPageByOrganizationIdAfter(
-              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit);
+          searching
+              ? accounts.findPageByOrganizationIdAfterSearching(
+                  organizationId.value(), cursor.createdAt(), cursor.id(), pattern, limit)
+              : accounts.findPageByOrganizationIdAfter(
+                  organizationId.value(), cursor.createdAt(), cursor.id(), limit);
       return SpringDataKeysetPageMapper.forward(
           fetched, pageRequest.size(), true, toDomainBatched(fetched), this::cursorOf);
     }
     if (pageRequest.before() != null) {
       final KeysetCursor cursor = pageRequest.before();
       final List<AccountEntity> fetched =
-          accounts.findPageByOrganizationIdBefore(
-              organizationId.value(), cursor.createdAt(), cursor.id(), normalizedSearchTerm, limit);
+          searching
+              ? accounts.findPageByOrganizationIdBeforeSearching(
+                  organizationId.value(), cursor.createdAt(), cursor.id(), pattern, limit)
+              : accounts.findPageByOrganizationIdBefore(
+                  organizationId.value(), cursor.createdAt(), cursor.id(), limit);
       return SpringDataKeysetPageMapper.backward(
           fetched, pageRequest.size(), toDomainBatched(fetched), this::cursorOf);
     }
     final List<AccountEntity> fetched =
-        accounts.findFirstPageByOrganizationId(organizationId.value(), normalizedSearchTerm, limit);
+        searching
+            ? accounts.findFirstPageByOrganizationIdSearching(
+                organizationId.value(), pattern, limit)
+            : accounts.findFirstPageByOrganizationId(organizationId.value(), limit);
     return SpringDataKeysetPageMapper.forward(
         fetched, pageRequest.size(), false, toDomainBatched(fetched), this::cursorOf);
+  }
+
+  // A blank term means no search. Otherwise "%term%" with the term's own LIKE metacharacters
+  // escaped with '!' (the queries say ESCAPE '!'), so typing % or _ searches for that
+  // character instead of matching every row.
+  private static String likePattern(final String searchTerm) {
+    if (searchTerm == null || searchTerm.isBlank()) {
+      return null;
+    }
+    final String escaped =
+        searchTerm.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    return "%" + escaped + "%";
   }
 
   private Function<AccountEntity, Account> toDomainBatched(final List<AccountEntity> entities) {

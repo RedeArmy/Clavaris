@@ -86,6 +86,35 @@ class SigningKeyRotationIntegrationTest extends RedisBackedIntegrationTest {
         .isTrue();
   }
 
+  // TD-PERF-045: the JWKS response is publicly cacheable for a short, bounded time, and the cache
+  // does not hide a rotation: a response fetched after the rotation carries both kids, so a
+  // verifier that refetches (on expiry or on an unknown kid) always finds the new key and the old.
+  @Test
+  void theJwksIsCacheableForAShortTimeAndStillShowsBothKeysAfterARotation() throws Exception {
+    String platformToken = requestPlatformAccessToken();
+    UUID organizationId = createOrganization(platformToken, "Jwks Cache Co");
+    ClientCredentials client = registerOAuthClient(platformToken, organizationId);
+    String preRotationKid =
+        parse(accessTokenOf(requestOrganizationToken(organizationId, client)))
+            .getHeader()
+            .getKeyID();
+
+    HttpResponse<String> before = get("/o/" + organizationId + "/oauth2/jwks");
+    rotateSigningKey(platformToken, organizationId);
+    HttpResponse<String> after = get("/o/" + organizationId + "/oauth2/jwks");
+    String postRotationKid =
+        parse(accessTokenOf(requestOrganizationToken(organizationId, client)))
+            .getHeader()
+            .getKeyID();
+
+    assertThat(before.headers().firstValue("Cache-Control")).contains("public, max-age=60");
+    assertThat(after.headers().firstValue("Cache-Control")).contains("public, max-age=60");
+    JWKSet published = parseJwkSet(after.body());
+    assertThat(published.getKeyByKeyId(preRotationKid)).isNotNull();
+    assertThat(published.getKeyByKeyId(postRotationKid)).isNotNull();
+    assertThat(postRotationKid).isNotEqualTo(preRotationKid);
+  }
+
   @Test
   void aTokenIssuedAfterRotationIsSignedWithTheNewKidAndTheOldKidStillVerifiesAlongsideIt()
       throws Exception {

@@ -1,6 +1,7 @@
 package com.clavaris.clientregistry.application.usecase.requestclientdomainconfig;
 
 import com.clavaris.clientregistry.domain.model.ClientDomainConfig;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,11 +22,12 @@ public interface ClientDomainConfigRepository {
   Optional<ClientDomainConfig> findByHostname(String hostname);
 
   /**
-   * TD-SEC-058: every currently-{@code VERIFIED} config, org-unscoped — the periodic
-   * re-verification job (only real caller) sweeps across every tenant on a schedule, not per
-   * request.
+   * TD-SEC-058, TD-PERF-044: the {@code VERIFIED} configs whose last verification is older than
+   * {@code cutoff} (or was never stamped), stalest first, at most {@code limit} — org-unscoped, for
+   * the periodic re-verification job, which sweeps a bounded batch per run rather than loading
+   * every tenant's configs at once.
    */
-  List<ClientDomainConfig> findAllVerified();
+  List<ClientDomainConfig> findStalestVerified(Instant cutoff, int limit);
 
   /**
    * Whether any client of this Organization has a {@code VERIFIED} custom domain with a registered

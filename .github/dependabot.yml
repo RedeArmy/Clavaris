@@ -15,6 +15,15 @@ updates:
     labels:
       - "dependencies"
 
+  # TD-PROC-014: the compose files pin postgres, redis and caddy by digest; without this ecosystem
+  # those pins never move and a base-image change arrives unreviewed (or never).
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

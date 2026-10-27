@@ -2,14 +2,15 @@ package com.clavaris.app.infrastructure.adapter.in.web.filter;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 /**
@@ -25,7 +26,11 @@ import java.util.TreeMap;
  * #TTL}, so abandoned requests cannot pile up or let a later prompt=login through: a note counts
  * only for the very request it was left for, only until it expires, and only for a login made after
  * it was left, and it is used up when it counts.
+ *
+ * <p>PMD.TooManyMethods: each method is one step of the note lifecycle (leave, check, use up,
+ * store, read back, parse); folding them together would only hide that.
  */
+@SuppressWarnings("PMD.TooManyMethods")
 /* package */ final class ReauthenticationMarker {
 
   /* package */ static final String SESSION_ATTRIBUTE = "clavaris.oidc.reauth.requested-at";
@@ -38,14 +43,15 @@ import java.util.TreeMap;
 
   private ReauthenticationMarker() {}
 
-  // Request fingerprint to when the note was left. Serializable because the session is shared
-  // through Redis; a copy is stored on every change so that the session sees the new value.
-  /* package */ record Notes(Map<String, Instant> requestedAt) implements Serializable {}
-
-  /* package */ static Notes create(final HttpServletRequest request, final Instant now) {
-    final Map<String, Instant> notes = new LinkedHashMap<>();
-    notes.put(fingerprint(request), now);
-    return new Notes(notes);
+  // TD-ARCH-039: the session attribute is a plain Map of request fingerprint to the ISO-8601
+  // instant the note was left, both Strings, so the Redis session serializer (JSON, with an
+  // allow-list) stores it with no type of ours in that list. A copy is stored on every change so
+  // that the session sees the new value.
+  /* package */ static Map<String, String> create(
+      final HttpServletRequest request, final Instant now) {
+    final Map<String, String> notes = new LinkedHashMap<>();
+    notes.put(fingerprint(request), now.toString());
+    return notes;
   }
 
   // The request's parameters, sorted, as a string. Not the raw query string: the saved request that
@@ -72,16 +78,13 @@ import java.util.TreeMap;
   // The notes still alive, as a copy that can be changed freely.
   private static Map<String, Instant> liveNotes(final HttpSession session, final Instant now) {
     final Map<String, Instant> live = new LinkedHashMap<>();
-    if (session != null
-        && session.getAttribute(SESSION_ATTRIBUTE)
-            instanceof Notes(final Map<String, Instant> stored)) {
-      stored.forEach(
-          (request, leftAt) -> {
-            if (!expired(leftAt, now)) {
-              live.put(request, leftAt);
-            }
-          });
-    }
+    storedNotes(session)
+        .forEach(
+            (request, leftAt) -> {
+              if (!expired(leftAt, now)) {
+                live.put(request, leftAt);
+              }
+            });
     return live;
   }
 
@@ -89,7 +92,33 @@ import java.util.TreeMap;
     if (notes.isEmpty()) {
       session.removeAttribute(SESSION_ATTRIBUTE);
     } else {
-      session.setAttribute(SESSION_ATTRIBUTE, new Notes(new LinkedHashMap<>(notes)));
+      final Map<String, String> asStrings = new LinkedHashMap<>();
+      notes.forEach((request, leftAt) -> asStrings.put(request, leftAt.toString()));
+      session.setAttribute(SESSION_ATTRIBUTE, asStrings);
+    }
+  }
+
+  // What the session holds, parsed; an entry that is not a String-to-ISO-instant pair is ignored.
+  private static Map<String, Instant> storedNotes(final HttpSession session) {
+    final Map<String, Instant> stored = new LinkedHashMap<>();
+    if (session != null && session.getAttribute(SESSION_ATTRIBUTE) instanceof Map<?, ?> raw) {
+      raw.forEach(
+          (key, value) -> {
+            if (key instanceof String request && value instanceof String leftAt) {
+              parseInstant(leftAt).ifPresent(parsed -> stored.put(request, parsed));
+            }
+          });
+    }
+    return stored;
+  }
+
+  // Not one of ours when it does not parse; such an entry is dropped the next time the notes are
+  // stored.
+  private static Optional<Instant> parseInstant(final String value) {
+    try {
+      return Optional.of(Instant.parse(value));
+    } catch (final DateTimeParseException _) {
+      return Optional.empty();
     }
   }
 
@@ -141,9 +170,8 @@ import java.util.TreeMap;
   // resumed, so another authorize request must leave them alone.
   /* package */ static void discardExpired(final HttpServletRequest request, final Instant now) {
     final HttpSession session = request.getSession(false);
-    if (session != null
-        && session.getAttribute(SESSION_ATTRIBUTE)
-            instanceof Notes(final Map<String, Instant> stored)) {
+    final Map<String, Instant> stored = storedNotes(session);
+    if (!stored.isEmpty()) {
       final Map<String, Instant> live = liveNotes(session, now);
       if (live.size() != stored.size()) {
         store(session, live);

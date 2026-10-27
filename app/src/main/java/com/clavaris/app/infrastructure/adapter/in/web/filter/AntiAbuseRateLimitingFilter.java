@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.AntPathMatcher;
@@ -81,13 +82,25 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
       final HttpServletResponse response,
       final FilterChain filterChain)
       throws ServletException, IOException {
-    Duration longestRetryAfter = null;
-
+    // TD-PERF-046: every matching rule's counter is consumed in one limiter call (one Redis round
+    // trip), not one call per rule; the longest Retry-After among the blocked ones is still what
+    // the
+    // client is told.
+    final List<RateLimitCheck> checks = new ArrayList<>();
     for (final RateLimitRule rule : rules) {
-      final Duration retryAfter = evaluateRule(rule, request);
-      if (retryAfter != null
-          && (longestRetryAfter == null || retryAfter.compareTo(longestRetryAfter) > 0)) {
-        longestRetryAfter = retryAfter;
+      final RateLimitCheck check = checkFor(rule, request);
+      if (check != null) {
+        checks.add(check);
+      }
+    }
+    Duration longestRetryAfter = null;
+    if (!checks.isEmpty()) {
+      for (final RateLimitDecision decision : rateLimiter.tryConsumeAll(checks)) {
+        if (!decision.allowed()
+            && (longestRetryAfter == null
+                || decision.retryAfter().compareTo(longestRetryAfter) > 0)) {
+          longestRetryAfter = decision.retryAfter();
+        }
       }
     }
 
@@ -98,7 +111,7 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private Duration evaluateRule(final RateLimitRule rule, final HttpServletRequest request) {
+  private RateLimitCheck checkFor(final RateLimitRule rule, final HttpServletRequest request) {
     if (!matches(rule, request)) {
       return null;
     }
@@ -109,10 +122,8 @@ public final class AntiAbuseRateLimitingFilter extends OncePerRequestFilter {
       // which would let one malformed-request flood exhaust a counter real requests also rely on.
       return null;
     }
-    final String redisKey = "ratelimit:" + rule.name() + ":" + keyHasher.hash(identifier);
-    final RateLimitDecision decision =
-        rateLimiter.tryConsume(redisKey, rule.limit(), rule.window());
-    return decision.allowed() ? null : decision.retryAfter();
+    return new RateLimitCheck(
+        "ratelimit:" + rule.name() + ":" + keyHasher.hash(identifier), rule.limit(), rule.window());
   }
 
   private boolean matches(final RateLimitRule rule, final HttpServletRequest request) {

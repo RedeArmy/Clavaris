@@ -10,7 +10,6 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountDirectory;
 import com.clavaris.organization.application.usecase.assignworkspaceroletoaccount.OrganizationAccountSummary;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -21,13 +20,9 @@ import org.springframework.stereotype.Component;
  * {@code app}, not either business module, same module-graph reason {@link
  * WorkspaceMemberAccountProvisionerBridge} already establishes.
  *
- * <p>Loops every page of identity-module's own {@link ListAccountsForOrganizationUseCase} (at its
- * {@link KeysetPageRequest#MAX_SIZE} page size) rather than returning just the first — this port's
- * contract is "every account in the Organization" for a picker to filter against, not a paginated
- * slice a dashboard list would render. Acceptable here (unlike a real user-facing list) because
- * this only backs admin surfaces (the "assign a role" picker, and — 2026-09-28 — the Teams tab's
- * own hierarchy display), not a page a caller waits on interactively for a large Organization; see
- * this port's own Javadoc.
+ * <p>TD-PERF-042: {@code searchAccounts} reads one bounded keyset page of identity-module's own
+ * {@link ListAccountsForOrganizationUseCase}, with the operator's search term. It used to loop
+ * every page of the Organization into memory so the "assign a role" picker could render them all.
  *
  * <p>{@code label}, 2026-09-28 (live UX request): the Teams hierarchy's own member list used to
  * render a bare {@code accountId} — real gap, organization-module has no access to
@@ -52,24 +47,15 @@ class OrganizationAccountDirectoryBridge implements OrganizationAccountDirectory
   }
 
   @Override
-  public List<OrganizationAccountSummary> listAccountsForOrganization(final UUID organizationId) {
-    final OrganizationId orgId = new OrganizationId(organizationId);
-    final List<OrganizationAccountSummary> summaries = new ArrayList<>();
-
-    KeysetPageRequest pageRequest = KeysetPageRequest.first(KeysetPageRequest.MAX_SIZE);
-    while (true) {
-      final KeysetPage<Account> page =
-          listAccounts.handle(new ListAccountsForOrganizationQuery(orgId, pageRequest, null));
-      for (final Account account : page.content()) {
-        summaries.add(new OrganizationAccountSummary(account.id().value(), labelFor(account)));
-      }
-      if (!page.hasNext()) {
-        break;
-      }
-      pageRequest = KeysetPageRequest.after(page.endCursor(), KeysetPageRequest.MAX_SIZE);
-    }
-
-    return List.copyOf(summaries);
+  public List<OrganizationAccountSummary> searchAccounts(
+      final UUID organizationId, final String term, final int limit) {
+    final KeysetPage<Account> page =
+        listAccounts.handle(
+            new ListAccountsForOrganizationQuery(
+                new OrganizationId(organizationId), KeysetPageRequest.first(limit), term));
+    return page.content().stream()
+        .map(account -> new OrganizationAccountSummary(account.id().value(), labelFor(account)))
+        .toList();
   }
 
   @Override
