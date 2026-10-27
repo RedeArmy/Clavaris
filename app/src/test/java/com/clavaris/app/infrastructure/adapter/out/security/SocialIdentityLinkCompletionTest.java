@@ -2,6 +2,8 @@ package com.clavaris.app.infrastructure.adapter.out.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -74,14 +76,7 @@ class SocialIdentityLinkCompletionTest {
         .handle(
             new ConnectSocialIdentityCommand(
                 new AccountId(accountId), SocialProvider.GITHUB, "gh-1"));
-    verify(sessions)
-        .establishViaSocialLogin(
-            any(),
-            any(),
-            org.mockito.ArgumentMatchers.eq(accountId),
-            any(),
-            org.mockito.ArgumentMatchers.eq(false),
-            any());
+    verify(sessions).establishViaSocialLogin(any(), any(), eq(accountId), any(), eq(false), any());
     assertThat(response.getRedirectedUrl())
         .isEqualTo("/o/" + organizationId + "/account/connections?connected");
   }
@@ -110,9 +105,7 @@ class SocialIdentityLinkCompletionTest {
     assertThat(run()).isTrue();
 
     assertThat(response.getRedirectedUrl()).endsWith("/account/connections?alreadyLinked");
-    verify(sessions)
-        .establishViaSocialLogin(
-            any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any());
+    verify(sessions).establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
   }
 
   @Test
@@ -142,13 +135,6 @@ class SocialIdentityLinkCompletionTest {
     assertThat(run()).isTrue();
 
     assertThat(response.getRedirectedUrl()).endsWith("/account/connections?connectError");
-    verify(sessions)
-        .establishViaSocialLogin(
-            any(),
-            any(),
-            org.mockito.ArgumentMatchers.eq(accountId),
-            any(),
-            org.mockito.ArgumentMatchers.eq(false),
-            any());
+    verify(sessions).establishViaSocialLogin(any(), any(), eq(accountId), any(), eq(false), any());
   }
 }

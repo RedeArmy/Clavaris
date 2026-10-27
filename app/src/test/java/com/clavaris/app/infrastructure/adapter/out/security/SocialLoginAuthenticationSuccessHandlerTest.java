@@ -153,7 +153,7 @@ class SocialLoginAuthenticationSuccessHandlerTest {
 
     handler.onAuthenticationSuccess(request, response, googleToken("user@example.com", true));
 
-    org.mockito.Mockito.verify(tenantUseCase, org.mockito.Mockito.never()).handle(any());
+    verify(tenantUseCase, never()).handle(any());
   }
 
   @Test
