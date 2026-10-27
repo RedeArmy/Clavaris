@@ -7,9 +7,9 @@
 <main>
     <div class="clavaris-card">
         <h1>Change email</h1>
-        <p class="clavaris-alert clavaris-alert--success" role="status" th:if="${confirmed}">
+        <output class="clavaris-alert clavaris-alert--success" th:if="${confirmed}">
             Your email address has been changed and verified.
-        </p>
+        </output>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${invalid}">
             This link is invalid or has expired. Request the change again from your profile.
         </p>

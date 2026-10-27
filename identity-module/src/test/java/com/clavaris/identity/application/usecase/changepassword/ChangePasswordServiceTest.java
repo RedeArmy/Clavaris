@@ -114,8 +114,9 @@ class ChangePasswordServiceTest {
 
   @Test
   void aWrongCurrentPasswordChangesNothing() {
+    final ChangePasswordCommand attempt = command("wrong", GOOD_NEW);
     assertThatExceptionOfType(IncorrectCurrentPasswordException.class)
-        .isThrownBy(() -> service.handle(command("wrong", GOOD_NEW)));
+        .isThrownBy(() -> service.handle(attempt));
 
     verify(accounts, never()).save(any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
@@ -124,8 +125,9 @@ class ChangePasswordServiceTest {
 
   @Test
   void aWeakNewPasswordIsRejectedBeforeAnythingChanges() {
+    final ChangePasswordCommand attempt = command("current-secret", "short");
     assertThatExceptionOfType(WeakPasswordException.class)
-        .isThrownBy(() -> service.handle(command("current-secret", "short")));
+        .isThrownBy(() -> service.handle(attempt));
 
     verify(accounts, never()).save(any());
   }
@@ -134,8 +136,9 @@ class ChangePasswordServiceTest {
   void aBreachedNewPasswordIsRejectedBeforeAnythingChanges() {
     when(breached.isBreached(GOOD_NEW)).thenReturn(true);
 
+    final ChangePasswordCommand attempt = command("current-secret", GOOD_NEW);
     assertThatExceptionOfType(BreachedPasswordException.class)
-        .isThrownBy(() -> service.handle(command("current-secret", GOOD_NEW)));
+        .isThrownBy(() -> service.handle(attempt));
 
     verify(accounts, never()).save(any());
   }
@@ -145,16 +148,11 @@ class ChangePasswordServiceTest {
     final Account socialOnly = Account.register(organizationId, new Email("social@example.com"));
     when(accounts.findById(socialOnly.id())).thenReturn(Optional.of(socialOnly));
 
+    final ChangePasswordCommand attempt =
+        new ChangePasswordCommand(
+            socialOnly.id(), "x", GOOD_NEW, KEEP, AuditActor.account(socialOnly.id().value()));
     assertThatExceptionOfType(NoPasswordToChangeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new ChangePasswordCommand(
-                        socialOnly.id(),
-                        "x",
-                        GOOD_NEW,
-                        KEEP,
-                        AuditActor.account(socialOnly.id().value()))));
+        .isThrownBy(() -> service.handle(attempt));
   }
 
   @Test

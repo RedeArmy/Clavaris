@@ -81,8 +81,9 @@ class DisconnectSocialIdentityServiceTest {
     when(identities.findAllByAccountId(account.id()))
         .thenReturn(List.of(link(SocialProvider.GITHUB)));
 
+    final DisconnectSocialIdentityCommand attempt = command(SocialProvider.GITHUB);
     assertThatExceptionOfType(LastSignInMethodException.class)
-        .isThrownBy(() -> service.handle(command(SocialProvider.GITHUB)));
+        .isThrownBy(() -> service.handle(attempt));
     verify(identities, never()).deleteByAccountIdAndProvider(any(), any());
   }
 
@@ -91,7 +92,8 @@ class DisconnectSocialIdentityServiceTest {
     account.attachPasswordCredential("argon2id$hash");
     when(identities.findAllByAccountId(account.id())).thenReturn(List.of());
 
+    final DisconnectSocialIdentityCommand attempt = command(SocialProvider.GOOGLE);
     assertThatExceptionOfType(SocialIdentityNotLinkedException.class)
-        .isThrownBy(() -> service.handle(command(SocialProvider.GOOGLE)));
+        .isThrownBy(() -> service.handle(attempt));
   }
 }

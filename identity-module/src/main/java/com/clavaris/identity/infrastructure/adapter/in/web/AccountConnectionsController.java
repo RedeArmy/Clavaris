@@ -42,6 +42,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class AccountConnectionsController {
 
   private static final String VIEW = "identity/account/connections";
+  private static final String ACCOUNT = "Account";
+  private static final String CONNECT_ERROR = "?connectError";
 
   private final CurrentAccountResolver currentAccount;
   private final SocialIdentityRepository identities;
@@ -65,7 +67,7 @@ public class AccountConnectionsController {
       final HttpServletRequest request,
       final Model model) {
     final AccountId accountId =
-        CurrentSessionSupport.requireResolved(currentAccount.resolve(request), "Account");
+        CurrentSessionSupport.requireResolved(currentAccount.resolve(request), ACCOUNT);
     final Set<SocialProvider> linked =
         identities.findAllByAccountId(accountId).stream()
             .map(SocialIdentity::provider)
@@ -88,11 +90,11 @@ public class AccountConnectionsController {
       final HttpServletResponse response)
       throws IOException {
     final AccountId accountId =
-        CurrentSessionSupport.requireResolved(currentAccount.resolve(request), "Account");
+        CurrentSessionSupport.requireResolved(currentAccount.resolve(request), ACCOUNT);
     final SocialProvider socialProvider = parse(provider);
     if (socialProvider == null
         || !policy.isProviderAllowed(new OrganizationId(organizationId), socialProvider)) {
-      response.sendRedirect(connectionsUrl(request, organizationId) + "?connectError");
+      response.sendRedirect(connectionsUrl(request, organizationId) + CONNECT_ERROR);
       return;
     }
     request
@@ -127,9 +129,9 @@ public class AccountConnectionsController {
       final HttpServletResponse response)
       throws IOException {
     final AccountId accountId =
-        CurrentSessionSupport.requireResolved(currentAccount.resolve(request), "Account");
+        CurrentSessionSupport.requireResolved(currentAccount.resolve(request), ACCOUNT);
     final SocialProvider socialProvider = parse(provider);
-    String outcome = "?connectError";
+    String outcome = CONNECT_ERROR;
     if (socialProvider != null) {
       try {
         disconnect.handle(
@@ -139,7 +141,7 @@ public class AccountConnectionsController {
       } catch (final LastSignInMethodException _) {
         outcome = "?lastMethod";
       } catch (final SocialIdentityNotLinkedException _) {
-        outcome = "?connectError";
+        outcome = CONNECT_ERROR;
       }
     }
     response.sendRedirect(connectionsUrl(request, organizationId) + outcome);

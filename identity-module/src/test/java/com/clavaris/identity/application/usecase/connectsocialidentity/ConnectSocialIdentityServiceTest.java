@@ -62,8 +62,9 @@ class ConnectSocialIdentityServiceTest {
   void aProviderTheOrganizationHasNotEnabledIsRefused() {
     when(policy.isProviderAllowed(organizationId, SocialProvider.GITHUB)).thenReturn(false);
 
+    final ConnectSocialIdentityCommand attempt = command();
     assertThatExceptionOfType(SocialConnectionNotAllowedException.class)
-        .isThrownBy(() -> service.handle(command()));
+        .isThrownBy(() -> service.handle(attempt));
     verify(identities, never()).save(any());
   }
 
@@ -79,8 +80,9 @@ class ConnectSocialIdentityServiceTest {
                     SocialProvider.GITHUB,
                     "gh-42")));
 
+    final ConnectSocialIdentityCommand attempt = command();
     assertThatExceptionOfType(SocialIdentityAlreadyLinkedException.class)
-        .isThrownBy(() -> service.handle(command()));
+        .isThrownBy(() -> service.handle(attempt));
     verify(identities, never()).save(any());
   }
 
@@ -91,7 +93,8 @@ class ConnectSocialIdentityServiceTest {
             List.of(
                 SocialIdentity.link(account.id(), organizationId, SocialProvider.GITHUB, "other")));
 
+    final ConnectSocialIdentityCommand attempt = command();
     assertThatExceptionOfType(SocialIdentityAlreadyLinkedException.class)
-        .isThrownBy(() -> service.handle(command()));
+        .isThrownBy(() -> service.handle(attempt));
   }
 }

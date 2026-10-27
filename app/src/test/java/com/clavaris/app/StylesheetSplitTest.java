@@ -37,11 +37,12 @@ class StylesheetSplitTest {
       Pattern.compile("th:(?:replace|insert|include)=\"~?\\{?\\s*([A-Za-z0-9_/\\-]+)");
   private static final Pattern CLASS_ATTRIBUTE =
       Pattern.compile("(?:class|th:class|th:classappend)=\"([^\"]*)\"");
-  private static final Pattern QUOTED_WITH_CLASS = Pattern.compile("'([^']*clavaris[^']*)'");
+  // Any quoted string; the "clavaris" filter is applied in code, so the pattern has no two
+  // unbounded runs around a literal (which backtracks quadratically).
+  private static final Pattern QUOTED = Pattern.compile("'([^']*)'");
   private static final Pattern TOKEN = Pattern.compile("[A-Za-z_][A-Za-z0-9_\\-]*");
   private static final Pattern CSS_CLASS = Pattern.compile("\\.([A-Za-z_][A-Za-z0-9_\\-]*)");
-  private static final Pattern JAVA_CLASS_LITERAL =
-      Pattern.compile("\"([^\"\\n]*clavaris-[^\"\\n]*)\"");
+  private static final Pattern JAVA_STRING_LITERAL = Pattern.compile("\"([^\"\\n]*)\"");
 
   private static String read(final Resource resource) throws IOException {
     try (InputStream in = resource.getInputStream()) {
@@ -93,9 +94,11 @@ class StylesheetSplitTest {
       while (attributes.find()) {
         addTokens(classes, attributes.group(1));
       }
-      final Matcher literals = QUOTED_WITH_CLASS.matcher(html);
+      final Matcher literals = QUOTED.matcher(html);
       while (literals.find()) {
-        addTokens(classes, literals.group(1));
+        if (literals.group(1).contains("clavaris")) {
+          addTokens(classes, literals.group(1));
+        }
       }
     }
     for (final String module : new String[] {"../app", "../common", "../identity-module"}) {
@@ -103,9 +106,11 @@ class StylesheetSplitTest {
       if (Files.isDirectory(sources)) {
         try (Stream<Path> files = Files.walk(sources)) {
           for (final Path file : files.filter(f -> f.toString().endsWith(".java")).toList()) {
-            final Matcher literals = JAVA_CLASS_LITERAL.matcher(Files.readString(file));
+            final Matcher literals = JAVA_STRING_LITERAL.matcher(Files.readString(file));
             while (literals.find()) {
-              addTokens(classes, literals.group(1));
+              if (literals.group(1).contains("clavaris-")) {
+                addTokens(classes, literals.group(1));
+              }
             }
           }
         }

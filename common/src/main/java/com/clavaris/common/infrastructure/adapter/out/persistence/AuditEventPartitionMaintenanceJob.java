@@ -117,6 +117,9 @@ class AuditEventPartitionMaintenanceJob {
     }
   }
 
+  // java:S2077: the statement is built from a YearMonth we computed, never from input, and DDL
+  // cannot take bind parameters.
+  @SuppressWarnings("java:S2077")
   private void ensurePartitions(final YearMonth current) {
     for (int ahead = 0; ahead <= partitionsAhead; ahead++) {
       final YearMonth month = current.plusMonths(ahead);
@@ -142,6 +145,9 @@ class AuditEventPartitionMaintenanceJob {
     }
   }
 
+  // java:S2077: the name is rebuilt from a YearMonth parsed out of a catalog name that matched the
+  // strict audit_events_YYYY_MM pattern, so no catalog text reaches the statement as written.
+  @SuppressWarnings("java:S2077")
   private void dropExpiredPartitions(final YearMonth oldestKept) {
     final List<YearMonth> expired = new ArrayList<>();
     for (final String name : jdbc.queryForList(LIST_PARTITIONS_SQL, String.class)) {

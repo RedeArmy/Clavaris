@@ -41,6 +41,7 @@ public class AccountEmailController {
   private static final String FORM_VIEW = "identity/account/email";
   private static final String RESULT_VIEW = "identity/account/email-confirmed";
   private static final String FORM_ATTRIBUTE = "changeEmailForm";
+  private static final String ORGANIZATION_ATTRIBUTE = "organizationId";
 
   private final RequestEmailChangeUseCase requestEmailChange;
   private final ConfirmEmailChangeUseCase confirmEmailChange;
@@ -57,7 +58,7 @@ public class AccountEmailController {
 
   @GetMapping
   public String show(@PathVariable final UUID organizationId, final Model model) {
-    model.addAttribute("organizationId", organizationId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organizationId);
     model.addAttribute(FORM_ATTRIBUTE, new ChangeEmailForm());
     return FORM_VIEW;
   }
@@ -70,7 +71,7 @@ public class AccountEmailController {
       @Valid @ModelAttribute(FORM_ATTRIBUTE) final ChangeEmailForm form,
       final BindingResult bindingResult,
       final Model model) {
-    model.addAttribute("organizationId", organizationId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organizationId);
     if (bindingResult.hasErrors()) {
       return FORM_VIEW;
     }
@@ -112,7 +113,7 @@ public class AccountEmailController {
       final HttpServletRequest httpRequest,
       final HttpServletResponse response,
       final Model model) {
-    model.addAttribute("organizationId", organizationId);
+    model.addAttribute(ORGANIZATION_ATTRIBUTE, organizationId);
     final AccountId accountId =
         CurrentSessionSupport.requireResolved(currentAccount.resolve(httpRequest), "Account");
     try {

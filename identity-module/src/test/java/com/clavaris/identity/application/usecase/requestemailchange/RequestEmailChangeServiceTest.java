@@ -76,8 +76,9 @@ class RequestEmailChangeServiceTest {
 
   @Test
   void aWrongPasswordStoresAndSendsNothing() {
+    final RequestEmailChangeCommand attempt = command("wrong", "new@example.com");
     assertThatExceptionOfType(IncorrectCurrentPasswordException.class)
-        .isThrownBy(() -> service.handle(command("wrong", "new@example.com")));
+        .isThrownBy(() -> service.handle(attempt));
 
     verify(requests, never()).replaceFor(any());
     verify(mail, never()).sendEmailChangeVerification(anyString(), any(), anyString());
@@ -109,14 +110,10 @@ class RequestEmailChangeServiceTest {
     final Account social = Account.register(organizationId, new Email("s@example.com"));
     when(accounts.findById(social.id())).thenReturn(Optional.of(social));
 
+    final RequestEmailChangeCommand attempt =
+        new RequestEmailChangeCommand(
+            social.id(), "x", new Email("n@example.com"), AuditActor.account(social.id().value()));
     assertThatExceptionOfType(NoPasswordToChangeException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new RequestEmailChangeCommand(
-                        social.id(),
-                        "x",
-                        new Email("n@example.com"),
-                        AuditActor.account(social.id().value()))));
+        .isThrownBy(() -> service.handle(attempt));
   }
 }

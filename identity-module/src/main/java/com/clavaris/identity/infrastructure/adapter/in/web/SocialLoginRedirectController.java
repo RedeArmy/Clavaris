@@ -70,13 +70,6 @@ public class SocialLoginRedirectController {
   public static final String REDIRECT_URL_SESSION_ATTRIBUTE = "clavaris.socialLogin.redirectUrl";
 
   /**
-   * The flat {@code /oauth2/authorization/{provider}} hop and the provider's callback carry no
-   * tenant of their own, yet they must read the session of the tier that started the login. This
-   * query parameter on the hop names it ({@code <organization id without dashes>} or {@link
-   * #PLATFORM_TENANT_TAG}); the authorization-request resolver then copies it into the OAuth {@code
-   * state} as a prefix, so the callback names it again.
-   */
-  /**
    * TD-FUT-043: set by the signed-in "connect a provider" action (never by the sign-in buttons) so
    * the provider callback links the identity to this Account instead of signing anyone in. The
    * value is the Account's id; the timestamp bounds how long the intent stays usable.
@@ -86,6 +79,13 @@ public class SocialLoginRedirectController {
   public static final String LINK_REQUESTED_AT_SESSION_ATTRIBUTE =
       "clavaris.socialLink.requestedAt";
 
+  /**
+   * The flat {@code /oauth2/authorization/{provider}} hop and the provider's callback carry no
+   * tenant of their own, yet they must read the session of the tier that started the login. This
+   * query parameter on the hop names it ({@code <organization id without dashes>} or {@link
+   * #PLATFORM_TENANT_TAG}); the authorization-request resolver then copies it into the OAuth {@code
+   * state} as a prefix, so the callback names it again.
+   */
   public static final String TENANT_TAG_PARAMETER = "clavaris_tenant";
 
   public static final String PLATFORM_TENANT_TAG = "platform";

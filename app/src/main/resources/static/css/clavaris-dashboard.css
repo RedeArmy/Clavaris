@@ -2835,12 +2835,13 @@ body:has(.htmx-request)::after {
   margin: 0;
 }
 
-.clavaris-profile-header__chips {
+/* Two classes so it outranks `.clavaris-profile-header__text p { margin: 0 }` without !important. */
+.clavaris-profile-header__text .clavaris-profile-header__chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   align-items: center;
-  margin-top: var(--space-2) !important;
+  margin-top: var(--space-2);
 }
 
 .clavaris-profile-header__fact {

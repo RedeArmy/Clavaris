@@ -72,16 +72,18 @@ class ConfirmEmailChangeServiceTest {
 
   @Test
   void anUnknownLinkIsInvalid() {
+    final ConfirmEmailChangeCommand attempt = new ConfirmEmailChangeCommand(account.id(), "nope");
     assertThatExceptionOfType(InvalidEmailChangeTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailChangeCommand(account.id(), "nope")));
+        .isThrownBy(() -> service.handle(attempt));
   }
 
   @Test
   void aLinkLostToAConcurrentUseIsInvalid() {
     when(requests.consumeIfActive(any(), any())).thenReturn(false);
 
+    final ConfirmEmailChangeCommand attempt = new ConfirmEmailChangeCommand(account.id(), RAW);
     assertThatExceptionOfType(InvalidEmailChangeTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailChangeCommand(account.id(), RAW)));
+        .isThrownBy(() -> service.handle(attempt));
     verify(accounts, never()).save(any());
   }
 
@@ -89,8 +91,9 @@ class ConfirmEmailChangeServiceTest {
   void aLinkOnlyWorksForTheAccountThatAskedForIt() {
     final AccountId someoneElse = AccountId.newId();
 
+    final ConfirmEmailChangeCommand attempt = new ConfirmEmailChangeCommand(someoneElse, RAW);
     assertThatExceptionOfType(InvalidEmailChangeTokenException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailChangeCommand(someoneElse, RAW)));
+        .isThrownBy(() -> service.handle(attempt));
     verify(requests, never()).consumeIfActive(any(), any());
   }
 
@@ -99,8 +102,9 @@ class ConfirmEmailChangeServiceTest {
     when(accounts.existsByOrganizationIdAndEmail(organizationId, new Email("new@example.com")))
         .thenReturn(true);
 
+    final ConfirmEmailChangeCommand attempt = new ConfirmEmailChangeCommand(account.id(), RAW);
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailChangeCommand(account.id(), RAW)));
+        .isThrownBy(() -> service.handle(attempt));
     assertThat(account.email()).isEqualTo(new Email("old@example.com"));
   }
 
@@ -108,7 +112,8 @@ class ConfirmEmailChangeServiceTest {
   void losingTheUniqueConstraintRaceIsRefusedToo() {
     doThrow(new DataIntegrityViolationException("dup")).when(accounts).save(account);
 
+    final ConfirmEmailChangeCommand attempt = new ConfirmEmailChangeCommand(account.id(), RAW);
     assertThatExceptionOfType(EmailAlreadyRegisteredException.class)
-        .isThrownBy(() -> service.handle(new ConfirmEmailChangeCommand(account.id(), RAW)));
+        .isThrownBy(() -> service.handle(attempt));
   }
 }

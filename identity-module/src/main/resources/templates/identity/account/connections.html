@@ -30,6 +30,12 @@
         <p th:if="${linked.isEmpty()}" class="clavaris-empty-state">No accounts are connected.</p>
         <div class="clavaris-table-wrapper" th:unless="${linked.isEmpty()}">
             <table class="clavaris-table">
+                <thead>
+                <tr>
+                    <th scope="col">Provider</th>
+                    <th scope="col">Action</th>
+                </tr>
+                </thead>
                 <tbody>
                 <tr th:each="provider : ${linked}">
                     <td th:text="${provider.name() == 'GITHUB' ? 'GitHub' : 'Google'}">Google</td>
@@ -46,6 +52,12 @@
 
         <div class="clavaris-table-wrapper" th:unless="${connectable.isEmpty()}">
             <table class="clavaris-table">
+                <thead>
+                <tr>
+                    <th scope="col">Provider</th>
+                    <th scope="col">Action</th>
+                </tr>
+                </thead>
                 <tbody>
                 <tr th:each="provider : ${connectable}">
                     <td th:text="${provider.name() == 'GITHUB' ? 'GitHub' : 'Google'}">GitHub</td>
