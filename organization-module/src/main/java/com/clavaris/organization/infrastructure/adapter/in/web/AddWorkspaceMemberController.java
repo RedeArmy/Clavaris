@@ -1,7 +1,7 @@
 package com.clavaris.organization.infrastructure.adapter.in.web;
 
 import com.clavaris.common.domain.model.AuditActor;
-import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
+import com.clavaris.organization.application.usecase.addworkspacemember.AccountAlreadyExistsException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberCommand;
 import com.clavaris.organization.application.usecase.addworkspacemember.AddWorkspaceMemberUseCase;
 import com.clavaris.organization.application.usecase.addworkspacemember.WorkspaceNotFoundException;
@@ -61,7 +61,7 @@ class AddWorkspaceMemberController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final WorkspaceNotFoundException | WorkspaceRoleNotFoundException _) {
       return ResponseEntity.notFound().build();
-    } catch (final AccountProvisioner.AccountAlreadyExistsException _) {
+    } catch (final AccountAlreadyExistsException _) {
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
     return ResponseEntity.status(HttpStatus.CREATED)

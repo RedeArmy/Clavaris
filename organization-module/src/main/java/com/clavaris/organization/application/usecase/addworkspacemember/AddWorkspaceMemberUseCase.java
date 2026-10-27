@@ -8,8 +8,8 @@ public interface AddWorkspaceMemberUseCase {
 
   /**
    * @throws WorkspaceNotFoundException if {@code command.workspaceId()} doesn't exist
-   * @throws AccountProvisioner.AccountAlreadyExistsException if {@code command.email()} is already
-   *     registered in this Workspace's own Organization
+   * @throws AccountAlreadyExistsException if {@code command.email()} is already registered in this
+   *     Workspace's own Organization
    */
   WorkspaceMembership handle(AddWorkspaceMemberCommand command);
 }

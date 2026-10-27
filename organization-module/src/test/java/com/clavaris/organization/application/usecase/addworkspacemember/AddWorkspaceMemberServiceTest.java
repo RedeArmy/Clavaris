@@ -180,12 +180,11 @@ class AddWorkspaceMemberServiceTest {
   void letsAccountAlreadyExistsExceptionPropagateWithoutSavingAMembership() {
     when(accountProvisioner.provisionAndSendWelcome(any(), any()))
         .thenThrow(
-            new AccountProvisioner.AccountAlreadyExistsException(
-                workspace.organizationId(), "taken@example.com"));
+            new AccountAlreadyExistsException(workspace.organizationId(), "taken@example.com"));
     AddWorkspaceMemberCommand command =
         new AddWorkspaceMemberCommand(workspace.id(), "taken@example.com", role.id(), ACTOR);
 
-    assertThatExceptionOfType(AccountProvisioner.AccountAlreadyExistsException.class)
+    assertThatExceptionOfType(AccountAlreadyExistsException.class)
         .isThrownBy(() -> service.handle(command));
 
     verify(memberships, never()).save(any());

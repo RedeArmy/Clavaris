@@ -12,6 +12,7 @@ import com.clavaris.identity.application.usecase.requestpasswordreset.RequestPas
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
+import com.clavaris.organization.application.usecase.addworkspacemember.AccountAlreadyExistsException;
 import com.clavaris.organization.application.usecase.addworkspacemember.AccountProvisioner;
 import java.security.SecureRandom;
 import java.util.UUID;

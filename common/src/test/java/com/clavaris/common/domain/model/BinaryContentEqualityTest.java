@@ -26,7 +26,7 @@ class BinaryContentEqualityTest {
   @Test
   void contentEqualsComparesBytesByValueNotArrayIdentity() {
     byte[] first = {1, 2, 3};
-    byte[] second = new byte[] {1, 2, 3};
+    byte[] second = {1, 2, 3};
 
     assertThat(first).isNotSameAs(second);
     assertThat(BinaryContentEquality.contentEquals(first, "image/png", second, "image/png"))
