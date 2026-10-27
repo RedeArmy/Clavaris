@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 /**
@@ -100,15 +101,21 @@ import java.util.TreeMap;
       raw.forEach(
           (key, value) -> {
             if (key instanceof String request && value instanceof String leftAt) {
-              try {
-                stored.put(request, Instant.parse(leftAt));
-              } catch (final DateTimeParseException ignored) {
-                // Not one of ours; dropped the next time the notes are stored.
-              }
+              parseInstant(leftAt).ifPresent(parsed -> stored.put(request, parsed));
             }
           });
     }
     return stored;
+  }
+
+  // Not one of ours when it does not parse; such an entry is dropped the next time the notes are
+  // stored.
+  private static Optional<Instant> parseInstant(final String value) {
+    try {
+      return Optional.of(Instant.parse(value));
+    } catch (final DateTimeParseException _) {
+      return Optional.empty();
+    }
   }
 
   // Leaves the note for this request (the End-User is about to sign in again), dropping the oldest

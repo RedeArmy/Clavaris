@@ -41,6 +41,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/workspaces")
 public class PlatformWorkspaceAssignRoleController {
 
+  private static final String ORGANIZATIONS_PATH_PREFIX = "/platform/dashboard/organizations/";
   private static final String ASSIGN_ROLE_FORM_FRAGMENT =
       "organization/platform/fragments/team-assign-role-form :: assignRoleForm";
   private static final String ACCOUNT_OPTIONS_FRAGMENT =
@@ -182,7 +183,7 @@ public class PlatformWorkspaceAssignRoleController {
 
   private static String assignRoleToTeamAction(
       final UUID organizationId, final UUID workspaceId, final UUID teamId) {
-    return "/platform/dashboard/organizations/"
+    return ORGANIZATIONS_PATH_PREFIX
         + organizationId
         + WORKSPACES_PATH_SEGMENT
         + workspaceId
@@ -193,7 +194,7 @@ public class PlatformWorkspaceAssignRoleController {
 
   private static String assignRoleToNoTeamAction(
       final UUID organizationId, final UUID workspaceId) {
-    return "/platform/dashboard/organizations/"
+    return ORGANIZATIONS_PATH_PREFIX
         + organizationId
         + WORKSPACES_PATH_SEGMENT
         + workspaceId
@@ -221,7 +222,7 @@ public class PlatformWorkspaceAssignRoleController {
     candidates.addEligibleAccounts(model, organizationId, workspace, null);
     model.addAttribute(
         "assignRoleSearchAction",
-        "/platform/dashboard/organizations/"
+        ORGANIZATIONS_PATH_PREFIX
             + organizationId
             + WORKSPACES_PATH_SEGMENT
             + workspace.id()

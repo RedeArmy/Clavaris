@@ -170,16 +170,12 @@ class RedisFixedWindowRateLimiter implements RateLimiter {
   }
 
   private RateLimitDecision failOpen(final String key, final DataAccessException failure) {
-    LOG.error(
-        "event=rate_limit_fail_open key_prefix={} reason={}",
-        keyPrefixForLogging(key),
-        failure.getClass().getSimpleName());
-    metrics.increment(
-        "clavaris.rate_limit.fail_open",
-        "rule",
-        keyPrefixForLogging(key),
-        "reason",
-        failure.getClass().getSimpleName());
+    // Computed once, not inside the logging call: the arguments would otherwise be built even when
+    // the level is off.
+    final String rule = keyPrefixForLogging(key);
+    final String reason = failure.getClass().getSimpleName();
+    LOG.error("event=rate_limit_fail_open key_prefix={} reason={}", rule, reason);
+    metrics.increment("clavaris.rate_limit.fail_open", "rule", rule, "reason", reason);
     return new RateLimitDecision(true, 0, Duration.ZERO);
   }
 

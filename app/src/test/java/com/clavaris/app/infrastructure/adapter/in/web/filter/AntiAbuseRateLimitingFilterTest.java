@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -101,7 +102,7 @@ class AntiAbuseRateLimitingFilterTest {
 
     org.mockito.ArgumentCaptor<List<RateLimitCheck>> batch =
         org.mockito.ArgumentCaptor.forClass(List.class);
-    verify(rateLimiter, org.mockito.Mockito.times(1)).tryConsumeAll(batch.capture());
+    verify(rateLimiter, times(1)).tryConsumeAll(batch.capture());
     assertThat(batch.getValue())
         .as("the two rules that match this path, not the token rule")
         .hasSize(2)
