@@ -146,7 +146,7 @@ services:
     # this host. One less thing exposed to the internet than local dev has.
 
   caddy:
-    image: caddy:2-alpine@sha256:504a44d7d74bd2bc28a66afc4774912fc21223ca8a67734af1c54ab2f999b489
+    image: caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
     restart: unless-stopped
     ports:
       - "80:80"
