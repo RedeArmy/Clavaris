@@ -84,9 +84,10 @@ public class AccountPasswordController {
               form.getNewPassword(),
               CurrentSessionSupport.currentSessionId(request),
               AuditActor.account(accountId.value())));
-    } catch (final IncorrectCurrentPasswordException _) {
-      bindingResult.rejectValue(
-          "currentPassword", "currentPassword.incorrect", "The current password is incorrect");
+    } catch (final IncorrectCurrentPasswordException
+        | NoPasswordToChangeException
+        | VerificationOverloadedException failure) {
+      CurrentPasswordFailures.apply(failure, bindingResult, model, response);
       return FORM_VIEW;
     } catch (final WeakPasswordException _) {
       bindingResult.rejectValue(
@@ -104,14 +105,6 @@ public class AccountPasswordController {
           "newPassword",
           "newPassword.breached",
           "This password cannot be used — please choose a different one");
-      return FORM_VIEW;
-    } catch (final NoPasswordToChangeException _) {
-      model.addAttribute("noPassword", true);
-      return FORM_VIEW;
-    } catch (final VerificationOverloadedException _) {
-      // The current password was never checked: a 503, not a wrong-password message (TD-FUT-017).
-      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-      model.addAttribute("serviceOverloadedError", true);
       return FORM_VIEW;
     }
     return "redirect:/o/" + organizationId + "/account/profile?passwordChanged";

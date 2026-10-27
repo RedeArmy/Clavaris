@@ -91,16 +91,10 @@ public class AccountEmailController {
               form.getCurrentPassword(),
               newEmail,
               AuditActor.account(accountId.value())));
-    } catch (final IncorrectCurrentPasswordException _) {
-      bindingResult.rejectValue(
-          "currentPassword", "currentPassword.incorrect", "The current password is incorrect");
-      return FORM_VIEW;
-    } catch (final NoPasswordToChangeException _) {
-      model.addAttribute("noPassword", true);
-      return FORM_VIEW;
-    } catch (final VerificationOverloadedException _) {
-      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-      model.addAttribute("serviceOverloadedError", true);
+    } catch (final IncorrectCurrentPasswordException
+        | NoPasswordToChangeException
+        | VerificationOverloadedException failure) {
+      CurrentPasswordFailures.apply(failure, bindingResult, model, response);
       return FORM_VIEW;
     }
     return "redirect:/o/" + organizationId + "/account/profile?emailChangeRequested";
