@@ -26,9 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
  * for the removed member's Account ({@link WorkspaceMemberRefreshTokenRevoker}, 2026-09-06) and now
  * also the domain {@code Session} row, the SAS-managed access/ID token, and the hosted-login page's
  * own browser session ({@link WorkspaceMemberAccountRevoker}, 2026-09-29) — see that port's own
- * Javadoc for exactly why the second half is safe to do unconditionally today (the real
- * Account-Workspace 1:1 invariant) and what changes the moment that invariant doesn't hold anymore
- * (TD-WS-005). Together this is the same "full BR-ID-03-shaped cascade" {@code
+ * Javadoc for why it is only done when the removal leaves the Account with no Workspace at all
+ * (TD-WS-005, closed 2026-10-27: it used to be unconditional, correct only while an Account could
+ * belong to one Workspace, and would have signed a member out of every other Workspace it still
+ * belongs to). Together this is the same "full BR-ID-03-shaped cascade" {@code
  * RotateRefreshTokenService}'s own reuse response already runs, not the full workspace-scoped-token
  * architecture BR-WS-03's own text still correctly names as out of v1 scope — that remains a
  * separate, larger gap (a consuming application still can't get a webhook-driven live revocation of
@@ -112,7 +113,14 @@ public class RemoveWorkspaceMemberService implements RemoveWorkspaceMemberUseCas
     // here, unlike AccountProvisioner's own deliberately-outside-the-transaction network call. A
     // crash between the writes is not a real risk this way — either all commit or none do.
     refreshTokenRevoker.revokeAllRefreshTokensFor(command.accountId());
-    accountRevoker.revokeAllAccessFor(command.accountId());
+    // TD-WS-005: the account's whole live session and token set is only ended when this was its
+    // last Workspace. While it still belongs to another one, removing it here must not sign it out
+    // of that one; its refresh tokens are rotated out above regardless (a rotated-out refresh token
+    // is always safe to invalidate), so it signs in again to carry on. The membership just deleted
+    // is already gone from this read, which is why any row found is a different Workspace.
+    if (memberships.findAllByAccountId(command.accountId()).isEmpty()) {
+      accountRevoker.revokeAllAccessFor(command.accountId());
+    }
 
     auditEvents.write(
         command.actor(),
