@@ -19,7 +19,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- TD-PROC-005/CLAUDE.md §3: locked at Spring Boot 4.1 — bump to the latest 4.1.x patch
              at implementation time, not a deliberate patch-version choice of its own. -->
-        <spring-boot.version>4.1.1</spring-boot.version>
+        <spring-boot.version>4.1.2</spring-boot.version>
         <!-- Overrides the Spring Boot BOM's own managed Testcontainers version:
              an old 1.20.4 default hardcoded Docker API 1.32 in its
              detection-phase ping, which recent Docker Engine builds (this dev
