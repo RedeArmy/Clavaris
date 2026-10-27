@@ -1,5 +1,6 @@
 package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.ConfirmationTokenCodec;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.time.Duration;
@@ -27,7 +28,6 @@ final class DeleteOAuthClientConfirmationTokens {
   private static final String SESSION_ATTRIBUTE_PREFIX =
       "clavaris.deleteOAuthClient.confirmationToken.";
   private static final Duration TTL = Duration.ofMinutes(10);
-  private static final char SEPARATOR = '|';
 
   private DeleteOAuthClientConfirmationTokens() {
     // Utility class — never instantiated.
@@ -37,7 +37,8 @@ final class DeleteOAuthClientConfirmationTokens {
     final String token = UUID.randomUUID().toString();
     request
         .getSession(true)
-        .setAttribute(attributeName(clientId), encode(token, Instant.now().plus(TTL)));
+        .setAttribute(
+            attributeName(clientId), ConfirmationTokenCodec.encode(token, Instant.now().plus(TTL)));
     return token;
   }
 
@@ -51,31 +52,11 @@ final class DeleteOAuthClientConfirmationTokens {
     final Object raw = session.getAttribute(attributeName);
     // Single-use: removed on this very first check, regardless of the outcome below.
     session.removeAttribute(attributeName);
-    if (!(raw instanceof String stored)) {
-      return false;
-    }
-    final int separator = stored.indexOf(SEPARATOR);
-    if (separator < 0) {
-      return false;
-    }
-    final Instant expiresAt;
-    try {
-      expiresAt = Instant.ofEpochMilli(Long.parseLong(stored.substring(separator + 1)));
-    } catch (final NumberFormatException _) {
-      return false;
-    }
-    return !Instant.now().isAfter(expiresAt)
-        && stored.substring(0, separator).equals(submittedToken);
+    return raw instanceof String stored
+        && ConfirmationTokenCodec.matches(stored, submittedToken, Instant.now());
   }
 
   private static String attributeName(final String clientId) {
     return SESSION_ATTRIBUTE_PREFIX + clientId;
-  }
-
-  // TD-ARCH-039: a session attribute is a plain String (token and expiry joined), so the Redis
-  // session serializer can store it as JSON without a type of ours in its allow-list. The token is
-  // a UUID, so the separator cannot occur in it.
-  private static String encode(final String token, final Instant expiresAt) {
-    return token + SEPARATOR + expiresAt.toEpochMilli();
   }
 }
