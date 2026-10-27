@@ -209,7 +209,7 @@ jobs:
       # artifact for a person, and attached to the image below as a signed attestation for a tool.
       - name: Generate the CycloneDX SBOM
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@v0.24.3
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.push.outputs.digest }}
           format: cyclonedx-json
