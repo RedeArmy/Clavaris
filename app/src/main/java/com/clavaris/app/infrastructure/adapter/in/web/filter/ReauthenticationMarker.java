@@ -26,7 +26,11 @@ import java.util.TreeMap;
  * #TTL}, so abandoned requests cannot pile up or let a later prompt=login through: a note counts
  * only for the very request it was left for, only until it expires, and only for a login made after
  * it was left, and it is used up when it counts.
+ *
+ * <p>PMD.TooManyMethods: each method is one step of the note lifecycle (leave, check, use up,
+ * store, read back, parse); folding them together would only hide that.
  */
+@SuppressWarnings("PMD.TooManyMethods")
 /* package */ final class ReauthenticationMarker {
 
   /* package */ static final String SESSION_ATTRIBUTE = "clavaris.oidc.reauth.requested-at";
