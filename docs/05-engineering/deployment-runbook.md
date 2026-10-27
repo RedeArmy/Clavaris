@@ -320,6 +320,39 @@ The three base images (`postgres`, `redis`, `caddy`) are pinned by digest in bot
 Dependabot's `docker-compose` ecosystem proposes the bumps weekly, so a base-image change arrives as
 a pull request to review, not silently on the next `docker compose pull`.
 
+### 6f. Audit log partitions, retention and archive (TD-FUT-047)
+
+`audit_events` is range-partitioned by month (UTC), one partition `audit_events_YYYY_MM` per month
+plus `audit_events_default`. `AuditEventPartitionMaintenanceJob` runs at start-up and nightly at
+03:50 and creates every missing month from the current one to three ahead
+(`clavaris.audit.partitions-ahead`). Nothing is deleted unless you ask: `clavaris.audit.retention-months`
+is `0` (keep everything) until a compliance period is decided.
+
+- **Turn on retention.** Set `clavaris.audit.retention-months=N` (for example `AUDIT_RETENTION_MONTHS`
+  mapped in `.env`). Each night every partition whose whole month is more than `N` months old is
+  dropped, and each drop is itself written to the audit log (`audit_log.partition_dropped`). The
+  current and future months are never dropped.
+- **Archive before you drop.** A drop is permanent. To keep a month, dump it first, then let the job
+  (or you) drop it:
+  `docker compose exec postgres pg_dump -U clavaris -t audit_events_2026_01 clavaris | gzip > audit_events_2026_01.sql.gz`.
+  Restoring is `gunzip -c ... | psql`, then `ALTER TABLE audit_events ATTACH PARTITION audit_events_2026_01
+  FOR VALUES FROM ('2026-01-01 00:00:00+00') TO ('2026-02-01 00:00:00+00')`.
+- **If you see `event=audit_events_default_partition_in_use`.** Events are landing in the default
+  partition because a month's partition did not exist (the job was down for more than the months
+  ahead). The events are safe, but that month's partition cannot be created while the default holds
+  rows that belong to it. Fix it by hand: `BEGIN; ALTER TABLE audit_events DETACH PARTITION
+  audit_events_default; CREATE TABLE audit_events_YYYY_MM PARTITION OF audit_events FOR VALUES FROM
+  (...) TO (...); INSERT INTO audit_events SELECT * FROM audit_events_default WHERE occurred_at >=
+  ... AND occurred_at < ...; DELETE FROM audit_events_default WHERE ...; ALTER TABLE audit_events
+  ATTACH PARTITION audit_events_default DEFAULT; COMMIT;` (one month at a time).
+- **Upgrading a large existing table.** The migration copies the old table into the new one in a
+  single transaction, fine up to a few million rows. For tens of millions, take the application down
+  for a maintenance window, or copy the old table in batches into a pre-created partitioned table
+  first; do not run it against a live system of that size.
+- **Reading the log** is unchanged: the per-Organization page uses the keyset index on every
+  partition and stops at the newest ones (measured on 600,000 rows over 13 months: 1.3 ms for the
+  first page, 3.1 ms for an older one).
+
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 
 Everything in §1–§7 above describes the single-VM artifact itself, deployable to any host with a
