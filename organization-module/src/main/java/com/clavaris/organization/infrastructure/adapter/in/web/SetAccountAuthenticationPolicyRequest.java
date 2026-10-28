@@ -20,4 +20,11 @@ public record SetAccountAuthenticationPolicyRequest(
     boolean usernameSignInEnabled,
     boolean passwordAtSignUpEnabled,
     boolean deviceTrustEnabled,
-    boolean selfRegistrationRequiresApproval) {}
+    boolean selfRegistrationRequiresApproval,
+    Boolean selfServiceEmailChangeEnabled) {
+
+  /** Absent means on: a client written before TD-FUT-052 must not switch email change off. */
+  public boolean selfServiceEmailChangeEnabledOrDefault() {
+    return selfServiceEmailChangeEnabled == null || selfServiceEmailChangeEnabled;
+  }
+}

@@ -42,6 +42,7 @@ class JpaAccountAuthenticationPolicyRepository implements AccountAuthenticationP
             policy.passwordAtSignUpEnabled(),
             policy.deviceTrustEnabled(),
             policy.selfRegistrationRequiresApproval(),
+            policy.selfServiceEmailChangeEnabled(),
             policy.createdAt(),
             policy.updatedAt()));
   }
@@ -60,6 +61,7 @@ class JpaAccountAuthenticationPolicyRepository implements AccountAuthenticationP
         entity.isPasswordAtSignUpEnabled(),
         entity.isDeviceTrustEnabled(),
         entity.isSelfRegistrationRequiresApproval(),
+        entity.isSelfServiceEmailChangeEnabled(),
         entity.getCreatedAt(),
         entity.getUpdatedAt());
   }

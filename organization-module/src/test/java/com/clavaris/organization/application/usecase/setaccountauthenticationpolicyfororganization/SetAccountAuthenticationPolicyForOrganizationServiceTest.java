@@ -223,4 +223,38 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
 
     assertThat(result.policy().passwordAtSignUpEnabled()).isFalse();
   }
+
+  // TD-FUT-052: a command written before the setting existed leaves it on; the full command turns
+  // it
+  // off, both for a fresh policy and for one that already exists.
+  @Test
+  void theEmailChangeSettingDefaultsToOnAndCanBeSwitchedOffOnFreshAndExistingPolicies() {
+    UUID organizationId = UUID.randomUUID();
+    when(organizations.existsById(organizationId)).thenReturn(true);
+    when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.empty());
+    assertThat(
+            service.handle(validCommand(organizationId)).policy().selfServiceEmailChangeEnabled())
+        .isTrue();
+
+    SetAccountAuthenticationPolicyForOrganizationCommand off =
+        new SetAccountAuthenticationPolicyForOrganizationCommand(
+            organizationId,
+            false,
+            EmailVerificationMethod.LINK,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            ACTOR);
+    assertThat(service.handle(off).policy().selfServiceEmailChangeEnabled()).isFalse();
+
+    when(policies.findByOrganizationId(organizationId))
+        .thenReturn(Optional.of(AccountAuthenticationPolicy.defaults(organizationId)));
+    assertThat(service.handle(off).policy().selfServiceEmailChangeEnabled()).isFalse();
+  }
 }
