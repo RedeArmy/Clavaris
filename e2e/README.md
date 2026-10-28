@@ -13,6 +13,7 @@ violation, uncaught script error or failed same-origin request, whatever the tes
 | Spec | What it covers |
 |---|---|
 | `hosted-sign-in.spec.ts` | the page every consuming application sends its users to: renders styled, its script runs, a PKCE sign-in returns an authorization code, a wrong password leaves the form usable |
+| `dashboard-scripts.spec.ts` | the page scripts as the build ships them (minified, TD-FUT-051): walks up to 60 pages of the operator dashboard by following its links, fails on any CSP violation, script error or failed request, and checks the served scripts really are the minified ones |
 | `dashboard.spec.ts` | the operator dashboard: sign-in session, htmx present, creating a Workspace swaps the list in place, and the operator's own Manage account and Sessions pages load the shell's scripts |
 
 ## Running locally

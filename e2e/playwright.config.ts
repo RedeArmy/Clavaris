@@ -25,7 +25,7 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     {
       name: "dashboard",
-      testMatch: /dashboard\.spec\.ts/,
+      testMatch: /dashboard.*\.spec\.ts/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: ".auth/operator.json" },
     },
