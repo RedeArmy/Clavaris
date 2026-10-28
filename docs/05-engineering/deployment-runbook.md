@@ -353,6 +353,25 @@ is `0` (keep everything) until a compliance period is decided.
   partition and stops at the newest ones (measured on 600,000 rows over 13 months: 1.3 ms for the
   first page, 3.1 ms for an older one).
 
+### 6g. Expired-record retention and security.txt (2026-10-27)
+
+**Retention.** `ExpiredIdentityRecordsRetentionJob` runs nightly at 04:45 (one replica, under an
+advisory lock) and deletes tokens, pending requests, refresh tokens and sessions that expired more
+than `clavaris.retention.expired-records-grace-days` (default 7) ago, in batches of
+`clavaris.retention.batch-size` (5,000). It logs `event=expired_records_swept table=... deleted=...`
+for every table it touched. Nothing needs configuring; raise the grace if support wants longer to
+look at an expired link. `login_events` is swept by age, `clavaris.retention.login-events-days` (default 400; `0` keeps sign-in history forever). The migration that adds the two
+supporting indexes (`refresh_tokens(expires_at)`, `sessions(last_seen_at)`) takes a short write lock
+on those tables; on a database that already holds many millions of rows, run it in a quiet window.
+
+**Self-service credential changes.** An Account whose password is the generated one from a social sign-up changes its password or email after a sign-in made in the last `clavaris.self-service.recent-sign-in-minutes` (default 10); otherwise the page asks the person to sign in again. An Organization can switch the End-User's own email change off with `selfServiceEmailChangeEnabled: false` on its authentication policy (the field is optional and defaults to on).
+
+**security.txt.** Set `SECURITY_TXT_CONTACT` (a `mailto:`, `https:` or `tel:` URI) and
+`SECURITY_TXT_EXPIRES` (an ISO-8601 instant in the future) in `.env`; `SECURITY_TXT_POLICY` is
+optional (an `https:` URL). Check it with `curl -i https://<domain>/.well-known/security.txt`: a
+`404` means a value is missing, malformed or past. Put a reminder to renew the expiry date, since an
+expired file is withdrawn rather than served.
+
 ## 7. Pre-production environment (VirtualBox VM) and automatic CD (ADR-0018 addendum, 2026-09-09)
 
 Everything in §1–§7 above describes the single-VM artifact itself, deployable to any host with a

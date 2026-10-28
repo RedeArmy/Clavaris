@@ -313,6 +313,10 @@ Since ADR-0010, two more cross-module references follow this same discipline and
 |---|---|---|---|
 | `AccountRegisteredEvent` | `identity-module` | Best-effort: triggers email verification send (async, retryable — a delayed verification email is not a correctness issue) | ✅ → `account.created` |
 | `AccountEmailVerifiedEvent` | `identity-module` | — | ✅ → `account.email_verified` |
+| `AccountPasswordChangedEvent` | `identity-module` | — (TD-FUT-043: the End-User changed their own password while signed in; no secret in the payload; a consumer ends its own sessions) | ✅ → `account.password_changed` |
+| `AccountEmailChangedEvent` | `identity-module` | — (TD-FUT-043; a consumer keeping its own copy of the email has no other way to learn it changed; the payload carries both addresses) | ✅ → `account.email_changed` |
+| `SocialIdentityLinkedEvent` | `identity-module` | — (raised by the social sign-in's confirmed link and, since TD-FUT-043, by the signed-in "connect a provider" action) | ✅ → `social_identity.linked` |
+| `SocialIdentityUnlinkedEvent` | `identity-module` | — (TD-FUT-043: the End-User removed a provider from their Account) | ✅ → `social_identity.unlinked` |
 | `PasswordResetRequestedEvent` | `identity-module` | Best-effort: triggers reset email send | ❌ (internal only — a reset request is not a fact a consumer needs) |
 | `PasswordResetCompletedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: all active sessions/refresh tokens are revoked synchronously, same transaction (BR-ID-04) | ❌ (internal only) |
 | `RefreshTokenReuseDetectedEvent` | `identity-module` | **Invariant cascade, already completed before this event is raised**: full-account token revocation, synchronous (BR-ID-03). The security alert (NFR §5) is a separate best-effort side effect, not a gate on the revocation itself | ✅ → `refresh_token.reuse_detected`, so a consumer can react (e.g. force logout its own session) |
