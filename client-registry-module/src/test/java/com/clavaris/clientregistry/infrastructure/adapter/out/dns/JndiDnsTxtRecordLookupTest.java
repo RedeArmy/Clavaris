@@ -16,14 +16,25 @@ import org.junit.jupiter.api.Test;
  */
 class JndiDnsTxtRecordLookupTest {
 
+  private static final int ATTEMPTS = 3;
+  private static final long RETRY_PAUSE_MILLIS = 1000;
+
   private final JndiDnsTxtRecordLookup lookup = new JndiDnsTxtRecordLookup();
 
   // google.com's own DMARC TXT record — a long-lived, stable, publicly documented record
   // (RFC 7489) from a domain with every incentive to never let it lapse, chosen specifically so
   // this test doesn't depend on anything this project itself controls or could accidentally break.
+  // The lookup answers an empty list for any failure, by design, so a single dropped UDP packet
+  // looks exactly like "no such record". This is the one test that talks to the real DNS, so it
+  // gets a few attempts before it concludes the record is missing; a real regression (wrong
+  // parsing, wrong provider) fails all of them.
   @Test
-  void returnsRealTxtValuesForARealStableRecord() {
+  void returnsRealTxtValuesForARealStableRecord() throws InterruptedException {
     List<String> values = lookup.lookupTxtRecords("_dmarc.google.com");
+    for (int attempt = 1; attempt < ATTEMPTS && values.isEmpty(); attempt++) {
+      Thread.sleep(RETRY_PAUSE_MILLIS);
+      values = lookup.lookupTxtRecords("_dmarc.google.com");
+    }
 
     assertThat(values).isNotEmpty().anyMatch(value -> value.startsWith("v=DMARC1"));
   }
