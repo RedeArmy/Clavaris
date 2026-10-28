@@ -29,7 +29,8 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
 
   private final SecurityContextRepository contextRepository = mock(SecurityContextRepository.class);
   private final SpringSecurityAuthenticatedSessionEstablisher establisher =
-      new SpringSecurityAuthenticatedSessionEstablisher(contextRepository);
+      new SpringSecurityAuthenticatedSessionEstablisher(
+          contextRepository, AccountSessionLimiter.unlimited());
 
   @AfterEach
   void clearSecurityContext() {

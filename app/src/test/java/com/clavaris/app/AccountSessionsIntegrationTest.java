@@ -19,6 +19,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,7 +48,8 @@ import tools.jackson.databind.ObjectMapper;
 @TestPropertySource(
     properties = {
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
-      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
+      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret",
+      "clavaris.session.max-per-account=3"
     })
 class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
 
@@ -163,6 +165,35 @@ class AccountSessionsIntegrationTest extends RedisBackedIntegrationTest {
     HttpResponse<String> afterRevoke = getSessionsPageRaw(client, organizationId);
     assertThat(afterRevoke.statusCode()).isEqualTo(302);
     assertThat(afterRevoke.headers().firstValue("Location").orElseThrow()).contains("/login");
+  }
+
+  // TD-PERF-051: an Account never holds more live browser sessions than the cap (3 in this suite).
+  // The fourth device ends the least recently used one, on a real Redis-backed session store.
+  @Test
+  void aFourthDeviceEndsTheLeastRecentlyUsedSessionSoTheAccountNeverExceedsTheCap()
+      throws Exception {
+    UUID organizationId = createOrganization();
+    String email = "session-cap@example.com";
+    registerAccount(organizationId, email, "a-correct-password");
+    HttpClient first = newSessionBackedClient();
+    HttpClient second = newSessionBackedClient();
+    HttpClient third = newSessionBackedClient();
+    HttpClient fourth = newSessionBackedClient();
+    for (HttpClient device : List.of(first, second, third)) {
+      login(device, organizationId, email, "a-correct-password", "device");
+      assertThat(getSessionsPageRaw(device, organizationId).statusCode()).isEqualTo(200);
+    }
+
+    login(fourth, organizationId, email, "a-correct-password", "device");
+
+    HttpResponse<String> endedOne = getSessionsPageRaw(first, organizationId);
+    assertThat(endedOne.statusCode()).as("the oldest session was ended").isEqualTo(302);
+    assertThat(endedOne.headers().firstValue("Location").orElseThrow()).contains("/login");
+    for (HttpClient stillSignedIn : List.of(second, third, fourth)) {
+      assertThat(getSessionsPageRaw(stillSignedIn, organizationId).statusCode())
+          .as("the others stay signed in")
+          .isEqualTo(200);
+    }
   }
 
   // TD-SEC-035: real, end-to-end proof the two new anti-abuse rules are actually wired onto this
