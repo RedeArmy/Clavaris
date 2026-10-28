@@ -3,6 +3,7 @@ package com.clavaris.organization.application.usecase.setaccountauthenticationpo
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -86,34 +87,28 @@ public class SetAccountAuthenticationPolicyForOrganizationService
       final AccountAuthenticationPolicy existing,
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
     return existing
-        .withPolicy(
-            command.emailVerificationRequiredAtSignIn(),
-            command.emailVerificationMethod(),
-            command.emailCodeSignInEnabled(),
-            command.emailLinkSignInEnabled(),
-            command.usernameSignUpEnabled(),
-            command.usernameRequired(),
-            command.usernameSignInEnabled(),
-            command.passwordAtSignUpEnabled(),
-            command.deviceTrustEnabled(),
-            command.selfRegistrationRequiresApproval())
+        .withPolicy(settingsFrom(command))
         .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled());
   }
 
   private AccountAuthenticationPolicy defineFromCommand(
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
-    return AccountAuthenticationPolicy.define(
-            command.organizationId(),
-            command.emailVerificationRequiredAtSignIn(),
-            command.emailVerificationMethod(),
-            command.emailCodeSignInEnabled(),
-            command.emailLinkSignInEnabled(),
-            command.usernameSignUpEnabled(),
-            command.usernameRequired(),
-            command.usernameSignInEnabled(),
-            command.passwordAtSignUpEnabled(),
-            command.deviceTrustEnabled(),
-            command.selfRegistrationRequiresApproval())
+    return AccountAuthenticationPolicy.define(command.organizationId(), settingsFrom(command))
         .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled());
+  }
+
+  private static AccountAuthenticationSettings settingsFrom(
+      final SetAccountAuthenticationPolicyForOrganizationCommand command) {
+    return new AccountAuthenticationSettings(
+        command.emailVerificationRequiredAtSignIn(),
+        command.emailVerificationMethod(),
+        command.emailCodeSignInEnabled(),
+        command.emailLinkSignInEnabled(),
+        command.usernameSignUpEnabled(),
+        command.usernameRequired(),
+        command.usernameSignInEnabled(),
+        command.passwordAtSignUpEnabled(),
+        command.deviceTrustEnabled(),
+        command.selfRegistrationRequiresApproval());
   }
 }

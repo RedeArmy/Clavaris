@@ -31,16 +31,17 @@ class AccountAuthenticationPolicyTest {
     AccountAuthenticationPolicy policy =
         AccountAuthenticationPolicy.define(
             organizationId,
-            true,
-            EmailVerificationMethod.CODE,
-            true,
-            true,
-            true,
-            true,
-            true,
-            false,
-            true,
-            false);
+            new AccountAuthenticationSettings(
+                true,
+                EmailVerificationMethod.CODE,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                true,
+                false));
 
     assertThat(policy.id()).isNotNull();
     assertThat(policy.organizationId()).isEqualTo(organizationId);
@@ -66,7 +67,17 @@ class AccountAuthenticationPolicyTest {
 
     AccountAuthenticationPolicy updated =
         original.withPolicy(
-            true, EmailVerificationMethod.BOTH, true, false, true, false, true, true, true, false);
+            new AccountAuthenticationSettings(
+                true,
+                EmailVerificationMethod.BOTH,
+                true,
+                false,
+                true,
+                false,
+                true,
+                true,
+                true,
+                false));
 
     assertThat(updated.id()).isEqualTo(original.id());
     assertThat(updated.organizationId()).isEqualTo(original.organizationId());
@@ -87,16 +98,17 @@ class AccountAuthenticationPolicyTest {
         AccountAuthenticationPolicy.reconstitute(
             persistedId,
             organizationId,
-            true,
-            EmailVerificationMethod.LINK,
-            false,
-            true,
-            false,
-            false,
-            false,
-            true,
-            false,
-            false,
+            new AccountAuthenticationSettings(
+                true,
+                EmailVerificationMethod.LINK,
+                false,
+                true,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false),
             true,
             persistedCreatedAt,
             persistedUpdatedAt);
@@ -118,16 +130,17 @@ class AccountAuthenticationPolicyTest {
 
     AccountAuthenticationPolicy retuned =
         off.withPolicy(
-            false,
-            EmailVerificationMethod.LINK,
-            false,
-            false,
-            false,
-            false,
-            false,
-            true,
-            false,
-            false);
+            new AccountAuthenticationSettings(
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false));
     assertThat(retuned.selfServiceEmailChangeEnabled())
         .as("re-tuning the other settings does not turn it back on")
         .isFalse();

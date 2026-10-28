@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
 import com.clavaris.organization.domain.model.EmailVerificationMethod;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,16 +22,17 @@ class GetAccountAuthenticationPolicyForOrganizationServiceTest {
     AccountAuthenticationPolicy stored =
         AccountAuthenticationPolicy.define(
             organizationId,
-            true,
-            EmailVerificationMethod.CODE,
-            true,
-            false,
-            false,
-            false,
-            false,
-            true,
-            false,
-            false);
+            new AccountAuthenticationSettings(
+                true,
+                EmailVerificationMethod.CODE,
+                true,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false));
     when(policies.findByOrganizationId(organizationId)).thenReturn(Optional.of(stored));
     GetAccountAuthenticationPolicyForOrganizationService service =
         new GetAccountAuthenticationPolicyForOrganizationService(policies);

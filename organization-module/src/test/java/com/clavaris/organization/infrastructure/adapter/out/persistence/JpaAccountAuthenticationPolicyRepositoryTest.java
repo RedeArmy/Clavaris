@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
 import com.clavaris.organization.domain.model.EmailVerificationMethod;
 import com.clavaris.organization.domain.model.Organization;
 import java.util.Optional;
@@ -44,16 +45,17 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
     AccountAuthenticationPolicy policy =
         AccountAuthenticationPolicy.define(
             organizationId,
-            true,
-            EmailVerificationMethod.CODE,
-            true,
-            false,
-            true,
-            false,
-            true,
-            false,
-            true,
-            false);
+            new AccountAuthenticationSettings(
+                true,
+                EmailVerificationMethod.CODE,
+                true,
+                false,
+                true,
+                false,
+                true,
+                false,
+                true,
+                false));
 
     policies.save(policy);
 
@@ -88,7 +90,17 @@ class JpaAccountAuthenticationPolicyRepositoryTest {
 
     AccountAuthenticationPolicy updated =
         original.withPolicy(
-            true, EmailVerificationMethod.BOTH, true, true, true, true, true, false, true, false);
+            new AccountAuthenticationSettings(
+                true,
+                EmailVerificationMethod.BOTH,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                true,
+                false));
     policies.save(updated);
 
     assertThat(springDataRepository.count())

@@ -28,74 +28,30 @@ import java.util.UUID;
  *
  * <p>Same record-style-accessor PMD suppressions as {@link RateLimitPolicy}, same rationale.
  */
-// PMD.LongVariable: every flagged field/parameter name here spells out exactly which of the
-// nine tunable strategies it governs (emailVerificationRequiredAtSignIn, usernameSignInEnabled,
-// passwordAtSignUpEnabled, ...) — same "descriptive over abbreviated" convention every sibling
-// policy aggregate in this module already establishes. PMD.ExcessiveParameterList: one parameter
-// per persisted column across define/reconstitute/withPolicy, same "wiring, not sprawl" reasoning
-// RateLimitPolicy's own constructor already documents. PMD.AvoidDuplicateLiterals: "must not be
-// null" is reused across every Objects.requireNonNull guard in the private constructor, same
-// false positive every other multi-field domain aggregate's constructor already triggers.
-@SuppressWarnings({
-  "PMD.TooManyMethods",
-  "PMD.LongVariable",
-  "PMD.ExcessiveParameterList",
-})
+// PMD.TooManyMethods: one flat accessor per option, so no caller needs to know the options are
+// grouped in AccountAuthenticationSettings (TD-ARCH-042).
+@SuppressWarnings("PMD.TooManyMethods")
 public final class AccountAuthenticationPolicy {
 
   private final UUID id;
   private final UUID organizationId;
-  private final boolean emailVerificationRequiredAtSignIn;
-  private final EmailVerificationMethod emailVerificationMethod;
-  private final boolean emailCodeSignInEnabled;
-  private final boolean emailLinkSignInEnabled;
-  private final boolean usernameSignUpEnabled;
-  private final boolean usernameRequired;
-  private final boolean usernameSignInEnabled;
-  private final boolean passwordAtSignUpEnabled;
-  private final boolean deviceTrustEnabled;
-  // TD-FUT-019: gates RegisterAccountService/AuthenticateWithSocialProviderService's own signup
-  // path — off by default (opt-in, zero regression), same posture deviceTrustEnabled already
-  // establishes for this same aggregate.
-  private final boolean selfRegistrationRequiresApproval;
+  private final AccountAuthenticationSettings settings;
   // TD-FUT-052: whether an End-User may change their own email. On by default; an Organization
   // whose consuming application owns the email turns it off.
   private final boolean selfServiceEmailChangeEnabled;
   private final Instant createdAt;
   private final Instant updatedAt;
 
-  @SuppressWarnings("java:S107") // one parameter per persisted column, same rationale as
-  // RateLimitPolicy's own private constructor — a synthetic parameter object here would add
-  // indirection without removing any real complexity.
   private AccountAuthenticationPolicy(
       final UUID id,
       final UUID organizationId,
-      final boolean emailVerificationRequiredAtSignIn,
-      final EmailVerificationMethod emailVerificationMethod,
-      final boolean emailCodeSignInEnabled,
-      final boolean emailLinkSignInEnabled,
-      final boolean usernameSignUpEnabled,
-      final boolean usernameRequired,
-      final boolean usernameSignInEnabled,
-      final boolean passwordAtSignUpEnabled,
-      final boolean deviceTrustEnabled,
-      final boolean selfRegistrationRequiresApproval,
+      final AccountAuthenticationSettings settings,
       final boolean selfServiceEmailChangeEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
     this.organizationId = Objects.requireNonNull(organizationId, "organizationId must not be null");
-    this.emailVerificationRequiredAtSignIn = emailVerificationRequiredAtSignIn;
-    this.emailVerificationMethod =
-        Objects.requireNonNull(emailVerificationMethod, "emailVerificationMethod must not be null");
-    this.emailCodeSignInEnabled = emailCodeSignInEnabled;
-    this.emailLinkSignInEnabled = emailLinkSignInEnabled;
-    this.usernameSignUpEnabled = usernameSignUpEnabled;
-    this.usernameRequired = usernameRequired;
-    this.usernameSignInEnabled = usernameSignInEnabled;
-    this.passwordAtSignUpEnabled = passwordAtSignUpEnabled;
-    this.deviceTrustEnabled = deviceTrustEnabled;
-    this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
+    this.settings = Objects.requireNonNull(settings, "settings must not be null");
     this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
@@ -103,51 +59,15 @@ public final class AccountAuthenticationPolicy {
 
   /** The fixed defaults every Organization implicitly has until an operator tunes them. */
   public static AccountAuthenticationPolicy defaults(final UUID organizationId) {
-    return define(
-        organizationId,
-        false,
-        EmailVerificationMethod.LINK,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false);
+    return define(organizationId, AccountAuthenticationSettings.defaults());
   }
 
   /** A brand-new policy row for an Organization that has never had one set before. */
-  @SuppressWarnings("java:S107")
   public static AccountAuthenticationPolicy define(
-      final UUID organizationId,
-      final boolean emailVerificationRequiredAtSignIn,
-      final EmailVerificationMethod emailVerificationMethod,
-      final boolean emailCodeSignInEnabled,
-      final boolean emailLinkSignInEnabled,
-      final boolean usernameSignUpEnabled,
-      final boolean usernameRequired,
-      final boolean usernameSignInEnabled,
-      final boolean passwordAtSignUpEnabled,
-      final boolean deviceTrustEnabled,
-      final boolean selfRegistrationRequiresApproval) {
+      final UUID organizationId, final AccountAuthenticationSettings settings) {
     final Instant now = Instant.now();
     return new AccountAuthenticationPolicy(
-        UUID.randomUUID(),
-        organizationId,
-        emailVerificationRequiredAtSignIn,
-        emailVerificationMethod,
-        emailCodeSignInEnabled,
-        emailLinkSignInEnabled,
-        usernameSignUpEnabled,
-        usernameRequired,
-        usernameSignInEnabled,
-        passwordAtSignUpEnabled,
-        deviceTrustEnabled,
-        selfRegistrationRequiresApproval,
-        true,
-        now,
-        now);
+        UUID.randomUUID(), organizationId, settings, true, now, now);
   }
 
   /**
@@ -155,89 +75,31 @@ public final class AccountAuthenticationPolicy {
    * original {@code id}/{@code createdAt} and stamping a fresh {@code updatedAt}, same "update in
    * place, never a second row" convention as {@link RateLimitPolicy#withRequestsPerMinute}.
    */
-  @SuppressWarnings("java:S107")
-  public AccountAuthenticationPolicy withPolicy(
-      final boolean newEmailVerificationRequiredAtSignIn,
-      final EmailVerificationMethod newEmailVerificationMethod,
-      final boolean newEmailCodeSignInEnabled,
-      final boolean newEmailLinkSignInEnabled,
-      final boolean newUsernameSignUpEnabled,
-      final boolean newUsernameRequired,
-      final boolean newUsernameSignInEnabled,
-      final boolean newPasswordAtSignUpEnabled,
-      final boolean newDeviceTrustEnabled,
-      final boolean newSelfRegistrationRequiresApproval) {
+  public AccountAuthenticationPolicy withPolicy(final AccountAuthenticationSettings newSettings) {
     return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        newEmailVerificationRequiredAtSignIn,
-        newEmailVerificationMethod,
-        newEmailCodeSignInEnabled,
-        newEmailLinkSignInEnabled,
-        newUsernameSignUpEnabled,
-        newUsernameRequired,
-        newUsernameSignInEnabled,
-        newPasswordAtSignUpEnabled,
-        newDeviceTrustEnabled,
-        newSelfRegistrationRequiresApproval,
-        selfServiceEmailChangeEnabled,
-        createdAt,
-        Instant.now());
+        id, organizationId, newSettings, selfServiceEmailChangeEnabled, createdAt, Instant.now());
   }
 
   /** The same policy with the End-User's own email change switched on or off (TD-FUT-052). */
   public AccountAuthenticationPolicy withSelfServiceEmailChange(final boolean enabled) {
     return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        emailVerificationRequiredAtSignIn,
-        emailVerificationMethod,
-        emailCodeSignInEnabled,
-        emailLinkSignInEnabled,
-        usernameSignUpEnabled,
-        usernameRequired,
-        usernameSignInEnabled,
-        passwordAtSignUpEnabled,
-        deviceTrustEnabled,
-        selfRegistrationRequiresApproval,
-        enabled,
-        createdAt,
-        updatedAt);
+        id, organizationId, settings, enabled, createdAt, updatedAt);
   }
 
-  @SuppressWarnings("java:S107")
   public static AccountAuthenticationPolicy reconstitute(
       final UUID id,
       final UUID organizationId,
-      final boolean emailVerificationRequiredAtSignIn,
-      final EmailVerificationMethod emailVerificationMethod,
-      final boolean emailCodeSignInEnabled,
-      final boolean emailLinkSignInEnabled,
-      final boolean usernameSignUpEnabled,
-      final boolean usernameRequired,
-      final boolean usernameSignInEnabled,
-      final boolean passwordAtSignUpEnabled,
-      final boolean deviceTrustEnabled,
-      final boolean selfRegistrationRequiresApproval,
+      final AccountAuthenticationSettings settings,
       final boolean selfServiceEmailChangeEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
-        id,
-        organizationId,
-        emailVerificationRequiredAtSignIn,
-        emailVerificationMethod,
-        emailCodeSignInEnabled,
-        emailLinkSignInEnabled,
-        usernameSignUpEnabled,
-        usernameRequired,
-        usernameSignInEnabled,
-        passwordAtSignUpEnabled,
-        deviceTrustEnabled,
-        selfRegistrationRequiresApproval,
-        selfServiceEmailChangeEnabled,
-        createdAt,
-        updatedAt);
+        id, organizationId, settings, selfServiceEmailChangeEnabled, createdAt, updatedAt);
+  }
+
+  /** The ten options tuned together, as one value. */
+  public AccountAuthenticationSettings settings() {
+    return settings;
   }
 
   public UUID id() {
@@ -249,43 +111,43 @@ public final class AccountAuthenticationPolicy {
   }
 
   public boolean emailVerificationRequiredAtSignIn() {
-    return emailVerificationRequiredAtSignIn;
+    return settings.emailVerificationRequiredAtSignIn();
   }
 
   public EmailVerificationMethod emailVerificationMethod() {
-    return emailVerificationMethod;
+    return settings.emailVerificationMethod();
   }
 
   public boolean emailCodeSignInEnabled() {
-    return emailCodeSignInEnabled;
+    return settings.emailCodeSignInEnabled();
   }
 
   public boolean emailLinkSignInEnabled() {
-    return emailLinkSignInEnabled;
+    return settings.emailLinkSignInEnabled();
   }
 
   public boolean usernameSignUpEnabled() {
-    return usernameSignUpEnabled;
+    return settings.usernameSignUpEnabled();
   }
 
   public boolean usernameRequired() {
-    return usernameRequired;
+    return settings.usernameRequired();
   }
 
   public boolean usernameSignInEnabled() {
-    return usernameSignInEnabled;
+    return settings.usernameSignInEnabled();
   }
 
   public boolean passwordAtSignUpEnabled() {
-    return passwordAtSignUpEnabled;
+    return settings.passwordAtSignUpEnabled();
   }
 
   public boolean deviceTrustEnabled() {
-    return deviceTrustEnabled;
+    return settings.deviceTrustEnabled();
   }
 
   public boolean selfRegistrationRequiresApproval() {
-    return selfRegistrationRequiresApproval;
+    return settings.selfRegistrationRequiresApproval();
   }
 
   public boolean selfServiceEmailChangeEnabled() {
