@@ -1,8 +1,8 @@
 package com.clavaris.webhook.infrastructure.adapter.in.web;
 
+import com.clavaris.common.domain.model.ConfirmationTokenCodec;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -20,6 +20,11 @@ import java.util.UUID;
  * that {@code endpointId}; {@link #consume} always removes the session attribute on its very first
  * check, whether the submitted token matches or not — a stale confirm page, reloaded or
  * auto-submitted a second time, can never re-trigger a delete with the same token.
+ *
+ * <p>The session holds a plain {@code String} (token and expiry joined by {@link
+ * ConfirmationTokenCodec}), never a record: the Redis sessions are allow-listed JSON (TD-ARCH-039),
+ * and a record of ours is written without a type id and cannot be read back, which fails every
+ * later request that loads the session.
  */
 final class DeleteWebhookEndpointConfirmationTokens {
 
@@ -35,7 +40,9 @@ final class DeleteWebhookEndpointConfirmationTokens {
     final String token = UUID.randomUUID().toString();
     request
         .getSession(true)
-        .setAttribute(attributeName(endpointId), new Entry(token, Instant.now().plus(TTL)));
+        .setAttribute(
+            attributeName(endpointId),
+            ConfirmationTokenCodec.encode(token, Instant.now().plus(TTL)));
     return token;
   }
 
@@ -49,22 +56,11 @@ final class DeleteWebhookEndpointConfirmationTokens {
     final Object raw = session.getAttribute(attributeName);
     // Single-use: removed on this very first check, regardless of the outcome below.
     session.removeAttribute(attributeName);
-    if (!(raw instanceof Entry(String token, Instant expiresAt))
-        || Instant.now().isAfter(expiresAt)) {
-      return false;
-    }
-    return token.equals(submittedToken);
+    return raw instanceof String stored
+        && ConfirmationTokenCodec.matches(stored, submittedToken, Instant.now());
   }
 
   private static String attributeName(final UUID endpointId) {
     return SESSION_ATTRIBUTE_PREFIX + endpointId;
-  }
-
-  // This app's own HttpSession is Redis-backed (Spring Session, not in-memory) — any object
-  // stored as a session attribute must survive real serialization, not just work by accident in a
-  // single-JVM test.
-  private record Entry(String token, Instant expiresAt) implements Serializable {
-
-    private static final long serialVersionUID = 1L;
   }
 }
