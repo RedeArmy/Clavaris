@@ -480,6 +480,11 @@ jobs:
       - name: Run migration immutability check
         run: ./scripts/check-migration-immutability.sh
 
+      # TD-FUT-039: a plain CREATE INDEX on an already-populated table blocks its writers for the
+      # whole build; see the script's header.
+      - name: Run non-blocking index check
+        run: ./scripts/check-nonblocking-indexes.sh
+
   sonarcloud:
     name: SonarCloud analysis (Quality Gate)
     runs-on: ubuntu-latest

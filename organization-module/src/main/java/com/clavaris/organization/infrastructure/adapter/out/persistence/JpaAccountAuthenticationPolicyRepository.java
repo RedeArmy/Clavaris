@@ -2,6 +2,7 @@ package com.clavaris.organization.infrastructure.adapter.out.persistence;
 
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.domain.model.AccountAuthenticationPolicy;
+import com.clavaris.organization.domain.model.AccountAuthenticationSettings;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -51,16 +52,17 @@ class JpaAccountAuthenticationPolicyRepository implements AccountAuthenticationP
     return AccountAuthenticationPolicy.reconstitute(
         entity.getId(),
         entity.getOrganizationId(),
-        entity.isEmailVerificationRequiredAtSignIn(),
-        entity.getEmailVerificationMethod(),
-        entity.isEmailCodeSignInEnabled(),
-        entity.isEmailLinkSignInEnabled(),
-        entity.isUsernameSignUpEnabled(),
-        entity.isUsernameRequired(),
-        entity.isUsernameSignInEnabled(),
-        entity.isPasswordAtSignUpEnabled(),
-        entity.isDeviceTrustEnabled(),
-        entity.isSelfRegistrationRequiresApproval(),
+        new AccountAuthenticationSettings(
+            entity.isEmailVerificationRequiredAtSignIn(),
+            entity.getEmailVerificationMethod(),
+            entity.isEmailCodeSignInEnabled(),
+            entity.isEmailLinkSignInEnabled(),
+            entity.isUsernameSignUpEnabled(),
+            entity.isUsernameRequired(),
+            entity.isUsernameSignInEnabled(),
+            entity.isPasswordAtSignUpEnabled(),
+            entity.isDeviceTrustEnabled(),
+            entity.isSelfRegistrationRequiresApproval()),
         entity.isSelfServiceEmailChangeEnabled(),
         entity.getCreatedAt(),
         entity.getUpdatedAt());

@@ -115,6 +115,10 @@ class PlatformWebhookEndpointControllerTest {
                     deactivateEndpoint,
                     activateEndpoint,
                     rotateEndpointSecret,
+                    organizationResolver,
+                    currentPlatformAccount),
+                new PlatformWebhookEndpointSettingsController(
+                    getEndpoint,
                     updateEndpointUrl,
                     updateEndpointDescription,
                     updateEndpointEventTypes,

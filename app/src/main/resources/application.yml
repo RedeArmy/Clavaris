@@ -79,6 +79,11 @@ spring:
     # Default locations (classpath:db/migration) already match every module's
     # scaffolded db/migration folder — nothing to override here.
     enabled: true
+    postgresql:
+      # TD-FUT-039: Flyway's default advisory lock is transactional, so a transaction stays open
+      # for the whole migration, and CREATE INDEX CONCURRENTLY waits for every older transaction
+      # (including that one). Session-level makes the non-blocking index build possible.
+      transactional-lock: false
   task:
     scheduling:
       # TD-PERF-003: Spring Boot's own default here is 1 (confirmed by decompiling the actual
@@ -231,6 +236,11 @@ clavaris:
   # is a freshly generated, structurally-valid-but-never-real key, and SOCIAL_CREDENTIAL_ENCRYPTION_
   # KEY is listed in .env.example from day one — directly avoiding a repeat of the gap TD-SEC-047
   # closed for WEBHOOK_SECRET_ENCRYPTION_KEY (that key shipped without a .env.example entry at all).
+  # TD-PERF-051: most live browser sessions one tenant Account may hold. A sign-in past the cap ends
+  # the least recently used ones. 0 means no cap. Measured: revoking N sessions costs 8 Redis
+  # commands each (200 sessions: ~3.2 s), so the count is what is bounded.
+  session:
+    max-per-account: ${CLAVARIS_SESSION_MAX_PER_ACCOUNT:10}
   organization:
     social-credential-encryption-key: ${SOCIAL_CREDENTIAL_ENCRYPTION_KEY:2kqyn0bYhyCCadc20eH6ceXJS1z9DjwAhOjqQkDtYc8=}
   # ADR-0026: SupabaseS3ProfilePictureStorage's own Supabase Storage (S3-compatible) credentials —

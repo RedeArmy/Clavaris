@@ -42,8 +42,8 @@ import org.springframework.security.web.header.HeaderWriter;
  * unreachable, not just deprecated. The project-owned replacement ({@code ConsentController},
  * {@code identity/consent.html}) needs no script at all and only the same one conditional inline
  * {@code <style>} block {@code identity/login.html} already uses for {@code primaryColor} — it gets
- * the plain {@link #STRICT_POLICY}, the same as every other template this project owns other than
- * the login page (grep confirms zero {@code <script>} anywhere under {@code
+ * the plain {@link #ContentSecurityPolicies.STRICT_POLICY}, the same as every other template this
+ * project owns other than the login page (grep confirms zero {@code <script>} anywhere under {@code
  * identity-module}'s/{@code organization-module}'s own {@code resources/templates} besides {@code
  * login.html}'s own two same-origin scripts). <b>Investigating this originally surfaced
  * TD-SEC-026</b> — {@code requireAuthorizationConsent} was never set to {@code true} anywhere, so
@@ -80,8 +80,8 @@ import org.springframework.security.web.header.HeaderWriter;
  * Constructed with an {@link EmbeddingEligibilityChecker} at every {@code SecurityFilterChain}
  * builder site (not just {@code OrganizationAuthorizationServerConfig}'s own) for a uniform
  * constructor shape — the other three call sites simply never reach a request whose path matches
- * {@link #LOGIN_PAGE_PATH}/{@link #CONSENT_PAGE_PATH}, so the checker there is never actually
- * invoked.
+ * {@link #ContentSecurityPolicies.LOGIN_PAGE_PATH}/{@link
+ * #ContentSecurityPolicies.CONSENT_PAGE_PATH}, so the checker there is never actually invoked.
  *
  * <p><b>TD-SEC-011: the consent page's own relaxation reads {@code client_id}</b> (OAuth2's own
  * snake_case parameter — confirmed by reading {@code
@@ -99,13 +99,13 @@ import org.springframework.security.web.header.HeaderWriter;
  * '*'} for every ordinary, non-modal consent render in a development-tier Organization, not just
  * genuinely embedded ones. Real fix: {@link #captureModalStateIfPresent} stashes the original
  * authorize request's own {@code state} value into the {@code HttpSession} the moment {@code
- * display=modal} is seen on {@link #AUTHORIZE_PATH} — the same {@code HttpSession}-attribute idiom
- * {@code DeviceTrustGate}/{@code SessionTaskGate} already establish — and {@link
- * #withRelaxedFrameAncestorsOnConsentPage} matches it back against the consent render's own {@code
- * state} before relaxing. Keyed by {@code state}, not a bare boolean, specifically so a second,
- * unrelated, non-modal consent render later in the same browser session can never inherit a stale
- * "was modal once" flag — the exact shape of regression the reverted blanket-drop attempt above
- * hit.
+ * display=modal} is seen on {@link #ContentSecurityPolicies.AUTHORIZE_PATH} — the same {@code
+ * HttpSession}-attribute idiom {@code DeviceTrustGate}/{@code SessionTaskGate} already establish —
+ * and {@link #withRelaxedFrameAncestorsOnConsentPage} matches it back against the consent render's
+ * own {@code state} before relaxing. Keyed by {@code state}, not a bare boolean, specifically so a
+ * second, unrelated, non-modal consent render later in the same browser session can never inherit a
+ * stale "was modal once" flag — the exact shape of regression the reverted blanket-drop attempt
+ * above hit.
  *
  * <p><b>Security finding, 2026-10-07 (live validation of TD-FUT-045, the embedded-profile extension
  * of this same mechanism): {@code EmbeddingEligibilityChecker} now takes the request path's own
@@ -118,21 +118,24 @@ import org.springframework.security.web.header.HeaderWriter;
  * named. Same {@code organizationId}-cross-check posture this codebase already applies elsewhere
  * for an identical reason ({@code DeviceTrustChallengeController}, BR-ORG-02). {@link
  * #organizationIdFromPath} parses it straight from the request path for both {@link
- * #LOGIN_PAGE_PATH}/{@link #ACCOUNT_PROFILE_PAGE_PATH} (both genuinely {@code
+ * #ContentSecurityPolicies.LOGIN_PAGE_PATH}/{@link
+ * #ContentSecurityPolicies.ACCOUNT_PROFILE_PAGE_PATH} (both genuinely {@code
  * "/o/{organizationId}/..."} shaped) and fails CLOSED (no relaxation attempted at all) if that ever
  * comes back null — never silently falls through to the one call site ({@link
  * #withRelaxedFrameAncestorsOnConsentPage}, the flat/org-agnostic consent page) where a null is a
  * deliberate, unrelated opt-out.
  *
  * <p><b>ADR-0025: the admin dashboard's own policy.</b> {@code /platform/dashboard/**} gets {@code
- * script-src 'self'} — same shape as {@link #LOGIN_PAGE_POLICY}, for the same reason: a real,
- * same-origin, project-vendored script (HTMX, self-hosted under {@code /js/htmx.min.js}, never a
- * CDN), never {@code 'unsafe-inline'}/{@code 'unsafe-eval'} (HTMX's own attribute-driven model
- * needs neither — confirmed against its own docs, not assumed). Deliberately its own named policy,
- * not a reuse of {@code LOGIN_PAGE_POLICY} — the two happen to be identical today, but they relax
- * for structurally different reasons (one script tag vs. a whole app shell) and this project's own
- * established convention ({@code STRICT_POLICY} vs. {@code LOGIN_PAGE_POLICY} themselves) is a
- * named constant per real reason, not one shared just because the text matches right now.
+ * script-src 'self'} — same shape as {@link #ContentSecurityPolicies.LOGIN_PAGE_POLICY}, for the
+ * same reason: a real, same-origin, project-vendored script (HTMX, self-hosted under {@code
+ * /js/htmx.min.js}, never a CDN), never {@code 'unsafe-inline'}/{@code 'unsafe-eval'} (HTMX's own
+ * attribute-driven model needs neither — confirmed against its own docs, not assumed). Deliberately
+ * its own named policy, not a reuse of {@code ContentSecurityPolicies.LOGIN_PAGE_POLICY} — the two
+ * happen to be identical today, but they relax for structurally different reasons (one script tag
+ * vs. a whole app shell) and this project's own established convention ({@code
+ * ContentSecurityPolicies.STRICT_POLICY} vs. {@code ContentSecurityPolicies.LOGIN_PAGE_POLICY}
+ * themselves) is a named constant per real reason, not one shared just because the text matches
+ * right now.
  *
  * <p><b>Security finding, 2026-10-09 (live-caught on preproduction, real browser): {@code
  * form-action 'self'} widens to the requesting {@code OAuthClient}'s own registered {@code
@@ -149,10 +152,6 @@ import org.springframework.security.web.header.HeaderWriter;
  * frame-ancestors}, reused verbatim here for {@code form-action} instead, never widened to every
  * Organization's own registered clients.
  */
-// PMD.AvoidDuplicateLiterals: the repeated string is "PMD.LongVariable" itself, used on 4 of this
-// class's own long, descriptively-named constants — same false-positive rationale
-// OrganizationAuthorizationServerConfig's own identical class-level suppression documents.
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
 
   private static final String HEADER_NAME = "Content-Security-Policy";
@@ -172,34 +171,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // carries. See this class's own Javadoc for why the consent page can't reuse CLIENT_ID_PARAM.
   private static final String OAUTH2_CLIENT_ID_PARAM = "client_id";
 
-  // font-src 'self' on every policy below: clavaris.css self-hosts Geist (/fonts/*.woff2). With
-  // font-src 'none' the browser blocked both files, so the whole UI silently fell back to the
-  // system font. Same-origin fonts only — never a font CDN.
-  private static final String STRICT_POLICY =
-      "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; "
-          + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
-          + "form-action 'self'; frame-ancestors 'none'";
-
-  // Every other page the consuming application's people see (sign-up, password reset, consent):
-  // STRICT_POLICY except script-src 'self', because consumer-head loads appearance.js on all of
-  // them. With script-src 'none' the app's page background was blocked on every screen but login,
-  // passkeys and profile, and vanished on the next page of the flow. Same-origin files only; still
-  // no inline script, connect-src or framing.
-  private static final String CONSUMER_POLICY =
-      STRICT_POLICY.replace("script-src 'none'", "script-src 'self'");
-
-  // Matches only ConsentController's own flat, org-agnostic GET — see CONSENT_PATH_PATTERN's own
-  // comment in OrganizationAuthorizationServerConfig for why this is not "/o/*/oauth2/consent".
-  // Never the platform tier (client_credentials only, BR-PLATFORM-01, no interactive consent to
-  // render).
-  private static final Pattern CONSENT_PAGE_PATH = Pattern.compile("^/oauth2/consent$");
-
-  // TD-SEC-050: the one point in the whole flow that reliably sees display=modal on an
-  // authenticated (or about-to-authenticate) request before SAS's own sendAuthorizationConsent
-  // drops it on its internal redirect to CONSENT_PAGE_PATH above — see this class's own Javadoc
-  // addendum for the full flow this closes.
-  private static final Pattern AUTHORIZE_PATH = Pattern.compile("^/o/[^/]+/oauth2/authorize$");
-
   // Keyed by this specific authorization attempt's own OAuth2 "state" value (a fresh, single-use
   // nonce per RFC 6749 §10.12) rather than a bare boolean — see
   // withRelaxedFrameAncestorsOnConsentPage for why a boolean would risk relaxing a later,
@@ -208,104 +179,6 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // a blanket relaxation).
   private static final String MODAL_STATE_SESSION_ATTRIBUTE =
       "clavaris.security.display-modal.pending-state";
-
-  // TD-SEC-009 addendum, see this class's own Javadoc: the one project-owned template that now
-  // loads a real, same-origin script.
-  //
-  // connect-src 'self', not 'none' (TD-FUT-034, same DASHBOARD_PAGE_POLICY bug class found live
-  // 2026-09-16, now repeated here deliberately): webauthn-login.js's own "Sign in with a passkey"
-  // button issues fetch() calls to /login/webauthn/start and /login/webauthn/finish — governed by
-  // connect-src, never script-src. script-src 'self' only permits loading the script file itself.
-  private static final String LOGIN_PAGE_POLICY =
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-          + "form-action 'self'; frame-ancestors 'none'";
-
-  // Matches only LoginController's own GET/POST /o/{organizationId}/login — never
-  // /o/*/login/social/** (SocialLoginConfig's plain links, nothing to double-submit) or the
-  // platform tier's own login template (a different page, no such script).
-  private static final Pattern LOGIN_PAGE_PATH = Pattern.compile("^/o/[^/]+/login$");
-
-  // ADR-0025: same relaxation, own named policy — see this class's own Javadoc for why not reused.
-  //
-  // connect-src 'self', not 'none' (SDE-III review, 2026-09-16 — real bug, found live): every
-  // mutation and every paginated list on this whole dashboard (register/deactivate/rotate-secret,
-  // Organizations, Workspaces, OAuth Clients, Secret Keys, ...) is an HTMX hx-post/hx-get, which
-  // issues its request via fetch()/XHR — governed by CSP's connect-src, never script-src.
-  // script-src 'self' only permits loading /js/htmx.min.js itself, not the requests that script
-  // makes. With connect-src 'none' (copied from STRICT_POLICY/LOGIN_PAGE_POLICY, neither of which
-  // makes any fetch call at all), the browser silently blocks every single HTMX request on this
-  // chain — no network entry, no visible error unless the operator opens the console — confirmed
-  // live against a real browser's own CSP violation report on this exact directive.
-  private static final String DASHBOARD_PAGE_POLICY =
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; "
-          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-          + "form-action 'self'; frame-ancestors 'none'";
-
-  // img-src gains blob: here and nowhere else: profile-picture-upload.js previews the file a person
-  // has just chosen (URL.createObjectURL) before anything is uploaded. A blob: URL can only be
-  // minted by a script of this same origin, so it opens no new remote image source.
-  //
-  // Matches every page under the dashboard app shell — PlatformDashboardSecurityConfig's own
-  // securityMatcher already scopes the whole /platform/** chain to ROLE_PLATFORM_ACCOUNT (this
-  // sub-path included), so this pattern only needs to distinguish "dashboard" from "login/register/
-  // forgot-password" on that same chain, not re-enforce authentication itself.
-  //
-  // TD-FUT-051, found by the first browser-level test (e2e/): the operator's own Manage account and
-  // Sessions pages (/platform/account, /platform/account/sessions) render inside this same app
-  // shell and load the same scripts, but were matched by nothing here and so fell through to
-  // STRICT_POLICY (script-src 'none'). Every script was refused and the page's dialogs and uploads
-  // silently did nothing. They belong to the shell, so they get its policy. The pattern is
-  // anchored on "account" followed by "/" or the end, so /platform/account-alert/lock (a one-click
-  // link from an email, no shell, no script) stays strict.
-  private static final Pattern DASHBOARD_PAGE_PATH =
-      Pattern.compile("^/platform/(dashboard|account)(/.*)?$");
-
-  // TD-FUT-034: the self-service "your passkeys" page's own webauthn-register.js needs both
-  // script-src 'self' (to load at all — every other page outside the three named patterns here
-  // falls through to STRICT_POLICY's own script-src 'none', which would block the script entirely)
-  // and connect-src 'self' (its registration/start and registration/finish fetch() calls) — same
-  // two-directive fix LOGIN_PAGE_POLICY's own identical comment documents, scoped to just this one
-  // new page rather than widening to all of /o/*/account/** (no sibling self-service page uses a
-  // script today).
-  private static final String ACCOUNT_PASSKEYS_PAGE_POLICY =
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
-          + "form-action 'self'; frame-ancestors 'none'";
-
-  private static final Pattern ACCOUNT_PASSKEYS_PAGE_PATH =
-      Pattern.compile("^/o/[^/]+/account/passkeys$");
-
-  // Clerk <UserProfile/> parity, pattern (a) — embedded profile, same ADR-0009 §1/§4 mechanism as
-  // LOGIN_PAGE_POLICY right above, deliberately not CORS/a new JS SDK (that would reopen ADR-0013's
-  // own locked "no cross-origin browser caller" decision — confirmed with the product owner,
-  // 2026-10-07): a consuming application iframes this same self-service page
-  // (identity/account/profile.html) with ?display=modal&clientId=... on the src URL, exactly the
-  // login page's own query-param convention, reusing EmbeddingEligibilityChecker verbatim (no
-  // change needed here for this). Real single sign-on, not merely "the embedded login's own first
-  // session survives" (real bug found live, 2026-10-10, closed in
-  // AdaptiveSameSiteSessionCookieSerializer, not here): an Account that already has an ordinary,
-  // non-embedded, top-level session on a real HTTPS deployment is now recognized by this iframe
-  // directly, no second login inside it required — only a genuinely brand-new browser (no live
-  // Clavaris session at all yet) sees Clavaris's own login form inside the iframe first.
-  //
-  // script-src 'self' (this template's own i18n.js/organization-dialog.js, same two scripts
-  // every dashboard-adjacent page already loads), connect-src 'none' (neither script makes a
-  // fetch/XHR call — confirmed by reading organization-dialog.js directly, no HTMX attributes
-  // anywhere in this specific template unlike the dashboard's own pages).
-  private static final String ACCOUNT_PROFILE_PAGE_POLICY =
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; "
-          + "font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'; "
-          + "form-action 'self'; frame-ancestors 'none'";
-
-  private static final Pattern ACCOUNT_PROFILE_PAGE_PATH =
-      Pattern.compile("^/o/[^/]+/account/profile$");
-
-  // See this class's own Javadoc (2026-10-07 security finding) for why this exists. Reused by
-  // both login/profile — LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH already proved the shape, this
-  // just captures the same segment.
-  @SuppressWarnings("PMD.LongVariable")
-  private static final Pattern ORGANIZATION_SCOPED_PATH_PREFIX = Pattern.compile("^/o/([^/]+)/.*$");
 
   private final EmbeddingEligibilityChecker embeddingChecker;
 
@@ -347,7 +220,8 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
         : policy;
   }
 
-  // TD-SEC-050: fires on every request to AUTHORIZE_PATH, authenticated or not — an unauthenticated
+  // TD-SEC-050: fires on every request to ContentSecurityPolicies.AUTHORIZE_PATH, authenticated or
+  // not — an unauthenticated
   // first hit still passes through HeaderWriterFilter before ExceptionTranslationFilter redirects
   // it to login, and Spring Security's own default changeSessionId() (session-fixation protection
   // at login) preserves this same session object's attributes across the ID rotation, so capturing
@@ -355,7 +229,7 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // to this same path is harmless (same value, or nothing to capture if display=modal is genuinely
   // absent this time).
   private static void captureModalStateIfPresent(final HttpServletRequest request) {
-    if (!AUTHORIZE_PATH.matcher(request.getRequestURI()).matches()) {
+    if (!ContentSecurityPolicies.AUTHORIZE_PATH.matcher(request.getRequestURI()).matches()) {
       return;
     }
     final String state = request.getParameter(OAuth2ParameterNames.STATE);
@@ -368,37 +242,37 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   // gets its own real policy/relaxation rule rather than one being folded into "everything else".
   private String policyFor(final HttpServletRequest request) {
     final String requestUri = request.getRequestURI();
-    if (CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
+    if (ContentSecurityPolicies.CONSENT_PAGE_PATH.matcher(requestUri).matches()) {
       return withWidenedFormAction(
           withRelaxedFrameAncestorsOnConsentPage(request),
           request.getParameter(OAUTH2_CLIENT_ID_PARAM),
           null);
     }
-    if (LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
+    if (ContentSecurityPolicies.LOGIN_PAGE_PATH.matcher(requestUri).matches()) {
       final UUID organizationId = organizationIdFromPath(requestUri);
       return withWidenedFormAction(
           withRelaxedFrameAncestorsIfDisplayModal(
-              LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM, organizationId),
+              ContentSecurityPolicies.LOGIN_PAGE_POLICY, request, CLIENT_ID_PARAM, organizationId),
           request.getParameter(CLIENT_ID_PARAM),
           organizationId);
     }
-    if (DASHBOARD_PAGE_PATH.matcher(requestUri).matches()) {
-      return DASHBOARD_PAGE_POLICY;
+    if (ContentSecurityPolicies.DASHBOARD_PAGE_PATH.matcher(requestUri).matches()) {
+      return ContentSecurityPolicies.DASHBOARD_PAGE_POLICY;
     }
-    if (ACCOUNT_PASSKEYS_PAGE_PATH.matcher(requestUri).matches()) {
-      return ACCOUNT_PASSKEYS_PAGE_POLICY;
+    if (ContentSecurityPolicies.ACCOUNT_PASSKEYS_PAGE_PATH.matcher(requestUri).matches()) {
+      return ContentSecurityPolicies.ACCOUNT_PASSKEYS_PAGE_POLICY;
     }
-    if (ACCOUNT_PROFILE_PAGE_PATH.matcher(requestUri).matches()) {
+    if (ContentSecurityPolicies.ACCOUNT_PROFILE_PAGE_PATH.matcher(requestUri).matches()) {
       return withRelaxedFrameAncestorsIfDisplayModal(
-          ACCOUNT_PROFILE_PAGE_POLICY,
+          ContentSecurityPolicies.ACCOUNT_PROFILE_PAGE_POLICY,
           request,
           CLIENT_ID_PARAM,
           organizationIdFromPath(requestUri));
     }
-    if (ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri).matches()) {
-      return CONSUMER_POLICY;
+    if (ContentSecurityPolicies.ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri).matches()) {
+      return ContentSecurityPolicies.CONSUMER_POLICY;
     }
-    return STRICT_POLICY;
+    return ContentSecurityPolicies.STRICT_POLICY;
   }
 
   private String withRelaxedFrameAncestorsIfDisplayModal(
@@ -410,7 +284,8 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
       return basePolicy;
     }
     // Security finding, 2026-10-07: this method is only ever called for a request this class's
-    // own LOGIN_PAGE_PATH/ACCOUNT_PROFILE_PAGE_PATH already matched — both genuinely
+    // own ContentSecurityPolicies.LOGIN_PAGE_PATH/ContentSecurityPolicies.ACCOUNT_PROFILE_PAGE_PATH
+    // already matched — both genuinely
     // "/o/{organizationId}/..." shaped, so expectedOrganizationId should never actually be null
     // here. If it somehow is (a malformed segment HeaderWriterFilter sees before Spring MVC's own
     // @PathVariable UUID binding would reject it), fail CLOSED — no relaxation at all — never
@@ -425,7 +300,8 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
   }
 
   private static UUID organizationIdFromPath(final String requestUri) {
-    final Matcher matcher = ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri);
+    final Matcher matcher =
+        ContentSecurityPolicies.ORGANIZATION_SCOPED_PATH_PREFIX.matcher(requestUri);
     if (!matcher.matches()) {
       return null;
     }
@@ -452,7 +328,9 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     // just closed.
     if (DISPLAY_MODAL.equals(request.getParameter(DISPLAY_PARAM))) {
       return relaxFrameAncestors(
-          CONSUMER_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
+          ContentSecurityPolicies.CONSUMER_POLICY,
+          request.getParameter(OAUTH2_CLIENT_ID_PARAM),
+          null);
     }
     final HttpSession session = request.getSession(false);
     final String pendingState =
@@ -460,9 +338,11 @@ public final class ContentSecurityPolicyHeaderWriter implements HeaderWriter {
     if (pendingState != null
         && Objects.equals(pendingState, request.getParameter(OAuth2ParameterNames.STATE))) {
       return relaxFrameAncestors(
-          CONSUMER_POLICY, request.getParameter(OAUTH2_CLIENT_ID_PARAM), null);
+          ContentSecurityPolicies.CONSUMER_POLICY,
+          request.getParameter(OAUTH2_CLIENT_ID_PARAM),
+          null);
     }
-    return CONSUMER_POLICY;
+    return ContentSecurityPolicies.CONSUMER_POLICY;
   }
 
   private String relaxFrameAncestors(

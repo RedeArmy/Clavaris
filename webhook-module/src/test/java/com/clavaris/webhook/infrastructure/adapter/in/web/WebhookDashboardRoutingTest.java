@@ -83,6 +83,11 @@ class WebhookDashboardRoutingTest {
             mock(DeactivateWebhookEndpointUseCase.class),
             mock(ActivateWebhookEndpointUseCase.class),
             mock(RotateWebhookEndpointSecretUseCase.class),
+            organizationResolver,
+            currentPlatformAccount);
+    PlatformWebhookEndpointSettingsController settingsController =
+        new PlatformWebhookEndpointSettingsController(
+            getEndpoint,
             mock(UpdateWebhookEndpointUrlUseCase.class),
             mock(UpdateWebhookEndpointDescriptionUseCase.class),
             mock(UpdateWebhookEndpointEventTypesUseCase.class),
@@ -127,7 +132,11 @@ class WebhookDashboardRoutingTest {
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                endpointController, logsController, activityController, eventCatalogController)
+                endpointController,
+                settingsController,
+                logsController,
+                activityController,
+                eventCatalogController)
             .setViewResolvers(viewResolver)
             .build();
   }

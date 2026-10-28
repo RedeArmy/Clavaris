@@ -71,6 +71,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
   private static final String DEVICE_TRUST_STEP_UP_AMR_AUTHORITY = "AMR_MFA";
 
   private final SecurityContextRepository contextRepository;
+  private final AccountSessionLimiter sessionLimiter;
 
   // Same instance shape SAS's own ExceptionTranslationFilter uses by default to remember "what was
   // the browser actually trying to reach" before redirecting to login — reusing the session-backed
@@ -79,8 +80,10 @@ public class SpringSecurityAuthenticatedSessionEstablisher
   private final RequestCache requestCache = new HttpSessionRequestCache();
 
   public SpringSecurityAuthenticatedSessionEstablisher(
-      final SecurityContextRepository contextRepository) {
+      final SecurityContextRepository contextRepository,
+      final AccountSessionLimiter sessionLimiter) {
     this.contextRepository = contextRepository;
+    this.sessionLimiter = sessionLimiter;
   }
 
   @Override
@@ -238,6 +241,9 @@ public class SpringSecurityAuthenticatedSessionEstablisher
     // session — losing it would silently drop the user back to a generic page instead of resuming
     // the flow they started.
     final HttpSession existingSession = request.getSession(false);
+    // The id this session had before the rotation: in the same browser it is the one being
+    // replaced, not another device, so the session cap must not count it (TD-PERF-051).
+    final String replacedSessionId = existingSession == null ? null : existingSession.getId();
     if (existingSession != null) {
       request.changeSessionId();
     }
@@ -270,6 +276,7 @@ public class SpringSecurityAuthenticatedSessionEstablisher
       session.setAttribute(SessionDeviceAttributes.USER_AGENT, request.getHeader("User-Agent"));
       session.setAttribute(SessionDeviceAttributes.SOURCE_IP, request.getRemoteAddr());
     }
+    sessionLimiter.makeRoomFor(accountId, replacedSessionId);
 
     final SavedRequest savedRequest = requestCache.getRequest(request, response);
     return savedRequest != null ? savedRequest.getRedirectUrl() : fallbackUrl;

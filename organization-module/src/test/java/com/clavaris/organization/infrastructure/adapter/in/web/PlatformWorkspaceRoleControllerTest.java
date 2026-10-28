@@ -50,7 +50,11 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.spring6.templateresolver.SpringResourceTemplateResolver;
 import org.thymeleaf.spring6.view.ThymeleafViewResolver;
 
-/** Same standalone MockMvc + real Thymeleaf setup as {@link PlatformWorkspaceControllerTest}. */
+/**
+ * Covers both {@link PlatformWorkspaceRoleController} and {@link
+ * PlatformWorkspaceRoleDetailController} (one page, two controllers since TD-ARCH-042). Same
+ * standalone MockMvc + real Thymeleaf setup as {@link PlatformWorkspaceControllerTest}.
+ */
 class PlatformWorkspaceRoleControllerTest {
 
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -104,18 +108,13 @@ class PlatformWorkspaceRoleControllerTest {
     ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
     viewResolver.setTemplateEngine(templateEngine);
 
+    PlatformWorkspaceRoleSupport support =
+        new PlatformWorkspaceRoleSupport(getOrganization, listRoles, currentPlatformAccount);
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformWorkspaceRoleController(
-                    getOrganization,
-                    listRoles,
-                    listWorkspaces,
-                    listTeams,
-                    listTeamRoleIdsForTeams,
-                    createRole,
-                    updateRole,
-                    deleteRole,
-                    currentPlatformAccount))
+                    listWorkspaces, listTeams, listTeamRoleIdsForTeams, createRole, support),
+                new PlatformWorkspaceRoleDetailController(updateRole, deleteRole, support))
             .setViewResolvers(viewResolver)
             .build();
   }
