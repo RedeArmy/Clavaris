@@ -3,7 +3,9 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -53,9 +55,20 @@ class VerifyEmailControllerTest {
   }
 
   @Test
-  void aValidTokenConfirmsAndRendersSuccess() throws Exception {
+  void openingTheLinkChangesNothingAndAsksForAClick() throws Exception {
     mockMvc
         .perform(get("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "a-token"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/verify-email-confirm"));
+
+    verifyNoInteractions(useCase);
+  }
+
+  @Test
+  void aValidTokenConfirmsAndRendersSuccess() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "a-token"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/verify-email-success"));
 
@@ -70,7 +83,7 @@ class VerifyEmailControllerTest {
 
     mockMvc
         .perform(
-            get("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "bad-token"))
+            post("/o/{organizationId}/verify-email", ORGANIZATION_ID).param("token", "bad-token"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/verification-link-invalid"));
   }

@@ -166,14 +166,27 @@ class EmailVerificationAndPasswordResetIntegrationTest extends RedisBackedIntegr
     return httpClient.send(loginRequest, HttpResponse.BodyHandlers.discarding());
   }
 
+  // The emailed link only asks for a click (a GET must not use up a single-use link: mail scanners
+  // open every URL in a message); the click is a POST carrying the token and a CSRF token.
   private HttpResponse<String> getVerifyEmail(UUID organizationId, String token)
       throws IOException, InterruptedException {
-    HttpRequest request =
-        HttpRequest.newBuilder(
-                baseUri("/o/" + organizationId + "/verify-email?token=" + urlEncode(token)))
-            .GET()
-            .build();
-    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    HttpResponse<String> page =
+        httpClient.send(
+            HttpRequest.newBuilder(
+                    baseUri("/o/" + organizationId + "/verify-email?token=" + urlEncode(token)))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(page.body()).as("opening the link asks for a click").contains("Verify my email");
+    String csrfToken = extractCsrfToken(page.body());
+    return httpClient.send(
+        HttpRequest.newBuilder(baseUri("/o/" + organizationId + "/verify-email"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "_csrf=" + csrfToken + "&token=" + urlEncode(token)))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
   }
 
   private void requestPasswordReset(UUID organizationId, String email)

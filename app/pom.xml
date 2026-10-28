@@ -321,6 +321,50 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- TD-FUT-051: the page scripts are minified in target/classes, never in the source tree,
+                 with Closure Compiler in WHITESPACE_ONLY mode: it parses the file (so regex literals,
+                 template strings, ASI and comments are handled by a real parser, which a regular
+                 expression cannot do safely for JavaScript), removes whitespace and comments, and
+                 renames nothing and rewrites nothing. htmx.min.js is already minified and left alone.
+                 A script that does not parse fails the build instead of shipping broken. -->
+            <plugin>
+                <groupId>com.github.blutorange</groupId>
+                <artifactId>closure-compiler-maven-plugin</artifactId>
+                <version>2.31.0</version>
+                <configuration>
+                    <baseSourceDir>${project.basedir}/src/main/resources</baseSourceDir>
+                    <baseTargetDir>${project.build.outputDirectory}</baseTargetDir>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>minify-scripts</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>minify</goal>
+                        </goals>
+                        <configuration>
+                            <encoding>UTF-8</encoding>
+                            <sourceDir>static/js</sourceDir>
+                            <targetDir>static/js</targetDir>
+                            <includes>
+                                <include>*.js</include>
+                            </includes>
+                            <excludes>
+                                <exclude>htmx.min.js</exclude>
+                            </excludes>
+                            <closureLanguageIn>ECMASCRIPT_2021</closureLanguageIn>
+                            <closureLanguageOut>ECMASCRIPT_2021</closureLanguageOut>
+                            <closureCompilationLevel>WHITESPACE_ONLY</closureCompilationLevel>
+                            <closureCreateSourceMap>false</closureCreateSourceMap>
+                            <skipMerge>true</skipMerge>
+                            <!-- resources:resources has just copied the sources, so every output looks
+                                 newer than its source; without this the plugin skips them all. -->
+                            <force>true</force>
+                            <outputFilename>#{path}/#{basename}.#{extension}</outputFilename>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- TD-FUT-048: the stylesheets are minified in target/classes, never in the source tree. A
                  whitespace-and-comments pass, deliberately: it never reads a value, so it cannot
                  mishandle a modern one. A real CSS compressor was tried first (ph-css) and dropped a

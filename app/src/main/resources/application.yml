@@ -180,6 +180,13 @@ spring:
 # dev-default path/password below are convenience-only, same convention as DB_DEV_*: never used in
 # a real deployment, where both must be set explicitly.
 clavaris:
+  # RFC 9116 /.well-known/security.txt (SecurityTxtController). Off until the operator sets both a
+  # contact (mailto:, https: or tel: URI) and an expiry in the future; with either missing or stale
+  # the endpoint answers 404 instead of publishing a contact nobody reads.
+  security-txt:
+    contact: ${SECURITY_TXT_CONTACT:}
+    expires: ${SECURITY_TXT_EXPIRES:}
+    policy: ${SECURITY_TXT_POLICY:}
   signing-key-store:
     path: ${TOKEN_SIGNING_KEY_STORE_PATH:./data/dev-signing-keys.p12}
     password: ${TOKEN_SIGNING_KEY_STORE_PASSWORD:dev-only-signing-key-store-password-change-in-real-deployments}

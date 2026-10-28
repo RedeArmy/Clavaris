@@ -3,7 +3,9 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -53,10 +55,22 @@ class ConfirmSocialLinkControllerTest {
   }
 
   @Test
-  void aValidTokenConfirmsAndRendersSuccess() throws Exception {
+  void openingTheLinkChangesNothingAndAsksForAClick() throws Exception {
     mockMvc
         .perform(
             get("/o/{organizationId}/confirm-social-link", ORGANIZATION_ID)
+                .param("token", "a-token"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("identity/social-link-confirm"));
+
+    verifyNoInteractions(useCase);
+  }
+
+  @Test
+  void aValidTokenConfirmsAndRendersSuccess() throws Exception {
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/confirm-social-link", ORGANIZATION_ID)
                 .param("token", "a-token"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/social-link-confirmed"));
@@ -72,7 +86,7 @@ class ConfirmSocialLinkControllerTest {
 
     mockMvc
         .perform(
-            get("/o/{organizationId}/confirm-social-link", ORGANIZATION_ID)
+            post("/o/{organizationId}/confirm-social-link", ORGANIZATION_ID)
                 .param("token", "bad-token"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/social-link-invalid"));

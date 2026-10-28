@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Link your account')}">
+    <title>Link your account</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Link your account</h1>
+        <p>Confirm that you want to link this sign-in provider to your account.</p>
+        <form method="post" th:action="@{/o/{organizationId}/confirm-social-link(organizationId=${organizationId})}">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="hidden" name="token" th:value="${token}"/>
+            <button class="clavaris-button" type="submit">Link my account</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>
