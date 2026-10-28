@@ -10,29 +10,14 @@ import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantAccountOnlySe
 import com.clavaris.app.infrastructure.adapter.in.web.filter.TenantSessionConcurrencyFilter;
 import com.clavaris.app.infrastructure.adapter.out.bridge.EmbeddingEligibilityChecker;
 import com.clavaris.app.infrastructure.adapter.out.bridge.RedirectUriOriginResolver;
-import com.clavaris.app.infrastructure.adapter.out.persistence.HashedTokenOAuth2AuthorizationService;
 import com.clavaris.app.infrastructure.adapter.out.persistence.OrganizationRegisteredClientRepository;
-import com.clavaris.app.infrastructure.adapter.out.security.AuthenticationContextClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.BearerTokenHasher;
-import com.clavaris.app.infrastructure.adapter.out.security.ClientAuthenticationFailureHandler;
-import com.clavaris.app.infrastructure.adapter.out.security.ClientSecretAuthenticationSupport;
-import com.clavaris.app.infrastructure.adapter.out.security.EmailClaimsCustomizer;
-import com.clavaris.app.infrastructure.adapter.out.security.OidcDiscoveryMetadataCustomizer;
-import com.clavaris.app.infrastructure.adapter.out.security.OidcSessionIdRecorder;
-import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwksPublishingSource;
-import com.clavaris.app.infrastructure.adapter.out.security.OrganizationJwtIssuerValidator;
 import com.clavaris.app.infrastructure.adapter.out.security.OrganizationLoginRedirectEntryPoint;
-import com.clavaris.app.infrastructure.adapter.out.security.OrganizationScopedJwkSource;
-import com.clavaris.app.infrastructure.adapter.out.security.PhoneClaimsCustomizer;
-import com.clavaris.app.infrastructure.adapter.out.security.ProfilePictureClaimsCustomizer;
 import com.clavaris.app.infrastructure.adapter.out.security.RateLimitKeyHasher;
-import com.clavaris.app.infrastructure.adapter.out.security.RefreshTokenRotationAuthenticationProvider;
 import com.clavaris.app.infrastructure.adapter.out.security.RequestScopedConsentService;
-import com.clavaris.app.infrastructure.adapter.out.security.SessionBackedRefreshTokenGenerator;
 import com.clavaris.app.infrastructure.adapter.out.security.SpringSecurityAuthenticatedSessionEstablisher;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenIssuanceEventLogger;
 import com.clavaris.app.infrastructure.adapter.out.security.TokenRevocationEventLogger;
-import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceAwareOidcUserInfoMapper;
 import com.clavaris.app.infrastructure.adapter.out.security.WorkspaceRoleClaimsCustomizer;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.common.application.port.CpuBoundVerificationGate;
@@ -46,7 +31,6 @@ import com.clavaris.organization.application.usecase.addworkspacemember.Workspac
 import com.clavaris.organization.application.usecase.createworkspace.WorkspaceRoleRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.nimbusds.jose.jwk.source.JWKSource;
-import com.nimbusds.jose.proc.SecurityContext;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -56,22 +40,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
-import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
-import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
-import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -179,100 +153,11 @@ public class OrganizationAuthorizationServerConfig {
   // OAuth2AuthorizationEndpointConfigurer/OAuth2ConfigurerUtils#withMultipleIssuersPattern
   // directly: that wrapping is applied to authorizationEndpointUri, never to consentPage). See
   // ConsentController's own Javadoc for the full design this path is wired into below.
-  private static final String CONSENT_PATH_PATTERN = "/oauth2/consent";
+  /* package */ static final String CONSENT_PATH_PATTERN = "/oauth2/consent";
 
   @SuppressWarnings("PMD.UnnecessaryConstructor")
   public OrganizationAuthorizationServerConfig() {
     // Intentionally empty — this class holds no state, only the @Bean methods below.
-  }
-
-  // TD-NEW-1 (SDE-III complexity review, 2026-09-02): the three helpers below factor out
-  // organizationAuthorizationServerSecurityFilterChain's own pre-DSL object construction — each is
-  // a genuinely self-contained sub-assembly with a narrow, explicit input/output (JWKS/decoder,
-  // token-generation pipeline, authorization service), not a fragment of the surrounding wiring.
-  // Deliberately NOT extracted: the @Bean method's own parameter list, and the
-  // http.securityMatcher(...) fluent DSL chain itself — this class's own Javadoc above already
-  // explains why splitting either of those would be the wrong move (the parameter list IS the
-  // point: one bean, ~20 legitimately distinct SAS/Spring Security collaborators; the DSL chain IS
-  // the SecurityFilterChain assembly, the one thing this bean unavoidably exists to produce). This
-  // extraction only shortens the method body's own construction boilerplate, a different axis from
-  // the coupling/parameter-count concern that Javadoc defends.
-
-  /**
-   * The dynamic, per-request-resolved JWKS pair (TD-SEC-008) plus the {@code /userinfo} decoder
-   * built on top of the publishing one — see the call site's own Javadoc for why signing and
-   * publishing deliberately stay two different {@link JWKSource} instances.
-   */
-  private static JwtDecoderAndJwkSources buildJwksAndUserInfoDecoder(
-      final SigningKeyRepository signingKeys,
-      final OrganizationSigningKeyMaterialFactory keyMaterial,
-      final Duration jwksOverlapDuration) {
-    final JWKSource<SecurityContext> signingJwkSource =
-        new OrganizationScopedJwkSource(keyMaterial);
-    final JWKSource<SecurityContext> jwksPublishingSource =
-        new OrganizationJwksPublishingSource(signingKeys, keyMaterial, jwksOverlapDuration);
-    final NimbusJwtDecoder userInfoJwtDecoder =
-        NimbusJwtDecoder.withJwkSource(jwksPublishingSource).build();
-    userInfoJwtDecoder.setJwtValidator(
-        new DelegatingOAuth2TokenValidator<>(
-            JwtValidators.createDefault(), new OrganizationJwtIssuerValidator()));
-    return new JwtDecoderAndJwkSources(signingJwkSource, jwksPublishingSource, userInfoJwtDecoder);
-  }
-
-  /** {@code signingJwkSource}, {@code jwksPublishingSource}, {@code userInfoJwtDecoder} bundled. */
-  private record JwtDecoderAndJwkSources(
-      JWKSource<SecurityContext> signingJwkSource,
-      JWKSource<SecurityContext> jwksPublishingSource,
-      NimbusJwtDecoder userInfoJwtDecoder) {}
-
-  /**
-   * ADR-0016/Workspace-feature/TD-SEC-016 token-issuance pipeline: one {@link JwtEncoder}, every
-   * ID-/access-token claims customizer composed into {@code JwtGenerator}'s single customizer slot
-   * (see the call site's own Javadoc for why they can't be set as separate calls), and BR-ID-03's
-   * refresh-token fallback wired via {@link DelegatingOAuth2TokenGenerator}.
-   */
-  private static OAuth2TokenGenerator<?> buildTokenGenerator(
-      final JWKSource<SecurityContext> signingJwkSource,
-      final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
-      final WorkspaceRoleClaimsCustomizer workspaceRoleClaims,
-      final IssueRefreshTokenUseCase issueRefreshToken,
-      final RecordSessionOidcIdUseCase recordSessionOidcId,
-      final AccountRepository accounts,
-      final String clavarisBaseUrl) {
-    final JwtEncoder jwtEncoder = new NimbusJwtEncoder(signingJwkSource);
-    final JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
-    final AuthenticationContextClaimsCustomizer authenticationContextClaims =
-        new AuthenticationContextClaimsCustomizer();
-    final ProfilePictureClaimsCustomizer profilePictureClaims =
-        new ProfilePictureClaimsCustomizer(accounts, clavarisBaseUrl);
-    final EmailClaimsCustomizer emailClaims = new EmailClaimsCustomizer(accounts);
-    final PhoneClaimsCustomizer phoneClaims = new PhoneClaimsCustomizer(accounts);
-    final OidcSessionIdRecorder sessionIdRecorder = new OidcSessionIdRecorder(recordSessionOidcId);
-    jwtGenerator.setJwtCustomizer(
-        context -> {
-          tokenIssuanceLogger.customize(context);
-          authenticationContextClaims.customize(context);
-          workspaceRoleClaims.customize(context);
-          profilePictureClaims.customize(context);
-          emailClaims.customize(context);
-          phoneClaims.customize(context);
-          sessionIdRecorder.customize(context);
-        });
-    return new DelegatingOAuth2TokenGenerator(
-        jwtGenerator, new SessionBackedRefreshTokenGenerator(issueRefreshToken));
-  }
-
-  /**
-   * TD-SEC-003/TD-SEC-019: the JDBC-backed, HMAC-hashed {@link OAuth2AuthorizationService} shared
-   * by both this tier's {@code /authorize} and {@code /token} — see the call site's own Javadoc for
-   * why this tier (unlike the platform one) has BR-ID-03 refresh-token survivability at stake.
-   */
-  private static OAuth2AuthorizationService buildAuthorizationService(
-      final JdbcTemplate jdbcTemplate,
-      final RegisteredClientRepository registeredClients,
-      final BearerTokenHasher bearerTokenHasher) {
-    return new HashedTokenOAuth2AuthorizationService(
-        new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClients), bearerTokenHasher);
   }
 
   // Explicit, named bean — not left to whatever HttpSecurity's own default resolution would pick —
@@ -414,8 +299,9 @@ public class OrganizationAuthorizationServerConfig {
     // with a delegating validator adding OrganizationJwtIssuerValidator — defense in depth on top
     // of the already-structural guarantee that a cross-tenant token's kid never resolves in a
     // different Organization's own JWKS.
-    final JwtDecoderAndJwkSources jwksAndDecoder =
-        buildJwksAndUserInfoDecoder(signingKeys, keyMaterial, Duration.ofHours(jwksOverlapHours));
+    final OrganizationTokenPipeline.JwtDecoderAndJwkSources jwksAndDecoder =
+        OrganizationTokenPipeline.buildJwksAndUserInfoDecoder(
+            signingKeys, keyMaterial, Duration.ofHours(jwksOverlapHours));
     http.setSharedObject(JWKSource.class, jwksAndDecoder.jwksPublishingSource());
     final NimbusJwtDecoder userInfoJwtDecoder = jwksAndDecoder.userInfoJwtDecoder();
 
@@ -423,7 +309,7 @@ public class OrganizationAuthorizationServerConfig {
     // alike) + TD-SEC-016 (event=token_issued) + BR-ID-03 (refresh-token fallback) — see
     // buildTokenGenerator's own Javadoc for the full per-claim rationale.
     final OAuth2TokenGenerator<?> tokenGenerator =
-        buildTokenGenerator(
+        OrganizationTokenPipeline.buildTokenGenerator(
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,
             new WorkspaceRoleClaimsCustomizer(workspaceMemberships, workspaceRoles),
@@ -452,7 +338,8 @@ public class OrganizationAuthorizationServerConfig {
     // value this tier ever writes here is HMAC-hashed before it reaches Postgres. See
     // HashedTokenOAuth2AuthorizationService's own Javadoc for the full design.
     final OAuth2AuthorizationService authorizationService =
-        buildAuthorizationService(jdbcTemplate, registeredClients, bearerTokenHasher);
+        OrganizationTokenPipeline.buildAuthorizationService(
+            jdbcTemplate, registeredClients, bearerTokenHasher);
 
     http.securityMatcher(
             "/o/*/oauth2/**",
@@ -486,74 +373,15 @@ public class OrganizationAuthorizationServerConfig {
             resourceServer -> resourceServer.jwt(jwt -> jwt.decoder(userInfoJwtDecoder)))
         .with(
             new OAuth2AuthorizationServerConfigurer(),
-            server ->
-                server
-                    .registeredClientRepository(registeredClients)
-                    .authorizationServerSettings(settings)
-                    .authorizationService(authorizationService)
-                    .authorizationConsentService(consentService)
-                    .tokenGenerator(tokenGenerator)
-                    // BR-ID-03: replaces SAS's own OAuth2RefreshTokenAuthenticationProvider
-                    // entirely for the refresh grant — same provider-swap extension point already
-                    // used below for ClientSecretAuthenticationProvider's password encoder. See
-                    // RefreshTokenRotationAuthenticationProvider's own Javadoc for why this is a
-                    // full replacement, not a delegating wrapper.
-                    .tokenEndpoint(
-                        tokenEndpoint ->
-                            tokenEndpoint.authenticationProviders(
-                                providers -> {
-                                  providers.removeIf(
-                                      OAuth2RefreshTokenAuthenticationProvider.class::isInstance);
-                                  providers.add(
-                                      new RefreshTokenRotationAuthenticationProvider(
-                                          authorizationService,
-                                          tokenGenerator,
-                                          rotateRefreshToken));
-                                }))
-                    // TD-SEC-017: every successful /oauth2/revoke call on any Organization gets a
-                    // structured event=token_revoked log line — see TokenRevocationEventLogger's
-                    // own Javadoc for why this replaces (not adds to) SAS's own default handler.
-                    .tokenRevocationEndpoint(
-                        revocation -> revocation.revocationResponseHandler(tokenRevocationLogger))
-                    // A genuine OIDC discovery document (/.well-known/openid-configuration), not
-                    // just plain OAuth2 authorization server metadata — ADR-0010 §5 requires every
-                    // Organization to have its own *OIDC* issuer, and this is what makes the
-                    // discovery filter advertise itself as one. Custom userInfoMapper (Workspace
-                    // feature follow-up): SAS's own default one silently drops workspace_id/
-                    // workspace_role from /userinfo — see WorkspaceAwareOidcUserInfoMapper's own
-                    // Javadoc for why, confirmed live via javap, not assumed.
-                    .oidc(
-                        oidc ->
-                            oidc.userInfoEndpoint(
-                                    userInfo ->
-                                        userInfo.userInfoMapper(
-                                            new WorkspaceAwareOidcUserInfoMapper()))
-                                .providerConfigurationEndpoint(
-                                    provider ->
-                                        provider.providerConfigurationCustomizer(
-                                            OidcDiscoveryMetadataCustomizer::customize)))
-                    // Same fix as the platform tier's chain, same root cause — extracted to
-                    // ClientSecretAuthenticationSupport (code review finding: this exact block was
-                    // duplicated byte-for-byte across both chains) — see that class's own Javadoc.
-                    .clientAuthentication(
-                        clientAuth ->
-                            clientAuth
-                                .errorResponseHandler(new ClientAuthenticationFailureHandler())
-                                .authenticationProviders(
-                                    providers ->
-                                        ClientSecretAuthenticationSupport.useClientSecretEncoder(
-                                            providers, argon2BulkheadGate)))
-                    // TD-SEC-011 (2026-09-06): the project-owned, branded replacement for SAS's own
-                    // DefaultConsentPage — see ConsentController's own Javadoc for the full design
-                    // and CONSENT_PATH_PATTERN's own comment above for why this is one flat,
-                    // org-agnostic literal rather than a per-Organization path. Configuring this at
-                    // all switches every Organization's own consent render from SAS's previous
-                    // inline 200 response to a 302 redirect here — a deliberate protocol-shape
-                    // change, not a side effect (see AuthorizationCodeFlowIntegrationTest's own
-                    // updated consent tests, which now assert the redirect explicitly).
-                    .authorizationEndpoint(
-                        authorizationEndpoint ->
-                            authorizationEndpoint.consentPage(CONSENT_PATH_PATTERN)))
+            new OrganizationAuthorizationServerCustomizer(
+                registeredClients,
+                settings,
+                authorizationService,
+                consentService,
+                tokenGenerator,
+                rotateRefreshToken,
+                tokenRevocationLogger,
+                argon2BulkheadGate))
         // /o/*/login is where an unauthenticated /oauth2/authorize request gets redirected to
         // (below) — it must be reachable pre-authentication, or the redirect loops back on itself.
         // /o/*/connect/logout (TD-SEC-028) is permitAll for the same class of reason, not by
