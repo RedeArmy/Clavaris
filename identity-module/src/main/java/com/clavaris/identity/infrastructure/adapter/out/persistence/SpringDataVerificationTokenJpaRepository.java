@@ -22,4 +22,10 @@ interface SpringDataVerificationTokenJpaRepository
       "update VerificationTokenEntity t set t.consumedAt = :consumedAt "
           + "where t.id = :tokenId and t.consumedAt is null and t.expiresAt > :consumedAt")
   int consumeIfActive(@Param("tokenId") UUID tokenId, @Param("consumedAt") Instant consumedAt);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "update VerificationTokenEntity t set t.consumedAt = :now "
+          + "where t.accountId = :accountId and t.consumedAt is null and t.expiresAt > :now")
+  int invalidateAllActiveForAccount(@Param("accountId") UUID accountId, @Param("now") Instant now);
 }

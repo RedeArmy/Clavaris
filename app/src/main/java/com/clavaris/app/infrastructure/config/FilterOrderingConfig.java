@@ -2,6 +2,7 @@ package com.clavaris.app.infrastructure.config;
 
 import com.clavaris.app.infrastructure.adapter.in.web.filter.CustomDomainRequestRewriteFilter;
 import com.clavaris.app.infrastructure.adapter.in.web.filter.JwksCacheControlFilter;
+import com.clavaris.app.infrastructure.adapter.in.web.filter.ReferrerPolicyFilter;
 import com.clavaris.clientregistry.application.usecase.registeroauthclient.OAuthClientRepository;
 import com.clavaris.clientregistry.application.usecase.requestclientdomainconfig.ClientDomainConfigRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -85,6 +86,16 @@ public class FilterOrderingConfig {
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
     registration.addUrlPatterns("/*");
     registration.setEnabled(maxAgeSeconds > 0);
+    return registration;
+  }
+
+  // TD-SEC-071: one header for every chain, set before any of them runs.
+  @Bean
+  public FilterRegistrationBean<ReferrerPolicyFilter> referrerPolicyFilter() {
+    final FilterRegistrationBean<ReferrerPolicyFilter> registration =
+        new FilterRegistrationBean<>(new ReferrerPolicyFilter());
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 2);
+    registration.addUrlPatterns("/*");
     return registration;
   }
 }

@@ -15,7 +15,8 @@ public record ChangePasswordCommand(
     String currentRawPassword,
     String newRawPassword,
     String keepSessionId,
-    AuditActor actor) {
+    AuditActor actor,
+    boolean recentlySignedIn) {
 
   // BR-ID-01: a record's generated toString() would print both passwords verbatim.
   @Override

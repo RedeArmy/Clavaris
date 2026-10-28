@@ -18,12 +18,18 @@ import java.util.UUID;
  */
 public final class PasswordCredential extends AbstractPasswordCredential<AccountId> {
 
+  // TD-FUT-053: true for the random credential stored at a social sign-up or a password-less
+  // registration, which the person never saw and so cannot use as proof of who is asking.
+  private final boolean generated;
+
   private PasswordCredential(
       final UUID id,
       final AccountId accountId,
       final String passwordHash,
-      final Instant updatedAt) {
+      final Instant updatedAt,
+      final boolean generated) {
     super(id, accountId, passwordHash, updatedAt);
+    this.generated = generated;
   }
 
   /**
@@ -32,7 +38,13 @@ public final class PasswordCredential extends AbstractPasswordCredential<Account
    *     PasswordHasher}), not here, so the domain never needs to know which algorithm.
    */
   public static PasswordCredential issue(final AccountId accountId, final String passwordHash) {
-    return new PasswordCredential(UUID.randomUUID(), accountId, passwordHash, Instant.now());
+    return new PasswordCredential(UUID.randomUUID(), accountId, passwordHash, Instant.now(), false);
+  }
+
+  /** A credential the person never chose (see {@link #generated()}). */
+  public static PasswordCredential issueGenerated(
+      final AccountId accountId, final String passwordHash) {
+    return new PasswordCredential(UUID.randomUUID(), accountId, passwordHash, Instant.now(), true);
   }
 
   /**
@@ -46,7 +58,21 @@ public final class PasswordCredential extends AbstractPasswordCredential<Account
       final AccountId accountId,
       final String passwordHash,
       final Instant updatedAt) {
-    return new PasswordCredential(id, accountId, passwordHash, updatedAt);
+    return new PasswordCredential(id, accountId, passwordHash, updatedAt, false);
+  }
+
+  public static PasswordCredential reconstitute(
+      final UUID id,
+      final AccountId accountId,
+      final String passwordHash,
+      final Instant updatedAt,
+      final boolean generated) {
+    return new PasswordCredential(id, accountId, passwordHash, updatedAt, generated);
+  }
+
+  /** Whether this was generated for the person rather than chosen by them. */
+  public boolean generated() {
+    return generated;
   }
 
   public AccountId accountId() {

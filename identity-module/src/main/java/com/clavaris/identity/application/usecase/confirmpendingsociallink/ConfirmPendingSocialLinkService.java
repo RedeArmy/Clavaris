@@ -10,6 +10,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,8 +58,11 @@ public class ConfirmPendingSocialLinkService implements ConfirmPendingSocialLink
       throw new InvalidPendingSocialLinkException();
     }
 
-    pendingLink.consume();
-    pendingLinks.save(pendingLink);
+    // The atomic consume is the single-use guard: two simultaneous clicks on one link both pass the
+    // isActive() read above, and only one of them wins this conditional update.
+    if (!pendingLinks.consumeIfActive(pendingLink.id(), Instant.now())) {
+      throw new InvalidPendingSocialLinkException();
+    }
 
     // PendingSocialLink itself carries no organizationId (it's scoped to an AccountId, which
     // already implies one) — this lookup is also how the confirmation click doubles as proof of

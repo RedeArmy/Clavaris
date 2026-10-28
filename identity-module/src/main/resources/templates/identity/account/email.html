@@ -13,14 +13,17 @@
 
         <!-- TD-FUT-043: the new address only replaces the current one once its owner opens the
              link mailed there; the current address is told about the request. -->
-        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${noPassword}">
-            This account does not sign in with a password, so its email cannot be changed here.
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${emailChangeDisabled}">
+            The application you use this account with manages your email address, so it cannot be changed here.
+        </p>
+        <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${recentSignInRequired}">
+            For your security, sign out and sign in again, then come back to change your email.
         </p>
         <p class="clavaris-alert clavaris-alert--error" role="alert" th:if="${serviceOverloadedError}">
             Too many people are signing in right now. Please try again in a moment.
         </p>
 
-        <form th:unless="${noPassword}" method="post" th:object="${changeEmailForm}"
+        <form th:unless="${recentSignInRequired} or ${emailChangeDisabled}" method="post" th:object="${changeEmailForm}"
               th:action="@{/o/{organizationId}/account/email(organizationId=${organizationId})}">
             <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
             <input type="hidden" th:if="${param.display}" name="display" th:value="${param.display}"/>
@@ -33,8 +36,8 @@
             </div>
 
             <div class="clavaris-field">
-                <label for="currentPassword">Current password</label>
-                <input id="currentPassword" type="password" th:field="*{currentPassword}" autocomplete="current-password" required/>
+                <label for="currentPassword">Current password (leave empty if you sign in without one)</label>
+                <input id="currentPassword" type="password" th:field="*{currentPassword}" autocomplete="current-password"/>
                 <p class="clavaris-field-error" th:if="${#fields.hasErrors('currentPassword')}" th:errors="*{currentPassword}">Password error</p>
             </div>
 

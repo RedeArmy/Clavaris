@@ -51,7 +51,9 @@ class SocialIdentityLinkCompletionTest {
   private void plantIntent(final Instant at) {
     session.setAttribute(
         SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE, accountId.toString());
-    session.setAttribute(SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, at);
+    session.setAttribute(
+        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE,
+        String.valueOf(at.toEpochMilli()));
   }
 
   private boolean run() throws Exception {
@@ -136,5 +138,32 @@ class SocialIdentityLinkCompletionTest {
 
     assertThat(response.getRedirectedUrl()).endsWith("/account/connections?connectError");
     verify(sessions).establishViaSocialLogin(any(), any(), eq(accountId), any(), eq(false), any());
+  }
+
+  // TD-SEC-072: the session comes back as the one that asked to connect, not as a social sign-in.
+  @Test
+  void aSessionWithCapturedFactorsIsRestoredNotReissuedAsASocialSignIn() throws Exception {
+    plantIntent(Instant.now());
+    session.setAttribute(
+        SocialLoginRedirectController.LINK_FACTORS_SESSION_ATTRIBUTE,
+        new java.util.ArrayList<>(
+            java.util.List.of("FACTOR_PASSWORD|1790000000000", "ROLE_ACCOUNT|0")));
+
+    assertThat(run()).isTrue();
+
+    verify(sessions).restoreSession(any(), any(), eq(accountId), any(), any());
+    verify(sessions, never())
+        .establishViaSocialLogin(any(), any(), any(), any(), anyBoolean(), any());
+  }
+
+  @Test
+  void aSessionPlantedWithoutFactorsFallsBackToTheSocialSignIn() throws Exception {
+    plantIntent(Instant.now());
+
+    assertThat(run()).isTrue();
+
+    verify(sessions)
+        .establishViaSocialLogin(any(), any(), eq(accountId), any(), anyBoolean(), any());
+    verify(sessions, never()).restoreSession(any(), any(), any(), any(), any());
   }
 }

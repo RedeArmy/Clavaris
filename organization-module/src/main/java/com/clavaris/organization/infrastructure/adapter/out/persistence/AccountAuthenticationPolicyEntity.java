@@ -55,6 +55,9 @@ public class AccountAuthenticationPolicyEntity {
   @Column(name = "self_registration_requires_approval", nullable = false)
   private boolean selfRegistrationRequiresApproval;
 
+  @Column(name = "self_service_email_change_enabled", nullable = false)
+  private boolean selfServiceEmailChangeEnabled;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -77,6 +80,7 @@ public class AccountAuthenticationPolicyEntity {
       final boolean passwordAtSignUpEnabled,
       final boolean deviceTrustEnabled,
       final boolean selfRegistrationRequiresApproval,
+      final boolean selfServiceEmailChangeEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = id;
@@ -91,6 +95,7 @@ public class AccountAuthenticationPolicyEntity {
     this.passwordAtSignUpEnabled = passwordAtSignUpEnabled;
     this.deviceTrustEnabled = deviceTrustEnabled;
     this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
+    this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -141,6 +146,10 @@ public class AccountAuthenticationPolicyEntity {
 
   public boolean isSelfRegistrationRequiresApproval() {
     return selfRegistrationRequiresApproval;
+  }
+
+  public boolean isSelfServiceEmailChangeEnabled() {
+    return selfServiceEmailChangeEnabled;
   }
 
   public Instant getCreatedAt() {

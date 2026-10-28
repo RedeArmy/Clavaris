@@ -8,6 +8,7 @@ import com.clavaris.identity.domain.model.PlatformAccount;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.PlatformSocialIdentity;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -53,8 +54,11 @@ public class ConfirmPendingPlatformSocialLinkService
       throw new InvalidPendingPlatformSocialLinkException();
     }
 
-    pendingLink.consume();
-    pendingLinks.save(pendingLink);
+    // The atomic consume is the single-use guard: two simultaneous clicks on one link both pass the
+    // isActive() read above, and only one of them wins this conditional update.
+    if (!pendingLinks.consumeIfActive(pendingLink.id(), Instant.now())) {
+      throw new InvalidPendingPlatformSocialLinkException();
+    }
 
     final PlatformSocialIdentity identity =
         PlatformSocialIdentity.link(

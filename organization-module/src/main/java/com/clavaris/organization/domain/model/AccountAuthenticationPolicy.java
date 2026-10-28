@@ -58,6 +58,9 @@ public final class AccountAuthenticationPolicy {
   // path — off by default (opt-in, zero regression), same posture deviceTrustEnabled already
   // establishes for this same aggregate.
   private final boolean selfRegistrationRequiresApproval;
+  // TD-FUT-052: whether an End-User may change their own email. On by default; an Organization
+  // whose consuming application owns the email turns it off.
+  private final boolean selfServiceEmailChangeEnabled;
   private final Instant createdAt;
   private final Instant updatedAt;
 
@@ -77,6 +80,7 @@ public final class AccountAuthenticationPolicy {
       final boolean passwordAtSignUpEnabled,
       final boolean deviceTrustEnabled,
       final boolean selfRegistrationRequiresApproval,
+      final boolean selfServiceEmailChangeEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     this.id = Objects.requireNonNull(id, "id must not be null");
@@ -92,6 +96,7 @@ public final class AccountAuthenticationPolicy {
     this.passwordAtSignUpEnabled = passwordAtSignUpEnabled;
     this.deviceTrustEnabled = deviceTrustEnabled;
     this.selfRegistrationRequiresApproval = selfRegistrationRequiresApproval;
+    this.selfServiceEmailChangeEnabled = selfServiceEmailChangeEnabled;
     this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
     this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt must not be null");
   }
@@ -140,6 +145,7 @@ public final class AccountAuthenticationPolicy {
         passwordAtSignUpEnabled,
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
+        true,
         now,
         now);
   }
@@ -174,8 +180,29 @@ public final class AccountAuthenticationPolicy {
         newPasswordAtSignUpEnabled,
         newDeviceTrustEnabled,
         newSelfRegistrationRequiresApproval,
+        selfServiceEmailChangeEnabled,
         createdAt,
         Instant.now());
+  }
+
+  /** The same policy with the End-User's own email change switched on or off (TD-FUT-052). */
+  public AccountAuthenticationPolicy withSelfServiceEmailChange(final boolean enabled) {
+    return new AccountAuthenticationPolicy(
+        id,
+        organizationId,
+        emailVerificationRequiredAtSignIn,
+        emailVerificationMethod,
+        emailCodeSignInEnabled,
+        emailLinkSignInEnabled,
+        usernameSignUpEnabled,
+        usernameRequired,
+        usernameSignInEnabled,
+        passwordAtSignUpEnabled,
+        deviceTrustEnabled,
+        selfRegistrationRequiresApproval,
+        enabled,
+        createdAt,
+        updatedAt);
   }
 
   @SuppressWarnings("java:S107")
@@ -192,6 +219,7 @@ public final class AccountAuthenticationPolicy {
       final boolean passwordAtSignUpEnabled,
       final boolean deviceTrustEnabled,
       final boolean selfRegistrationRequiresApproval,
+      final boolean selfServiceEmailChangeEnabled,
       final Instant createdAt,
       final Instant updatedAt) {
     return new AccountAuthenticationPolicy(
@@ -207,6 +235,7 @@ public final class AccountAuthenticationPolicy {
         passwordAtSignUpEnabled,
         deviceTrustEnabled,
         selfRegistrationRequiresApproval,
+        selfServiceEmailChangeEnabled,
         createdAt,
         updatedAt);
   }
@@ -257,6 +286,10 @@ public final class AccountAuthenticationPolicy {
 
   public boolean selfRegistrationRequiresApproval() {
     return selfRegistrationRequiresApproval;
+  }
+
+  public boolean selfServiceEmailChangeEnabled() {
+    return selfServiceEmailChangeEnabled;
   }
 
   public Instant createdAt() {

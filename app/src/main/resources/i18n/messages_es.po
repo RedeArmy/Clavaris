@@ -3019,3 +3019,44 @@ msgstr "El usuario desconectó una cuenta social"
 
 msgid "Audit log partition dropped by retention"
 msgstr "Partición del registro de auditoría eliminada por retención"
+
+msgid "Confirm email change"
+msgstr "Confirmar el cambio de correo electrónico"
+
+msgid "Confirm that you want to change your email address to the one this link was sent to."
+msgstr "Confirma que quieres cambiar tu dirección de correo electrónico a aquella a la que se envió este enlace."
+
+msgid "For your security, sign out and sign in again, then come back to change your email."
+msgstr "Por tu seguridad, cierra sesión e inicia sesión de nuevo, y vuelve para cambiar tu correo electrónico."
+
+msgid "Current password (leave empty if you sign in without one)"
+msgstr "Contraseña actual (déjala vacía si inicias sesión sin una)"
+
+msgid "For your security, sign out and sign in again, then come back to change your password."
+msgstr "Por tu seguridad, cierra sesión e inicia sesión de nuevo, y vuelve para cambiar tu contraseña."
+
+msgid "The application you use this account with manages your email address, so it cannot be changed here."
+msgstr "La aplicación con la que usas esta cuenta gestiona tu dirección de correo electrónico, por lo que no se puede cambiar aquí."
+
+msgid "Confirm your email"
+msgstr "Confirma tu correo electrónico"
+
+
+msgid "Confirm that this is your email address to finish verifying it."
+msgstr "Confirma que esta es tu dirección de correo electrónico para terminar de verificarla."
+
+
+msgid "Verify my email"
+msgstr "Verificar mi correo electrónico"
+
+
+msgid "Link your account"
+msgstr "Vincula tu cuenta"
+
+
+msgid "Confirm that you want to link this sign-in provider to your account."
+msgstr "Confirma que quieres vincular este proveedor de inicio de sesión a tu cuenta."
+
+
+msgid "Link my account"
+msgstr "Vincular mi cuenta"

@@ -86,3 +86,10 @@ msgstr "{0} — Cambiar contraseña"
 
 msgid "{0} — Connected accounts"
 msgstr "{0} — Cuentas conectadas"
+
+msgid "{0} — Confirm your email"
+msgstr "{0} — Confirma tu correo electrónico"
+
+
+msgid "{0} — Link your account"
+msgstr "{0} — Vincula tu cuenta"

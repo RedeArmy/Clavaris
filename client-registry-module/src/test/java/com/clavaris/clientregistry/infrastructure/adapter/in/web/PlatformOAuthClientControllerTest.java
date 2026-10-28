@@ -119,22 +119,26 @@ class PlatformOAuthClientControllerTest {
     ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
     viewResolver.setTemplateEngine(templateEngine);
 
+    // The controller was split by concern (TD-ARCH-042); the tests keep exercising them together
+    // through one MockMvc, as the dashboard does, so no test body had to change.
+    PlatformOAuthClientSupport support =
+        new PlatformOAuthClientSupport(
+            getClient,
+            organizationResolver,
+            currentPlatformAccount,
+            "https://clavaris.example.test");
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlatformOAuthClientController(
                     registerClient,
                     listClientsPaged,
-                    getClient,
                     deactivateClient,
                     activateClient,
                     rotateClientSecret,
-                    updateRedirectSettings,
-                    updateGrantTypes,
-                    updateScopes,
-                    updateConsent,
-                    organizationResolver,
-                    currentPlatformAccount,
-                    "https://clavaris.example.test"))
+                    support),
+                new PlatformOAuthClientSettingsController(
+                    updateRedirectSettings, updateGrantTypes, updateScopes, updateConsent, support),
+                new PlatformOAuthClientRedirectUriRowsController(support))
             .setViewResolvers(viewResolver)
             .build();
   }

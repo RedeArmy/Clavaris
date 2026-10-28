@@ -4,7 +4,9 @@ import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.
 import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -43,6 +45,11 @@ class JpaPendingSocialLinkRepository implements PendingSocialLinkRepository {
             pendingLink.consumedAt().orElse(null)));
   }
 
+  @Override
+  public int invalidateAllActiveForAccount(final AccountId accountId, final Instant now) {
+    return pendingLinks.invalidateAllActiveForAccount(accountId.value(), now);
+  }
+
   private PendingSocialLink toDomain(final PendingSocialLinkEntity entity) {
     return PendingSocialLink.reconstitute(
         entity.getId(),
@@ -52,5 +59,10 @@ class JpaPendingSocialLinkRepository implements PendingSocialLinkRepository {
         entity.getConfirmationTokenHash(),
         entity.getExpiresAt(),
         entity.getConsumedAt());
+  }
+
+  @Override
+  public boolean consumeIfActive(final UUID linkId, final Instant consumedAt) {
+    return pendingLinks.consumeIfActive(linkId, consumedAt) > 0;
   }
 }

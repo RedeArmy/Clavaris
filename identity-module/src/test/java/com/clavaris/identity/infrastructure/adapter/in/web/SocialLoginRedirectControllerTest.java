@@ -134,7 +134,7 @@ class SocialLoginRedirectControllerTest {
         new org.springframework.mock.web.MockHttpSession();
     session.setAttribute(SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE, "acct");
     session.setAttribute(
-        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, java.time.Instant.now());
+        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, "1790000000000");
 
     mockMvc.perform(
         get("/o/{organizationId}/login/social/google", ORGANIZATION_ID).session(session));
@@ -153,7 +153,7 @@ class SocialLoginRedirectControllerTest {
         new org.springframework.mock.web.MockHttpSession();
     session.setAttribute(SocialLoginRedirectController.LINK_ACCOUNT_ID_SESSION_ATTRIBUTE, "acct");
     session.setAttribute(
-        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, java.time.Instant.now());
+        SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, "1790000000000");
 
     mockMvc.perform(get("/platform/login/social/github").session(session));
 

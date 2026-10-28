@@ -45,6 +45,11 @@ class JpaVerificationTokenRepository implements VerificationTokenRepository {
     return tokens.consumeIfActive(tokenId, consumedAt) > 0;
   }
 
+  @Override
+  public int invalidateAllActiveForAccount(final AccountId accountId, final Instant now) {
+    return tokens.invalidateAllActiveForAccount(accountId.value(), now);
+  }
+
   private VerificationToken toDomain(final VerificationTokenEntity entity) {
     return VerificationToken.reconstitute(
         entity.getId(),

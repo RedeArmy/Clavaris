@@ -5,6 +5,8 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
+import com.clavaris.identity.domain.event.SocialIdentityLinkedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import org.slf4j.Logger;
@@ -28,16 +30,19 @@ public class ConnectSocialIdentityService implements ConnectSocialIdentityUseCas
   private final AccountRepository accounts;
   private final SocialIdentityRepository identities;
   private final OrganizationSocialLoginPolicyProvider policy;
+  private final EventOutboxWriter outbox;
   private final AuditEventRecorder auditEvents;
 
   public ConnectSocialIdentityService(
       final AccountRepository accounts,
       final SocialIdentityRepository identities,
       final OrganizationSocialLoginPolicyProvider policy,
+      final EventOutboxWriter outbox,
       final AuditEventRecorder auditEvents) {
     this.accounts = accounts;
     this.identities = identities;
     this.policy = policy;
+    this.outbox = outbox;
     this.auditEvents = auditEvents;
   }
 
@@ -62,16 +67,19 @@ public class ConnectSocialIdentityService implements ConnectSocialIdentityUseCas
     if (providerAlreadyLinkedHere || identityTakenInOrganization) {
       throw new SocialIdentityAlreadyLinkedException();
     }
+    final SocialIdentity identity =
+        SocialIdentity.link(
+            account.id(), account.organizationId(), command.provider(), command.providerUserId());
     try {
-      identities.save(
-          SocialIdentity.link(
-              account.id(),
-              account.organizationId(),
-              command.provider(),
-              command.providerUserId()));
+      identities.save(identity);
     } catch (final DataIntegrityViolationException raced) {
       throw new SocialIdentityAlreadyLinkedException(raced);
     }
+    outbox.write(
+        "social_identity.linked",
+        account.id(),
+        account.organizationId(),
+        SocialIdentityLinkedEvent.from(identity, account.organizationId()));
     auditEvents.write(
         AuditActor.account(account.id().value()),
         "account.social_identity_connected",

@@ -75,7 +75,9 @@ public class SetAccountAuthenticationPolicyForOrganizationService
             + " deviceTrustEnabled="
             + command.deviceTrustEnabled()
             + " selfRegistrationRequiresApproval="
-            + command.selfRegistrationRequiresApproval());
+            + command.selfRegistrationRequiresApproval()
+            + " selfServiceEmailChangeEnabled="
+            + command.selfServiceEmailChangeEnabled());
 
     return new SetAccountAuthenticationPolicyForOrganizationResult(policy);
   }
@@ -83,32 +85,35 @@ public class SetAccountAuthenticationPolicyForOrganizationService
   private AccountAuthenticationPolicy applyCommand(
       final AccountAuthenticationPolicy existing,
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
-    return existing.withPolicy(
-        command.emailVerificationRequiredAtSignIn(),
-        command.emailVerificationMethod(),
-        command.emailCodeSignInEnabled(),
-        command.emailLinkSignInEnabled(),
-        command.usernameSignUpEnabled(),
-        command.usernameRequired(),
-        command.usernameSignInEnabled(),
-        command.passwordAtSignUpEnabled(),
-        command.deviceTrustEnabled(),
-        command.selfRegistrationRequiresApproval());
+    return existing
+        .withPolicy(
+            command.emailVerificationRequiredAtSignIn(),
+            command.emailVerificationMethod(),
+            command.emailCodeSignInEnabled(),
+            command.emailLinkSignInEnabled(),
+            command.usernameSignUpEnabled(),
+            command.usernameRequired(),
+            command.usernameSignInEnabled(),
+            command.passwordAtSignUpEnabled(),
+            command.deviceTrustEnabled(),
+            command.selfRegistrationRequiresApproval())
+        .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled());
   }
 
   private AccountAuthenticationPolicy defineFromCommand(
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
     return AccountAuthenticationPolicy.define(
-        command.organizationId(),
-        command.emailVerificationRequiredAtSignIn(),
-        command.emailVerificationMethod(),
-        command.emailCodeSignInEnabled(),
-        command.emailLinkSignInEnabled(),
-        command.usernameSignUpEnabled(),
-        command.usernameRequired(),
-        command.usernameSignInEnabled(),
-        command.passwordAtSignUpEnabled(),
-        command.deviceTrustEnabled(),
-        command.selfRegistrationRequiresApproval());
+            command.organizationId(),
+            command.emailVerificationRequiredAtSignIn(),
+            command.emailVerificationMethod(),
+            command.emailCodeSignInEnabled(),
+            command.emailLinkSignInEnabled(),
+            command.usernameSignUpEnabled(),
+            command.usernameRequired(),
+            command.usernameSignInEnabled(),
+            command.passwordAtSignUpEnabled(),
+            command.deviceTrustEnabled(),
+            command.selfRegistrationRequiresApproval())
+        .withSelfServiceEmailChange(command.selfServiceEmailChangeEnabled());
   }
 }

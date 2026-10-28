@@ -5,8 +5,10 @@ import com.clavaris.identity.application.usecase.confirmemailverification.Confir
 import com.clavaris.identity.application.usecase.confirmemailverification.InvalidVerificationTokenException;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -28,7 +30,21 @@ public class VerifyEmailController {
 
   // Success vs. invalid-token each need their own exit — same rationale as
   // RegisterAccountController's own suppression.
+  // A GET must not change anything (TD-SEC-073): mail scanners and link previewers open every URL
+  // in a message and would use the single-use link up before its owner did. The link lands on a
+  // page that asks for a click, and only the POST below verifies, the pattern
+  // EmailLinkSignInController already follows.
   @GetMapping
+  public String confirmPage(
+      @PathVariable final UUID organizationId,
+      @RequestParam final String token,
+      final Model model) {
+    model.addAttribute("organizationId", organizationId);
+    model.addAttribute("token", token);
+    return "identity/verify-email-confirm";
+  }
+
+  @PostMapping
   public String verify(@PathVariable final UUID organizationId, @RequestParam final String token) {
     try {
       useCase.handle(new ConfirmEmailVerificationCommand(token));

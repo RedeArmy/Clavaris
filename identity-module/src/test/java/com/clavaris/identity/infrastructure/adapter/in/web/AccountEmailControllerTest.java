@@ -15,13 +15,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
-import com.clavaris.identity.application.usecase.changepassword.NoPasswordToChangeException;
-import com.clavaris.identity.application.usecase.confirmemailchange.ConfirmEmailChangeUseCase;
-import com.clavaris.identity.application.usecase.confirmemailchange.InvalidEmailChangeTokenException;
-import com.clavaris.identity.application.usecase.registeraccount.EmailAlreadyRegisteredException;
+import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
+import com.clavaris.identity.application.usecase.requestemailchange.EmailChangeNotAllowedException;
 import com.clavaris.identity.application.usecase.requestemailchange.RequestEmailChangeUseCase;
+import com.clavaris.identity.application.usecase.requestemailchange.SelfServiceEmailChangePolicy;
 import com.clavaris.identity.domain.model.AccountId;
-import com.clavaris.identity.domain.model.OrganizationId;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,18 +33,19 @@ class AccountEmailControllerTest {
   private static final String URL = "/o/" + ORG + "/account/email";
 
   private RequestEmailChangeUseCase requestChange;
-  private ConfirmEmailChangeUseCase confirmChange;
+  private SelfServiceEmailChangePolicy policy;
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     requestChange = mock(RequestEmailChangeUseCase.class);
-    confirmChange = mock(ConfirmEmailChangeUseCase.class);
+    policy = mock(SelfServiceEmailChangePolicy.class);
+    when(policy.isAllowed(any())).thenReturn(true);
     CurrentAccountResolver currentAccount = mock(CurrentAccountResolver.class);
     when(currentAccount.resolve(any())).thenReturn(Optional.of(AccountId.newId()));
     mockMvc =
         SelfServiceMvc.standalone(
-            new AccountEmailController(requestChange, confirmChange, currentAccount));
+            new AccountEmailController(requestChange, currentAccount, policy, 10));
   }
 
   private MockHttpServletRequestBuilder submit(final String newEmail, final String password) {
@@ -101,12 +100,12 @@ class AccountEmailControllerTest {
   }
 
   @Test
-  void anAccountWithoutAPasswordIsToldSo() throws Exception {
-    doThrow(new NoPasswordToChangeException()).when(requestChange).handle(any());
+  void anAccountWithoutAPasswordAndAnOldSessionIsToldToSignInAgain() throws Exception {
+    doThrow(new RecentSignInRequiredException()).when(requestChange).handle(any());
 
     mockMvc
-        .perform(submit("new@example.com", "x"))
-        .andExpect(model().attribute("noPassword", true));
+        .perform(submit("new@example.com", ""))
+        .andExpect(model().attribute("recentSignInRequired", true));
   }
 
   @Test
@@ -120,35 +119,19 @@ class AccountEmailControllerTest {
   }
 
   @Test
-  void aValidLinkConfirmsTheChange() throws Exception {
+  void theFormTellsAnOrganizationThatSwitchedEmailChangeOffTheyCannotUseIt() throws Exception {
+    when(policy.isAllowed(any())).thenReturn(false);
+
+    mockMvc.perform(get(URL)).andExpect(model().attribute("emailChangeDisabled", true));
+  }
+
+  @Test
+  void aSubmissionTheOrganizationRefusesShowsTheSameNotice() throws Exception {
+    doThrow(new EmailChangeNotAllowedException()).when(requestChange).handle(any());
+
     mockMvc
-        .perform(get(URL + "/confirm").param("token", "the-token"))
+        .perform(submit("new@example.com", "current-secret"))
         .andExpect(status().isOk())
-        .andExpect(view().name("identity/account/email-confirmed"))
-        .andExpect(model().attribute("confirmed", true));
-
-    verify(confirmChange).handle(any());
-  }
-
-  @Test
-  void anInvalidLinkIsA400() throws Exception {
-    doThrow(new InvalidEmailChangeTokenException()).when(confirmChange).handle(any());
-
-    mockMvc
-        .perform(get(URL + "/confirm").param("token", "bad"))
-        .andExpect(status().isBadRequest())
-        .andExpect(model().attribute("invalid", true));
-  }
-
-  @Test
-  void anAddressTakenInTheMeantimeIsA409() throws Exception {
-    doThrow(new EmailAlreadyRegisteredException(new OrganizationId(ORG)))
-        .when(confirmChange)
-        .handle(any());
-
-    mockMvc
-        .perform(get(URL + "/confirm").param("token", "t"))
-        .andExpect(status().isConflict())
-        .andExpect(model().attribute("taken", true));
+        .andExpect(model().attribute("emailChangeDisabled", true));
   }
 }

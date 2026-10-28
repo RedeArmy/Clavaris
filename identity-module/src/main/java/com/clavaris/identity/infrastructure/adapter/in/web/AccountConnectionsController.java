@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -110,7 +111,13 @@ public class AccountConnectionsController {
     request
         .getSession()
         .setAttribute(
-            SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE, Instant.now());
+            SocialLoginRedirectController.LINK_REQUESTED_AT_SESSION_ATTRIBUTE,
+            String.valueOf(Instant.now().toEpochMilli()));
+    request
+        .getSession()
+        .setAttribute(
+            SocialLoginRedirectController.LINK_FACTORS_SESSION_ATTRIBUTE,
+            SessionFactors.capture(SecurityContextHolder.getContext().getAuthentication()));
     response.sendRedirect(
         request.getContextPath()
             + "/oauth2/authorization/"

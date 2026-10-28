@@ -13,7 +13,8 @@ public class ChangeEmailForm {
   @Size(max = 254, message = "Email must be at most 254 characters")
   private String newEmail;
 
-  @NotBlank(message = "Please enter your current password")
+  // Optional here: an Account with no password proves itself with a recent sign-in instead, and
+  // the use case rejects a blank one for an Account that has a password.
   private String currentPassword;
 
   public String getNewEmail() {

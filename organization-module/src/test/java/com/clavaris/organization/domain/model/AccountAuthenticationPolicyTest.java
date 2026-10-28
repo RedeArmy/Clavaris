@@ -97,11 +97,39 @@ class AccountAuthenticationPolicyTest {
             true,
             false,
             false,
+            true,
             persistedCreatedAt,
             persistedUpdatedAt);
 
     assertThat(policy.id()).isEqualTo(persistedId);
     assertThat(policy.createdAt()).isEqualTo(persistedCreatedAt);
     assertThat(policy.updatedAt()).isEqualTo(persistedUpdatedAt);
+  }
+
+  // TD-FUT-052: on by default, switchable, and untouched by the other settings being re-set.
+  @Test
+  void selfServiceEmailChangeIsOnByDefaultCanBeSwitchedOffAndSurvivesAPolicyUpdate() {
+    AccountAuthenticationPolicy defaults = AccountAuthenticationPolicy.defaults(organizationId);
+    assertThat(defaults.selfServiceEmailChangeEnabled()).isTrue();
+
+    AccountAuthenticationPolicy off = defaults.withSelfServiceEmailChange(false);
+    assertThat(off.selfServiceEmailChangeEnabled()).isFalse();
+    assertThat(off.id()).isEqualTo(defaults.id());
+
+    AccountAuthenticationPolicy retuned =
+        off.withPolicy(
+            false,
+            EmailVerificationMethod.LINK,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            false,
+            false);
+    assertThat(retuned.selfServiceEmailChangeEnabled())
+        .as("re-tuning the other settings does not turn it back on")
+        .isFalse();
   }
 }

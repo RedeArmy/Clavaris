@@ -613,4 +613,18 @@ class AccountTest {
     assertThat(account.lastName()).contains("Family");
     assertThat(account.pictureUrl()).contains("https://pic");
   }
+
+  @Test
+  void aGeneratedPasswordIsNotOneThePersonChoseUntilTheyReplaceIt() {
+    Account account =
+        Account.register(new OrganizationId(UUID.randomUUID()), new Email("g@example.com"));
+    assertThat(account.hasUserChosenPassword()).as("no credential at all").isFalse();
+
+    account.attachGeneratedPasswordCredential("argon2id$random");
+    assertThat(account.hasUserChosenPassword()).isFalse();
+    assertThat(account.passwordCredential().orElseThrow().generated()).isTrue();
+
+    account.resetPasswordCredential("argon2id$picked");
+    assertThat(account.hasUserChosenPassword()).as("a real change makes it theirs").isTrue();
+  }
 }

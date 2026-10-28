@@ -44,6 +44,8 @@ class ConfirmPendingSocialLinkServiceTest {
     accounts = mock(AccountRepository.class);
     outbox = mock(EventOutboxWriter.class);
     service = new ConfirmPendingSocialLinkService(pendingLinks, socialIdentities, accounts, outbox);
+    // Default: this call wins the conditional-consume race; the lost-race test overrides it.
+    when(pendingLinks.consumeIfActive(any(), any())).thenReturn(true);
   }
 
   @Test
@@ -65,9 +67,8 @@ class ConfirmPendingSocialLinkServiceTest {
     AccountId accountId = service.handle(new ConfirmPendingSocialLinkCommand(rawToken));
 
     assertThat(accountId).isEqualTo(account.id());
-    assertThat(pendingLink.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
-    verify(pendingLinks).save(pendingLink);
+    verify(pendingLinks).consumeIfActive(eq(pendingLink.id()), any());
     verify(socialIdentities).save(any(SocialIdentity.class));
     verify(accounts).save(account);
     verify(outbox).write(eq("social_identity.linked"), eq(account.id()), any(), any());
@@ -150,6 +151,29 @@ class ConfirmPendingSocialLinkServiceTest {
             Instant.now().minusSeconds(1));
     when(pendingLinks.findByConfirmationTokenHash(RefreshTokenSecret.hash(rawToken)))
         .thenReturn(Optional.of(pendingLink));
+    ConfirmPendingSocialLinkCommand command = new ConfirmPendingSocialLinkCommand(rawToken);
+
+    assertThatExceptionOfType(InvalidPendingSocialLinkException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(socialIdentities, never()).save(any());
+  }
+
+  // Two simultaneous clicks on one link both read it as active; only one wins the conditional
+  // consume, and the loser must be refused before anything is linked.
+  @Test
+  void aLinkConsumedByAConcurrentConfirmationIsRefusedBeforeAnythingIsLinked() {
+    String rawToken = "raced-token";
+    PendingSocialLink pendingLink =
+        PendingSocialLink.raise(
+            AccountId.newId(),
+            SocialProvider.GOOGLE,
+            "google-sub-raced",
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(3600));
+    when(pendingLinks.findByConfirmationTokenHash(RefreshTokenSecret.hash(rawToken)))
+        .thenReturn(Optional.of(pendingLink));
+    when(pendingLinks.consumeIfActive(any(), any())).thenReturn(false);
     ConfirmPendingSocialLinkCommand command = new ConfirmPendingSocialLinkCommand(rawToken);
 
     assertThatExceptionOfType(InvalidPendingSocialLinkException.class)

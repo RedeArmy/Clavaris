@@ -132,7 +132,8 @@ class JpaAccountRepository implements AccountRepository {
                 credentialRow.getId(),
                 accountId,
                 credentialRow.getPasswordHash(),
-                credentialRow.getUpdatedAt());
+                credentialRow.getUpdatedAt(),
+                credentialRow.isGenerated());
     final Username username =
         entity.getUsername() == null ? null : new Username(entity.getUsername());
     return Account.reconstitute(
@@ -286,7 +287,8 @@ class JpaAccountRepository implements AccountRepository {
                         credential.id(),
                         credential.accountId().value(),
                         credential.passwordHash(),
-                        credential.updatedAt())));
+                        credential.updatedAt(),
+                        credential.generated())));
   }
 
   @Override

@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
@@ -376,6 +377,150 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(200);
   }
 
+  // TD-TEST-009 / TD-FUT-043: the whole connect-a-provider round trip against the GitHub stub, with
+  // the real OAuth2 login filter in the middle. That filter replaces the security context with the
+  // provider's token, so what must hold afterwards is that the person is still the password
+  // Account they were, the provider identity is linked to it, and nobody was signed in as the
+  // provider's user.
+  @Test
+  void aSignedInAccountCanConnectGitHubAndStaysTheSameAccount() throws Exception {
+    final UUID organizationId = organizationWithGitHub();
+    registerAccount(organizationId, "connector@example.test", "a-correct-password");
+    final SessionClient browser = new SessionClient();
+    signIn(browser, organizationId, "connector@example.test", "a-correct-password");
+    CURRENT_STUB_USER.set(new StubGitHubUser(990777, "octo-connect", "unrelated@example.test"));
+
+    final String callback = connectGitHub(browser, organizationId);
+
+    assertThat(callback).endsWith("/o/" + organizationId + "/account/connections?connected");
+    assertThat(
+            jdbcTemplate.queryForList(
+                "select a.email from social_identities si join accounts a on a.id = si.account_id"
+                    + " where a.organization_id = ? and si.provider = 'GITHUB'"
+                    + " and si.provider_user_id = '990777'",
+                String.class,
+                organizationId))
+        .as("linked to the Account that asked, whatever email GitHub reports")
+        .containsExactly("connector@example.test");
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from accounts where organization_id = ?",
+                Integer.class,
+                organizationId))
+        .as("nobody was created or signed in as the provider's user")
+        .isEqualTo(1);
+    assertThat(browser.get(baseUri("/o/" + organizationId + "/account/profile")).statusCode())
+        .as("still signed in as the same Account after the provider round trip")
+        .isEqualTo(200);
+    assertThat(browser.get(baseUri("/o/" + organizationId + "/account/connections")).body())
+        .contains("GitHub");
+  }
+
+  @Test
+  void aProviderIdentityAlreadyLinkedToAnotherAccountIsRefusedAndTheSessionSurvives()
+      throws Exception {
+    final UUID organizationId = organizationWithGitHub();
+    registerAccount(organizationId, "first-owner@example.test", "a-correct-password");
+    registerAccount(organizationId, "second-owner@example.test", "a-correct-password");
+    CURRENT_STUB_USER.set(new StubGitHubUser(990888, "shared-gh", "shared@example.test"));
+    final SessionClient first = new SessionClient();
+    signIn(first, organizationId, "first-owner@example.test", "a-correct-password");
+    assertThat(connectGitHub(first, organizationId)).endsWith("?connected");
+    final SessionClient second = new SessionClient();
+    signIn(second, organizationId, "second-owner@example.test", "a-correct-password");
+
+    final String callback = connectGitHub(second, organizationId);
+
+    assertThat(callback).endsWith("/o/" + organizationId + "/account/connections?alreadyLinked");
+    assertThat(second.get(baseUri("/o/" + organizationId + "/account/profile")).statusCode())
+        .as("a refused connect still leaves the person signed in as themselves")
+        .isEqualTo(200);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from social_identities si join accounts a on a.id = si.account_id"
+                    + " where a.organization_id = ? and si.provider_user_id = '990888'",
+                Integer.class,
+                organizationId))
+        .isEqualTo(1);
+  }
+
+  // TD-FUT-053: an Account that only ever signs in with a provider has no password to type, so a
+  // sign-in made moments ago is its proof. Driven for real: GitHub creates the Account, and the
+  // very session that sign-in established changes the email.
+  @Test
+  void aProviderOnlyAccountCanChangeItsEmailRightAfterSigningIn() throws Exception {
+    final UUID organizationId = organizationWithGitHub();
+    CURRENT_STUB_USER.set(new StubGitHubUser(990999, "no-password", "provider-only@example.test"));
+    final SessionClient browser = new SessionClient();
+    assertThat(completeGitHubLogin(browser, organizationId)).endsWith("login?authenticated");
+    final String page = browser.get(baseUri("/o/" + organizationId + "/account/email")).body();
+
+    final HttpResponse<String> requested =
+        browser.postForm(
+            baseUri("/o/" + organizationId + "/account/email"),
+            "_csrf=" + csrfOf(page) + "&newEmail=moved-provider@example.test&currentPassword=");
+
+    assertThat(requested.statusCode())
+        .as("body: %s", requested.body().replaceAll("(?s)<head>.*?</head>", ""))
+        .isEqualTo(302);
+    assertThat(requested.headers().firstValue("Location").orElseThrow())
+        .contains("emailChangeRequested");
+    verify(mailSender)
+        .sendEmailChangeVerification(eq("moved-provider@example.test"), any(), anyString());
+  }
+
+  private UUID organizationWithGitHub() throws IOException, InterruptedException {
+    final String platformToken =
+        requestPlatformAccessToken(
+            "platform:organizations:write platform:social-login-policy:write");
+    final UUID organizationId = createOrganization(platformToken, "Connect Co");
+    enableGitHubSocialLogin(platformToken, organizationId);
+    return organizationId;
+  }
+
+  private void signIn(
+      final SessionClient browser,
+      final UUID organizationId,
+      final String email,
+      final String password)
+      throws IOException, InterruptedException {
+    final HttpResponse<String> form = browser.get(baseUri("/o/" + organizationId + "/login"));
+    final HttpResponse<String> submitted =
+        browser.postForm(
+            baseUri("/o/" + organizationId + "/login"),
+            "_csrf="
+                + csrfOf(form.body())
+                + "&email="
+                + urlEncode(email)
+                + "&password="
+                + urlEncode(password));
+    assertThat(submitted.statusCode()).as("sign-in redirects on success").isEqualTo(302);
+  }
+
+  /** The POST on the Connected accounts page, the hop to the provider and its callback. */
+  private String connectGitHub(final SessionClient browser, final UUID organizationId)
+      throws IOException, InterruptedException {
+    final String page =
+        browser.get(baseUri("/o/" + organizationId + "/account/connections")).body();
+    final HttpResponse<String> connect =
+        browser.postForm(
+            baseUri("/o/" + organizationId + "/account/connections/github/connect"),
+            "_csrf=" + csrfOf(page));
+    assertThat(connect.statusCode()).isEqualTo(302);
+    final String authorization = connect.headers().firstValue("Location").orElseThrow();
+    assertThat(authorization).contains("/oauth2/authorization/github");
+    final HttpResponse<String> toProvider = browser.get(URI.create(authorization));
+    final String state =
+        queryParam(toProvider.headers().firstValue("Location").orElseThrow(), "state");
+    return finishGitHubLogin(browser, state);
+  }
+
+  private static String csrfOf(final String html) {
+    final Matcher matcher = Pattern.compile("name=\"_csrf\" value=\"([^\"]+)\"").matcher(html);
+    assertThat(matcher.find()).as("page must render a _csrf hidden input").isTrue();
+    return matcher.group(1);
+  }
+
   /**
    * Walks the entire redirect chain for one GitHub sign-in attempt on the given {@code client}'s
    * own session, returning the final redirect target's path.
@@ -577,6 +722,16 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
 
     HttpResponse<String> get(final URI uri) throws IOException, InterruptedException {
       final HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
+      return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    HttpResponse<String> postForm(final URI uri, final String body)
+        throws IOException, InterruptedException {
+      final HttpRequest request =
+          HttpRequest.newBuilder(uri)
+              .header("Content-Type", "application/x-www-form-urlencoded")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
       return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 

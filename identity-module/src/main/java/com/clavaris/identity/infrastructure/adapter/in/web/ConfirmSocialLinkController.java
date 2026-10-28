@@ -5,8 +5,10 @@ import com.clavaris.identity.application.usecase.confirmpendingsociallink.Confir
 import com.clavaris.identity.application.usecase.confirmpendingsociallink.InvalidPendingSocialLinkException;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -30,7 +32,19 @@ public class ConfirmSocialLinkController {
 
   // Success vs. invalid-token each need their own exit — same rationale as
   // VerifyEmailController's own identical suppression.
+  // A GET must not change anything (TD-SEC-073): see VerifyEmailController. The link lands on a
+  // page that asks for a click; only the POST links the provider.
   @GetMapping
+  public String confirmPage(
+      @PathVariable final UUID organizationId,
+      @RequestParam final String token,
+      final Model model) {
+    model.addAttribute("organizationId", organizationId);
+    model.addAttribute("token", token);
+    return "identity/social-link-confirm";
+  }
+
+  @PostMapping
   public String confirm(@PathVariable final UUID organizationId, @RequestParam final String token) {
     try {
       useCase.handle(new ConfirmPendingSocialLinkCommand(token));

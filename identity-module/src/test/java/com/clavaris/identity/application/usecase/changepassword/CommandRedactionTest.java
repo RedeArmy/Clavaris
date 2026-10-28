@@ -28,7 +28,8 @@ class CommandRedactionTest {
                 "current-secret",
                 "new-secret-value",
                 "sid",
-                AuditActor.account(accountId.value()))
+                AuditActor.account(accountId.value()),
+                true)
             .toString();
 
     assertThat(printed).doesNotContain("current-secret").doesNotContain("new-secret-value");
@@ -41,7 +42,8 @@ class CommandRedactionTest {
                 accountId,
                 "current-secret",
                 new Email("someone@example.com"),
-                AuditActor.account(accountId.value()))
+                AuditActor.account(accountId.value()),
+                true)
             .toString();
 
     assertThat(printed).doesNotContain("current-secret").doesNotContain("someone@example.com");

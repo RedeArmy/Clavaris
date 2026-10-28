@@ -134,6 +134,17 @@ public final class OrganizationRateLimitRules {
             RateLimitIdentifiers::authenticatedAccountId,
             credentialChangePerAccountLimit,
             Duration.ofMinutes(5)),
+        // Connecting starts a redirect to an external provider and disconnecting rewrites the
+        // sign-in methods; neither asks for a password, so they get the same per-Account bound as
+        // the credential changes above instead of being open-ended for a hijacked session.
+        new RateLimitRule(
+            "account-connections:change",
+            HttpMethod.POST,
+            "/o/*/account/connections/**",
+            RateLimitRule.always(),
+            RateLimitIdentifiers::authenticatedAccountId,
+            credentialChangePerAccountLimit,
+            Duration.ofMinutes(5)),
         new RateLimitRule(
             "account-email:change",
             HttpMethod.POST,

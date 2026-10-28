@@ -30,7 +30,15 @@ public final class KnownWebhookEventTypeOptions {
       List.of(
           new EventTypeOption("account.created", "A new Account was registered."),
           new EventTypeOption("account.deleted", "An Account was permanently deleted."),
+          new EventTypeOption(
+              "account.email_changed",
+              "An Account's email address was changed by the End-User, after verifying the new"
+                  + " address (the payload carries both)."),
           new EventTypeOption("account.email_verified", "An Account's email address was verified."),
+          new EventTypeOption(
+              "account.password_changed",
+              "An End-User changed their own password while signed in; their other sessions were"
+                  + " ended."),
           new EventTypeOption(
               "account.profile_updated",
               "An Account's firstName/lastName/username/phoneNumber changed — by the Account"
@@ -57,6 +65,9 @@ public final class KnownWebhookEventTypeOptions {
           new EventTypeOption(
               "social_identity.linked",
               "A social identity (Google, GitHub) was linked to an Account."),
+          new EventTypeOption(
+              "social_identity.unlinked",
+              "A social identity (Google, GitHub) was removed from an Account."),
           new EventTypeOption("workspace.created", "A new Workspace was created."),
           new EventTypeOption("workspace.deleted", "A Workspace was permanently deleted."),
           new EventTypeOption("workspace_membership.added", "A member joined a Workspace."),

@@ -198,6 +198,18 @@ public class SpringSecurityAuthenticatedSessionEstablisher
         fallbackUrl);
   }
 
+  @Override
+  public String restoreSession(
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final UUID accountId,
+      final List<GrantedAuthority> authorities,
+      final String fallbackUrl) {
+    // No device-trust step-up is added: the person already passed whatever the original session
+    // did, and this restores that session rather than starting a new one.
+    return establishWithAuthorities(request, response, accountId, authorities, false, fallbackUrl);
+  }
+
   private String establishWithAuthorities(
       final HttpServletRequest request,
       final HttpServletResponse response,

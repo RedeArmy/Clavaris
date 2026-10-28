@@ -83,6 +83,24 @@ class JpaAccountRepositoryTest {
         .isEqualTo("argon2id$stored-hash");
   }
 
+  // TD-FUT-053: the "generated" mark must survive the round trip, or a social sign-up's random
+  // password would read as one the person chose and be asked for as proof.
+  @Test
+  void aGeneratedPasswordCredentialStaysMarkedGeneratedAcrossTheDatabase() {
+    OrganizationId organizationId = new OrganizationId(UUID.randomUUID());
+    Account generated = Account.register(organizationId, new Email("generated@example.com"));
+    generated.attachGeneratedPasswordCredential("argon2id$random");
+    Account chosen = Account.register(organizationId, new Email("chosen@example.com"));
+    chosen.attachPasswordCredential("argon2id$picked");
+    repository.save(generated);
+    repository.saveCredential(generated);
+    repository.save(chosen);
+    repository.saveCredential(chosen);
+
+    assertThat(repository.findById(generated.id()).orElseThrow().hasUserChosenPassword()).isFalse();
+    assertThat(repository.findById(chosen.id()).orElseThrow().hasUserChosenPassword()).isTrue();
+  }
+
   // TD-PERF-019: RegisterAccountService/AuthenticateWithSocialProviderService#linkBrandNewAccount
   // now call insert(), not save(), for the one case both already know is genuinely new.
   @Test
