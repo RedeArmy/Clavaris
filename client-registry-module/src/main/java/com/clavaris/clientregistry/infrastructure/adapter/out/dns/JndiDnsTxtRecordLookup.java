@@ -38,12 +38,10 @@ import org.springframework.stereotype.Component;
  * {@code try/finally}, closing quietly (a close failure here is never worth failing an otherwise-
  * successful lookup over, and is itself logged rather than silently swallowed).
  */
-// PMD.AtLeastOneConstructor: this class holds no state of its own beyond the static LOG field —
-// same "intentionally empty" precedent GlobalExceptionHandler's own identical suppression
-// documents. PMD.LooseCoupling/ReplaceHashtableWithMap: javax.naming.Context's own constructor
+// PMD.LooseCoupling/ReplaceHashtableWithMap: javax.naming.Context's own constructor
 // requires exactly Hashtable<?, ?>, not Map — a JDK API constraint, not a design choice this class
 // is free to change.
-@SuppressWarnings({"PMD.AtLeastOneConstructor", "PMD.LooseCoupling", "PMD.ReplaceHashtableWithMap"})
+@SuppressWarnings({"PMD.LooseCoupling", "PMD.ReplaceHashtableWithMap"})
 @Component
 class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
 
@@ -52,6 +50,18 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
   private static final String DNS_TIMEOUT_INITIAL_MS = "3000";
 
   private static final String DNS_TIMEOUT_RETRIES = "2";
+
+  // Null means the system's own resolvers (what Spring uses). A test points it at an in-process
+  // server so that no test depends on the health of the real DNS (TD-TEST-010).
+  private final String providerUrl;
+
+  /* package */ JndiDnsTxtRecordLookup() {
+    this(null);
+  }
+
+  /* package */ JndiDnsTxtRecordLookup(final String providerUrl) {
+    this.providerUrl = providerUrl;
+  }
 
   // Two exits (a real result, or an empty list on any failure) is clearer here than forcing a
   // single-return shape onto "succeeded" vs. "failed" — same rationale ClientDomainConfig's own
@@ -64,6 +74,9 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
     env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
     env.put("com.sun.jndi.dns.timeout.initial", DNS_TIMEOUT_INITIAL_MS);
     env.put("com.sun.jndi.dns.timeout.retries", DNS_TIMEOUT_RETRIES);
+    if (providerUrl != null) {
+      env.put("java.naming.provider.url", providerUrl);
+    }
     InitialDirContext context = null;
     try {
       context = new InitialDirContext(env);
