@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.changepassword.ChangePasswordUseCase;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
-import com.clavaris.identity.application.usecase.changepassword.NoPasswordToChangeException;
+import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.domain.model.AccountId;
@@ -41,7 +41,8 @@ class AccountPasswordControllerTest {
     CurrentAccountResolver currentAccount = mock(CurrentAccountResolver.class);
     when(currentAccount.resolve(any())).thenReturn(Optional.of(AccountId.newId()));
     mockMvc =
-        SelfServiceMvc.standalone(new AccountPasswordController(changePassword, currentAccount));
+        SelfServiceMvc.standalone(
+            new AccountPasswordController(changePassword, currentAccount, 10));
   }
 
   private MockHttpServletRequestBuilder submit(final String current, final String confirm) {
@@ -68,14 +69,18 @@ class AccountPasswordControllerTest {
     verify(changePassword).handle(any());
   }
 
+  // Optional on the form since TD-FUT-053 (an Account whose password is the generated one has none
+  // to type); the use case rejects a blank one for an Account that chose a password.
   @Test
-  void aBlankCurrentPasswordIsAFieldErrorAndCallsNothing() throws Exception {
+  void aBlankCurrentPasswordIsLeftToTheUseCaseToJudge() throws Exception {
+    doThrow(new IncorrectCurrentPasswordException()).when(changePassword).handle(any());
+
     mockMvc
         .perform(submit("", "a-brand-new-passphrase-42"))
         .andExpect(status().isOk())
         .andExpect(model().attributeHasFieldErrors("changePasswordForm", "currentPassword"));
 
-    verify(changePassword, never()).handle(any());
+    verify(changePassword).handle(any());
   }
 
   @Test
@@ -112,13 +117,13 @@ class AccountPasswordControllerTest {
   }
 
   @Test
-  void anAccountWithoutAPasswordIsToldSo() throws Exception {
-    doThrow(new NoPasswordToChangeException()).when(changePassword).handle(any());
+  void anAccountWithAGeneratedPasswordAndAnOldSessionIsToldToSignInAgain() throws Exception {
+    doThrow(new RecentSignInRequiredException()).when(changePassword).handle(any());
 
     mockMvc
-        .perform(submit("x", "a-brand-new-passphrase-42"))
+        .perform(submit("", "a-brand-new-passphrase-42"))
         .andExpect(status().isOk())
-        .andExpect(model().attribute("noPassword", true));
+        .andExpect(model().attribute("recentSignInRequired", true));
   }
 
   @Test

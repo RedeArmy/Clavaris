@@ -223,4 +223,34 @@ class SpringSecurityAuthenticatedSessionEstablisherTest {
 
     assertThat(redirectTarget).contains("/o/x/oauth2/authorize");
   }
+
+  // TD-SEC-072: restoring a session adds nothing — no social marker, no new factor — so the claims
+  // a relying party reads are the original session's.
+  @Test
+  void restoreSessionKeepsExactlyTheGivenAuthoritiesAndAddsNone() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    UUID accountId = UUID.randomUUID();
+    java.time.Instant original = java.time.Instant.parse("2026-10-27T10:00:00Z");
+
+    establisher.restoreSession(
+        request,
+        response,
+        accountId,
+        java.util.List.of(
+            org.springframework.security.core.authority.FactorGrantedAuthority.withAuthority(
+                    org.springframework.security.core.authority.FactorGrantedAuthority
+                        .PASSWORD_AUTHORITY)
+                .issuedAt(original)
+                .build(),
+            new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ACCOUNT")),
+        "/o/x/account/connections");
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getName())
+        .isEqualTo(accountId.toString());
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(GrantedAuthority::getAuthority)
+        .containsExactlyInAnyOrder("FACTOR_PASSWORD", "ROLE_ACCOUNT");
+    verify(contextRepository).saveContext(any(), any(), any());
+  }
 }

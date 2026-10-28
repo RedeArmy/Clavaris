@@ -206,16 +206,34 @@ public final class Account {
    * already be hashed (see {@link PasswordCredential#issue}). Throws if one is already attached;
    * password changes go through {@link #resetPasswordCredential}, not this method.
    */
+  public void attachPasswordCredential(final String passwordHash) {
+    attach(PasswordCredential.issue(id, passwordHash));
+  }
+
+  /**
+   * As {@link #attachPasswordCredential}, for a random credential the person never chose and does
+   * not know (a social sign-up, a registration without a password). It keeps "forgot password"
+   * working but is not proof of who is asking (TD-FUT-053).
+   */
+  public void attachGeneratedPasswordCredential(final String passwordHash) {
+    attach(PasswordCredential.issueGenerated(id, passwordHash));
+  }
+
   // PMD.NullAssignment: deliberately clears passwordResetRequiredAt, not an accidental discard.
   @SuppressWarnings("PMD.NullAssignment")
-  public void attachPasswordCredential(final String passwordHash) {
+  private void attach(final PasswordCredential credential) {
     if (this.passwordCredential != null) {
       throw new IllegalStateException(
           "Account " + id.value() + " already has a password credential attached");
     }
-    this.passwordCredential = PasswordCredential.issue(id, passwordHash);
+    this.passwordCredential = credential;
     // Clerk "session tasks" parity: setting a password always clears any pending requirement.
     this.passwordResetRequiredAt = null;
+  }
+
+  /** True if the person chose their password, so it can be asked for as proof (TD-FUT-053). */
+  public boolean hasUserChosenPassword() {
+    return passwordCredential != null && !passwordCredential.generated();
   }
 
   /**

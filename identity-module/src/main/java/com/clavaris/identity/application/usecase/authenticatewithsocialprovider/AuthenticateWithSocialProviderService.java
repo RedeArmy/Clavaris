@@ -261,7 +261,8 @@ public class AuthenticateWithSocialProviderService
             // down — before this fix, a social-only account had no password_credential row at
             // all, so a password-reset attempt would have failed outright (Account.
             // resetPasswordCredential requires one to already exist).
-            account.attachPasswordCredential(hasher.hash(RandomPasswordGenerator.generate()));
+            account.attachGeneratedPasswordCredential(
+                hasher.hash(RandomPasswordGenerator.generate()));
             // Clerk dashboard "Users" tab parity — a brand-new social signup is also its own
             // first sign-in. TD-FUT-019: skipped when gated — there is no session to establish
             // yet, so nothing actually "signed in" for this to record.

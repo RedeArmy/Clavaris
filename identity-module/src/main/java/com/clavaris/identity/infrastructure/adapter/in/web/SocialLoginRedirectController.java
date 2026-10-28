@@ -72,9 +72,17 @@ public class SocialLoginRedirectController {
   /**
    * TD-FUT-043: set by the signed-in "connect a provider" action (never by the sign-in buttons) so
    * the provider callback links the identity to this Account instead of signing anyone in. The
-   * value is the Account's id; the timestamp bounds how long the intent stays usable.
+   * value is the Account's id; the timestamp (epoch milliseconds as a String, see
+   * SocialIdentityLinkCompletion) bounds how long the intent stays usable.
    */
   public static final String LINK_ACCOUNT_ID_SESSION_ATTRIBUTE = "clavaris.socialLink.accountId";
+
+  /**
+   * The factors of the session that started the connect, as {@link SessionFactors#capture} writes
+   * them, so the session restored after the provider round trip is the same session in every way
+   * but its id (TD-SEC-072).
+   */
+  public static final String LINK_FACTORS_SESSION_ATTRIBUTE = "clavaris.socialLink.factors";
 
   public static final String LINK_REQUESTED_AT_SESSION_ATTRIBUTE =
       "clavaris.socialLink.requestedAt";

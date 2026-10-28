@@ -105,7 +105,13 @@ public class RegisterAccountService implements RegisterAccountUseCase {
         pendingApproval
             ? Account.registerPendingApproval(command.organizationId(), command.email())
             : Account.register(command.organizationId(), command.email());
-    account.attachPasswordCredential(hasher.hash(rawPasswordToAttach)); // BR-ID-01/BR-ID-02
+    // BR-ID-01/BR-ID-02. A password the person did not submit is a random one they never see:
+    // stored, so that "forgot password" works, but marked as generated (TD-FUT-053).
+    if (passwordSubmitted(command)) {
+      account.attachPasswordCredential(hasher.hash(rawPasswordToAttach));
+    } else {
+      account.attachGeneratedPasswordCredential(hasher.hash(rawPasswordToAttach));
+    }
     if (username != null) {
       account.assignUsername(username);
     }
@@ -189,6 +195,10 @@ public class RegisterAccountService implements RegisterAccountUseCase {
     if (breachedPasswordChecker.isBreached(command.rawPassword())) {
       throw new BreachedPasswordException();
     }
+  }
+
+  private static boolean passwordSubmitted(final RegisterAccountCommand command) {
+    return command.rawPassword() != null && !command.rawPassword().isBlank();
   }
 
   private String resolveRawPassword(

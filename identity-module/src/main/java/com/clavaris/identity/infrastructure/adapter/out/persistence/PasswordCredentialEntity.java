@@ -18,17 +18,29 @@ public class PasswordCredentialEntity extends AbstractPasswordCredentialEntity {
   @Column(name = "account_id", nullable = false)
   private UUID accountId;
 
+  @Column(nullable = false)
+  private boolean generated;
+
   protected PasswordCredentialEntity() {
     super();
   }
 
   public PasswordCredentialEntity(
-      final UUID id, final UUID accountId, final String passwordHash, final Instant updatedAt) {
+      final UUID id,
+      final UUID accountId,
+      final String passwordHash,
+      final Instant updatedAt,
+      final boolean generated) {
     super(id, passwordHash, updatedAt);
     this.accountId = accountId;
+    this.generated = generated;
   }
 
   public UUID getAccountId() {
     return accountId;
+  }
+
+  public boolean isGenerated() {
+    return generated;
   }
 }

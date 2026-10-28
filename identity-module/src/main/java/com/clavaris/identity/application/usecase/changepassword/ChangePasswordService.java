@@ -9,16 +9,18 @@ import com.clavaris.identity.application.usecase.listactivesessionsforaccount.Ac
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
+import com.clavaris.identity.domain.event.AccountPasswordChangedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.PasswordCredential;
 import com.clavaris.identity.domain.service.PasswordPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 /**
  * TD-FUT-043: an End-User changes their own password without the forgot-password round trip.
@@ -34,6 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>A confirmation is sent to the address of record, so a change made through a hijacked session
  * is visible to the real owner. A failure to send it never undoes the change.
+ *
+ * <p>Only the writes run inside a database transaction. The Argon2 check (which may wait on its
+ * concurrency gate), the breach lookup (an outbound HTTP call), the new hash and the notice mail
+ * all happen outside it, so a pooled connection is never held while waiting on any of them — the
+ * discipline TD-PERF-031 set for registration. The account is read before and written inside the
+ * transaction with its version, so a change made in between fails loudly instead of being
+ * overwritten.
  */
 public class ChangePasswordService implements ChangePasswordUseCase {
 
@@ -47,8 +56,10 @@ public class ChangePasswordService implements ChangePasswordUseCase {
   private final RefreshTokenRepository refreshTokens;
   private final AccountTokenRevoker accountTokenRevoker;
   private final AccountActiveSessionsRepository activeSessions;
+  private final EventOutboxWriter outbox;
   private final AuditEventRecorder auditEvents;
   private final MailSender mailSender;
+  private final TransactionOperations transaction;
 
   @SuppressWarnings({
     "java:S107",
@@ -63,8 +74,10 @@ public class ChangePasswordService implements ChangePasswordUseCase {
       final RefreshTokenRepository refreshTokens,
       final AccountTokenRevoker accountTokenRevoker,
       final AccountActiveSessionsRepository activeSessions,
+      final EventOutboxWriter outbox,
       final AuditEventRecorder auditEvents,
-      final MailSender mailSender) {
+      final MailSender mailSender,
+      final TransactionOperations transaction) {
     this.accounts = accounts;
     this.verifier = verifier;
     this.hasher = hasher;
@@ -73,27 +86,21 @@ public class ChangePasswordService implements ChangePasswordUseCase {
     this.refreshTokens = refreshTokens;
     this.accountTokenRevoker = accountTokenRevoker;
     this.activeSessions = activeSessions;
+    this.outbox = outbox;
     this.auditEvents = auditEvents;
     this.mailSender = mailSender;
+    this.transaction = transaction;
   }
 
   @Override
-  @Transactional
   public void handle(final ChangePasswordCommand command) {
     final Account account =
         accounts
             .findById(command.accountId())
             .orElseThrow(() -> new IllegalStateException("Signed-in account no longer exists"));
-    final PasswordCredential credential =
-        account.passwordCredential().orElseThrow(NoPasswordToChangeException::new);
-
     // The proof of who is asking. Checked first, so a wrong current password reveals nothing about
     // whether the new one would have been acceptable.
-    if (!verifier.matches(command.currentRawPassword(), credential.passwordHash())) {
-      LOG.warn(
-          "event=password_change_rejected reason=incorrect_current accountId={}", account.id());
-      throw new IncorrectCurrentPasswordException();
-    }
+    proveWhoIsAsking(account, command);
     // Validated before any mutation, as ConfirmPasswordResetService does.
     if (!PasswordPolicy.isSatisfiedBy(command.newRawPassword())) {
       throw new WeakPasswordException();
@@ -102,7 +109,35 @@ public class ChangePasswordService implements ChangePasswordUseCase {
       throw new BreachedPasswordException();
     }
 
-    account.resetPasswordCredential(hasher.hash(command.newRawPassword()));
+    final String newHash = hasher.hash(command.newRawPassword());
+    transaction.executeWithoutResult(status -> apply(account, newHash, command));
+    notifyOwner(account);
+  }
+
+  // A password the person chose is the proof. An Account whose only credential is the random one
+  // generated at a social sign-up (or has none) has no password to type, so a sign-in made moments
+  // ago is the proof instead, and the new password becomes the first one they actually know
+  // (TD-FUT-053).
+  private void proveWhoIsAsking(final Account account, final ChangePasswordCommand command) {
+    if (account.hasUserChosenPassword()) {
+      final PasswordCredential credential = account.passwordCredential().orElseThrow();
+      if (!verifier.matches(command.currentRawPassword(), credential.passwordHash())) {
+        LOG.warn(
+            "event=password_change_rejected reason=incorrect_current accountId={}", account.id());
+        throw new IncorrectCurrentPasswordException();
+      }
+    } else if (!command.recentlySignedIn()) {
+      throw new RecentSignInRequiredException();
+    }
+  }
+
+  private void apply(
+      final Account account, final String newHash, final ChangePasswordCommand command) {
+    if (account.passwordCredential().isPresent()) {
+      account.resetPasswordCredential(newHash);
+    } else {
+      account.attachPasswordCredential(newHash);
+    }
     accounts.save(account);
     accounts.saveCredential(account);
 
@@ -116,6 +151,11 @@ public class ChangePasswordService implements ChangePasswordUseCase {
       }
     }
 
+    outbox.write(
+        "account.password_changed",
+        account.id(),
+        account.organizationId(),
+        AccountPasswordChangedEvent.from(account));
     auditEvents.write(
         command.actor(),
         "account.password_changed",
@@ -124,7 +164,6 @@ public class ChangePasswordService implements ChangePasswordUseCase {
         null,
         account.organizationId().value());
     LOG.info("event=password_changed accountId={}", account.id());
-    notifyOwner(account);
   }
 
   // The owner finding out is the point of the notice; not being able to tell them must not undo a

@@ -2,6 +2,7 @@ package com.clavaris.identity.application.usecase.disconnectsocialidentity;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +12,7 @@ import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
@@ -29,6 +31,7 @@ class DisconnectSocialIdentityServiceTest {
 
   private AccountRepository accounts;
   private SocialIdentityRepository identities;
+  private EventOutboxWriter outbox;
   private WebAuthnCredentialRepository passkeys;
   private DisconnectSocialIdentityService service;
   private Account account;
@@ -37,10 +40,11 @@ class DisconnectSocialIdentityServiceTest {
   void setUp() {
     accounts = mock(AccountRepository.class);
     identities = mock(SocialIdentityRepository.class);
+    outbox = mock(EventOutboxWriter.class);
     passkeys = mock(WebAuthnCredentialRepository.class);
     service =
         new DisconnectSocialIdentityService(
-            accounts, identities, passkeys, mock(AuditEventRecorder.class));
+            accounts, identities, passkeys, outbox, mock(AuditEventRecorder.class));
     account = Account.register(organizationId, new Email("holder@example.com"));
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
     when(passkeys.findAllByAccountId(account.id())).thenReturn(List.of());
@@ -64,6 +68,8 @@ class DisconnectSocialIdentityServiceTest {
     service.handle(command(SocialProvider.GITHUB));
 
     verify(identities).deleteByAccountIdAndProvider(account.id(), SocialProvider.GITHUB);
+    verify(outbox)
+        .write(eq("social_identity.unlinked"), eq(account.id()), eq(organizationId), any());
   }
 
   @Test

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -20,6 +21,7 @@ import com.clavaris.identity.application.usecase.listactivesessionsforaccount.Ac
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordChecker;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registeraccount.PasswordHasher;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.application.usecase.requestemailverification.MailSender;
@@ -33,6 +35,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionOperations;
 
 class ChangePasswordServiceTest {
 
@@ -49,6 +52,7 @@ class ChangePasswordServiceTest {
   private RefreshTokenRepository refreshTokens;
   private AccountTokenRevoker tokenRevoker;
   private AccountActiveSessionsRepository activeSessions;
+  private EventOutboxWriter outbox;
   private AuditEventRecorder audit;
   private MailSender mail;
   private ChangePasswordService service;
@@ -64,6 +68,7 @@ class ChangePasswordServiceTest {
     refreshTokens = mock(RefreshTokenRepository.class);
     tokenRevoker = mock(AccountTokenRevoker.class);
     activeSessions = mock(AccountActiveSessionsRepository.class);
+    outbox = mock(EventOutboxWriter.class);
     audit = mock(AuditEventRecorder.class);
     mail = mock(MailSender.class);
     service =
@@ -76,8 +81,10 @@ class ChangePasswordServiceTest {
             refreshTokens,
             tokenRevoker,
             activeSessions,
+            outbox,
             audit,
-            mail);
+            mail,
+            TransactionOperations.withoutTransaction());
     account = Account.register(organizationId, new Email("holder@example.com"));
     account.attachPasswordCredential("argon2id$old");
     when(accounts.findById(account.id())).thenReturn(Optional.of(account));
@@ -88,7 +95,7 @@ class ChangePasswordServiceTest {
 
   private ChangePasswordCommand command(final String current, final String next) {
     return new ChangePasswordCommand(
-        account.id(), current, next, KEEP, AuditActor.account(account.id().value()));
+        account.id(), current, next, KEEP, AuditActor.account(account.id().value()), false);
   }
 
   @Test
@@ -110,6 +117,8 @@ class ChangePasswordServiceTest {
     verify(activeSessions).revoke("other");
     verify(activeSessions, never()).revoke(KEEP);
     verify(mail).sendPasswordChangedNotice("holder@example.com", organizationId);
+    verify(outbox)
+        .write(eq("account.password_changed"), eq(account.id()), eq(organizationId), any());
   }
 
   @Test
@@ -119,6 +128,7 @@ class ChangePasswordServiceTest {
         .isThrownBy(() -> service.handle(attempt));
 
     verify(accounts, never()).save(any());
+    verify(outbox, never()).write(any(), any(), any(), any());
     verify(sessions, never()).revokeAllActiveForAccount(any());
     verify(mail, never()).sendPasswordChangedNotice(any(), any());
   }
@@ -143,16 +153,50 @@ class ChangePasswordServiceTest {
     verify(accounts, never()).save(any());
   }
 
+  // TD-FUT-053: the password stored at a social sign-up is random and unknown to the person, so it
+  // cannot be asked for; a sign-in made moments ago stands in for it.
   @Test
-  void anAccountWithoutAPasswordHasNothingToChange() {
-    final Account socialOnly = Account.register(organizationId, new Email("social@example.com"));
-    when(accounts.findById(socialOnly.id())).thenReturn(Optional.of(socialOnly));
+  void anAccountWithAGeneratedPasswordMaySetItsFirstRealOneRightAfterSigningIn() {
+    final Account social = Account.register(organizationId, new Email("social@example.com"));
+    social.attachGeneratedPasswordCredential("argon2id$random");
+    when(accounts.findById(social.id())).thenReturn(Optional.of(social));
+    when(activeSessions.findAllByAccountId(social.id())).thenReturn(List.of());
 
+    service.handle(
+        new ChangePasswordCommand(
+            social.id(), "", GOOD_NEW, KEEP, AuditActor.account(social.id().value()), true));
+
+    assertThat(social.passwordCredential().orElseThrow().passwordHash()).isEqualTo("argon2id$new");
+    assertThat(social.hasUserChosenPassword()).as("now a password the person knows").isTrue();
+    verify(verifier, never()).matches(any(), any());
+  }
+
+  @Test
+  void anAccountWithAGeneratedPasswordMustSignInAgainWhenItsSessionIsOld() {
+    final Account social = Account.register(organizationId, new Email("social@example.com"));
+    social.attachGeneratedPasswordCredential("argon2id$random");
+    when(accounts.findById(social.id())).thenReturn(Optional.of(social));
     final ChangePasswordCommand attempt =
         new ChangePasswordCommand(
-            socialOnly.id(), "x", GOOD_NEW, KEEP, AuditActor.account(socialOnly.id().value()));
-    assertThatExceptionOfType(NoPasswordToChangeException.class)
+            social.id(), "", GOOD_NEW, KEEP, AuditActor.account(social.id().value()), false);
+
+    assertThatExceptionOfType(RecentSignInRequiredException.class)
         .isThrownBy(() -> service.handle(attempt));
+
+    verify(accounts, never()).save(any());
+  }
+
+  @Test
+  void anAccountWithNoCredentialAtAllGetsItsFirstOne() {
+    final Account bare = Account.register(organizationId, new Email("bare@example.com"));
+    when(accounts.findById(bare.id())).thenReturn(Optional.of(bare));
+    when(activeSessions.findAllByAccountId(bare.id())).thenReturn(List.of());
+
+    service.handle(
+        new ChangePasswordCommand(
+            bare.id(), "", GOOD_NEW, KEEP, AuditActor.account(bare.id().value()), true));
+
+    assertThat(bare.passwordCredential()).isPresent();
   }
 
   @Test

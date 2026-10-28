@@ -1,5 +1,6 @@
 package com.clavaris.identity.application.usecase.requestemailverification;
 
+import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.VerificationToken;
 import java.time.Instant;
 import java.util.Optional;
@@ -46,4 +47,14 @@ public interface VerificationTokenRepository {
    *     treat {@code false} exactly like an invalid token, never silently proceed as if it won.
    */
   boolean consumeIfActive(UUID tokenId, Instant consumedAt);
+
+  /**
+   * Ends every still-usable token of this Account (password reset, email verification, sign-in code
+   * and link, device-trust challenge). Used when the address they were sent to stops being the
+   * Account's: whoever still reads the old mailbox must not be able to finish a reset that was
+   * started before the change.
+   *
+   * @return how many tokens were ended
+   */
+  int invalidateAllActiveForAccount(AccountId accountId, Instant now);
 }

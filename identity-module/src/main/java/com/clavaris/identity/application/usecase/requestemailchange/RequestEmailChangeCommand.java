@@ -5,7 +5,11 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.Email;
 
 public record RequestEmailChangeCommand(
-    AccountId accountId, String currentRawPassword, Email newEmail, AuditActor actor) {
+    AccountId accountId,
+    String currentRawPassword,
+    Email newEmail,
+    AuditActor actor,
+    boolean recentlySignedIn) {
 
   // The raw password never reaches a log line through a stray toString().
   @Override

@@ -5,7 +5,7 @@ import com.clavaris.identity.application.usecase.authenticatewithpassword.Verifi
 import com.clavaris.identity.application.usecase.changepassword.ChangePasswordCommand;
 import com.clavaris.identity.application.usecase.changepassword.ChangePasswordUseCase;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
-import com.clavaris.identity.application.usecase.changepassword.NoPasswordToChangeException;
+import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
 import com.clavaris.identity.application.usecase.registeraccount.BreachedPasswordException;
 import com.clavaris.identity.application.usecase.registeraccount.WeakPasswordException;
 import com.clavaris.identity.domain.model.AccountId;
@@ -13,7 +13,10 @@ import com.clavaris.identity.domain.service.PasswordPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.time.Duration;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -43,11 +46,15 @@ public class AccountPasswordController {
 
   private final ChangePasswordUseCase changePassword;
   private final CurrentAccountResolver currentAccount;
+  private final Duration recentSignInWindow;
 
   public AccountPasswordController(
-      final ChangePasswordUseCase changePassword, final CurrentAccountResolver currentAccount) {
+      final ChangePasswordUseCase changePassword,
+      final CurrentAccountResolver currentAccount,
+      @Value("${clavaris.self-service.recent-sign-in-minutes:10}") final long recentSignInMinutes) {
     this.changePassword = changePassword;
     this.currentAccount = currentAccount;
+    this.recentSignInWindow = Duration.ofMinutes(recentSignInMinutes);
   }
 
   @GetMapping
@@ -83,9 +90,11 @@ public class AccountPasswordController {
               form.getCurrentPassword(),
               form.getNewPassword(),
               CurrentSessionSupport.currentSessionId(request),
-              AuditActor.account(accountId.value())));
+              AuditActor.account(accountId.value()),
+              SessionFactors.signedInWithin(
+                  SecurityContextHolder.getContext().getAuthentication(), recentSignInWindow)));
     } catch (final IncorrectCurrentPasswordException
-        | NoPasswordToChangeException
+        | RecentSignInRequiredException
         | VerificationOverloadedException failure) {
       CurrentPasswordFailures.apply(failure, bindingResult, model, response);
       return FORM_VIEW;

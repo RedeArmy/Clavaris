@@ -2,7 +2,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 
 import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
 import com.clavaris.identity.application.usecase.changepassword.IncorrectCurrentPasswordException;
-import com.clavaris.identity.application.usecase.changepassword.NoPasswordToChangeException;
+import com.clavaris.identity.application.usecase.changepassword.RecentSignInRequiredException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -28,8 +28,8 @@ final class CurrentPasswordFailures {
     if (failure instanceof IncorrectCurrentPasswordException) {
       bindingResult.rejectValue(
           "currentPassword", "currentPassword.incorrect", "The current password is incorrect");
-    } else if (failure instanceof NoPasswordToChangeException) {
-      model.addAttribute("noPassword", true);
+    } else if (failure instanceof RecentSignInRequiredException) {
+      model.addAttribute("recentSignInRequired", true);
     } else if (failure instanceof VerificationOverloadedException) {
       // The current password was never checked: a 503, not a wrong-password message (TD-FUT-017).
       response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);

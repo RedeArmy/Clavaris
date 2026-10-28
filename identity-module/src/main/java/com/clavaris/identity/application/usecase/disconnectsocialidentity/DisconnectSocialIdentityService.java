@@ -3,7 +3,9 @@ package com.clavaris.identity.application.usecase.disconnectsocialidentity;
 import com.clavaris.common.application.port.AuditEventRecorder;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.SocialIdentityRepository;
 import com.clavaris.identity.application.usecase.registeraccount.AccountRepository;
+import com.clavaris.identity.application.usecase.registeraccount.EventOutboxWriter;
 import com.clavaris.identity.application.usecase.registerwebauthncredential.WebAuthnCredentialRepository;
+import com.clavaris.identity.domain.event.SocialIdentityUnlinkedEvent;
 import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import java.util.List;
@@ -26,16 +28,19 @@ public class DisconnectSocialIdentityService implements DisconnectSocialIdentity
   private final AccountRepository accounts;
   private final SocialIdentityRepository identities;
   private final WebAuthnCredentialRepository passkeys;
+  private final EventOutboxWriter outbox;
   private final AuditEventRecorder auditEvents;
 
   public DisconnectSocialIdentityService(
       final AccountRepository accounts,
       final SocialIdentityRepository identities,
       final WebAuthnCredentialRepository passkeys,
+      final EventOutboxWriter outbox,
       final AuditEventRecorder auditEvents) {
     this.accounts = accounts;
     this.identities = identities;
     this.passkeys = passkeys;
+    this.outbox = outbox;
     this.auditEvents = auditEvents;
   }
 
@@ -58,6 +63,11 @@ public class DisconnectSocialIdentityService implements DisconnectSocialIdentity
       throw new LastSignInMethodException();
     }
     identities.deleteByAccountIdAndProvider(account.id(), command.provider());
+    outbox.write(
+        "social_identity.unlinked",
+        account.id(),
+        account.organizationId(),
+        SocialIdentityUnlinkedEvent.of(account.id(), account.organizationId(), command.provider()));
     auditEvents.write(
         command.actor(),
         "account.social_identity_disconnected",

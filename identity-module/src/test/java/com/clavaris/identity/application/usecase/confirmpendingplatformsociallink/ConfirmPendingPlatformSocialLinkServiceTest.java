@@ -3,6 +3,7 @@ package com.clavaris.identity.application.usecase.confirmpendingplatformsocialli
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,6 +39,8 @@ class ConfirmPendingPlatformSocialLinkServiceTest {
     socialIdentities = mock(PlatformSocialIdentityRepository.class);
     accounts = mock(PlatformAccountRepository.class);
     service = new ConfirmPendingPlatformSocialLinkService(pendingLinks, socialIdentities, accounts);
+    // Default: this call wins the conditional-consume race; the lost-race test overrides it.
+    when(pendingLinks.consumeIfActive(any(), any())).thenReturn(true);
   }
 
   @Test
@@ -59,9 +62,8 @@ class ConfirmPendingPlatformSocialLinkServiceTest {
         service.handle(new ConfirmPendingPlatformSocialLinkCommand(rawToken));
 
     assertThat(platformAccountId).isEqualTo(account.id());
-    assertThat(pendingLink.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
-    verify(pendingLinks).save(pendingLink);
+    verify(pendingLinks).consumeIfActive(eq(pendingLink.id()), any());
     verify(socialIdentities).save(any(PlatformSocialIdentity.class));
     verify(accounts).save(account);
   }
@@ -144,6 +146,30 @@ class ConfirmPendingPlatformSocialLinkServiceTest {
             Instant.now().minusSeconds(1));
     when(pendingLinks.findByConfirmationTokenHash(RefreshTokenSecret.hash(rawToken)))
         .thenReturn(Optional.of(pendingLink));
+    ConfirmPendingPlatformSocialLinkCommand command =
+        new ConfirmPendingPlatformSocialLinkCommand(rawToken);
+
+    assertThatExceptionOfType(InvalidPendingPlatformSocialLinkException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    verify(socialIdentities, never()).save(any());
+  }
+
+  // Two simultaneous clicks on one link both read it as active; only one wins the conditional
+  // consume, and the loser must be refused before anything is linked.
+  @Test
+  void aLinkConsumedByAConcurrentConfirmationIsRefusedBeforeAnythingIsLinked() {
+    String rawToken = "raced-token";
+    PendingPlatformSocialLink pendingLink =
+        PendingPlatformSocialLink.raise(
+            PlatformAccountId.newId(),
+            SocialProvider.GOOGLE,
+            "google-sub-raced",
+            RefreshTokenSecret.hash(rawToken),
+            Instant.now().plusSeconds(3600));
+    when(pendingLinks.findByConfirmationTokenHash(RefreshTokenSecret.hash(rawToken)))
+        .thenReturn(Optional.of(pendingLink));
+    when(pendingLinks.consumeIfActive(any(), any())).thenReturn(false);
     ConfirmPendingPlatformSocialLinkCommand command =
         new ConfirmPendingPlatformSocialLinkCommand(rawToken);
 

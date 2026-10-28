@@ -4,7 +4,9 @@ import com.clavaris.identity.application.usecase.authenticateplatformaccountwith
 import com.clavaris.identity.domain.model.PendingPlatformSocialLink;
 import com.clavaris.identity.domain.model.PlatformAccountId;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -52,5 +54,10 @@ class JpaPendingPlatformSocialLinkRepository implements PendingPlatformSocialLin
         entity.getConfirmationTokenHash(),
         entity.getExpiresAt(),
         entity.getConsumedAt());
+  }
+
+  @Override
+  public boolean consumeIfActive(final UUID linkId, final Instant consumedAt) {
+    return pendingLinks.consumeIfActive(linkId, consumedAt) > 0;
   }
 }

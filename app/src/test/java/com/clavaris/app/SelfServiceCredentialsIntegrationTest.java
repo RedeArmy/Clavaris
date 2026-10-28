@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -21,8 +22,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -47,7 +51,9 @@ import tools.jackson.databind.ObjectMapper;
 @TestPropertySource(
     properties = {
       "PLATFORM_BOOTSTRAP_CLIENT_ID=test-platform-client",
-      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret"
+      "PLATFORM_BOOTSTRAP_CLIENT_SECRET=a-test-platform-secret",
+      "clavaris.security-txt.contact=mailto:security@example.test",
+      "clavaris.security-txt.expires=2099-01-01T00:00:00Z"
     })
 class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
 
@@ -66,6 +72,44 @@ class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
   @Autowired private MailSender mailSender;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+
+  // True if any mail went out while a database transaction was open on the sending thread.
+  private final AtomicBoolean mailSentInsideTransaction = new AtomicBoolean();
+
+  // The mail provider is a network call; none of these services may hold a pooled connection while
+  // waiting on it (the TD-PERF-031 discipline), so every send records whether a transaction was
+  // active at that moment.
+  @BeforeEach
+  void watchForMailInsideTransactions() {
+    mailSentInsideTransaction.set(false);
+    doAnswer(
+            invocation -> {
+              if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                mailSentInsideTransaction.set(true);
+              }
+              return null;
+            })
+        .when(mailSender)
+        .sendPasswordChangedNotice(any(), any());
+    doAnswer(
+            invocation -> {
+              if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                mailSentInsideTransaction.set(true);
+              }
+              return null;
+            })
+        .when(mailSender)
+        .sendEmailChangeVerification(any(), any(), any());
+    doAnswer(
+            invocation -> {
+              if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                mailSentInsideTransaction.set(true);
+              }
+              return null;
+            })
+        .when(mailSender)
+        .sendEmailChangeNotice(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+  }
 
   @Test
   void changingThePasswordKeepsThisSessionEndsTheOthersAndSwitchesTheCredential() throws Exception {
@@ -94,6 +138,7 @@ class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
     assertThat(get(here, org, "/account/profile").statusCode()).isEqualTo(200);
     assertThat(get(elsewhere, org, "/account/profile").statusCode()).isEqualTo(302);
     verify(mailSender).sendPasswordChangedNotice(eq(email), any());
+    assertThat(mailSentInsideTransaction).isFalse();
     assertThat(canLogin(org, email, NEW_PASSWORD)).isTrue();
     assertThat(canLogin(org, email, PASSWORD)).isFalse();
   }
@@ -140,16 +185,24 @@ class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
     verify(mailSender).sendEmailChangeVerification(eq(newEmail), any(), token.capture());
     verify(mailSender).sendEmailChangeNotice(eq(email), any(), eq(newEmail), eq(false));
 
-    HttpResponse<String> confirmed =
+    // A mail scanner opening the link must not use it up: the GET only asks for a click.
+    HttpResponse<String> opened =
         get(client, org, "/account/email/confirm?token=" + token.getValue());
+    assertThat(opened.body()).contains("Confirm email change");
+    assertThat(canLogin(org, newEmail, PASSWORD)).as("opening the link changes nothing").isFalse();
+
+    HttpResponse<String> confirmed =
+        post(client, org, "/account/email/confirm", "token=" + token.getValue());
 
     assertThat(confirmed.statusCode()).isEqualTo(200);
     assertThat(confirmed.body()).contains("has been changed");
     assertThat(canLogin(org, newEmail, PASSWORD)).isTrue();
     assertThat(canLogin(org, email, PASSWORD)).isFalse();
     verify(mailSender).sendEmailChangeNotice(eq(email), any(), eq(newEmail), eq(true));
+    assertThat(mailSentInsideTransaction).isFalse();
     // Single use: the same link a second time is refused.
-    assertThat(get(client, org, "/account/email/confirm?token=" + token.getValue()).statusCode())
+    assertThat(
+            post(client, org, "/account/email/confirm", "token=" + token.getValue()).statusCode())
         .isEqualTo(400);
   }
 
@@ -168,7 +221,9 @@ class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
     verify(mailSender)
         .sendEmailChangeVerification(eq("asker-new@example.com"), any(), token.capture());
 
-    assertThat(get(bystander, org, "/account/email/confirm?token=" + token.getValue()).statusCode())
+    assertThat(
+            post(bystander, org, "/account/email/confirm", "token=" + token.getValue())
+                .statusCode())
         .isEqualTo(400);
     assertThat(canLogin(org, "asker@example.com", PASSWORD)).isTrue();
   }
@@ -207,6 +262,126 @@ class SelfServiceCredentialsIntegrationTest extends RedisBackedIntegrationTest {
 
     assertThat(response.statusCode()).isEqualTo(302);
     assertThat(response.headers().firstValue("Location").orElseThrow()).contains("connectError");
+  }
+
+  // BR-ID-04: an address change must not leave a reset started before it usable by whoever still
+  // reads the old mailbox.
+  @Test
+  void aPasswordResetMailedToTheOldAddressStopsWorkingOnceTheEmailChanges() throws Exception {
+    UUID org = createOrganization();
+    String email = "reset-then-move@example.com";
+    String newEmail = "reset-moved@example.com";
+    registerAccount(org, email, PASSWORD);
+    requestPasswordReset(org, email);
+    ArgumentCaptor<String> resetToken = ArgumentCaptor.forClass(String.class);
+    verify(mailSender).sendPasswordReset(eq(email), any(), resetToken.capture());
+    HttpClient client = newSessionBackedClient();
+    login(client, org, email, PASSWORD);
+    post(client, org, "/account/email", "newEmail=" + newEmail + "&currentPassword=" + PASSWORD);
+    ArgumentCaptor<String> emailToken = ArgumentCaptor.forClass(String.class);
+    verify(mailSender).sendEmailChangeVerification(eq(newEmail), any(), emailToken.capture());
+    post(client, org, "/account/email/confirm", "token=" + emailToken.getValue());
+
+    HttpResponse<String> reset =
+        resetPassword(org, resetToken.getValue(), "attacker-chosen-passphrase-9");
+
+    assertThat(reset.statusCode()).as("the old reset link is dead").isNotEqualTo(302);
+    assertThat(canLogin(org, newEmail, PASSWORD)).isTrue();
+  }
+
+  @Test
+  void connectedAccountsActionsAreRateLimitedPerAccount() throws Exception {
+    UUID org = createOrganization();
+    registerAccount(org, "connections-limit@example.com", PASSWORD);
+    HttpClient client = newSessionBackedClient();
+    login(client, org, "connections-limit@example.com", PASSWORD);
+    int limit = 10;
+
+    for (int attempt = 1; attempt <= limit; attempt++) {
+      assertThat(post(client, org, "/account/connections/github/disconnect", "").statusCode())
+          .isEqualTo(302);
+    }
+
+    assertThat(post(client, org, "/account/connections/github/disconnect", "").statusCode())
+        .isEqualTo(429);
+  }
+
+  private void requestPasswordReset(final UUID org, final String email)
+      throws IOException, InterruptedException {
+    HttpClient client = newSessionBackedClient();
+    String csrf = extractCsrfToken(get(client, org, "/forgot-password").body());
+    client.send(
+        HttpRequest.newBuilder(baseUri("/o/" + org + "/forgot-password"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(HttpRequest.BodyPublishers.ofString("_csrf=" + csrf + "&email=" + email))
+            .build(),
+        HttpResponse.BodyHandlers.discarding());
+  }
+
+  private HttpResponse<String> resetPassword(
+      final UUID org, final String token, final String newPassword)
+      throws IOException, InterruptedException {
+    HttpClient client = newSessionBackedClient();
+    String csrf = extractCsrfToken(get(client, org, "/reset-password?token=" + token).body());
+    return client.send(
+        HttpRequest.newBuilder(baseUri("/o/" + org + "/reset-password"))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    "_csrf="
+                        + csrf
+                        + "&token="
+                        + token
+                        + "&newPassword="
+                        + newPassword
+                        + "&confirmPassword="
+                        + newPassword))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  // TD-FUT-050 / TD-TEST-009: served through the real default chain, publicly, without a session.
+  @Test
+  void securityTxtIsServedPubliclyThroughTheRealFilterChains() throws Exception {
+    HttpClient client = newSessionBackedClient();
+
+    HttpResponse<String> response =
+        client.send(
+            HttpRequest.newBuilder(baseUri("/.well-known/security.txt")).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.headers().firstValue("Content-Type").orElseThrow())
+        .startsWith("text/plain");
+    assertThat(response.body())
+        .contains("Contact: mailto:security@example.test")
+        .contains("Expires: 2099-01-01T00:00:00Z")
+        .contains("Canonical: ");
+  }
+
+  // TD-SEC-071: every chain sends the header, the tenant pages, the platform pages, the OIDC
+  // endpoints and the catch-all alike, since tokens travel in the URL of several of them.
+  @Test
+  void everyFilterChainSendsNoReferrer() throws Exception {
+    UUID org = createOrganization();
+    HttpClient client = newSessionBackedClient();
+
+    for (String path :
+        new String[] {
+          "/o/" + org + "/login",
+          "/o/" + org + "/oauth2/jwks",
+          "/o/" + org + "/.well-known/openid-configuration",
+          "/platform/login",
+          "/"
+        }) {
+      HttpResponse<String> response =
+          client.send(
+              HttpRequest.newBuilder(baseUri(path)).GET().build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertThat(response.headers().firstValue("Referrer-Policy"))
+          .as("Referrer-Policy on " + path)
+          .hasValue("no-referrer");
+    }
   }
 
   private boolean canLogin(final UUID org, final String email, final String password)

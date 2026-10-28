@@ -7,6 +7,13 @@
 <main>
     <div class="clavaris-card">
         <h1>Change email</h1>
+        <form th:if="${pendingToken}" method="post"
+              th:action="@{/o/{organizationId}/account/email/confirm(organizationId=${organizationId})}">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="hidden" name="token" th:value="${pendingToken}"/>
+            <p>Confirm that you want to change your email address to the one this link was sent to.</p>
+            <button class="clavaris-button" type="submit">Confirm email change</button>
+        </form>
         <output class="clavaris-alert clavaris-alert--success" th:if="${confirmed}">
             Your email address has been changed and verified.
         </output>

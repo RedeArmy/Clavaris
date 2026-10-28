@@ -3,7 +3,9 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
 import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.security.core.GrantedAuthority;
 
 /**
  * Outbound port — implemented in {@code app}, using real Spring Security machinery ({@code
@@ -87,5 +89,19 @@ public interface AuthenticatedSessionEstablisher {
       HttpServletResponse response,
       UUID accountId,
       boolean deviceTrustVerified,
+      String fallbackUrl);
+
+  /**
+   * TD-SEC-072: re-establishes an Account's session with exactly the authorities (factors and
+   * authentication times) it had before something replaced its security context — the connect-a-
+   * provider round trip. Not a new sign-in: nothing is added, so the {@code amr} and authentication
+   * time a relying party sees are the original ones. {@code authorities} comes from {@link
+   * SessionFactors#restore}.
+   */
+  String restoreSession(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      UUID accountId,
+      List<GrantedAuthority> authorities,
       String fallbackUrl);
 }

@@ -96,6 +96,9 @@ class AccountConnectionsControllerTest {
     assertThat(
             session.getAttribute(SocialLoginRedirectController.ORGANIZATION_ID_SESSION_ATTRIBUTE))
         .isEqualTo(ORG.toString());
+    assertThat(session.getAttribute(SocialLoginRedirectController.LINK_FACTORS_SESSION_ATTRIBUTE))
+        .as("the factors of the session that asked, kept for the restore (TD-SEC-072)")
+        .isInstanceOf(java.util.List.class);
   }
 
   @Test
@@ -142,5 +145,28 @@ class AccountConnectionsControllerTest {
     mockMvc
         .perform(post(URL + "/myspace/disconnect"))
         .andExpect(redirectedUrl(URL + "?connectError"));
+  }
+
+  // The sessions are allow-listed JSON (TD-ARCH-039): a type of ours is written without a type id
+  // and cannot be read back, so a connect that stored an Instant looked like a plain sign-in when
+  // the provider called back. Only Strings, and lists of Strings, survive.
+  @Test
+  void everythingTheConnectKeepsInTheSessionSurvivesJsonSessions() throws Exception {
+    when(policy.isProviderAllowed(new OrganizationId(ORG), SocialProvider.GITHUB)).thenReturn(true);
+    MockHttpSession session = new MockHttpSession();
+
+    mockMvc.perform(post(URL + "/github/connect").session(session));
+
+    for (String name : java.util.Collections.list(session.getAttributeNames())) {
+      Object value = session.getAttribute(name);
+      assertThat(value)
+          .as("session attribute " + name)
+          .satisfiesAnyOf(
+              v -> assertThat(v).isInstanceOf(String.class),
+              v ->
+                  assertThat(v)
+                      .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                      .allMatch(String.class::isInstance));
+    }
   }
 }
