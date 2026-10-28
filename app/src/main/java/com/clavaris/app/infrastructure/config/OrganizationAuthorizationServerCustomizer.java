@@ -10,6 +10,7 @@ import com.clavaris.common.application.port.CpuBoundVerificationGate;
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.RotateRefreshTokenUseCase;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2RefreshTokenAuthenticationProvider;
@@ -31,7 +32,7 @@ final class OrganizationAuthorizationServerCustomizer
   private final AuthorizationServerSettings settings;
   private final OAuth2AuthorizationService authorizationService;
   private final OAuth2AuthorizationConsentService consentService;
-  private final OAuth2TokenGenerator<?> tokenGenerator;
+  private final OAuth2TokenGenerator<OAuth2Token> tokenGenerator;
   private final RotateRefreshTokenUseCase rotateRefreshToken;
   private final TokenRevocationEventLogger tokenRevocationLogger;
   private final CpuBoundVerificationGate argon2BulkheadGate;
@@ -43,7 +44,7 @@ final class OrganizationAuthorizationServerCustomizer
       final AuthorizationServerSettings settings,
       final OAuth2AuthorizationService authorizationService,
       final OAuth2AuthorizationConsentService consentService,
-      final OAuth2TokenGenerator<?> tokenGenerator,
+      final OAuth2TokenGenerator<OAuth2Token> tokenGenerator,
       final RotateRefreshTokenUseCase rotateRefreshToken,
       final TokenRevocationEventLogger tokenRevocationLogger,
       final CpuBoundVerificationGate argon2BulkheadGate) {

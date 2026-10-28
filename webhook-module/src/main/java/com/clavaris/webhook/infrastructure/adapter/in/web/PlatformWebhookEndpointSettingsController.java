@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints")
 public class PlatformWebhookEndpointSettingsController {
 
+  private static final String ENDPOINT_ATTRIBUTE = "endpoint";
   private static final String DETAIL_VIEW = "webhook/platform/organization-webhook-endpoint-detail";
 
   private final GetWebhookEndpointForOrganizationUseCase getEndpoint;
@@ -89,7 +90,7 @@ public class PlatformWebhookEndpointSettingsController {
       WebhookDashboardControllerSupport.populateHeaderModel(
           model, organizationId, organizationName);
       model.addAttribute(
-          "endpoint",
+          ENDPOINT_ATTRIBUTE,
           WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
               getEndpoint, organizationId, endpointId));
       model.addAttribute("unsafeWebhookUrlError", true);
@@ -97,7 +98,7 @@ public class PlatformWebhookEndpointSettingsController {
     }
 
     WebhookDashboardControllerSupport.populateHeaderModel(model, organizationId, organizationName);
-    model.addAttribute("endpoint", updated);
+    model.addAttribute(ENDPOINT_ATTRIBUTE, updated);
     return WebhookDashboardControllerSupport.redirectToDetail(organizationId, endpointId);
   }
 
@@ -146,7 +147,7 @@ public class PlatformWebhookEndpointSettingsController {
       // and the "All events" toggle both left unchecked).
       WebhookDashboardControllerSupport.populateHeaderModel(
           model, organizationId, organizationName);
-      model.addAttribute("endpoint", existing);
+      model.addAttribute(ENDPOINT_ATTRIBUTE, existing);
       model.addAttribute("emptyEventTypesError", true);
       return DETAIL_VIEW;
     }

@@ -1,14 +1,17 @@
 package com.clavaris.common.infrastructure.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import org.awaitility.core.ConditionTimeoutException;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -114,7 +117,7 @@ class NonBlockingIndexMigrationTest {
         statement.execute("SET lock_timeout = '2s'");
         statement.execute(
             "INSERT INTO hot_events (organization_id) VALUES ('" + UUID.randomUUID() + "')");
-      } catch (final SQLException e) {
+      } catch (final SQLException _) {
         writerGotThrough = false; // lock_timeout: it queued behind the build
       }
       openWriter.commit();
@@ -123,19 +126,23 @@ class NonBlockingIndexMigrationTest {
     }
   }
 
-  private void awaitBuildWaitingForTheLock() throws InterruptedException {
-    for (int attempt = 0; attempt < 100; attempt++) {
-      final Integer waiting =
-          jdbc.queryForObject(
-              "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
-                  + " AND query ILIKE 'CREATE INDEX%'",
-              Integer.class);
-      if (waiting != null && waiting > 0) {
-        return;
-      }
-      Thread.sleep(100);
+  private void awaitBuildWaitingForTheLock() {
+    try {
+      await()
+          .atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(100))
+          .until(
+              () -> {
+                final Integer waiting =
+                    jdbc.queryForObject(
+                        "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+                            + " AND query ILIKE 'CREATE INDEX%'",
+                        Integer.class);
+                return waiting != null && waiting > 0;
+              });
+    } catch (final ConditionTimeoutException _) {
+      throw new AssertionError("the index build never started waiting for the open writer");
     }
-    throw new AssertionError("the index build never started waiting for the open writer");
   }
 
   @Test

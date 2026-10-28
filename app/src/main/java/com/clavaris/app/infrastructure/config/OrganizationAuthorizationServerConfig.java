@@ -40,6 +40,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -308,7 +309,7 @@ public class OrganizationAuthorizationServerConfig {
     // ADR-0016 (acr/amr) + Workspace feature (workspace_id/workspace_role, ID and access tokens
     // alike) + TD-SEC-016 (event=token_issued) + BR-ID-03 (refresh-token fallback) — see
     // buildTokenGenerator's own Javadoc for the full per-claim rationale.
-    final OAuth2TokenGenerator<?> tokenGenerator =
+    final OAuth2TokenGenerator<OAuth2Token> tokenGenerator =
         OrganizationTokenPipeline.buildTokenGenerator(
             jwksAndDecoder.signingJwkSource(),
             tokenIssuanceLogger,

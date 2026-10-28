@@ -82,8 +82,6 @@ public class PlatformWebhookEndpointController {
   private static final String REGISTER_VIEW = "webhook/platform/register-webhook-endpoint";
   private static final String DETAIL_VIEW = "webhook/platform/organization-webhook-endpoint-detail";
   private static final String CREATE_FORM_ATTRIBUTE = "createForm";
-  private static final String ORGANIZATION_ID_ATTRIBUTE = "organizationId";
-  private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
   private static final String ENDPOINT_ATTRIBUTE = "endpoint";
   private static final String JUST_REGISTERED_RAW_SECRET_ATTRIBUTE = "justRegisteredRawSecret";
 

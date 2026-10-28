@@ -22,6 +22,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import java.time.Duration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -80,7 +81,7 @@ final class OrganizationTokenPipeline {
    * (see the call site's own Javadoc for why they can't be set as separate calls), and BR-ID-03's
    * refresh-token fallback wired via {@link DelegatingOAuth2TokenGenerator}.
    */
-  /* package */ static OAuth2TokenGenerator<?> buildTokenGenerator(
+  /* package */ static OAuth2TokenGenerator<OAuth2Token> buildTokenGenerator(
       final JWKSource<SecurityContext> signingJwkSource,
       final OAuth2TokenCustomizer<JwtEncodingContext> tokenIssuanceLogger,
       final WorkspaceRoleClaimsCustomizer workspaceRoleClaims,
