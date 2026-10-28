@@ -19,16 +19,9 @@ import com.clavaris.webhook.application.usecase.registerwebhookendpoint.WebhookE
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretCommand;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretResult;
 import com.clavaris.webhook.application.usecase.rotatewebhookendpointsecret.RotateWebhookEndpointSecretUseCase;
-import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionCommand;
-import com.clavaris.webhook.application.usecase.updatewebhookendpointdescription.UpdateWebhookEndpointDescriptionUseCase;
-import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesCommand;
-import com.clavaris.webhook.application.usecase.updatewebhookendpointeventtypes.UpdateWebhookEndpointEventTypesUseCase;
-import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlCommand;
-import com.clavaris.webhook.application.usecase.updatewebhookendpointurl.UpdateWebhookEndpointUrlUseCase;
 import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -76,15 +69,10 @@ import org.springframework.web.server.ResponseStatusException;
  * redirect, and an SSRF-rejected URL needs its form re-displayed with the value the owner just
  * typed, not lost to a fresh GET.
  */
-// PMD.ExcessiveImports/PMD.CouplingBetweenObjects: every import/collaborator here backs a real,
+// PMD.ExcessiveImports: every import here backs a real,
 // distinct use case or form object this controller genuinely needs — same "wiring, not sprawl"
 // reasoning this codebase's own comparable controllers already document.
-@SuppressWarnings({
-  "PMD.LongVariable",
-  "PMD.ExcessiveImports",
-  "PMD.CouplingBetweenObjects",
-  "PMD.TooManyMethods"
-})
+@SuppressWarnings({"PMD.LongVariable", "PMD.ExcessiveImports"})
 @Controller
 @RequestMapping("/platform/dashboard/organizations/{organizationId}/webhook-endpoints")
 public class PlatformWebhookEndpointController {
@@ -105,17 +93,13 @@ public class PlatformWebhookEndpointController {
   private final DeactivateWebhookEndpointUseCase deactivateEndpoint;
   private final ActivateWebhookEndpointUseCase activateEndpoint;
   private final RotateWebhookEndpointSecretUseCase rotateEndpointSecret;
-  private final UpdateWebhookEndpointUrlUseCase updateEndpointUrl;
-  private final UpdateWebhookEndpointDescriptionUseCase updateEndpointDescription;
-  private final UpdateWebhookEndpointEventTypesUseCase updateEndpointEventTypes;
   private final OrganizationForPlatformAccountResolver organizationResolver;
   private final CurrentPlatformAccountResolver currentPlatformAccount;
 
-  // java:S107/PMD.ExcessiveParameterList: one parameter per collaborating port — same rationale
-  // as every other multi-collaborator constructor in this codebase. The three update-* use cases
-  // added by this class's own live UX request, 2026-09-25 pushed the count from 8 to 11, past
-  // PMD's own default threshold of 10.
-  @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
+  // java:S107: one parameter per collaborating port — same rationale as every other
+  // multi-collaborator constructor in this codebase. The three update-* use cases live in
+  // PlatformWebhookEndpointSettingsController since TD-ARCH-042.
+  @SuppressWarnings("java:S107")
   public PlatformWebhookEndpointController(
       final RegisterWebhookEndpointUseCase registerEndpoint,
       final GetWebhookEndpointForOrganizationUseCase getEndpoint,
@@ -123,9 +107,6 @@ public class PlatformWebhookEndpointController {
       final DeactivateWebhookEndpointUseCase deactivateEndpoint,
       final ActivateWebhookEndpointUseCase activateEndpoint,
       final RotateWebhookEndpointSecretUseCase rotateEndpointSecret,
-      final UpdateWebhookEndpointUrlUseCase updateEndpointUrl,
-      final UpdateWebhookEndpointDescriptionUseCase updateEndpointDescription,
-      final UpdateWebhookEndpointEventTypesUseCase updateEndpointEventTypes,
       final OrganizationForPlatformAccountResolver organizationResolver,
       final CurrentPlatformAccountResolver currentPlatformAccount) {
     this.registerEndpoint = registerEndpoint;
@@ -134,9 +115,6 @@ public class PlatformWebhookEndpointController {
     this.deactivateEndpoint = deactivateEndpoint;
     this.activateEndpoint = activateEndpoint;
     this.rotateEndpointSecret = rotateEndpointSecret;
-    this.updateEndpointUrl = updateEndpointUrl;
-    this.updateEndpointDescription = updateEndpointDescription;
-    this.updateEndpointEventTypes = updateEndpointEventTypes;
     this.organizationResolver = organizationResolver;
     this.currentPlatformAccount = currentPlatformAccount;
   }
@@ -158,7 +136,7 @@ public class PlatformWebhookEndpointController {
     final String organizationName =
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
-    populateHeaderModel(model, organizationId, organizationName);
+    WebhookDashboardControllerSupport.populateHeaderModel(model, organizationId, organizationName);
     populateEndpointsModel(model, organizationId, KeysetPageRequest.fromCursors(after, before));
     if (WebhookDashboardControllerSupport.isHtmxRequest(request)) {
       return ENDPOINTS_FRAGMENT;
@@ -177,7 +155,7 @@ public class PlatformWebhookEndpointController {
     final String organizationName =
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
-    populateHeaderModel(model, organizationId, organizationName);
+    WebhookDashboardControllerSupport.populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(CREATE_FORM_ATTRIBUTE, new RegisterWebhookEndpointForm());
     return REGISTER_VIEW;
   }
@@ -197,7 +175,7 @@ public class PlatformWebhookEndpointController {
     final WebhookEndpoint endpoint =
         WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
             getEndpoint, organizationId, endpointId);
-    populateHeaderModel(model, organizationId, organizationName);
+    WebhookDashboardControllerSupport.populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(ENDPOINT_ATTRIBUTE, endpoint);
     return DETAIL_VIEW;
   }
@@ -215,7 +193,7 @@ public class PlatformWebhookEndpointController {
     final String organizationName =
         WebhookDashboardControllerSupport.requireOwnedOrganizationName(
             organizationResolver, organizationId, ownerPlatformAccountId);
-    populateHeaderModel(model, organizationId, organizationName);
+    WebhookDashboardControllerSupport.populateHeaderModel(model, organizationId, organizationName);
 
     if (bindingResult.hasErrors()) {
       return REGISTER_VIEW;
@@ -276,7 +254,7 @@ public class PlatformWebhookEndpointController {
         new DeactivateWebhookEndpointCommand(
             endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    return redirectToDetail(organizationId, endpointId);
+    return WebhookDashboardControllerSupport.redirectToDetail(organizationId, endpointId);
   }
 
   @PostMapping("/{endpointId}/activate")
@@ -296,7 +274,7 @@ public class PlatformWebhookEndpointController {
         new ActivateWebhookEndpointCommand(
             endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    return redirectToDetail(organizationId, endpointId);
+    return WebhookDashboardControllerSupport.redirectToDetail(organizationId, endpointId);
   }
 
   // Never returns "redirect:" — see this class's own Javadoc.
@@ -320,119 +298,10 @@ public class PlatformWebhookEndpointController {
             new RotateWebhookEndpointSecretCommand(
                 endpointId, AuditActor.platformAccount(ownerPlatformAccountId)));
 
-    populateHeaderModel(model, organizationId, organizationName);
+    WebhookDashboardControllerSupport.populateHeaderModel(model, organizationId, organizationName);
     model.addAttribute(ENDPOINT_ATTRIBUTE, result.endpoint());
     model.addAttribute(JUST_REGISTERED_RAW_SECRET_ATTRIBUTE, result.rawNewSigningSecret());
     return DETAIL_VIEW;
-  }
-
-  // Never returns "redirect:" on the rejected-URL path — same rationale as create() above: the
-  // value the owner just typed would be lost to a fresh GET.
-  @PostMapping("/{endpointId}/url")
-  public String updateUrl(
-      final HttpServletRequest request,
-      @PathVariable final UUID organizationId,
-      @PathVariable final UUID endpointId,
-      @RequestParam final String url,
-      final Model model) {
-    final UUID ownerPlatformAccountId =
-        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
-            currentPlatformAccount, request);
-    final String organizationName =
-        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
-            organizationResolver, organizationId, ownerPlatformAccountId);
-    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-        getEndpoint, organizationId, endpointId);
-
-    final WebhookEndpoint updated;
-    try {
-      updated =
-          updateEndpointUrl.handle(
-              new UpdateWebhookEndpointUrlCommand(
-                  endpointId, url, AuditActor.platformAccount(ownerPlatformAccountId)));
-    } catch (final UnsafeWebhookUrlException _) {
-      // Same "form error, not a bare status code" reasoning as create()'s own identical catch.
-      populateHeaderModel(model, organizationId, organizationName);
-      model.addAttribute(
-          ENDPOINT_ATTRIBUTE,
-          WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-              getEndpoint, organizationId, endpointId));
-      model.addAttribute("unsafeWebhookUrlError", true);
-      return DETAIL_VIEW;
-    }
-
-    populateHeaderModel(model, organizationId, organizationName);
-    model.addAttribute(ENDPOINT_ATTRIBUTE, updated);
-    return redirectToDetail(organizationId, endpointId);
-  }
-
-  @PostMapping("/{endpointId}/description")
-  public String updateDescription(
-      final HttpServletRequest request,
-      @PathVariable final UUID organizationId,
-      @PathVariable final UUID endpointId,
-      @RequestParam(required = false) final String description) {
-    final UUID ownerPlatformAccountId =
-        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
-            currentPlatformAccount, request);
-    WebhookDashboardControllerSupport.requireOwnedOrganizationName(
-        organizationResolver, organizationId, ownerPlatformAccountId);
-    WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-        getEndpoint, organizationId, endpointId);
-
-    updateEndpointDescription.handle(
-        new UpdateWebhookEndpointDescriptionCommand(
-            endpointId, description, AuditActor.platformAccount(ownerPlatformAccountId)));
-
-    return redirectToDetail(organizationId, endpointId);
-  }
-
-  @PostMapping("/{endpointId}/event-types")
-  public String updateEventTypes(
-      final HttpServletRequest request,
-      @PathVariable final UUID organizationId,
-      @PathVariable final UUID endpointId,
-      @RequestParam(required = false) final List<String> subscribedEventTypes,
-      final Model model) {
-    final UUID ownerPlatformAccountId =
-        WebhookDashboardControllerSupport.requireCurrentPlatformAccount(
-            currentPlatformAccount, request);
-    final String organizationName =
-        WebhookDashboardControllerSupport.requireOwnedOrganizationName(
-            organizationResolver, organizationId, ownerPlatformAccountId);
-    final WebhookEndpoint existing =
-        WebhookDashboardControllerSupport.requireEndpointBelongsToOrganization(
-            getEndpoint, organizationId, endpointId);
-
-    if (subscribedEventTypes == null || subscribedEventTypes.isEmpty()) {
-      // Same "form error, not a bare status code" reasoning as create()'s own identical catch —
-      // WebhookEndpoint#updateEventTypes would otherwise throw IllegalArgumentException
-      // (BR-WEBHOOK-06) for a caller this dashboard form can genuinely produce (every checkbox
-      // and the "All events" toggle both left unchecked).
-      populateHeaderModel(model, organizationId, organizationName);
-      model.addAttribute(ENDPOINT_ATTRIBUTE, existing);
-      model.addAttribute("emptyEventTypesError", true);
-      return DETAIL_VIEW;
-    }
-
-    updateEndpointEventTypes.handle(
-        new UpdateWebhookEndpointEventTypesCommand(
-            endpointId, subscribedEventTypes, AuditActor.platformAccount(ownerPlatformAccountId)));
-
-    return redirectToDetail(organizationId, endpointId);
-  }
-
-  private String redirectToDetail(final UUID organizationId, final UUID endpointId) {
-    return "redirect:/platform/dashboard/organizations/"
-        + organizationId
-        + "/webhook-endpoints/"
-        + endpointId;
-  }
-
-  private void populateHeaderModel(
-      final Model model, final UUID organizationId, final String organizationName) {
-    model.addAttribute(ORGANIZATION_ID_ATTRIBUTE, organizationId);
-    model.addAttribute(ORGANIZATION_NAME_ATTRIBUTE, organizationName);
   }
 
   private void populateEndpointsModel(

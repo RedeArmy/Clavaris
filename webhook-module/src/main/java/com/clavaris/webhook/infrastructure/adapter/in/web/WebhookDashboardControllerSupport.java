@@ -6,6 +6,7 @@ import com.clavaris.webhook.domain.model.WebhookEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.ui.Model;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -69,5 +70,18 @@ final class WebhookDashboardControllerSupport {
     return getEndpoint
         .handle(new GetWebhookEndpointForOrganizationQuery(organizationId, endpointId))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+  }
+
+  /* package */ static String redirectToDetail(final UUID organizationId, final UUID endpointId) {
+    return "redirect:/platform/dashboard/organizations/"
+        + organizationId
+        + "/webhook-endpoints/"
+        + endpointId;
+  }
+
+  /* package */ static void populateHeaderModel(
+      final Model model, final UUID organizationId, final String organizationName) {
+    model.addAttribute("organizationId", organizationId);
+    model.addAttribute("organizationName", organizationName);
   }
 }
