@@ -25,16 +25,9 @@ public class PlatformOAuthClientRedirectUriRowsController {
   private static final String DETAIL_FRAGMENT = DETAIL_VIEW + " :: detail";
   private static final String REDIRECT_SETTINGS_FORM_ATTRIBUTE = "redirectSettingsForm";
 
-  private final OrganizationForPlatformAccountResolver organizationResolver;
-  private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final PlatformOAuthClientSupport support;
 
-  public PlatformOAuthClientRedirectUriRowsController(
-      final OrganizationForPlatformAccountResolver organizationResolver,
-      final CurrentPlatformAccountResolver currentPlatformAccount,
-      final PlatformOAuthClientSupport support) {
-    this.organizationResolver = organizationResolver;
-    this.currentPlatformAccount = currentPlatformAccount;
+  public PlatformOAuthClientRedirectUriRowsController(final PlatformOAuthClientSupport support) {
     this.support = support;
   }
 
@@ -54,8 +47,7 @@ public class PlatformOAuthClientRedirectUriRowsController {
       final UpdateOAuthClientRedirectSettingsForm form,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
     support.populateDetailModel(
         model,
         organizationId,

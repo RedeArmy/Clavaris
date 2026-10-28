@@ -11,6 +11,7 @@ import javax.naming.directory.Attributes;
 import javax.naming.directory.InitialDirContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -55,6 +56,8 @@ class JndiDnsTxtRecordLookup implements DnsTxtRecordLookup {
   // server so that no test depends on the health of the real DNS (TD-TEST-010).
   private final String providerUrl;
 
+  // The constructor Spring uses; the other one exists for tests.
+  @Autowired
   /* package */ JndiDnsTxtRecordLookup() {
     this(null);
   }

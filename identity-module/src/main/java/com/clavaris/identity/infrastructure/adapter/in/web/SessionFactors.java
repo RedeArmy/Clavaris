@@ -94,7 +94,6 @@ public final class SessionFactors {
     final Instant cutoff = Instant.now().minus(window);
     for (final GrantedAuthority authority : authentication.getAuthorities()) {
       if (authority instanceof FactorGrantedAuthority factor
-          && factor.getIssuedAt() != null
           && factor.getIssuedAt().isAfter(cutoff)) {
         return true;
       }

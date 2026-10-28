@@ -22,6 +22,7 @@ import com.clavaris.identity.domain.model.AccountId;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialIdentity;
 import com.clavaris.identity.domain.model.SocialProvider;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +30,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -153,9 +158,25 @@ class AccountConnectionsControllerTest {
   @Test
   void everythingTheConnectKeepsInTheSessionSurvivesJsonSessions() throws Exception {
     when(policy.isProviderAllowed(new OrganizationId(ORG), SocialProvider.GITHUB)).thenReturn(true);
+    // A real signed-in session, so the factors the connect captures are not an empty list that
+    // every "all of them are Strings" assertion would pass vacuously.
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            UsernamePasswordAuthenticationToken.authenticated(
+                accountId.value().toString(),
+                null,
+                List.of(
+                    FactorGrantedAuthority.withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
+                        .issuedAt(Instant.now())
+                        .build(),
+                    new SimpleGrantedAuthority("ROLE_ACCOUNT"))));
     MockHttpSession session = new MockHttpSession();
 
-    mockMvc.perform(post(URL + "/github/connect").session(session));
+    try {
+      mockMvc.perform(post(URL + "/github/connect").session(session));
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
 
     for (String name : java.util.Collections.list(session.getAttributeNames())) {
       Object value = session.getAttribute(name);
@@ -166,6 +187,7 @@ class AccountConnectionsControllerTest {
               v ->
                   assertThat(v)
                       .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)
+                      .isNotEmpty()
                       .allMatch(String.class::isInstance));
     }
   }

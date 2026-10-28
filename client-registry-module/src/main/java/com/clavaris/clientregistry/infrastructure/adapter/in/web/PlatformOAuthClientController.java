@@ -100,8 +100,6 @@ public class PlatformOAuthClientController {
   private final DeactivateOAuthClientUseCase deactivateClient;
   private final ActivateOAuthClientUseCase activateClient;
   private final RotateOAuthClientSecretUseCase rotateClientSecret;
-  private final OrganizationForPlatformAccountResolver organizationResolver;
-  private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final PlatformOAuthClientSupport support;
 
   public PlatformOAuthClientController(
@@ -110,16 +108,12 @@ public class PlatformOAuthClientController {
       final DeactivateOAuthClientUseCase deactivateClient,
       final ActivateOAuthClientUseCase activateClient,
       final RotateOAuthClientSecretUseCase rotateClientSecret,
-      final OrganizationForPlatformAccountResolver organizationResolver,
-      final CurrentPlatformAccountResolver currentPlatformAccount,
       final PlatformOAuthClientSupport support) {
     this.registerClient = registerClient;
     this.listClientsPaged = listClientsPaged;
     this.deactivateClient = deactivateClient;
     this.activateClient = activateClient;
     this.rotateClientSecret = rotateClientSecret;
-    this.organizationResolver = organizationResolver;
-    this.currentPlatformAccount = currentPlatformAccount;
     this.support = support;
   }
 
@@ -146,11 +140,9 @@ public class PlatformOAuthClientController {
       @RequestParam(required = false) final String after,
       @RequestParam(required = false) final String before,
       final Model model) {
-    return DashboardControllerSupport.showPaginatedList(
+    return support.showPaginatedList(
         request,
         organizationId,
-        currentPlatformAccount,
-        organizationResolver,
         KeysetPageRequest.fromCursors(after, before),
         (owned, pageRequest) ->
             renderOAuthClientsList(model, organizationId, owned.organizationName(), pageRequest),
@@ -164,8 +156,7 @@ public class PlatformOAuthClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
     final OAuthClient client = support.requireOwnedClient(organizationId, clientId);
     support.populateDetailModel(model, organizationId, owned.organizationName(), client);
     return DashboardControllerSupport.isHtmxRequest(request) ? DETAIL_FRAGMENT : DETAIL_VIEW;
@@ -179,8 +170,7 @@ public class PlatformOAuthClientController {
       @PathVariable final UUID organizationId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     final RegisterOAuthClientResult result;
     try {
@@ -217,8 +207,7 @@ public class PlatformOAuthClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     try {
       deactivateClient.handle(
@@ -254,8 +243,7 @@ public class PlatformOAuthClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     final ActivateOAuthClientResult result;
     try {
@@ -292,8 +280,7 @@ public class PlatformOAuthClientController {
       @PathVariable final String clientId,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     final RotateOAuthClientSecretResult result;
     try {

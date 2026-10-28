@@ -47,8 +47,6 @@ public class PlatformOAuthClientSettingsController {
   private final UpdateOAuthClientGrantTypesUseCase updateGrantTypes;
   private final UpdateOAuthClientScopesUseCase updateScopes;
   private final UpdateOAuthClientConsentUseCase updateConsent;
-  private final OrganizationForPlatformAccountResolver organizationResolver;
-  private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final PlatformOAuthClientSupport support;
 
   public PlatformOAuthClientSettingsController(
@@ -56,15 +54,11 @@ public class PlatformOAuthClientSettingsController {
       final UpdateOAuthClientGrantTypesUseCase updateGrantTypes,
       final UpdateOAuthClientScopesUseCase updateScopes,
       final UpdateOAuthClientConsentUseCase updateConsent,
-      final OrganizationForPlatformAccountResolver organizationResolver,
-      final CurrentPlatformAccountResolver currentPlatformAccount,
       final PlatformOAuthClientSupport support) {
     this.updateRedirectSettings = updateRedirectSettings;
     this.updateGrantTypes = updateGrantTypes;
     this.updateScopes = updateScopes;
     this.updateConsent = updateConsent;
-    this.organizationResolver = organizationResolver;
-    this.currentPlatformAccount = currentPlatformAccount;
     this.support = support;
   }
 
@@ -79,8 +73,7 @@ public class PlatformOAuthClientSettingsController {
           final UpdateOAuthClientRedirectSettingsForm form,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     // Live UX request, 2026-09-24: at least one real redirect URI is required to actually SAVE —
     // without one, /authorize has nothing to match against for this client's own
@@ -154,8 +147,7 @@ public class PlatformOAuthClientSettingsController {
           final List<String> allowedGrantTypes,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     try {
       updateGrantTypes.handle(
@@ -199,8 +191,7 @@ public class PlatformOAuthClientSettingsController {
       @RequestParam(name = "allowedScopes", required = false) final List<String> allowedScopes,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
     final List<String> parsedScopes =
         allowedScopes == null
             ? List.of()
@@ -243,8 +234,7 @@ public class PlatformOAuthClientSettingsController {
       @RequestParam(name = "requireConsent", defaultValue = "false") final boolean requireConsent,
       final Model model) {
     final DashboardControllerSupport.OwnedOrganization owned =
-        DashboardControllerSupport.requireOwnedOrganization(
-            request, organizationId, currentPlatformAccount, organizationResolver);
+        support.requireOwnedOrganization(request, organizationId);
 
     try {
       updateConsent.handle(

@@ -57,16 +57,16 @@ class JndiDnsTxtRecordLookupTest {
       final DatagramPacket query = new DatagramPacket(buffer, buffer.length);
       try {
         server.receive(query);
-        final byte[] response = respondTo(query.getData(), query.getLength());
+        final byte[] response = respondTo(query.getData());
         server.send(new DatagramPacket(response, response.length, query.getSocketAddress()));
-      } catch (final IOException e) {
+      } catch (final IOException _) {
         return; // socket closed by the test
       }
     }
   }
 
   // The question starts at byte 12: labels, a zero byte, then QTYPE and QCLASS (4 bytes).
-  private byte[] respondTo(final byte[] query, final int length) throws IOException {
+  private byte[] respondTo(final byte[] query) throws IOException {
     int end = 12;
     final StringBuilder name = new StringBuilder();
     while (query[end] != 0) {

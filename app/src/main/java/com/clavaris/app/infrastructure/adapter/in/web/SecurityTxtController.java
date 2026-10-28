@@ -26,14 +26,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 class SecurityTxtController {
 
   // A URI the RFC allows for Contact: mailto:, https: or tel:. No whitespace, so no extra line.
-  private static final Pattern CONTACT = Pattern.compile("(mailto:|https://|tel:)\\S+");
-  private static final Pattern POLICY = Pattern.compile("https://\\S+");
-  private static final Pattern LANGUAGES = Pattern.compile("[A-Za-z]{2,3}(, ?[A-Za-z]{2,3})*");
+  private static final Pattern CONTACT_PATTERN = Pattern.compile("(mailto:|https://|tel:)\\S+");
+  private static final Pattern POLICY_PATTERN = Pattern.compile("https://\\S+");
+  // A language tag as RFC 9116 lists them ("en", "es"); the list is split and each tag checked,
+  // rather than one repeated-group pattern, so the check cannot recurse on a long input.
+  private static final Pattern LANGUAGE_TAG = Pattern.compile("[A-Za-z]{2,3}");
 
-  private final String contact;
+  private final String contactUri;
   private final String expires;
-  private final String policy;
-  private final String languages;
+  private final String policyUrl;
+  private final String preferredLanguages;
   private final String baseUrl;
 
   /* package */ SecurityTxtController(
@@ -42,32 +44,47 @@ class SecurityTxtController {
       @Value("${clavaris.security-txt.policy:}") final String policy,
       @Value("${clavaris.security-txt.preferred-languages:en, es}") final String languages,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String baseUrl) {
-    this.contact = contact.strip();
+    this.contactUri = contact.strip();
     this.expires = expires.strip();
-    this.policy = policy.strip();
-    this.languages = languages.strip();
+    this.policyUrl = policy.strip();
+    this.preferredLanguages = languages.strip();
     this.baseUrl = baseUrl.strip();
   }
 
   @GetMapping({"/.well-known/security.txt", "/security.txt"})
   /* package */ ResponseEntity<String> securityTxt() {
     final Instant expiry = parseExpiry();
-    if (!CONTACT.matcher(contact).matches() || expiry == null || !expiry.isAfter(Instant.now())) {
+    if (!CONTACT_PATTERN.matcher(contactUri).matches()
+        || expiry == null
+        || !expiry.isAfter(Instant.now())) {
       return ResponseEntity.notFound().build();
     }
     final StringBuilder body = new StringBuilder();
-    body.append("Contact: ").append(contact).append('\n');
+    body.append("Contact: ").append(contactUri).append('\n');
     body.append("Expires: ").append(expiry).append('\n');
-    if (POLICY.matcher(policy).matches()) {
-      body.append("Policy: ").append(policy).append('\n');
+    if (POLICY_PATTERN.matcher(policyUrl).matches()) {
+      body.append("Policy: ").append(policyUrl).append('\n');
     }
-    if (LANGUAGES.matcher(languages).matches()) {
-      body.append("Preferred-Languages: ").append(languages).append('\n');
+    if (validLanguages()) {
+      body.append("Preferred-Languages: ").append(preferredLanguages).append('\n');
     }
     body.append("Canonical: ").append(baseUrl).append("/.well-known/security.txt\n");
     return ResponseEntity.ok()
         .contentType(new MediaType("text", "plain", java.nio.charset.StandardCharsets.UTF_8))
         .body(body.toString());
+  }
+
+  // Comma-separated language tags, each two or three letters; an empty or odd list is left out.
+  private boolean validLanguages() {
+    if (preferredLanguages.isEmpty()) {
+      return false;
+    }
+    for (final String tag : preferredLanguages.split(",", -1)) {
+      if (!LANGUAGE_TAG.matcher(tag.strip()).matches()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private Instant parseExpiry() {

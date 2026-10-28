@@ -3,8 +3,10 @@ package com.clavaris.clientregistry.infrastructure.adapter.in.web;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationQuery;
 import com.clavaris.clientregistry.application.usecase.getoauthclientfororganization.GetOAuthClientForOrganizationUseCase;
 import com.clavaris.clientregistry.domain.model.OAuthClient;
+import com.clavaris.common.domain.model.KeysetPageRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -31,12 +33,18 @@ class PlatformOAuthClientSupport {
   private static final String ORGANIZATION_NAME_ATTRIBUTE = "organizationName";
 
   private final GetOAuthClientForOrganizationUseCase getClient;
+  private final OrganizationForPlatformAccountResolver organizationResolver;
+  private final CurrentPlatformAccountResolver currentPlatformAccount;
   private final String clavarisBaseUrl;
 
   /* package */ PlatformOAuthClientSupport(
       final GetOAuthClientForOrganizationUseCase getClient,
+      final OrganizationForPlatformAccountResolver organizationResolver,
+      final CurrentPlatformAccountResolver currentPlatformAccount,
       @Value("${CLAVARIS_BASE_URL:http://localhost:8080}") final String clavarisBaseUrl) {
     this.getClient = getClient;
+    this.organizationResolver = organizationResolver;
+    this.currentPlatformAccount = currentPlatformAccount;
     this.clavarisBaseUrl = clavarisBaseUrl;
   }
 
@@ -111,5 +119,29 @@ class PlatformOAuthClientSupport {
       return DETAIL_FRAGMENT;
     }
     return redirectToDetail(organizationId, clientId);
+  }
+
+  // The operator must own the Organization in the URL; every handler of the three controllers
+  // starts here, so the two resolvers live in this class instead of in each constructor.
+  /* package */ DashboardControllerSupport.OwnedOrganization requireOwnedOrganization(
+      final HttpServletRequest request, final UUID organizationId) {
+    return DashboardControllerSupport.requireOwnedOrganization(
+        request, organizationId, currentPlatformAccount, organizationResolver);
+  }
+
+  /* package */ String showPaginatedList(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final KeysetPageRequest pageRequest,
+      final BiConsumer<DashboardControllerSupport.OwnedOrganization, KeysetPageRequest> renderList,
+      final DashboardControllerSupport.PaginatedViewNames viewNames) {
+    return DashboardControllerSupport.showPaginatedList(
+        request,
+        organizationId,
+        currentPlatformAccount,
+        organizationResolver,
+        pageRequest,
+        renderList,
+        viewNames);
   }
 }

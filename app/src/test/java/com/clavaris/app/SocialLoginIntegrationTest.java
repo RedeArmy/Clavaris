@@ -2,6 +2,7 @@ package com.clavaris.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
@@ -464,11 +465,8 @@ class SocialLoginIntegrationTest extends RedisBackedIntegrationTest {
         .isEqualTo(302);
     assertThat(requested.headers().firstValue("Location").orElseThrow())
         .contains("emailChangeRequested");
-    org.mockito.Mockito.verify(mailSender)
-        .sendEmailChangeVerification(
-            org.mockito.ArgumentMatchers.eq("moved-provider@example.test"),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.anyString());
+    verify(mailSender)
+        .sendEmailChangeVerification(eq("moved-provider@example.test"), any(), anyString());
   }
 
   private UUID organizationWithGitHub() throws IOException, InterruptedException {
