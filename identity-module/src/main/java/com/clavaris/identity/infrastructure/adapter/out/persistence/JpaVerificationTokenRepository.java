@@ -50,6 +50,21 @@ class JpaVerificationTokenRepository implements VerificationTokenRepository {
     return tokens.invalidateAllActiveForAccount(accountId.value(), now);
   }
 
+  @Override
+  public int invalidateActiveOfTypeForAccount(
+      final AccountId accountId, final VerificationTokenType type, final Instant now) {
+    return tokens.invalidateActiveOfTypeForAccount(accountId.value(), type.name(), now);
+  }
+
+  @Override
+  public Optional<VerificationToken> findLatestActiveOfTypeForAccount(
+      final AccountId accountId, final VerificationTokenType type, final Instant now) {
+    return tokens
+        .findFirstByAccountIdAndTypeAndConsumedAtIsNullAndExpiresAtAfterOrderByExpiresAtDesc(
+            accountId.value(), type.name(), now)
+        .map(this::toDomain);
+  }
+
   private VerificationToken toDomain(final VerificationTokenEntity entity) {
     return VerificationToken.reconstitute(
         entity.getId(),

@@ -54,13 +54,13 @@ class AuthenticateWithEmailLinkServiceTest {
     String rawToken = "a-real-256-bit-token";
     VerificationToken token = issuedToken(account.id(), rawToken);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     Account result = service.handle(new AuthenticateWithEmailLinkCommand(organizationId, rawToken));
 
     assertThat(result).isEqualTo(account);
-    assertThat(token.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
-    verify(tokens).save(token);
+    verify(tokens).consumeIfActive(eq(token.id()), any(Instant.class));
     verify(accounts)
         .recordSignInVerifyingEmail(eq(account.id()), any(Instant.class), any(Instant.class));
   }
@@ -147,5 +147,25 @@ class AuthenticateWithEmailLinkServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).save(any());
+  }
+
+  // See AuthenticateWithEmailCodeServiceTest: the conditional update is the single-use guarantee.
+  @Test
+  void rejectsALinkAnotherRequestConsumedFirstAndSignsNobodyIn() {
+    Account account = Account.register(organizationId, new Email("link-race@example.com"));
+    when(accounts.findById(account.id())).thenReturn(Optional.of(account));
+    String rawToken = "a-real-256-bit-token";
+    VerificationToken token = issuedToken(account.id(), rawToken);
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawToken))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(false);
+    AuthenticateWithEmailLinkCommand command =
+        new AuthenticateWithEmailLinkCommand(organizationId, rawToken);
+
+    assertThatExceptionOfType(InvalidSignInLinkException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(account.emailVerifiedAt()).isEmpty();
+    verify(accounts, never())
+        .recordSignInVerifyingEmail(any(), any(Instant.class), any(Instant.class));
   }
 }

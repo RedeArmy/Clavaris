@@ -26,6 +26,8 @@ import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountSessi
 import com.clavaris.identity.application.usecase.rotaterefreshtoken.AccountTokenRevoker;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Wires the identity use cases for: email verification and password recovery, including
@@ -70,9 +72,14 @@ class CredentialRecoveryUseCaseConfig {
       final AccountRepository accounts,
       final VerificationTokenRepository verificationTokens,
       final MailSender mailSender,
-      final EventOutboxWriter eventOutboxWriter) {
+      final EventOutboxWriter eventOutboxWriter,
+      final PlatformTransactionManager transactionManager) {
     return new RequestPasswordResetService(
-        accounts, verificationTokens, mailSender, eventOutboxWriter);
+        accounts,
+        verificationTokens,
+        mailSender,
+        eventOutboxWriter,
+        new TransactionTemplate(transactionManager));
   }
 
   @Bean

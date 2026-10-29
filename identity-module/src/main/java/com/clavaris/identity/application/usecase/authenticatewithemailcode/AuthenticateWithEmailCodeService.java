@@ -7,6 +7,7 @@ import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.VerificationToken;
 import com.clavaris.identity.domain.model.VerificationTokenType;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,8 +90,18 @@ public class AuthenticateWithEmailCodeService implements AuthenticateWithEmailCo
     }
 
     final VerificationToken token = found2.get();
-    token.consume();
-    tokens.save(token);
+    // The atomic, authoritative single-use check: the isActive() test above is only a fast-path
+    // rejection. A plain consume() followed by save() let two concurrent confirms with the same
+    // code both pass it and both sign in (SP 800-63B-4 §3.1.3.2: a secret is valid only once).
+    // The conditional update has exactly one winner; the loser reads false and is an invalid code.
+    if (!tokens.consumeIfActive(token.id(), Instant.now())) {
+      LOG.info(
+          "event=email_code_sign_in_failure organizationId={} accountId={}"
+              + " reason=invalid_or_expired_code",
+          command.organizationId(),
+          account.id());
+      throw new InvalidOneTimeCodeException();
+    }
 
     account.verifyEmail();
     // SDE-III review, 2026-09-30 — real bug found and closed: this method never called

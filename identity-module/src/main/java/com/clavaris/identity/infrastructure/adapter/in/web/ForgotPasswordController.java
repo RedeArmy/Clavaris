@@ -6,6 +6,10 @@ import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -31,13 +35,19 @@ public class ForgotPasswordController {
   private static final String FORM_VIEW = "identity/forgot-password";
   private static final String CLIENT_ID = "clientId";
 
+  private static final Logger LOG = LoggerFactory.getLogger(ForgotPasswordController.class);
+
   private final RequestPasswordResetUseCase useCase;
   private final ReturnToApplicationLink returnLink;
+  private final Executor emailRequestExecutor;
 
   public ForgotPasswordController(
-      final RequestPasswordResetUseCase useCase, final ReturnToApplicationLink returnLink) {
+      final RequestPasswordResetUseCase useCase,
+      final ReturnToApplicationLink returnLink,
+      final Executor emailRequestExecutor) {
     this.useCase = useCase;
     this.returnLink = returnLink;
+    this.emailRequestExecutor = emailRequestExecutor;
   }
 
   @GetMapping
@@ -73,12 +83,38 @@ public class ForgotPasswordController {
       return FORM_VIEW;
     }
 
-    useCase.handle(
+    // Off the request thread, so how long this takes cannot say whether the address has an account
+    // (an unknown one returned right after the lookup, a known one after the token insert, the
+    // outbox write and a call to the mail provider). Done here, not inside the use case, because
+    // the workspace member provisioning also calls that use case and needs its mail sent, and any
+    // failure raised, before it carries on. A task the bounded executor rejects is logged and
+    // dropped the same for every address; the person asks again.
+    final RequestPasswordResetCommand command =
         new RequestPasswordResetCommand(
-            new OrganizationId(organizationId), new Email(form.getEmail())));
+            new OrganizationId(organizationId), new Email(form.getEmail()));
+    try {
+      emailRequestExecutor.execute(() -> sendResetFor(command));
+    } catch (final RejectedExecutionException _) {
+      LOG.warn(
+          "event=password_reset_dropped organizationId={} reason=executor_saturated",
+          organizationId);
+    }
 
     return RedirectQueryParams.appendIfPresent(
         "redirect:/o/" + organizationId + "/forgot-password/pending", CLIENT_ID, clientId);
+  }
+
+  // Runs on the executor's thread; nothing thrown here can reach, or differ in, the response.
+  @SuppressWarnings("PMD.AvoidCatchingGenericException")
+  private void sendResetFor(final RequestPasswordResetCommand command) {
+    try {
+      useCase.handle(command);
+    } catch (final RuntimeException failure) {
+      LOG.warn(
+          "event=password_reset_failed organizationId={} exceptionType={}",
+          command.organizationId(),
+          failure.getClass().getName());
+    }
   }
 
   @GetMapping("/pending")

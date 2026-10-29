@@ -145,6 +145,110 @@ class JpaVerificationTokenRepositoryTest {
     assertThat(repository.findByTokenHash("race-hash").orElseThrow().isActive()).isFalse();
   }
 
+  // Asking to sign in must end the earlier sign-in codes and nothing else: a password reset or an
+  // email verification the person has under way has to survive it.
+  @Test
+  void invalidateActiveOfTypeEndsOnlyThatTypeForOnlyThatAccount() {
+    VerificationToken oldCode = signInCode("old-code-hash");
+    VerificationToken passwordReset =
+        VerificationToken.issue(
+            accountId,
+            VerificationTokenType.PASSWORD_RESET,
+            "reset-hash",
+            Instant.now().plusSeconds(3600));
+    repository.save(oldCode);
+    repository.save(passwordReset);
+
+    int ended =
+        repository.invalidateActiveOfTypeForAccount(
+            accountId, VerificationTokenType.EMAIL_SIGN_IN_CODE, Instant.now());
+
+    assertThat(ended).isEqualTo(1);
+    assertThat(repository.findByTokenHash("old-code-hash").orElseThrow().isActive()).isFalse();
+    assertThat(repository.findByTokenHash("reset-hash").orElseThrow().isActive())
+        .as("a password reset under way is not a sign-in code and must stay valid")
+        .isTrue();
+  }
+
+  @Test
+  void invalidateActiveOfTypeLeavesAnAlreadyUsedOrExpiredTokenAlone() {
+    VerificationToken expired =
+        VerificationToken.issue(
+            accountId,
+            VerificationTokenType.EMAIL_SIGN_IN_CODE,
+            "expired-hash",
+            Instant.now().minusSeconds(60));
+    repository.save(expired);
+
+    int ended =
+        repository.invalidateActiveOfTypeForAccount(
+            accountId, VerificationTokenType.EMAIL_SIGN_IN_CODE, Instant.now());
+
+    assertThat(ended).as("nothing was active, so nothing is ended").isZero();
+  }
+
+  // The cooldown dates a secret by when it expires, so the lookup must return the one that expires
+  // last, only of that type, and never one that is used up or already expired.
+  @Test
+  void findLatestActiveOfTypeReturnsTheOneExpiringLastAndIgnoresOtherTypesAndDeadTokens() {
+    VerificationToken older =
+        VerificationToken.issue(
+            accountId,
+            VerificationTokenType.EMAIL_SIGN_IN_CODE,
+            "older-hash",
+            Instant.now().plusSeconds(300));
+    VerificationToken newer =
+        VerificationToken.issue(
+            accountId,
+            VerificationTokenType.EMAIL_SIGN_IN_CODE,
+            "newer-hash",
+            Instant.now().plusSeconds(590));
+    VerificationToken otherType =
+        VerificationToken.issue(
+            accountId,
+            VerificationTokenType.PASSWORD_RESET,
+            "reset-hash",
+            Instant.now().plusSeconds(3600));
+    VerificationToken expired =
+        VerificationToken.issue(
+            accountId,
+            VerificationTokenType.EMAIL_SIGN_IN_CODE,
+            "expired-hash",
+            Instant.now().minusSeconds(5));
+    repository.save(older);
+    repository.save(newer);
+    repository.save(otherType);
+    repository.save(expired);
+
+    assertThat(
+            repository.findLatestActiveOfTypeForAccount(
+                accountId, VerificationTokenType.EMAIL_SIGN_IN_CODE, Instant.now()))
+        .map(VerificationToken::tokenHash)
+        .contains("newer-hash");
+
+    repository.consumeIfActive(newer.id(), Instant.now());
+
+    assertThat(
+            repository.findLatestActiveOfTypeForAccount(
+                accountId, VerificationTokenType.EMAIL_SIGN_IN_CODE, Instant.now()))
+        .map(VerificationToken::tokenHash)
+        .as("a used-up token no longer counts")
+        .contains("older-hash");
+  }
+
+  @Test
+  void findLatestActiveOfTypeIsEmptyWhenTheAccountHasNone() {
+    assertThat(
+            repository.findLatestActiveOfTypeForAccount(
+                accountId, VerificationTokenType.EMAIL_SIGN_IN_LINK, Instant.now()))
+        .isEmpty();
+  }
+
+  private VerificationToken signInCode(final String hash) {
+    return VerificationToken.issue(
+        accountId, VerificationTokenType.EMAIL_SIGN_IN_CODE, hash, Instant.now().plusSeconds(600));
+  }
+
   // BR-ID-04's real TOCTOU-fix proof: ConfirmPasswordResetServiceTest already proves the service
   // layer treats a lost race as an invalid token using a mocked repository, which can only show the
   // *service* reacts correctly to a stubbed false — it cannot prove PostgreSQL itself actually

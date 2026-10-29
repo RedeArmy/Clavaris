@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,11 +20,15 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.VerificationToken;
+import com.clavaris.identity.domain.model.VerificationTokenType;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.transaction.support.TransactionOperations;
 
 class RequestEmailSignInLinkServiceTest {
 
@@ -41,7 +46,14 @@ class RequestEmailSignInLinkServiceTest {
     tokens = mock(VerificationTokenRepository.class);
     mailSender = mock(MailSender.class);
     policyProvider = mock(AccountAuthenticationPolicyProvider.class);
-    service = new RequestEmailSignInLinkService(accounts, tokens, mailSender, policyProvider);
+    service =
+        new RequestEmailSignInLinkService(
+            accounts,
+            tokens,
+            mailSender,
+            policyProvider,
+            Runnable::run,
+            TransactionOperations.withoutTransaction());
     when(policyProvider.policyFor(organizationId)).thenReturn(enabledPolicy());
   }
 
@@ -105,5 +117,129 @@ class RequestEmailSignInLinkServiceTest {
         .isThrownBy(() -> service.handle(command));
 
     verify(accounts, never()).findByOrganizationIdAndEmail(any(), any());
+  }
+
+  // The earlier secret must stop working the moment a new one is issued: several live at once
+  // multiply a guesser's chances. Ended before the new one is written, and only this type.
+  @Test
+  void endsTheEarlierSecretsOfTheSameTypeBeforeWritingTheNewOne() {
+    Email email = new Email("reissue@example.com");
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+
+    service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
+
+    InOrder order = inOrder(tokens);
+    order
+        .verify(tokens)
+        .invalidateActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_LINK), any(Instant.class));
+    order.verify(tokens).save(any());
+    verify(tokens, never()).invalidateAllActiveForAccount(any(), any());
+  }
+
+  // Whether the caller learns anything from the outcome: nothing is thrown for an unknown address,
+  // for a failure while issuing, or for a saturated executor.
+  @Test
+  void aFailureWhileIssuingNeverReachesTheCaller() {
+    Email email = new Email("boom@example.com");
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    org.mockito.Mockito.doThrow(new IllegalStateException("db down")).when(tokens).save(any());
+
+    service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
+
+    verify(mailSender, never()).sendEmailSignInLink(any(), any(), any());
+  }
+
+  @Test
+  void aSaturatedExecutorIsLoggedAndDroppedNotThrown() {
+    Email email = new Email("busy@example.com");
+    RequestEmailSignInLinkService saturated =
+        new RequestEmailSignInLinkService(
+            accounts,
+            tokens,
+            mailSender,
+            policyProvider,
+            task -> {
+              throw new java.util.concurrent.RejectedExecutionException("queue full");
+            },
+            TransactionOperations.withoutTransaction());
+
+    saturated.handle(new RequestEmailSignInLinkCommand(organizationId, email));
+
+    verify(accounts, never()).findByOrganizationIdAndEmail(any(), any());
+    verify(tokens, never()).save(any());
+  }
+
+  // The point of running the work on the executor: the caller returns before any of it, so the
+  // response time cannot depend on whether the address has an account.
+  @Test
+  void theCallerReturnsBeforeTheAccountLookupWhenTheWorkIsDeferred() {
+    java.util.List<Runnable> deferred = new java.util.ArrayList<>();
+    RequestEmailSignInLinkService deferring =
+        new RequestEmailSignInLinkService(
+            accounts,
+            tokens,
+            mailSender,
+            policyProvider,
+            deferred::add,
+            TransactionOperations.withoutTransaction());
+
+    deferring.handle(
+        new RequestEmailSignInLinkCommand(organizationId, new Email("later@example.com")));
+
+    org.mockito.Mockito.verifyNoInteractions(accounts, tokens, mailSender);
+    org.assertj.core.api.Assertions.assertThat(deferred).hasSize(1);
+  }
+
+  // Asked again inside the wait: nothing new is sent and the earlier secret stays valid, so the
+  // person still has the email they already got. The caller sees the same as for any request.
+  @Test
+  void sendsNothingNewWhenAskedAgainWithinTheWait() {
+    Email email = new Email("impatient@example.com");
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    // Issued ten seconds ago: both kinds live ten minutes.
+    when(tokens.findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_LINK), any(Instant.class)))
+        .thenReturn(
+            Optional.of(
+                VerificationToken.issue(
+                    account.id(),
+                    VerificationTokenType.EMAIL_SIGN_IN_LINK,
+                    "earlier-hash",
+                    Instant.now().plusSeconds(600).minusSeconds(10))));
+
+    service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
+
+    verify(tokens, never()).save(any());
+    verify(tokens, never()).invalidateActiveOfTypeForAccount(any(), any(), any());
+    verify(mailSender, never()).sendEmailSignInLink(any(), any(), any());
+  }
+
+  @Test
+  void sendsANewOneOnceTheWaitHasPassed() {
+    Email email = new Email("patient@example.com");
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    when(tokens.findLatestActiveOfTypeForAccount(
+            eq(account.id()), eq(VerificationTokenType.EMAIL_SIGN_IN_LINK), any(Instant.class)))
+        .thenReturn(
+            Optional.of(
+                VerificationToken.issue(
+                    account.id(),
+                    VerificationTokenType.EMAIL_SIGN_IN_LINK,
+                    "earlier-hash",
+                    Instant.now().plusSeconds(600).minusSeconds(45))));
+
+    service.handle(new RequestEmailSignInLinkCommand(organizationId, email));
+
+    verify(tokens).save(any());
+    verify(mailSender).sendEmailSignInLink(eq(email.value()), eq(organizationId), any());
   }
 }

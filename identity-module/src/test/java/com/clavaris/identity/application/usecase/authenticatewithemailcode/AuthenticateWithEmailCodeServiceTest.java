@@ -56,14 +56,14 @@ class AuthenticateWithEmailCodeServiceTest {
     String rawCode = "482913";
     VerificationToken token = issuedToken(account.id(), rawCode);
     when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(true);
 
     Account result =
         service.handle(new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode));
 
     assertThat(result).isEqualTo(account);
-    assertThat(token.consumedAt()).isPresent();
     assertThat(account.emailVerifiedAt()).isPresent();
-    verify(tokens).save(token);
+    verify(tokens).consumeIfActive(eq(token.id()), any(Instant.class));
     verify(accounts)
         .recordSignInVerifyingEmail(eq(account.id()), any(Instant.class), any(Instant.class));
   }
@@ -145,5 +145,28 @@ class AuthenticateWithEmailCodeServiceTest {
 
     assertThatExceptionOfType(InvalidOneTimeCodeException.class)
         .isThrownBy(() -> service.handle(command));
+  }
+
+  // The race this fixes: two confirms with the same still-active code both pass the in-memory
+  // isActive() check, and only the conditional update has a single winner. The loser reads false
+  // and must be treated as an invalid code, never as a sign-in (SP 800-63B-4 §3.1.3.2).
+  @Test
+  void rejectsACodeAnotherRequestConsumedFirstAndSignsNobodyIn() {
+    Account account = Account.register(organizationId, email);
+    when(accounts.findByOrganizationIdAndEmail(organizationId, email))
+        .thenReturn(Optional.of(account));
+    String rawCode = "482913";
+    VerificationToken token = issuedToken(account.id(), rawCode);
+    when(tokens.findByTokenHash(RefreshTokenSecret.hash(rawCode))).thenReturn(Optional.of(token));
+    when(tokens.consumeIfActive(eq(token.id()), any(Instant.class))).thenReturn(false);
+    AuthenticateWithEmailCodeCommand command =
+        new AuthenticateWithEmailCodeCommand(organizationId, email, rawCode);
+
+    assertThatExceptionOfType(InvalidOneTimeCodeException.class)
+        .isThrownBy(() -> service.handle(command));
+
+    assertThat(account.emailVerifiedAt()).isEmpty();
+    verify(accounts, never())
+        .recordSignInVerifyingEmail(any(), any(Instant.class), any(Instant.class));
   }
 }
