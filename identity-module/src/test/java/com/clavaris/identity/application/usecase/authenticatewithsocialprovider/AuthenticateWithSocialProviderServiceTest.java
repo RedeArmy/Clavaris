@@ -184,15 +184,16 @@ class AuthenticateWithSocialProviderServiceTest {
     assertThat(account.username().orElseThrow().value()).isEqualTo("ada-lovelace");
   }
 
-  // ADR-0026: a username already taken by a different Account in this Organization must not block
-  // the signup itself — the field is simply left unset.
+  // ADR-0026/ADR-0031: a username already taken by a different Account in this Organization must
+  // not block the signup itself — the next free number is appended instead.
   @Test
-  void skipsAssigningTheUsernameWhenItsAlreadyTakenInThisOrganization() {
+  void appendsANumberToTheUsernameWhenItsAlreadyTakenInThisOrganization() {
     when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
         .thenReturn(Optional.empty());
     when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
         .thenReturn(Optional.empty());
-    when(accounts.existsByOrganizationIdAndUsername(eq(ORGANIZATION_ID), any())).thenReturn(true);
+    when(accounts.existsByOrganizationIdAndUsername(eq(ORGANIZATION_ID), any()))
+        .thenReturn(true, false);
 
     AuthenticateWithSocialProviderCommand command =
         new AuthenticateWithSocialProviderCommand(
@@ -207,6 +208,34 @@ class AuthenticateWithSocialProviderServiceTest {
             null);
 
     service.handle(command);
+
+    org.mockito.ArgumentCaptor<Account> savedAccount =
+        org.mockito.ArgumentCaptor.forClass(Account.class);
+    verify(accounts).insert(savedAccount.capture());
+    assertThat(savedAccount.getValue().username().orElseThrow().value())
+        .isEqualTo("already-taken2");
+  }
+
+  // ADR-0031: a provider that offers no usable username (Google never does) leaves the account
+  // without one, for the person to choose after signing in.
+  @Test
+  void leavesTheUsernameUnsetWhenTheProviderOffersNone() {
+    when(socialIdentities.findByOrganizationIdAndProviderAndProviderUserId(any(), any(), any()))
+        .thenReturn(Optional.empty());
+    when(accounts.findByOrganizationIdAndEmail(ORGANIZATION_ID, EMAIL))
+        .thenReturn(Optional.empty());
+
+    service.handle(
+        new AuthenticateWithSocialProviderCommand(
+            ORGANIZATION_ID,
+            SocialProvider.GOOGLE,
+            "google-sub-456",
+            EMAIL,
+            true,
+            "Ada",
+            "Lovelace",
+            null,
+            null));
 
     org.mockito.ArgumentCaptor<Account> savedAccount =
         org.mockito.ArgumentCaptor.forClass(Account.class);
