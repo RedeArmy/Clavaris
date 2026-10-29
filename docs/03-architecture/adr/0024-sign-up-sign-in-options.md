@@ -115,11 +115,9 @@ unique index (`WHERE username IS NOT NULL`) scoped `(organization_id, username)`
 no backfill required. `authenticatewithusername` is a structural twin of
 `authenticatewithpassword`, looking up by `(organizationId, username)` instead of email, reusing
 `establish(...)` unchanged (still `amr=["pwd"]` — the factor is still a password, only the
-identifier differs). Username sign-in gets its **own dedicated route**
-(`UsernameSignInController`, `/o/{organizationId}/login/username`) rather than merging into
-`LoginController`'s single field: the two controllers' form base classes diverge in ways a shared
-`@Email`-constrained field can't absorb (see Consequences), and it matches the "one method, one
-route" pattern already established for the two passwordless email flows in Decision 3.
+identifier differs). Username sign-in originally got its **own dedicated route** (`UsernameSignInController`,
+`/o/{organizationId}/login/username`); **superseded by ADR-0032 (2026-10-28):** the sign-in page has one
+field for a username or an email, and the separate route, which no login limit covered, is gone.
 
 ### 5. Device Trust — a step-up challenge, built on the existing device-recognition primitive
 
