@@ -184,6 +184,16 @@ spring:
 # restart no longer regenerates every signing key and mass-invalidates every issued token. The
 # dev-default path/password below are convenience-only, same convention as DB_DEV_*: never used in
 # a real deployment, where both must be set explicitly.
+# The Swagger UI is a developer convenience (prd-mvp.md: "/swagger-ui.html, dev/local only"), but
+# nothing enforced that: the default chain permits every request, so it was served publicly in every
+# deployment. Off by default, on in application-dev.yml. The OpenAPI document itself (/v3/api-docs)
+# stays on: it is the contract, not a page that renders anything. Besides removing a public page
+# nobody needs in production, this is what makes the DOMPurify suppression in owasp-suppressions.xml
+# honest: the vulnerable bundle ships in the jar but is never served.
+springdoc:
+  swagger-ui:
+    enabled: false
+
 clavaris:
   # RFC 9116 /.well-known/security.txt (SecurityTxtController). Off until the operator sets both a
   # contact (mailto:, https: or tel: URI) and an expiry in the future; with either missing or stale
