@@ -266,7 +266,6 @@ class AuthenticateWithPasswordServiceTest {
                 false,
                 false,
                 false,
-                false,
                 true,
                 false,
                 false));
@@ -294,7 +293,6 @@ class AuthenticateWithPasswordServiceTest {
             new AccountAuthenticationPolicySnapshot(
                 true,
                 EmailVerificationMethod.LINK,
-                false,
                 false,
                 false,
                 false,

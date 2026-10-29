@@ -139,6 +139,22 @@ class RegisterAccountControllerTest {
         .andExpect(model().attribute("socialProviders", List.of()));
   }
 
+  // ADR-0031: the username field is always offered, above the email, whatever the Organization's
+  // policy says.
+  @Test
+  void getAlwaysOffersTheUsernameFieldAboveTheEmail() throws Exception {
+    final String html =
+        mockMvc
+            .perform(get("/o/{organizationId}/register", ORGANIZATION_ID))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("id=\"username\"").contains("id=\"email\"");
+    assertThat(html.indexOf("id=\"username\"")).isLessThan(html.indexOf("id=\"email\""));
+  }
+
   // SDE-III review, 2026-09-16 — sign-up-with-Google/GitHub: same "computed fresh on every
   // render" contract LoginControllerTest's own identical test proves for the sign-in page — this
   // page's own social buttons must reflect exactly the same allowed-providers set.
@@ -437,8 +453,7 @@ class RegisterAccountControllerTest {
   @Test
   void invalidUsernameShapeRerendersTheFormWithAFieldError() throws Exception {
     when(useCase.handle(any())).thenThrow(new IllegalArgumentException("Not a valid username"));
-    // usernameSignUpEnabled=true — register.html's own username field (and this rejection's
-    // message) only renders at all when the Organization's policy actually offers it.
+    // register.html's username field (and this rejection's message) is always rendered, ADR-0031.
     when(policyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(
@@ -446,7 +461,6 @@ class RegisterAccountControllerTest {
                 EmailVerificationMethod.LINK,
                 false,
                 false,
-                true,
                 false,
                 false,
                 true,
@@ -500,7 +514,6 @@ class RegisterAccountControllerTest {
                 false,
                 false,
                 false,
-                false,
                 false));
     AccountId accountId = AccountId.newId();
     when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
@@ -541,7 +554,6 @@ class RegisterAccountControllerTest {
                 false,
                 false,
                 false,
-                false,
                 false));
     AccountId accountId = AccountId.newId();
     when(useCase.handle(any())).thenReturn(new RegisterAccountResult(accountId, false));
@@ -567,7 +579,6 @@ class RegisterAccountControllerTest {
                 EmailVerificationMethod.LINK,
                 false,
                 true,
-                false,
                 false,
                 false,
                 false,

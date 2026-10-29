@@ -19,7 +19,8 @@ import jakarta.validation.constraints.Size;
  */
 public class RegisterAccountForm extends EmailPasswordConfirmationForm {
 
-  // Presence/requiredness is also policy-driven (usernameSignUpEnabled/usernameRequired) — the
+  // Requiredness is policy-driven (usernameRequired; the field itself is always offered, ADR-0031)
+  // — the
   // shape itself (length, character set) is enforced by Username's own domain constructor, not
   // duplicated here as a @Pattern the two could drift apart from.
   @Size(max = 32, message = "Username must be at most 32 characters")

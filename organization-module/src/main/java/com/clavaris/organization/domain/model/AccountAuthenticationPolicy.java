@@ -126,10 +126,6 @@ public final class AccountAuthenticationPolicy {
     return settings.emailLinkSignInEnabled();
   }
 
-  public boolean usernameSignUpEnabled() {
-    return settings.usernameSignUpEnabled();
-  }
-
   public boolean usernameRequired() {
     return settings.usernameRequired();
   }

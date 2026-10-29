@@ -396,7 +396,6 @@ public class RegisterAccountController {
   private void addSignUpOptions(final UUID organizationId, final Model model) {
     final OrganizationId orgId = new OrganizationId(organizationId);
     final AccountAuthenticationPolicySnapshot policy = policyProvider.policyFor(orgId);
-    model.addAttribute("usernameSignUpEnabled", policy.usernameSignUpEnabled());
     model.addAttribute("usernameRequired", policy.usernameRequired());
     model.addAttribute("passwordAtSignUpEnabled", policy.passwordAtSignUpEnabled());
 

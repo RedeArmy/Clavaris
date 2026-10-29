@@ -42,9 +42,9 @@ fields, richer than `Organization.socialLoginEnabled`'s 2-field shape, so it fol
 | `emailVerificationMethod` | `LINK` | `LINK` \| `CODE` \| `BOTH` — how a verification email proves control |
 | `emailCodeSignInEnabled` | `false` | passwordless sign-in via a 6-digit one-time code |
 | `emailLinkSignInEnabled` | `false` | passwordless sign-in via a single-use magic link |
-| `usernameSignUpEnabled` | `false` | accounts may claim a `Username` at sign-up |
-| `usernameRequired` | `false` | only meaningful with `usernameSignUpEnabled` |
-| `usernameSignInEnabled` | `false` | only meaningful with `usernameSignUpEnabled` |
+| ~~`usernameSignUpEnabled`~~ | removed (ADR-0031) | accounts may claim a `Username` at sign-up |
+| `usernameRequired` | `false` | whether the sign-up username may be left empty (ADR-0031: the field is always offered) |
+| `usernameSignInEnabled` | `false` | sign in with the username (ADR-0031: no sign-up switch is needed first) |
 | `passwordAtSignUpEnabled` | `true` | matches pre-ADR-0024 mandatory-password sign-up |
 | `deviceTrustEnabled` | `false` | step-up challenge for a sign-in from an unrecognized device |
 
@@ -55,9 +55,10 @@ instead. `SetAccountAuthenticationPolicyForOrganizationService` (operator/`Platf
 new `PlatformScopes.ACCOUNT_AUTHENTICATION_POLICY_WRITE`) validates two cross-field invariants
 before persisting:
 
-- `usernameRequired` or `usernameSignInEnabled` without `usernameSignUpEnabled` → rejected
-  (`UsernameRequiredWithoutSignUpException`) — a login method a sign-up flow can never produce is
-  incoherent.
+- ~~`usernameRequired` or `usernameSignInEnabled` without `usernameSignUpEnabled` → rejected
+  (`UsernameRequiredWithoutSignUpException`)~~ — **superseded by ADR-0031 (2026-10-28):** the sign-up
+  form always offers a username, so this rule, the exception and the `usernameSignUpEnabled` field
+  itself are gone.
 - `passwordAtSignUpEnabled=false` with neither `emailCodeSignInEnabled` nor
   `emailLinkSignInEnabled` set → rejected (`PasswordOptionalRequiresPasswordlessSignInException`) —
   see Decision 2 for why passwordless sign-up needs one of these as its own completion step.

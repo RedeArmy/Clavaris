@@ -6,7 +6,6 @@ import com.clavaris.organization.application.usecase.setaccountauthenticationpol
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationCommand;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationResult;
 import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.SetAccountAuthenticationPolicyForOrganizationUseCase;
-import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.UsernameRequiredWithoutSignUpException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -43,9 +42,7 @@ class SetAccountAuthenticationPolicyController {
   @ApiResponse(responseCode = "200", description = "Policy created or updated")
   @ApiResponse(
       responseCode = "400",
-      description =
-          "usernameRequired/usernameSignInEnabled without usernameSignUpEnabled, or"
-              + " passwordAtSignUpEnabled=false with no passwordless sign-in method enabled")
+      description = "passwordAtSignUpEnabled=false with no passwordless sign-in method enabled")
   @ApiResponse(responseCode = "404", description = "No Organization exists with the given id")
   @PutMapping("/api/v1/admin/organizations/{organizationId}/authentication-policy")
   /* package */ ResponseEntity<AccountAuthenticationPolicyResponse> set(
@@ -62,7 +59,6 @@ class SetAccountAuthenticationPolicyController {
                   request.emailVerificationMethod(),
                   request.emailCodeSignInEnabled(),
                   request.emailLinkSignInEnabled(),
-                  request.usernameSignUpEnabled(),
                   request.usernameRequired(),
                   request.usernameSignInEnabled(),
                   request.passwordAtSignUpEnabled(),
@@ -72,8 +68,7 @@ class SetAccountAuthenticationPolicyController {
                   AuditActor.platformClient(authentication.getName())));
     } catch (final OrganizationNotFoundException _) {
       return ResponseEntity.notFound().build();
-    } catch (final UsernameRequiredWithoutSignUpException
-        | PasswordOptionalRequiresPasswordlessSignInException _) {
+    } catch (final PasswordOptionalRequiresPasswordlessSignInException _) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
     }
     return ResponseEntity.ok(AccountAuthenticationPolicyResponse.from(result.policy()));

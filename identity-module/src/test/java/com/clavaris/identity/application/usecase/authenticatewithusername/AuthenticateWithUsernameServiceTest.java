@@ -171,7 +171,6 @@ class AuthenticateWithUsernameServiceTest {
                 false,
                 false,
                 false,
-                false,
                 true,
                 false,
                 false));

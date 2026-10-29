@@ -14,11 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
  * account_authentication_policy.set} audit event in the same transaction — same TD-SEC-007 pattern
  * every other admin-API mutation on this surface already uses.
  */
-// PMD.CyclomaticComplexity: handle's two validation guards plus the existing-vs-new branch are
-// the whole point of this orchestration (fail fast on an inconsistent policy before touching
-// persistence) — same "wiring, not sprawl" reasoning already applied to other
-// Configuration/orchestration classes across this codebase.
-@SuppressWarnings("PMD.CyclomaticComplexity")
 public class SetAccountAuthenticationPolicyForOrganizationService
     implements SetAccountAuthenticationPolicyForOrganizationUseCase {
 
@@ -39,10 +34,6 @@ public class SetAccountAuthenticationPolicyForOrganizationService
   @Transactional
   public SetAccountAuthenticationPolicyForOrganizationResult handle(
       final SetAccountAuthenticationPolicyForOrganizationCommand command) {
-    if ((command.usernameRequired() || command.usernameSignInEnabled())
-        && !command.usernameSignUpEnabled()) {
-      throw new UsernameRequiredWithoutSignUpException();
-    }
     if (!command.passwordAtSignUpEnabled()
         && !command.emailCodeSignInEnabled()
         && !command.emailLinkSignInEnabled()) {
@@ -69,8 +60,6 @@ public class SetAccountAuthenticationPolicyForOrganizationService
         command.organizationId().toString(),
         "emailVerificationMethod="
             + command.emailVerificationMethod()
-            + " usernameSignUpEnabled="
-            + command.usernameSignUpEnabled()
             + " passwordAtSignUpEnabled="
             + command.passwordAtSignUpEnabled()
             + " deviceTrustEnabled="
@@ -104,7 +93,6 @@ public class SetAccountAuthenticationPolicyForOrganizationService
         command.emailVerificationMethod(),
         command.emailCodeSignInEnabled(),
         command.emailLinkSignInEnabled(),
-        command.usernameSignUpEnabled(),
         command.usernameRequired(),
         command.usernameSignInEnabled(),
         command.passwordAtSignUpEnabled(),

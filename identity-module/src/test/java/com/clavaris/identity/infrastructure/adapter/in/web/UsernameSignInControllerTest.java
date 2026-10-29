@@ -212,16 +212,7 @@ class UsernameSignInControllerTest {
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(
-                false,
-                EmailVerificationMethod.LINK,
-                false,
-                false,
-                true,
-                false,
-                true,
-                true,
-                true,
-                false));
+                false, EmailVerificationMethod.LINK, false, false, false, true, true, true, false));
     when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
 
     mockMvc
@@ -245,16 +236,7 @@ class UsernameSignInControllerTest {
     when(authenticationPolicyProvider.policyFor(any()))
         .thenReturn(
             new AccountAuthenticationPolicySnapshot(
-                false,
-                EmailVerificationMethod.LINK,
-                false,
-                false,
-                true,
-                false,
-                true,
-                true,
-                true,
-                false));
+                false, EmailVerificationMethod.LINK, false, false, false, true, true, true, false));
     when(knownDevices.findByAccountIdAndDeviceTokenHash(any(), any())).thenReturn(Optional.empty());
     doThrow(new MailDeliveryException("boom")).when(requestDeviceTrustChallenge).handle(any());
 

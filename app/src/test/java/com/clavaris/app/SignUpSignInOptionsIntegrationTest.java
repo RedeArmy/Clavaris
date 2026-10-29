@@ -93,6 +93,9 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
   void usernameSignInEstablishesARealSessionEndToEnd() throws Exception {
     String platformToken = requestPlatformAccessToken();
     UUID organizationId = createOrganization(platformToken, "Username Sign-In Co");
+    // ADR-0031: this body still carries usernameSignUpEnabled, the switch that was removed, the way
+    // a
+    // client written before the removal would: it must be accepted and ignored, not rejected.
     setAuthenticationPolicy(
         platformToken,
         organizationId,
@@ -142,7 +145,6 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "emailVerificationMethod": "LINK",
           "emailCodeSignInEnabled": true,
           "emailLinkSignInEnabled": false,
-          "usernameSignUpEnabled": false,
           "usernameRequired": false,
           "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,
@@ -201,7 +203,6 @@ class SignUpSignInOptionsIntegrationTest extends RedisBackedIntegrationTest {
           "emailVerificationMethod": "LINK",
           "emailCodeSignInEnabled": false,
           "emailLinkSignInEnabled": false,
-          "usernameSignUpEnabled": false,
           "usernameRequired": false,
           "usernameSignInEnabled": false,
           "passwordAtSignUpEnabled": true,
