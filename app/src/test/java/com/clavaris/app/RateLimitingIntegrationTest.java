@@ -48,7 +48,11 @@ import tools.jackson.databind.ObjectMapper;
       // TD-PERF-034: the tenant tier's non-refresh limit defaults to 6000 now; a small one keeps
       // the
       // "refresh is exempt from it" test below cheap while still proving the distinction.
-      "clavaris.rate-limit.token.tenant-per-client-ip-limit=20"
+      "clavaris.rate-limit.token.tenant-per-client-ip-limit=20",
+      // The per-IP login limit is shared by every test in this class (they all come from one
+      // address), and none of them exercises it; raised so the per-account tests stay independent
+      // of how many sign-ins the others already made.
+      "clavaris.rate-limit.login.per-ip-limit=1000"
     })
 class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
 
@@ -100,6 +104,24 @@ class RateLimitingIntegrationTest extends RedisBackedIntegrationTest {
 
     HttpResponse<String> overLimit = submitLogin(organizationId, csrfToken, email);
 
+    assertThat(overLimit.statusCode()).isEqualTo(429);
+    assertThat(overLimit.headers().firstValue("Retry-After")).isPresent();
+  }
+
+  // ADR-0032: a username goes through the same sign-in URL as an email, so it meets the same
+  // per-account limit. It used to have a route of its own (/login/username) that no limit covered.
+  @Test
+  void blocksALoginByUsernameWith429AfterThePerAccountAntiAbuseLimitIsExceeded() throws Exception {
+    UUID organizationId = UUID.randomUUID();
+    String csrfToken = fetchLoginCsrfToken(organizationId);
+
+    for (int attempt = 1; attempt <= loginPerAccountLimit; attempt++) {
+      assertThat(submitLogin(organizationId, csrfToken, "victim_user").statusCode())
+          .as("attempt %d is within the limit", attempt)
+          .isEqualTo(200);
+    }
+
+    HttpResponse<String> overLimit = submitLogin(organizationId, csrfToken, "victim_user");
     assertThat(overLimit.statusCode()).isEqualTo(429);
     assertThat(overLimit.headers().firstValue("Retry-After")).isPresent();
   }

@@ -10,10 +10,10 @@ import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlR
 /**
  * TD-ARCH-016: the ports {@link PrimaryFactorLoginCompletion#completeAfterPrimaryFactor} needs —
  * bundled as one record parameter rather than a flat parameter list, per this row's own analysis in
- * `technical-debt-register.md`. Each implementing controller ({@link LoginController}, {@link
- * UsernameSignInController}) builds exactly one of these once, in its own constructor, from ports
- * it already collaborates with individually — never a new dependency either controller didn't
- * already have. {@code recordLoginEvent} (TD-FUT-034) joined the original 6 the same way.
+ * `technical-debt-register.md`. Each implementing controller ({@link LoginController}) builds
+ * exactly one of these once, in its own constructor, from ports it already collaborates with
+ * individually — never a new dependency either controller didn't already have. {@code
+ * recordLoginEvent} (TD-FUT-034) joined the original 6 the same way.
  */
 /* package */ record PrimaryFactorLoginPorts(
     KnownDeviceRepository knownDevices,

@@ -10,11 +10,11 @@ import java.util.UUID;
 /**
  * Clerk "session tasks" parity: the shared "does this just-authenticated login have a required task
  * still outstanding?" check every primary-factor controller ({@link LoginController}, {@link
- * UsernameSignInController}, {@link EmailCodeSignInController}, {@link EmailLinkSignInController})
- * runs right after its own {@code Authenticate*UseCase} succeeds and — critically — after {@link
- * DeviceTrustGate#intercept} has already returned empty (a login can be paused for one, then the
- * other, but this one only ever runs once the device-trust gate has already let the login through,
- * same ordering every caller follows).
+ * EmailCodeSignInController}, {@link EmailLinkSignInController}) runs right after its own {@code
+ * Authenticate*UseCase} succeeds and — critically — after {@link DeviceTrustGate#intercept} has
+ * already returned empty (a login can be paused for one, then the other, but this one only ever
+ * runs once the device-trust gate has already let the login through, same ordering every caller
+ * follows).
  *
  * <p>TD-PERF-015 (closed): {@link #intercept} used to take an {@code AccountId} and its own {@code
  * AccountRepository}, re-fetching the exact {@link Account} row the caller's own {@code

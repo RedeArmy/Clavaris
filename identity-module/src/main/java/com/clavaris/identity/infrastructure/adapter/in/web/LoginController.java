@@ -1,7 +1,7 @@
 package com.clavaris.identity.infrastructure.adapter.in.web;
 
-import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordCommand;
-import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithidentifier.AuthenticateWithIdentifierCommand;
+import com.clavaris.identity.application.usecase.authenticatewithidentifier.AuthenticateWithIdentifierUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.VerificationOverloadedException;
@@ -17,7 +17,6 @@ import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBra
 import com.clavaris.identity.application.usecase.resolveclientbranding.ClientBrandingSnapshot;
 import com.clavaris.identity.application.usecase.resolveredirecturl.RedirectUrlResolver;
 import com.clavaris.identity.domain.model.Account;
-import com.clavaris.identity.domain.model.Email;
 import com.clavaris.identity.domain.model.OrganizationId;
 import com.clavaris.identity.domain.model.SocialProvider;
 import jakarta.servlet.http.HttpServletRequest;
@@ -73,7 +72,7 @@ public class LoginController {
 
   private static final String FORM_VIEW = "identity/login";
 
-  private final AuthenticateWithPasswordUseCase useCase;
+  private final AuthenticateWithIdentifierUseCase useCase;
   private final OrganizationSocialLoginPolicyProvider policyProvider;
   private final AccountAuthenticationPolicyProvider authenticationPolicyProvider;
   private final ClientBrandingProvider clientBrandingProvider;
@@ -90,7 +89,7 @@ public class LoginController {
   // class-level suppressions already establish.
   @SuppressWarnings({"java:S107", "PMD.ExcessiveParameterList"})
   public LoginController(
-      final AuthenticateWithPasswordUseCase useCase,
+      final AuthenticateWithIdentifierUseCase useCase,
       final AuthenticatedSessionEstablisher sessions,
       final OrganizationSocialLoginPolicyProvider policyProvider,
       final RecordAccountLoginDeviceUseCase recordLoginDevice,
@@ -161,14 +160,13 @@ public class LoginController {
     try {
       account =
           useCase.handle(
-              new AuthenticateWithPasswordCommand(
-                  new OrganizationId(organizationId),
-                  new Email(form.getEmail()),
-                  form.getPassword()));
+              new AuthenticateWithIdentifierCommand(
+                  new OrganizationId(organizationId), form.getEmail(), form.getPassword()));
     } catch (final InvalidCredentialsException _) {
       // Deliberately one single, generic, form-level error — never field-scoped (that would
-      // itself leak "the email field was fine, it was the password" or vice versa), matching
-      // InvalidCredentialsException's own anti-enumeration design.
+      // itself leak "the identifier was fine, it was the password" or vice versa), matching
+      // InvalidCredentialsException's own anti-enumeration design. ADR-0032: the same error for an
+      // identifier of neither shape, or a username where username sign-in is off.
       model.addAttribute("loginError", true);
       addSignInOptions(organizationId, model, clientId, redirectUrl, display);
       return FORM_VIEW;
@@ -190,7 +188,8 @@ public class LoginController {
     }
 
     // TD-ARCH-016 (closed): used to be an identical, byte-for-byte-duplicated block against
-    // UsernameSignInController's own equivalent — see PrimaryFactorLoginCompletion's own Javadoc.
+    // the former UsernameSignInController's own equivalent — see PrimaryFactorLoginCompletion's own
+    // Javadoc.
     try {
       return PrimaryFactorLoginCompletion.completeAfterPrimaryFactor(
           loginPorts,

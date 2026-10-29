@@ -19,7 +19,7 @@ package com.clavaris.identity.infrastructure.adapter.in.web;
  */
 public enum PendingAuthenticationFactor {
 
-  /** {@link LoginController} (email+password) and {@link UsernameSignInController}. */
+  /** {@link LoginController} (email or username, plus password). */
   PASSWORD,
 
   /** {@link EmailCodeSignInController} and {@link EmailLinkSignInController}. */

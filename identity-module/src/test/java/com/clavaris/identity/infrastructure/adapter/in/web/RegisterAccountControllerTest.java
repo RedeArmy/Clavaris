@@ -448,7 +448,7 @@ class RegisterAccountControllerTest {
   // catch, such as a too-short value or one containing anything besides letters, digits,
   // underscore, or hyphen. Nothing here used to catch this exception, so it reached the
   // controller as an unhandled server error instead of a field-level message.
-  // UsernameSignInControllerTest's own equivalent test already proves the matching sign-in-side
+  // The sign-in side's equivalent test already proved the matching
   // gap closed. This proves the sign-up side.
   @Test
   void invalidUsernameShapeRerendersTheFormWithAFieldError() throws Exception {

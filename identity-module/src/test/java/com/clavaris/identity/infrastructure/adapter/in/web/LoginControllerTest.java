@@ -22,8 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordCommand;
-import com.clavaris.identity.application.usecase.authenticatewithpassword.AuthenticateWithPasswordUseCase;
+import com.clavaris.identity.application.usecase.authenticatewithidentifier.AuthenticateWithIdentifierCommand;
+import com.clavaris.identity.application.usecase.authenticatewithidentifier.AuthenticateWithIdentifierUseCase;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.EmailNotVerifiedException;
 import com.clavaris.identity.application.usecase.authenticatewithpassword.InvalidCredentialsException;
 import com.clavaris.identity.application.usecase.authenticatewithsocialprovider.OrganizationSocialLoginPolicyProvider;
@@ -65,7 +65,7 @@ class LoginControllerTest {
 
   private static final UUID ORGANIZATION_ID = UUID.randomUUID();
 
-  private AuthenticateWithPasswordUseCase useCase;
+  private AuthenticateWithIdentifierUseCase useCase;
   private AuthenticatedSessionEstablisher sessionEstablisher;
   private OrganizationSocialLoginPolicyProvider policyProvider;
   private RecordAccountLoginDeviceUseCase recordLoginDevice;
@@ -80,7 +80,7 @@ class LoginControllerTest {
 
   @BeforeEach
   void setUp() {
-    useCase = mock(AuthenticateWithPasswordUseCase.class);
+    useCase = mock(AuthenticateWithIdentifierUseCase.class);
     sessionEstablisher = mock(AuthenticatedSessionEstablisher.class);
     policyProvider = mock(OrganizationSocialLoginPolicyProvider.class);
     recordLoginDevice = mock(RecordAccountLoginDeviceUseCase.class);
@@ -295,10 +295,8 @@ class LoginControllerTest {
 
     verify(useCase)
         .handle(
-            new AuthenticateWithPasswordCommand(
-                new OrganizationId(ORGANIZATION_ID),
-                new Email("user@example.com"),
-                "correct-password"));
+            new AuthenticateWithIdentifierCommand(
+                new OrganizationId(ORGANIZATION_ID), "user@example.com", "correct-password"));
     // New-device login email notification — fired after a successful login, same accountId.
     verify(recordLoginDevice).handle(any());
   }
@@ -360,12 +358,14 @@ class LoginControllerTest {
             eq("https://app.example.com/dashboard"));
   }
 
+  // ADR-0032: the first field holds an email or a username, so its shape is judged by the use case
+  // (a generic rejection), not by the form; only an empty one is a form error.
   @Test
-  void invalidEmailRerendersTheFormWithoutCallingTheUseCase() throws Exception {
+  void aBlankIdentifierRerendersTheFormWithoutCallingTheUseCase() throws Exception {
     mockMvc
         .perform(
             post("/o/{organizationId}/login", ORGANIZATION_ID)
-                .param("email", "not-an-email")
+                .param("email", "  ")
                 .param("password", "some-password"))
         .andExpect(status().isOk())
         .andExpect(view().name("identity/login"))
@@ -374,6 +374,62 @@ class LoginControllerTest {
     verifyNoInteractions(useCase);
     verifyNoInteractions(sessionEstablisher);
     verifyNoInteractions(recordLoginDevice);
+  }
+
+  @Test
+  void aUsernameIsHandedToTheUseCaseAsTypedAndSignsInLikeAnEmail() throws Exception {
+    Account account = newAccount();
+    when(useCase.handle(any())).thenReturn(account);
+    when(sessionEstablisher.establish(
+            any(), any(), eq(account.id().value()), eq(false), anyString()))
+        .thenReturn("/o/" + ORGANIZATION_ID + "/login?authenticated");
+
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login", ORGANIZATION_ID)
+                .param("email", "ada_l")
+                .param("password", "correct-password"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login?authenticated"));
+
+    verify(useCase)
+        .handle(
+            new AuthenticateWithIdentifierCommand(
+                new OrganizationId(ORGANIZATION_ID), "ada_l", "correct-password"));
+  }
+
+  // The field is a plain email box where username sign-in is off, and one for either where it is
+  // on.
+  @Test
+  void theIdentifierFieldIsAnEmailBoxUnlessUsernameSignInIsOn() throws Exception {
+    final String off =
+        mockMvc
+            .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(off).contains("type=\"email\"").doesNotContain("Username or email");
+
+    when(authenticationPolicyProvider.policyFor(new OrganizationId(ORGANIZATION_ID)))
+        .thenReturn(
+            new AccountAuthenticationPolicySnapshot(
+                false,
+                EmailVerificationMethod.LINK,
+                false,
+                false,
+                false,
+                true,
+                true,
+                false,
+                false));
+    final String on =
+        mockMvc
+            .perform(get("/o/{organizationId}/login", ORGANIZATION_ID))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(on).contains("Username or email").contains("autocomplete=\"username\"");
+    assertThat(on).doesNotContain("href=\"login/username\"");
   }
 
   @Test

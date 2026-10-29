@@ -15,11 +15,10 @@ import java.util.UUID;
 /**
  * ADR-0024 §6: the shared "should this just-authenticated login be paused for a device-trust
  * step-up?" check every primary-factor controller ({@link LoginController}, {@link
- * UsernameSignInController}, {@link EmailCodeSignInController}, {@link EmailLinkSignInController})
- * runs right after its own {@code Authenticate*UseCase} succeeds and before calling {@link
- * AuthenticatedSessionEstablisher} — a stateless static utility, same shape as {@link DeviceCookie}
- * (no collaborating port holds state worth a Spring bean of its own; each caller already holds the
- * two ports this needs).
+ * EmailCodeSignInController}, {@link EmailLinkSignInController}) runs right after its own {@code
+ * Authenticate*UseCase} succeeds and before calling {@link AuthenticatedSessionEstablisher} — a
+ * stateless static utility, same shape as {@link DeviceCookie} (no collaborating port holds state
+ * worth a Spring bean of its own; each caller already holds the two ports this needs).
  *
  * <p>Recognition reuses the exact same primitive {@code RecordAccountLoginDeviceService} already
  * uses ({@link KnownDeviceRepository#findByAccountIdAndDeviceTokenHash}) — deliberately called
