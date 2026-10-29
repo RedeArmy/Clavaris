@@ -114,6 +114,31 @@ class SessionTaskChallengeControllerTest {
         .andExpect(status().is3xxRedirection());
   }
 
+  // ADR-0031: the "choose a username" pause must not open the forced password reset page — that
+  // page would let the person set a password nobody asked them to set.
+  @Test
+  void aPendingUsernameTaskCannotDriveThePasswordResetPage() throws Exception {
+    MockHttpSession session = pendingSessionFor(AccountId.newId(), "SOCIAL");
+    session.setAttribute(
+        SessionTaskPendingState.TASK_ATTRIBUTE, SessionTaskPendingState.TASK_USERNAME);
+
+    mockMvc
+        .perform(
+            get("/o/{organizationId}/login/session-task/password-reset", ORGANIZATION_ID)
+                .session(session))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/o/" + ORGANIZATION_ID + "/login"));
+    mockMvc
+        .perform(
+            post("/o/{organizationId}/login/session-task/password-reset", ORGANIZATION_ID)
+                .session(session)
+                .param("newPassword", "a-Str0ng-Password!")
+                .param("confirmPassword", "a-Str0ng-Password!"))
+        .andExpect(status().is3xxRedirection());
+
+    verifyNoInteractions(completeUseCase);
+  }
+
   @Test
   void getWithAPendingTaskShowsTheForm() throws Exception {
     MockHttpSession session = pendingSessionFor(AccountId.newId(), "PASSWORD");

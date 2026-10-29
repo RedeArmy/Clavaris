@@ -66,13 +66,42 @@ public final class SessionTaskGate {
       // TD-SEC-055: non-null only for factor == SOCIAL — same rationale as DeviceTrustGate's own
       // identical parameter.
       final SocialProvider provider) {
-    if (account.passwordResetRequiredAt().isEmpty()) {
+    return intercept(
+        request, organizationId, account, factor, clientId, redirectUrl, provider, false);
+  }
+
+  /**
+   * ADR-0031: as above, plus the "choose a username" task for a brand-new social sign-up that ended
+   * without one ({@code chooseUsername}, from {@code
+   * AuthenticateWithSocialProviderResult.LoggedIn#usernameNeeded}). A forced password reset takes
+   * precedence; the username is asked for only when it is the sole outstanding task.
+   */
+  @SuppressWarnings("java:S107")
+  public static Optional<String> intercept(
+      final HttpServletRequest request,
+      final UUID organizationId,
+      final Account account,
+      final PendingAuthenticationFactor factor,
+      final String clientId,
+      final String redirectUrl,
+      final SocialProvider provider,
+      final boolean chooseUsername) {
+    final String task;
+    final String path;
+    if (account.passwordResetRequiredAt().isPresent()) {
+      task = SessionTaskPendingState.TASK_PASSWORD_RESET;
+      path = "password-reset";
+    } else if (chooseUsername && account.username().isEmpty()) {
+      task = SessionTaskPendingState.TASK_USERNAME;
+      path = "username";
+    } else {
       return Optional.empty();
     }
 
     final HttpSession session = request.getSession(true);
     session.setAttribute(
         SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE, account.id().value().toString());
+    session.setAttribute(SessionTaskPendingState.TASK_ATTRIBUTE, task);
     session.setAttribute(SessionTaskPendingState.FACTOR_ATTRIBUTE, factor.name());
     session.setAttribute(
         SessionTaskPendingState.ORGANIZATION_ID_ATTRIBUTE, organizationId.toString());
@@ -86,6 +115,6 @@ public final class SessionTaskGate {
       session.setAttribute(SessionTaskPendingState.PROVIDER_ATTRIBUTE, provider.name());
     }
 
-    return Optional.of("/o/" + organizationId + "/login/session-task/password-reset");
+    return Optional.of("/o/" + organizationId + "/login/session-task/" + path);
   }
 }

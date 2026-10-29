@@ -12,7 +12,19 @@ import com.clavaris.identity.domain.model.AccountId;
  */
 public sealed interface AuthenticateWithSocialProviderResult {
 
-  record LoggedIn(AccountId accountId) implements AuthenticateWithSocialProviderResult {}
+  /**
+   * @param usernameNeeded ADR-0031: true only for a brand-new signup that ended without a username
+   *     (Google offers none, and a GitHub login can be unusable): the web adapter pauses the login
+   *     to ask for one before any session exists. Always false for a returning login.
+   */
+  record LoggedIn(AccountId accountId, boolean usernameNeeded)
+      implements AuthenticateWithSocialProviderResult {
+
+    /** A login that needs nothing further. */
+    public LoggedIn(final AccountId accountId) {
+      this(accountId, false);
+    }
+  }
 
   /**
    * A {@code PendingSocialLink} was raised and a confirmation email sent to the account's email of

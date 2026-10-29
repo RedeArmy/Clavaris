@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/consumer-head :: consumerHead('Choose a username')}">
+    <title>Choose a username</title>
+</head>
+<body>
+<main>
+    <div class="clavaris-card">
+        <h1>Choose a username</h1>
+        <p th:if="${usernameRequired}">Pick a username to finish creating your account.</p>
+        <p th:unless="${usernameRequired}">Pick a username for your account, or skip this for now.</p>
+
+        <form th:action="@{''}" th:object="${form}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div class="clavaris-field">
+                <label for="username">Username</label>
+                <input id="username" type="text" th:field="*{username}" autocomplete="username"
+                       pattern="[A-Za-z0-9_-]+" minlength="3" maxlength="32" required autofocus/>
+                <p class="clavaris-field-hint" th:unless="${#fields.hasErrors('username')}">3–32 characters: letters, numbers, underscores or hyphens</p>
+                <p class="clavaris-field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}">Username error</p>
+            </div>
+            <button class="clavaris-button" type="submit">Continue</button>
+        </form>
+
+        <form th:unless="${usernameRequired}" th:action="@{skip}" method="post">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button class="clavaris-button clavaris-button--secondary" type="submit">Skip for now</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

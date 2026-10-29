@@ -13,6 +13,9 @@ msgstr "{0} — Cuenta bloqueada"
 msgid "{0} — Check your email"
 msgstr "{0} — Revisa tu correo electrónico"
 
+msgid "{0} — Choose a username"
+msgstr "{0} — Elige un nombre de usuario"
+
 msgid "{0} — Confirm sign-in"
 msgstr "{0} — Confirmar inicio de sesión"
 

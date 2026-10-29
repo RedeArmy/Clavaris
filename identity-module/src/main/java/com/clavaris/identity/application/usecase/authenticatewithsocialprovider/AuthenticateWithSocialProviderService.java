@@ -13,10 +13,10 @@ import com.clavaris.identity.domain.model.Account;
 import com.clavaris.identity.domain.model.AccountStatus;
 import com.clavaris.identity.domain.model.PendingSocialLink;
 import com.clavaris.identity.domain.model.SocialIdentity;
-import com.clavaris.identity.domain.model.Username;
 import com.clavaris.identity.domain.service.RandomPasswordGenerator;
 import com.clavaris.identity.domain.service.RefreshTokenSecret;
 import com.clavaris.identity.domain.service.SocialLinkingPolicy;
+import com.clavaris.identity.domain.service.UsernameAllocator;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -321,7 +321,8 @@ public class AuthenticateWithSocialProviderService
             metrics.increment(
                 LOGIN_METRIC, PROVIDER_TAG, command.provider().name(), OUTCOME_TAG, "new_signup");
 
-            return new AuthenticateWithSocialProviderResult.LoggedIn(account.id());
+            return new AuthenticateWithSocialProviderResult.LoggedIn(
+                account.id(), account.username().isEmpty());
           });
     } catch (final DataIntegrityViolationException e) {
       // Code review finding, TOCTOU: handle()'s own existingAccount check and this transaction's
@@ -340,30 +341,21 @@ public class AuthenticateWithSocialProviderService
     }
   }
 
-  // ADR-0026: best-effort, never blocks the signup this method is called from. Two independent
-  // ways this can legitimately not assign a username, both silently skipped rather than failing
-  // the whole social signup over a cosmetic field: (1) command.username() itself fails Username's
-  // own shape/length validation (GitHub allows a 1-39 char login; Username requires 3-32) — a
-  // malformed input surfaces as absent, never an exception, same convention
-  // WorkspaceRoleClaimsCustomizer's own malformed-principal-name guard already documents; (2) the
-  // exact same username string is already taken by a different Account in this Organization — a
-  // pre-check, not a race-proof guarantee (a concurrent registration could still win the
-  // uniqueness constraint first), but good enough for a field nothing else in this flow depends on
-  // being set.
+  // ADR-0026/ADR-0031: best-effort, never blocks the signup this method is called from. The
+  // provider's name (a GitHub login) is used as is when free; when another Account of this
+  // Organization already has it, a number is appended (UsernameAllocator). A name Username itself
+  // rejects (GitHub allows 1-39 characters, Username 3-32) yields nothing rather than an exception
+  // or a rewrite, and so does a Google signup, which offers none: the account is then created
+  // without one and the person is asked to choose after signing in. The availability check is a
+  // pre-check, not a race-proof guarantee — the unique index on (organization_id, username) is the
+  // backstop.
   private void applySocialProviderUsernameIfAvailable(
       final Account account, final AuthenticateWithSocialProviderCommand command) {
-    if (command.username() == null) {
-      return;
-    }
-    final Username username;
-    try {
-      username = new Username(command.username());
-    } catch (final IllegalArgumentException _) {
-      return;
-    }
-    if (!accounts.existsByOrganizationIdAndUsername(command.organizationId(), username)) {
-      account.assignUsername(username);
-    }
+    UsernameAllocator.allocate(
+            command.username(),
+            candidate ->
+                accounts.existsByOrganizationIdAndUsername(command.organizationId(), candidate))
+        .ifPresent(account::assignUsername);
   }
 
   private AuthenticateWithSocialProviderResult raisePendingLinkForExistingAccount(

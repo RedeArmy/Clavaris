@@ -160,6 +160,11 @@ public class SessionTaskChallengeController {
     if (!organizationId.toString().equals(pendingOrgId)) {
       return Optional.empty();
     }
+    // ADR-0031: absent means a pause from before the attribute existed, which was always this one.
+    final Object pendingTask = session.getAttribute(SessionTaskPendingState.TASK_ATTRIBUTE);
+    if (pendingTask != null && !SessionTaskPendingState.TASK_PASSWORD_RESET.equals(pendingTask)) {
+      return Optional.empty();
+    }
     final Object rawAccountId = session.getAttribute(SessionTaskPendingState.ACCOUNT_ID_ATTRIBUTE);
     if (rawAccountId == null) {
       return Optional.empty();

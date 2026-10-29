@@ -410,6 +410,9 @@ msgstr "Elige un nombre para tu nuevo tenant aislado."
 msgid "Choose a new password"
 msgstr "Elige una contraseña nueva"
 
+msgid "Choose a username"
+msgstr "Elige un nombre de usuario"
+
 msgid "Choose image"
 msgstr "Elegir imagen"
 
@@ -574,6 +577,9 @@ msgstr "Pantalla de consentimiento"
 
 msgid "Consent screen setting changed"
 msgstr "Ajuste de la pantalla de consentimiento modificado"
+
+msgid "Continue"
+msgstr "Continuar"
 
 msgid "Copy"
 msgstr "Copiar"
@@ -757,6 +763,15 @@ msgstr "Nombre, usuario o correo electrónico"
 
 msgid "No matching users"
 msgstr "No hay usuarios que coincidan"
+
+msgid "Pick a username for your account, or skip this for now."
+msgstr "Elige un nombre de usuario para tu cuenta, o sáltate este paso por ahora."
+
+msgid "Pick a username to finish creating your account."
+msgstr "Elige un nombre de usuario para terminar de crear tu cuenta."
+
+msgid "Skip for now"
+msgstr "Omitir por ahora"
 
 msgid "When disabled, signing in again revokes every other active session for that Account."
 msgstr "Si se deshabilita, volver a iniciar sesión revoca el resto de las sesiones activas de esa cuenta."

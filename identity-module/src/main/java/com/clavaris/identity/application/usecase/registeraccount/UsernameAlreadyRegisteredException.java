@@ -14,4 +14,10 @@ public final class UsernameAlreadyRegisteredException extends RuntimeException {
   public UsernameAlreadyRegisteredException(final OrganizationId organizationId) {
     super("This username is already registered in organization " + organizationId.value());
   }
+
+  /** A lost race on the unique index, keeping the original failure as the cause. */
+  public UsernameAlreadyRegisteredException(
+      final OrganizationId organizationId, final Throwable cause) {
+    super("This username is already registered in organization " + organizationId.value(), cause);
+  }
 }
