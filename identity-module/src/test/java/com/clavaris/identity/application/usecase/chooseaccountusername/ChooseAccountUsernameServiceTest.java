@@ -69,11 +69,12 @@ class ChooseAccountUsernameServiceTest {
   @Test
   void rejectsAUsernameAnotherAccountOfTheSameOrganizationAlreadyHas() {
     when(accounts.existsByOrganizationIdAndUsername(
-            eq(account.organizationId()), eq(new Username("taken"))))
+            account.organizationId(), new Username("taken")))
         .thenReturn(true);
+    final ChooseAccountUsernameCommand taken = command("taken");
 
     assertThatExceptionOfType(UsernameAlreadyRegisteredException.class)
-        .isThrownBy(() -> service.handle(command("taken")));
+        .isThrownBy(() -> service.handle(taken));
 
     assertThat(account.username()).isEmpty();
     verify(accounts, never()).save(any());
@@ -85,17 +86,21 @@ class ChooseAccountUsernameServiceTest {
     doThrow(new DataIntegrityViolationException("ux_accounts_organization_id_username"))
         .when(accounts)
         .save(account);
+    final ChooseAccountUsernameCommand racing = command("racing");
 
     assertThatExceptionOfType(UsernameAlreadyRegisteredException.class)
-        .isThrownBy(() -> service.handle(command("racing")));
+        .isThrownBy(() -> service.handle(racing));
 
     verify(auditEvents, never()).write(any(), any(), any(), any(), any());
   }
 
   @Test
   void rejectsAShapeTheUsernameRuleDoesNotAllow() {
-    assertThatIllegalArgumentException().isThrownBy(() -> service.handle(command("no spaces")));
-    assertThatIllegalArgumentException().isThrownBy(() -> service.handle(command("ab")));
+    final ChooseAccountUsernameCommand withSpace = command("no spaces");
+    final ChooseAccountUsernameCommand tooShort = command("ab");
+
+    assertThatIllegalArgumentException().isThrownBy(() -> service.handle(withSpace));
+    assertThatIllegalArgumentException().isThrownBy(() -> service.handle(tooShort));
 
     verify(accounts, never()).save(any());
   }
@@ -117,11 +122,11 @@ class ChooseAccountUsernameServiceTest {
         Account.register(new OrganizationId(UUID.randomUUID()), new Email("ghost@example.com"));
     when(accounts.findById(other.id())).thenReturn(Optional.empty());
 
+    final ChooseAccountUsernameCommand forGhost =
+        new ChooseAccountUsernameCommand(
+            other.id(), "someone", AuditActor.account(other.id().value()));
+
     assertThatExceptionOfType(AccountNotFoundException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new ChooseAccountUsernameCommand(
-                        other.id(), "someone", AuditActor.account(other.id().value()))));
+        .isThrownBy(() -> service.handle(forGhost));
   }
 }

@@ -428,8 +428,10 @@ class LoginControllerTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertThat(on).contains("Username or email").contains("autocomplete=\"username\"");
-    assertThat(on).doesNotContain("href=\"login/username\"");
+    assertThat(on)
+        .contains("Username or email")
+        .contains("autocomplete=\"username\"")
+        .doesNotContain("href=\"login/username\"");
   }
 
   @Test

@@ -193,7 +193,7 @@ class CreateProductionEnvironmentServiceTest {
         saved =
             org.mockito.ArgumentCaptor.forClass(
                 com.clavaris.organization.domain.model.AccountAuthenticationPolicy.class);
-    org.mockito.Mockito.verify(authenticationPolicies).save(saved.capture());
+    verify(authenticationPolicies).save(saved.capture());
     org.assertj.core.api.Assertions.assertThat(saved.getValue().organizationId())
         .isEqualTo(result.organization().id());
     org.assertj.core.api.Assertions.assertThat(saved.getValue().usernameSignInEnabled()).isTrue();

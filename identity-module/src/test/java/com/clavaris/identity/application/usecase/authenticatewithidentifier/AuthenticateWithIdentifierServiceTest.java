@@ -79,25 +79,30 @@ class AuthenticateWithIdentifierServiceTest {
 
   @Test
   void aMalformedEmailIsTheSameRejectionAsAWrongPasswordAndNothingIsChecked() {
+    final AuthenticateWithIdentifierCommand malformed = command("not an@email");
+
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(() -> service.handle(command("not an@email")));
+        .isThrownBy(() -> service.handle(malformed));
 
     verifyNoInteractions(byEmail, byUsername);
   }
 
   @Test
   void aMalformedUsernameIsTheSameRejectionAsAWrongPassword() {
+    final AuthenticateWithIdentifierCommand withSpace = command("has space");
+    final AuthenticateWithIdentifierCommand tooShort = command("ab");
+    final AuthenticateWithIdentifierCommand blank = command("   ");
+    final AuthenticateWithIdentifierCommand absent =
+        new AuthenticateWithIdentifierCommand(organizationId, null, PASSWORD);
+
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(() -> service.handle(command("has space")));
+        .isThrownBy(() -> service.handle(withSpace));
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(() -> service.handle(command("ab")));
+        .isThrownBy(() -> service.handle(tooShort));
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(() -> service.handle(command("   ")));
+        .isThrownBy(() -> service.handle(blank));
     assertThatExceptionOfType(InvalidCredentialsException.class)
-        .isThrownBy(
-            () ->
-                service.handle(
-                    new AuthenticateWithIdentifierCommand(organizationId, null, PASSWORD)));
+        .isThrownBy(() -> service.handle(absent));
 
     verifyNoInteractions(byEmail, byUsername);
   }
@@ -110,10 +115,13 @@ class AuthenticateWithIdentifierServiceTest {
     when(byUsername.handle(org.mockito.ArgumentMatchers.any()))
         .thenThrow(new EmailNotVerifiedException());
 
+    final AuthenticateWithIdentifierCommand byEmailCommand = command("ada@example.com");
+    final AuthenticateWithIdentifierCommand byUsernameCommand = command("ada_l");
+
     assertThatExceptionOfType(EmailNotVerifiedException.class)
-        .isThrownBy(() -> service.handle(command("ada@example.com")));
+        .isThrownBy(() -> service.handle(byEmailCommand));
     assertThatExceptionOfType(EmailNotVerifiedException.class)
-        .isThrownBy(() -> service.handle(command("ada_l")));
+        .isThrownBy(() -> service.handle(byUsernameCommand));
   }
 
   @Test
@@ -121,8 +129,10 @@ class AuthenticateWithIdentifierServiceTest {
     when(byEmail.handle(org.mockito.ArgumentMatchers.any()))
         .thenThrow(new IllegalArgumentException("a real bug, not a bad shape"));
 
+    final AuthenticateWithIdentifierCommand command = command("ada@example.com");
+
     org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
-        .isThrownBy(() -> service.handle(command("ada@example.com")));
+        .isThrownBy(() -> service.handle(command));
     verify(byEmail).handle(org.mockito.ArgumentMatchers.any());
   }
 }

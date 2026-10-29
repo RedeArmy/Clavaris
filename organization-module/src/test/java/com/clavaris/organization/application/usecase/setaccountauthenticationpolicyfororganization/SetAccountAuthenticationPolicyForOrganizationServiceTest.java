@@ -128,7 +128,7 @@ class SetAccountAuthenticationPolicyForOrganizationServiceTest {
   }
 
   // ADR-0031: the sign-up form always offers a username, so requiring it or signing in with it
-  // needs no other switch (it used to be refused without usernameSignUpEnabled, now removed).
+  // needs no other switch. The removed sign-up switch used to be a precondition for both.
   @Test
   void acceptsUsernameRequiredAndUsernameSignInOnAnyPolicy() {
     UUID organizationId = UUID.randomUUID();

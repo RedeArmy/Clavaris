@@ -176,7 +176,7 @@ class CreateOrganizationServiceTest {
 
     final org.mockito.ArgumentCaptor<AccountAuthenticationPolicy> saved =
         org.mockito.ArgumentCaptor.forClass(AccountAuthenticationPolicy.class);
-    org.mockito.Mockito.verify(authenticationPolicies).save(saved.capture());
+    verify(authenticationPolicies).save(saved.capture());
     org.assertj.core.api.Assertions.assertThat(saved.getValue().organizationId())
         .isEqualTo(result.organization().id());
     org.assertj.core.api.Assertions.assertThat(saved.getValue().usernameSignInEnabled()).isTrue();
