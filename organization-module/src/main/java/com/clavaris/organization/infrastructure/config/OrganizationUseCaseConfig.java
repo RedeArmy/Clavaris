@@ -34,6 +34,7 @@ import com.clavaris.organization.application.usecase.listorganizationsforplatfor
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccount.ListOrganizationsForPlatformAccountUseCase;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedService;
 import com.clavaris.organization.application.usecase.listorganizationsforplatformaccountpaged.ListOrganizationsForPlatformAccountPagedUseCase;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.RateLimitPolicyRepository;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationService;
 import com.clavaris.organization.application.usecase.setratelimitpolicyfororganization.SetRateLimitPolicyForOrganizationUseCase;
@@ -93,6 +94,7 @@ class OrganizationUseCaseConfig {
       final PlatformAccountExistsChecker platformAccountExistsChecker,
       final AuditEventRecorder auditEvents,
       final RateLimitPolicyRepository policies,
+      final AccountAuthenticationPolicyRepository authenticationPolicies,
       @Value("${clavaris.rate-limit.capacity.development-default-requests-per-minute:300}")
           final int developmentDefaultRequestsPerMinute,
       @Value("${clavaris.rate-limit.capacity.hard-cap-requests-per-minute:6000}")
@@ -104,6 +106,7 @@ class OrganizationUseCaseConfig {
         platformAccountExistsChecker,
         auditEvents,
         policies,
+        authenticationPolicies,
         developmentDefaultRequestsPerMinute,
         hardSystemWideCap);
   }
@@ -116,8 +119,10 @@ class OrganizationUseCaseConfig {
   /* package */ CreateProductionEnvironmentUseCase createProductionEnvironmentUseCase(
       final OrganizationRepository organizations,
       final SigningKeyProvisioner keyProvisioner,
-      final AuditEventRecorder auditEvents) {
-    return new CreateProductionEnvironmentService(organizations, keyProvisioner, auditEvents);
+      final AuditEventRecorder auditEvents,
+      final AccountAuthenticationPolicyRepository authenticationPolicies) {
+    return new CreateProductionEnvironmentService(
+        organizations, keyProvisioner, auditEvents, authenticationPolicies);
   }
 
   @Bean

@@ -14,6 +14,7 @@ import com.clavaris.common.domain.model.AuditActor;
 import com.clavaris.organization.application.usecase.createorganization.OrganizationRepository;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner;
 import com.clavaris.organization.application.usecase.createorganization.SigningKeyProvisioner.ProvisionedSigningKey;
+import com.clavaris.organization.application.usecase.setaccountauthenticationpolicyfororganization.AccountAuthenticationPolicyRepository;
 import com.clavaris.organization.domain.model.Organization;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,7 @@ class CreateProductionEnvironmentServiceTest {
   private OrganizationRepository organizations;
   private SigningKeyProvisioner keyProvisioner;
   private AuditEventRecorder auditEvents;
+  private AccountAuthenticationPolicyRepository authenticationPolicies;
   private CreateProductionEnvironmentService service;
 
   @BeforeEach
@@ -35,7 +37,10 @@ class CreateProductionEnvironmentServiceTest {
     organizations = mock(OrganizationRepository.class);
     keyProvisioner = mock(SigningKeyProvisioner.class);
     auditEvents = mock(AuditEventRecorder.class);
-    service = new CreateProductionEnvironmentService(organizations, keyProvisioner, auditEvents);
+    authenticationPolicies = mock(AccountAuthenticationPolicyRepository.class);
+    service =
+        new CreateProductionEnvironmentService(
+            organizations, keyProvisioner, auditEvents, authenticationPolicies);
   }
 
   private Organization developmentOrganization() {
@@ -170,5 +175,27 @@ class CreateProductionEnvironmentServiceTest {
             "Organization",
             result.organization().id().toString(),
             "developmentOrganizationId=" + developmentOrganization.id());
+  }
+
+  // ADR-0032: the PRODUCTION sibling starts like any new Organization, with username sign-in on.
+  @Test
+  void theProductionSiblingStartsWithUsernameSignInEnabled() {
+    when(keyProvisioner.provisionFor(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(new ProvisionedSigningKey(UUID.randomUUID(), "a-kid", "RS256"));
+    Organization development = developmentOrganization();
+
+    CreateProductionEnvironmentResult result =
+        service.handle(
+            new CreateProductionEnvironmentCommand(
+                development.id(), "JobSeeker Production", ACTOR));
+
+    org.mockito.ArgumentCaptor<com.clavaris.organization.domain.model.AccountAuthenticationPolicy>
+        saved =
+            org.mockito.ArgumentCaptor.forClass(
+                com.clavaris.organization.domain.model.AccountAuthenticationPolicy.class);
+    org.mockito.Mockito.verify(authenticationPolicies).save(saved.capture());
+    org.assertj.core.api.Assertions.assertThat(saved.getValue().organizationId())
+        .isEqualTo(result.organization().id());
+    org.assertj.core.api.Assertions.assertThat(saved.getValue().usernameSignInEnabled()).isTrue();
   }
 }
