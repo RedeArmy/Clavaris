@@ -9,3 +9,8 @@ management:
 logging:
   level:
     com.clavaris: DEBUG
+
+# The one place the Swagger UI is served (see springdoc in application.yml).
+springdoc:
+  swagger-ui:
+    enabled: true

@@ -34,4 +34,29 @@
     <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin\-stdlib.*@.*$</packageUrl>
     <cve>CVE-2026-53914</cve>
   </suppress>
+  <suppress>
+    <notes><![CDATA[
+      Not reachable in this deployment: DOMPurify bundled inside swagger-ui (CVE-2026-116803 and
+      CVE-2026-116804, both fixed in DOMPurify 3.4.17). dependency-check finds it through the
+      swagger-ui webjar springdoc-openapi-starter-webmvc-ui pulls in; DOMPurify is compiled into
+      swagger-ui-bundle.js, so it cannot be upgraded on its own, and no swagger-ui release has the
+      fix yet (5.34.0, the latest checked 2026-10-29, bundles 3.4.16; 5.32.14, in use, bundles
+      3.4.13). The scanner scores both 10.0, while the public advisories rate them as XSS around
+      5.1 to 6.1 and NVD had not analysed them yet, so the number is probably a placeholder.
+
+      Why suppressing is honest: the bundle is only ever executed by the Swagger UI page, and that
+      page is disabled everywhere but the "dev" profile (springdoc.swagger-ui.enabled=false in
+      application.yml, true in application-dev.yml), which is never used in a deployment. The
+      vulnerable code ships in the jar but is never served. What DOMPurify would sanitise there is
+      the description text of our own OpenAPI document, generated from our own annotations, never
+      input from a user.
+
+      Self-expiring: the package URL matches only DOMPurify 3.4.10 to 3.4.16, so the day the
+      webjar ships 3.4.17 or later this entry stops matching and the scan covers it again. Revisit
+      it when springdoc or swagger-ui releases past that, and drop it then.
+    ]]></notes>
+    <packageUrl regex="true">^pkg:javascript/DOMPurify@3\.4\.(1[0-6])$</packageUrl>
+    <cve>CVE-2026-116803</cve>
+    <cve>CVE-2026-116804</cve>
+  </suppress>
 </suppressions>
